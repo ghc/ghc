@@ -439,6 +439,11 @@ deriving instance Data (Pat GhcPs)
 deriving instance Data (Pat GhcRn)
 deriving instance Data (Pat GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (ArgPat p)
+deriving instance Data (ArgPat GhcPs)
+deriving instance Data (ArgPat GhcRn)
+deriving instance Data (ArgPat GhcTc)
+
 deriving instance Data ConPatTc
 
 deriving instance Data (HsConPatTyArg GhcPs)

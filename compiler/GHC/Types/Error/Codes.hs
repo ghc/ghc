@@ -601,6 +601,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInvalidDefaultedTyVar"                     = 45625
   GhcDiagnosticCode "TcRnIllegalTermLevelUse"                       = 01928
   GhcDiagnosticCode "TcRnNamespacedWarningPragmaWithoutFlag"        = 14995
+  GhcDiagnosticCode "TcRnInvisPatWithNoForAll"                      = 14964
+  GhcDiagnosticCode "TcRnIllegalInvisibleTypePattern"               = 78249
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

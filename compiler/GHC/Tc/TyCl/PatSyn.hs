@@ -801,8 +801,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                       }
              body' = noLocA $
                      HsLam noAnn LamSingle $
-                     MG{ mg_alts = noLocA [mkSimpleMatch (LamAlt LamSingle)
-                                                         args body]
+                     MG{ mg_alts = noLocA [mkSimpleMatchArg (LamAlt LamSingle)
+                                                         (map mkRetainedVisPat args)
+                                                         body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
              match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id))) []
@@ -943,7 +944,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
           where
-            builder_args  = [L (l2l loc) (VarPat noExtField (L loc n))
+            builder_args  = [mkVisPat (L (l2l loc) (VarPat noExtField (L loc n)))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
@@ -958,7 +959,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
                            (L l [L loc match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
+      = mg { mg_alts = L l [L loc (match { m_pats = mkVisPat nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 

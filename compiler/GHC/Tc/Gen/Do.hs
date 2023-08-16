@@ -166,10 +166,10 @@ expand_do_stmts do_or_lc
   do expand_stmts <- expand_do_stmts do_or_lc lstmts
      -- NB: No need to wrap the expansion with an ExpandedStmt
      -- as we want to flatten the rec block statements into its parent do block anyway
-     return $ mkHsApps (wrapGenSpan bind_fun)                           -- (>>=)
-                      [ (wrapGenSpan mfix_fun) `mkHsApp` mfix_expr      -- (mfix (do block))
-                      , genHsLamDoExp do_or_lc [ mkBigLHsVarPatTup all_ids ]     --        (\ x ->
-                                       expand_stmts                  --               stmts')
+     return $ mkHsApps (wrapGenSpan bind_fun)                                           -- (>>=)
+                      [ (wrapGenSpan mfix_fun) `mkHsApp` mfix_expr                      -- (mfix (do block))
+                      , genHsLamDoExp do_or_lc [ mkVisPat $ mkBigLHsVarPatTup all_ids ] --        (\ x ->
+                                       expand_stmts                                     --               stmts')
                       ]
   where
     local_only_ids = local_ids \\ later_ids -- get unique local rec ids;
@@ -186,7 +186,7 @@ expand_do_stmts do_or_lc
     do_block     :: LHsExpr GhcRn
     do_block     = L loc $ HsDo noExtField do_or_lc do_stmts
     mfix_expr    :: LHsExpr GhcRn
-    mfix_expr    = genHsLamDoExp do_or_lc [ wrapGenSpan (LazyPat noExtField $ mkBigLHsVarPatTup all_ids) ]
+    mfix_expr    = genHsLamDoExp do_or_lc [ mkVisPat $ wrapGenSpan (LazyPat noExtField $ mkBigLHsVarPatTup all_ids) ]
                                           $ do_block
                              -- NB: LazyPat because we do not want to eagerly evaluate the pattern
                              -- and potentially loop forever
@@ -204,7 +204,7 @@ mk_failable_expr doFlav pat@(L loc _) expr fail_op =
 
      ; if irrf_pat                        -- don't wrap with fail block if
                                           -- the pattern is irrefutable
-       then return $ genHsLamDoExp doFlav [pat] expr
+       then return $ genHsLamDoExp doFlav [mkVisPat pat] expr
        else L loc <$> mk_fail_block doFlav pat expr fail_op
      }
 
@@ -213,12 +213,12 @@ mk_fail_block :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcR
 mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
       return $ HsLam noAnn LamSingle $ mkMatchGroup (doExpansionOrigin doFlav)     -- \
-                (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e               --  pat -> expr
+                (wrapGenSpan [ genHsCaseAltDoExp doFlav (mkVisPat pat) e           --  pat -> expr
                              , fail_alt_case dflags pat fail_op      --  _   -> fail "fail pattern"
                              ])
         where
           fail_alt_case :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LMatch GhcRn (LHsExpr GhcRn)
-          fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav genWildPat $
+          fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav (mkVisPat genWildPat) $
                                              L ploc (fail_op_expr dflags pat fail_op)
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn

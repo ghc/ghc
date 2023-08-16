@@ -126,28 +126,30 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
 -----------------
 tcMatchPats :: forall a.
                HsMatchContextRn
-            -> [LPat GhcRn]             -- ^ patterns
+            -> [LArgPat GhcRn]          -- ^ patterns
             -> [ExpPatType]             -- ^ types of the patterns
             -> TcM a                    -- ^ checker for the body
-            -> TcM ([LPat GhcTc], a)
+            -> TcM ([LArgPat GhcTc], a)
 -- See Note [tcMatchPats]
 --
 -- PRECONDITION:
---    number of visible Pats in pats
---      (@a is invisible)
---  = number of visible ExpPatTypes in pat_tys
---      (ExpForAllPatTy v is visible iff b is Required)
+--    number of visible pats::[LArgPat GhcRn]   (p is visible, @p is invisible)
+--      ==
+--    number of visible pat_tys::[ExpPatType]   (ExpFunPatTy is visible,
+--                                               ExpForAllPatTy b is visible iff b is Required)
 --
 -- POSTCONDITION:
---   Returns only the /value/ patterns; see Note [tcMatchPats]
+--   number and order of output [LArgPat GhcTc]
+--      ==
+--   number and order of input  [LArgPat GhcRn]
 
 tcMatchPats match_ctxt pats pat_tys thing_inside
-  = assertPpr (count isVisibleExpPatType pat_tys == length pats)
+  = assertPpr (count isVisibleExpPatType pat_tys == count (isVisArgPat . unLoc) pats)
               (ppr pats $$ ppr pat_tys) $
        -- Check PRECONDITION
        -- When we get @patterns the (length pats) will change
     do { err_ctxt <- getErrCtxt
-       ; let loop :: [LPat GhcRn] -> [ExpPatType] -> TcM ([LPat GhcTc], a)
+       ; let loop :: [LArgPat GhcRn] -> [ExpPatType] -> TcM ([LArgPat GhcTc], a)
 
              -- No more patterns.  Discard excess pat_tys;
              -- they should all be invisible.  Example:
@@ -163,28 +165,49 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
 
              -- ExpFunPatTy: expecting a value pattern
              -- tc_lpat will error if it sees a @t type pattern
-             loop (pat : pats) (ExpFunPatTy pat_ty : pat_tys)
+             loop (L l (VisPat _ pat) : pats) (ExpFunPatTy pat_ty : pat_tys)
                = do { (p, (ps, res)) <- tc_lpat pat_ty penv pat $
                                         loop pats pat_tys
-                    ; return (p:ps, res) }
+                    ; return (L l (VisPat Retained p) : ps, res) }
+                    -- This VisPat is Retained.
+                    -- See Note [Invisible binders in functions] in GHC.Hs.Pat
 
              -- ExpForAllPat: expecting a type pattern
-             loop (pat : pats) (ExpForAllPatTy bndr : pat_tys)
-               | Bndr tv vis <- bndr
+             loop all_pats@(L l apat : pats) (ExpForAllPatTy (Bndr tv vis) : pat_tys)
+               | VisPat _ pat <- apat
                , isVisibleForAllTyFlag vis
-               = do { (_p, (ps, res)) <- tc_forall_lpat tv penv pat $
+               = do { (p, (ps, res)) <- tc_forall_lpat tv penv pat $
                                         loop pats pat_tys
 
-                    ; return (ps, res) }
+                    ; return (L l (VisPat Erased p) : ps, res) }
+                    -- This VisPat is Erased.
+                    -- See Note [Invisible binders in functions] in GHC.Hs.Pat
 
-               -- Invisible forall in type, and an @a type pattern
-               -- Add an equation here when we have these
+               -- Invisible (Specified) forall in type, and an @a type pattern
                -- E.g.    f :: forall a. Bool -> a -> blah
                --         f @b True  x = rhs1  -- b is bound to skolem a
                --         f @c False y = rhs2  -- c is bound to skolem a
+               | InvisPat _ tp <- apat
+               , isSpecifiedForAllTyFlag vis
+               = do { (p, (ps, res)) <- tc_ty_pat tp tv $
+                                        loop pats pat_tys
+                    ; return (L l (InvisPat p tp) : ps, res) }
 
                | otherwise  -- Discard invisible pat_ty
-               = loop (pat:pats) pat_tys
+               = loop all_pats pat_tys
+
+             -- This case handles the user error when an InvisPat is used
+             -- without a corresponding invisible (Specified) forall in the type
+             -- E.g. 1.  f :: Int
+             --          f @a = ...   -- loop (InvisPat{} : _) []
+             --      2.  f :: Int -> Int
+             --          f @a x = ... -- loop (InvisPat{} : _) (ExpFunPatTy{} : _)
+             --      3.  f :: forall a -> Int
+             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Required) : _)
+             --      4.  f :: forall {a}. Int
+             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Inferred) : _)
+             loop (L loc (InvisPat _ tp) : _) _ =
+                failAt (locA loc) (TcRnInvisPatWithNoForAll tp)
 
              loop pats@(_:_) [] = pprPanic "tcMatchPats" (ppr pats)
                     -- Failure of PRECONDITION
@@ -236,11 +259,6 @@ It takes the list of patterns writen by the user, but it returns only the
 /value/ patterns.  For example:
      f :: forall a. forall b -> a -> Mabye b -> blah
      f @a w x (Just y) = ....
-tcMatchPats returns only the /value/ patterns [x, Just y].  Why?  The
-desugarer expects only value patterns.  (We could change that, but we would
-have to do so carefullly.)  However, distinguishing value patterns from type
-patterns is a bit tricky; e.g. the `w` in this example.  So it's very
-convenient to filter them out right here.
 
 
 ************************************************************************

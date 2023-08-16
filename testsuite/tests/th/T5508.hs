@@ -5,5 +5,6 @@ module T5508 where
 import Language.Haskell.TH
 
 thb = $(do { let x = mkName "x"
-                 v = return (LamE [VarP x] $ VarE x)
+                 p = VarP x
+                 v = return (LamE [VisAP p] $ VarE x)
            ; [| $v . id |] })

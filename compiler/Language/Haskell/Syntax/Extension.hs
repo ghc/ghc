@@ -612,6 +612,14 @@ type family XCoPat       x
 type family XXPat        x
 type family XHsFieldBind x
 
+
+-- =====================================================================
+-- Type families for the ArgPat extension points
+
+type family XVisPat      x
+type family XInvisPat    x
+type family XXArgPat     x
+
 -- =====================================================================
 -- Type families for the HsTypes type families
 

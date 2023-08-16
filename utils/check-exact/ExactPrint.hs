@@ -4733,6 +4733,24 @@ instance ExactPrint (Pat GhcPs) where
 
 -- ---------------------------------------------------------------------
 
+instance ExactPrint (ArgPat GhcPs) where
+  getAnnotationEntry (VisPat _ pat) = getAnnotationEntry pat
+  getAnnotationEntry InvisPat{}     = NoEntryVal
+
+  setAnnotationAnchor (VisPat x pat) anc ts cs = VisPat x (setAnnotationAnchor pat anc ts cs)
+  setAnnotationAnchor a@(InvisPat _ _) _ _ _   = a
+
+  exact (VisPat x pat) = do
+    pat' <- markAnnotated pat
+    pure (VisPat x pat')
+
+  exact (InvisPat tokat tp) = do
+    tokat' <- markEpToken tokat
+    tp' <- markAnnotated tp
+    pure (InvisPat tokat' tp')
+
+-- ---------------------------------------------------------------------
+
 instance ExactPrint (HsPatSigType GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a

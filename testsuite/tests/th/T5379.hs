@@ -4,7 +4,7 @@ module Main where
 import Language.Haskell.TH
 
 $( [d| g = 0
-       h = $( return $ LamE [VarP (mkName "g")] (VarE 'g) ) |] )
+       h = $( return $ LamE [VisAP $ VarP (mkName "g")] (VarE 'g) ) |] )
          -- The 'g should bind to the g=0 definition
 
 -- Should print 0, not 1!

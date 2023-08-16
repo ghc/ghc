@@ -10,6 +10,12 @@
 
   * Extend `Pragma` with `SCCP`.
 
+  * Added new data type `ArgPat` with two constructors: `VisAP` and `InvisAP`.
+    The first one corresponds to the common patterns, and the second one is a type
+    abstraction `@t`. Were introduced new functions `visAP` ans `invisAP`. Was
+    introduced new type alias `ArgPatQ`. Added new function `pprArgPat`. Constructors
+    `Clause` and `LamE`, now use `ArgPat` instead of `Pat`. New functions `clauseArg` and `lamArgE` were added, both of which accept `[m ArgPat]`. (Ghc Proposal #448).
+
 ## 2.21.0.0
 
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of

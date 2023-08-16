@@ -9,7 +9,7 @@ class C a where
 mkC :: Name -> Q [Dec]
 mkC n = return
   [InstanceD Nothing [] (AppT (ConT ''C) (ConT n))
-    [ FunD 'inlinable [Clause [WildP] (NormalB (ConE '())) []],
-      PragmaD (InlineP 'inlinable Inline FunLike AllPhases)    
-    ] 
+    [ FunD 'inlinable [Clause [VisAP WildP] (NormalB (ConE '())) []],
+      PragmaD (InlineP 'inlinable Inline FunLike AllPhases)
+    ]
   ]

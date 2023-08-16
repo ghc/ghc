@@ -40,6 +40,7 @@ type CodeQ = Code Q
 
 type InfoQ               = Q Info
 type PatQ                = Q Pat
+type ArgPatQ             = Q ArgPat
 type FieldPatQ           = Q FieldPat
 type ExpQ                = Q Exp
 type DecQ                = Q Dec
@@ -168,6 +169,14 @@ viewP e p = do e' <- e
                p' <- p
                pure (ViewP e' p')
 
+visAP :: Quote m => m Pat -> m ArgPat
+visAP p = do p' <- p
+             pure (VisAP p')
+
+invisAP :: Quote m => m Type -> m ArgPat
+invisAP t = do t' <- t
+               pure (InvisAP t')
+
 fieldPat :: Quote m => Name -> m Pat -> m FieldPat
 fieldPat n p = do p' <- p
                   pure (n, p')
@@ -244,11 +253,13 @@ match p rhs ds = do { p' <- p;
 
 -- | Use with 'funD'
 clause :: Quote m => [m Pat] -> m Body -> [m Dec] -> m Clause
-clause ps r ds = do { ps' <- sequenceA ps;
-                      r' <- r;
-                      ds' <- sequenceA ds;
-                      pure (Clause ps' r' ds') }
+clause ps = clauseArg (fmap visAP ps)
 
+clauseArg :: Quote m => [m ArgPat] -> m Body -> [m Dec] -> m Clause
+clauseArg ps r ds = do { ps' <- sequenceA ps;
+                         r' <- r;
+                         ds' <- sequenceA ds;
+                         pure (Clause ps' r' ds') }
 
 ---------------------------------------------------------------------------
 -- *   Exp
@@ -296,9 +307,12 @@ sectionR :: Quote m => m Exp -> m Exp -> m Exp
 sectionR x y = infixE Nothing x (Just y)
 
 lamE :: Quote m => [m Pat] -> m Exp -> m Exp
-lamE ps e = do ps' <- sequenceA ps
-               e' <- e
-               pure (LamE ps' e')
+lamE ps = lamArgE (fmap visAP ps)
+
+lamArgE  :: Quote m => [m ArgPat] -> m Exp -> m Exp
+lamArgE ps e = do ps' <- sequenceA ps
+                  e' <- e
+                  pure (LamE ps' e')
 
 -- | Single-arg lambda
 lam1E :: Quote m => m Pat -> m Exp -> m Exp

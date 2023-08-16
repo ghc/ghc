@@ -785,7 +785,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
                             selectMatchVars (zipWithEqual "matchWrapper"
                                               (\a b -> (scaledMult a, unLoc b))
                                                 arg_tys
-                                                (hsLMatchPats m))
+                                                (filterOutErasedPats $ hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
@@ -819,7 +819,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
-           ; let upats = map (decideBangHood dflags) pats
+           ; let upats = map (decideBangHood dflags) (filterOutErasedPats pats)
            -- pat_nablas is the covered set *after* matching the pattern, but
            -- before any of the GRHSs. We extend the environment with pat_nablas
            -- (via updPmNablas) so that the where-clause of 'grhss' can profit
@@ -844,11 +844,13 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
       $ replicate (length (grhssGRHSs m)) ldi_nablas
 
     is_pat_syn_match :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
-    is_pat_syn_match origin (L _ (Match _ _ [l_pat] _)) | isDoExpansionGenerated origin = isPatSyn l_pat
+    is_pat_syn_match origin (L _ (Match _ _ [L _ (VisPat _ l_pat)] _)) | isDoExpansionGenerated origin
+                         = isPatSyn l_pat
     is_pat_syn_match _ _ = False
     -- generated match pattern that is not a wildcard
     non_gen_wc :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
-    non_gen_wc origin (L _ (Match _ _ ([L _ (WildPat _)]) _)) = not . isDoExpansionGenerated $ origin
+    non_gen_wc origin (L _ (Match _ _ ([L _ (VisPat _ (L _ (WildPat _)))]) _))
+                   = not . isDoExpansionGenerated $ origin
     non_gen_wc _ _ = True
 
 {- Note [Long-distance information in matchWrapper]

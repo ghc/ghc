@@ -1899,6 +1899,12 @@ instance Diagnostic TcRnMessage where
           WarningTxt{} -> text "WARNING"
           DeprecatedTxt{} -> text "DEPRECATED"
 
+    TcRnIllegalInvisibleTypePattern tp -> mkSimpleDecorated $
+      text "Illegal invisible type pattern:" <+> ppr tp
+
+    TcRnInvisPatWithNoForAll tp -> mkSimpleDecorated $
+      text "Invisible type pattern" <+> ppr tp <+> text "has no associated forall"
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2524,6 +2530,10 @@ instance Diagnostic TcRnMessage where
     TcRnInvalidDefaultedTyVar{}
       -> ErrorWithoutFlag
     TcRnNamespacedWarningPragmaWithoutFlag{}
+      -> ErrorWithoutFlag
+    TcRnIllegalInvisibleTypePattern{}
+      -> ErrorWithoutFlag
+    TcRnInvisPatWithNoForAll{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3185,6 +3195,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNamespacedWarningPragmaWithoutFlag{}
       -> [suggestExtension LangExt.ExplicitNamespaces]
+    TcRnIllegalInvisibleTypePattern{}
+      -> [suggestExtension LangExt.TypeAbstractions]
+    TcRnInvisPatWithNoForAll{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

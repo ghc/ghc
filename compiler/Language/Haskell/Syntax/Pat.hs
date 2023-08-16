@@ -20,7 +20,8 @@
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
         Pat(..), LPat,
-        ConLikeP,
+        ConLikeP, ArgPat(..), LArgPat, isInvisArgPat,
+        isVisArgPat, mapVisPat,
 
         HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
         HsConPatTyArg(..), XConPatTyArg,
@@ -234,6 +235,30 @@ type family ConLikeP x
 data HsConPatTyArg p = HsConPatTyArg !(XConPatTyArg p) (HsTyPat p)
 
 type family XConPatTyArg p
+
+-- | A pattern to be used in a sequence of patterns, like what appears
+-- to the right of @f@ in @f a b True = ...@. A 'ArgPat' allows for the
+-- possibility of binding a /type variable/ with \@.
+data ArgPat pass -- See Note [Invisible binders in functions] in GHC.Hs.Pat
+  = VisPat (XVisPat pass) (LPat pass)
+  | InvisPat (XInvisPat pass) (HsTyPat (NoGhcTc pass))
+  | XArgPat !(XXArgPat pass)
+
+isInvisArgPat :: ArgPat p -> Bool
+isInvisArgPat InvisPat{} = True
+isInvisArgPat VisPat{}   = False
+isInvisArgPat XArgPat{}  = False
+
+isVisArgPat :: ArgPat pass -> Bool
+isVisArgPat VisPat{}   = True
+isVisArgPat InvisPat{} = False
+isVisArgPat XArgPat{}  = False
+
+mapVisPat :: (LPat pass -> LPat pass) -> ArgPat pass -> ArgPat pass
+mapVisPat f (VisPat x pat) = VisPat x (f pat)
+mapVisPat _ arg_pat = arg_pat
+
+type LArgPat pass =  XRec pass (ArgPat pass)
 
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (HsConPatTyArg (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))

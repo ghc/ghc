@@ -94,6 +94,107 @@ already be in scope, and so are always new variables that only bind whatever typ
 matched, rather than ever referring to a variable from an outer scope. Type wildcards
 ``_`` may be used in any place where no new variable needs binding.
 
+.. _type-abstractions-in-functions:
+
+Type Abstractions in Functions
+------------------------------
+
+Type abstraction syntax can be used in lambdas and function left-hand sides to
+bring into scope type variables associated with invisible ``forall``.
+For example::
+
+    id :: forall a. a -> a
+    id @t x = x :: t
+
+Here type variables ``t`` and ``a`` stand for the same type, i.e. the first and
+only type argument of ``id``. In a call ``id @Int`` we have ``a = Int``, ``t = Int``.
+The difference is that ``a`` is in scope in the type signature, while ``t`` is
+in scope in the function equation.
+
+The scope of ``a`` can be extended to cover the function equation as well by
+enabling :extension:`ScopedTypeVariables`. Using a separate binder like ``@t``
+is the modern and more flexible alternative for that, capable of handling
+higher-rank scenarios (see the ``higherRank`` example below).
+
+When multiple variables are bound with ``@``-binders, they are matched
+left-to-right with the corresponding forall-bound variables in the type
+signature::
+
+    const :: forall a. forall b. a -> b -> a
+    const @ta @tb x  = x
+
+In this example, ``@ta`` corresponds to ``forall a.`` and ``@tb`` to
+``forall b.``. It is also possible to use ``@``-binders in combination with
+implicit quantification (i.e. no explicit forall in the signature)::
+
+    const :: a -> b -> a
+    const @ta @tb x  = x
+
+In such cases, type variables in the signature are considered to be quantified
+with an implicit ``forall`` in the order in which they appear in the signature,
+c.f. :extension:`TypeApplications`.
+
+It is not possible to match against a specific type (such as ``Maybe`` or
+``Int``) in an ``@``-binder. The binder must be irrefutable, i.e. it may take
+one of the following forms:
+
+    * type variable pattern ``@a``
+    * type variable pattern with a kind annotation ``@(f :: Type -> Type)``
+    * wildcard ``@_``, with or without a kind annotation
+
+The main advantage to using ``@``-binders over :extension:`ScopedTypeVariables`
+is the ability to use them in lambdas passed to higher-rank functions::
+
+    higherRank :: (forall a. (Num a, Bounded a) => a -> a) -> (Int8, Int16)
+    higherRank f = (f 42, f 42)
+
+    ex :: (Int8, Int16)
+    ex = higherRank (\ @a x -> maxBound @a - x )
+                       -- @a-binder in a lambda pattern in an argument
+                       -- to a higher-order function
+
+At the moment, an ``@``-binder is valid only in a limited set of circumstances:
+
+* In a function left-hand side, where the function must have an explicit
+  type signature::
+
+    f1 :: forall a. a -> forall b. b -> (a, b)
+    f1 @a x @b y = (x :: a, y :: b)        -- OK
+
+  It would be illegal to omit the type signature for ``f``, nor is it
+  possible to move the binder to a lambda on the RHS::
+
+    f2 :: forall a. a -> forall b. b -> (a, b)
+    f2 = \ @a x @b y -> (x :: a, y :: b)   -- ILLEGAL
+
+* In a lambda annotated with an inline type signature:
+  ::
+
+    f3 = (\ @a x @b y -> (x :: a, y :: b) )      -- OK
+        :: forall a. a -> forall b. b -> (a, b)
+
+* In a lambda used as an argument to a higher-rank function or data
+  constructor::
+
+    h :: (forall a. a -> forall b. b -> (a, b)) -> (Int, Bool)
+    h = ...
+
+    f4 = h (\ @a x @b y -> (x :: a, y :: b))     -- OK
+
+* In a lambda used as a field of a data structure (e.g. a list item), whose type
+  is impredicative (see :extension:`ImpredicativeTypes`)::
+
+    f5 :: [forall a. a -> a -> a]
+    f5 = [ \ @a x _ -> x :: a,
+           \ @a _ y -> y :: a ]
+
+* In a lambda of multiple arguments, where the first argument is visible, and
+  only if :extension:`DeepSubsumption` is off::
+
+    {-# LANGUAGE NoDeepSubsumption #-}
+    f6 :: () -> forall a. a -> (a, a)
+    f6 = \ _ @a x -> (x :: a, x)   -- OK
+
 .. _invisible-binders-in-type-declarations:
 
 Invisible Binders in Type Declarations

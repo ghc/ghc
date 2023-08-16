@@ -172,7 +172,7 @@ do
   let defBang = bang noSourceUnpackedness noSourceStrictness
   patSynVarName <- newName "a"
   sequenceA
-    [ funD_doc (mkName "qux") [clause [ [p| a |], [p| b |] ] (normalB [e| () |]) []]
+    [ funD_doc (mkName "qux") [clause [[p| a |], [p| b |] ] (normalB [e| () |]) []]
         (Just "This is qux") [Just "Arg uno", Just "Arg dos"]
 
     , dataD_doc (cxt []) (mkName "Quux") [] Nothing

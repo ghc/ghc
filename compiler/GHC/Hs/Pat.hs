@@ -22,7 +22,8 @@
 -}
 
 module GHC.Hs.Pat (
-        Pat(..), LPat,
+        Pat(..), LPat, ArgPat(..), LArgPat,
+        isInvisArgPat, isVisArgPat, mapVisPat,
         EpAnnSumPat(..),
         ConPatTc (..),
         ConLikeP,
@@ -38,17 +39,20 @@ module GHC.Hs.Pat (
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
-        mkPrefixConPat, mkCharLitPat, mkNilPat,
+        mkPrefixConPat, mkCharLitPat, mkNilPat, mkVisPat, mkVisPatX,
+        mkRetainedVisPat,
+
+        Erasure(..),
 
         isSimplePat, isPatSyn,
         looksLazyPatBind,
         isBangedLPat,
-        gParPat, patNeedsParens, parenthesizePat,
+        gParPat, patNeedsParens, parenthesizePat, parenthesizeLArgPat,
         isIrrefutableHsPatHelper, isIrrefutableHsPatHelperM, isBoringHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
 
-        pprParendLPat, pprConArgs,
+        pprParendLArgPat, pprParendLPat, pprConArgs,
         pprLPat
     ) where
 
@@ -182,6 +186,87 @@ type instance XConPatTyArg GhcTc = NoExtField
 
 type instance XHsFieldBind _ = [AddEpAnn]
 
+type instance XVisPat GhcPs = NoExtField
+type instance XVisPat GhcRn = NoExtField
+type instance XVisPat GhcTc = Erasure
+
+type instance XInvisPat GhcPs = EpToken "@"
+type instance XInvisPat GhcRn = NoExtField
+type instance XInvisPat GhcTc = Type
+
+type instance XXArgPat (GhcPass _) = DataConCantHappen
+
+-- Erasure is the property of an argument that determines whether the argument
+-- is erased at compile-time or retained in runtime (GHC Proposal #378).
+--
+--   Erased   <=> the pattern corresponds to a forall-bound variable,
+--                e.g. f :: forall a -> blah
+--                     f pat = ...    -- pat is erased
+--
+--   Retained <=> the pattern corresponds to a function argument,
+--                e.g. f :: Int -> blah
+--                     f pat = ...    -- pat is retained
+--
+-- See Note [Invisible binders in functions]
+data Erasure = Erased | Retained
+  deriving (Data)
+
+{- Note [Invisible binders in functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC Proposal #448 (section 1.5 Type arguments in lambda patterns) introduces
+binders for invisible type arguments (@a-binders) in function equations and
+lambdas, e.g.
+
+  1.  {-# LANGUAGE TypeAbstractions #-}
+      id1 :: a -> a
+      id1 @t x = x :: t     -- @t-binder on the LHS of a function equation
+
+  2.  {-# LANGUAGE TypeAbstractions #-}
+      ex :: (Int8, Int16)
+      ex = higherRank (\ @a x -> maxBound @a - x )
+                            -- @a-binder in a lambda pattern in an argument
+                            -- to a higher-order function
+      higherRank :: (forall a. (Num a, Bounded a) => a -> a) -> (Int8, Int16)
+      higherRank f = (f 42, f 42)
+
+In the AST, patterns in function equations and lambdas are represented with
+ArgPat, which is roughly equivalent to:
+    data ArgPat p
+      = VisPat   (LPat p)
+      | InvisPat (LHsType p)
+
+Each pattern is either visible (not prefixed with @) or invisible (prefixed with @):
+    f :: forall a. forall b -> forall c. Int -> ...
+    f @a b @c x  = ...
+
+In this example, the arg-patterns are
+    1. InvisPat @a     -- in the type sig: forall a.
+    2. VisPat b        -- in the type sig: forall b ->
+    3. InvisPat @c     -- in the type sig: forall c.
+    4. VisPat x        -- in the type sig: Int ->
+
+Invisible patterns are always type patterns, i.e. they are matched with
+forall-bound type variables in the signature. Consequently, those variables (and
+their binders) are erased during compilation, having no effect on program
+execution at runtime.
+
+Visible patterns, on the other hand, may be matched with ordinary function
+arguments (Int ->) as well as required type arguments (forall b ->). This means
+that a visible pattern may either be erased or retained, and we only find out in
+the type checker, namely in tcMatchPats, where we match up all arg-patterns with
+quantifiers from the type signature.
+
+In other words, invisible patterns are always /erased/, while visible patterns
+are sometimes /erased/ and sometimes /retained/. To record this distinction, we
+store a flag in XVisPat:
+  data Erasure = Erased | Retained
+  type instance XVisPat GhcTc = Erasure
+
+The desugarer has no use for erased patterns, as the type checker generates
+HsWrappers to bind the corresponding type variables. Erased patterns are simply
+discarded by calling filterOutErasedPats.
+-}
+
 -- ---------------------------------------------------------------------
 
 -- API Annotations types
@@ -310,6 +395,15 @@ pprPatBndr var
       True -> parens (pprBndr LambdaBind var) -- Could pass the site to pprPat
                                               -- but is it worth it?
       False -> pprPrefixOcc var
+
+instance OutputableBndrId p => Outputable (ArgPat (GhcPass p)) where
+    ppr (InvisPat _ tvb) = char '@' <> ppr tvb
+    ppr (VisPat _ lpat)  = ppr lpat
+
+pprParendLArgPat :: (OutputableBndrId p)
+              => PprPrec -> LArgPat (GhcPass p) -> SDoc
+pprParendLArgPat p (L _ (VisPat _ lpat))    = pprParendLPat p lpat
+pprParendLArgPat _ (L _ (InvisPat _ typat)) = char '@' <> ppr typat
 
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
@@ -448,6 +542,19 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 mkCharLitPat :: SourceText -> Char -> LPat GhcTc
 mkCharLitPat src c = mkPrefixConPat charDataCon
                           [noLocA $ LitPat noExtField (HsCharPrim src c)] []
+
+-- | A helper function that constructs an argument pattern (LArgPat) from a pattern (LPat)
+mkVisPat :: XVisPat (GhcPass pass) ~ NoExtField => LPat (GhcPass pass) -> LArgPat (GhcPass pass)
+mkVisPat = mkVisPatX noExtField
+
+mkVisPatX :: XVisPat (GhcPass pass) -> LPat (GhcPass pass) -> LArgPat (GhcPass pass)
+mkVisPatX x lpat = L (getLoc lpat) (VisPat x lpat)
+
+mkRetainedVisPat :: forall pass. IsPass pass => LPat (GhcPass pass) -> LArgPat (GhcPass pass)
+mkRetainedVisPat = case ghcPass @pass of
+  GhcPs -> mkVisPat
+  GhcRn -> mkVisPat
+  GhcTc -> mkVisPatX Retained
 
 {-
 ************************************************************************
@@ -850,6 +957,14 @@ parenthesizePat p lpat@(L loc pat)
   | patNeedsParens p pat = L loc (gParPat lpat)
   | otherwise            = lpat
 
+
+parenthesizeLArgPat :: IsPass p
+                   => PprPrec
+                   -> LArgPat (GhcPass p)
+                   -> LArgPat (GhcPass p)
+parenthesizeLArgPat p (L l (VisPat x lpat))   = L l (VisPat x (parenthesizePat p lpat))
+parenthesizeLArgPat _ argpat@(L _ InvisPat{}) = argpat
+
 {-
 % Collect all EvVars from all constructor patterns
 -}
@@ -896,6 +1011,7 @@ collectEvVarsPat pat =
 -}
 
 type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
+type instance Anno (ArgPat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = EpAnnCO
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
