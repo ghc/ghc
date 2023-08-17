@@ -38,10 +38,11 @@ instance NFData   ArMode
 runAr :: FilePath    -- ^ path to @ar@
       -> [String]    -- ^ other arguments
       -> [FilePath]  -- ^ input file paths
+      -> [CmdOption] -- ^ Additional options
       -> Action ()
-runAr arPath flagArgs fileArgs = withTempFile $ \tmp -> do
+runAr arPath flagArgs fileArgs buildOptions = withTempFile $ \tmp -> do
     writeFile' tmp $ unwords fileArgs
-    cmd [arPath] flagArgs ('@' : tmp)
+    cmd [arPath] flagArgs ('@' : tmp) buildOptions
 
 -- | Invoke @ar@ given a path to it and a list of arguments. Note that @ar@
 -- will be called multiple times if the list of files to be archived is too
@@ -50,7 +51,8 @@ runAr arPath flagArgs fileArgs = withTempFile $ \tmp -> do
 runArWithoutTempFile :: FilePath    -- ^ path to @ar@
                      -> [String]    -- ^ other arguments
                      -> [FilePath]  -- ^ input file paths
+                     -> [CmdOption] -- ^ Additional options
                      -> Action ()
-runArWithoutTempFile arPath flagArgs fileArgs =
+runArWithoutTempFile arPath flagArgs fileArgs buildOptions =
     forM_ (chunksOfSize cmdLineLengthLimit fileArgs) $ \argsChunk ->
-        unit . cmd [arPath] $ flagArgs ++ argsChunk
+        unit (cmd [arPath] (flagArgs ++ argsChunk) buildOptions)
