@@ -6,7 +6,8 @@ import GHC.Core.Class (classMinimalDef)
 import GHC.Core.TyCo.FVs (tyConsOfType)
 import GHC.Driver.Ppr (showSDocForUser)
 import GHC.Unit.State (lookupUnitId, lookupPackageName)
-import GHC.Unit.Info (UnitInfo, unitExposedModules, PackageName(..))
+import GHC.Unit.Info (UnitInfo, unitExposedModules, unitId, PackageName(..))
+import GHC.Unit.Types (UnitId)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Env (hsc_units, hscEPS)
 import GHC.Utils.Outputable
@@ -163,14 +164,14 @@ reportUnitDecls :: UnitInfo -> Ghc SDoc
 reportUnitDecls unit_info = do
     let exposed :: [ModuleName]
         exposed = map fst (unitExposedModules unit_info)
-    vcat <$> mapM reportModuleDecls exposed
+    vcat <$> mapM (reportModuleDecls $ unitId unit_info) exposed
 
-reportModuleDecls :: ModuleName -> Ghc SDoc
-reportModuleDecls modl_nm
+reportModuleDecls :: UnitId -> ModuleName -> Ghc SDoc
+reportModuleDecls unit_id modl_nm
   | modl_nm `elem` ignoredModules = do
       return $ vcat [ mod_header, text "-- ignored", text "" ]
   | otherwise = do
-    modl <- GHC.lookupQualifiedModule NoPkgQual modl_nm
+    modl <- GHC.lookupQualifiedModule (OtherPkg unit_id) modl_nm
     mb_mod_info <- GHC.getModuleInfo modl
     mod_info <- case mb_mod_info of
       Nothing -> fail "Failed to find module"
