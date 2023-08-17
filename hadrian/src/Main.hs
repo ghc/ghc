@@ -15,6 +15,7 @@ import qualified Base
 import qualified CommandLine
 import qualified Environment
 import qualified Rules
+import qualified Rules.Codes
 import qualified Rules.Clean
 import qualified Rules.Docspec
 import qualified Rules.Documentation
@@ -99,6 +100,7 @@ main = do
             Rules.Docspec.docspecRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
+            Rules.Codes.codesRules
             Rules.Lint.lintRules
             Rules.Nofib.nofibRules
             Rules.oracleRules
