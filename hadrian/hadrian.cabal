@@ -78,6 +78,7 @@ executable hadrian
                        , Rules.BinaryDist
                        , Rules.CabalReinstall
                        , Rules.Clean
+                       , Rules.Codes
                        , Rules.Compile
                        , Rules.Dependencies
                        , Rules.Docspec
