@@ -110,20 +110,40 @@ other, the install script:
 
 -}
 
+data Relocatable = Relocatable | NotRelocatable
+
+installTo :: Relocatable -> String -> Action ()
+installTo relocatable prefix = do
+    root <- buildRoot
+    version        <- setting ProjectVersion
+    targetPlatform <- setting TargetPlatformFull
+    let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+        bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
+    runBuilder (Configure bindistFilesDir) ["--prefix="++prefix] [] []
+    let env = case relocatable of
+                Relocatable -> [AddEnv "RelocatableBuild" "YES"]
+                NotRelocatable -> []
+    runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
+
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
-    phony "install" $ do
+    phony "reloc-binary-dist-dir" $ do
         need ["binary-dist-dir"]
+        cwd <- liftIO $ IO.getCurrentDirectory
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
         let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
-            bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
-            prefixErr = "You must specify a path with --prefix when using the"
+        let prefix = cwd -/- root -/- "reloc-bindist" -/- ghcVersionPretty
+        installTo Relocatable prefix
+
+
+    phony "install" $ do
+        need ["binary-dist-dir"]
+        let prefixErr = "You must specify a path with --prefix when using the"
                      ++ " 'install' rule"
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
-        runBuilder (Configure bindistFilesDir) ["--prefix="++installPrefix] [] []
-        runBuilder (Make bindistFilesDir) ["install"] [] []
+        installTo NotRelocatable installPrefix
 
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
@@ -284,10 +304,12 @@ bindistRules = do
                 IO.removeFile unversioned_wrapper_path <|> return ()
                 IO.createFileLink versioned_wrapper unversioned_wrapper_path
 
+    let buildBinDist = buildBinDistX "binary-dist-dir" "bindist"
+        buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist"
 
-    let buildBinDist :: Compressor -> Action ()
-        buildBinDist compressor = do
-            need ["binary-dist-dir"]
+        buildBinDistX :: String -> FilePath -> Compressor -> Action ()
+        buildBinDistX target bindist_folder compressor = do
+            need [target]
 
             version        <- setting ProjectVersion
             targetPlatform <- setting TargetPlatformFull
@@ -296,15 +318,16 @@ bindistRules = do
 
             -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
             tarPath <- builderPath (Tar Create)
-            cmd [Cwd $ root -/- "bindist"] tarPath
+            cmd [Cwd $ root -/- bindist_folder] tarPath
                 [ "-c", compressorTarFlag compressor, "-f"
                 , ghcVersionPretty <.> "tar" <.> compressorExtension compressor
                 , ghcVersionPretty ]
 
-    phony "binary-dist" $ buildBinDist Xz
-    phony "binary-dist-gzip" $ buildBinDist Gzip
-    phony "binary-dist-bzip2" $ buildBinDist Bzip2
-    phony "binary-dist-xz" $ buildBinDist Xz
+    forM_ [("binary", buildBinDist), ("reloc-binary", buildBinDistReloc)] $ \(name, mk_bindist) -> do
+      phony (name <> "-dist") $ mk_bindist Xz
+      phony (name <> "-dist-gzip") $ mk_bindist Gzip
+      phony (name <> "-dist-bzip2") $ mk_bindist Bzip2
+      phony (name <> "-dist-xz") $ mk_bindist Xz
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
