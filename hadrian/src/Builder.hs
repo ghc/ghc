@@ -313,20 +313,20 @@ instance H.Builder Builder where
                 msgOut = "[runBuilderWith] Exactly one output file expected."
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
-                    Stdout stdout <- cmd' [path] buildArgs
+                    Stdout stdout <- cmd' [path] buildArgs buildOptions
                     -- see Note [Capture stdout as a ByteString]
                     writeFileChangedBS output stdout
             case builder of
                 Ar Pack stg -> do
                     useTempFile <- arSupportsAtFile stg
-                    if useTempFile then runAr                path buildArgs buildInputs
-                                   else runArWithoutTempFile path buildArgs buildInputs
+                    if useTempFile then runAr                path buildArgs buildInputs buildOptions
+                                   else runArWithoutTempFile path buildArgs buildInputs buildOptions
 
-                Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs
+                Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs buildOptions
 
                 Autoreconf dir -> do
                   bash <- bashPath
-                  cmd' [Cwd dir] [bash, path] buildArgs
+                  cmd' [Cwd dir] [bash, path] buildArgs buildOptions
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
@@ -339,7 +339,7 @@ instance H.Builder Builder where
 
                 GenPrimopCode -> do
                     stdin <- readFile' input
-                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
+                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs buildOptions
                     -- see Note [Capture stdout as a ByteString]
                     writeFileChangedBS output stdout
 
@@ -350,47 +350,47 @@ instance H.Builder Builder where
                       , "describe"
                       , input -- the package name
                       ]
-                    cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
+                    cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"]) buildOptions
 
                 GhcPkg Unregister _ -> do
                     -- unregistering is allowed to fail (e.g. when a package
                     -- isn't already present)
-                    Exit _ <- cmd' [path] (buildArgs ++ [input])
+                    Exit _ <- cmd' [path] (buildArgs ++ [input]) buildOptions
                     return ()
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
                 HsCpp    -> captureStdout
 
-                Make dir -> cmd' path ["-C", dir] buildArgs
+                Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
 
                 Makeinfo -> do
-                  cmd' [path] "--no-split" [ "-o", output] [input]
+                  cmd' [path] "--no-split" [ "-o", output] [input] buildOptions
 
                 Xelatex   ->
                   -- xelatex produces an incredible amount of output, almost
                   -- all of which is useless. Suppress it unless user
                   -- requests a loud build.
                   if verbosity >= Diagnostic
-                    then cmd' [Cwd output] [path] buildArgs
-                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
+                    then cmd' [Cwd output] [path] buildArgs buildOptions
+                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs buildOptions
                             when (code /= ExitSuccess) $ do
                               liftIO $ BSL.hPutStrLn stderr out
                               putFailure "xelatex failed!"
                               fail "xelatex failed"
 
-                Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
+                Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input]) buildOptions
 
                 Tar _ -> cmd' buildOptions [path] buildArgs
 
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
                 Testsuite RunTest -> do
-                  Exit code <- cmd [path] buildArgs
+                  Exit code <- cmd [path] buildArgs buildOptions
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
 
-                _  -> cmd' [path] buildArgs
+                _  -> cmd' [path] buildArgs buildOptions
 
 -- | Invoke @haddock@ given a path to it and a list of arguments. The arguments
 -- are passed in a response file.
