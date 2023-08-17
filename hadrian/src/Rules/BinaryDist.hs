@@ -17,6 +17,8 @@ import qualified System.Directory.Extra as IO
 import Data.Either
 import GHC.Toolchain (ccProgram, tgtCCompiler, ccLinkProgram, tgtCCompilerLink)
 import GHC.Toolchain.Program (prgFlags)
+import qualified Data.Set as Set
+import Oracles.Flavour
 
 {-
 Note [Binary distributions]
@@ -262,6 +264,7 @@ bindistRules = do
           need $ map (bindistFilesDir -/-)
                     (["configure", "Makefile"] ++ bindistInstallFiles)
           copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
+          generateBuildMk >>= writeFile' (bindistFilesDir -/- "build.mk")
           copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
           copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
           forM_ bin_targets $ \(pkg, _) -> do
@@ -338,6 +341,21 @@ bindistRules = do
 
 data Compressor = Gzip | Bzip2 | Xz
                 deriving (Eq, Ord, Show)
+
+
+-- Information from the build configuration which needs to be propagated to config.mk.in
+generateBuildMk :: Action String
+generateBuildMk = do
+  dynamicGhc <- askDynGhcPrograms
+  rtsWays <- unwords . map show . Set.toList <$> interpretInContext (vanillaContext Stage1 rts) getRtsWays
+  return $ unlines [ "GhcRTSWays" =. rtsWays
+                   , "DYNAMIC_GHC_PROGRAMS" =. yesNo dynamicGhc ]
+
+
+  where
+    yesNo True = "YES"
+    yesNo False = "NO"
+    a =. b = a ++ " = " ++ b
 
 -- | Flag to pass to tar to use the given 'Compressor'.
 compressorTarFlag :: Compressor -> String
