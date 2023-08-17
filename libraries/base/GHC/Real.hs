@@ -18,7 +18,72 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Real where
+module GHC.Real
+    ( -- * Classes
+      Real(..)
+    , Integral(..)
+    , Fractional(..)
+    , RealFrac(..)
+
+      -- * Conversion
+    , fromIntegral
+    , realToFrac
+
+      -- * Formatting
+    , showSigned
+
+      -- * Predicates
+    , even
+    , odd
+
+      -- * Arithmetic
+    , (^)
+    , (^^)
+    , gcd
+    , lcm
+
+      -- * 'Ratio'
+    , Ratio(..)
+    , Rational
+    , infinity
+    , notANumber
+
+      -- * 'Enum' helpers
+    , numericEnumFrom
+    , numericEnumFromThen
+    , numericEnumFromTo
+    , numericEnumFromThenTo
+    , integralEnumFrom
+    , integralEnumFromThen
+    , integralEnumFromTo
+    , integralEnumFromThenTo
+
+      -- ** Construction
+    , (%)
+
+      -- ** Projection
+    , numerator
+    , denominator
+
+      -- ** Operations
+    , reduce
+
+      -- * Internal
+    , ratioPrec
+    , ratioPrec1
+    , divZeroError
+    , ratioZeroDenominatorError
+    , overflowError
+    , underflowError
+    , mkRationalBase2
+    , mkRationalBase10
+    , FractionalExponentBase(..)
+    , (^%^)
+    , (^^%^^)
+    , mkRationalWithExponentBase
+    , powImpl
+    , powImplAcc
+    ) where
 
 #include "MachDeps.h"
 
