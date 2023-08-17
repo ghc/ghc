@@ -325,6 +325,13 @@ $ ./configure [--prefix=PATH] && make install
 
 workflow, for now.
 
+Note: On windows you need to use the `reloc-binary-dist` target.
+
+#### Relocatable Binary Distribution
+
+If you require a relocatable binary distribution (for example on Windows), then you
+can build the `reloc-binary-dist` target.
+
 ### Building and installing GHC
 
 You can get Hadrian to build _and_ install a binary distribution in one go
