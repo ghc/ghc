@@ -57,26 +57,45 @@ stages:
 # Note [The CI Story]
 # ~~~~~~~~~~~~~~~~~~~
 #
-# There are two different types of pipelines:
+# There are a few different types of pipelines. Among them:
 #
-#  - marge-bot merges to `master`. Here we perform an exhaustive validation
+# 1. marge-bot merges to `master`. Here we perform an exhaustive validation
 #    across all of the platforms which we support. In addition, we push
 #    performance metric notes upstream, providing a persistent record of the
 #    performance characteristics of the compiler.
 #
-#  - merge requests. Here we perform a slightly less exhaustive battery of
+# 2. merge requests. Here we perform a slightly less exhaustive battery of
 #    testing. Namely we omit some configurations (e.g. the unregisterised job).
 #    These use the merge request's base commit for performance metric
 #    comparisons.
 #
-
+# These and other pipelines are defined implicitly by the rules of individual
+# jobs.
+#
+# At the top level, however, we can declare that pipelines (of whatever type)
+# only run when:
+#
+# 1. Processing a merge request (as mentioned above)
+#
+# 2. Processing a tag
+#
+# 3. Pushing to master on the root ghc/ghc repo (as mentioned above)
+#
+# 4. Pushing to a release branch on the root ghc/ghc repo
+#
+# 5. Somebody manually triggers a pipeline from the GitLab UI
+#
+# In particular, note that pipelines don't automatically run just when changes
+# are pushed to a feature branch.
 workflow:
-  # N.B. Don't run on wip/ branches, instead on run on merge requests.
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_TAG
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
+    # N.B.: If we weren't explicit about CI_PROJECT_ID, the following rule would
+    # cause a duplicate pipeline for merge requests coming from the master
+    # branch of a fork.
+    - if: $CI_PROJECT_ID == "1" && $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PROJECT_ID == "1" && $CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 # which versions of GHC to allow bootstrap with
