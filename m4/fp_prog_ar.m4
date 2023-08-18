@@ -11,7 +11,7 @@ if test -z "$fp_prog_ar"; then
   then
     AC_PATH_PROG([fp_prog_ar], [ar])
     if test -n "$fp_prog_ar"; then
-      fp_prog_ar=$(cygpath -m $fp_prog_ar)
+      fp_prog_ar="$(cygpath -m $fp_prog_ar)"
     fi
   else
     AC_CHECK_TARGET_TOOL([AR], [ar])

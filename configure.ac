@@ -345,33 +345,21 @@ AC_SUBST(TablesNextToCode)
 FP_FIND_ROOT
 
 # Extract and configure the Windows toolchain
-if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
-    FP_SETUP_WINDOWS_TOOLCHAIN
-else
-    AC_PATH_TOOL([CC],[gcc], [clang])
-    AC_PATH_TOOL([CXX],[g++], [clang++])
-    AC_PATH_TOOL([NM],[nm])
-    # N.B. we don't probe for LD here but instead
-    # do so in FIND_LD to avoid #21778.
-    AC_PATH_TOOL([AR],[ar])
-    AC_PATH_TOOL([RANLIB],[ranlib])
-    AC_PATH_TOOL([OBJDUMP],[objdump])
-    AC_PATH_TOOL([Windres],[windres])
-    AC_PATH_TOOL([Genlib],[genlib])
-
-    HAVE_GENLIB=False
-    if test "$HostOS" = "mingw32"; then
+if test "$HostOS" = "mingw32"; then
+    if "$EnableDistroToolchain" = "NO"; then
+        FP_SETUP_WINDOWS_TOOLCHAIN
+    else
         AC_CHECK_TARGET_TOOL([Windres],[windres])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
             HAVE_GENLIB=True
+        else
+            HAVE_GENLIB=False
         fi
     fi
-fi
 
-if test "$HostOS" = "mingw32"; then
     WindresCmd="$Windres"
     AC_SUBST([WindresCmd])
     AC_SUBST([GenlibCmd])
@@ -746,6 +734,7 @@ dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
 dnl ** how to invoke `ar' and `ranlib'
+FP_PROG_AR
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_SUPPORTS_DASH_L
 FP_PROG_AR_NEEDS_RANLIB
