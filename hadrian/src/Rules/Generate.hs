@@ -7,7 +7,6 @@ module Rules.Generate (
 
 import Development.Shake.FilePath
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import Base
 import qualified Context
 import Expression
@@ -430,44 +429,44 @@ generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
     settings <- traverse sequence $
-        [ ("C compiler command",   queryTarget' ccPath)
-        , ("C compiler flags",     queryTarget' ccFlags)
-        , ("C++ compiler command", queryTarget' cxxPath)
-        , ("C++ compiler flags",   queryTarget' cxxFlags)
-        , ("C compiler link flags",       queryTarget' clinkFlags)
-        , ("C compiler supports -no-pie", queryTarget' linkSupportsNoPie)
-        , ("CPP command",         queryTarget' cppPath)
-        , ("CPP flags",           queryTarget' cppFlags)
-        , ("Haskell CPP command", queryTarget' hsCppPath)
-        , ("Haskell CPP flags",   queryTarget' hsCppFlags)
-        , ("ld supports compact unwind", queryTarget' linkSupportsCompactUnwind)
-        , ("ld supports filelist",       queryTarget' linkSupportsFilelist)
-        , ("ld is GNU ld",               queryTarget' linkIsGnu)
-        , ("Merge objects command", queryTarget' mergeObjsPath)
-        , ("Merge objects flags", queryTarget' mergeObjsFlags)
-        , ("Merge objects supports response files", queryTarget' mergeObjsSupportsResponseFiles')
-        , ("ar command",          queryTarget' arPath)
-        , ("ar flags",            queryTarget' arFlags)
-        , ("ar supports at file", queryTarget' arSupportsAtFile')
-        , ("ar supports -L",      queryTarget' arSupportsDashL')
-        , ("ranlib command", queryTarget' ranlibPath)
+        [ ("C compiler command",   queryTarget ccPath)
+        , ("C compiler flags",     queryTarget ccFlags)
+        , ("C++ compiler command", queryTarget cxxPath)
+        , ("C++ compiler flags",   queryTarget cxxFlags)
+        , ("C compiler link flags",       queryTarget clinkFlags)
+        , ("C compiler supports -no-pie", queryTarget linkSupportsNoPie)
+        , ("CPP command",         queryTarget cppPath)
+        , ("CPP flags",           queryTarget cppFlags)
+        , ("Haskell CPP command", queryTarget hsCppPath)
+        , ("Haskell CPP flags",   queryTarget hsCppFlags)
+        , ("ld supports compact unwind", queryTarget linkSupportsCompactUnwind)
+        , ("ld supports filelist",       queryTarget linkSupportsFilelist)
+        , ("ld is GNU ld",               queryTarget linkIsGnu)
+        , ("Merge objects command", queryTarget mergeObjsPath)
+        , ("Merge objects flags", queryTarget mergeObjsFlags)
+        , ("Merge objects supports response files", queryTarget mergeObjsSupportsResponseFiles')
+        , ("ar command",          queryTarget arPath)
+        , ("ar flags",            queryTarget arFlags)
+        , ("ar supports at file", queryTarget arSupportsAtFile')
+        , ("ar supports -L",      queryTarget arSupportsDashL')
+        , ("ranlib command", queryTarget ranlibPath)
         , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
         , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
         , ("touch command", expr $ settingsFileSetting ToolchainSetting_TouchCommand)
-        , ("windres command", queryTarget' (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
+        , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
-        , ("target platform string", queryTarget' targetPlatformTriple)
-        , ("target os",        queryTarget' (show . archOS_OS . tgtArchOs))
-        , ("target arch",      queryTarget' (show . archOS_arch . tgtArchOs))
-        , ("target word size", queryTarget' wordSize)
-        , ("target word big endian",       queryTarget' isBigEndian)
-        , ("target has GNU nonexec stack", queryTarget' (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
-        , ("target has .ident directive",  queryTarget' (yesNo . Toolchain.tgtSupportsIdentDirective))
-        , ("target has subsections via symbols", queryTarget' (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
+        , ("target platform string", queryTarget targetPlatformTriple)
+        , ("target os",        queryTarget (show . archOS_OS . tgtArchOs))
+        , ("target arch",      queryTarget (show . archOS_arch . tgtArchOs))
+        , ("target word size", queryTarget wordSize)
+        , ("target word big endian",       queryTarget isBigEndian)
+        , ("target has GNU nonexec stack", queryTarget (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
+        , ("target has .ident directive",  queryTarget (yesNo . Toolchain.tgtSupportsIdentDirective))
+        , ("target has subsections via symbols", queryTarget (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
-        , ("Unregisterised", queryTarget' (yesNo . tgtUnregisterised))
-        , ("LLVM target", queryTarget' tgtLlvmTarget)
+        , ("Unregisterised", queryTarget (yesNo . tgtUnregisterised))
+        , ("LLVM target", queryTarget tgtLlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
@@ -475,8 +474,8 @@ generateSettings = do
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
-        , ("Tables next to code", queryTarget' (yesNo . tgtTablesNextToCode))
-        , ("Leading underscore",  queryTarget' (yesNo . tgtSymbolsHaveLeadingUnderscore))
+        , ("Tables next to code", queryTarget (yesNo . tgtTablesNextToCode))
+        , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
         ]
@@ -511,21 +510,6 @@ generateSettings = do
     isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness
     wordSize    = show . wordSize2Bytes . tgtWordSize
     mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
-
-    -- Like @'queryTarget'@ specialized to String, but replace occurrences of
-    -- @topDirectory </> inplace/mingw@ with @$tooldir/mingw@ in the resulting string
-    --
-    -- See Note [How we configure the bundled windows toolchain]
-    queryTarget' :: (Toolchain.Target -> String) -> Expr String
-    queryTarget' f = do
-      topdir <- expr $ topDirectory
-      queryTarget (\t -> substTooldir topdir (archOS_OS $ tgtArchOs t) (f t))
-      where
-        substTooldir :: String -> OS -> String -> String
-        substTooldir topdir OSMinGW32 s
-          = T.unpack $
-            T.replace (T.pack $ normalise $ topdir </> "inplace" </> "mingw") (T.pack "$tooldir/mingw") (T.pack $ normalise s)
-        substTooldir _ _ s = s
 
 
 -- | Generate @Config.hs@ files.
