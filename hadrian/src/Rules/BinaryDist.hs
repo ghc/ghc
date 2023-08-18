@@ -290,7 +290,10 @@ bindistRules = do
               IO.removeFile unversioned_wrapper_path <|> return ()
               IO.createFileLink versioned_wrapper unversioned_wrapper_path
 
-    let buildBinDist = buildBinDistX "binary-dist-dir" "bindist"
+    let buildBinDist compressor = do
+          win_target <- isWinTarget
+          when win_target (error "normal binary-dist does not work for windows target, use `reloc-binary-dist-*` target instead.")
+          buildBinDistX "binary-dist-dir" "bindist" compressor
         buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist"
 
         buildBinDistX :: String -> FilePath -> Compressor -> Action ()
