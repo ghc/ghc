@@ -649,7 +649,7 @@ Kind inference for data/newtype instance declarations
 
 Consider these declarations ::
 
-   data family T :: forall k. (k->Type) -> k -> Type
+   data family T :: forall k. (k -> Type) -> k -> Type
 
    data instance T p q where
       MkT :: forall r. r Int -> T r Int
@@ -657,13 +657,13 @@ Consider these declarations ::
 Here ``T`` has an invisible kind argument; and perhaps it is instantiated
 to ``Type`` in the instance, thus::
 
-   data instance T @Type (p :: Type->Type) (q :: Type) where
+   data instance T @Type (p :: Type -> Type) (q :: Type) where
       MkT :: forall r. r Int -> T r Int
 
 Or perhaps we intended the specialisation to be in the GADT data
 constructor, thus::
 
-   data instance T @k (p :: k->Type) (q :: k) where
+   data instance T @k (p :: k -> Type) (q :: k) where
       MkT :: forall r. r Int -> T @Type r Int
 
 It gets more complicated if there are multiple constructors.  In
@@ -775,6 +775,11 @@ Closed type family instances are subject to the same rules: ::
   type family F :: Maybe (Maybe k) where
     F = Just (Nothing :: Maybe k)     -- rejected: k not in scope
 
+  type F :: forall k. Maybe (Maybe k)
+  type family F @k where
+    F @k = Just (Nothing :: Maybe k)  -- accepted
+
+  -- CUSKs version (Legacy)  
   type family F :: Maybe (Maybe k) where
     F @k = Just (Nothing :: Maybe k)  -- accepted
 
@@ -858,10 +863,17 @@ For example: ::
       F2 x     = x
     -- F2 fails to compile: no complete signature
 
-    type family F3 (a :: k) :: k where
-      F3 True  = False
-      F3 False = True
-      F3 x     = x
+    type F3 :: k -> k 
+    type family F3 a where 
+      F3 True  = False 
+      F3 False = True 
+      F3 x     = x  
+
+    -- CUSKs version (legacy)
+    type family F4 (a :: k) :: k where
+      F4 True  = False
+      F4 False = True
+      F4 x     = x
     -- OK
 
 Higher-rank kinds
