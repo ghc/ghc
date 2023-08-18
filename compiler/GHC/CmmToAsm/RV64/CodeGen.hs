@@ -1823,7 +1823,11 @@ genCCall target dest_regs arg_regs bid = do
           r_dst = getRegisterReg platform (CmmLocal dst)
       if isFloatFormat format
         then readResults (gpReg:gpRegs) fpRegs dsts (fpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w fpReg))
-        else readResults gpRegs (fpReg:fpRegs) dsts (gpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w gpReg))
+        else readResults gpRegs (fpReg:fpRegs) dsts (gpReg:accumRegs) $
+          accumCode `snocOL`
+          MOV (OpReg w r_dst) (OpReg w gpReg) `appOL`
+          -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
+          truncateReg W64 w r_dst
 
     unaryFloatOp w op arg_reg dest_reg = do
       platform <- getPlatform
