@@ -247,4 +247,4 @@ test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms
 test('CCallConv',
      [],
      multi_compile_and_run,
-     ['CCallConv', [('CCallConv_cmm.cmm', ''), ('CCallConv_c.c', '')], ''])
+     ['CCallConv', [('CCallConv_c.c', '')], ''])

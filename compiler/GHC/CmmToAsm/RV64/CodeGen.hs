@@ -1734,24 +1734,20 @@ genCCall target dest_regs arg_regs bid = do
       --
     -- Still have GP regs, and we want to pass an GP argument.
 
-    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format , hint == NoHint = do
-      -- Do not sign-extend unsigned register values. Otherwise, unsigned
-      -- parameters (e.g. uint8_t) are messed up with sign bits.
+    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
+      -- RISCV64 Integer Calling Convention: "When passed in registers or on the
+      -- stack, integer scalars narrower than XLEN bits are widened according to
+      -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
       let w = formatToWidth format
-          mov = MOV (OpReg w gpReg) (OpReg w r)
-          accumCode' = accumCode `appOL`
-                       code_r `snocOL`
-                       ann (text "Pass gp argument (NoHint): " <> ppr r) mov
-      passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
+          assignArg = if hint == SignedHint then
+             COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r) `consOL`
+                       signExtend w W64 r gpReg
 
-    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
-    -- RISCV64 Integer Calling Convention: "When passed in registers or on the
-    -- stack, integer scalars narrower than XLEN bits are widened according to
-    -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
-      let w = formatToWidth format
+            else toOL[COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r)
+                     , MOV (OpReg w gpReg) (OpReg w r)]
           accumCode' = accumCode `appOL`
                        code_r `appOL`
-                       signExtend w W64 r gpReg
+                       assignArg
       passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
 
     -- Still have FP regs, and we want to pass an FP argument.
@@ -1764,18 +1760,27 @@ genCCall target dest_regs arg_regs bid = do
       passArguments pack gpRegs fpRegs args stackSpace (fpReg:accumRegs) accumCode'
 
     -- No mor regs left to pass. Must pass on stack.
-    passArguments pack [] [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode = do
+    -- TODO: Pack can probably be deleted
+    passArguments pack [] [] ((r, format, hint, code_r) : args) stackSpace accumRegs accumCode = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
-          stackSpace' | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
-                      | otherwise                           = stackSpace
+          stackSpace'
+            | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
+            | otherwise = stackSpace
           str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpace')))
-          stackCode = code_r `snocOL`
-                      ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
-      passArguments pack [] [] args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
+          stackCode =
+            if hint == SignedHint
+              then
+                code_r
+                  `appOL` signExtend w W64 r ip_reg
+                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ip_reg) str
+              else
+                code_r
+                  `snocOL` ann (text "Pass unsigned argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
+      passArguments pack [] [] args (stackSpace' + space) accumRegs (stackCode `appOL` accumCode)
 
-    -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
+-- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
     passArguments pack [] fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
