@@ -32,7 +32,7 @@
 	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = https://gitlab.haskell.org/ghc/packages/xhtml.git
+	url = https://github.com/finleymcilwaine/xhtml.git
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
