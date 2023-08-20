@@ -22,7 +22,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Arity
-import GHC.Core.Subst
+import GHC.Core.Subst hiding ( extendInScopeSet )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold

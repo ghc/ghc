@@ -24,7 +24,7 @@ module GHC.Core.Subst (
         emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
         extendIdSubst, extendIdSubstList, extendTCvSubst, extendTvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
-        extendInScope, extendInScopeList, extendInScopeIds,
+        extendInScope, extendInScopeList, extendInScopeIds, GHC.Core.Subst.extendInScopeSet,
         isInScope, setInScope, getTCvSubst, extendTvSubst, extendCvSubst,
         delBndr, delBndrs,
 
@@ -50,13 +50,14 @@ import GHC.Core.Type hiding
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env
+import GHC.Types.Var.Env as InScopeSet
 import GHC.Types.Id
 import GHC.Types.Name     ( Name )
 import GHC.Types.Var
 import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.Set
 
 import GHC.Builtin.Names
 import GHC.Data.Maybe
@@ -288,7 +289,7 @@ isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
 -- and remove any existing substitutions for it
 extendInScope :: Subst -> Var -> Subst
 extendInScope (Subst in_scope ids tvs cvs) v
-  = Subst (in_scope `extendInScopeSet` v)
+  = Subst (in_scope `InScopeSet.extendInScopeSet` v)
           (ids `delVarEnv` v) (tvs `delVarEnv` v) (cvs `delVarEnv` v)
 
 -- | Add the 'Var's to the in-scope set: see also 'extendInScope'
@@ -303,6 +304,14 @@ extendInScopeIds :: Subst -> [Id] -> Subst
 extendInScopeIds (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetList` vs)
           (ids `delVarEnvList` vs) tvs cvs
+
+-- | Add the 'Var's to the in-scope set: see also 'extendInScope'
+extendInScopeSet :: Subst -> VarSet -> Subst
+extendInScopeSet (Subst in_scope ids tvs cvs) vs
+  = Subst (in_scope `extendInScopeSetSet` vs)
+          (ids `minus` vs) (tvs `minus` vs) (cvs `minus` vs)
+  where
+    minus env set = minusVarEnv env (getUniqSet set)
 
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
@@ -462,7 +471,7 @@ substIdBndr :: SDoc
 
 substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
   = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
-    (Subst (in_scope `extendInScopeSet` new_id) new_env tvs cvs, new_id)
+    (Subst (in_scope `InScopeSet.extendInScopeSet` new_id) new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1
@@ -532,7 +541,7 @@ clone_id    :: Subst                    -- Substitution for the IdInfo
             -> (Subst, Id)              -- Transformed pair
 
 clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
-  = (Subst (in_scope `extendInScopeSet` new_id) new_idvs tvs new_cvs, new_id)
+  = (Subst (in_scope `InScopeSet.extendInScopeSet` new_id) new_idvs tvs new_cvs, new_id)
   where
     id1     = setVarUnique old_id uniq
     id2     = substIdType subst id1
