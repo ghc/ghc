@@ -402,6 +402,9 @@ pprReg w r = case r of
          -- no support for widths > W64.
          | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
+isIntOp :: Operand -> Bool
+isIntOp o = not (isFloatOp o || isDoubleOp o)
+
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ (RegReal (RealRegSingle i))) | i > 31 = True
 isFloatOp (OpReg _ (RegVirtual (VirtualRegF _))) = True
@@ -574,10 +577,14 @@ pprInstr platform instr = case instr of
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
   CSET o l r c  -> case c of
-    EQ  -> lines_ [ subFor l r
+    EQ | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tseqz" <+> pprOp platform o <> comma <+> pprOp platform o]
-    NE  -> lines_ [ subFor l r
+    EQ | isFloatOp l && isFloatOp r -> line $ floatOp "\tfeq.s"
+    NE | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o]
+    --    feq.s   a0,fa0,fa1
+    --    xori    a0,a0,1
+    NE | isFloatOp l && isFloatOp r -> lines_ [floatOp "\tfeq.s", text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
     SLT -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r ]
     SLE -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
@@ -590,7 +597,11 @@ pprInstr platform instr = case instr of
     UGE -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
     UGT -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l ]
-    _  -> panic $ "RV64.ppr: unhandled CSET conditional: " ++ show c
+    OLT | isFloatOp l && isFloatOp r -> line $ floatOp "\tflt.s"
+    OLE | isFloatOp l && isFloatOp r -> line $ floatOp "\tfle.s"
+    OGT | isFloatOp l && isFloatOp r -> line $ floatOp "\tfgt.s"
+    OGE | isFloatOp l && isFloatOp r -> line $ floatOp "\tfge.s"
+    _  -> pprPanic "RV64.ppr: unhandled CSET conditional" (pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
                  | (OpImm _) <- l = panic "RV64.ppr: Cannot SUB IMM _"
@@ -601,6 +612,7 @@ pprInstr platform instr = case instr of
       sltuFor l r| (OpImm _) <- r = text "\tsltui"
                  | (OpImm _) <- l = panic "PV64.ppr: Cannot SLTU IMM _"
                  | otherwise      = text "\tsltu"
+      floatOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
 
   CBZ o (TBlock bid) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   CBZ o (TLabel lbl) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
@@ -657,6 +669,8 @@ pprInstr platform instr = case instr of
   LDRU II32 o1 o2 -> op2 (text "\tlwu") o1 o2
   -- double words (64bit) cannot be sign extended by definition
   LDRU II64 o1 o2 -> op2 (text "\tld") o1 o2
+  LDRU FF32 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tflw") o1 o2
+  LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
   -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
