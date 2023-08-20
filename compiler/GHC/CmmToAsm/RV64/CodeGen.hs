@@ -1283,7 +1283,12 @@ genCondJump bid expr = do
               -- ensure we get float regs
               (reg_fx, _format_fx, code_fx) <- getFloatReg x
               (reg_fy, _format_fy, code_fy) <- getFloatReg y
-              return $ code_fx `appOL` code_fy `snocOL` (annExpr expr (BCOND cmp (OpReg w reg_fx) (OpReg w reg_fy) (TBlock bid)))
+              oneReg <- getNewRegNat II64
+              return $ code_fx `appOL`
+                       code_fy `snocOL`
+                       annExpr expr (CSET  ip (OpReg w reg_fx) (OpReg w reg_fy) cmp) `snocOL`
+                       MOV (OpReg W64 oneReg) (OpImm (ImmInt 1)) `snocOL`
+                       BCOND EQ ip (OpReg w oneReg) (TBlock bid)
 
         case mop of
           MO_F_Eq w -> fbcond w EQ

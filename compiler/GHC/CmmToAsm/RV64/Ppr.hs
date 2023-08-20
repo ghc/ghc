@@ -579,12 +579,12 @@ pprInstr platform instr = case instr of
   CSET o l r c  -> case c of
     EQ | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tseqz" <+> pprOp platform o <> comma <+> pprOp platform o]
-    EQ | isFloatOp l && isFloatOp r -> line $ floatOp "\tfeq.s"
+    EQ | isFloatOp l && isFloatOp r -> line $ binOp "\tfeq.s"
     NE | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o]
     --    feq.s   a0,fa0,fa1
     --    xori    a0,a0,1
-    NE | isFloatOp l && isFloatOp r -> lines_ [floatOp "\tfeq.s", text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
+    NE | isFloatOp l && isFloatOp r -> lines_ [binOp "\tfeq.s", text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
     SLT -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r ]
     SLE -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
@@ -597,10 +597,10 @@ pprInstr platform instr = case instr of
     UGE -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
     UGT -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l ]
-    OLT | isFloatOp l && isFloatOp r -> line $ floatOp "\tflt.s"
-    OLE | isFloatOp l && isFloatOp r -> line $ floatOp "\tfle.s"
-    OGT | isFloatOp l && isFloatOp r -> line $ floatOp "\tfgt.s"
-    OGE | isFloatOp l && isFloatOp r -> line $ floatOp "\tfge.s"
+    OLT | isFloatOp l && isFloatOp r -> line $ binOp "\tflt.s"
+    OLE | isFloatOp l && isFloatOp r -> line $ binOp "\tfle.s"
+    OGT | isFloatOp l && isFloatOp r -> line $ binOp "\tfgt.s"
+    OGE | isFloatOp l && isFloatOp r -> line $ binOp "\tfge.s"
     _  -> pprPanic "RV64.ppr: unhandled CSET conditional" (pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
@@ -612,7 +612,7 @@ pprInstr platform instr = case instr of
       sltuFor l r| (OpImm _) <- r = text "\tsltui"
                  | (OpImm _) <- l = panic "PV64.ppr: Cannot SLTU IMM _"
                  | otherwise      = text "\tsltu"
-      floatOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
+      binOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
 
   CBZ o (TBlock bid) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   CBZ o (TLabel lbl) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
@@ -683,16 +683,16 @@ pprInstr platform instr = case instr of
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
+  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.w") o1 o2
   SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.l") o1 o2
-  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.w") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
   SCVTF o1 o2 -> pprPanic "RV64.pprInstr - impossible integer to float conversion" $
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
 
-  FCVTZS o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\fcvt.w.s") o1 o2
-  FCVTZS o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\fcvt.l.s") o1 o2
-  FCVTZS o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\fcvt.w.d") o1 o2
-  FCVTZS o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\fcvt.l.d") o1 o2
+  FCVTZS o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.w.s") o1 o2
+  FCVTZS o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.w.s") o1 o2
+  FCVTZS o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.l.s") o1 o2
+  FCVTZS o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.l.s") o1 o2
   FCVTZS o1 o2 -> pprPanic "RV64.pprInstr - impossible float to integer conversion" $
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
 
