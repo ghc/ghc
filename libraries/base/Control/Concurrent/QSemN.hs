@@ -32,12 +32,12 @@ import Data.IORef (IORef, newIORef, atomicModifyIORef)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | 'QSemN' is a quantity semaphore in which the resource is acquired
--- and released in units of one. It provides guaranteed FIFO ordering
+-- and released in arbitrary amounts. It provides guaranteed FIFO ordering
 -- for satisfying blocked `waitQSemN` calls.
 --
 -- The pattern
 --
--- >   bracket_ (waitQSemN n) (signalQSemN n) (...)
+-- > bracket_ (waitQSemN n) (signalQSemN n) (...)
 --
 -- is safe; it never loses any of the resource.
 --
@@ -71,7 +71,7 @@ newQSemN initial
 -- An unboxed version of Maybe (MVar a)
 data MaybeMV a = JustMV !(MVar a) | NothingMV
 
--- |Wait for the specified quantity to become available
+-- |Wait for the specified quantity to become available.
 waitQSemN :: QSemN -> Int -> IO ()
 -- We need to mask here. Once we've enqueued our MVar, we need
 -- to be sure to wait for it. Otherwise, we could lose our

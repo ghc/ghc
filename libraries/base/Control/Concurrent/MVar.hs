@@ -11,7 +11,7 @@
 -- Stability   :  stable
 -- Portability :  non-portable (concurrency)
 --
--- An @'MVar' t@ is mutable location that is either empty or contains a
+-- An @'MVar' t@ is a mutable location that is either empty or contains a
 -- value of type @t@.  It has two fundamental operations: 'putMVar'
 -- which fills an 'MVar' if it is empty and blocks otherwise, and
 -- 'takeMVar' which empties an 'MVar' if it is full and blocks
@@ -25,7 +25,7 @@
 --      wait and signal.
 --
 -- They were introduced in the paper
--- <https://www.haskell.org/ghc/docs/papers/concurrent-haskell.ps.gz "Concurrent Haskell">
+-- ["Concurrent Haskell"](https://www.microsoft.com/en-us/research/wp-content/uploads/1996/01/concurrent-haskell.pdf)
 -- by Simon Peyton Jones, Andrew Gordon and Sigbjorn Finne, though
 -- some details of their implementation have since then changed (in
 -- particular, a put on a full 'MVar' used to error, but now merely
@@ -35,7 +35,7 @@
 --
 -- 'MVar's offer more flexibility than 'Data.IORef.IORef's, but less flexibility
 -- than 'GHC.Conc.STM'.  They are appropriate for building synchronization
--- primitives and performing simple interthread communication; however
+-- primitives and performing simple inter-thread communication; however
 -- they are very simple and susceptible to race conditions, deadlocks or
 -- uncaught exceptions.  Do not use them if you need to perform larger
 -- atomic operations such as reading from multiple variables: use 'GHC.Conc.STM'
@@ -54,8 +54,8 @@
 -- No thread can be blocked indefinitely on an 'MVar' unless another
 -- thread holds that 'MVar' indefinitely.  One usual implementation of
 -- this fairness guarantee is that threads blocked on an 'MVar' are
--- served in a first-in-first-out fashion, but this is not guaranteed
--- in the semantics.
+-- served in a first-in-first-out fashion (this is what GHC does),
+-- but this is not guaranteed in the semantics.
 --
 -- === Gotchas
 --
@@ -64,7 +64,7 @@
 -- 'MVar', it will be evaluated by the thread that consumes it, not the
 -- thread that produced it.  Be sure to 'evaluate' values to be placed
 -- in an 'MVar' to the appropriate normal form, or utilize a strict
--- MVar provided by the strict-concurrency package.
+-- @MVar@ provided by the [strict-concurrency](https://hackage.haskell.org/package/strict-concurrency) package.
 --
 -- === Ordering
 --
@@ -89,33 +89,33 @@
 -- reader has not read yet, and empty otherwise.
 --
 -- @
---     data SkipChan a = SkipChan (MVar (a, [MVar ()])) (MVar ())
+-- data SkipChan a = SkipChan (MVar (a, [MVar ()])) (MVar ())
 --
---     newSkipChan :: IO (SkipChan a)
---     newSkipChan = do
---         sem <- newEmptyMVar
---         main <- newMVar (undefined, [sem])
---         return (SkipChan main sem)
+-- newSkipChan :: IO (SkipChan a)
+-- newSkipChan = do
+--     sem <- newEmptyMVar
+--     main <- newMVar (undefined, [sem])
+--     return (SkipChan main sem)
 --
---     putSkipChan :: SkipChan a -> a -> IO ()
---     putSkipChan (SkipChan main _) v = do
---         (_, sems) <- takeMVar main
---         putMVar main (v, [])
---         mapM_ (\sem -> putMVar sem ()) sems
+-- putSkipChan :: SkipChan a -> a -> IO ()
+-- putSkipChan (SkipChan main _) v = do
+--     (_, sems) <- takeMVar main
+--     putMVar main (v, [])
+--     mapM_ (\\sem -> putMVar sem ()) sems
 --
---     getSkipChan :: SkipChan a -> IO a
---     getSkipChan (SkipChan main sem) = do
---         takeMVar sem
---         (v, sems) <- takeMVar main
---         putMVar main (v, sem:sems)
---         return v
+-- getSkipChan :: SkipChan a -> IO a
+-- getSkipChan (SkipChan main sem) = do
+--     takeMVar sem
+--     (v, sems) <- takeMVar main
+--     putMVar main (v, sem : sems)
+--     return v
 --
---     dupSkipChan :: SkipChan a -> IO (SkipChan a)
---     dupSkipChan (SkipChan main _) = do
---         sem <- newEmptyMVar
---         (v, sems) <- takeMVar main
---         putMVar main (v, sem:sems)
---         return (SkipChan main sem)
+-- dupSkipChan :: SkipChan a -> IO (SkipChan a)
+-- dupSkipChan (SkipChan main _) = do
+--     sem <- newEmptyMVar
+--     (v, sems) <- takeMVar main
+--     putMVar main (v, sem : sems)
+--     return (SkipChan main sem)
 -- @
 --
 -- This example was adapted from the original Concurrent Haskell paper.
@@ -186,7 +186,7 @@ swapMVar mvar new =
 -}
 {-# INLINE withMVar #-}
 -- inlining has been reported to have dramatic effects; see
--- http://www.haskell.org//pipermail/haskell/2006-May/017907.html
+-- https://mail.haskell.org/pipermail/haskell/2006-May/017907.html
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io =
   mask $ \restore -> do
@@ -274,7 +274,7 @@ addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer = GHC.MVar.addMVarFinalizer
 
 -- | Make a 'Weak' pointer to an 'MVar', using the second argument as
--- a finalizer to run when 'MVar' is garbage-collected
+-- a finalizer to run when the 'MVar' is garbage-collected
 --
 -- @since 4.6.0.0
 mkWeakMVar :: MVar a -> IO () -> IO (Weak (MVar a))

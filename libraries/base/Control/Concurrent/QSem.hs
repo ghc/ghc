@@ -34,7 +34,7 @@ import Data.Maybe
 --
 -- The pattern
 --
--- >   bracket_ waitQSem signalQSem (...)
+-- > bracket_ waitQSem signalQSem (...)
 --
 -- is safe; it never loses a unit of the resource.
 --
@@ -67,7 +67,7 @@ newQSem initial
       sem <- newMVar (initial, [], [])
       return (QSem sem)
 
--- |Wait for a unit to become available
+-- |Wait for a unit to become available.
 waitQSem :: QSem -> IO ()
 waitQSem (QSem m) =
   mask_ $ do
@@ -91,7 +91,7 @@ waitQSem (QSem m) =
                             else do putMVar b (); return (i,b1,b2)
                    putMVar m r')
 
--- |Signal that a unit of the 'QSem' is available
+-- |Signal that a unit of the 'QSem' is available.
 signalQSem :: QSem -> IO ()
 signalQSem (QSem m) =
   uninterruptibleMask_ $ do -- Note [signal uninterruptible]

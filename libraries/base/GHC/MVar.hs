@@ -42,9 +42,11 @@ as a box, which may be empty or full.
 -}
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
--- | @since 4.1.0.0
+-- | Compares the underlying pointers.
+--
+-- @since 4.1.0.0
 instance Eq (MVar a) where
-        (MVar mvar1#) == (MVar mvar2#) = isTrue# (sameMVar# mvar1# mvar2#)
+    (MVar mvar1#) == (MVar mvar2#) = isTrue# (sameMVar# mvar1# mvar2#)
 
 {-
 M-Vars are rendezvous points for concurrent threads.  They begin
@@ -66,9 +68,9 @@ newEmptyMVar = IO $ \ s# ->
 
 -- |Create an 'MVar' which contains the supplied value.
 newMVar :: a -> IO (MVar a)
-newMVar value =
-    newEmptyMVar        >>= \ mvar ->
-    putMVar mvar value  >>
+newMVar value = do
+    mvar <- newEmptyMVar
+    putMVar mvar value
     return mvar
 
 -- |Return the contents of the 'MVar'.  If the 'MVar' is currently
@@ -95,6 +97,7 @@ takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 --
 -- 'readMVar' is multiple-wakeup, so when multiple readers are
 -- blocked on an 'MVar', all of them are woken up at the same time.
+-- The runtime guarantees that all woken threads complete their 'readMVar' operation.
 --
 -- /Compatibility note:/ Prior to base 4.7, 'readMVar' was a combination
 -- of 'takeMVar' and 'putMVar'.  This mean that in the presence of
@@ -104,12 +107,12 @@ takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 -- can be recovered by implementing 'readMVar as follows:
 --
 -- @
---  readMVar :: MVar a -> IO a
---  readMVar m =
---    mask_ $ do
---      a <- takeMVar m
---      putMVar m a
---      return a
+-- readMVar :: MVar a -> IO a
+-- readMVar m =
+--   mask_ $ do
+--     a <- takeMVar m
+--     putMVar m a
+--     return a
 -- @
 readMVar :: MVar a -> IO a
 readMVar (MVar mvar#) = IO $ \ s# -> readMVar# mvar# s#

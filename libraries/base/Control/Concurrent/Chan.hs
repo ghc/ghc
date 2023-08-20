@@ -13,9 +13,9 @@
 --
 -- Unbounded channels.
 --
--- The channels are implemented with @MVar@s and therefore inherit all the
+-- The channels are implemented with 'Control.Concurrent.MVar's and therefore inherit all the
 -- caveats that apply to @MVar@s (possibility of races, deadlocks etc). The
--- stm (software transactional memory) library has a more robust implementation
+-- @stm@ (software transactional memory) library has a more robust implementation
 -- of channels called @TChan@s.
 --
 -----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ import Control.Exception (mask_)
 #define _UPK_(x) {-# UNPACK #-} !(x)
 
 -- A channel is represented by two @MVar@s keeping track of the two ends
--- of the channel contents,i.e.,  the read- and write ends. Empty @MVar@s
+-- of the channel contents, i.e., the read- and write ends. Empty @MVar@s
 -- are used to handle consumers trying to read from an empty channel.
 
 -- |'Chan' is an abstract type representing an unbounded FIFO channel.
@@ -59,13 +59,13 @@ data ChItem a = ChItem a _UPK_(Stream a)
   -- although it leads to higher allocation, the channel data takes up
   -- less space and is therefore quicker to GC.
 
--- See the Concurrent Haskell paper for a diagram explaining the
+-- See the Concurrent Haskell paper for a diagram explaining
 -- how the different channel operations proceed.
 
 -- @newChan@ sets up the read and write end of a channel by initialising
 -- these two @MVar@s with an empty @MVar@.
 
--- |Build and returns a new instance of 'Chan'.
+-- |Build and return a new instance of 'Chan'.
 newChan :: IO (Chan a)
 newChan = do
    hole  <- newEmptyMVar
@@ -113,7 +113,7 @@ readChan (Chan readVar _) =
     return (new_read_end, val)
 
 -- |Duplicate a 'Chan': the duplicate channel begins empty, but data written to
--- either channel from then on will be available from both.  Hence this creates
+-- either channel from then on will be available from both. Hence this creates
 -- a kind of broadcast channel, where data written by anyone is seen by
 -- everyone else.
 --
