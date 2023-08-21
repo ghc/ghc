@@ -27,6 +27,7 @@
 #include "MarkWeak.h"
 #include "Sparks.h"
 #include "Sweep.h"
+#include "sm/CheckGc.h"
 
 #include "Arena.h"
 #include "Storage.h"
@@ -435,6 +436,17 @@ GarbageCollect (struct GcConfig config,
   // thread
   ASSERT(!work_stealing || n_gc_threads - 1 > n_gc_idle_threads);
 
+#if defined(DEBUG)
+  {
+    static int gc_n = 0;
+    char fname[255];
+    snprintf(fname, 255, "gcs/pre-gc-%d.dot", gc_n);
+    dump_heap_to(fname);
+    fprintf(stderr, "pre-GC %d\n", gc_n);
+    fflush(stderr);
+    gc_n++;
+  }
+#endif
 
   debugTrace(DEBUG_gc, "GC (gen %d, using %d thread(s), %s work stealing)",
              N, (int)getNumCapabilities() - (int)n_gc_idle_threads,
@@ -940,6 +952,18 @@ GarbageCollect (struct GcConfig config,
   if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       checkUnload();
   }
+
+#if defined(DEBUG)
+  {
+    static int gc_n = 0;
+    char fname[255];
+    snprintf(fname, 255, "gcs/post-gc-%d.dot", gc_n);
+    dump_heap_to(fname);
+    fprintf(stderr, "post-GC %d\n", gc_n);
+    fflush(stderr);
+    gc_n++;
+  }
+#endif
 
 #if defined(PROFILING)
   // resetStaticObjectForProfiling() must be called before
