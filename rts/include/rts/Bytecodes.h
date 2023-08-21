@@ -112,7 +112,9 @@
 
 #define bci_PRIMCALL                    87
 
-#define bci_BCO_NAME                    88
+#define bci_PUSH_TAGGED                 88
+
+#define bci_BCO_NAME                    89
 
 #define bci_OP_ADD_64                   90
 #define bci_OP_SUB_64                   91

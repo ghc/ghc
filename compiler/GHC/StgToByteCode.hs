@@ -96,6 +96,8 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+import GHC.Types.Var.Env (IdEnv, mkVarEnv, lookupVarEnv)
+import GHC.StgToCmm.Types (LambdaFormInfo(LFCon))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -121,10 +123,14 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
 
+        let flattened_binds = concatMap flattenBind (reverse lifted_binds)
+
         (BcM_State{..}, proto_bcos) <-
-           runBc hsc_env this_mod mb_modBreaks $ do
-             let flattened_binds = concatMap flattenBind (reverse lifted_binds)
+           runBc hsc_env this_mod mb_modBreaks (mkVarEnv (getDcs flattened_binds)) $
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
+
+        when (notNull ffis)
+             (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
@@ -148,6 +154,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
   where dflags  = hsc_dflags hsc_env
         logger  = hsc_logger hsc_env
         profile = targetProfile dflags
+
+getDcs :: [(Id, CgStgRhs)] -> [(Id, DataCon)]
+getDcs ((id, StgRhsCon _ dc _ _ _ _) : xs) = (id, dc) : getDcs xs
+getDcs (_ : xs) = getDcs xs
+getDcs [] = []
 
 {- Note [Generating code for top-level string literal bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2224,6 +2235,16 @@ pushAtom d p (StgVarArg var)
             | idType var `eqType` addrPrimTy ->
               return (unitOL (PUSH_ADDR (getName var)), szb)
 
+            | idPrimRep var == BoxedRep (Just Unlifted) -> do
+              mayDc <- lookupDc var
+              case mayDc of
+                Nothing ->
+                  case idLFInfo_maybe var of
+                    Nothing -> pprPanic "pushAtom: unlifted external id without LFInfo" (ppr var)
+                    Just (LFCon dc) -> return (unitOL (PUSH_TAGGED (getName var) dc), szb)
+                    Just{} -> pprPanic "pushAtom: expected LFCon" (ppr var)
+                Just dc -> return (unitOL (PUSH_TAGGED (getName var) dc), szb)
+
             | otherwise -> do
               let varTy = idType var
               massertPpr (definitelyLiftedType varTy) $
@@ -2584,6 +2605,7 @@ data BcM_State
                                             -- See Note [Breakpoint identifiers]
                                             -- in GHC.Types.Breakpoint
         , breakInfoIdx :: !Int              -- ^ Next index for breakInfo array
+        , bcm_dcs     :: IdEnv DataCon
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
@@ -2593,11 +2615,11 @@ ioToBc io = BcM $ \st -> do
   x <- io
   return (st, x)
 
-runBc :: HscEnv -> Module -> Maybe ModBreaks
+runBc :: HscEnv -> Module -> Maybe ModBreaks -> IdEnv DataCon
       -> BcM r
       -> IO (BcM_State, r)
-runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty 0)
+runBc hsc_env this_mod modBreaks dcs (BcM m)
+   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty dcs 0)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2669,3 +2691,6 @@ getCurrentModBreaks = BcM $ \st -> return (st, modBreaks st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+lookupDc :: Id -> BcM (Maybe DataCon)
+lookupDc id = BcM $ \st -> pure (st, lookupVarEnv (bcm_dcs st) id)

@@ -154,6 +154,13 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("PUSH_G   " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n" );
          pc += 1; break;
+      case bci_PUSH_TAGGED:
+         debugBelch("PUSH_TAGGED  " );
+         printPtr( ptrs[BCO_NEXT] );
+         debugBelch(" ");
+         printPtr( (StgPtr)literals[BCO_NEXT] );
+         debugBelch("\n");
+         break;
       case bci_PUSH_ALTS_P:
          debugBelch("PUSH_ALTS_P  " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n");

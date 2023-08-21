@@ -96,6 +96,9 @@ data BCInstr
    | PUSH_PRIMOP  PrimOp
    | PUSH_BCO     (ProtoBCO Name)
 
+   -- Push a tagged ptr
+   | PUSH_TAGGED Name DataCon
+
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name) ArgRep
    | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
@@ -372,6 +375,7 @@ instance Outputable BCInstr where
    ppr (PUSH_UBX32 lit)      = text "PUSH_UBX32" <+> ppr lit
    ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
    ppr (PUSH_ADDR nm)        = text "PUSH_ADDR" <+> ppr nm
+   ppr (PUSH_TAGGED nm tg)   = text "PUSH_TAGGED" <+> ppr nm <+> ppr tg
    ppr PUSH_APPLY_N          = text "PUSH_APPLY_N"
    ppr PUSH_APPLY_V          = text "PUSH_APPLY_V"
    ppr PUSH_APPLY_F          = text "PUSH_APPLY_F"
@@ -500,6 +504,7 @@ bciStackUse PUSH32_W{}            = 1  -- takes exactly 1 word
 bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
+bciStackUse PUSH_TAGGED{}         = 1
 bciStackUse (PUSH_ALTS bco _)     = 2 {- profiling only, restore CCCS -} +
                                     3 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =

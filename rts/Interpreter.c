@@ -484,6 +484,9 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
 STATIC_INLINE StgClosure *tagConstr(StgClosure *con) {
     return TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
 }
+STATIC_INLINE StgClosure *tagPtr(StgClosure *p, StgInfoTable *itbl) {
+    return TAG_CLOSURE(stg_min(TAG_MASK, 1 + itbl->srt), p);
+}
 
 static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_p_info,
@@ -1546,6 +1549,18 @@ run_BCO:
             }
 
             SpW(-1) = (W_) tagged_obj;
+            Sp_subW(1);
+            goto nextInsn;
+        }
+
+        case bci_PUSH_TAGGED: {
+            W_ o1 = BCO_GET_LARGE_ARG;
+            W_ o_itbl = BCO_GET_LARGE_ARG;
+            IF_DEBUG(interpreter,
+                     debugBelch("PUSH_TAGGED %ld %ld\n", o1, o_itbl);
+                );
+            StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
+            SpW(-1) = (W_)tagPtr((StgClosure *)BCO_PTR(o1), itbl);
             Sp_subW(1);
             goto nextInsn;
         }
