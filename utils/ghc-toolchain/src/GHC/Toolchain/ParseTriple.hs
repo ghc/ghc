@@ -20,12 +20,12 @@ parseTriple cc triple
   | [archName, vendorName, osName] <- parts
   = do arch <- parseArch cc archName
        os   <- parseOs osName
-       return (ArchOS arch os, Just vendorName)
+       return (ArchOS arch os, Just (parseVendor vendorName))
 
   | [archName, vendorName, osName, _abi] <- parts
   = do arch <- parseArch cc archName
        os   <- parseOs osName
-       return (ArchOS arch os, Just vendorName)
+       return (ArchOS arch os, Just (parseVendor vendorName))
 
   | otherwise
   = throwE $ "malformed triple " ++ triple
@@ -79,6 +79,20 @@ parseOs os =
       "wasi" -> pure OSWasi
       "ghcjs" -> pure OSGhcjs
       _ -> throwE $ "Unknown operating system " ++ os
+
+parseVendor :: String -> String
+parseVendor vendor =
+  case vendor of
+    -- like i686-pc-linux-gnu, i686-gentoo-freebsd8, x86_64-w64-mingw32
+    "pc" -> "unknown"
+    "gentoo" -> "unknown"
+    "w64" -> "unknown"
+    -- like armv5tel-softfloat-linux-gnueabi
+    "softfloat" -> "unknown"
+    -- like armv7a-hardfloat-linux-gnueabi
+    "hardfloat" -> "unknown"
+    -- Pass through by default
+    _ -> vendor
 
 splitOn :: Char -> String -> [String]
 splitOn sep = go
