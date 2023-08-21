@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -10,10 +11,12 @@
 
 -- | Warnings for a module
 module GHC.Unit.Module.Warnings
-   ( WarningCategory
+   ( WarningCategory(..)
    , mkWarningCategory
    , defaultWarningCategory
    , validWarningCategory
+   , InWarningCategory(..)
+   , fromWarningCategory
 
    , WarningCategorySet
    , emptyWarningCategorySet
@@ -56,6 +59,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Unicode
 
+import Language.Haskell.Syntax.Concrete (HsToken (HsTok))
 import Language.Haskell.Syntax.Extension
 
 import Data.Data
@@ -110,6 +114,15 @@ the possibility of them being infinite.
 
 -}
 
+data InWarningCategory
+  = InWarningCategory
+    { iwc_in :: !(Located (HsToken "in")),
+      iwc_st :: !SourceText,
+      iwc_wc :: (Located WarningCategory)
+    } deriving Data
+
+fromWarningCategory :: WarningCategory -> InWarningCategory
+fromWarningCategory wc = InWarningCategory (noLoc HsTok) NoSourceText (noLoc wc)
 
 
 -- See Note [Warning categories]
@@ -184,7 +197,7 @@ deleteWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCateg
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt pass
    = WarningTxt
-      (Maybe (Located WarningCategory))
+      (Maybe (Located InWarningCategory))
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
       (Located SourceText)
@@ -197,7 +210,7 @@ data WarningTxt pass
 -- | To which warning category does this WARNING or DEPRECATED pragma belong?
 -- See Note [Warning categories].
 warningTxtCategory :: WarningTxt pass -> WarningCategory
-warningTxtCategory (WarningTxt (Just (L _ cat)) _ _) = cat
+warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _ _) = cat
 warningTxtCategory _ = defaultWarningCategory
 
 -- | The message that the WarningTxt was specified to output
@@ -218,8 +231,14 @@ warningTxtSame w1 w2
               | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
               | otherwise                                      = False
 
-deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
+deriving instance Eq InWarningCategory
+
+deriving instance (Eq (HsToken "in"), Eq (IdP pass)) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
+
+instance Outputable InWarningCategory where
+  ppr (InWarningCategory _ _ wt) = text "in" <+> doubleQuotes (ppr wt)
+
 
 instance Outputable (WarningTxt pass) where
     ppr (WarningTxt mcat lsrc ws)
@@ -227,7 +246,7 @@ instance Outputable (WarningTxt pass) where
             NoSourceText   -> pp_ws ws
             SourceText src -> ftext src <+> ctg_doc <+> pp_ws ws <+> text "#-}"
         where
-          ctg_doc = maybe empty (\ctg -> text "in" <+> doubleQuotes (ppr ctg)) mcat
+          ctg_doc = maybe empty (\ctg -> ppr ctg) mcat
 
 
     ppr (DeprecatedTxt lsrc  ds)
