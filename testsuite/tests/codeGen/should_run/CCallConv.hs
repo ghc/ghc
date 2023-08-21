@@ -72,6 +72,20 @@ foreign import ccall "funFloat"
     Float# -> -- s1
     Float# -- result
 
+foreign import ccall "funDouble"
+  funDouble ::
+    Double# -> -- a0
+    Double# -> -- a1
+    Double# -> -- a2
+    Double# -> -- a3
+    Double# -> -- a4
+    Double# -> -- a5
+    Double# -> -- a6
+    Double# -> -- a7
+    Double# -> -- s0
+    Double# -> -- s1
+    Double# -- result
+
 main :: IO ()
 main =
   -- N.B. the values here aren't choosen by accident: -1 means all bits one in
@@ -89,6 +103,7 @@ main =
       res32 :: Int64# = fun32 i32 w32 i32 i32 i32 i32 i32 i32 w32 i32
       expected_res32 :: Int64 = 2 * (fromInteger . fromIntegral) (maxBound :: Word32) + 8 * (-1)
       resFloat :: Float = F# (funFloat 1.0# 1.1# 1.2# 1.3# 1.4# 1.5# 1.6# 1.7# 1.8# 1.9#)
+      resDouble :: Double = D# (funDouble 1.0## 1.1## 1.2## 1.3## 1.4## 1.5## 1.6## 1.7## 1.8## 1.9##)
    in do
         print $ "fun8 result:" ++ show (I64# res8)
         assertEqual expected_res8 (I64# res8)
@@ -98,6 +113,8 @@ main =
         assertEqual expected_res32 (I64# res32)
         print $ "funFloat result:" ++ show resFloat
         assertEqual (14.5 :: Float) resFloat
+        print $ "funDouble result:" ++ show resDouble
+        assertEqual (14.5 :: Double) resDouble
 
 assertEqual :: (Eq a, Show a) => a -> a -> IO ()
 assertEqual a b =

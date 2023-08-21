@@ -72,3 +72,20 @@ float funFloat(float a0, float a1, float a2, float a3, float a4, float a5,
 
   return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + s0 + s1;
 }
+
+double funDouble(double a0, double a1, double a2, double a3, double a4, double a5,
+             double a6, double a7, double s0, double s1) {
+  printf("funDouble:\n");
+  printf("a0: %f\n", a0);
+  printf("a1: %f\n", a1);
+  printf("a2: %f\n", a2);
+  printf("a3: %f\n", a3);
+  printf("a4: %f\n", a4);
+  printf("a5: %f\n", a5);
+  printf("a6: %f\n", a6);
+  printf("a7: %f\n", a7);
+  printf("s0: %f\n", s0);
+  printf("s1: %f\n", s1);
+
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + s0 + s1;
+}
