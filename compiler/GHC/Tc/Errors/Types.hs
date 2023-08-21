@@ -3080,6 +3080,15 @@ data TcRnMessage where
     -> !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
     -> TcRnMessage
 
+  {-| TcRnDeprecatedInvisTyArgInConPat is a warning that triggers on type applications
+      in constructor patterns when the user has not enabled '-XTypeAbstractions'
+      but instead has enabled both '-XScopedTypeVariables' and '-XTypeApplications'.
+
+      This warning is a deprecation mechanism that is scheduled until GHC 9.12.
+  -}
+  TcRnDeprecatedInvisTyArgInConPat
+    :: TcRnMessage
+
   {-| TcRnLoopySuperclassSolve is a warning, controlled by @-Wloopy-superclass-solve@,
       that is triggered when GHC solves a constraint in a possibly-loopy way,
       violating the class instance termination rules described in the section

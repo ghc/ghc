@@ -2797,9 +2797,6 @@ impliedXFlags
     , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. #7854
     , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
 
-    -- In accordance with GHC Proposal #448 "Modern Scoped Type Variables"
-    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.TypeAbstractions)
-
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
 
     , (LangExt.DerivingVia, turnOn, LangExt.DerivingStrategies)

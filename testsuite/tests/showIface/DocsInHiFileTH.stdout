@@ -286,6 +286,5 @@ docs:
          ImportQualifiedPost
          StandaloneKindSignatures
          FieldSelectors
-         TypeAbstractions
 extensible fields:
 

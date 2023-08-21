@@ -1,3 +1,4 @@
+
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
@@ -6,7 +7,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
-
+{-# LANGUAGE MultiWayIf                 #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -642,9 +643,26 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
   where
     check_lang_exts :: RnM ()
     check_lang_exts =
-      unlessXOptM LangExt.TypeAbstractions $
-        for_ (listToMaybe tyargs) $ \ arg ->
-          addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
+      for_ (listToMaybe tyargs) $ \ arg ->
+        do { type_abs   <- xoptM LangExt.TypeAbstractions
+           ; type_app   <- xoptM LangExt.TypeApplications
+           ; scoped_tvs <- xoptM LangExt.ScopedTypeVariables
+           ; if | type_abs
+                -> return ()
+
+                -- As per [GHC Proposal 604](https://github.com/ghc-proposals/ghc-proposals/pull/604/),
+                -- we allow type applications in constructor patterns when -XTypeApplications and
+                -- -XScopedTypeVariables are both enabled, but we emit a warning when doing so.
+                --
+                -- This warning is scheduled to become an error in GHC 9.12, in
+                -- which case we will get the usual error (below),
+                -- which suggests enabling -XTypeAbstractions.
+                | type_app && scoped_tvs
+                -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
+
+                | otherwise
+                -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
+           }
 
     rnConPatTyArg (HsConPatTyArg at t) = do
       t' <- liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t

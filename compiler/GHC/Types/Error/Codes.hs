@@ -580,6 +580,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnImplicitRhsQuantification"                 = 16382
   GhcDiagnosticCode "TcRnBadTyConTelescope"                         = 87279
   GhcDiagnosticCode "TcRnPatersonCondFailure"                       = 22979
+  GhcDiagnosticCode "TcRnDeprecatedInvisTyArgInConPat"              = 69797
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

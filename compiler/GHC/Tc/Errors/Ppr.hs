@@ -1824,6 +1824,11 @@ instance Diagnostic TcRnMessage where
                 text "whereas" <+> quotes (text "forall {a}.") <+> text "and" <+> quotes (text "forall a ->") <+> text "do not."
              ]]
 
+    TcRnDeprecatedInvisTyArgInConPat ->
+      mkSimpleDecorated $
+        cat [ text "Type applications in constructor patterns will require"
+            , text "the TypeAbstractions extension starting from GHC 9.12." ]
+
     TcRnInvisBndrWithoutSig _ hs_bndr ->
       mkSimpleDecorated $
         vcat [ hang (text "Invalid invisible type variable binder:")
@@ -2427,6 +2432,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnMissingRoleAnnotations
     TcRnIllegalInvisTyVarBndr{}
       -> ErrorWithoutFlag
+    TcRnDeprecatedInvisTyArgInConPat {}
+      -> WarningWithoutFlag
     TcRnInvalidInvisTyVarBndr{}
       -> ErrorWithoutFlag
     TcRnInvisBndrWithoutSig{}
@@ -3071,6 +3078,8 @@ instance Diagnostic TcRnMessage where
     TcRnMissingRoleAnnotation{}
       -> noHints
     TcRnIllegalInvisTyVarBndr{}
+      -> [suggestExtension LangExt.TypeAbstractions]
+    TcRnDeprecatedInvisTyArgInConPat{}
       -> [suggestExtension LangExt.TypeAbstractions]
     TcRnInvalidInvisTyVarBndr{}
       -> noHints
