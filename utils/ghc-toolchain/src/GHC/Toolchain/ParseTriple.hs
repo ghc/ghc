@@ -54,6 +54,7 @@ parseArch cc arch =
       "hppa" -> pure ArchUnknown
       "wasm32" -> pure ArchWasm32
       "javascript" -> pure ArchJavaScript
+      "loongarch64" -> pure ArchLoongArch64
       _ -> throwE $ "Unknown architecture " ++ arch
 
 parseOs :: String -> M OS
