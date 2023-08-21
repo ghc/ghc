@@ -1,4 +1,3 @@
-
 test('rnfail001', normal, compile_fail, [''])
 test('rnfail002', normal, compile_fail, [''])
 test('rnfail003', normal, compile_fail, [''])
@@ -59,6 +58,7 @@ test('rnfail055', [extra_files(['RnFail055.hs', 'RnFail055.hs-boot', 'RnFail055_
 test('rnfail056', normal, compile_fail, [''])
 test('rnfail057', normal, compile_fail, [''])
 test('rnfail058', normal, compile_fail, [''])
+test('rnfail059', [extra_files(['RnFail059.hs', 'RnFail059.hs-boot', 'RnFail059_aux.hs'])], multimod_compile_fail, ['RnFail059', '-v0'])
 
 test('rn_dup', normal, compile_fail, [''])
 test('T495', normal, compile_fail, [''])

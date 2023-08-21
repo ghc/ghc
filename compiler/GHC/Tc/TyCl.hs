@@ -48,6 +48,7 @@ import GHC.Tc.Zonk.TcType
 import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
+import {-# SOURCE #-} GHC.Tc.Module( checkBootDeclM )
 import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
@@ -84,6 +85,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
+import GHC.Types.TypeEnv
 import GHC.Types.Unique
 import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
@@ -93,6 +95,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList, equivClasses )
 
 import GHC.Unit
+import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -209,7 +212,12 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Do it before Step 3 (adding implicit things) because the latter
            -- expects well-formed TyCons
        ; traceTc "Starting validity check" (ppr tyclss)
-       ; tyclss <- concatMapM checkValidTyCl tyclss
+       ; tyclss <- tcExtendTyConEnv tyclss $
+           -- NB: put the TyCons in the environment for validity checking,
+           -- as we might look them up in checkTyConConsistentWithBoot.
+           -- See Note [TyCon boot consistency checking].
+                   concatMapM checkValidTyCl tyclss
+
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
@@ -4328,6 +4336,7 @@ checkValidTyCl tc
     recoverM recovery_code     $
     do { traceTc "Starting validity for tycon" (ppr tc)
        ; checkValidTyCon tc
+       ; checkTyConConsistentWithBoot tc -- See Note [TyCon boot consistency checking]
        ; traceTc "Done validity for tycon" (ppr tc)
        ; return [tc] }
   where
@@ -4403,6 +4412,49 @@ Some notes:
 --        T1 { f1 :: b, f2 :: a, f3 ::Int } :: T
 --        T2 { f1 :: c, f2 :: c, f3 ::Int } :: T
 -- Here we do not complain about f1,f2 because they are existential
+
+-- | Check that a 'TyCon' is consistent with the one in the hs-boot file,
+-- if any.
+--
+-- See Note [TyCon boot consistency checking].
+checkTyConConsistentWithBoot :: TyCon -> TcM ()
+checkTyConConsistentWithBoot tc =
+  do { gbl_env <- getGblEnv
+     ; let name          = tyConName tc
+           real_thing    = ATyCon tc
+           boot_info     = tcg_self_boot gbl_env
+           boot_type_env = case boot_info of
+             NoSelfBoot            -> emptyTypeEnv
+             SelfBoot boot_details -> md_types boot_details
+           m_boot_info   = lookupTypeEnv boot_type_env name
+     ; case m_boot_info of
+         Nothing         -> return ()
+         Just boot_thing -> checkBootDeclM HsBoot boot_thing real_thing
+     }
+
+{- Note [TyCon boot consistency checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to throw an error when A.hs and A.hs-boot define a TyCon inconsistently,
+e.g.
+
+  -- A.hs-boot
+  type D :: Type
+  data D
+
+  -- A.hs
+  data D (k :: Type) = MkD
+
+Here A.D and A[boot].D have different kinds, so we must error. In addition, we
+must error eagerly, lest other parts of the compiler witness this inconsistency
+(which was the subject of #16127). To achieve this, we call
+checkTyConIsConsistentWithBoot in checkValidTyCl, which is called in
+GHC.Tc.TyCl.tcTyClGroup.
+
+Note that, when calling checkValidTyCl, we must extend the TyCon environment.
+For example, we could end up comparing the RHS of two type synonym declarations
+to check they are consistent, and these RHS might mention some of the TyCons we
+are validity checking, so they need to be in the environment.
+-}
 
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
