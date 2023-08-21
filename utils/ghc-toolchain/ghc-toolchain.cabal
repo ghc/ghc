@@ -17,6 +17,7 @@ library
                       GHC.Toolchain.Prelude,
                       GHC.Toolchain.Program,
                       GHC.Toolchain.ParseTriple,
+                      GHC.Toolchain.NormaliseTriple,
                       GHC.Toolchain.CheckArm,
                       GHC.Toolchain.Target,
                       GHC.Toolchain.Tools.Ar,
