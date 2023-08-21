@@ -329,11 +329,7 @@ data TcRnMessage where
   -}
   TcRnSolverReport :: SolverReportWithCtxt
                    -> DiagnosticReason
-                   -> [GhcHint]
                    -> TcRnMessage
-    -- TODO: split up TcRnSolverReport into several components,
-    -- so that we can compute the reason and hints, as opposed
-    -- to having to pass them here.
 
   {-| TcRnSolverDepthError is an error that occurs when the constraint solver
       exceeds the maximum recursion depth.
@@ -4983,7 +4979,6 @@ data SolverReport
   = SolverReport
   { sr_important_msg :: SolverReportWithCtxt
   , sr_supplementary :: [SolverReportSupplementary]
-  , sr_hints         :: [GhcHint]
   }
 
 -- | Additional information to print in a 'SolverReport', after the
@@ -5541,7 +5536,7 @@ data HoleError
   -- See 'NotInScopeError' for other not-in-scope errors.
   --
   -- Test cases: T9177a.
-  = OutOfScopeHole [ImportError]
+  = OutOfScopeHole [ImportError] [GhcHint]
   -- | Report a typed hole, or wildcard, with additional information.
   | HoleError HoleSort
               [TcTyVar]                     -- Other type variables which get computed on the way.

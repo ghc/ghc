@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
@@ -22,6 +23,9 @@ module GHC.Tc.Errors.Ppr
   , TcRnMessageOpts(..)
   , pprTyThingUsedWrong
   , pprUntouchableVariable
+
+  --
+  , mismatchMsg_ExpectedActuals
 
   -- | Useful when overriding message printing.
   , messageWithInfoDiagnosticMessage
@@ -141,7 +145,7 @@ instance Diagnostic TcRnMessage where
                   (diagnosticMessage opts msg)
     TcRnWithHsDocContext ctxt msg
       -> messageWithHsDocContext opts ctxt (diagnosticMessage opts msg)
-    TcRnSolverReport msg _ _
+    TcRnSolverReport msg _
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnSolverDepthError ty depth -> mkSimpleDecorated msg
       where
@@ -1862,7 +1866,7 @@ instance Diagnostic TcRnMessage where
            TcRnMessageDetailed _ m -> diagnosticReason m
     TcRnWithHsDocContext _ msg
       -> diagnosticReason msg
-    TcRnSolverReport _ reason _
+    TcRnSolverReport _ reason
       -> reason -- Error, or a Warning if we are deferring type errors
     TcRnSolverDepthError {}
       -> ErrorWithoutFlag
@@ -2467,8 +2471,8 @@ instance Diagnostic TcRnMessage where
            TcRnMessageDetailed _ m -> diagnosticHints m
     TcRnWithHsDocContext _ msg
       -> diagnosticHints msg
-    TcRnSolverReport _ _ hints
-      -> hints
+    TcRnSolverReport (SolverReportWithCtxt ctxt msg) _
+      -> tcSolverReportMsgHints ctxt msg
     TcRnSolverDepthError {}
       -> [SuggestIncreaseReductionDepth]
     TcRnRedundantConstraints{}
@@ -4490,7 +4494,7 @@ pprSameOccInfo (SameOcc same_pkg n1 n2) =
 **********************************************************************-}
 
 pprHoleError :: SolverReportErrCtxt -> Hole -> HoleError -> SDoc
-pprHoleError _ (Hole { hole_ty, hole_occ = rdr }) (OutOfScopeHole imp_errs)
+pprHoleError _ (Hole { hole_ty, hole_occ = rdr }) (OutOfScopeHole imp_errs _hints)
   = out_of_scope_msg $$ vcat (map ppr imp_errs)
   where
     herald | isDataOcc (rdrNameOcc rdr) = text "Data constructor not in scope:"
@@ -4613,6 +4617,128 @@ scopeErrorHints scope_err =
     NoTopLevelBinding      -> noHints
     UnknownSubordinate {}  -> noHints
     NotInScopeTc _         -> noHints
+
+tcSolverReportMsgHints :: SolverReportErrCtxt -> TcSolverReportMsg -> [GhcHint]
+tcSolverReportMsgHints ctxt = \case
+  BadTelescope {}
+    -> noHints
+  UserTypeError {}
+    -> noHints
+  UnsatisfiableError {}
+    -> noHints
+  ReportHoleError hole err
+    -> holeErrorHints hole err
+  CannotUnifyVariable mismatch_msg rea
+    -> mismatchMsgHints ctxt mismatch_msg ++ cannotUnifyVariableHints rea
+  Mismatch { mismatchMsg = mismatch_msg }
+    -> mismatchMsgHints ctxt mismatch_msg
+  FixedRuntimeRepError {}
+    -> noHints
+  BlockedEquality {}
+    -> noHints
+  ExpectingMoreArguments {}
+    -> noHints
+  UnboundImplicitParams {}
+    -> noHints
+  AmbiguityPreventsSolvingCt {}
+    -> noHints
+  CannotResolveInstance {}
+    -> noHints
+  OverlappingInstances {}
+    -> noHints
+  UnsafeOverlap {}
+   -> noHints
+
+mismatchMsgHints :: SolverReportErrCtxt -> MismatchMsg -> [GhcHint]
+mismatchMsgHints ctxt msg =
+  maybeToList [ hint | (exp,act) <- mismatchMsg_ExpectedActuals msg
+                     , hint <- suggestAddSig ctxt exp act ]
+
+mismatchMsg_ExpectedActuals :: MismatchMsg -> Maybe (Type, Type)
+mismatchMsg_ExpectedActuals = \case
+  BasicMismatch { mismatch_ty1 = exp, mismatch_ty2 = act } ->
+    Just (exp, act)
+  KindMismatch { kmismatch_expected = exp, kmismatch_actual = act } ->
+    Just (exp, act)
+  TypeEqMismatch { teq_mismatch_expected = exp, teq_mismatch_actual = act } ->
+    Just (exp,act)
+  CouldNotDeduce { cnd_extra = cnd_extra }
+    | Just (CND_Extra _ exp act) <- cnd_extra
+    -> Just (exp, act)
+    | otherwise
+    -> Nothing
+
+holeErrorHints :: Hole -> HoleError -> [GhcHint]
+holeErrorHints _hole = \case
+  OutOfScopeHole _ hints
+    -> hints
+  HoleError {}
+    -> noHints
+
+cannotUnifyVariableHints :: CannotUnifyVariableReason -> [GhcHint]
+cannotUnifyVariableHints = \case
+  CannotUnifyWithPolytype {}
+    -> noHints
+  OccursCheck {}
+    -> noHints
+  SkolemEscape {}
+    -> noHints
+  DifferentTyVars {}
+    -> noHints
+  RepresentationalEq {}
+    -> noHints
+
+suggestAddSig :: SolverReportErrCtxt -> TcType -> TcType -> Maybe GhcHint
+-- See Note [Suggest adding a type signature]
+suggestAddSig ctxt ty1 _ty2
+  | bndr : bndrs <- inferred_bndrs
+  = Just $ SuggestAddTypeSignatures $ NamedBindings (bndr :| bndrs)
+  | otherwise
+  = Nothing
+  where
+    inferred_bndrs =
+      case getTyVar_maybe ty1 of
+        Just tv | isSkolemTyVar tv -> find (cec_encl ctxt) False tv
+        _                          -> []
+
+    -- 'find' returns the binders of an InferSkol for 'tv',
+    -- provided there is an intervening implication with
+    -- ic_given_eqs /= NoGivenEqs (i.e. a GADT match)
+    find [] _ _ = []
+    find (implic:implics) seen_eqs tv
+       | tv `elem` ic_skols implic
+       , InferSkol prs <- ic_info implic
+       , seen_eqs
+       = map fst prs
+       | otherwise
+       = find implics (seen_eqs || ic_given_eqs implic /= NoGivenEqs) tv
+
+{- Note [Suggest adding a type signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The OutsideIn algorithm rejects GADT programs that don't have a principal
+type, and indeed some that do.  Example:
+   data T a where
+     MkT :: Int -> T Int
+
+   f (MkT n) = n
+
+Does this have type f :: T a -> a, or f :: T a -> Int?
+The error that shows up tends to be an attempt to unify an
+untouchable type variable.  So suggestAddSig sees if the offending
+type variable is bound by an *inferred* signature, and suggests
+adding a declared signature instead.
+
+More specifically, we suggest adding a type sig if we have p ~ ty, and
+p is a skolem bound by an InferSkol.  Those skolems were created from
+unification variables in simplifyInfer.  Why didn't we unify?  It must
+have been because of an intervening GADT or existential, making it
+untouchable. Either way, a type signature would help.  For GADTs, it
+might make it typeable; for existentials the attempt to write a
+signature will fail -- or at least will produce a better error message
+next time
+
+This initially came up in #8968, concerning pattern synonyms.
+-}
 
 {- *********************************************************************
 *                                                                      *
