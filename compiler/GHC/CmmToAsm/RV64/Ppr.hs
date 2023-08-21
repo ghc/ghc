@@ -482,9 +482,9 @@ pprInstr platform instr = case instr of
     | otherwise -> op3 (text "\tmul") o1 o2 o3
   SMULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
   SMULL o1 o2 o3 -> op3 (text "\tsmull") o1 o2 o3
-  NEG  o1 o2
-    | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfneg") o1 o2
-    | otherwise -> op2 (text "\tneg") o1 o2
+  NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfneg.s") o1 o2
+  NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfneg.d") o1 o2
+  NEG o1 o2 -> op2 (text "\tneg") o1 o2
   DIV o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
   -- TODO: This must (likely) be refined regarding width
     -> op3 (text "\tfdiv." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
