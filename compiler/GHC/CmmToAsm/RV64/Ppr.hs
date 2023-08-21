@@ -403,7 +403,7 @@ pprReg w r = case r of
          | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
 isIntOp :: Operand -> Bool
-isIntOp o = not (isFloatOp o || isDoubleOp o)
+isIntOp = not . isFloatOp
 
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ (RegReal (RealRegSingle i))) | i > 31 = True
@@ -601,7 +601,7 @@ pprInstr platform instr = case instr of
     OLE | isFloatOp l && isFloatOp r -> line $ binOp "\tfle.s"
     OGT | isFloatOp l && isFloatOp r -> line $ binOp "\tfgt.s"
     OGE | isFloatOp l && isFloatOp r -> line $ binOp "\tfge.s"
-    _  -> pprPanic "RV64.ppr: unhandled CSET conditional" (pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
+    x  -> pprPanic "RV64.ppr: unhandled CSET conditional" (text (show x) <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
                  | (OpImm _) <- l = panic "RV64.ppr: Cannot SUB IMM _"
