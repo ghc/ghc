@@ -696,7 +696,8 @@ pprInstr platform instr = case instr of
   FCVTZS o1 o2 -> pprPanic "RV64.pprInstr - impossible float to integer conversion" $
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
 
-  FABS o1 o2 -> op2 (text "\tfabs") o1 o2
+  FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
+  FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ (instrCon instr)
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
