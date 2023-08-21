@@ -1,5 +1,6 @@
 module GHC.Toolchain.Program
     ( Program(..)
+    , shProgram
     , _prgPath
     , _prgFlags
     , addFlagIfNew
@@ -36,6 +37,9 @@ data Program = Program { prgPath :: FilePath
                        , prgFlags :: [String]
                        }
     deriving (Read, Eq, Ord)
+
+shProgram :: Program
+shProgram = Program "sh" []
 
 instance Show Program where
   -- Normalise filepaths before showing to aid with diffing the target files.

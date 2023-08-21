@@ -31,6 +31,7 @@ import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Nm
 import GHC.Toolchain.Tools.MergeObjs
 import GHC.Toolchain.Tools.Readelf
+import GHC.Toolchain.NormaliseTriple (normaliseTriple)
 
 data Opts = Opts
     { optTriple    :: String
@@ -367,15 +368,17 @@ ldOverrideWhitelist a =
     _ -> False
 
 
+
 mkTarget :: Opts -> M Target
 mkTarget opts = do
+    normalised_triple <- normaliseTriple (optTriple opts)
     -- Use Llvm target if specified, otherwise use triple as llvm target
-    let tgtLlvmTarget = fromMaybe (optTriple opts) (optLlvmTriple opts)
+    let tgtLlvmTarget = fromMaybe normalised_triple (optLlvmTriple opts)
     cc0 <- findCc tgtLlvmTarget (optCc opts)
     cxx <- findCxx tgtLlvmTarget (optCxx opts)
     cpp <- findCpp (optCpp opts) cc0
     hsCpp <- findHsCpp (optHsCpp opts) cc0
-    (archOs, tgtVendor) <- parseTriple cc0 (optTriple opts)
+    (archOs, tgtVendor) <- parseTriple cc0 normalised_triple
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
     ccLink <- findCcLink tgtLlvmTarget (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
