@@ -159,6 +159,8 @@ toolTargets = [ binary
               , ghcBoot
               , ghcBootTh
               , ghcPlatform
+              , ghcToolchain
+              , ghcToolchainBin
               , ghcHeap
               , ghci
               , ghcPkg  -- # executable
