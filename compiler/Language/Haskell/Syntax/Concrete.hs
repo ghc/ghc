@@ -35,6 +35,7 @@ data HsToken (tok :: Symbol) = HsTok
 -- avoid a dependency.
 data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
 
+deriving instance Eq (HsToken tok)
 deriving instance KnownSymbol tok => Data (HsToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)
 
