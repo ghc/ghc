@@ -699,3 +699,4 @@ test('VisFlag5', normal, compile_fail, [''])
 test('T22684', normal, compile_fail, [''])
 test('T23514a', normal, compile_fail, [''])
 test('T22478c', normal, compile_fail, [''])
+test('T23776', normal, compile, ['']) # to become an error in GHC 9.12

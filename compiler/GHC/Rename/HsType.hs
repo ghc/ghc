@@ -38,6 +38,7 @@ module GHC.Rename.HsType (
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
         nubL, nubN,
+
         -- Error helpers
         badKindSigErr
   ) where
