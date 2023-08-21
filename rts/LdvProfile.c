@@ -64,8 +64,6 @@ processHeapClosureForDead( const StgClosure *c )
     uint32_t size;
     const StgInfoTable *info;
 
-    info = get_itbl(c);
-
     info = c->header.info;
     if (IS_FORWARDING_PTR(info)) {
         // The size of the evacuated closure is currently stored in
