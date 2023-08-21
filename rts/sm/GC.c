@@ -100,6 +100,68 @@
  * See also: Note [STATIC_LINK fields] in Storage.h.
  */
 
+struct ClosureList {
+  const char *label;
+  const StgClosure *closure;
+  struct ClosureList *next;
+};
+
+static struct ClosureList *follow_list = NULL;
+
+static void addClosureToList(struct ClosureList **list, const char *label, const StgClosure *closure) {
+  struct ClosureList *x = (struct ClosureList*) stgMallocBytes(sizeof(struct ClosureList), "addClosureToList");
+  x->label = label;
+  x->closure = closure;
+  while (true) {
+    x->next = *list;
+    if (cas((StgVolatilePtr) list, (StgWord) x->next, (StgWord) x) == (StgWord) x->next) break;
+  }
+}
+
+void followClosure(const char *label, const StgClosure *closure);
+void followClosure(const char *label, const StgClosure *closure) {
+  addClosureToList(&follow_list, label, closure);
+}
+
+static void scavengeClosureList(struct ClosureList **head) {
+  struct ClosureList **last = head;
+  struct ClosureList *el = *last;
+  while (el) {
+    const StgInfoTable *info = el->closure->header.info;
+    if (IS_FORWARDING_PTR(info)) {
+      StgClosure *p = (StgClosure *) UN_FORWARDING_PTR(info);
+      debugBelch("closure %s @ %p evacuated to %p\n",
+                 el->label, el->closure, p);
+      el->closure = p;
+    } else if (HEAP_ALLOCED_GC(el->closure)) {
+      bdescr *bd = Bdescr((StgPtr) el->closure);
+      if (!(bd->flags & BF_EVACUATED)) {
+        debugBelch("closure %s died @ %p\n", el->label, el->closure);
+        *last = el->next;
+        stgFree(el);
+        el = *last;
+        continue;
+      }
+    }
+
+    last = &el->next;
+    el = el->next;
+  }
+}
+
+void printClosureList(struct ClosureList *list) {
+  while (list) {
+    debugBelch("Closure %s @ %p", list->label, list->closure);
+    if (HEAP_ALLOCED_GC(list->closure)) {
+      bdescr *bd = Bdescr((StgPtr) list->closure);
+      debugBelch(" (gen=%d)", bd->gen_no);
+    } else {
+      debugBelch(" (static)");
+    }
+    debugBelch("\n");
+  }
+}
+
 /* Hot GC globals
  * ~~~~~~~~~~~~~~
  * The globals below are quite hot during GC but read-only, initialized during
@@ -942,6 +1004,9 @@ GarbageCollect (struct GcConfig config,
   // because a finalizer may call hs_free_fun_ptr() or
   // hs_free_stable_ptr(), both of which access the StablePtr table.
   stablePtrUnlock();
+
+  scavengeClosureList(&follow_list);
+  printClosureList(follow_list);
 
   // Unload dynamically-loaded object code after a major GC.
   // See Note [Object unloading] in CheckUnload.c for details.
