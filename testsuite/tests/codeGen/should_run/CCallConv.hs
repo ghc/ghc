@@ -58,6 +58,20 @@ foreign import ccall "fun32"
     Int32# -> -- s1
     Int64# -- result
 
+foreign import ccall "funFloat"
+  funFloat ::
+    Float# -> -- a0
+    Float# -> -- a1
+    Float# -> -- a2
+    Float# -> -- a3
+    Float# -> -- a4
+    Float# -> -- a5
+    Float# -> -- a6
+    Float# -> -- a7
+    Float# -> -- s0
+    Float# -> -- s1
+    Float# -- result
+
 main :: IO ()
 main =
   -- N.B. the values here aren't choosen by accident: -1 means all bits one in
@@ -74,6 +88,7 @@ main =
       w32 :: Word32# = wordToWord32# (4294967295##)
       res32 :: Int64# = fun32 i32 w32 i32 i32 i32 i32 i32 i32 w32 i32
       expected_res32 :: Int64 = 2 * (fromInteger . fromIntegral) (maxBound :: Word32) + 8 * (-1)
+      resFloat :: Float = F# (funFloat 1.0# 1.1# 1.2# 1.3# 1.4# 1.5# 1.6# 1.7# 1.8# 1.9#)
    in do
         print $ "fun8 result:" ++ show (I64# res8)
         assertEqual expected_res8 (I64# res8)
@@ -81,9 +96,11 @@ main =
         assertEqual expected_res16 (I64# res16)
         print $ "fun32 result:" ++ show (I64# res32)
         assertEqual expected_res32 (I64# res32)
+        print $ "funFloat result:" ++ show resFloat
+        assertEqual (14.5 :: Float) resFloat
 
-assertEqual :: (Integral a, Integral b, Show a, Show b) => a -> b -> IO ()
+assertEqual :: (Eq a, Show a) => a -> a -> IO ()
 assertEqual a b =
-  if (fromIntegral a) == (fromIntegral b)
+  if a == b
     then pure ()
     else error $ show a ++ " =/= " ++ show b

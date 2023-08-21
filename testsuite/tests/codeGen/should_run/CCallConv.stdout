@@ -1,6 +1,7 @@
 "fun8 result:502"
 "fun16 result:131062"
 "fun32 result:8589934582"
+"funFloat result:14.5"
 fun32:
 a0: 0xffffffff -1
 a1: 0xffffffff 4294967295
@@ -34,3 +35,14 @@ a6: 0xffffffff -1
 a7: 0xffffffff -1
 s0: 0xffffffff -1
 s1: 0xff 255
+funFloat:
+a0: 1.000000
+a1: 1.100000
+a2: 1.200000
+a3: 1.300000
+a4: 1.400000
+a5: 1.500000
+a6: 1.600000
+a7: 1.700000
+s0: 1.800000
+s1: 1.900000

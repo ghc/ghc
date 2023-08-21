@@ -1797,17 +1797,14 @@ genCCall target dest_regs arg_regs bid = do
                       ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
       passArguments pack [] fpRegs args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
 
-    -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
-    passArguments pack gpRegs [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
+    -- Still have gpRegs left, but want to pass a FP argument. Must be passed in gpReg then.
+    passArguments pack (gpReg:gpRegs) [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
-          bytes = widthInBits w `div` 8
-          space = if pack then bytes else 8
-          stackSpace' | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
-                      | otherwise                           = stackSpace
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpace')))
-          stackCode = code_r `snocOL`
-                      ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
-      passArguments pack gpRegs [] args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
+          mov = MOV (OpReg w gpReg) (OpReg w r)
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass fp argument in gpReg: " <> ppr r) mov
+      passArguments pack gpRegs [] args stackSpace (gpReg:accumRegs) accumCode'
 
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
