@@ -669,7 +669,9 @@ pprInstr platform instr = case instr of
   LDRU II32 o1 o2 -> op2 (text "\tlwu") o1 o2
   -- double words (64bit) cannot be sign extended by definition
   LDRU II64 o1 o2 -> op2 (text "\tld") o1 o2
+  LDRU FF32 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tflw") o1 o2
   LDRU FF32 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tflw") o1 o2
+  LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
   -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
