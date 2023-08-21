@@ -1978,8 +1978,9 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
                                 (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
         |  {- empty -}      { Nothing }
 
-warning_category :: { Maybe (Located WarningCategory) }
-        : 'in' STRING                  { Just (sL1 $2 (mkWarningCategory (getSTRING $2))) }
+warning_category :: { Maybe (Located InWarningCategory) }
+        : 'in' STRING                  { Just (sLL $1 $> $ InWarningCategory (hsTok' $1) (getSTRINGs $2)
+                                                                             (sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
 warnings :: { OrdList (LWarnDecl GhcPs) }
@@ -4461,6 +4462,9 @@ listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 
 hsTok :: Located Token -> LHsToken tok GhcPs
 hsTok (L l _) = L (mkTokenLocation l) HsTok
+
+hsTok' :: Located Token -> Located (HsToken tok)
+hsTok' (L l _) = L l HsTok
 
 hsUniTok :: Located Token -> LHsUniToken tok utok GhcPs
 hsUniTok t@(L l _) =
