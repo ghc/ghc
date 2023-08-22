@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs, TypeOperators #-}
 module Builder (
     -- * Data types
-    ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
+    ArMode (..), CcMode (..), ConfigurationInfo (..), CodesMode(..), DependencyType (..),
     GhcMode (..), GhcPkgMode (..), HaddockMode (..), TestMode(..), SphinxMode (..),
     TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..),
 
@@ -149,6 +149,14 @@ instance Binary   Win32TarballsMode
 instance Hashable Win32TarballsMode
 instance NFData   Win32TarballsMode
 
+data CodesMode
+  = Used
+  | Outdated
+  deriving (Eq, Generic, Show)
+
+instance Binary   CodesMode
+instance Hashable CodesMode
+instance NFData   CodesMode
 
 
 -- | A 'Builder' is a (usually external) command invoked in a separate process
@@ -193,7 +201,9 @@ data Builder = Alex
              | Makeindex  -- ^ from xelatex
              | Git GitMode
              | Win32Tarballs Win32TarballsMode
+             | CodesUtil CodesMode
              deriving (Eq, Generic, Show)
+
 
 instance Binary   Builder
 instance Hashable Builder
@@ -218,6 +228,7 @@ builderProvenance = \case
     -- Never used
     Hpc              -> context Stage1 hpcBin
     Hp2Ps            -> context stage0Boot hp2ps
+    CodesUtil {}     -> context Stage1 lintCodes
     _                -> Nothing
   where
     context s p = Just $ vanillaContext s p
@@ -258,6 +269,9 @@ instance H.Builder Builder where
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
         Haddock _ -> haddockDeps Stage1  -- Haddock currently runs in Stage1
+        -- CodesUtil requires stage1 ghc library
+        CodesUtil {} ->
+          (\p -> [p]) <$> pkgConfFile (vanillaContext Stage1 compiler)
         _         -> return []
 
     -- query the builder for some information.
@@ -389,6 +403,9 @@ instance H.Builder Builder where
                   Exit code <- cmd [path] buildArgs
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
+
+                CodesUtil {} -> do
+                  withVerbosity Diagnostic $ cmd' buildOptions [path] buildArgs
 
                 _  -> cmd' [path] buildArgs
 

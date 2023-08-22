@@ -102,6 +102,7 @@ executable hadrian
                        , Settings.Builders.Common
                        , Settings.Builders.Cc
                        , Settings.Builders.Configure
+                       , Settings.Builders.CodesUtil
                        , Settings.Builders.DeriveConstants
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
