@@ -283,6 +283,23 @@ Runtime system
   even if this constructor does not have the field in question.
   This change enables :extension:`TemplateHaskell` support for :extension:`DuplicateRecordFields`.
 
+``text`` library
+~~~~~~~~~~~~~~~~
+
+The version of the ``text`` library included changes ``Data.Text.Array.Array`` to be
+a type synonym of ``Data.Array.Byte.ByteArray``. While its former  data
+constructor, ``ByteArray``, has been replaced with a pattern synonym, it cannot
+be imported as bundled with the type constructor.
+
+Consequently, imports like: ::
+
+    import Data.Text.Array (Array(..))
+
+will need to avoid using a bundled import (e.g. by qualification): ::
+
+    import Data.Text.Array as A
+
+
 Included libraries
 ~~~~~~~~~~~~~~~~~~
 
