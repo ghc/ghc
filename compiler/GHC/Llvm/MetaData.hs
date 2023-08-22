@@ -1,6 +1,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module GHC.Llvm.MetaData where
+module GHC.Llvm.MetaData
+  ( MetaId(..)
+  , ppMetaId
+  , MetaExpr(..)
+  , MetaAnnot(..)
+  , MetaDecl(..)
+  ) where
 
 import GHC.Prelude
 
