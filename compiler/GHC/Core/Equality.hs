@@ -5,10 +5,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DerivingVia #-}
 
+-- TODO: Rename to GHC.HsToCore.CoreEquality or something
 module GHC.Core.Equality where
 
 import GHC.Prelude
 
+-- import GHC.Types.Name (Name)
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Rep
@@ -18,7 +20,7 @@ import GHC.Types.Literal
 import GHC.Types.Tickish
 
 import Data.Equality.Graph as EG
-import Data.Equality.Analysis
+import Data.Equality.Analysis.Monadic
 import qualified Data.Equality.Graph.Monad as EGM
 import GHC.Utils.Outputable
 import GHC.Core.Coercion (coercionType)
@@ -37,7 +39,7 @@ import Control.Monad.Trans.Reader
 -- In practice, no-one writes gigantic lambda expressions in guards and view patterns
 
 data AltF a
-    = AltF AltCon' [()] a
+    = AltF AltCon' [()] a -- [()] tells us the number of constructors..., bad representation TODO
     deriving (Functor, Foldable, Traversable, Eq, Ord)
 
 data BindF a
@@ -46,14 +48,19 @@ data BindF a
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
 
 type BoundVar = Int
-data ExprF a
+-- If we use this datatype specifically for representing HsToCore.Pmc, we may
+-- be able to drop the coercion field, and add a specific one for constructor
+-- application
+data ExprF r
   = VarF BoundVar
+  -- ROMES:TODO: what about using Names for comparison? Since this is only for equality purposes...
+  -- It makes it possible to use the ConLikeName as the FreeVar Name, since there is conLikeName for PmAltConLike
   | FreeVarF Id
   | LitF Literal
-  | AppF a a
-  | LamF a
-  | LetF (BindF a) a
-  | CaseF a [AltF a] -- can we drop the case type for expr equality? we don't need them back, we just need to check equality. (perhaps this specialization makes this more suitable in the Pmc namespace)
+  | AppF r r
+  | LamF r
+  | LetF (BindF r) r
+  | CaseF r [AltF r] -- can we drop the case type for expr equality? we don't need them back, we just need to check equality. (perhaps this specialization makes this more suitable in the Pmc namespace)
 
   -- | CastF a (DeBruijn CoercionR) -- can we drop this
   -- | TickF CoreTickish a          -- this, when representing expressions for equality?
@@ -83,17 +90,18 @@ instance Ord AltCon' where
 -- this makes perfect sense, if we already have to represent this in the e-graph
 -- we might as well make it a better suited representation for the e-graph...
 -- keeping the on-fly debruijn is harder
-representCoreExprEgr :: forall a
-                   . Analysis a CoreExprF
+representCoreExprEgr :: forall a m
+                   . Analysis m a CoreExprF
                   => CoreExpr
                   -> EGraph a CoreExprF
-                  -> (ClassId, EGraph a CoreExprF)
-representCoreExprEgr expr egr = EGM.runEGraphM egr (runReaderT (go expr) emptyCME) where
-  go :: CoreExpr -> ReaderT CmEnv (EGM.EGraphM a CoreExprF) ClassId
+                  -> m (ClassId, EGraph a CoreExprF)
+representCoreExprEgr expr egr = EGM.runEGraphMT egr (runReaderT (go expr) emptyCME) where
+  go :: CoreExpr -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) ClassId
   go = \case
     Var v -> do
       env <- ask
       case lookupCME env v of
+        -- Nothing -> addE (FreeVarF $ varName v)
         Nothing -> addE (FreeVarF v)
         Just i  -> addE (VarF i)
     Lit lit -> addE (LitF lit)
@@ -121,13 +129,13 @@ representCoreExprEgr expr egr = EGM.runEGraphM egr (runReaderT (go expr) emptyCM
       as' <- traverse (local (`extendCME` b) . goAlt) as
       addE (CaseF e' as')
 
-  goAlt :: CoreAlt -> ReaderT CmEnv (EGM.EGraphM a CoreExprF) (CoreAltF ClassId)
+  goAlt :: CoreAlt -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) (CoreAltF ClassId)
   goAlt (Alt c bs e) = do
     e' <- local (`extendCMEs` bs) $ go e
     return (AltF (AC' c) (map (const ()) bs) e')
 
-  addE :: Analysis a CoreExprF => CoreExprF ClassId -> ReaderT CmEnv (EGM.EGraphM a CoreExprF) ClassId
-  addE e = lift $ EGM.add $ Node e
+  addE :: Analysis m a CoreExprF => CoreExprF ClassId -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) ClassId
+  addE e = lift $ EGM.addM $ Node e
 
 type CoreExprF = ExprF
 type CoreAltF = AltF

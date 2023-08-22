@@ -44,6 +44,8 @@ import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
 
+import Control.Monad.Trans.Maybe
+
 -- | Coverage checking action. Can be composed 'leftToRight' or 'topToBottom'.
 newtype CheckAction a = CA { unCA :: Nablas -> DsM (CheckResult a) }
   deriving Functor
@@ -198,12 +200,12 @@ checkRecSel pr@(PmRecSel { pr_arg = arg, pr_cons = cons }) = CA $ \inc -> do
            Var arg_id -> return arg_id
            _ -> mkPmId $ exprType arg
 
-  unc <- liftNablasM (\d ->
-    let (arg_id', d') = representId arg_id d
-        con_cts = map (PhiNotConCt arg_id' . PmAltConLike) cons
+  unc <- liftNablasM (\d -> do
+    Just (arg_id', d') <- runMaybeT $ representId arg_id d
+    let con_cts = map (PhiNotConCt arg_id' . PmAltConLike) cons
         arg_ct  = PhiCoreCt arg_id' arg
         phi_cts = listToBag (arg_ct : con_cts)
-     in addPhiCts d' phi_cts) inc
+    addPhiCts d' phi_cts) inc
   pure CheckResult { cr_ret = pr{ pr_arg_var = arg_id }, cr_uncov = unc, cr_approx = mempty }
 
 

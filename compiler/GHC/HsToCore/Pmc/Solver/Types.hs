@@ -24,7 +24,6 @@ module GHC.HsToCore.Pmc.Solver.Types (
         -- ** Looking up 'VarInfo'
         lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo,
 
-        representId, representIds, representIdNablas, representIdsNablas,
         lookupMatchIdMap,
 
         -- ** Caching residual COMPLETE sets
@@ -85,14 +84,12 @@ import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
 
 import Data.Functor.Compose
-import Data.Equality.Analysis (Analysis(..))
 import Data.Equality.Graph (EGraph, ClassId)
 import Data.Equality.Graph.Lens
 import qualified Data.Equality.Graph as EG
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS (empty)
 import Data.Bifunctor (second)
-import Control.Monad.Trans.State (runState, state, execState)
 
 -- import GHC.Driver.Ppr
 
@@ -233,7 +230,9 @@ data PmAltConApp
   = PACA
   { paca_con :: !PmAltCon
   , paca_tvs :: ![TyVar]
-  , paca_ids :: ![ClassId]
+  , paca_ids :: ![ClassId] -- TODO(talk about merging things by congruence in
+                           -- the e-graph) ... the merging is done automatically when the pms are
+                           -- represented, but we keep these still for error reporting and what not...
   }
 
 -- | See 'vi_bot'.
@@ -849,101 +848,9 @@ type TmEGraph = EGraph VarInfo CoreExprF
 instance Show VarInfo where
   show = showPprUnsafe . ppr
 
--- | Represents a match-id in 'Nablas'
-representIdNablas :: Id -> Nablas -> Nablas
-representIdNablas x (MkNablas nbs) = MkNablas $ mapBag (snd . representId x) nbs
-
-representIdsNablas :: [Id] -> Nablas -> Nablas
-representIdsNablas xs = execState (mapM (\x -> state (((),) . representIdNablas x)) xs)
-
--- Are these even used? don't we always use the ones above?
--- | Like 'representId' but for a single Nabla
-representId :: Id -> Nabla -> (ClassId, Nabla)
-representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0, ts_reps=idmp})
-    = case lookupVarEnv idmp x of
-        -- The reason why we can't use an empty new class is that we don't account for the IdMap in the 'representCoreExprEgr'
-        -- In particular, if we represent "reverse @a xs" in the e-graph, the
-        -- node in which "xs" will be represented won't match the e-class id
-        -- representing "xs", because that class doesn't contain "VarF xs"
-        -- (but at least we can still mkMatchIds without storing the VarF for that one)
-        -- Nothing -> case EG.newEClass (emptyVarInfo x) eg0 of
-        Nothing -> case EG.add (EG.Node (FreeVarF x)) eg0 of
-          (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=EG.rebuild eg1, ts_reps=extendVarEnv idmp x xid})
-        Just xid -> (xid, MkNabla tyst tmst)
-
-representIds :: [Id] -> Nabla -> ([ClassId], Nabla)
-representIds xs = runState (mapM (state . representId) xs)
-
 -- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
 -- There ought to be a better way.
 -- ROMES:TODO:
 instance Eq VarInfo where
   (==) a b = vi_id a == vi_id b
-instance Analysis VarInfo CoreExprF where
-  {-# INLINE makeA #-}
-  {-# INLINE joinA #-}
-
-  -- When an e-class is created for a variable, we create an VarInfo from it.
-  -- It doesn't matter if this variable is bound or free, since it's the first
-  -- variable in this e-class (and all others would have to be equivalent to
-  -- it)
-  --
-  -- Also, the Eq instance for DeBruijn Vars will ensure that two free
-  -- variables with the same Id are equal and so they will be represented in
-  -- the same e-class
-  makeA (FreeVarF x) = emptyVarInfo x
-  makeA _ = emptyVarInfo unitDataConId
-  -- makeA _ = Nothing
-    -- Always start with Nothing, and add things as we go?
-
-  -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
-  -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble
-  -- Hacks hacks hacks
-  -- Do some "obvious" things in this merge, despite keeping all the nuanced
-  -- joining operations in addVarCt. Some part of them will be redundant, but
-  -- if we don't do the simple things here we might end up losing information
-  -- when merging things through the e-graph outside of 'addVarCt'
-
--- I think we really need effects, because the operation is only well-defined
--- since it can fail when it is conflicting
--- and that would allow us to do the merge procedure correcly here instead of in addVarCt
--- we may be able to have Analysis (Effect VarInfo) (...)
-  -- joinA Nothing Nothing  = Nothing
-  -- joinA Nothing (Just b) = Just b
-  -- joinA (Just a) Nothing = Just a
-  -- joinA (Just a) (Just b)
-  joinA a b
-       = b{ vi_id = if vi_id b == unitDataConId && vi_id a /= unitDataConId then vi_id a else vi_id b
-               , vi_pos = case (vi_pos a, vi_pos b) of
-                            ([], []) -> []
-                            ([], x) -> x
-                            (x, []) -> x
-                            (_x, y) -> y -- keep right
-               , vi_neg = foldr (flip extendPmAltConSet) (vi_neg b) (pmAltConSetElems $ vi_neg a)
-               , vi_bot = case (vi_bot a, vi_bot b) of
-                            (IsBot,IsBot) -> IsBot
-                            (IsBot,IsNotBot) -> IsNotBot -- keep b, achhhhh
-                            (IsBot,MaybeBot) -> IsBot
-                            (IsNotBot,IsBot) -> IsBot -- keep b, achhhhh
-                            (IsNotBot,IsNotBot) -> IsNotBot
-                            (IsNotBot,MaybeBot) -> IsNotBot
-                            (MaybeBot, IsBot) -> IsBot
-                            (MaybeBot, IsNotBot) -> IsNotBot
-                            (MaybeBot, MaybeBot) -> MaybeBot
-               , vi_rcm = case (vi_rcm a, vi_rcm b) of
-                            (RCM Nothing Nothing,RCM a b) -> RCM a b
-                            (RCM Nothing (Just a),RCM Nothing Nothing) -> RCM Nothing (Just a)
-                            (RCM Nothing (Just _a),RCM Nothing (Just b)) -> RCM Nothing (Just b) -- keep right
-                            (RCM Nothing (Just a),RCM (Just b) Nothing) -> RCM (Just b) (Just a)
-                            (RCM Nothing (Just _a),RCM (Just b) (Just c)) -> RCM (Just b) (Just c) -- keep right
-                            (RCM (Just a) Nothing,RCM Nothing Nothing) -> RCM (Just a) Nothing
-                            (RCM (Just a) Nothing,RCM Nothing (Just b)) -> RCM (Just a) (Just b)
-                            (RCM (Just _a) Nothing,RCM (Just b) Nothing) -> RCM (Just b) Nothing -- keep right
-                            (RCM (Just _a) Nothing,RCM (Just b) (Just c)) -> RCM (Just b) (Just c)
-                            (RCM (Just a) (Just b),RCM Nothing Nothing) -> RCM (Just a) (Just b)
-                            (RCM (Just a) (Just _b),RCM Nothing (Just c)) -> RCM (Just a) (Just c)
-                            (RCM (Just _a) (Just b),RCM (Just c) Nothing) -> RCM (Just c) (Just b)
-                            (RCM (Just _a) (Just _b),RCM (Just c) (Just d)) -> RCM (Just c) (Just d)
-                            -- we could also have _ _, (Just c) (Just d) -> (Just c, Just d)
-               }
 

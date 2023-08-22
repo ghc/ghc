@@ -75,6 +75,8 @@ import qualified Data.List.NonEmpty as NE
 import Data.Coerce
 import GHC.Tc.Utils.Monad
 
+import Control.Monad.Trans.Maybe
+
 import Data.Maybe (fromJust)
 
 --
@@ -106,7 +108,7 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
       !missing0 <- getLdiNablas
 
       -- See Note (TODO) [Represent the MatchIds before the CheckAction]
-      let missing = representIdNablas var missing0
+      Just missing <- runMaybeT $ representIdNablas var missing0
 
       pat_bind <- noCheckDs $ desugarPatBind loc var p
       tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
@@ -179,7 +181,7 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
   !missing0 <- getLdiNablas
 
   -- See Note (TODO) [Represent the MatchIds before the CheckAction]
-  let missing = representIdsNablas vars missing0
+  Just missing <- runMaybeT $ representIdsNablas vars missing0
 
   tracePm "pmcMatches {" $
           hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
@@ -266,7 +268,7 @@ pmcRecSel sel_id arg
       !missing0 <- getLdiNablas
 
       -- See Note (TODO) [Represent the MatchIds before the CheckAction]
-      let missing = representIdNablas sel_id missing0
+      Just missing <- runMaybeT $ representIdNablas sel_id missing0
 
       tracePm "pmcRecSel {" (ppr sel_id)
       CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
