@@ -44,7 +44,7 @@ dnl ghc-toolchain.
 AC_DEFUN([SUBST_TOOLDIR],
 [
     dnl and Note [How we configure the bundled windows toolchain]
-    $1=`echo "$$1" | sed 's%'"$mingw_prefix"'%'"$mingw_install_prefix"'%g'`
+set -- "$(echo "$$1" | sed 's%'"$mingw_prefix"'%'"$mingw_install_prefix"'%g')"
 ])
 
 # FP_SETTINGS
