@@ -50,6 +50,9 @@ data Opts = Opts
     , optReadelf   :: ProgOpt
     , optMergeObjs :: ProgOpt
     , optWindres   :: ProgOpt
+    -- Note we don't actually configure LD into anything but
+    -- see #23857 and #22550 for the very unfortunate story.
+    , optLd        :: ProgOpt
     , optUnregisterised :: Maybe Bool
     , optTablesNextToCode :: Maybe Bool
     , optUseLibFFIForAdjustors :: Maybe Bool
@@ -92,6 +95,7 @@ emptyOpts = Opts
     , optReadelf   = po0
     , optMergeObjs = po0
     , optWindres   = po0
+    , optLd        = po0
     , optUnregisterised = Nothing
     , optTablesNextToCode = Nothing
     , optUseLibFFIForAdjustors = Nothing
@@ -103,7 +107,7 @@ emptyOpts = Opts
     po0 = emptyProgOpt
 
 _optCc, _optCxx, _optCpp, _optHsCpp, _optCcLink, _optAr, _optRanlib, _optNm,
-    _optReadelf, _optMergeObjs, _optWindres
+    _optReadelf, _optMergeObjs, _optWindres, _optLd
     :: Lens Opts ProgOpt
 _optCc      = Lens optCc      (\x o -> o {optCc=x})
 _optCxx     = Lens optCxx     (\x o -> o {optCxx=x})
@@ -116,6 +120,7 @@ _optNm      = Lens optNm      (\x o -> o {optNm=x})
 _optReadelf = Lens optReadelf (\x o -> o {optReadelf=x})
 _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
+_optLd = Lens optLd (\x o -> o {optLd= x})
 
 _optTriple :: Lens Opts String
 _optTriple = Lens optTriple (\x o -> o {optTriple=x})
@@ -170,6 +175,7 @@ options =
     , progOpts "readelf" "readelf utility" _optReadelf
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
+    , progOpts "ld" "linker" _optLd
     ]
   where
     progOpts :: String -> String -> Lens Opts ProgOpt -> [OptDescr (Opts -> Opts)]
@@ -381,7 +387,7 @@ mkTarget opts = do
     (archOs, tgtVendor) <- parseTriple cc0 normalised_triple
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
-    ccLink <- findCcLink tgtLlvmTarget (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
+    ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
 
     ar <- findAr tgtVendor (optAr opts)
     -- TODO: We could have
