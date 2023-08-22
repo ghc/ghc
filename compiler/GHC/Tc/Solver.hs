@@ -3593,19 +3593,13 @@ applyDefaultingRules wanteds
        ; tcg_env <- TcS.getGblEnv
        ; let plugins = tcg_defaulting_plugins tcg_env
 
-       ; plugin_defaulted <- if null plugins then return [] else
+       ; (wanteds, plugin_defaulted) <- if null plugins then return (wanteds, []) else
            do {
              ; traceTcS "defaultingPlugins {" (ppr wanteds)
-             ; defaultedGroups <- mapM (run_defaulting_plugin wanteds) plugins
+             ; (wanteds, defaultedGroups) <- mapAccumLM run_defaulting_plugin wanteds plugins
              ; traceTcS "defaultingPlugins }" (ppr defaultedGroups)
-             ; return defaultedGroups
+             ; return (wanteds, defaultedGroups)
              }
-
-       -- If a defaulting plugin solves a tyvar, some of the wanteds
-       -- will have filled-in metavars by now (see #23281). So we
-       -- re-zonk to make sure the built-in defaulting rules don't try
-       -- to solve the same metavars.
-       ; wanteds <- if or plugin_defaulted then TcS.zonkWC wanteds else pure wanteds
 
        ; let groups = findDefaultableGroups info wanteds
 
@@ -3629,8 +3623,14 @@ applyDefaultingRules wanteds
                     groups
                ; traceTcS "defaultingPlugin " $ ppr defaultedGroups
                ; case defaultedGroups of
-                 [] -> return False
-                 _  -> return True
+                 [] -> return (wanteds, False)
+                 _  -> do
+                     -- If a defaulting plugin solves any tyvars, some of the wanteds
+                     -- will have filled-in metavars by now (see #23281). So we
+                     -- re-zonk to make sure later defaulting doesn't try to solve
+                     -- the same metavars.
+                     wanteds' <- TcS.zonkWC wanteds
+                     return (wanteds', True)
                }
 
 
