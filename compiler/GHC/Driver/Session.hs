@@ -3728,48 +3728,6 @@ setUnsafeGlobalDynFlags dflags = do
 
 
 -- -----------------------------------------------------------------------------
--- SSE, AVX, FMA
-
-isSse4_2Enabled :: DynFlags -> Bool
-isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42
-
-isAvxEnabled :: DynFlags -> Bool
-isAvxEnabled dflags = avx dflags || avx2 dflags || avx512f dflags
-
-isAvx2Enabled :: DynFlags -> Bool
-isAvx2Enabled dflags = avx2 dflags || avx512f dflags
-
-isAvx512cdEnabled :: DynFlags -> Bool
-isAvx512cdEnabled dflags = avx512cd dflags
-
-isAvx512erEnabled :: DynFlags -> Bool
-isAvx512erEnabled dflags = avx512er dflags
-
-isAvx512fEnabled :: DynFlags -> Bool
-isAvx512fEnabled dflags = avx512f dflags
-
-isAvx512pfEnabled :: DynFlags -> Bool
-isAvx512pfEnabled dflags = avx512pf dflags
-
-isFmaEnabled :: DynFlags -> Bool
-isFmaEnabled dflags = fma dflags
-
--- -----------------------------------------------------------------------------
--- BMI2
-
-isBmiEnabled :: DynFlags -> Bool
-isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> bmiVersion dflags >= Just BMI1
-    ArchX86    -> bmiVersion dflags >= Just BMI1
-    _          -> False
-
-isBmi2Enabled :: DynFlags -> Bool
-isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> bmiVersion dflags >= Just BMI2
-    ArchX86    -> bmiVersion dflags >= Just BMI2
-    _          -> False
-
--- -----------------------------------------------------------------------------
 
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool
