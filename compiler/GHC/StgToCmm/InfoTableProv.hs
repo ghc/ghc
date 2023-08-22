@@ -6,6 +6,7 @@ import Foreign
 
 #if defined(HAVE_LIBZSTD)
 import Foreign.C.Types
+import Foreign.Marshal.Utils (copyBytes)
 import qualified Data.ByteString.Internal as BSI
 import GHC.IO (unsafePerformIO)
 #endif
@@ -274,7 +275,7 @@ compress clvl (BSI.PS srcForeignPtr off len) = unsafePerformIO $
             (srcPtr `plusPtr` off)
             (fromIntegral len)
             (fromIntegral clvl)
-        BSI.create compressedSize $ \p -> BSI.memcpy p dstPtr compressedSize
+        BSI.create compressedSize $ \p -> copyBytes p dstPtr compressedSize
 
 foreign import ccall unsafe "ZSTD_compress"
     zstd_compress ::
