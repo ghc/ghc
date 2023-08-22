@@ -36,6 +36,7 @@ data LlvmCgConfig = LlvmCgConfig
   , llvmCgContext           :: !SDocContext  -- ^ Context for LLVM code generation
   , llvmCgFillUndefWithGarbage :: !Bool      -- ^ Fill undefined literals with garbage values
   , llvmCgSplitSection      :: !Bool         -- ^ Split sections
+  , llvmCgAvxEnabled        :: !Bool
   , llvmCgBmiVersion        :: Maybe BmiVersion  -- ^ (x86) BMI instructions
   , llvmCgLlvmVersion       :: Maybe LlvmVersion -- ^ version of Llvm we're using
   , llvmCgDoWarn            :: !Bool         -- ^ True ==> warn unsupported Llvm version

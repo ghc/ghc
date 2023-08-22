@@ -948,8 +948,6 @@ llvmOptions llvm_config dflags =
        [("-enable-tbaa -tbaa",  "-enable-tbaa") | gopt Opt_LlvmTBAA dflags ]
     ++ [("-relocation-model=" ++ rmodel
         ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
-    ++ [("-stack-alignment=" ++ (show align)
-        ,"-stack-alignment=" ++ (show align)) | align > 0 ]
 
     -- Additional llc flags
     ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
@@ -967,11 +965,6 @@ llvmOptions llvm_config dflags =
                | otherwise                   = "static"
 
         platform = targetPlatform dflags
-
-        align :: Int
-        align = case platformArch platform of
-                  ArchX86_64 | isAvxEnabled dflags -> 32
-                  _                                -> 0
 
         attrs :: String
         attrs = intercalate "," $ mattr

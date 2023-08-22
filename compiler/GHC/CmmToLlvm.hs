@@ -196,7 +196,7 @@ cmmLlvmGen _ = return ()
 
 cmmMetaLlvmPrelude :: LlvmM ()
 cmmMetaLlvmPrelude = do
-  metas <- flip mapM stgTBAA $ \(uniq, name, parent) -> do
+  tbaa_metas <- flip mapM stgTBAA $ \(uniq, name, parent) -> do
     -- Generate / lookup meta data IDs
     tbaaId <- getMetaUniqueId
     setUniqMeta uniq tbaaId
@@ -209,9 +209,36 @@ cmmMetaLlvmPrelude = do
               -- just a name on its own. Previously `null` was accepted as the
               -- name.
               Nothing -> [ MetaStr name ]
+
+  platform <- getPlatform
+  cfg <- getConfig
+  let stack_alignment_metas =
+          case platformArch platform of
+            ArchX86_64 | llvmCgAvxEnabled cfg -> [mkStackAlignmentMeta 32]
+            _                                 -> []
+  module_flags_metas <- mkModuleFlagsMeta stack_alignment_metas
+  let metas = tbaa_metas ++ module_flags_metas
   cfg <- getConfig
   renderLlvm (ppLlvmMetas cfg metas)
              (ppLlvmMetas cfg metas)
+
+mkNamedMeta :: LMString -> [MetaExpr] -> LlvmM [MetaDecl]
+mkNamedMeta name exprs = do
+    (ids, decls) <- unzip <$> mapM f exprs
+    return $ decls ++ [MetaNamed name ids]
+  where
+    f expr = do
+      i <- getMetaUniqueId
+      return (i, MetaUnnamed i expr)
+
+mkModuleFlagsMeta :: [ModuleFlag] -> LlvmM [MetaDecl]
+mkModuleFlagsMeta =
+    mkNamedMeta "llvm.module.flags" . map moduleFlagToMetaExpr
+
+mkStackAlignmentMeta :: Integer -> ModuleFlag
+mkStackAlignmentMeta alignment =
+    ModuleFlag MFBError "override-stack-alignment" (MetaLit $ LMIntLit alignment i32)
+
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
