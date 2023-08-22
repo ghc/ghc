@@ -42,6 +42,10 @@ module GHC.Llvm (
 
         -- ** Metadata types
         MetaExpr(..), MetaAnnot(..), MetaDecl(..), MetaId(..),
+        -- *** Module flags
+        ModuleFlagBehavior(..),
+        ModuleFlag(..),
+        moduleFlagToMetaExpr,
 
         -- ** Operations on the type system.
         isGlobal, getLitType, getVarType,
