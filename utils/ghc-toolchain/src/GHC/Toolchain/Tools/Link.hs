@@ -43,16 +43,23 @@ _ccLinkProgram = Lens ccLinkProgram (\x o -> o{ccLinkProgram=x})
 
 findCcLink :: String -- ^ The llvm target to use if CcLink supports --target
            -> ProgOpt
+           -> ProgOpt
            -> Bool   -- ^ Whether we should search for a more efficient linker
            -> ArchOS -> Cc -> Maybe Readelf -> M CcLink
-findCcLink target progOpt ldOverride archOs cc readelf = checking "for C compiler for linking command" $ do
+findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C compiler for linking command" $ do
   -- Use the specified linker or try using the C compiler
   rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
-  ccLinkProgram <- case poFlags progOpt of
-                     Just _ ->
+  -- See #23857 for why we check to see if LD is set here
+  -- TLDR: If the user explicitly sets LD then in ./configure
+  -- we don't perform a linker search (and set -fuse-ld), so
+  -- we do the same here for consistency.
+  ccLinkProgram <- case (poPath ld, poFlags progOpt) of
+                     (_, Just _) ->
                          -- If the user specified linker flags don't second-guess them
                          pure rawCcLink
-                     Nothing -> do
+                     (Just {}, _) ->
+                         pure rawCcLink
+                     _ -> do
                          -- If not then try to find decent linker flags
                          findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
   ccLinkProgram <- linkSupportsTarget archOs cc target ccLinkProgram

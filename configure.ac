@@ -55,6 +55,8 @@ USER_CONF_CC_OPTS_STAGE2="$CONF_CC_OPTS_STAGE2"
 USER_CONF_CXX_OPTS_STAGE2="$CONF_CXX_OPTS_STAGE2"
 USER_CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2"
 
+USER_LD="$LD"
+
 dnl ----------------------------------------------------------
 dnl ** Find unixy sort and find commands,
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION

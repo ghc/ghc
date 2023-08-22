@@ -106,6 +106,10 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     echo "--readelf=$READELF" >> acargs
     echo "--windres=$WindresCmd" >> acargs
 
+    if test -n "$USER_LD"; then
+      echo "--ld=$USER_LD" >> acargs
+    fi
+
     ENABLE_GHC_TOOLCHAIN_NOT_ARG([locally-executable], [$CrossCompiling])
     ENABLE_GHC_TOOLCHAIN_ARG([unregisterised], [$Unregisterised])
     ENABLE_GHC_TOOLCHAIN_ARG([tables-next-to-code], [$TablesNextToCode])
