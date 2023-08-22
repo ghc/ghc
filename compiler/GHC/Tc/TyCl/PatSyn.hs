@@ -41,7 +41,6 @@ import GHC.Core.Type ( typeKind, tidyForAllTyBinders, tidyTypes, tidyType, isMan
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Core.Predicate
 
-import GHC.Builtin.Types.Prim
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
@@ -86,35 +85,11 @@ tcPatSynDecl (L loc psb@(PSB { psb_id = L _ name })) sig_fn prag_fn
   = setSrcSpanA loc $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
-    recoverM (recoverPSB psb) $
-    case (sig_fn name) of
+    -- See Note [Pattern synonym error recovery]
+    case sig_fn name of
       Nothing                 -> tcInferPatSynDecl psb prag_fn
       Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi prag_fn
       _                       -> panic "tcPatSynDecl"
-
-recoverPSB :: PatSynBind GhcRn GhcRn
-           -> TcM (LHsBinds GhcTc, TcGblEnv)
--- See Note [Pattern synonym error recovery]
-recoverPSB (PSB { psb_id = L _ name
-                , psb_args = details })
- = do { matcher_name <- newImplicitBinder name mkMatcherOcc
-      ; let placeholder = AConLike $ PatSynCon $
-                          mk_placeholder matcher_name
-      ; gbl_env <- tcExtendGlobalEnv [placeholder] getGblEnv
-      ; return (emptyBag, gbl_env) }
-  where
-    (_arg_names, is_infix) = collectPatSynArgInfo details
-    mk_placeholder matcher_name
-      = mkPatSyn name is_infix
-                        ([mkTyVarBinder SpecifiedSpec alphaTyVar], []) ([], [])
-                        [] -- Arg tys
-                        alphaTy
-                        (matcher_name, matcher_ty, True) Nothing
-                        []  -- Field labels
-       where
-         -- The matcher_id is used only by the desugarer, so actually
-         -- and error-thunk would probably do just as well here.
-         matcher_ty = mkSpecForAllTys [alphaTyVar] alphaTy
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,14 +109,19 @@ reporting no end (#15685).
 So we use simplifyTop to completely solve the constraint, report
 any errors, throw an exception.
 
-Even in the event of such an error we can recover and carry on, just
-as we do for value bindings, provided we plug in placeholder for the
-pattern synonym: see recoverPSB.  The goal of the placeholder is not
-to cause a raft of follow-on errors.  I've used the simplest thing for
-now, but we might need to elaborate it a bit later.  (e.g.  I've given
-it zero args, which may cause knock-on errors if it is used in a
-pattern.) But it'll do for now.
+Unlike for value bindings, we don't create a placeholder pattern
+synonym binding in an attempt to recover from the error, as this placeholder
+was occasionally the cause of strange follow-up errors to occur, as reported in #23467.
+It seems rather difficult to come up with a satisfactory placeholder:
 
+  - it would need to have the right number of arguments,
+    with the appropriate field names (if any),
+  - we could give each argument the type `forall a. a`; this would generally
+    work OK in pattern occurrences of the PatSyn, but not so in expressions,
+    e.g. "let x = Con y" would require (y :: forall a. a) which would cause
+    confusing errors.
+
+So, for now at least, we don't attempt to recover at all.
 -}
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
