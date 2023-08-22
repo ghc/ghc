@@ -848,10 +848,6 @@ release-hackage-lint:
       artifacts: false
   extends: .test-primops
 
-test-primops-validate:
-  extends: .test-primops-validate-template
-  when: manual
-
 test-primops-label:
   extends: .test-primops-validate-template
   rules:
