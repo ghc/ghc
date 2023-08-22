@@ -79,6 +79,7 @@ ppMetaId (MetaId n) = char '!' <> int n
 
 -- | LLVM metadata expressions
 data MetaExpr = MetaStr !LMString
+              | MetaLit !LlvmLit
               | MetaNode !MetaId
               | MetaVar !LlvmVar
               | MetaStruct [MetaExpr]

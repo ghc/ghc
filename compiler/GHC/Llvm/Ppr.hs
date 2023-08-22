@@ -299,6 +299,7 @@ ppMetaExpr :: IsLine doc => LlvmCgConfig -> MetaExpr -> doc
 ppMetaExpr opts = \case
   MetaVar (LMLitVar (LMNullLit _)) -> text "null"
   MetaStr    s                     -> char '!' <> doubleQuotes (ftext s)
+  MetaLit    l                     -> ppTypeLit opts l
   MetaNode   n                     -> ppMetaId n
   MetaVar    v                     -> ppVar opts v
   MetaStruct es                    -> char '!' <> braces (ppCommaJoin (ppMetaExpr opts) es)
