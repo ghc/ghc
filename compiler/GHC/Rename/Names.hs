@@ -1303,8 +1303,13 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                    , export_depr_warns )
 
         IEThingAll _ (L l tc) -> do
-            ImpOccItem gre child_gres _ <- lookup_parent ie $ ieWrappedName tc
+            ImpOccItem { imp_item      = gre
+                       , imp_bundled   = bundled_gres
+                       , imp_is_parent = is_par
+                       }
+              <- lookup_parent ie $ ieWrappedName tc
             let name = greName gre
+                child_gres = if is_par then bundled_gres else []
                 imp_list_warn
 
                   | null child_gres
@@ -1445,18 +1450,23 @@ data ImpOccItem
 mkImportOccEnv :: HscEnv -> ImpDeclSpec -> [IfaceExport] -> OccEnv (NameEnv ImpOccItem)
 mkImportOccEnv hsc_env decl_spec all_avails =
   mkOccEnv_C (plusNameEnv_C combine)
-    [ (occ, mkNameEnv [(nm, ImpOccItem g bundled is_parent)])
+    [ (occ, mkNameEnv [(nm, item)])
     | avail <- all_avails
-    , let gs = gresFromAvail hsc_env (Just hiding_spec) avail
-    , g <- gs
-    , let nm = greName g
-          occ = greOccName g
+    , let gres = gresFromAvail hsc_env (Just hiding_spec) avail
+    , gre <- gres
+    , let nm = greName gre
+          occ = greOccName gre
           (is_parent, bundled) = case avail of
             AvailTC c _
-              -> if c == nm -- (Recall the AvailTC invariant)
-                 then ( True, case gs of { g0 : gs' | greName g0 == nm -> gs'; _ -> gs } )
-                 else ( False, gs )
+              | c == nm -- (Recall the AvailTC invariant from GHC.Types.AvailInfo)
+              -> ( True, drop 1 gres ) -- "drop 1": don't include the parent itself.
+              | otherwise
+              -> ( False, gres )
             _ -> ( False, [] )
+          item = ImpOccItem
+               { imp_item      = gre
+               , imp_bundled   = bundled
+               , imp_is_parent = is_parent }
     ]
   where
 
