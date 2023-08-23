@@ -39,12 +39,15 @@ findCc llvmTarget progOpt = checking "for C compiler" $ do
     -- there's a more optimal one
     ccProgram <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
 
-    cc' <- ignoreUnusedArgs $ Cc {ccProgram}
-    cc  <- ccSupportsTarget llvmTarget cc'
-    checking "whether Cc works" $ checkCcWorks cc
-    checkC99Support cc
-    checkCcSupportsExtraViaCFlags cc
-    return cc
+    cc0 <- ignoreUnusedArgs $ Cc {ccProgram}
+    cc1 <- ccSupportsTarget llvmTarget cc0
+    checking "whether Cc works" $ checkCcWorks cc1
+    cc2 <- oneOf "cc doesn't support C99" $ map checkC99Support
+        [ cc1
+        , cc1 & _ccFlags %++ "-std=gnu99"
+        ]
+    checkCcSupportsExtraViaCFlags cc2
+    return cc2
 
 checkCcWorks :: Cc -> M ()
 checkCcWorks cc = withTempDir $ \dir -> do
@@ -75,7 +78,7 @@ ccSupportsTarget :: String -> Cc -> M Cc
 ccSupportsTarget target cc = checking "whether Cc supports --target" $
                              supportsTarget _ccProgram checkCcWorks target cc
 
-checkC99Support :: Cc -> M ()
+checkC99Support :: Cc -> M Cc
 checkC99Support cc = checking "for C99 support" $ withTempDir $ \dir -> do
     let test_o = dir </> "test.o"
     compileC cc test_o $ unlines
@@ -84,6 +87,7 @@ checkC99Support cc = checking "for C99 support" $ withTempDir $ \dir -> do
         , "# error \"Compiler does not advertise C99 conformance\""
         , "#endif"
         ]
+    return cc
 
 checkCcSupportsExtraViaCFlags :: Cc -> M ()
 checkCcSupportsExtraViaCFlags cc = checking "whether cc supports extra via-c flags" $ withTempDir $ \dir -> do
