@@ -39,12 +39,15 @@ findCc llvmTarget progOpt = checking "for C compiler" $ do
     -- there's a more optimal one
     ccProgram <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
 
-    cc' <- ignoreUnusedArgs $ Cc {ccProgram}
-    cc  <- ccSupportsTarget llvmTarget cc'
-    checking "whether Cc works" $ checkCcWorks cc
-    checkC99Support cc
-    checkCcSupportsExtraViaCFlags cc
-    return cc
+    cc0 <- ignoreUnusedArgs $ Cc {ccProgram}
+    cc1 <- ccSupportsTarget llvmTarget cc0
+    checking "whether Cc works" $ checkCcWorks cc1
+    cc2 <- oneOf "cc doesn't support C99" $ map checkC99Support
+        [ cc1
+        , cc1 & _ccFlags %++ "-std=c99"
+        ]
+    checkCcSupportsExtraViaCFlags cc2
+    return cc2
 
 checkCcWorks :: Cc -> M ()
 checkCcWorks cc = withTempDir $ \dir -> do
