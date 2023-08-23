@@ -46,7 +46,7 @@ checkWordSize cc = checking "word size" $ do
 
 checkEndianness :: Cc -> M Endianness
 checkEndianness cc = do
-    checkEndiannessParamH cc <|> checkEndiannessLimitsH cc
+    checkEndiannessParamH cc <|> checkEndiannessLimitsH cc <|> checkEndianness__BYTE_ORDER__ cc
 
 checkEndiannessParamH :: Cc -> M Endianness
 checkEndiannessParamH cc = checking "endianness (param.h)" $ do
@@ -91,6 +91,28 @@ checkEndiannessLimitsH cc = checking "endianness (limits.h)" $ do
         , "unknown"
         , "#endif"
         ]
+
+checkEndianness__BYTE_ORDER__ :: Cc -> M Endianness
+checkEndianness__BYTE_ORDER__ cc = checking "endianness (__BYTE_ORDER__)" $ do
+    out <- preprocess cc prog
+    case reverse $ lines out of
+      "big":_ -> return BigEndian
+      "little":_ -> return LittleEndian
+      "unknown":_ -> throwE "unknown endianness"
+      _ -> throwE "unrecognized output"
+  where
+    prog = unlines
+        [ "#include <sys/param.h>"
+        , "#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__"
+        , "little"
+        , "#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__"
+        , "big"
+        , "#else"
+        , "unknown"
+        , "#endif"
+        ]
+
+
 
 checkLeadingUnderscore :: Cc -> Nm -> M Bool
 checkLeadingUnderscore cc nm = checking ctxt $ withTempDir $ \dir -> do
