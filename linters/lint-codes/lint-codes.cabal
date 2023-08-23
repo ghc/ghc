@@ -17,10 +17,11 @@ executable lint-codes
     LintCodes.Args
     LintCodes.Coverage
     LintCodes.Static
+    LintCodes.Orphan
 
   build-depends:
       base >= 4 && < 5
-    , ghc >= 9.9
+    , ghc
     , bytestring
     , containers
     , directory

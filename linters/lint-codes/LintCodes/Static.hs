@@ -2,11 +2,11 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module LintCodes.Static
   ( FamEqnIndex, Use(..), used, outdated
   , LibDir(..), getFamEqnCodes
-  , staticallyUsedCodes
   )
   where
 
@@ -20,13 +20,6 @@ import qualified Data.Map.Strict as Map
 import Control.Monad.IO.Class
   ( liftIO )
 
--- ghc
-import GHC.Driver.Errors.Types
-  ( GhcMessage )
-import GHC.Types.Error
-  ( DiagnosticCode(..) )
-import GHC.Types.Error.Codes
-  ( constructorCodes )
 
 -- ghc (API usage)
 import GHC
@@ -54,7 +47,7 @@ import GHC.Driver.Env
 import GHC.Iface.Env
   ( lookupOrig )
 import GHC.Iface.Load
-  ( WhereFrom(..), loadInterface )
+  ( loadInterface )
 import GHC.Types.Name
   ( nameOccName, occNameFS )
 import GHC.Types.Name.Occurrence
@@ -64,7 +57,6 @@ import GHC.Types.TyThing
 import GHC.Types.PkgQual
   ( PkgQual(..) )
 import GHC.Tc.Utils.Monad
-  ( initIfaceLoad )
 import GHC.Unit.Finder
   ( FindResult(..), findImportedModule )
 import GHC.Utils.Outputable
@@ -72,13 +64,10 @@ import GHC.Utils.Outputable
 import Language.Haskell.Syntax.Module.Name
   ( mkModuleName )
 
---------------------------------------------------------------------------------
+import GHC.Types.Error
 
--- | The diagnostic codes that are statically reachable from the
--- 'GhcMessage' datatype.
-staticallyUsedCodes :: Map DiagnosticCode String
-staticallyUsedCodes = constructorCodes @GhcMessage
 
+import LintCodes.Orphan
 --------------------------------------------------------------------------------
 
 -- | The index of an equation of the 'GhcDiagnosticCode' type family,
@@ -105,15 +94,16 @@ outdated _ = Nothing
 -- of Template Haskell at compile-time is problematic for Hadrian.
 
 -- | The diagnostic codes returned by the 'GhcDiagnosticCode' type family.
-getFamEqnCodes :: Maybe LibDir -> IO ( Map DiagnosticCode ( FamEqnIndex, String, Use ) )
-getFamEqnCodes mb_libDir =
-  do { tc <- ghcDiagnosticCodeTyCon mb_libDir
+getFamEqnCodes :: FilePath -> Maybe LibDir -> IO ( Map DiagnosticCode ( FamEqnIndex, String, Use ) )
+getFamEqnCodes pkg_db mb_libDir =
+  do { tc <- ghcDiagnosticCodeTyCon pkg_db mb_libDir
      ; return $ case isClosedSynFamilyTyConWithAxiom_maybe tc of
      { Nothing -> error "can't find equations for 'GhcDiagnosticCode'"
      ; Just ax -> Map.fromList
                 $ zipWith parseBranch [1..]
                 $ fromBranches $ coAxiomBranches ax
      } }
+
 
 parseBranch :: Int -> CoAxBranch -> ( DiagnosticCode, ( FamEqnIndex, String, Use ) )
 parseBranch i ( CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
@@ -142,13 +132,13 @@ parseBranchRHS rhs
 newtype LibDir = LibDir { libDir :: FilePath }
 
 -- | Look up the 'GhcDiagnosticCode' type family using the GHC API.
-ghcDiagnosticCodeTyCon :: Maybe LibDir -> IO TyCon
-ghcDiagnosticCodeTyCon mb_libDir =
+ghcDiagnosticCodeTyCon :: FilePath -> Maybe LibDir -> IO TyCon
+ghcDiagnosticCodeTyCon pkg_db mb_libDir =
   runGhc (libDir <$> mb_libDir)
 
   -- STEP 1: start a GHC API session with "-package ghc"
   do { dflags1 <- getSessionDynFlags
-     ; let opts = map noLoc ["-package ghc"]
+     ; let opts = map noLoc ["-hide-all-packages", "-package-db=" ++ pkg_db, "-package ghc"]
      ; logger <- getLogger
      ; (dflags2, _,_) <- parseDynamicFlags logger dflags1 opts
      ; setSessionDynFlags dflags2

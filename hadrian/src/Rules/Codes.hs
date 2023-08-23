@@ -23,5 +23,5 @@ codesRules = do
 codes :: CodesMode -> Action ()
 codes usage = do
   putBuild $ "| Computing " ++ describeUsage usage ++ " diagnostic codes."
-  let codesContext = vanillaContext Stage1 lintCodes
+  let codesContext = vanillaContext stage0InTree lintCodes
   build (target codesContext (CodesUtil usage) [] [])

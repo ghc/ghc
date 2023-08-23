@@ -228,7 +228,7 @@ builderProvenance = \case
     -- Never used
     Hpc              -> context Stage1 hpcBin
     Hp2Ps            -> context stage0Boot hp2ps
-    CodesUtil {}     -> context Stage1 lintCodes
+    CodesUtil {}     -> context stage0Boot lintCodes
     _                -> Nothing
   where
     context s p = Just $ vanillaContext s p
@@ -271,7 +271,7 @@ instance H.Builder Builder where
         Haddock _ -> haddockDeps Stage1  -- Haddock currently runs in Stage1
         -- CodesUtil requires stage1 ghc library
         CodesUtil {} ->
-          (\p -> [p]) <$> pkgConfFile (vanillaContext Stage1 compiler)
+          (\p -> [p]) <$> pkgConfFile (vanillaContext stage0InTree compiler)
         _         -> return []
 
     -- query the builder for some information.

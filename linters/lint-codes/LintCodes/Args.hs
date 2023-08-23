@@ -23,11 +23,11 @@ data Mode
   -- | List outdated diagnostic codes.
   | Outdated
 
-parseArgs :: [String] -> (Mode, Maybe LibDir)
+parseArgs :: [String] -> (Mode, FilePath, Maybe LibDir)
 parseArgs args
   | not (any isHelp args)
-  , mode_arg : rest <- args
-  = ( parseMode mode_arg, parseMbLibDir rest )
+  , mode_arg : pkg_db : rest <- args
+  = ( parseMode mode_arg, pkg_db, parseMbLibDir rest )
   | otherwise
   = error $ errorMsgWithHeader lintCodesHeader
 

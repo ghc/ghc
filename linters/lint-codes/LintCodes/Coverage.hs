@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module LintCodes.Coverage
   ( getCoveredCodes )
@@ -53,6 +54,8 @@ import qualified Data.Text.Encoding as Text
 import Control.Monad.Trans.State.Strict
   ( State, runState, get, put )
 
+
+import LintCodes.Orphan
 --------------------------------------------------------------------------------
 -- Diagnostic code coverage from testsuite .stdout and .stderr files
 
