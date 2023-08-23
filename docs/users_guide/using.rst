@@ -1765,8 +1765,8 @@ Haddock
     top-level type-signature.  With this flag GHC will parse Haddock comments
     and include them in the interface file it produces.
 
-    Note that this flag makes GHC's parser more strict so programs which are
-    accepted without Haddock may be rejected with :ghc-flag:`-haddock`.
+    Consider using :ghc-flag:`-Winvalid-haddock` to be informed about discarded
+    documentation comments.
 
 Miscellaneous flags
 -------------------
