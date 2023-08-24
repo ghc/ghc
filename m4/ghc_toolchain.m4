@@ -148,7 +148,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN_BIN],[
                 -ilibraries/ghc-platform/src -iutils/ghc-toolchain/src \
                 -XNoImplicitPrelude \
                 -odir actmp-ghc-toolchain -hidir actmp-ghc-toolchain \
-                utils/ghc-toolchain/exe/Main.hs -o acghc-toolchain
+                utils/ghc-toolchain/exe/Main.hs -o acghc-toolchain || AC_MSG_ERROR([Could not compile ghc-toolchain])
             GHC_TOOLCHAIN_BIN="./acghc-toolchain"
             ;;
         *)
