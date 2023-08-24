@@ -60,7 +60,7 @@ linkBCO
   -> UnlinkedBCO
   -> IO ResolvedBCO
 linkBCO interp pkgs_loaded le bco_ix
-           (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
+           (UnlinkedBCO _ arity insns bitmap lits0 ptrs0 _) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
   (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded le) (elemsFlatBag lits0)

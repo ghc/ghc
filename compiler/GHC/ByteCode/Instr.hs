@@ -51,7 +51,8 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
-        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs
+        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
+        protoBCOIsStatic   :: Bool
    }
 
 -- | A local block label (e.g. identifying a case alternative).
@@ -300,9 +301,9 @@ instance Outputable a => Outputable (ProtoBCO a) where
                  , protoBCOBitmap     = bitmap
                  , protoBCOBitmapSize = bsize
                  , protoBCOArity      = arity
-                 , protoBCOExpr       = origin })
-      = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
-                <> colon)
+                 , protoBCOExpr       = origin
+                 , protoBCOIsStatic   = static })
+      = hsep ([text "ProtoBCO", ppr name <> char '#' <> int arity] ++ [text "static" | static]) <> colon
         $$ nest 3 (case origin of
                       Left alts ->
                         vcat (zipWith (<+>) (char '{' : repeat (char ';'))
