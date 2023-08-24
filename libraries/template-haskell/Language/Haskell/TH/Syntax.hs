@@ -146,6 +146,20 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qPutDoc :: DocLoc -> String -> m ()
   qGetDoc :: DocLoc -> m (Maybe String)
 
+  -- \"Runs\" the 'Q' monad. Normal users of Template Haskell
+  -- should not need this function, as the splice brackets @$( ... )@
+  -- are the usual way of running a 'Q' computation.
+  --
+  -- This function is primarily used in GHC internals, and for debugging
+  -- splices by running them in 'IO'.
+  --
+  -- Note that many functions in 'Q', such as 'reify' and other compiler
+  -- queries, are not supported when running 'Q' in 'IO'; these operations
+  -- simply fail at runtime. Indeed, the only operations guaranteed to succeed
+  -- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
+  runQ :: Q a -> m a
+  runQ (Q m) = m
+
 -----------------------------------------------------
 --      The IO instance of Quasi
 --
@@ -213,19 +227,6 @@ counter = unsafePerformIO (newIORef 0)
 
 newtype Q a = Q { unQ :: forall m. Quasi m => m a }
 
--- \"Runs\" the 'Q' monad. Normal users of Template Haskell
--- should not need this function, as the splice brackets @$( ... )@
--- are the usual way of running a 'Q' computation.
---
--- This function is primarily used in GHC internals, and for debugging
--- splices by running them in 'IO'.
---
--- Note that many functions in 'Q', such as 'reify' and other compiler
--- queries, are not supported when running 'Q' in 'IO'; these operations
--- simply fail at runtime. Indeed, the only operations guaranteed to succeed
--- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
-runQ :: Quasi m => Q a -> m a
-runQ (Q m) = m
 
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
