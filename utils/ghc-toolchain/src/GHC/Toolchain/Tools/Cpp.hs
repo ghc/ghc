@@ -10,7 +10,7 @@ import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
 import GHC.Toolchain.Tools.Cc
-import GHC.Toolchain.Utils (withTempDir)
+import GHC.Toolchain.Utils (withTempDir, oneOf)
 
 newtype Cpp = Cpp { cppProgram :: Program
                     }
@@ -83,7 +83,12 @@ findCpp :: ProgOpt -> Cc -> M Cpp
 findCpp progOpt cc = checking "for C preprocessor" $ do
   -- Use the specified CPP or try to use the c compiler
   foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  -- Check whether the C preprocessor needs -std=gnu99 (only very old toolchains need this)
+  Cc cpp2 <- oneOf "cc doesn't support C99" $ map checkC99Support
+        [ Cc foundCppProg
+        , Cc (foundCppProg & _prgFlags %++ "-std=gnu99")
+        ]
   -- Always add the -E flag to the CPP, regardless of the user options
-  let cppProgram = addFlagIfNew "-E" foundCppProg
+  let cppProgram = addFlagIfNew "-E" cpp2
   return Cpp{cppProgram}
 
