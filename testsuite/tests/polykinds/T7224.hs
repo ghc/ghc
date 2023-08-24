@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T7224 where
 

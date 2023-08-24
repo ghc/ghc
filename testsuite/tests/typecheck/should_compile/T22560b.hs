@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T22560b where
 

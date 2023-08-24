@@ -1,8 +1,8 @@
 
-TyAppPat_ScopedTyVarConflict.hs:10:6: error: [GHC-69710]
+TyAppPat_ScopedTyVarConflict.hs:11:6: error: [GHC-69710]
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
 
-TyAppPat_ScopedTyVarConflict.hs:11:6: error: [GHC-69710]
+TyAppPat_ScopedTyVarConflict.hs:12:6: error: [GHC-69710]
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.

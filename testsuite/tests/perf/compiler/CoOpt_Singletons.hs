@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}

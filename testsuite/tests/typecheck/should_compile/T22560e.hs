@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeAbstractions #-}
+
 module T22560e where
 
 import Data.Kind

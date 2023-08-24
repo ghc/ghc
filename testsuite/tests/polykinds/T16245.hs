@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE TypeAbstractions #-}
 module T16245 where
 
 import Data.Kind

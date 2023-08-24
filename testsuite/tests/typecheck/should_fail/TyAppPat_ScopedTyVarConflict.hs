@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables #-}

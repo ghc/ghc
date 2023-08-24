@@ -1,5 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
+
 module Bug where
 
 import GHC.Exts

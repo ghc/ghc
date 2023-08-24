@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 {-# LANGUAGE FlexibleInstances, UndecidableInstances, FunctionalDependencies #-}
 

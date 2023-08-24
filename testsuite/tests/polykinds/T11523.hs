@@ -10,6 +10,7 @@
 {-# language GADTs #-}
 {-# language ConstraintKinds #-}
 {-# language FlexibleInstances #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# language TypeOperators #-}
 {-# language ScopedTypeVariables #-}
 {-# language DefaultSignatures #-}

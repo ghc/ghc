@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds, TypeApplications, GADTs #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T18851d where
 

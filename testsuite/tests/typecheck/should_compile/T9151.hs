@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T9151 where
 

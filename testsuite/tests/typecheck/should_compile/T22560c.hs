@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T22560c where
 

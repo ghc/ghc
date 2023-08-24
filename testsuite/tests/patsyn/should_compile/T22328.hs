@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, PatternSynonyms, GADTs, ViewPatterns #-}
+{-# LANGUAGE TypeApplications, PatternSynonyms, GADTs, ViewPatterns, TypeAbstractions #-}
 
 module T22328 where
 

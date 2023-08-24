@@ -1,7 +1,8 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# Language PatternSynonyms, ViewPatterns, GADTs, ConstraintKinds, RankNTypes,
              PolyKinds, ScopedTypeVariables, DataKinds, TypeOperators,
-             TypeApplications, TypeFamilies, TypeFamilyDependencies #-}
+             TypeApplications, TypeFamilies, TypeFamilyDependencies,
+             TypeAbstractions #-}
 
 module T14507 where
 

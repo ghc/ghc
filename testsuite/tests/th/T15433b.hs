@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeApplications, TypeFamilies, PartialTypeSignatures #-}
+{-# LANGUAGE TemplateHaskell, TypeApplications, TypeAbstractions, TypeFamilies, PartialTypeSignatures #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
