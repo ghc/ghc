@@ -204,6 +204,10 @@ data AppCtxt
        (HsExpr GhcRn)    -- Inside an expansion of this expression
        SrcSpan           -- The SrcSpan of the expression
                          --    noSrcSpan if outermost; see Note [AppCtxt]
+       SrcSpan           -- The SrcSpan of the application as specified
+                         -- inside the expansion.
+                         -- Used for accurately reconstructing the
+                         -- original SrcSpans in 'rebuildHsApps'.
 
   | VACall
        (HsExpr GhcRn) Int  -- In the third argument of function f
@@ -238,7 +242,7 @@ a second time.
 -}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc (VAExpansion _ l) = l
+appCtxtLoc (VAExpansion _ l _) = l
 appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
@@ -246,7 +250,7 @@ insideExpansion (VAExpansion {}) = True
 insideExpansion (VACall {})      = False
 
 instance Outputable AppCtxt where
-  ppr (VAExpansion e _) = text "VAExpansion" <+> ppr e
+  ppr (VAExpansion e _ _) = text "VAExpansion" <+> ppr e
   ppr (VACall f n _)    = text "VACall" <+> int n <+> ppr f
 
 type family XPass p where
@@ -310,7 +314,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     -- See Note [Looking through HsExpanded]
     go (XExpr (HsExpanded orig fun)) ctxt args
-      = go fun (VAExpansion orig (appCtxtLoc ctxt))
+      = go fun (VAExpansion orig (appCtxtLoc ctxt) (appCtxtLoc ctxt))
                (EWrap (EExpand orig) : args)
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
@@ -339,11 +343,11 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     set :: SrcAnn ann -> AppCtxt -> AppCtxt
     set l (VACall f n _)        = VACall f n (locA l)
-    set _ ctxt@(VAExpansion {}) = ctxt
+    set l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 
     dec :: SrcAnn ann -> AppCtxt -> AppCtxt
     dec l (VACall f n _)        = VACall f (n-1) (locA l)
-    dec _ ctxt@(VAExpansion {}) = ctxt
+    dec l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 
 -- | Rebuild an application: takes a type-checked application head
 -- expression together with arguments in the form of typechecked 'HsExprArg's
@@ -390,7 +394,9 @@ rebuild_hs_apps fun ctxt (arg : args)
       EWrap (EHsWrap wrap)
         -> rebuild_hs_apps (mkHsWrap wrap fun) ctxt args
   where
-    lfun = L (noAnnSrcSpan $ appCtxtLoc ctxt) fun
+    lfun = L (noAnnSrcSpan $ appCtxtLoc' ctxt) fun
+    appCtxtLoc' (VAExpansion _ _ l) = l
+    appCtxtLoc' v = appCtxtLoc v
 
 {- Note [Representation-polymorphic Ids with no binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -775,6 +781,19 @@ labels (#19154) won't work.
 
 It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
 
+In order to be able to more accurately reconstruct the original `SrcSpan`s
+from the renamer in `rebuildHsApps`, we also have to track the `SrcSpan`
+of the current application in `VAExpansion` when unwrapping `HsExpanded`
+in `splitHsApps`, just as we track it in a non-expanded expression.
+
+Previously, `rebuildHsApps` substituted the location of the original
+expression as given by `splitHsApps` for this. As a result, the application
+head in expanded expressions, e.g. the call to `fromListN`, would either
+have `noSrcSpan` set as its location post-typecheck, or get the location
+of the original expression, depending on whether the `XExpr` given to
+`splitHsApps` is in the outermost layer. The span it got in the renamer
+would always be discarded, causing #23120.
+
 Note [Looking through Template Haskell splices in splitHsApps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When typechecking an application, we must look through untyped TH splices in
@@ -869,7 +888,7 @@ addHeadCtxt fun_ctxt thing_inside
   | otherwise
   = setSrcSpan fun_loc $
     case fun_ctxt of
-      VAExpansion orig _ -> addExprCtxt orig thing_inside
+      VAExpansion orig _ _ -> addExprCtxt orig thing_inside
       VACall {}          -> thing_inside
   where
     fun_loc = appCtxtLoc fun_ctxt
@@ -1064,6 +1083,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
                                                            (1, []) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
+       -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noAnn hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $

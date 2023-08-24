@@ -46,7 +46,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard
                         , wrapGenSpan, genHsIntegralLit, genHsTyLit
-                        , genHsVar, genLHsVar, genHsApp, genHsApps
+                        , genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps'
                         , genAppType, isIrrefutableHsPatRn )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
@@ -450,10 +450,11 @@ rnExpr (ExplicitList _ exps)
           then return  (ExplicitList noExtField exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
+       ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
        ; let rn_list  = ExplicitList noExtField exps'
              lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n
-             exp_list = genHsApps from_list_n_name [hs_lit, wrapGenSpan rn_list]
+             exp_list = genHsApps' (L (noAnnSrcSpan loc) from_list_n_name) [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
 
@@ -2415,7 +2416,11 @@ mkApplicativeStmt ctxt args need_join body_stmts
                 ; return (Just join_op, fvs) }
            else
              return (Nothing, emptyNameSet)
-       ; let applicative_stmt = noLocA $ ApplicativeStmt noExtField
+       -- We cannot really say where the ApplicativeStmt is located with more accuracy
+       -- than the span of the do-block, but it is better than nothing for IDE info
+       -- See Note [Source locations for implicit function calls]
+       ; loc <- getSrcSpanM
+       ; let applicative_stmt = L (noAnnSrcSpan loc) $ ApplicativeStmt noExtField
                (zip (fmap_op : repeat ap_op) args)
                mb_join
        ; return ( applicative_stmt : body_stmts

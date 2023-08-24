@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies            #-}
 {-# LANGUAGE UndecidableInstances    #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- For the HasLoc instances
@@ -1010,10 +1011,14 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
         ]
       LitPat _ _ ->
         []
-      NPat _ _ _ _ ->
-        []
-      NPlusKPat _ n _ _ _ _ ->
+      NPat _ (L loc lit) _ eq ->
+        [ toHie $ L (l2l loc :: SrcSpanAnnA) lit
+        , toHieSyntax (L ospan eq)
+        ]
+      NPlusKPat _ n (L loc lit) _ ord _ ->
         [ toHie $ C (PatternBind scope pscope rsp) n
+        , toHie $ L (l2l loc :: SrcSpanAnnA) lit
+        , toHieSyntax (L ospan ord)
         ]
       SigPat _ pat sig ->
         [ toHie $ PS rsp scope pscope pat
@@ -1055,6 +1060,23 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
             L spn $ HsFieldBind x lbl (PS rsp scope fscope pat) pun
           scoped_fds = listScopes pscope fds
 
+toHieSyntax :: forall p. HiePass p => LocatedA (SyntaxExpr (GhcPass p)) -> HieM [HieAST Type]
+toHieSyntax s = local (const GeneratedInfo) $ case hiePass @p of
+  HieRn -> toHie s
+  HieTc -> toHie s
+
+instance ToHie (LocatedA SyntaxExprRn) where
+  toHie (L mspan (SyntaxExprRn expr)) = toHie (L mspan expr)
+  toHie (L _ NoSyntaxExprRn) = pure []
+
+instance ToHie (LocatedA SyntaxExprTc) where
+  toHie (L mspan (SyntaxExprTc expr w1 w2)) = concatM
+      [ toHie (L mspan expr)
+      , concatMapM (toHie . L mspan) w1
+      , toHie (L mspan w2)
+      ]
+  toHie (L _ NoSyntaxExprTc) = pure []
+
 instance ToHie (TScoped (HsPatSigType GhcRn)) where
   toHie (TS sc (HsPS (HsPSRn wcs tvs) body@(L span _))) = concatM $
       [ bindingsOnly $ map (C $ TyVarBind (mkScopeA span) sc) (wcs++tvs)
@@ -1088,6 +1110,50 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
       , toHie body
       ]
 
+{-
+Note [Source locations for implicit function calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While calls to e.g. 'fromString' with -XOverloadedStrings do not actually
+appear in the source code, giving their HsWrapper the location of the
+overloaded bit of syntax that triggered them is useful for assigning
+their type class evidence uses to the right location in the HIE AST.
+Without this, we only get type class instance information under the
+expected top-level node if the type had to be inferred. (#23540)
+
+We currently handle the following constructors with this in mind,
+all largely in the renamer as their locations are normally inherited by
+the typechecker:
+
+  * HsOverLit, where we assign the SrcSpan of the overloaded literal
+    to ol_from_fun.
+  * HsDo, where we give the SrcSpan of the entire do block to each
+    ApplicativeStmt.
+  * HsExpanded ExplicitList{}, where we give the SrcSpan of the original
+    list expression to the 'fromListN' call.
+
+In order for the implicit function calls to not be confused for actual
+occurrences of functions in the source code, most of this extra information
+is put under 'GeneratedInfo'.
+-}
+
+whenPostTc :: forall p t m. (HiePass p, Applicative t, Monoid m) => ((p ~ 'Typechecked) => t m) -> t m
+whenPostTc a = case hiePass @p of
+  HieTc -> a
+  HieRn -> pure mempty
+
+-- | Helper function for a common pattern where we are only interested in
+-- implicit evidence information: runs only post-typecheck and marks the
+-- current 'NodeOrigin' as generated.
+whenPostTcGen :: forall p. HiePass p => ((p ~ 'Typechecked) => HieM [HieAST Type]) -> HieM [HieAST Type]
+whenPostTcGen a = local (const GeneratedInfo) $ whenPostTc @p a
+
+instance HiePass p => ToHie (LocatedA (HsOverLit (GhcPass p))) where
+  toHie (L span (OverLit x _)) = whenPostTcGen @p $ concatM $ case x of
+      OverLitTc _ witness _ ->
+        [ toHie (L span witness)
+        ]
+      -- See Note [Source locations for implicit function calls]
+
 instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -1100,7 +1166,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsOverLabel {} -> []
       HsIPVar _ _ -> []
-      HsOverLit _ _ -> []
+      HsOverLit _ o ->
+        [ toHie (L mspan o)
+        ]
       HsLit _ _ -> []
       HsLam _ mg ->
         [ toHie mg
@@ -1186,8 +1254,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie expr
         , toHie $ TS (ResolvedScopes [mkLScopeA expr]) sig
         ]
-      ArithSeq _ _ info ->
+      ArithSeq enum _ info ->
         [ toHie info
+        , whenPostTcGen @p $ toHie (L mspan enum)
         ]
       HsPragE _ _ expr ->
         [ toHie expr
@@ -1261,15 +1330,22 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
       LastStmt _ body _ _ ->
         [ toHie body
         ]
-      BindStmt _ pat body ->
+      BindStmt monad pat body ->
         [ toHie $ PS (getRealSpan $ getLocA body) scope NoScope pat
         , toHie body
+        , whenPostTcGen @p $
+            toHieSyntax $ L span (xbstc_bindOp monad)
         ]
       ApplicativeStmt _ stmts _ ->
         [ concatMapM (toHie . RS scope . snd) stmts
+        , let applicative_or_functor = map fst stmts
+           in whenPostTcGen @p $
+                concatMapM (toHieSyntax . L span) applicative_or_functor
         ]
-      BodyStmt _ body _ _ ->
+      BodyStmt _ body monad alternative ->
         [ toHie body
+        , whenPostTc @p $
+            concatMapM (toHieSyntax . L span) [monad, alternative]
         ]
       LetStmt _ binds ->
         [ toHie $ RS scope binds

@@ -1111,9 +1111,10 @@ rnOverLit origLit
           }
         ; let std_name = hsOverLitName val
         ; (from_thing_name, fvs1) <- lookupSyntaxName std_name
+        ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
         ; let rebindable = from_thing_name /= std_name
               lit' = lit { ol_ext = OverLitRn { ol_rebindable = rebindable
-                                              , ol_from_fun = noLocA from_thing_name } }
+                                              , ol_from_fun = L (noAnnSrcSpan loc) from_thing_name } }
         ; if isNegativeZeroOverLit lit'
           then do { (negate_name, fvs2) <- lookupSyntaxExpr negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)

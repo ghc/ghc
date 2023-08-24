@@ -528,7 +528,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
        ; go emptyVarSet [] [] fun_sigma rn_args }
   where
     fun_orig = exprCtOrigin (case fun_ctxt of
-                               VAExpansion e _ -> e
+                               VAExpansion e _ _ -> e
                                VACall e _ _    -> e)
 
     -- These are the type variables which must be instantiated to concrete

@@ -42,7 +42,7 @@ just attach noSrcSpan to everything.
 
 module GHC.Hs.Utils(
   -- * Terms
-  mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith,
+  mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith, mkHsSyntaxApps,
   mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkLamCaseMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
@@ -282,6 +282,17 @@ mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
                                        <.> mkWpEvLams dicts) expr
 
+mkHsSyntaxApps :: SrcSpanAnnA -> SyntaxExprTc -> [LHsExpr GhcTc]
+               -> LHsExpr GhcTc
+mkHsSyntaxApps ann (SyntaxExprTc { syn_expr      = fun
+                                 , syn_arg_wraps = arg_wraps
+                                 , syn_res_wrap  = res_wrap }) args
+  = mkLHsWrap res_wrap (foldl' mkHsApp (L ann fun) (zipWithEqual "mkHsSyntaxApps"
+                                                     mkLHsWrap arg_wraps args))
+mkHsSyntaxApps _ NoSyntaxExprTc args = pprPanic "mkHsSyntaxApps" (ppr args)
+  -- this function should never be called in scenarios where there is no
+  -- syntax expr
+
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
 mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
@@ -516,14 +527,7 @@ nlHsApp f x = noLocA (HsApp noComments f (mkLHsPar x))
 
 nlHsSyntaxApps :: SyntaxExprTc -> [LHsExpr GhcTc]
                -> LHsExpr GhcTc
-nlHsSyntaxApps (SyntaxExprTc { syn_expr      = fun
-                             , syn_arg_wraps = arg_wraps
-                             , syn_res_wrap  = res_wrap }) args
-  = mkLHsWrap res_wrap (foldl' nlHsApp (noLocA fun) (zipWithEqual "nlHsSyntaxApps"
-                                                     mkLHsWrap arg_wraps args))
-nlHsSyntaxApps NoSyntaxExprTc args = pprPanic "nlHsSyntaxApps" (ppr args)
-  -- this function should never be called in scenarios where there is no
-  -- syntax expr
+nlHsSyntaxApps = mkHsSyntaxApps noSrcSpanA
 
 nlHsApps :: IsSrcSpanAnn p a
          => IdP (GhcPass p) -> [LHsExpr (GhcPass p)] -> LHsExpr (GhcPass p)

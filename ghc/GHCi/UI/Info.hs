@@ -381,9 +381,14 @@ processAllTypeCheckedModule tcm
 
     -- | Variant of @syb@'s @everything@ (which summarises all nodes
     -- in top-down, left-to-right order) with a stop-condition on 'NameSet's
+    -- and 'OverLitTc'
     everythingAllSpans :: (r -> r -> r) -> r -> GenericQ r -> GenericQ r
     everythingAllSpans k z f x
       | (False `mkQ` (const True :: NameSet -> Bool)) x = z
+      -- Exception for OverLitTc: we have SrcSpans in the ol_witness field,
+      -- but it's there only for HIE file info (see Note [Source locations for implicit function calls]).
+      -- T16804 fails without this.
+      | (False `mkQ` (const True :: OverLitTc -> Bool)) x = z
       | otherwise = foldl k (f x) (gmapQ (everythingAllSpans k z f) x)
 
     cmpSpan (_,a,_) (_,b,_)

@@ -691,14 +691,14 @@ newNonTrivialOverloadedLit :: HsOverLit GhcRn
                            -> ExpRhoType
                            -> TcM (HsOverLit GhcTc)
 newNonTrivialOverloadedLit
-  lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable (L _ meth_name) })
+  lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable (L loc meth_name) })
   res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
                       \_ _ -> return ()
-        ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
+        ; let L _ witness = mkHsSyntaxApps (l2l loc) fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_ext = OverLitTc { ol_rebindable = rebindable
                                            , ol_witness = witness
