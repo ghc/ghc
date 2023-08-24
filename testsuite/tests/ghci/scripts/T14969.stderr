@@ -4,4 +4,7 @@
         in the constraint: Num (t2 -> t1 -> t3)
     • When checking the inferred type
         it :: forall {t1} {t2} {t3}. (Num t1, Num (t2 -> t1 -> t3)) => t3
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use FlexibleContexts
+      You may enable this language extension in GHCi with:
+        :set -XFlexibleContexts

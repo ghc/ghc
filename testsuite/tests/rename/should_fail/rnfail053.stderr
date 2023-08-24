@@ -4,6 +4,5 @@ rnfail053.hs:6:10: error: [GHC-25709]
         MkT :: forall a. a -> T
     • In the definition of data constructor ‘MkT’
       In the data type declaration for ‘T’
-    Suggested fixes:
-       Perhaps you intended to use ExistentialQuantification
-       Perhaps you intended to use GADTs
+    Suggested fix:
+      Enable any of the following extensions: ExistentialQuantification, GADTs

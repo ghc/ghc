@@ -9,6 +9,8 @@
     Suggested fix:
       Perhaps you intended to use GeneralizedNewtypeDeriving
       for GHC's newtype-deriving extension
+      You may enable this language extension in GHCi with:
+        :set -XGeneralizedNewtypeDeriving
 
 <interactive>:19:9: error: [GHC-88464]
     Data constructor not in scope: T2 :: T -> t

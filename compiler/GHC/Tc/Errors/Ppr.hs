@@ -3015,8 +3015,7 @@ instance Diagnostic TcRnMessage where
     TcRnGADTsDisabled{}
       -> [suggestExtension LangExt.GADTs]
     TcRnExistentialQuantificationDisabled{}
-      -> [suggestExtension LangExt.ExistentialQuantification,
-          suggestExtension LangExt.GADTs]
+      -> [suggestAnyExtension [LangExt.ExistentialQuantification, LangExt.GADTs]]
     TcRnGADTDataContext{}
       -> noHints
     TcRnMultipleConForNewtype{}

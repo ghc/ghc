@@ -9,6 +9,5 @@ T12083a.hs:10:26: error: [GHC-25709]
         ExistentiallyLost :: forall u. TC u => u -> ExistentiallyLost
     • In the definition of data constructor ‘ExistentiallyLost’
       In the data type declaration for ‘ExistentiallyLost’
-    Suggested fixes:
-       Perhaps you intended to use ExistentialQuantification
-       Perhaps you intended to use GADTs
+    Suggested fix:
+      Enable any of the following extensions: ExistentialQuantification, GADTs

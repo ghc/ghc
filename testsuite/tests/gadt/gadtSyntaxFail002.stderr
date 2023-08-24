@@ -4,6 +4,5 @@ gadtSyntaxFail002.hs:9:5: error: [GHC-25709]
         C2 :: forall a. a -> Char -> Foo a a
     • In the definition of data constructor ‘C2’
       In the data type declaration for ‘Foo’
-    Suggested fixes:
-       Perhaps you intended to use ExistentialQuantification
-       Perhaps you intended to use GADTs
+    Suggested fix:
+      Enable any of the following extensions: ExistentialQuantification, GADTs
