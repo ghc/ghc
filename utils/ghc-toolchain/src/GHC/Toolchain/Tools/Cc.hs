@@ -10,6 +10,7 @@ module GHC.Toolchain.Tools.Cc
     , compileC
     , compileAsm
     , addPlatformDepCcFlags
+    , checkC99Support
     ) where
 
 import Control.Monad
