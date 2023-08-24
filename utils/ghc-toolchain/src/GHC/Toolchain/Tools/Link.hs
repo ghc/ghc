@@ -63,7 +63,7 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
                          -- If not then try to find decent linker flags
                          findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
   ccLinkProgram <- linkSupportsTarget archOs cc target ccLinkProgram
-  ccLinkSupportsNoPie         <- checkSupportsNoPie  ccLinkProgram
+  ccLinkSupportsNoPie         <- checkSupportsNoPie  cc ccLinkProgram
   ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
   ccLinkSupportsFilelist      <- checkSupportsFilelist cc ccLinkProgram
   ccLinkIsGnu                 <- checkLinkIsGnu archOs ccLinkProgram
@@ -119,16 +119,15 @@ doLinkerSearch = False
 #endif
 
 -- | See Note [No PIE when linking] in GHC.Driver.Session
-checkSupportsNoPie :: Program -> M Bool
-checkSupportsNoPie ccLink = checking "whether the cc linker supports -no-pie" $
+checkSupportsNoPie :: Cc -> Program -> M Bool
+checkSupportsNoPie cc ccLink = checking "whether the cc linker supports -no-pie" $
   withTempDir $ \dir -> do
-    let test_c = dir </> "test.c"
-    writeFile test_c "int main() { return 0; }"
-
+    let test_o  = dir </> "test.o"
     let test = dir </> "test"
+    compileC cc test_o "int main() { return 0; }"
     -- Check output as some GCC versions only warn and don't respect -Werror
     -- when passed an unrecognized flag.
-    (code, out, err) <- readProgram ccLink ["-no-pie", "-Werror", "-x", "c", test_c, "-o", test]
+    (code, out, err) <- readProgram ccLink ["-no-pie", "-Werror", test_o, "-o", test]
     return (isSuccess code && not ("unrecognized" `isInfixOf` out) && not ("unrecognized" `isInfixOf` err))
 
 -- ROMES:TODO: This check is wrong here and in configure because with ld.gold parses "-n" "o_compact_unwind"
