@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T22383 where
 

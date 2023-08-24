@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, PatternSynonyms, ViewPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs, PatternSynonyms, ViewPatterns, ScopedTypeVariables, TypeAbstractions #-}
 
 module T19847 where
 

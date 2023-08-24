@@ -1,6 +1,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE PolyKinds, DataKinds, RankNTypes, TypeFamilies,
-             TypeApplications, TypeOperators, GADTs #-}
+             TypeApplications, TypeAbstractions, TypeOperators, GADTs #-}
 
 module SAKS_030 where
 

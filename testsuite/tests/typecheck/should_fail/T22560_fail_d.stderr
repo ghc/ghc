@@ -1,5 +1,5 @@
 
-T22560_fail_d.hs:5:1: error: [GHC-92337]
+T22560_fail_d.hs:7:1: error: [GHC-92337]
     • Invalid invisible type variable binder: @k
       Either a standalone kind signature (SAKS)
       or a complete user-supplied kind (CUSK, legacy feature)

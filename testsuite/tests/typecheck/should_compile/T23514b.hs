@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies, DataKinds #-}
+{-# LANGUAGE TypeAbstractions #-}
 module T23514b where
 
 import GHC.Types

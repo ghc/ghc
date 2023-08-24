@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE CUSKs #-}
 

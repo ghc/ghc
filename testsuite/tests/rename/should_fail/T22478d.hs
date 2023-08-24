@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Werror=name-shadowing #-}
 
+{-# LANGUAGE TypeAbstractions #-}
+
 module T22478d where
 
 import Data.Kind (Type)

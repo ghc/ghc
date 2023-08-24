@@ -3,13 +3,29 @@ T22478e.hs:6:4: error: [GHC-68567]
     Illegal type: ‘[a, b]’
     Suggested fix: Perhaps you intended to use DataKinds
 
+T22478e.hs:6:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @[a, b]
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
 T22478e.hs:7:4: error: [GHC-68567]
     Illegal type: ‘1’
     Suggested fix: Perhaps you intended to use DataKinds
 
+T22478e.hs:7:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @1
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
 T22478e.hs:8:4: error: [GHC-23482]
     Illegal visible kind application: @k
     Suggested fix: Perhaps you intended to use TypeApplications
+
+T22478e.hs:8:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @(t @k)
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T22478e.hs:9:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @(t :: k)
+    Suggested fix: Perhaps you intended to use TypeAbstractions
 
 T22478e.hs:9:13: error: [GHC-49378]
     • Illegal kind signature ‘k’
@@ -20,10 +36,22 @@ T22478e.hs:10:4: error: [GHC-68567]
     Illegal type: ‘'(a, b)’
     Suggested fix: Perhaps you intended to use DataKinds
 
+T22478e.hs:10:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @('(a, b))
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
 T22478e.hs:11:4: error: [GHC-68567]
     Illegal type: ‘"str"’
     Suggested fix: Perhaps you intended to use DataKinds
 
+T22478e.hs:11:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @"str"
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
 T22478e.hs:12:4: error: [GHC-68567]
     Illegal type: ‘'c'’
     Suggested fix: Perhaps you intended to use DataKinds
+
+T22478e.hs:12:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @'c'
+    Suggested fix: Perhaps you intended to use TypeAbstractions

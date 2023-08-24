@@ -1,0 +1,5 @@
+
+T23776.hs:8:6: warning: [GHC-69797]
+    Type applications in constructor patterns will require
+    the TypeAbstractions extension starting from GHC 9.12.
+    Suggested fix: Perhaps you intended to use TypeAbstractions
