@@ -1,6 +1,6 @@
 ## Summary
 
-Write a brief description of the issue.
+Please read the guidance in [https://gitlab.haskell.org/ghc/ghc/-/wikis/report-a-bug] and write a brief description of the issue.
 
 ## Steps to reproduce
 
