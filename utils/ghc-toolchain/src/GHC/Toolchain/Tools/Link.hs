@@ -62,7 +62,7 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
                      _ -> do
                          -- If not then try to find decent linker flags
                          findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
-  ccLinkProgram <- linkSupportsTarget archOs cc target ccLinkProgram
+  ccLinkProgram <- linkSupportsTarget cc target ccLinkProgram
   ccLinkSupportsNoPie         <- checkSupportsNoPie  cc ccLinkProgram
   ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
   ccLinkSupportsFilelist      <- checkSupportsFilelist cc ccLinkProgram
@@ -94,13 +94,10 @@ findLinkFlags enableOverride cc ccLink
   | otherwise =
     return ccLink
 
-linkSupportsTarget :: ArchOS -> Cc -> String -> Program -> M Program
+linkSupportsTarget :: Cc -> String -> Program -> M Program
 -- Javascript toolchain provided by emsdk just ignores --target flag so
 -- we have this special case to match with ./configure (#23744)
-linkSupportsTarget archOS _ _ c
-  | ArchJavaScript <- archOS_arch archOS
-  = return c
-linkSupportsTarget _ cc target link
+linkSupportsTarget cc target link
   = checking "whether cc linker supports --target" $
     supportsTarget (Lens id const) (checkLinkWorks cc) target link
 
