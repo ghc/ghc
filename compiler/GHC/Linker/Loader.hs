@@ -952,11 +952,11 @@ linkSomeBCOs interp pkgs_loaded ue le mods = foldr fun do_link mods []
     let flat = [ bco | bcos <- mods, bco <- bcos ]
         names = map unlinkedBCOName flat
         bco_ix = mkNameEnv (zip names [0..])
-    (resolved, isUnlifted) <- unzip <$> sequence
+    (resolved, statics) <- unzip <$> sequence
       [ (\x -> (x, unlinkedBCOIsStatic bco)) <$> linkBCO interp pkgs_loaded le bco_ix bco | bco <- flat ]
     hvrefs <- createBCOs interp resolved
     zipWithM_ (\v isU -> when isU $ void . seqHValue interp ue =<< mkForeignRef v (pure ()))
-      hvrefs isUnlifted
+      hvrefs statics
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'

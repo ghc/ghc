@@ -1556,9 +1556,6 @@ run_BCO:
         case bci_PUSH_TAGGED: {
             W_ o1 = BCO_GET_LARGE_ARG;
             W_ o_itbl = BCO_GET_LARGE_ARG;
-            IF_DEBUG(interpreter,
-                     debugBelch("PUSH_TAGGED %ld %ld\n", o1, o_itbl);
-                );
             StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
             SpW(-1) = (W_)tagPtr((StgClosure *)BCO_PTR(o1), itbl);
             Sp_subW(1);
