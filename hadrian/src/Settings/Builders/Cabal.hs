@@ -188,11 +188,9 @@ configureArgs cFlags' ldFlags' = do
                            , cFlags'
                            ]
         ldFlags  = ldArgs <> ldFlags'
-    cldFlags <- unwords <$> (cFlags <> ldFlags)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
-        , not (null cldFlags) ? arg ("--gcc-options=" ++ cldFlags)
         , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
         , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
