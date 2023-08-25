@@ -6,7 +6,6 @@ import Foreign
 
 #if defined(HAVE_LIBZSTD)
 import Foreign.C.Types
-import Foreign.Marshal.Utils (copyBytes)
 import qualified Data.ByteString.Internal as BSI
 import GHC.IO (unsafePerformIO)
 #endif
