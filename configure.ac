@@ -627,8 +627,6 @@ dnl     If gcc, make sure it's at least 4.7
 dnl
 FP_GCC_VERSION
 
-dnl ** See whether cc supports -no-pie
-FP_GCC_SUPPORTS_NO_PIE
 
 dnl ** Check support for the extra flags passed by GHC when compiling via C
 FP_GCC_SUPPORTS_VIA_C_FLAGS
@@ -674,6 +672,9 @@ FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2])
 
 FP_PROG_CC_LINKER_TARGET([CONF_CC_OPTS_STAGE1], [CONF_GCC_LINKER_OPTS_STAGE1])
 FP_PROG_CC_LINKER_TARGET([CONF_CC_OPTS_STAGE2], [CONF_GCC_LINKER_OPTS_STAGE2])
+
+dnl ** See whether cc used as a linker supports -no-pie
+FP_GCC_SUPPORTS_NO_PIE
 
 dnl Pass -Qunused-arguments or otherwise GHC will have very noisy invocations of Clang
 dnl TODO: Do we need -Qunused-arguments in CXX and GCC linker too?
