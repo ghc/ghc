@@ -101,33 +101,36 @@ would be great, and we'd surely love your company! If you're looking
 to hack on GHC, check out the guidelines in the `HACKING.md` file in
 this directory - they'll get you up to speed quickly.
 
-Contributors & Acknowledgements
+Governance and Acknowledgements
 ===============================
 
-GHC in its current form wouldn't exist without the hard work of
-[its many contributors][12]. Over time, it has grown to include the
-efforts and research of many institutions, highly talented people, and
-groups from around the world. We'd like to thank them all, and invite
-you to join!
+GHC is a community project developed by a team of highly-talented
+ researchers, individual contributors, and full-time developers. We are indebted to the
+[many people](https://gitlab.haskell.org/ghc/ghc-hq/-/blob/main/team.mkd?plain=0#user-content-the-ghc-team)
+whose work has brought GHC to its current state.
 
-  [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]:  https://gitlab.haskell.org/ghc/ghc/issues
-          "gitlab.haskell.org/ghc/ghc/issues"
-  [3]:  https://gitlab.haskell.org/ghc/ghc/wikis/building
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building"
-  [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
-  [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
-  [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github"
-  [8]:  https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation"
-  [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
-  [10]: https://gitlab.haskell.org/ghc/ghc/issues
-          "https://gitlab.haskell.org/ghc/ghc/issues"
-  [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
-          "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
-          "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
-  [13]: https://github.com/ghc-proposals/ghc-proposals
-          "https://github.com/ghc-proposals/ghc-proposals"
+Some larger decisions are made by a smaller group of core contributors,
+as described in our [governance documentation](https://gitlab.haskell.org/ghc/ghc-hq#ghc-governance).
+
+
+[1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
+[2]:  https://gitlab.haskell.org/ghc/ghc/issues
+        "gitlab.haskell.org/ghc/ghc/issues"
+[3]:  https://gitlab.haskell.org/ghc/ghc/wikis/building
+        "https://gitlab.haskell.org/ghc/ghc/wikis/building"
+[4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
+[5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
+[6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
+[7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
+        "https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github"
+[8]:  https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
+        "https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation"
+[9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
+[10]: https://gitlab.haskell.org/ghc/ghc/issues
+        "https://gitlab.haskell.org/ghc/ghc/issues"
+[11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
+        "http://www.haskell.org/pipermail/glasgow-haskell-users/"
+[12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
+        "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
+[13]: https://github.com/ghc-proposals/ghc-proposals
+        "https://github.com/ghc-proposals/ghc-proposals"
