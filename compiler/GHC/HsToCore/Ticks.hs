@@ -613,15 +613,15 @@ addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
 addTickTupArg (Missing ty) = return (Missing ty)
 
 
-addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
-                  -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
+addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc)
+                  -> TM (MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc))
 addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (traverse (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = L l matches' }
 
-addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
-             -> TM (Match GhcTc (LHsExpr GhcTc))
+addTickMatch :: Bool -> Bool -> Match GhcTc (LPat GhcTc) (LHsExpr GhcTc)
+             -> TM (Match GhcTc (LPat GhcTc) (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
@@ -870,13 +870,13 @@ addTickHsCmd (XCmd (HsWrap w cmd)) =
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
 
-addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
-                     -> TM (MatchGroup GhcTc (LHsCmd GhcTc))
+addTickCmdMatchGroup :: MatchGroup GhcTc (LPat GhcTc) (LHsCmd GhcTc)
+                     -> TM (MatchGroup GhcTc (LPat GhcTc) (LHsCmd GhcTc))
 addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
   matches' <- mapM (traverse addTickCmdMatch) matches
   return $ mg { mg_alts = L l matches' }
 
-addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
+addTickCmdMatch :: Match GhcTc (LPat GhcTc) (LHsCmd GhcTc) -> TM (Match GhcTc (LPat GhcTc) (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
@@ -1245,9 +1245,9 @@ mkBinTickBoxHpc boxLabel pos e = do
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 
-matchesOneOfMany :: [LMatch GhcTc body] -> Bool
+matchesOneOfMany :: [LMatch GhcTc pat body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
-        matchCount :: LMatch GhcTc body -> Int
+        matchCount :: LMatch GhcTc pat body -> Int
         matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))
           = length grhss

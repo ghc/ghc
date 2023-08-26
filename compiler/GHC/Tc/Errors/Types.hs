@@ -5692,8 +5692,8 @@ data MatchArgsContext
 -- numbers of arguments in a match group.
 data MatchArgBadMatches where
   MatchArgMatches
-    ::  { matchArgFirstMatch :: LocatedA (Match GhcRn body)
-        , matchArgBadMatches :: NE.NonEmpty (LocatedA (Match GhcRn body)) }
+    ::  { matchArgFirstMatch :: LocatedA (Match GhcRn pat body)
+        , matchArgBadMatches :: NE.NonEmpty (LocatedA (Match GhcRn pat body)) }
     -> MatchArgBadMatches
 
 data PragmaWarningInfo

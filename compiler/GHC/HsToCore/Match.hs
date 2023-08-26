@@ -737,7 +737,7 @@ matchWrapper
   :: HsMatchContext GhcTc              -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
-  -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
+  -> MatchGroup GhcTc  (LPat GhcTc) (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
 {-
@@ -802,7 +802,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info :: LMatch GhcTc (LPat GhcTc) (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (decideBangHood dflags) pats
@@ -819,7 +819,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
       then id
       else discardWarningsDs
 
-    initNablasMatches :: Nablas -> [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
+    initNablasMatches :: Nablas -> [LMatch GhcTc (LPat GhcTc) b] -> [(Nablas, NonEmpty Nablas)]
     initNablasMatches ldi_nablas ms
       = map (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
 

@@ -418,16 +418,16 @@ rnExpr (HsPragE x prag expr)
     rn_prag (HsPragSCC x ann) = HsPragSCC x ann
 
 rnExpr (HsLam x matches)
-  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
+  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnPats rnLExpr matches
        ; return (HsLam x matches', fvMatch) }
 
 rnExpr (HsLamCase x lc_variant matches)
-  = do { (matches', fvs_ms) <- rnMatchGroup (LamCaseAlt lc_variant) rnLExpr matches
+  = do { (matches', fvs_ms) <- rnMatchGroup (LamCaseAlt lc_variant) rnPats rnLExpr matches
        ; return (HsLamCase x lc_variant matches', fvs_ms) }
 
 rnExpr (HsCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
-       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
+       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnPats rnLExpr matches
        ; return (HsCase CaseAlt new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
 rnExpr (HsLet _ tkLet binds tkIn expr)
@@ -883,7 +883,7 @@ rnCmd (HsCmdApp x fun arg)
        ; return (HsCmdApp x fun' arg', fvFun `plusFV` fvArg) }
 
 rnCmd (HsCmdLam _ matches)
-  = do { (matches', fvMatch) <- rnMatchGroup (ArrowMatchCtxt KappaExpr) rnLCmd matches
+  = do { (matches', fvMatch) <- rnMatchGroup (ArrowMatchCtxt KappaExpr) rnPats rnLCmd matches
        ; return (HsCmdLam noExtField matches', fvMatch) }
 
 rnCmd (HsCmdPar x lpar e rpar)
@@ -892,13 +892,13 @@ rnCmd (HsCmdPar x lpar e rpar)
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
-       ; (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnLCmd matches
+       ; (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnPats rnLCmd matches
        ; return (HsCmdCase noExtField new_expr new_matches
                 , e_fvs `plusFV` ms_fvs) }
 
 rnCmd (HsCmdLamCase x lc_variant matches)
   = do { (new_matches, ms_fvs) <-
-           rnMatchGroup (ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant) rnLCmd matches
+           rnMatchGroup (ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant) rnPats rnLCmd matches
        ; return (HsCmdLamCase x lc_variant new_matches, ms_fvs) }
 
 rnCmd (HsCmdIf _ _ p b1 b2)
@@ -960,7 +960,7 @@ methodNamesCmd (HsCmdLamCase _ _ matches)
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch :: MatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
+methodNamesMatch :: MatchGroup GhcRn (LPat GhcRn) (LHsCmd GhcRn) -> FreeVars
 methodNamesMatch (MG { mg_alts = L _ ms })
   = plusFVs (map do_one ms)
  where

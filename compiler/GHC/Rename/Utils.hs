@@ -768,7 +768,7 @@ genSimpleFunBind fun pats expr
   where
     gen = noAnnSrcSpan generatedSrcSpan
 
-genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
+genFunBind :: LocatedN Name -> [LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn

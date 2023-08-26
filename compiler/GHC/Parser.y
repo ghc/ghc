@@ -3286,7 +3286,7 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist(PATS) :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)]) }
+altslist(PATS) :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)]) }
         : '{'        alts(PATS) '}'    { $2 >>= \ $2 -> amsrl
                                            (sLL $1 $> (reverse (snd $ unLoc $2)))
                                            (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) }
@@ -3296,14 +3296,14 @@ altslist(PATS) :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (Located
         | '{'              '}'   { amsrl (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
         | vocurly          close { return $ noLocA [] }
 
-alts(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+alts(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LPat GhcPs) (LocatedA b)])) }
         : alts1(PATS)              { $1 >>= \ $1 -> return $
                                      sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
         | ';' alts(PATS)           { $2 >>= \ $2 -> return $
                                      sLL $1 $> (((mz AnnSemi $1) ++ (fst $ unLoc $2) )
                                                ,snd $ unLoc $2) }
 
-alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LPat GhcPs) (LocatedA b)])) }
         : alts1(PATS) ';' alt(PATS) { $1 >>= \ $1 ->
                                         $3 >>= \ $3 ->
                                           case snd $ unLoc $1 of
@@ -3321,7 +3321,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
                                              return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
         | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 $1 ([],[$1]) }
 
-alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
+alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LPat GhcPs) (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
                          acsA (\cs -> sLLAsl $1 $>
                                          (Match { m_ext = EpAnn (listAsAnchor $1) [] cs

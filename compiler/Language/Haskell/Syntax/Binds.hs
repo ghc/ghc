@@ -199,7 +199,7 @@ data HsBindLR idL idR
 
         fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
-        fun_matches :: MatchGroup idR (LHsExpr idR)  -- ^ The payload
+        fun_matches :: MatchGroup idR (LPat idR) (LHsExpr idR)  -- ^ The payload
 
     }
 
@@ -560,4 +560,4 @@ making the distinction between the two names clear.
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (MatchGroup id (LPat id) (LHsExpr id))

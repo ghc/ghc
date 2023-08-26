@@ -76,6 +76,7 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.SrcLoc
+import GHC.Types.Basic
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -96,9 +97,9 @@ same number of arguments before using @tcMatches@ to do the work.
 -}
 
 tcMatchesFun :: LocatedN Name -- MatchContext Id
-             -> MatchGroup GhcRn (LHsExpr GhcRn)
+             -> MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
-             -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+             -> TcM (HsWrapper, MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc))
                                 -- Returns type of body
 tcMatchesFun fun_name matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
@@ -127,7 +128,7 @@ tcMatchesFun fun_name matches exp_ty
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
     what   = FunRhs { mc_fun = fun_name, mc_fixity = Prefix, mc_strictness = strictness }
-    match_ctxt = MC { mc_what = what, mc_body = tcBody }
+    match_ctxt = MC { mc_what = what, mc_pats = tcPats, mc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
       , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
@@ -140,12 +141,12 @@ tcMatchesFun fun_name matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (AnnoBody body, Outputable (body GhcTc)) =>
-                TcMatchCtxt body      -- ^ Case context
+tcMatchesCase :: (AnnoPatBody Pat body) =>
+                TcMatchCtxt Pat body      -- ^ Case context
              -> Scaled TcSigmaTypeFRR -- ^ Type of scrutinee
-             -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
+             -> MatchGroup GhcRn (LPat GhcRn) (LocatedA (body GhcRn)) -- ^ The case alternatives
              -> ExpRhoType                               -- ^ Type of the whole case expression
-             -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+             -> TcM (MatchGroup GhcTc (LPat GhcTc) (LocatedA (body GhcTc)))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
@@ -153,10 +154,10 @@ tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
   = tcMatches ctxt [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
-              -> TcMatchCtxt HsExpr
-              -> MatchGroup GhcRn (LHsExpr GhcRn)
+              -> TcMatchCtxt Pat HsExpr
+              -> MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn)
               -> ExpRhoType
-              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+              -> TcM (HsWrapper, MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
   =  do { checkArgCounts (mc_what match_ctxt) match
         ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
@@ -180,8 +181,9 @@ tcGRHSsPat grhss res_ty
       -- desugar to incorrect code.
     tcGRHSs match_ctxt grhss res_ty
   where
-    match_ctxt :: TcMatchCtxt HsExpr -- AZ
+    match_ctxt :: TcMatchCtxt Pat HsExpr -- AZ
     match_ctxt = MC { mc_what = PatBindRhs,
+                      mc_pats = tcPats,
                       mc_body = tcBody }
 
 {- *********************************************************************
@@ -190,32 +192,45 @@ tcGRHSsPat grhss res_ty
 *                                                                      *
 ********************************************************************* -}
 
-data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcTc,  -- What kind of thing this is
-         mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
+data TcMatchCtxt pat body   -- c.f. TcStmtCtxt, also in this module
+  = MC { mc_what :: HsMatchContext GhcTc     -- What kind of thing this is
+       , mc_pats :: forall a.                -- Type checker for match patterns
+                    HsMatchContext GhcTc
+                 -> [LocatedA (pat GhcRn)]   -- patterns
+                 -> [ExpPatType]             -- types of the patterns
+                 -> TcM a                    -- checker for the body
+                 -> TcM ([LocatedA (pat GhcTc)], a)
+       , mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
                                            -- an alternative
                  -> ExpRhoType
                  -> TcM (LocatedA (body GhcTc)) }
 
 type AnnoBody body
   = ( Outputable (body GhcRn)
-    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
-    , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
+    , Outputable (body GhcTc)
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
     , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     )
 
+type AnnoPatBody pat body
+  = ( AnnoBody body
+    , OutputablePrec (LocatedA (pat GhcRn))
+    , OutputablePrec (LocatedA (pat GhcTc))
+    , Anno (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    , Anno (Match GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+    , Anno [LocatedA (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
+    )
+
 -- | Type-check a MatchGroup.
-tcMatches :: (AnnoBody body, Outputable (body GhcTc)) =>
-             TcMatchCtxt body
+tcMatches :: (AnnoPatBody pat body) =>
+             TcMatchCtxt pat body
           -> [ExpPatType]             -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
-          -> MatchGroup GhcRn (LocatedA (body GhcRn))
-          -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+          -> MatchGroup GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))
+          -> TcM (MatchGroup GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_ext = origin })
@@ -249,11 +264,12 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
         match_fun_pat_ty ExpForAllPatTy{} = Nothing
 
 -------------
-tcMatch :: (AnnoBody body) => TcMatchCtxt body
+tcMatch :: (AnnoPatBody pat body)
+        => TcMatchCtxt pat body
         -> [ExpPatType]          -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch GhcRn (LocatedA (body GhcRn))
-        -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
+        -> LMatch GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))
+        -> TcM (LMatch GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))
 
 tcMatch ctxt pat_tys rhs_ty match
   = wrapLocMA (tc_match ctxt pat_tys rhs_ty) match
@@ -261,7 +277,7 @@ tcMatch ctxt pat_tys rhs_ty match
     tc_match ctxt pat_tys rhs_ty
              match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
+        do { (pats', grhss') <- (mc_pats ctxt) (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noAnn
                            , m_ctxt = mc_what ctxt
@@ -277,7 +293,7 @@ tcMatch ctxt pat_tys rhs_ty match
 
     -- We filter out type patterns because we have no use for them in HsToCore.
     -- Type variable bindings have already been converted to HsWrappers.
-    filter_out_type_pats :: [LPat GhcTc] -> [LPat GhcTc]
+    filter_out_type_pats :: [pat] -> [pat]
     filter_out_type_pats = filterByList (map is_fun_pat_ty pat_tys)
       where
         is_fun_pat_ty ExpFunPatTy{}    = True
@@ -285,7 +301,7 @@ tcMatch ctxt pat_tys rhs_ty match
 
 -------------
 tcGRHSs :: AnnoBody body
-        => TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
+        => TcMatchCtxt pat body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
         -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 
 -- Notice that we pass in the full res_ty, so that we get
@@ -303,7 +319,7 @@ tcGRHSs ctxt (GRHSs _ grhss binds) res_ty
         ; return (GRHSs emptyComments grhss' binds') }
 
 -------------
-tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn))
+tcGRHS :: TcMatchCtxt pat body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn))
        -> TcM (GRHS GhcTc (LocatedA (body GhcTc)))
 
 tcGRHS ctxt res_ty (GRHS _ guards rhs)
@@ -1174,8 +1190,8 @@ the variables they bind into scope, and typecheck the thing_inside.
 
 -- | @checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
 -- number of args are used in each equation.
-checkArgCounts :: AnnoBody body
-          => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (body GhcRn))
+checkArgCounts :: (AnnoPatBody pat body)
+          => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))
           -> TcM ()
 checkArgCounts _ (MG { mg_alts = L _ [] })
     = return ()
@@ -1189,5 +1205,5 @@ checkArgCounts matchContext (MG { mg_alts = L _ (match1:matches) })
     n_args1 = args_in_match match1
     mb_bad_matches = NE.nonEmpty [m | m <- matches, args_in_match m /= n_args1]
 
-    args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
+    args_in_match :: (LocatedA (Match GhcRn pat1 body1) -> Int)
     args_in_match (L _ (Match { m_pats = pats })) = length pats

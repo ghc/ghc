@@ -297,7 +297,7 @@ data HsExpr p
               (HsLit p)      -- ^ Simple (non-overloaded) literals
 
   | HsLam     (XLam p)
-              (MatchGroup p (LHsExpr p))
+              (MatchGroup p (LPat p) (LHsExpr p))
                        -- ^ Lambda abstraction. Currently always a single match
        --
        -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
@@ -315,7 +315,7 @@ data HsExpr p
   --           'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsLamCase (XLamCase p) LamCaseVariant (MatchGroup p (LHsExpr p))
+  | HsLamCase (XLamCase p) LamCaseVariant (MatchGroup p (LPat p) (LHsExpr p))
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
@@ -398,7 +398,7 @@ data HsExpr p
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | HsCase      (XCase p)
                 (LHsExpr p)
-                (MatchGroup p (LHsExpr p))
+                (MatchGroup p (LPat p) (LHsExpr p))
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnIf',
   --       'GHC.Parser.Annotation.AnnSemi',
@@ -846,7 +846,7 @@ data HsCmd id
                 (LHsExpr id)
 
   | HsCmdLam    (XCmdLam id)
-                (MatchGroup id (LHsCmd id))     -- kappa
+                (MatchGroup id (LPat id) (LHsCmd id))     -- kappa
        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --       'GHC.Parser.Annotation.AnnRarrow',
 
@@ -863,7 +863,7 @@ data HsCmd id
 
   | HsCmdCase   (XCmdCase id)
                 (LHsExpr id)
-                (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
+                (MatchGroup id (LPat id) (LHsCmd id))     -- bodies are HsCmd's
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',
     --       'GHC.Parser.Annotation.AnnOf','GHC.Parser.Annotation.AnnOpen' @'{'@,
     --       'GHC.Parser.Annotation.AnnClose' @'}'@
@@ -881,7 +881,7 @@ data HsCmd id
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | HsCmdLamCase (XCmdLamCase id) LamCaseVariant
-                 (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
+                 (MatchGroup id (LPat id) (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function
@@ -977,29 +977,29 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 -}
 
-data MatchGroup p body
-  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
-       , mg_alts    :: XRec p [LMatch p body] } -- The alternatives
+data MatchGroup p pat body
+  = MG { mg_ext     :: XMG p pat body -- Post-typechecker, types of args and result, and origin
+       , mg_alts    :: XRec p [LMatch p pat body] } -- The alternatives
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-  | XMatchGroup !(XXMatchGroup p body)
+  | XMatchGroup !(XXMatchGroup p pat body)
 
 -- | Located Match
-type LMatch id body = XRec id (Match id body)
+type LMatch id pat body = XRec id (Match id pat body)
 -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
 -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-data Match p body
+data Match p pat body
   = Match {
-        m_ext :: XCMatch p body,
+        m_ext :: XCMatch p pat body,
         m_ctxt :: HsMatchContext p,
           -- See Note [m_ctxt in Match]
-        m_pats :: [LPat p], -- The patterns
+        m_pats :: [pat], -- The patterns
         m_grhss :: (GRHSs p body)
   }
-  | XMatch !(XXMatch p body)
+  | XMatch !(XXMatch p pat body)
 
 {-
 Note [m_ctxt in Match]
@@ -1039,7 +1039,7 @@ annotations
 -}
 
 
-isInfixMatch :: Match id body -> Bool
+isInfixMatch :: Match id pat body -> Bool
 isInfixMatch match = case m_ctxt match of
   FunRhs {mc_fixity = Infix} -> True
   _                          -> False

@@ -250,7 +250,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                   => HsMatchContext GhcPs
                   -> [LPat GhcPs] -> DataCon
                   -> [LHsExpr GhcPs -> m (LHsExpr GhcPs)]
-                  -> m (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
     match_for_con ctxt = mkSimpleConMatch ctxt $
         \con_name xsM -> do xs <- sequence xsM
                             pure $ nlHsApps con_name xs  -- Con x1 x2 ..
@@ -634,7 +634,7 @@ mkSimpleConMatch :: Monad m => HsMatchContext GhcPs
                  -> [LPat GhcPs]
                  -> DataCon
                  -> [LHsExpr GhcPs -> a]
-                 -> m (LMatch GhcPs (LHsExpr GhcPs))
+                 -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
 mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
     let vars_needed = takeList insides as_RDRs
@@ -670,7 +670,7 @@ mkSimpleConMatch2 :: Monad m
                   -> [LPat GhcPs]
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
-                  -> m (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
 mkSimpleConMatch2 ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
         vars_needed = takeList insides as_RDRs
@@ -698,7 +698,7 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat GhcPs] -> DataCon -> [a]
-                                 -> m (LMatch GhcPs (LHsExpr GhcPs)))
+                                 -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)))
                   -> TyCon -> [a] -> LHsExpr GhcPs -> m (LHsExpr GhcPs)
 mkSimpleTupleCase match_for_con tc insides x
   = do { let data_con = tyConSingleDataCon tc
@@ -914,7 +914,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                 -> [LPat GhcPs]
                 -> DataCon
                 -> [Maybe (LHsExpr GhcPs)]
-                -> m (LMatch GhcPs (LHsExpr GhcPs))
+                -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
     match_foldr z = mkSimpleConMatch2 foldr_match_ctxt $ \_ xs -> return (mkFoldr xs)
       where
         -- g1 v1 (g2 v2 (.. z))
@@ -944,7 +944,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                   => [LPat GhcPs]
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
-                  -> m (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
     match_foldMap = mkSimpleConMatch2 foldMap_match_ctxt $ \_ xs -> return (mkFoldMap xs)
       where
         -- mappend v1 (mappend v2 ..)
@@ -993,7 +993,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                => [LPat GhcPs]
                -> DataCon
                -> [Maybe (LHsExpr GhcPs)]
-               -> m (LMatch GhcPs (LHsExpr GhcPs))
+               -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
     match_null = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkNull xs)
       where
         -- v1 && v2 && ..
@@ -1107,7 +1107,7 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                   => [LPat GhcPs]
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
-                  -> m (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
     match_for_con = mkSimpleConMatch2 traverse_match_ctxt $
                                              \con xs -> return (mkApCon con xs)
       where

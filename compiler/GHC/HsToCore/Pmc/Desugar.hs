@@ -327,13 +327,13 @@ desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
 -- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
-desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
+desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LPat GhcTc) (LHsExpr GhcTc))
                -> DsM (PmMatchGroup Pre)
 desugarMatches vars matches =
   PmMatchGroup <$> traverse (desugarMatch vars) matches
 
 -- Desugar a single match
-desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
+desugarMatch :: [Id] -> LMatch GhcTc (LPat GhcTc) (LHsExpr GhcTc) -> DsM (PmMatch Pre)
 desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   dflags <- getDynFlags
   -- decideBangHood: See Note [Desugaring -XStrict matches in Pmc]

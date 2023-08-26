@@ -53,6 +53,7 @@ module GHC.Types.Basic (
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec,
         starPrec, appPrec, maxPrec,
         maybeParen,
+        OutputablePrec(..),
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
@@ -837,6 +838,9 @@ maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise              = parens pretty
+
+class Outputable a => OutputablePrec a where
+  pprParend :: PprPrec -> a -> SDoc
 
 {- Note [Precedence in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,5 +1,5 @@
 module GHC.Tc.Gen.Match where
-import GHC.Hs           ( GRHSs, MatchGroup, LHsExpr )
+import GHC.Hs           ( GRHSs, MatchGroup, LHsExpr, LPat )
 import GHC.Tc.Types.Evidence  ( HsWrapper )
 import GHC.Tc.Utils.TcType( ExpSigmaType, ExpRhoType )
 import GHC.Tc.Types     ( TcM )
@@ -12,6 +12,6 @@ tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 
 tcMatchesFun :: LocatedN Name
-             -> MatchGroup GhcRn (LHsExpr GhcRn)
+             -> MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn)
              -> ExpSigmaType
-             -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+             -> TcM (HsWrapper, MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc))

@@ -496,13 +496,13 @@ type family XXCmdTop x
 
 -- -------------------------------------
 -- MatchGroup type families
-type family XMG           x b
-type family XXMatchGroup  x b
+type family XMG           x p b
+type family XXMatchGroup  x p b
 
 -- -------------------------------------
 -- Match type families
-type family XCMatch  x b
-type family XXMatch  x b
+type family XCMatch  x p b
+type family XXMatch  x p b
 
 -- -------------------------------------
 -- GRHSs type families

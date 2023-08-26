@@ -50,6 +50,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep 
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
+import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
@@ -266,7 +267,9 @@ tcExpr (HsLam _ match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
         ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
-    match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
+    match_ctxt = MC { mc_what = LambdaExpr
+                    , mc_pats = tcPats
+                    , mc_body = tcBody }
     herald = ExpectedFunTyLam match
 
 tcExpr e@(HsLamCase x lc_variant matches) res_ty
@@ -274,7 +277,9 @@ tcExpr e@(HsLamCase x lc_variant matches) res_ty
            <- tcMatchLambda herald match_ctxt matches res_ty
        ; return (mkHsWrap wrap $ HsLamCase x lc_variant matches') }
   where
-    match_ctxt = MC { mc_what = LamCaseAlt lc_variant, mc_body = tcBody }
+    match_ctxt = MC { mc_what = LamCaseAlt lc_variant
+                    , mc_pats = tcPats
+                    , mc_body = tcBody }
     herald = ExpectedFunTyLamCase lc_variant e
 
 
@@ -387,6 +392,7 @@ tcExpr (HsCase x scrut matches) res_ty
         ; return (HsCase x scrut' matches') }
  where
     match_ctxt = MC { mc_what = x,
+                      mc_pats = tcPats,
                       mc_body = tcBody }
 
 tcExpr (HsIf x pred b1 b2) res_ty
@@ -425,7 +431,7 @@ tcExpr (HsMultiIf _ alts) res_ty
        ; res_ty <- readExpType res_ty
        ; tcEmitBindingUsage (supUEs ues)  -- See Note [MultiWayIf linearity checking]
        ; return (HsMultiIf res_ty alts') }
-  where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
+  where match_ctxt = MC { mc_what = IfAlt, mc_pats = tcPats, mc_body = tcBody }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
   = tcDoStmts do_or_lc stmts res_ty
@@ -1268,7 +1274,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
        ; let updEnv :: UniqMap Name (Id, LHsExpr GhcRn)
              updEnv = listToUniqMap $ upd_ids
 
-             make_pat :: ConLike -> LMatch GhcRn (LHsExpr GhcRn)
+             make_pat :: ConLike -> LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn)
              -- As explained in Note [Record Updates], to desugar
              --
              --   e { x=e1, y=e2 }
@@ -1317,7 +1323,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
              case_expr :: HsExpr GhcRn
              case_expr = HsCase RecUpd record_expr
                        $ mkMatchGroup (Generated DoPmc) (wrapGenSpan matches)
-             matches :: [LMatch GhcRn (LHsExpr GhcRn)]
+             matches :: [LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn)]
              matches = map make_pat relevant_cons
 
              let_binds :: HsLocalBindsLR GhcRn GhcRn

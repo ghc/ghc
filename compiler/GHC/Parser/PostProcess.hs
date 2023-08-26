@@ -591,7 +591,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
   = go [L loc1 mtchs1] (noAnnSrcSpan $ locA loc1) binds []
   where
     -- See Note [Exact Print Annotations for FunBind]
-    go :: [LMatch GhcPs (LHsExpr GhcPs)] -- accumulates matches for current fun
+    go :: [LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)] -- accumulates matches for current fun
        -> SrcSpanAnnA                    -- current top level loc
        -> [LHsDecl GhcPs]                -- Any docbinds seen
        -> [LHsDecl GhcPs]                -- rest of decls to be processed
@@ -672,7 +672,7 @@ getMonoBindAll (L l (ValD _ b) : ds) =
   in L l' (ValD noExtField b') : getMonoBindAll ds'
 getMonoBindAll (d : ds) = d : getMonoBindAll ds
 
-has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
+has_args :: [LMatch GhcPs pat body] -> Bool
 has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
 has_args (L _ (Match { m_pats = args }) : _) = not (null args)
         -- Don't group together FunBinds if they have
@@ -734,7 +734,7 @@ tyConToDataCon (L loc tc)
 
 mkPatSynMatchGroup :: LocatedN RdrName
                    -> LocatedL (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (MatchGroup GhcPs (LPat GhcPs) (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
@@ -1355,7 +1355,7 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
       | Infix <- is_infix = ParseContext (Just $ unLoc fun) NoIncompleteDoBlock
       | otherwise         = noParseContext
 
-makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
+makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms
@@ -1529,8 +1529,8 @@ instance DisambInfixOp RdrName where
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcAnn NoEpAnns
-    , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
-    , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
+    , Anno [LocatedA (Match GhcPs (LPat GhcPs) (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
+    , Anno (Match GhcPs (LPat GhcPs) (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
     , Anno [LocatedA (StmtLR GhcPs GhcPs
                        (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnL
@@ -1550,7 +1550,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV
-    :: SrcSpan -> (EpAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
+    :: SrcSpan -> (EpAnnComments -> MatchGroup GhcPs (LPat GhcPs) (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
     :: SrcSpan
@@ -1569,11 +1569,11 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsOpAppPV :: SrcSpan -> LocatedA b -> LocatedN (InfixOp b) -> LocatedA b
               -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
-  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LocatedA b)])
+  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)])
              -> EpAnnHsCase -> PV (LocatedA b)
   -- | Disambiguate "\case" and "\cases"
   mkHsLamCasePV :: SrcSpan -> LamCaseVariant
-                -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> [AddEpAnn]
+                -> (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)]) -> [AddEpAnn]
                 -> PV (LocatedA b)
   -- | Function argument representation
   type FunArg b
@@ -1771,7 +1771,7 @@ instance DisambECP (HsCmd GhcPs) where
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ mkPlainErrorMsgEnvelope loc $ PsErrParseErrorInCmd e
 
-checkLamMatchGroup :: SrcSpan -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
+checkLamMatchGroup :: SrcSpan -> MatchGroup GhcPs (LPat GhcPs) (LHsExpr GhcPs) -> PV ()
 checkLamMatchGroup l (MG { mg_alts = (L _ (matches:_))}) = do
   when (null (hsLMatchPats matches)) $ addError $ mkPlainErrorMsgEnvelope l PsErrEmptyLambda
 checkLamMatchGroup _ _ = return ()

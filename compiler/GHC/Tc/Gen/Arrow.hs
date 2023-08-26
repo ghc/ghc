@@ -320,13 +320,14 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 -- | Typechecking for case command alternatives. Used for 'HsCmdCase'.
 tcCmdMatches :: CmdEnv
              -> TcTypeFRR -- ^ Type of the scrutinee.
-             -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
+             -> MatchGroup GhcRn (LPat GhcRn) (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
-             -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
+             -> TcM (MatchGroup GhcTc (LPat GhcTc) (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
     match_ctxt = MC { mc_what = ArrowMatchCtxt ArrowCaseAlt,
+                      mc_pats = tcPats,
                       mc_body = mc_body }
     mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }
@@ -334,9 +335,9 @@ tcCmdMatches env scrut_ty matches (stk, res_ty)
 -- | Typechecking for 'HsCmdLam' and 'HsCmdLamCase'.
 tcCmdMatchLambda :: CmdEnv
                  -> HsArrowMatchContext
-                 -> MatchGroup GhcRn (LHsCmd GhcRn)
+                 -> MatchGroup GhcRn (LPat GhcRn) (LHsCmd GhcRn)
                  -> CmdType
-                 -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
+                 -> TcM (HsWrapper, MatchGroup GhcTc (LPat GhcTc) (LHsCmd GhcTc))
 tcCmdMatchLambda env
                  ctxt
                  mg@MG { mg_alts = L l matches, mg_ext = origin }

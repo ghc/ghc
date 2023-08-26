@@ -744,7 +744,7 @@ exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
 exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
 
 -- | Extract a suitable CtOrigin from a MatchGroup
-matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
+matchesCtOrigin :: MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn) -> CtOrigin
 matchesCtOrigin (MG { mg_alts = alts })
   | L _ [L _ match] <- alts
   , Match { m_grhss = grhss } <- match
@@ -1419,7 +1419,7 @@ data ExpectedFunTyOrigin
   | ExpectedFunTyMatches
       !TypedThing
         -- ^ name of the function
-      !(MatchGroup GhcRn (LHsExpr GhcRn))
+      !(MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn))
        -- ^ equations
 
   -- | Ensure that a lambda abstraction has a function type.
@@ -1427,7 +1427,7 @@ data ExpectedFunTyOrigin
   -- Test cases for representation-polymorphism checks:
   --   RepPolyLambda
   | ExpectedFunTyLam
-      !(MatchGroup GhcRn (LHsExpr GhcRn))
+      !(MatchGroup GhcRn (LPat GhcRn) (LHsExpr GhcRn))
 
   -- | Ensure that a lambda case expression has a function type.
   --

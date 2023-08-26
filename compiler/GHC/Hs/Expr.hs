@@ -790,6 +790,12 @@ pprDebugParendExpr p expr
       True  -> pprParendLExpr p expr
       False -> pprLExpr         expr
 
+instance OutputableBndrId p => OutputablePrec (LocatedA (HsExpr (GhcPass p))) where
+  pprParend = pprParendLExpr
+
+instance OutputableBndrId p => OutputablePrec (HsExpr (GhcPass p)) where
+  pprParend = pprParendExpr
+
 pprParendLExpr :: (OutputableBndrId p)
                => PprPrec -> LHsExpr (GhcPass p) -> SDoc
 pprParendLExpr p (L _ e) = pprParendExpr p e
@@ -1324,9 +1330,9 @@ instance (OutputableBndrId p) => Outputable (HsCmdTop (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XMG         GhcPs b = Origin
-type instance XMG         GhcRn b = Origin
-type instance XMG         GhcTc b = MatchGroupTc
+type instance XMG         GhcPs p b = Origin
+type instance XMG         GhcRn p b = Origin
+type instance XMG         GhcTc p b = MatchGroupTc
 
 data MatchGroupTc
   = MatchGroupTc
@@ -1335,20 +1341,20 @@ data MatchGroupTc
        , mg_origin  :: Origin  -- Origin (Generated vs FromSource)
        } deriving Data
 
-type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
+type instance XXMatchGroup (GhcPass _) p b = DataConCantHappen
 
-type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
-type instance XXMatch (GhcPass _) b = DataConCantHappen
+type instance XCMatch (GhcPass _) p b = EpAnn [AddEpAnn]
+type instance XXMatch (GhcPass _) p b = DataConCantHappen
 
-instance (OutputableBndrId pr, Outputable body)
-            => Outputable (Match (GhcPass pr) body) where
+instance (OutputableBndrId pr, Outputable body, OutputablePrec pat)
+            => Outputable (Match (GhcPass pr) pat body) where
   ppr = pprMatch
 
-isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
+isEmptyMatchGroup :: MatchGroup (GhcPass p) pat body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
 
 -- | Is there only one RHS in this list of matches?
-isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
+isSingletonMatchGroup :: [LMatch (GhcPass p) pat body] -> Bool
 isSingletonMatchGroup matches
   | [L _ match] <- matches
   , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
@@ -1356,14 +1362,14 @@ isSingletonMatchGroup matches
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
+matchGroupArity :: MatchGroup (GhcPass id) pat body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
   | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
 
-hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
+hsLMatchPats :: LMatch (GhcPass id) pat body -> [pat]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 
 -- We keep the type checker happy by providing EpAnnComments.  They
@@ -1386,15 +1392,15 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
 
 type instance XXGRHS (GhcPass _) b = DataConCantHappen
 
-pprMatches :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+           => MatchGroup (GhcPass idR) pat body -> SDoc
 pprMatches MG { mg_alts = matches }
     = vcat (map pprMatch (map unLoc (unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+           => MatchGroup (GhcPass idR) (LPat (GhcPass idR)) (LHsExpr (GhcPass idR)) -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
@@ -1405,10 +1411,10 @@ pprPatBind pat grhss
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]
 
-pprMatch :: (OutputableBndrId idR, Outputable body)
-         => Match (GhcPass idR) body -> SDoc
+pprMatch :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+         => Match (GhcPass idR) pat body -> SDoc
 pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
-  = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
+  = sep [ sep (herald : map (nest 2 . pprParend appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt grhss) ]
   where
     (herald, other_pats)
@@ -1428,9 +1434,9 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                         | null rest -> (pp_infix, [])           -- x &&& y = e
                         | otherwise -> (parens pp_infix, rest)  -- (x &&& y) z = e
                         where
-                          pp_infix = pprParendLPat opPrec p1
+                          pp_infix = pprParend opPrec p1
                                      <+> pprInfixOcc fun
-                                     <+> pprParendLPat opPrec p2
+                                     <+> pprParend opPrec p2
                      _ -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
             LambdaExpr -> (char '\\', pats)
@@ -1438,10 +1444,10 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
             -- We don't simply return (empty, pats) to avoid introducing an
             -- additional `nest 2` via the empty herald
             LamCaseAlt LamCases ->
-              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
+              maybe (empty, []) (first $ pprParend appPrec) (uncons pats)
 
             ArrowMatchCtxt (ArrowLamCaseAlt LamCases) ->
-              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
+              maybe (empty, []) (first $ pprParend appPrec) (uncons pats)
 
             ArrowMatchCtxt KappaExpr -> (char '\\', pats)
 
@@ -2003,8 +2009,8 @@ matchDoContextErrString (MDoExpr m)  = prependQualified m (text "'mdo' block")
 matchDoContextErrString ListComp     = text "list comprehension"
 matchDoContextErrString MonadComp    = text "monad comprehension"
 
-pprMatchInCtxt :: (OutputableBndrId idR, Outputable body)
-               => Match (GhcPass idR) body -> SDoc
+pprMatchInCtxt :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+               => Match (GhcPass idR) pat body -> SDoc
 pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
                                         <> colon)
                              4 (pprMatch match)
@@ -2198,10 +2204,10 @@ type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
   = SrcSpanAnnL
 type instance Anno (HsCmdTop (GhcPass p)) = SrcAnn NoEpAnns
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
-type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
-type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
+type instance Anno (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcAnn NoEpAnns
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcAnn NoEpAnns
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA

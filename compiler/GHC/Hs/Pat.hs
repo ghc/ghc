@@ -300,6 +300,12 @@ pprPatBndr var
                                               -- but is it worth it?
       False -> pprPrefixOcc var
 
+instance OutputableBndrId p => OutputablePrec (Pat (GhcPass p)) where
+  pprParend = pprParendPat
+
+instance OutputableBndrId p => OutputablePrec (LocatedA (Pat (GhcPass p))) where
+  pprParend = pprParendLPat
+
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc

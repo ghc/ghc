@@ -41,7 +41,7 @@ pprPatBind :: forall bndr p . (OutputableBndrId bndr,
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+           => MatchGroup (GhcPass idR) (LPat (GhcPass idR)) (LHsExpr (GhcPass idR)) -> SDoc
 
 data ThModFinalizers
 type role HsUntypedSpliceResult representational

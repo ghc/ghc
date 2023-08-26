@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -522,7 +523,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
                                  rnMatchGroup (mkPrefixFunRhs name)
-                                              rnLExpr matches
+                                              rnPats rnLExpr matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
 
@@ -769,7 +770,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             ExplicitBidirectional mg ->
                 do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
                                    rnMatchGroup (mkPrefixFunRhs (L l name))
-                                                rnLExpr mg
+                                                rnPats rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
@@ -1238,13 +1239,20 @@ checkDupMinimalSigs sigs
 -}
 
 type AnnoBody body
-  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
-    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
-    , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
+  = ( Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
     , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcAnn NoEpAnns
     , Outputable (body GhcPs)
+    , Outputable (body GhcRn)
+    )
+
+type AnnoPatBody pat body
+  = ( AnnoBody body
+    , Anno [LocatedA (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
+    , Anno (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    , Anno (Match GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Outputable (pat GhcPs)
+    , Outputable (pat GhcRn)
     )
 
 -- Note [Empty MatchGroups]
@@ -1270,14 +1278,16 @@ type AnnoBody body
 -- \cases expressions or commands. In that case, or if we encounter an empty
 -- MatchGroup but -XEmptyCases is disabled, we add an error.
 
-rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext GhcRn
+rnMatchGroup :: (AnnoPatBody pat body)
+             => HsMatchContext GhcRn
+             -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-             -> MatchGroup GhcPs (LocatedA (body GhcPs))
-             -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
+             -> MatchGroup GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
+             -> RnM (MatchGroup GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
+rnMatchGroup ctxt rnMatchPats rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
          -- see Note [Empty MatchGroups]
   = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase ctxt))
-       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
+       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnMatchPats rnBody) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
   where
     mustn't_be_empty = case ctxt of
@@ -1285,20 +1295,22 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
       ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> return True
       _ -> not <$> xoptM LangExt.EmptyCase
 
-rnMatch :: AnnoBody body
+rnMatch :: (AnnoPatBody pat body)
         => HsMatchContext GhcRn
+        -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-        -> LMatch GhcPs (LocatedA (body GhcPs))
-        -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
+        -> LMatch GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
+        -> RnM (LMatch GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
+rnMatch ctxt rnMatchPats rnBody = wrapLocFstMA (rnMatch' ctxt rnMatchPats rnBody)
 
-rnMatch' :: (AnnoBody body)
+rnMatch' :: (AnnoPatBody pat body)
          => HsMatchContext GhcRn
+         -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-         -> Match GhcPs (LocatedA (body GhcPs))
-         -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
-  = rnPats ctxt pats $ \ pats' -> do
+         -> Match GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
+         -> RnM (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
+rnMatch' ctxt rnMatchPats rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
+  = rnMatchPats ctxt pats $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })

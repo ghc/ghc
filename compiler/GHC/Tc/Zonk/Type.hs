@@ -739,7 +739,7 @@ zonk_bind bind@(FunBind { fun_id = L loc var
                         , fun_ext = (co_fn, ticks) })
   = do { new_var <- zonkIdBndr var
        ; runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
-    do { new_ms <- zonkMatchGroup zonkLExpr ms
+    do { new_ms <- zonkMatchGroup zonkPat zonkLExpr ms
        ; return (bind { fun_id = L loc new_var
                       , fun_matches = new_ms
                       , fun_ext = (new_co_fn, ticks) }) } }
@@ -774,7 +774,7 @@ zonk_bind (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                             -- Specifically /not/ zonkIdBndr; we do not want to
                             -- complain about a representation-polymorphic binder
            ; runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
-        do { new_ms            <- zonkMatchGroup zonkLExpr ms
+        do { new_ms            <- zonkMatchGroup zonkPat zonkLExpr ms
            ; return $ L loc $
              bind { fun_id      = L mloc new_mono_id
                   , fun_matches = new_ms
@@ -827,7 +827,7 @@ zonkPatSynDir :: HsPatSynDir GhcTc
               -> ZonkTcM (HsPatSynDir GhcTc)
 zonkPatSynDir Unidirectional             = return Unidirectional
 zonkPatSynDir ImplicitBidirectional      = return ImplicitBidirectional
-zonkPatSynDir (ExplicitBidirectional mg) = ExplicitBidirectional <$> zonkMatchGroup zonkLExpr mg
+zonkPatSynDir (ExplicitBidirectional mg) = ExplicitBidirectional <$> zonkMatchGroup zonkPat zonkLExpr mg
 
 zonkSpecPrags :: TcSpecPrags -> ZonkTcM TcSpecPrags
 zonkSpecPrags IsDefaultMethod = return IsDefaultMethod
@@ -852,13 +852,15 @@ zonkLTcSpecPrags ps
 -}
 
 zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
-               => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
-               -> MatchGroup GhcTc (LocatedA (body GhcTc))
-               -> ZonkTcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
-zonkMatchGroup zBody (MG { mg_alts = L l ms
-                         , mg_ext = MatchGroupTc arg_tys res_ty origin
-                         })
-  = do  { ms' <- mapM (zonkMatch zBody) ms
+               => (LocatedA (pat GhcTc) -> ZonkBndrT TcM (LocatedA (pat GhcTc)))
+               -> (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
+               -> MatchGroup GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc))
+               -> ZonkTcM (MatchGroup GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))
+zonkMatchGroup zPat zBody
+  (MG { mg_alts = L l ms
+      , mg_ext = MatchGroupTc arg_tys res_ty origin
+      })
+  = do  { ms' <- mapM (zonkMatch zPat zBody) ms
         ; arg_tys' <- zonkScaledTcTypesToTypesX arg_tys
         ; res_ty'  <- zonkTcTypeToTypeX res_ty
         ; return (MG { mg_alts = L l ms'
@@ -866,12 +868,13 @@ zonkMatchGroup zBody (MG { mg_alts = L l ms
                      }) }
 
 zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
-          => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
-          -> LMatch GhcTc (LocatedA (body GhcTc))
-          -> ZonkTcM (LMatch GhcTc (LocatedA (body GhcTc)))
-zonkMatch zBody (L loc match@(Match { m_pats = pats
+          => (LocatedA (pat GhcTc) -> ZonkBndrT TcM (LocatedA (pat GhcTc)))
+          -> (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
+          -> LMatch GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc))
+          -> ZonkTcM (LMatch GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))
+zonkMatch zPat zBody (L loc match@(Match { m_pats = pats
                                     , m_grhss = grhss }))
-  = runZonkBndrT (zonkPats pats) $ \ new_pats ->
+  = runZonkBndrT (traverse zPat pats) $ \ new_pats ->
   do  { new_grhss <- zonkGRHSs zBody grhss
       ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
@@ -940,11 +943,11 @@ zonkExpr (HsOverLit x lit)
         ; return (HsOverLit x lit') }
 
 zonkExpr (HsLam x matches)
-  = do new_matches <- zonkMatchGroup zonkLExpr matches
+  = do new_matches <- zonkMatchGroup zonkPat zonkLExpr matches
        return (HsLam x new_matches)
 
 zonkExpr (HsLamCase x lc_variant matches)
-  = do new_matches <- zonkMatchGroup zonkLExpr matches
+  = do new_matches <- zonkMatchGroup zonkPat zonkLExpr matches
        return (HsLamCase x lc_variant new_matches)
 
 zonkExpr (HsApp x e1 e2)
@@ -998,7 +1001,7 @@ zonkExpr (ExplicitSum args alt arity expr)
 
 zonkExpr (HsCase x expr ms)
   = do new_expr <- zonkLExpr expr
-       new_ms <- zonkMatchGroup zonkLExpr ms
+       new_ms <- zonkMatchGroup zonkPat zonkLExpr ms
        return (HsCase x new_expr new_ms)
 
 zonkExpr (HsIf x e1 e2 e3)
@@ -1151,7 +1154,7 @@ zonkCmd (HsCmdApp x c e)
        return (HsCmdApp x new_c new_e)
 
 zonkCmd (HsCmdLam x matches)
-  = do new_matches <- zonkMatchGroup zonkLCmd matches
+  = do new_matches <- zonkMatchGroup zonkPat zonkLCmd matches
        return (HsCmdLam x new_matches)
 
 zonkCmd (HsCmdPar x lpar c rpar)
@@ -1160,11 +1163,11 @@ zonkCmd (HsCmdPar x lpar c rpar)
 
 zonkCmd (HsCmdCase x expr ms)
   = do new_expr <- zonkLExpr expr
-       new_ms <- zonkMatchGroup zonkLCmd ms
+       new_ms <- zonkMatchGroup zonkPat zonkLCmd ms
        return (HsCmdCase x new_expr new_ms)
 
 zonkCmd (HsCmdLamCase x lc_variant ms)
-  = do new_ms <- zonkMatchGroup zonkLCmd ms
+  = do new_ms <- zonkMatchGroup zonkPat zonkLCmd ms
        return (HsCmdLamCase x lc_variant new_ms)
 
 zonkCmd (HsCmdIf x eCond ePred cThen cElse)

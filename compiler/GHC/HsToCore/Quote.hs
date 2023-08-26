@@ -1705,7 +1705,7 @@ the choice in HsExpanded, but it seems simpler to consult the flag (again).
 -----------------------------------------------------------------------------
 -- Building representations of auxiliary structures like Match, Clause, Stmt,
 
-repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
+repMatchTup ::  LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = [p]
                         , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
@@ -1718,7 +1718,7 @@ repMatchTup (L _ (Match { m_pats = [p]
      ; wrapGenSyms (ss1++ss2) match }}}
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
-repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
+repClauseTup ::  LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = ps
                          , m_grhss = GRHSs _ guards  wheres })) =
   do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
@@ -2052,7 +2052,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 -- Haskell Template's Meta.Exp type so we punt if it isn't a simple thing like
 -- (\ p1 .. pn -> exp) by causing an error.
 
-repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
+repLambda :: LMatch GhcRn (LPat GhcRn) (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
                                               (EmptyLocalBinds _) } ))

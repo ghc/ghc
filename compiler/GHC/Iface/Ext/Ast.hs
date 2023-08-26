@@ -496,8 +496,8 @@ patScopes
   :: Maybe Span
   -> Scope
   -> Scope
-  -> [LPat (GhcPass p)]
-  -> [PScoped (LPat (GhcPass p))]
+  -> [LocatedA (pat (GhcPass p))]
+  -> [PScoped (LocatedA (pat (GhcPass p)))]
 patScopes rsp useScope patScope xs =
   map (\(RS sc a) -> PS rsp useScope sc a) $
     listScopes patScope xs
@@ -789,10 +789,11 @@ class ( HiePass (NoGhcTcPass p)
       , NoGhcTcPass p ~ 'Renamed
       , ModifyState (IdGhcP p)
       , Data (GRHS  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
-      , Data (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
-      , Data (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))
+      , Data (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsExpr (GhcPass p))))
+      , Data (Match (GhcPass p) (LocatedA (Pat (GhcPass p))) (LocatedA (HsCmd  (GhcPass p))))
       , Data (Stmt  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
       , Data (Stmt  (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))
+      , Data (Pat    (GhcPass p))
       , Data (HsExpr (GhcPass p))
       , Data (HsCmd  (GhcPass p))
       , Data (AmbiguousFieldOcc (GhcPass p))
@@ -818,18 +819,22 @@ instance ToHie (Context (Located NoExtField)) where
   toHie _ = pure []
 
 type AnnoBody p body
-  = ( Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
-                   ~ SrcSpanAnnA
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
-                   ~ SrcSpanAnnL
-    , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+  = ( Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ SrcAnn NoEpAnns
     , Anno (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
-
     , Data (body (GhcPass p))
-    , Data (Match (GhcPass p) (LocatedA (body (GhcPass p))))
     , Data (GRHS  (GhcPass p) (LocatedA (body (GhcPass p))))
     , Data (Stmt  (GhcPass p) (LocatedA (body (GhcPass p))))
+    )
+
+type AnnoPatBody p pat body
+  = ( AnnoBody p body
+    , Anno (Match (GhcPass p) (LocatedA (pat (GhcPass p))) (LocatedA (body (GhcPass p))))
+                   ~ SrcSpanAnnA
+    , Anno [LocatedA (Match (GhcPass p) (LocatedA (pat (GhcPass p))) (LocatedA (body (GhcPass p))))]
+                   ~ SrcSpanAnnL
+    , Data (pat (GhcPass p))
+    , Data (Match (GhcPass p) (LocatedA (pat (GhcPass p))) (LocatedA (body (GhcPass p))))
     )
 
 instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
@@ -875,9 +880,10 @@ instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
         ]
 
 instance ( HiePass p
-         , AnnoBody p body
+         , AnnoPatBody p pat body
+         , ToHie (PScoped (LocatedA (pat (GhcPass p))))
          , ToHie (LocatedA (body (GhcPass p)))
-         ) => ToHie (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) where
+         ) => ToHie (MatchGroup (GhcPass p) (LocatedA (pat (GhcPass p))) (LocatedA (body (GhcPass p)))) where
   toHie mg = case mg of
     MG{ mg_alts = (L span alts) } ->
       local (setOrigin origin) $ concatM
@@ -924,9 +930,10 @@ instance HiePass p => ToHie (HsPatSynDir (GhcPass p)) where
 
 instance ( HiePass p
          , Data (body (GhcPass p))
-         , AnnoBody p body
+         , AnnoPatBody p pat body
+         , ToHie (PScoped (LocatedA (pat (GhcPass p))))
          , ToHie (LocatedA (body (GhcPass p)))
-         ) => ToHie (LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))) where
+         ) => ToHie (LocatedA (Match (GhcPass p) (LocatedA (pat (GhcPass p))) (LocatedA (body (GhcPass p))))) where
   toHie (L span m ) = concatM $ makeNodeA m span : case m of
     Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
       [ toHie mctx
