@@ -850,9 +850,6 @@ instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
         [ toHie expr
         ]
       XHsBindsLR ext -> case hiePass @p of
-#if __GLASGOW_HASKELL__ < 811
-        HieRn -> dataConCantHappen ext
-#endif
         HieTc
           | AbsBinds{ abs_exports = xs, abs_binds = binds
                     , abs_ev_binds = ev_binds

@@ -617,9 +617,6 @@ compileForeign hsc_env lang stub_c = do
               LangObjcxx -> viaCPipeline Cobjcxx
               LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
               LangJs     -> \pe hsc_env ml fp -> Just <$> foreignJsPipeline pe hsc_env ml fp
-#if __GLASGOW_HASKELL__ < 811
-              RawObject  -> panic "compileForeign: should be unreachable"
-#endif
             pipe_env = mkPipeEnv NoStop stub_c Nothing (Temporary TFL_GhcSession)
         res <- runPipeline (hsc_hooks hsc_env) (pipeline pipe_env hsc_env Nothing stub_c)
         case res of

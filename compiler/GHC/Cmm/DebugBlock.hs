@@ -119,9 +119,6 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               -- recover by copying ticks below.
               scp' | SubScope _ scp' <- scp      = scp'
                    | CombinedScope scp' _ <- scp = scp'
-#if __GLASGOW_HASKELL__ < 901
-                   | otherwise                   = panic "findP impossible"
-#endif
 
       scopeMap = foldl' (\acc (key, scope) -> insertMulti key scope acc) Map.empty childScopes
 

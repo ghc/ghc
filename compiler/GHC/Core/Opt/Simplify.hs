@@ -43,10 +43,6 @@ import GHC.Types.Unique.FM
 import Control.Monad
 import Data.Foldable ( for_ )
 
-#if __GLASGOW_HASKELL__ <= 810
-import GHC.Utils.Panic ( panic )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *
@@ -285,9 +281,6 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } }
-#if __GLASGOW_HASKELL__ <= 810
-      | otherwise = panic "do_iteration"
-#endif
       where
         -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount

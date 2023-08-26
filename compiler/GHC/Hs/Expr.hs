@@ -712,9 +712,6 @@ ppr_expr (HsEmbTy _ _ ty)
   = hsep [text "type", ppr ty]
 
 ppr_expr (XExpr x) = case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 811
-  GhcPs -> ppr x
-#endif
   GhcRn -> ppr x
   GhcTc -> ppr x
 
@@ -749,9 +746,6 @@ ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 901
-                                        GhcPs -> Nothing
-#endif
                                         GhcRn -> ppr_infix_expr_rn x
                                         GhcTc -> ppr_infix_expr_tc x
 ppr_infix_expr _ = Nothing
@@ -856,9 +850,6 @@ hsExprNeedsParens prec = go
     go (XExpr x) = case ghcPass @p of
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x
-#if __GLASGOW_HASKELL__ <= 900
-                     GhcPs -> True
-#endif
 
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr (HsWrap _ e))          = hsExprNeedsParens prec e
@@ -1302,10 +1293,6 @@ ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
       = fall_through
 
 ppr_cmd (XCmd x) = case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 811
-  GhcPs -> ppr x
-  GhcRn -> ppr x
-#endif
   GhcTc -> case x of
     HsWrap w cmd -> pprHsWrapper w (\_ -> parens (ppr_cmd cmd))
 
@@ -1874,10 +1861,6 @@ instance OutputableBndrId p
       pprHsQuote (VarBr _ False n)
         = text "''" <> pprPrefixOcc (unLoc n)
       pprHsQuote (XQuote b)  = case ghcPass @p of
-#if __GLASGOW_HASKELL__ <= 900
-          GhcPs -> dataConCantHappen b
-          GhcRn -> dataConCantHappen b
-#endif
           GhcTc -> pprPanic "pprHsQuote: `HsQuote GhcTc` shouldn't exist" (ppr b)
                    -- See Note [The life cycle of a TH quotation]
 

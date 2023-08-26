@@ -2546,10 +2546,6 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
                                             , ppr new_rewriters ])
        ; return new_ev }
 
-#if __GLASGOW_HASKELL__ <= 810
-  | otherwise
-  = panic "rewriteEvidence"
-#endif
   where
     new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
     loc      = ctEvLoc old_ev

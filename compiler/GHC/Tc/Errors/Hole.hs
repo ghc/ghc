@@ -836,9 +836,6 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                            Just (dataConWrapId con, dataConNonlinearType con)
                                        _ -> Nothing }
             where name = case hfc of
-#if __GLASGOW_HASKELL__ < 901
-                           IdHFCand id     -> idName id
-#endif
                            GreHFCand gre   -> greName gre
                            NameHFCand name -> name
           discard_it = go subs seen maxleft ty elts

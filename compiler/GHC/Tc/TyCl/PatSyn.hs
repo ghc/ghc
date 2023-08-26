@@ -933,9 +933,6 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds } } }
 
-#if __GLASGOW_HASKELL__ <= 810
-  | otherwise = panic "tcPatSynBuilderBind"  -- Both cases dealt with
-#endif
   where
     mb_match_group
        = case dir of

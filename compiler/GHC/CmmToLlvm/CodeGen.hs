@@ -1684,11 +1684,6 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_AlignmentCheck {} -> panicOp
 
-#if __GLASGOW_HASKELL__ < 811
-    MO_VF_Extract {} -> panicOp
-    MO_V_Extract {} -> panicOp
-#endif
-
     where
         binLlvmOp ty binOp allow_y_cast = do
           platform <- getPlatform

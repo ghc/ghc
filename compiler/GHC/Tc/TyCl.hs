@@ -2981,10 +2981,6 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- overlap done by dropDominatedAxioms
        ; return fam_tc } }
 
-#if __GLASGOW_HASKELL__ <= 810
-  | otherwise = panic "tcFamInst1"  -- Silence pattern-exhaustiveness checker
-#endif
-
 -- | Maybe return a list of Bools that say whether a type family was declared
 -- injective in the corresponding type arguments. Length of the list is equal to
 -- the number of arguments (including implicit kind/coercion arguments).

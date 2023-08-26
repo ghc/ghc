@@ -545,10 +545,6 @@ ppr_monobind (FunBind { fun_id = fun,
 
 ppr_monobind (PatSynBind _ psb) = ppr psb
 ppr_monobind (XHsBindsLR b) = case ghcPass @idL of
-#if __GLASGOW_HASKELL__ <= 900
-  GhcPs -> dataConCantHappen b
-  GhcRn -> dataConCantHappen b
-#endif
   GhcTc -> ppr_absbinds b
     where
       ppr_absbinds (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
