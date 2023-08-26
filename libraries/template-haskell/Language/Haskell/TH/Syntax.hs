@@ -57,7 +57,7 @@ import Data.Ratio
 import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
-                          TYPE, RuntimeRep(..), Multiplicity (..) )
+                          TYPE, RuntimeRep(..), Levity(..), Multiplicity (..) )
 import qualified Data.Kind as Kind (Type)
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Ptr          ( Ptr, plusPtr )
@@ -70,11 +70,6 @@ import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
 
-#if __GLASGOW_HASKELL__ >= 901
-import GHC.Types ( Levity(..) )
-#endif
-
-#if __GLASGOW_HASKELL__ >= 903
 import Data.Array.Byte (ByteArray(..))
 import GHC.Exts
   ( ByteArray#, unsafeFreezeByteArray#, copyAddrToByteArray#, newByteArray#
@@ -82,7 +77,6 @@ import GHC.Exts
   , copyByteArray#, newPinnedByteArray#)
 import GHC.ForeignPtr (ForeignPtr(..), ForeignPtrContents(..))
 import GHC.ST (ST(..), runST)
-#endif
 
 -----------------------------------------------------
 --
@@ -1014,11 +1008,7 @@ class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
   lift :: Quote m => t -> m Exp
-#if __GLASGOW_HASKELL__ >= 901
   default lift :: (r ~ ('BoxedRep 'Lifted), Quote m) => t -> m Exp
-#else
-  default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
-#endif
   lift = unTypeCode . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
@@ -1141,8 +1131,6 @@ instance Lift Addr# where
   lift x
     = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
 
-#if __GLASGOW_HASKELL__ >= 903
-
 -- |
 -- @since 2.19.0.0
 instance Lift ByteArray where
@@ -1173,8 +1161,6 @@ addrToByteArray (I# len) addr = runST $ ST $
     (# s', mb #) -> case copyAddrToByteArray# addr mb 0# len s' of
       s'' -> case unsafeFreezeByteArray# mb s'' of
         (# s''', ret #) -> (# s''', ByteArray ret #)
-
-#endif
 
 instance Lift a => Lift (Maybe a) where
   liftTyped x = unsafeCodeCoerce (lift x)

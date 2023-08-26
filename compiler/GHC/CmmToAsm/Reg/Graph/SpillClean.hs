@@ -399,12 +399,6 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
 
                 cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
 
-#if __GLASGOW_HASKELL__ <= 810
-        -- some other instruction
-        | otherwise
-        = cleanBackward liveSlotsOnEntry noReloads (li : acc) instrs
-#endif
-
 
 -- | Combine the associations from all the inward control flow edges.
 --

@@ -2311,9 +2311,6 @@ isStrictPattern (L loc pat) =
     EmbTyPat{}  -> False
 
     XPat ext        -> case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 811
-      GhcPs -> dataConCantHappen ext
-#endif
       GhcRn
         | HsPatExpanded _ p <- ext
         -> isStrictPattern (L loc p)

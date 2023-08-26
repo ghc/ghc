@@ -385,11 +385,6 @@ graphAddCoalesce (r1, r2) graph
         , RegReal _             <- r2
         = graph
 
-#if __GLASGOW_HASKELL__ <= 810
-        | otherwise
-        = panic "graphAddCoalesce"
-#endif
-
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph

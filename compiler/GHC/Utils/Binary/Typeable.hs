@@ -4,9 +4,6 @@
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 {-# OPTIONS_GHC -Wno-orphans -Wincomplete-patterns #-}
-#if MIN_VERSION_base(4,16,0)
-#define HAS_TYPELITCHAR
-#endif
 
 -- | Orphan Binary instances for Data.Typeable stuff
 module GHC.Utils.Binary.Typeable
@@ -19,9 +16,7 @@ import GHC.Prelude
 import GHC.Utils.Binary
 
 import GHC.Exts (RuntimeRep(..), VecCount(..), VecElem(..))
-#if __GLASGOW_HASKELL__ >= 901
 import GHC.Exts (Levity(Lifted, Unlifted))
-#endif
 import GHC.Serialized
 
 import Foreign
@@ -102,13 +97,8 @@ instance Binary RuntimeRep where
     put_ bh (VecRep a b)    = putByte bh 0 >> put_ bh a >> put_ bh b
     put_ bh (TupleRep reps) = putByte bh 1 >> put_ bh reps
     put_ bh (SumRep reps)   = putByte bh 2 >> put_ bh reps
-#if __GLASGOW_HASKELL__ >= 901
     put_ bh (BoxedRep Lifted)   = putByte bh 3
     put_ bh (BoxedRep Unlifted) = putByte bh 4
-#else
-    put_ bh LiftedRep       = putByte bh 3
-    put_ bh UnliftedRep     = putByte bh 4
-#endif
     put_ bh IntRep          = putByte bh 5
     put_ bh WordRep         = putByte bh 6
     put_ bh Int64Rep        = putByte bh 7
@@ -129,13 +119,8 @@ instance Binary RuntimeRep where
           0  -> VecRep <$> get bh <*> get bh
           1  -> TupleRep <$> get bh
           2  -> SumRep <$> get bh
-#if __GLASGOW_HASKELL__ >= 901
           3  -> pure (BoxedRep Lifted)
           4  -> pure (BoxedRep Unlifted)
-#else
-          3  -> pure LiftedRep
-          4  -> pure UnliftedRep
-#endif
           5  -> pure IntRep
           6  -> pure WordRep
           7  -> pure Int64Rep
@@ -173,17 +158,13 @@ instance Binary KindRep where
 instance Binary TypeLitSort where
     put_ bh TypeLitSymbol = putByte bh 0
     put_ bh TypeLitNat = putByte bh 1
-#if defined(HAS_TYPELITCHAR)
     put_ bh TypeLitChar = putByte bh 2
-#endif
     get bh = do
         tag <- getByte bh
         case tag of
           0 -> pure TypeLitSymbol
           1 -> pure TypeLitNat
-#if defined(HAS_TYPELITCHAR)
           2 -> pure TypeLitChar
-#endif
           _ -> fail "Binary.putTypeLitSort: invalid tag"
 
 putTypeRep :: BinHandle -> TypeRep a -> IO ()
@@ -198,12 +179,6 @@ putTypeRep bh (App f x) = do
     put_ bh (2 :: Word8)
     putTypeRep bh f
     putTypeRep bh x
-#if __GLASGOW_HASKELL__ < 903
-putTypeRep bh (Fun arg res) = do
-    put_ bh (3 :: Word8)
-    putTypeRep bh arg
-    putTypeRep bh res
-#endif
 
 instance Binary Serialized where
     put_ bh (Serialized the_type bytes) = do

@@ -383,9 +383,6 @@ pprPat (ConPat { pat_con = con
 pprPat (EmbTyPat _ toktype tp) = ppr toktype <+> ppr tp
 
 pprPat (XPat ext) = case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 811
-  GhcPs -> dataConCantHappen ext
-#endif
   GhcRn -> case ext of
     HsPatExpanded orig _ -> pprPat orig
   GhcTc -> case ext of
@@ -593,9 +590,6 @@ isIrrefutableHsPat is_strict = goL
     go (EmbTyPat {})       = True
 
     go (XPat ext)          = case ghcPass @p of
-#if __GLASGOW_HASKELL__ < 811
-      GhcPs -> dataConCantHappen ext
-#endif
       GhcRn -> case ext of
         HsPatExpanded _ pat -> go pat
       GhcTc -> case ext of
@@ -759,9 +753,6 @@ patNeedsParens p = go @p
     go (ViewPat {})      = True
     go (EmbTyPat {})     = True
     go (XPat ext)        = case ghcPass @q of
-#if __GLASGOW_HASKELL__ < 901
-      GhcPs -> dataConCantHappen ext
-#endif
       GhcRn -> case ext of
         HsPatExpanded orig _ -> go orig
       GhcTc -> case ext of
