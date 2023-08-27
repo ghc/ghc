@@ -2010,8 +2010,8 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namelist strings
-                {% fmap unitOL $ acsA (\cs -> sLL $2 $>
-                     (Warning (EpAnn (glR $2) (fst $ unLoc $3) cs) (unLoc $2)
+                {% fmap unitOL $ acsA (\cs -> L (comb3M $1 $2 $3)
+                     (Warning (EpAnn (glMR $1 $2) (fst $ unLoc $3) cs) (unLoc $2)
                               (WarningTxt $1 (noLoc NoSourceText) $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
@@ -4114,6 +4114,12 @@ comb3N :: Located a -> Located b -> LocatedN c -> SrcSpan
 comb3N a b c = a `seq` b `seq` c `seq`
     combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLocA c))
 
+comb3M :: Maybe (Located a) -> Located b -> Located c -> SrcSpan
+comb3M (Just a) b c = a `seq` b `seq` c `seq`
+    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLoc c))
+comb3M Nothing b c =  b `seq` c `seq`
+    (combineSrcSpans (getLoc b) (getLoc c))
+
 comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
     (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
@@ -4343,6 +4349,10 @@ glN = getLocA
 
 glR :: Located a -> Anchor
 glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
+
+glMR :: Maybe (Located a) -> Located b -> Anchor
+glMR (Just la) _ = glR la
+glMR _ la = glR la
 
 glAA :: Located a -> EpaLocation
 glAA = srcSpan2e . getLoc
@@ -4584,5 +4594,4 @@ adaptWhereBinds :: Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments))
                 ->        Located (HsLocalBinds GhcPs,       EpAnnComments)
 adaptWhereBinds Nothing = noLoc (EmptyLocalBinds noExtField, emptyComments)
 adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
-
 }

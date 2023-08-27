@@ -614,7 +614,17 @@ markEpAnnLMS' (EpAnn anc a cs) l kw (Just str) = do
           return (AddEpAnn kw' r')
       | otherwise = return (AddEpAnn kw' r)
 
+
 -- ---------------------------------------------------------------------
+
+markLToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
+  => Located (HsToken tok) -> EP w m (Located (HsToken tok))
+markLToken (L (RealSrcSpan aa mb) t) = do
+  epaLoc'<-  printStringAtAA (EpaSpan aa mb) (symbolVal (Proxy @tok))
+  case epaLoc' of
+    EpaSpan aa' mb' -> return (L (RealSrcSpan aa' mb') t)
+    _               -> return (L (RealSrcSpan aa  mb ) t)
+markLToken (L lt t) = return (L lt t)
 
 markToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => LHsToken tok GhcPs -> EP w m (LHsToken tok GhcPs)
@@ -1415,11 +1425,13 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
 
   exact (L (SrcSpanAnn an l) (WarningTxt mb_cat (L la src) ws)) = do
     an0 <- markAnnOpenP an src "{-# WARNING"
+    mb_cat' <- markAnnotated mb_cat
     an1 <- markEpAnnL an0 lapr_rest AnnOpenS
     ws' <- markAnnotated ws
     an2 <- markEpAnnL an1 lapr_rest AnnCloseS
     an3 <- markAnnCloseP an2
-    return (L (SrcSpanAnn an3 l) (WarningTxt mb_cat (L la src) ws'))
+    return (L (SrcSpanAnn an3 l) (WarningTxt mb_cat' (L la src) ws'))
+
 
   exact (L (SrcSpanAnn an l) (DeprecatedTxt (L ls src) ws)) = do
     an0 <- markAnnOpenP an src "{-# DEPRECATED"
@@ -1428,6 +1440,25 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
     an2 <- markEpAnnL an1 lapr_rest AnnCloseS
     an3 <- markAnnCloseP an2
     return (L (SrcSpanAnn an3 l) (DeprecatedTxt (L ls src) ws'))
+
+instance ExactPrint InWarningCategory where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ = a
+
+  exact (InWarningCategory tkIn source (L l wc)) = do
+      tkIn' <- markLToken tkIn
+      L _ (_,wc') <- markAnnotated (L l (source, wc))
+      return (InWarningCategory tkIn' source (L l wc'))
+
+instance ExactPrint (SourceText, WarningCategory) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ = a
+
+  exact (st, WarningCategory wc) = do
+      case st of
+          NoSourceText -> printStringAdvance $ "\"" ++ (unpackFS wc) ++ "\""
+          SourceText src -> printStringAdvance $ (unpackFS src)
+      return (st, WarningCategory wc)
 
 -- ---------------------------------------------------------------------
 
@@ -1750,19 +1781,20 @@ instance ExactPrint (WarnDecl GhcPs) where
   getAnnotationEntry (Warning an _ _) = fromAnn an
   setAnnotationAnchor (Warning an a b) anc cs = Warning (setAnchorEpa an anc cs) a b
 
-  exact (Warning an lns txt) = do
+  exact (Warning an lns  (WarningTxt mb_cat src ls )) = do
+    mb_cat' <- markAnnotated mb_cat
     lns' <- markAnnotated lns
     an0 <- markEpAnnL an lidl AnnOpenS -- "["
-    txt' <-
-      case txt of
-        WarningTxt mb_cat src ls -> do
-          ls' <- markAnnotated ls
-          return (WarningTxt mb_cat src ls')
-        DeprecatedTxt src ls -> do
-          ls' <- markAnnotated ls
-          return (DeprecatedTxt src ls')
+    ls' <- markAnnotated ls
     an1 <- markEpAnnL an0 lidl AnnCloseS -- "]"
-    return (Warning an1 lns' txt')
+    return (Warning an1 lns'  (WarningTxt mb_cat' src ls'))
+
+  exact (Warning an lns (DeprecatedTxt src ls)) = do
+    lns' <- markAnnotated lns
+    an0 <- markEpAnnL an lidl AnnOpenS -- "["
+    ls' <- markAnnotated ls
+    an1 <- markEpAnnL an0 lidl AnnCloseS -- "]"
+    return (Warning an1 lns' (DeprecatedTxt src ls'))
 
 -- ---------------------------------------------------------------------
 
@@ -1784,7 +1816,6 @@ instance ExactPrint FastString where
   -- TODO: https://ghc.haskell.org/trac/ghc/ticket/10313 applies.
   -- exact fs = printStringAdvance (show (unpackFS fs))
   exact fs = printStringAdvance (unpackFS fs) >> return fs
-
 
 -- ---------------------------------------------------------------------
 
@@ -3130,7 +3161,6 @@ instance (ExactPrint body)
 
 -- ---------------------------------------------------------------------
 
--- instance ExactPrint (HsRecUpdField GhcPs q) where
 instance (ExactPrint (LocatedA body))
     => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
