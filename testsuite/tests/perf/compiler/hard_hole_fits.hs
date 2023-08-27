@@ -7,6 +7,7 @@
 
 module SlowTypecheck where
 
+import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Expr
 import GHC (GhcPs)
 
