@@ -31,8 +31,8 @@ module GHC.Rename.Expr (
 import GHC.Prelude
 import GHC.Data.FastString
 
-import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
-                        , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
+import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
+                         RnMatchCtxt(..), rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env ( isBrackStage )
@@ -418,17 +418,29 @@ rnExpr (HsPragE x prag expr)
     rn_prag (HsPragSCC x ann) = HsPragSCC x ann
 
 rnExpr (HsLam x matches)
-  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnPats rnLExpr matches
+  = do { (matches', fvMatch) <- rnMatchGroup match_ctxt matches
        ; return (HsLam x matches', fvMatch) }
+  where
+    match_ctxt = RnMC { rnmc_what = LambdaExpr
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLExpr }
 
 rnExpr (HsLamCase x lc_variant matches)
-  = do { (matches', fvs_ms) <- rnMatchGroup (LamCaseAlt lc_variant) rnPats rnLExpr matches
+  = do { (matches', fvs_ms) <- rnMatchGroup match_ctxt matches
        ; return (HsLamCase x lc_variant matches', fvs_ms) }
+  where
+    match_ctxt = RnMC { rnmc_what = LamCaseAlt lc_variant
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLExpr }
 
 rnExpr (HsCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
-       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnPats rnLExpr matches
+       ; (new_matches, ms_fvs) <- rnMatchGroup match_ctxt matches
        ; return (HsCase CaseAlt new_expr new_matches, e_fvs `plusFV` ms_fvs) }
+  where
+    match_ctxt = RnMC { rnmc_what = CaseAlt
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLExpr }
 
 rnExpr (HsLet _ tkLet binds tkIn expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
@@ -550,8 +562,12 @@ rnExpr (HsIf _ p b1 b2)
                     ; return (mkExpandedExpr rn_if ds_if, fvs) } }
 
 rnExpr (HsMultiIf _ alts)
-  = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
+  = do { (alts', fvs) <- mapFvRn (rnGRHS match_ctxt) alts
        ; return (HsMultiIf noExtField alts', fvs) }
+  where
+    match_ctxt = RnMC { rnmc_what = IfAlt
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLExpr }
 
 rnExpr (ArithSeq _ _ seq)
   = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
@@ -883,8 +899,12 @@ rnCmd (HsCmdApp x fun arg)
        ; return (HsCmdApp x fun' arg', fvFun `plusFV` fvArg) }
 
 rnCmd (HsCmdLam _ matches)
-  = do { (matches', fvMatch) <- rnMatchGroup (ArrowMatchCtxt KappaExpr) rnPats rnLCmd matches
+  = do { (matches', fvMatch) <- rnMatchGroup match_ctxt matches
        ; return (HsCmdLam noExtField matches', fvMatch) }
+  where
+    match_ctxt = RnMC { rnmc_what = ArrowMatchCtxt KappaExpr
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLCmd }
 
 rnCmd (HsCmdPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLCmd e
@@ -892,14 +912,21 @@ rnCmd (HsCmdPar x lpar e rpar)
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
-       ; (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnPats rnLCmd matches
+       ; (new_matches, ms_fvs) <- rnMatchGroup match_ctxt matches
        ; return (HsCmdCase noExtField new_expr new_matches
                 , e_fvs `plusFV` ms_fvs) }
+  where
+    match_ctxt = RnMC { rnmc_what = (ArrowMatchCtxt ArrowCaseAlt)
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLCmd }
 
 rnCmd (HsCmdLamCase x lc_variant matches)
-  = do { (new_matches, ms_fvs) <-
-           rnMatchGroup (ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant) rnPats rnLCmd matches
+  = do { (new_matches, ms_fvs) <- rnMatchGroup match_ctxt matches
        ; return (HsCmdLamCase x lc_variant new_matches, ms_fvs) }
+  where
+    match_ctxt = RnMC { rnmc_what = ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLCmd }
 
 rnCmd (HsCmdIf _ _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p

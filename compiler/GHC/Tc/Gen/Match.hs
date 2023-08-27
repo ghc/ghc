@@ -128,7 +128,7 @@ tcMatchesFun fun_name matches exp_ty
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
     what   = FunRhs { mc_fun = fun_name, mc_fixity = Prefix, mc_strictness = strictness }
-    match_ctxt = MC { mc_what = what, mc_pats = tcPats, mc_body = tcBody }
+    match_ctxt = TcMC { tcmc_what = what, tcmc_pats = tcPats, tcmc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
       , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
@@ -159,7 +159,7 @@ tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys
               -> ExpRhoType
               -> TcM (HsWrapper, MatchGroup GhcTc (LPat GhcTc) (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
-  =  do { checkArgCounts (mc_what match_ctxt) match
+  =  do { checkArgCounts (tcmc_what match_ctxt) match
         ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
             -- checking argument counts since this is also used for \cases
             tcMatches match_ctxt pat_tys rhs_ty match }
@@ -182,9 +182,9 @@ tcGRHSsPat grhss res_ty
     tcGRHSs match_ctxt grhss res_ty
   where
     match_ctxt :: TcMatchCtxt Pat HsExpr -- AZ
-    match_ctxt = MC { mc_what = PatBindRhs,
-                      mc_pats = tcPats,
-                      mc_body = tcBody }
+    match_ctxt = TcMC { tcmc_what = PatBindRhs,
+                        tcmc_pats = tcPats,
+                        tcmc_body = tcBody }
 
 {- *********************************************************************
 *                                                                      *
@@ -193,17 +193,18 @@ tcGRHSsPat grhss res_ty
 ********************************************************************* -}
 
 data TcMatchCtxt pat body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcTc     -- What kind of thing this is
-       , mc_pats :: forall a.                -- Type checker for match patterns
-                    HsMatchContext GhcTc
-                 -> [LocatedA (pat GhcRn)]   -- patterns
-                 -> [ExpPatType]             -- types of the patterns
-                 -> TcM a                    -- checker for the body
-                 -> TcM ([LocatedA (pat GhcTc)], a)
-       , mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
-                                           -- an alternative
-                 -> ExpRhoType
-                 -> TcM (LocatedA (body GhcTc)) }
+  = TcMC
+       { tcmc_what :: HsMatchContext GhcTc     -- What kind of thing this is
+       , tcmc_pats :: forall a.                -- Type checker for match patterns
+                      HsMatchContext GhcTc
+                   -> [LocatedA (pat GhcRn)]   -- patterns
+                   -> [ExpPatType]             -- types of the patterns
+                   -> TcM a                    -- checker for the body
+                   -> TcM ([LocatedA (pat GhcTc)], a)
+       , tcmc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
+                                             -- an alternative
+                   -> ExpRhoType
+                   -> TcM (LocatedA (body GhcTc)) }
 
 type AnnoBody body
   = ( Outputable (body GhcRn)
@@ -277,17 +278,17 @@ tcMatch ctxt pat_tys rhs_ty match
     tc_match ctxt pat_tys rhs_ty
              match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- (mc_pats ctxt) (mc_what ctxt) pats pat_tys $
+        do { (pats', grhss') <- tcmc_pats ctxt (tcmc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noAnn
-                           , m_ctxt = mc_what ctxt
+                           , m_ctxt = tcmc_what ctxt
                            , m_pats = filter_out_type_pats pats'
                            , m_grhss = grhss' }) }
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         -- so we don't want to add "In the lambda abstraction \x->e"
     add_match_ctxt match thing_inside
-        = case mc_what ctxt of
+        = case tcmc_what ctxt of
             LambdaExpr -> thing_inside
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
@@ -325,10 +326,10 @@ tcGRHS :: TcMatchCtxt pat body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn
 tcGRHS ctxt res_ty (GRHS _ guards rhs)
   = do  { (guards', rhs')
             <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
-               mc_body ctxt rhs
+               tcmc_body ctxt rhs
         ; return (GRHS noAnn guards' rhs') }
   where
-    stmt_ctxt  = PatGuard (mc_what ctxt)
+    stmt_ctxt  = PatGuard (tcmc_what ctxt)
 
 {-
 ************************************************************************

@@ -267,19 +267,18 @@ tcExpr (HsLam _ match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
         ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
-    match_ctxt = MC { mc_what = LambdaExpr
-                    , mc_pats = tcPats
-                    , mc_body = tcBody }
+    match_ctxt = TcMC { tcmc_what = LambdaExpr
+                      , tcmc_pats = tcPats
+                      , tcmc_body = tcBody }
     herald = ExpectedFunTyLam match
 
 tcExpr e@(HsLamCase x lc_variant matches) res_ty
-  = do { (wrap, matches')
-           <- tcMatchLambda herald match_ctxt matches res_ty
+  = do { (wrap, matches') <- tcMatchLambda herald match_ctxt matches res_ty
        ; return (mkHsWrap wrap $ HsLamCase x lc_variant matches') }
   where
-    match_ctxt = MC { mc_what = LamCaseAlt lc_variant
-                    , mc_pats = tcPats
-                    , mc_body = tcBody }
+    match_ctxt = TcMC { tcmc_what = LamCaseAlt lc_variant
+                      , tcmc_pats = tcPats
+                      , tcmc_body = tcBody }
     herald = ExpectedFunTyLamCase lc_variant e
 
 
@@ -391,9 +390,9 @@ tcExpr (HsCase x scrut matches) res_ty
         ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
-    match_ctxt = MC { mc_what = x,
-                      mc_pats = tcPats,
-                      mc_body = tcBody }
+    match_ctxt = TcMC { tcmc_what = x,
+                        tcmc_pats = tcPats,
+                        tcmc_body = tcBody }
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
@@ -431,7 +430,9 @@ tcExpr (HsMultiIf _ alts) res_ty
        ; res_ty <- readExpType res_ty
        ; tcEmitBindingUsage (supUEs ues)  -- See Note [MultiWayIf linearity checking]
        ; return (HsMultiIf res_ty alts') }
-  where match_ctxt = MC { mc_what = IfAlt, mc_pats = tcPats, mc_body = tcBody }
+  where match_ctxt = TcMC { tcmc_what = IfAlt
+                          , tcmc_pats = tcPats
+                          , tcmc_body = tcBody }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
   = tcDoStmts do_or_lc stmts res_ty

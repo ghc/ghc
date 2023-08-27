@@ -25,6 +25,7 @@ module GHC.Rename.Bind (
 
    -- Other bindings
    rnMethodBinds, renameSigs,
+   RnMatchCtxt(..),
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..),
@@ -494,7 +495,10 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                                    -- after processing the LHS
                        , pat_ext = pat_fvs })
   = do  { mod <- getModule
-        ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs rnLExpr grhss
+        ; let match_ctxt = RnMC { rnmc_what = PatBindRhs
+                                , rnmc_pats = rnPats
+                                , rnmc_body = rnLExpr }
+        ; (grhss', rhs_fvs) <- rnGRHSs match_ctxt grhss
 
                 -- No scoped type variables for pattern bindings
         ; let all_fvs = pat_fvs `plusFV` rhs_fvs
@@ -520,10 +524,12 @@ rnBind sig_fn bind@(FunBind { fun_id = name
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
 
+        ; let match_ctxt = RnMC { rnmc_what = mkPrefixFunRhs name
+                                , rnmc_pats = rnPats
+                                , rnmc_body = rnLExpr }
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
-                                 rnMatchGroup (mkPrefixFunRhs name)
-                                              rnPats rnLExpr matches
+                                 rnMatchGroup match_ctxt matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
 
@@ -768,9 +774,11 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
-                do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
-                                   rnMatchGroup (mkPrefixFunRhs (L l name))
-                                                rnPats rnLExpr mg
+                do { let match_ctxt = RnMC { rnmc_what = mkPrefixFunRhs (L l name)
+                                           , rnmc_pats = rnPats
+                                           , rnmc_body = rnLExpr }
+                   ; (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
+                                   rnMatchGroup match_ctxt mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
@@ -1238,6 +1246,18 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
+data RnMatchCtxt pat body
+  = RnMC
+       { rnmc_what :: HsMatchContext GhcRn
+       , rnmc_pats :: forall a.
+                      HsMatchContext GhcRn
+                   -> [LocatedA (pat GhcPs)]
+                   -> ([LocatedA (pat GhcRn)]
+                   -> RnM (a, FreeVars))
+                   -> RnM (a, FreeVars)
+       , rnmc_body :: LocatedA (body GhcPs)
+                   -> RnM (LocatedA (body GhcRn), FreeVars) }
+
 type AnnoBody body
   = ( Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
     , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcAnn NoEpAnns
@@ -1279,43 +1299,37 @@ type AnnoPatBody pat body
 -- MatchGroup but -XEmptyCases is disabled, we add an error.
 
 rnMatchGroup :: (AnnoPatBody pat body)
-             => HsMatchContext GhcRn
-             -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
-             -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+             => RnMatchCtxt pat body
              -> MatchGroup GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
-rnMatchGroup ctxt rnMatchPats rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
+rnMatchGroup ctxt (MG { mg_alts = L lm ms, mg_ext = origin })
          -- see Note [Empty MatchGroups]
-  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase ctxt))
-       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnMatchPats rnBody) ms
+  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase (rnmc_what ctxt)))
+       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
   where
-    mustn't_be_empty = case ctxt of
+    mustn't_be_empty = case rnmc_what ctxt of
       LamCaseAlt LamCases -> return True
       ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> return True
       _ -> not <$> xoptM LangExt.EmptyCase
 
 rnMatch :: (AnnoPatBody pat body)
-        => HsMatchContext GhcRn
-        -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
-        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+        => RnMatchCtxt pat body
         -> LMatch GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
         -> RnM (LMatch GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
-rnMatch ctxt rnMatchPats rnBody = wrapLocFstMA (rnMatch' ctxt rnMatchPats rnBody)
+rnMatch ctxt = wrapLocFstMA (rnMatch' ctxt)
 
 rnMatch' :: (AnnoPatBody pat body)
-         => HsMatchContext GhcRn
-         -> (forall a. HsMatchContext GhcRn -> [LocatedA (pat GhcPs)] -> ([LocatedA (pat GhcRn)] -> RnM (a, FreeVars)) -> RnM (a, FreeVars))
-         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+         => RnMatchCtxt pat body
          -> Match GhcPs (LocatedA (pat GhcPs)) (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)), FreeVars)
-rnMatch' ctxt rnMatchPats rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
-  = rnMatchPats ctxt pats $ \ pats' -> do
-        { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
-        ; let mf' = case (ctxt, mf) of
+rnMatch' ctxt (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
+  = rnmc_pats ctxt (rnmc_what ctxt) pats $ \ pats' -> do
+        { (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
+        ; let mf' = case (rnmc_what ctxt, mf) of
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
                                             -> mf { mc_fun = L lf funid }
-                      _                     -> ctxt
+                      _                     -> rnmc_what ctxt
         ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
 
@@ -1329,30 +1343,27 @@ rnMatch' ctxt rnMatchPats rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = 
 -}
 
 rnGRHSs :: AnnoBody body
-        => HsMatchContext GhcRn
-        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+        => RnMatchCtxt pat body
         -> GRHSs GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHSs GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
+rnGRHSs ctxt (GRHSs _ grhss binds)
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
-    (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
+    (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt) grhss
     return (GRHSs emptyComments grhss' binds', fvGRHSs)
 
 rnGRHS :: AnnoBody body
-       => HsMatchContext GhcRn
-       -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+       => RnMatchCtxt pat body
        -> LGRHS GhcPs (LocatedA (body GhcPs))
        -> RnM (LGRHS GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnGRHS ctxt rnBody = wrapLocFstMA (rnGRHS' ctxt rnBody)
+rnGRHS ctxt = wrapLocFstMA (rnGRHS' ctxt)
 
-rnGRHS' :: HsMatchContext GhcRn
-        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
+rnGRHS' :: RnMatchCtxt pat body
         -> GRHS GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHS GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnGRHS' ctxt rnBody (GRHS _ guards rhs)
+rnGRHS' ctxt (GRHS _ guards rhs)
   = do  { pattern_guards_allowed <- xoptM LangExt.PatternGuards
-        ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) rnExpr guards $ \ _ ->
-                                    rnBody rhs
+        ; ((guards', rhs'), fvs) <- rnStmts stmt_ctxt rnExpr guards $ \ _ ->
+                                    rnmc_body ctxt rhs
 
         ; unless (pattern_guards_allowed || is_standard_guard guards') $
             addDiagnostic (nonStdGuardErr guards')
@@ -1365,6 +1376,8 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
     is_standard_guard []                  = True
     is_standard_guard [L _ (BodyStmt {})] = True
     is_standard_guard _                   = False
+
+    stmt_ctxt = PatGuard (rnmc_what ctxt)
 
 {-
 *********************************************************
