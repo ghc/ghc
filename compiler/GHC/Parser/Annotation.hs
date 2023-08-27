@@ -1039,7 +1039,7 @@ realSrcSpan :: SrcSpan -> RealSrcSpan
 realSrcSpan (RealSrcSpan s _) = s
 realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
   where
-    l = mkRealSrcLoc (fsLit "foo") (-1) (-1)
+    l = mkRealSrcLoc (fsLit "realSrcSpan") (-1) (-1)
 
 srcSpan2e :: SrcSpan -> EpaLocation
 srcSpan2e (RealSrcSpan s mb) = EpaSpan s mb
