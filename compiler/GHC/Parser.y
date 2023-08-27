@@ -2002,8 +2002,8 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namelist strings
-                {% fmap unitOL $ acsA (\cs -> sLL $2 $>
-                     (Warning (EpAnn (glR $2) (fst $ unLoc $3) cs) (unLoc $2)
+                {% fmap unitOL $ acsA (\cs -> L (comb3 $1 $2 $3)
+                     (Warning (EpAnn (glMR $1 $2) (fst $ unLoc $3) cs) (unLoc $2)
                               (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
@@ -4300,6 +4300,10 @@ glN = getLocA
 glR :: Located a -> Anchor
 glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
 
+glMR :: Maybe (Located a) -> Located b -> Anchor
+glMR (Just la) _ = glR la
+glMR _ la = glR la
+
 glAA :: Located a -> EpaLocation
 glAA = srcSpan2e . getLoc
 
@@ -4554,5 +4558,4 @@ adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
 
 combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
-
 }

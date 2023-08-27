@@ -1268,7 +1268,7 @@ type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
     ppr (Warnings ext decls)
-      = ftext src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
+      = ftext src <+> vcat (punctuate semi (map ppr decls)) <+> text "#-}"
       where src = case ghcPass @p of
               GhcPs | (_, SourceText src) <- ext -> src
               GhcRn | SourceText src <- ext -> src

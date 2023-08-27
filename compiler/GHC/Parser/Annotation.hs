@@ -1029,6 +1029,10 @@ instance HasLoc (Located a) where
 instance HasLoc (GenLocated (SrcSpanAnn' a) e) where
   getHasLoc (L (SrcSpanAnn _ l) _) = l
 
+instance (HasLoc a) => (HasLoc (Maybe a)) where
+  getHasLoc (Just a) = getHasLoc a
+  getHasLoc Nothing = noSrcSpan
+
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
 getHasLocList xs = foldl1' combineSrcSpans $ map getHasLoc xs
