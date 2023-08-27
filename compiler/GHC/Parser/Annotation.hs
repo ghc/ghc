@@ -757,7 +757,10 @@ data NameAnn
       }
   -- | Used for @->@, as an identifier
   | NameAnnRArrow {
+      nann_unicode   :: Bool,
+      nann_mopen     :: Maybe EpaLocation,
       nann_name      :: EpaLocation,
+      nann_mclose    :: Maybe EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for an item with a leading @'@. The annotation for
@@ -1288,8 +1291,8 @@ instance Outputable NameAnn where
     = text "NameAnnBars" <+> ppr a <+> ppr o <+> ppr n <+> ppr b <+> ppr t
   ppr (NameAnnOnly a o c t)
     = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
-  ppr (NameAnnRArrow n t)
-    = text "NameAnnRArrow" <+> ppr n <+> ppr t
+  ppr (NameAnnRArrow u o n c t)
+    = text "NameAnnRArrow" <+> ppr u <+> ppr o <+> ppr n <+> ppr c <+> ppr t
   ppr (NameAnnQuote q n t)
     = text "NameAnnQuote" <+> ppr q <+> ppr n <+> ppr t
   ppr (NameAnnTrailing t)

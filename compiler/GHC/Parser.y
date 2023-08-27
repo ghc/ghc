@@ -773,9 +773,9 @@ identifier :: { LocatedN RdrName }
         | qvarop                        { $1 }
         | qconop                        { $1 }
     | '(' '->' ')'      {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                 (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                 (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
     | '->'              {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                 (NameAnnRArrow (glAA $1) []) }
+                                 (NameAnnRArrow (isUnicode $1) Nothing (glAA $1) Nothing []) }
 
 -----------------------------------------------------------------------------
 -- Backpack stuff
@@ -3665,7 +3665,7 @@ ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit
         | '(#' bars '#)'        {% amsrn (sLL $1 $> $ getRdrName (sumTyCon (snd $2 + 1)))
                                        (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(' '->' ')'          {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                       (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                       (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
         | '[' ']'               {% amsrn (sLL $1 $> $ listTyCon_RDR)
                                        (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
@@ -3747,7 +3747,8 @@ otycon :: { LocatedN RdrName }
 op      :: { LocatedN RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
-        | '->'                  { sL1n $1 $ getRdrName unrestrictedFunTyCon }
+        | '->'                  {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
+                                     (NameAnnRArrow (isUnicode $1) Nothing (glAA $1) Nothing []) }
 
 varop   :: { LocatedN RdrName }
         : varsym                { $1 }
