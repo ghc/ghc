@@ -192,19 +192,18 @@ tcGRHSsPat grhss res_ty
 *                                                                      *
 ********************************************************************* -}
 
-data TcMatchCtxt pat body   -- c.f. TcStmtCtxt, also in this module
-  = TcMC
-       { tcmc_what :: HsMatchContext GhcTc     -- What kind of thing this is
-       , tcmc_pats :: forall a.                -- Type checker for match patterns
-                      HsMatchContext GhcTc
-                   -> [LocatedA (pat GhcRn)]   -- patterns
-                   -> [ExpPatType]             -- types of the patterns
-                   -> TcM a                    -- checker for the body
-                   -> TcM ([LocatedA (pat GhcTc)], a)
-       , tcmc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
-                                             -- an alternative
-                   -> ExpRhoType
-                   -> TcM (LocatedA (body GhcTc)) }
+data TcMatchCtxt pat body
+  = TcMC { tcmc_what :: HsMatchContext GhcTc     -- What kind of thing this is
+         , tcmc_pats :: forall a.                -- Type checker for match patterns
+                         HsMatchContext GhcTc
+                     -> [LocatedA (pat GhcRn)]   -- patterns
+                     -> [ExpPatType]             -- types of the patterns
+                     -> TcM a                    -- checker for the body
+                     -> TcM ([LocatedA (pat GhcTc)], a)
+         , tcmc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
+                                               -- an alternative
+                     -> ExpRhoType
+                     -> TcM (LocatedA (body GhcTc)) }
 
 type AnnoBody body
   = ( Outputable (body GhcRn)

@@ -1247,16 +1247,15 @@ checkDupMinimalSigs sigs
 -}
 
 data RnMatchCtxt pat body
-  = RnMC
-       { rnmc_what :: HsMatchContext GhcRn
-       , rnmc_pats :: forall a.
-                      HsMatchContext GhcRn
-                   -> [LocatedA (pat GhcPs)]
-                   -> ([LocatedA (pat GhcRn)]
-                   -> RnM (a, FreeVars))
-                   -> RnM (a, FreeVars)
-       , rnmc_body :: LocatedA (body GhcPs)
-                   -> RnM (LocatedA (body GhcRn), FreeVars) }
+  = RnMC { rnmc_what :: HsMatchContext GhcRn
+         , rnmc_pats :: forall a.
+                        HsMatchContext GhcRn
+                     -> [LocatedA (pat GhcPs)]
+                     -> ([LocatedA (pat GhcRn)]
+                     -> RnM (a, FreeVars))
+                     -> RnM (a, FreeVars)
+         , rnmc_body :: LocatedA (body GhcPs)
+                     -> RnM (LocatedA (body GhcRn), FreeVars) }
 
 type AnnoBody body
   = ( Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
