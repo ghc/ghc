@@ -1011,9 +1011,12 @@ instance NFData NameAnn where
     `deepseq` c
     `deepseq` d
     `deepseq` ()
-  rnf (NameAnnRArrow a b) =
+  rnf (NameAnnRArrow a b c d e) =
               a
     `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
     `deepseq` ()
   rnf (NameAnnQuote a b c) =
               a
@@ -1072,4 +1075,3 @@ instance NFData AnchorOperation where
 instance NFData DeltaPos where
   rnf (SameLine n)        = rnf n
   rnf (DifferentLine n m) = n `deepseq` m `deepseq` ()
-
