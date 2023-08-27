@@ -512,8 +512,8 @@ changeLocalDecls libdir (L l p) = do
   let  sig' = setEntryDP (L ls sig)  (SameLine 0)
   let (p',_,_w) = runTransform doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
-      replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
-                        -> Transform (LMatch GhcPs (LHsExpr GhcPs))
+      replaceLocalBinds :: LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)
+                        -> Transform (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds van (ValBinds _ binds sigs))))) = do
         let oldDecls = sortLocatedA $ map wrapDecl (bagToList binds) ++ map wrapSig sigs
         let decls = s:d:oldDecls
@@ -543,8 +543,8 @@ changeLocalDecls2 libdir (L l p) = do
   let  sig' = setEntryDP (L ls  sig) (SameLine 2)
   let (p',_,_w) = runTransform doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
-      replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
-                        -> Transform (LMatch GhcPs (LHsExpr GhcPs))
+      replaceLocalBinds :: LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)
+                        -> Transform (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
         let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2)))

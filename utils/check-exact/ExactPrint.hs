@@ -2179,7 +2179,7 @@ instance ExactPrint (RecordPatSynField GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (Match GhcPs (LocatedA (HsCmd GhcPs))) where
+instance ExactPrint (Match GhcPs (LocatedA (Pat GhcPs)) (LocatedA (HsCmd GhcPs))) where
   getAnnotationEntry (Match ann _ _ _) = fromAnn ann
   setAnnotationAnchor (Match an a b c) anc cs = Match (setAnchorEpa an anc cs) a b c
 
@@ -2188,7 +2188,7 @@ instance ExactPrint (Match GhcPs (LocatedA (HsCmd GhcPs))) where
 
 -- -------------------------------------
 
-instance ExactPrint (Match GhcPs (LocatedA (HsExpr GhcPs))) where
+instance ExactPrint (Match GhcPs (LocatedA (Pat GhcPs)) (LocatedA (HsExpr GhcPs))) where
   getAnnotationEntry (Match ann _ _ _) = fromAnn ann
   setAnnotationAnchor (Match an a b c) anc cs = Match (setAnchorEpa an anc cs) a b c
 
@@ -2197,7 +2197,10 @@ instance ExactPrint (Match GhcPs (LocatedA (HsExpr GhcPs))) where
 
 -- ---------------------------------------------------------------------
 
-exactMatch :: (Monad m, Monoid w) => (ExactPrint (GRHSs GhcPs body)) => (Match GhcPs body) -> EP w m (Match GhcPs body)
+exactMatch :: (Monad m, Monoid w)
+           => (ExactPrint pat, ExactPrint (GRHSs GhcPs body))
+           => (Match GhcPs pat body)
+           -> EP w m (Match GhcPs pat body)
 exactMatch (Match an mctxt pats grhss) = do
 
   debugM $ "exact Match entered"
@@ -3053,7 +3056,7 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
 -- ---------------------------------------------------------------------
 
 -- TODO:AZ: combine these instances
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
+instance ExactPrint (MatchGroup GhcPs (LocatedA (Pat GhcPs)) (LocatedA (HsExpr GhcPs))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ = a
   exact (MG x matches) = do
@@ -3063,7 +3066,7 @@ instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
       else return matches
     return (MG x matches')
 
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
+instance ExactPrint (MatchGroup GhcPs (LocatedA (Pat GhcPs)) (LocatedA (HsCmd GhcPs))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ = a
   exact (MG x matches) = do
@@ -4400,8 +4403,8 @@ instance ExactPrint (LocatedL [LocatedA (IE GhcPs)]) where
     (an1, ies') <- markAnnList an0 (markAnnotated ies)
     return (L (SrcSpanAnn an1 l) ies')
 
-instance (ExactPrint (Match GhcPs (LocatedA body)))
-   => ExactPrint (LocatedL [LocatedA (Match GhcPs (LocatedA body))]) where
+instance (ExactPrint (Match GhcPs (LocatedA pat) (LocatedA body)))
+   => ExactPrint (LocatedL [LocatedA (Match GhcPs (LocatedA pat) (LocatedA body))]) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
   exact (L la a) = do

@@ -187,7 +187,7 @@ captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
 captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms )))))
                        = L l (ValD x (FunBind a b (MG c (L d ms'))))
     where
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' :: [LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)]
       ms' = captureLineSpacing ms
 captureMatchLineSpacing d = d
 
@@ -245,7 +245,7 @@ setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms ))))) dp
                    = L l' (ValD x (FunBind a b (MG c (L d ms'))))
     where
       L l' _ = setEntryDP decl dp
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' :: [LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)]
       ms' = case ms of
         [] -> []
         (m0':ms0) -> setEntryDP m0' dp : ms0
@@ -375,7 +375,7 @@ pushDeclDP (ValD x (FunBind a b (MG c (L d  ms )))) dp
           = ValD x (FunBind a b (MG c (L d' ms')))
     where
       L d' _ = setEntryDP (L d ms) dp
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' :: [LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)]
       ms' = case ms of
         [] -> []
         (m0':ms0) -> setEntryDP m0' dp : ms0
@@ -452,7 +452,7 @@ balanceCommentsFB f s = balanceComments' f s
 -- | Move comments on the same line as the end of the match into the
 -- GRHS, prior to the binds
 balanceCommentsMatch :: (Monad m)
-  => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
+  => LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
 balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   logTr $ "balanceCommentsMatch: (logInfo)=" ++ showAst (logInfo)
   return (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
@@ -683,7 +683,7 @@ commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
 -- ---------------------------------------------------------------------
 
 balanceSameLineComments :: (Monad m)
-  => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
+  => LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs))
 balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
   logTr $ "balanceSameLineComments: (la)=" ++ showGhc (ss2range $ locA la)
   logTr $ "balanceSameLineComments: [logInfo]=" ++ showAst logInfo
@@ -877,7 +877,7 @@ instance HasDecls (LocatedA (HsDecl GhcPs)) where
 
 -- ---------------------------------------------------------------------
 
-instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
+instance HasDecls (LocatedA (Match GhcPs (LocatedA (Pat GhcPs)) (LocatedA (HsExpr GhcPs)))) where
   hsDecls (L _ (Match _ _ _ (GRHSs _ _ lb))) = return $ hsDeclsLocalBinds lb
 
   replaceDecls (L l (Match xm c p (GRHSs xr rhs binds))) []
@@ -1101,7 +1101,7 @@ newWhereAnnotation ww = do
 -- ---------------------------------------------------------------------
 
 type Decl  = LHsDecl GhcPs
-type PMatch = LMatch GhcPs (LHsExpr GhcPs)
+type PMatch = LMatch GhcPs (LPat GhcPs) (LHsExpr GhcPs)
 
 -- |Modify a 'LHsBind' wrapped in a 'ValD'. For a 'PatBind' the
 -- declarations are extracted and returned after modification. For a
