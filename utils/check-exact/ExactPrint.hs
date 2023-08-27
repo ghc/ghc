@@ -4117,7 +4117,7 @@ instance ExactPrint (LocatedN RdrName) where
         NameAnn a o l c t -> do
           mn <- markName a o (Just (l,n)) c
           case mn of
-            (o', (Just (l',_n)), c') -> do -- (o', (Just (l',n')), c')
+            (o', (Just (l',_n)), c') -> do
               t' <- markTrailing t
               return (NameAnn a o' l' c' t')
             _ -> error "ExactPrint (LocatedN RdrName)"
@@ -4139,10 +4139,23 @@ instance ExactPrint (LocatedN RdrName) where
           (o',_,c') <- markName a o Nothing c
           t' <- markTrailing t
           return (NameAnnOnly a o' c' t')
-        NameAnnRArrow nl t -> do
-          (AddEpAnn _ nl') <- markKwC NoCaptureComments (AddEpAnn AnnRarrow nl)
+        NameAnnRArrow unicode o nl c t -> do
+          o' <- case o of
+            Just o0 -> do
+              (AddEpAnn _ o') <- markKwC NoCaptureComments (AddEpAnn AnnOpenP o0)
+              return (Just o')
+            Nothing -> return Nothing
+          (AddEpAnn _ nl') <-
+            if unicode
+              then markKwC NoCaptureComments (AddEpAnn AnnRarrowU nl)
+              else markKwC NoCaptureComments (AddEpAnn AnnRarrow nl)
+          c' <- case c of
+            Just c0 -> do
+              (AddEpAnn _ c') <- markKwC NoCaptureComments (AddEpAnn AnnCloseP c0)
+              return (Just c')
+            Nothing -> return Nothing
           t' <- markTrailing t
-          return (NameAnnRArrow nl' t')
+          return (NameAnnRArrow unicode o' nl' c' t')
         NameAnnQuote q name t -> do
           debugM $ "NameAnnQuote"
           (AddEpAnn _ q') <- markKwC NoCaptureComments (AddEpAnn AnnSimpleQuote q)
