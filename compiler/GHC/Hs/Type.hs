@@ -439,9 +439,12 @@ hsScopedKvs  (L _ HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndr
 hsScopedKvs _ = []
 
 ---------------------
+hsTyVarLName :: HsTyVarBndr flag (GhcPass p) -> LIdP (GhcPass p)
+hsTyVarLName (UserTyVar _ _ n)     = n
+hsTyVarLName (KindedTyVar _ _ n _) = n
+
 hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
-hsTyVarName (UserTyVar _ _ (L _ n))     = n
-hsTyVarName (KindedTyVar _ _ (L _ n) _) = n
+hsTyVarName = unLoc . hsTyVarLName
 
 hsLTyVarName :: LHsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
 hsLTyVarName = hsTyVarName . unLoc
@@ -459,10 +462,12 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
 
-hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> LocatedN (IdP (GhcPass p))
-hsLTyVarLocName (L l a) = L (l2l l) (hsTyVarName a)
+hsLTyVarLocName :: Anno (IdGhcP p) ~ SrcSpanAnnN
+                => LHsTyVarBndr flag (GhcPass p) -> LocatedN (IdP (GhcPass p))
+hsLTyVarLocName (L _ a) = hsTyVarLName a
 
-hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [LocatedN (IdP (GhcPass p))]
+hsLTyVarLocNames :: Anno (IdGhcP p) ~ SrcSpanAnnN
+                 => LHsQTyVars (GhcPass p) -> [LocatedN (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Get the kind signature of a type, ignoring parentheses:

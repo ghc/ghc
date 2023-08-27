@@ -36,10 +36,10 @@ import GHC.Data.FastString
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
--- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
  -- "../../testsuite/tests/ghc-api/exactprint/RenameCase1.hs" (Just changeRenameCase1)
  -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet2.hs" (Just changeLayoutLet2)
@@ -205,7 +205,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
- "../../testsuite/tests/printer/Test22771.hs" Nothing
+ -- "../../testsuite/tests/printer/Test22771.hs" Nothing
+ "../../testsuite/tests/typecheck/should_fail/T22560_fail_c.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 

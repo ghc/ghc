@@ -912,18 +912,29 @@ checkTyVars pp_what equals_or_where tc tparms
             = let
                 an = (reverse ops) ++ cps
               in
-                return (L (widenLocatedAn (l Semi.<> annt) an)
-                       (KindedTyVar (addAnns (annk Semi.<> ann) an cs) bvis (L lv tv) k))
+                return (L (widenLocatedAn (l Semi.<> annt) (for_widening bvis:an))
+                       (KindedTyVar (addAnns (annk Semi.<> ann Semi.<> for_widening_ann bvis) an cs)
+                                    bvis (L lv tv) k))
     chk ops cps cs bvis (L l (HsTyVar ann _ (L ltv tv)))
         | isRdrTyVar tv
             = let
                 an = (reverse ops) ++ cps
               in
-                return (L (widenLocatedAn l an)
-                                     (UserTyVar (addAnns ann an cs) bvis (L ltv tv)))
+                return (L (widenLocatedAn l (for_widening bvis:an))
+                                     (UserTyVar (addAnns (ann Semi.<> for_widening_ann bvis) an cs)
+                                                bvis (L ltv tv)))
     chk _ _ _ _ t@(L loc _)
         = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
             (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where)
+
+    -- Return an AddEpAnn for use in widenLocatedAn. The AnnKeywordId is not used.
+    for_widening :: HsBndrVis GhcPs -> AddEpAnn
+    for_widening (HsBndrInvisible (L (TokenLoc loc) _)) = AddEpAnn AnnAnyclass loc
+    for_widening  _                                     = AddEpAnn AnnAnyclass (EpaDelta (SameLine 0) [])
+
+    for_widening_ann :: HsBndrVis GhcPs -> EpAnn [AddEpAnn]
+    for_widening_ann (HsBndrInvisible (L (TokenLoc (EpaSpan r _mb)) _)) = EpAnn (realSpanAsAnchor r) [] emptyComments
+    for_widening_ann  _                                     = EpAnnNotUsed
 
 
 whereDots, equalsDots :: SDoc
