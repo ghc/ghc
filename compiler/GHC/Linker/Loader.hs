@@ -55,6 +55,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Iface.Load
+import GHCi.Message (LoadedDLL)
 
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
@@ -172,7 +173,7 @@ emptyLoaderState = LoaderState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId [] [] emptyUniqDSet)
+  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet)
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
@@ -221,8 +222,8 @@ loadDependencies
   -> SrcSpan
   -> [Module]
   -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
+-- When called, the loader state must have been initialized (see `initLoaderState`)
 loadDependencies interp hsc_env pls span needed_mods = do
---   initLoaderState (hsc_dflags hsc_env) dl
    let opts = initLinkDepsOpts hsc_env
 
    -- Find what packages and linkables are required
@@ -512,25 +513,25 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
     DLL dll_unadorned -> do
       maybe_errstr <- loadDLL interp (platformSOName platform dll_unadorned)
       case maybe_errstr of
-         Nothing -> maybePutStrLn logger "done"
-         Just mm | platformOS platform /= OSDarwin ->
+         Right _ -> maybePutStrLn logger "done"
+         Left mm | platformOS platform /= OSDarwin ->
            preloadFailed mm lib_paths lib_spec
-         Just mm | otherwise -> do
+         Left mm | otherwise -> do
            -- As a backup, on Darwin, try to also load a .so file
            -- since (apparently) some things install that way - see
            -- ticket #8770.
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
            err2 <- loadDLL interp libfile
            case err2 of
-             Nothing -> maybePutStrLn logger "done"
-             Just _  -> preloadFailed mm lib_paths lib_spec
+             Right _ -> maybePutStrLn logger "done"
+             Left _  -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
       do maybe_errstr <- loadDLL interp dll_path
          case maybe_errstr of
-            Nothing -> maybePutStrLn logger "done"
-            Just mm -> preloadFailed mm lib_paths lib_spec
+            Right _ -> maybePutStrLn logger "done"
+            Left mm -> preloadFailed mm lib_paths lib_spec
          return pls
 
     Framework framework ->
@@ -614,7 +615,7 @@ loadExpr interp hsc_env span root_ul_bco = do
         -- Load the necessary packages and linkables
         let le = linker_env pls
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
-        resolved <- linkBCO interp le bco_ix root_ul_bco
+        resolved <- linkBCO interp (pkgs_loaded pls) le bco_ix root_ul_bco
         [root_hvref] <- createBCOs interp [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
         return (pls, fhv)
@@ -677,7 +678,7 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
                        , addr_env = plusNameEnv (addr_env le) bc_strs }
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp le2 [cbc]
+          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
@@ -858,8 +859,8 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
     m <- loadDLL interp soFile
     case m of
-        Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-        Just err -> linkFail msg err
+      Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
+      Left err -> linkFail msg err
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
 
@@ -899,7 +900,7 @@ dynLinkBCOs interp pls bcos = do
             ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
             le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
-        names_and_refs <- linkSomeBCOs interp le2 cbcs
+        names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -914,6 +915,7 @@ dynLinkBCOs interp pls bcos = do
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
+             -> PkgsLoaded
              -> LinkerEnv
              -> [CompiledByteCode]
              -> IO [(Name,HValueRef)]
@@ -921,7 +923,7 @@ linkSomeBCOs :: Interp
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs interp le mods = foldr fun do_link mods []
+linkSomeBCOs interp pkgs_loaded le mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum = inner (bc_bcos : accum)
 
@@ -930,7 +932,7 @@ linkSomeBCOs interp le mods = foldr fun do_link mods []
     let flat = [ bco | bcos <- mods, bco <- bcos ]
         names = map unlinkedBCOName flat
         bco_ix = mkNameEnv (zip names [0..])
-    resolved <- sequence [ linkBCO interp le bco_ix bco | bco <- flat ]
+    resolved <- sequence [ linkBCO interp pkgs_loaded le bco_ix bco | bco <- flat ]
     hvrefs <- createBCOs interp resolved
     return (zip names hvrefs)
 
@@ -1092,18 +1094,18 @@ loadPackages' interp hsc_env new_pks pls = do
                -- Link dependents first
              ; pkgs' <- link pkgs deps
                 -- Now link the package itself
-             ; (hs_cls, extra_cls) <- loadPackage interp hsc_env pkg_cfg
+             ; (hs_cls, extra_cls, loaded_dlls) <- loadPackage interp hsc_env pkg_cfg
              ; let trans_deps = unionManyUniqDSets [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg
                                                    | dep_pkg <- deps
                                                    , Just loaded_pkg_info <- pure (lookupUDFM pkgs' dep_pkg)
                                                    ]
-             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls trans_deps)) }
+             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls loaded_dlls trans_deps)) }
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
-loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec])
+loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])
 loadPackage interp hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
@@ -1145,7 +1147,9 @@ loadPackage interp hsc_env pkg
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
-        let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
+        let known_hs_dlls    = [ dll | DLLPath dll <- hs_classifieds ]
+            known_extra_dlls = [ dll | DLLPath dll <- extra_classifieds ]
+            known_dlls       = known_hs_dlls ++ known_extra_dlls
 #if defined(CAN_LOAD_DLL)
             dlls       = [ dll  | DLL dll        <- classifieds ]
 #endif
@@ -1166,10 +1170,13 @@ loadPackage interp hsc_env pkg
         loadFrameworks interp platform pkg
         -- See Note [Crash early load_dyn and locateLib]
         -- Crash early if can't load any of `known_dlls`
-        mapM_ (load_dyn interp hsc_env True) known_dlls
+        mapM_ (load_dyn interp hsc_env True) known_extra_dlls
+        loaded_dlls <- mapMaybeM (load_dyn interp hsc_env True) known_hs_dlls
         -- For remaining `dlls` crash early only when there is surely
         -- no package's DLL around ... (not is_dyn)
         mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
+#else
+        let loaded_dlls = []
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1189,7 +1196,7 @@ loadPackage interp hsc_env pkg
         if succeeded ok
            then do
              maybePutStrLn logger "done."
-             return (hs_classifieds, extra_classifieds)
+             return (hs_classifieds, extra_classifieds, loaded_dlls)
            else let errmsg = text "unable to load unit `"
                              <> pprUnitInfoForUser pkg <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
@@ -1242,19 +1249,20 @@ restriction very easily.
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
 -- loadDLL is going to search the system paths to find the library.
-load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO ()
+load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO (Maybe (RemotePtr LoadedDLL))
 load_dyn interp hsc_env crash_early dll = do
   r <- loadDLL interp dll
   case r of
-    Nothing  -> return ()
-    Just err ->
+    Right loaded_dll -> pure (Just loaded_dll)
+    Left err ->
       if crash_early
         then cmdLineErrorIO err
-        else
+        else do
           when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
             $ logMsg logger
                 (mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedExtraSharedLib) Nothing)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
+          pure Nothing
   where
     diag_opts = initDiagOpts (hsc_dflags hsc_env)
     logger = hsc_logger hsc_env

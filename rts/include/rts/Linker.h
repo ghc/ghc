@@ -91,7 +91,9 @@ void *loadNativeObj( pathchar *path, char **errmsg );
 HsInt unloadNativeObj( void *handle );
 
 /* load a dynamic library */
-const char *addDLL( pathchar* dll_name );
+void *addDLL(pathchar* dll_name, const char **errmsg);
+
+void *lookupSymbolInDLL(void *handle, const char *symbol_name);
 
 /* add a path to the library search path */
 HsPtr addLibrarySearchPath(pathchar* dll_path);
