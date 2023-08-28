@@ -21,6 +21,7 @@ module GHCi.Message
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
+  , LoadedDLL
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -69,8 +70,9 @@ data Message a where
   -- These all invoke the corresponding functions in the RTS Linker API.
   InitLinker :: Message ()
   LookupSymbol :: String -> Message (Maybe (RemotePtr ()))
+  LookupSymbolInDLL :: RemotePtr LoadedDLL -> String -> Message (Maybe (RemotePtr ()))
   LookupClosure :: String -> Message (Maybe HValueRef)
-  LoadDLL :: String -> Message (Maybe String)
+  LoadDLL :: String -> Message (Either String (RemotePtr LoadedDLL))
   LoadArchive :: String -> Message () -- error?
   LoadObj :: String -> Message () -- error?
   UnloadObj :: String -> Message () -- error?
@@ -394,6 +396,9 @@ data EvalResult a
 
 instance Binary a => Binary (EvalResult a)
 
+-- | A dummy type that tags pointers returned by 'LoadDLL'.
+data LoadedDLL
+
 -- SomeException can't be serialized because it contains dynamic
 -- types.  However, we do very limited things with the exceptions that
 -- are thrown by interpreted computations:
@@ -521,6 +526,7 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
+      40 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -564,6 +570,7 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
+  LookupSymbolInDLL dll str   -> putWord8 40 >> put dll >> put str
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
