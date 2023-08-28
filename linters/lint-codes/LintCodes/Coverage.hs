@@ -26,7 +26,7 @@ getCoveredCodes =
   -- Run git grep on .stdout and .stderr files in the testsuite subfolder.
   do { codes <- lines
             <$> readProcess "git"
-                [ "grep", "-oh", codeRegex
+                [ "grep", "-Eoh", codeRegex
                         -- -oh: only show the match, and omit the filename.
                 , "--", ":/testsuite/*.stdout", ":/testsuite/*.stderr"
                 , ":!*/codes.stdout" -- Don't include the output of this test itself.
@@ -35,7 +35,7 @@ getCoveredCodes =
 
 -- | Regular expression to parse a diagnostic code.
 codeRegex :: String
-codeRegex = "\\[[A-Za-z]\\+-[0-9]\\+\\]"
+codeRegex = "\\[[A-Za-z]+-[0-9]+\\]"
 
 -- | Turn a string that matches the 'codeRegex' regular expression
 -- into its corresponding 'DiagnosticCode'.
