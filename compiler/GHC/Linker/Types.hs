@@ -40,7 +40,8 @@ import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
-import GHCi.RemoteTypes        ( ForeignHValue )
+import GHCi.RemoteTypes        ( ForeignHValue, RemotePtr )
+import GHCi.Message            ( LoadedDLL )
 
 import GHC.Types.Var           ( Id )
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
@@ -146,11 +147,12 @@ data LoadedPkgInfo
   { loaded_pkg_uid         :: !UnitId
   , loaded_pkg_hs_objs     :: ![LibrarySpec]
   , loaded_pkg_non_hs_objs :: ![LibrarySpec]
+  , loaded_pkg_hs_dlls     :: ![RemotePtr LoadedDLL]
   , loaded_pkg_trans_deps  :: UniqDSet UnitId
   }
 
 instance Outputable LoadedPkgInfo where
-  ppr (LoadedPkgInfo uid hs_objs non_hs_objs trans_deps) =
+  ppr (LoadedPkgInfo uid hs_objs non_hs_objs _ trans_deps) =
     vcat [ppr uid
          , ppr hs_objs
          , ppr non_hs_objs
