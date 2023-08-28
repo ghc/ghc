@@ -133,10 +133,10 @@ emitArgTagCheck :: SDoc -> [CbvMark] -> [Id] -> FCode ()
 emitArgTagCheck info marks args = whenCheckTags $ do
   mod <- getModuleName
   let cbv_args = filter (isBoxedType . idType) $ filterByList (map isMarkedCbv marks) args
-  arg_infos <- mapM getCgIdInfo cbv_args
-  let arg_cmms = map idInfoToAmode arg_infos
-      mk_msg arg = showPprUnsafe (text "Untagged arg:" <> (ppr mod) <> char ':' <> info <+> ppr arg)
-  zipWithM_ emitTagAssertion (map mk_msg args) (arg_cmms)
+  forM_ cbv_args $ \arg -> do
+    cginfo <- getCgIdInfo arg
+    let msg = showPprUnsafe (text "Untagged arg:" <> (ppr mod) <> char ':' <> info <+> ppr arg)
+    emitTagAssertion msg (idInfoToAmode cginfo)
 
 taggedCgInfo :: CgIdInfo -> Bool
 taggedCgInfo cg_info

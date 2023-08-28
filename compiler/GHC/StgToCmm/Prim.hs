@@ -1717,11 +1717,9 @@ emitPrimOp cfg primop =
         -> do reg <- newTemp (primRepCmmType platform rep)
               pure [reg]
 
-      ReturnsAlg tycon | isUnboxedTupleTyCon tycon
+      ReturnsTuple
         -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
               pure regs
-
-      _ -> panic "cgOpApp"
     f regs
     pure $ map (CmmReg . CmmLocal) regs
 
