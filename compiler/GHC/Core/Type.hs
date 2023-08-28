@@ -2302,8 +2302,6 @@ isUnliftedType :: HasDebugCallStack => Type -> Bool
         -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#
         -- I found bindings like these were getting floated to the top level.
-        -- They are pretty bogus types, mind you.  It would be better never to
-        -- construct them
 isUnliftedType ty =
   case typeLevity_maybe ty of
     Just Lifted   -> False

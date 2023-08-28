@@ -563,8 +563,7 @@ isJoinId id
 -- | Doesn't return strictness marks
 idJoinPointHood :: Var -> JoinPointHood
 idJoinPointHood id
- | isId id  = assertPpr (isId id) (ppr id) $
-              case Var.idDetails id of
+ | isId id  = case Var.idDetails id of
                 JoinId arity _marks -> JoinPoint arity
                 _                   -> NotJoinPoint
  | otherwise = NotJoinPoint

@@ -758,8 +758,10 @@ Wrinkles
      are not /apart/: see Note [Type and Constraint are not apart]
 
 (W2) We need two absent-error Ids, aBSENT_ERROR_ID for types of kind Type, and
-     aBSENT_CONSTRAINT_ERROR_ID for vaues of kind Constraint.  Ditto noInlineId
-     vs noInlineConstraintId in GHC.Types.Id.Make; see Note [inlineId magic].
+     aBSENT_CONSTRAINT_ERROR_ID for types of kind Constraint.
+     See Note [Type vs Constraint for error ids] in GHC.Core.Make.
+     Ditto noInlineId vs noInlineConstraintId in GHC.Types.Id.Make;
+     see Note [inlineId magic].
 
 (W3) We need a TypeOrConstraint flag in LitRubbish.
 

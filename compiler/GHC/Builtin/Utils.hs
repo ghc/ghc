@@ -67,7 +67,7 @@ import GHC.Types.Id.Make
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.TyThing
-import GHC.Types.Unique ( isValidKnownKeyUnique )
+import GHC.Types.Unique ( isValidKnownKeyUnique, pprUniqueAlways )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
@@ -79,7 +79,7 @@ import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Data.List.SetOps
 
 import Control.Applicative ((<|>))
-import Data.List        ( intercalate , find )
+import Data.List        ( find )
 import Data.Maybe
 
 {-
@@ -116,12 +116,8 @@ Note [About wired-in things]
 knownKeyNames :: [Name]
 knownKeyNames
   | debugIsOn
-  , Just badNamesStr <- knownKeyNamesOkay all_names
-  = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
-       -- NB: We can't use ppr here, because this is sometimes evaluated in a
-       -- context where there are no DynFlags available, leading to a cryptic
-       -- "<<details unavailable>>" error. (This seems to happen only in the
-       -- stage 2 compiler, for reasons I [Richard] have no clue of.)
+  , Just badNamesDoc <- knownKeyNamesOkay all_names
+  = pprPanic "badAllKnownKeyNames" badNamesDoc
   | otherwise
   = all_names
   where
@@ -161,16 +157,15 @@ knownKeyNames
                         Nothing -> []
 
 -- | Check the known-key names list of consistency.
-knownKeyNamesOkay :: [Name] -> Maybe String
+knownKeyNamesOkay :: [Name] -> Maybe SDoc
 knownKeyNamesOkay all_names
   | ns@(_:_) <- filter (not . isValidKnownKeyUnique . getUnique) all_names
-  = Just $ "    Out-of-range known-key uniques: ["
-        ++ intercalate ", " (map (occNameString . nameOccName) ns) ++
-         "]"
+  = Just $ text "    Out-of-range known-key uniques: " <>
+           brackets (pprWithCommas (ppr . nameOccName) ns)
   | null badNamesPairs
   = Nothing
   | otherwise
-  = Just badNamesStr
+  = Just badNamesDoc
   where
     namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) Utils.singleton m n n)
                            emptyUFM all_names
@@ -178,14 +173,14 @@ knownKeyNamesOkay all_names
     badNamesPairs = nonDetUFMToList badNamesEnv
       -- It's OK to use nonDetUFMToList here because the ordering only affects
       -- the message when we get a panic
-    badNamesStrs  = map pairToStr badNamesPairs
-    badNamesStr   = unlines badNamesStrs
+    badNamesDoc :: SDoc
+    badNamesDoc  = vcat $ map pairToDoc badNamesPairs
 
-    pairToStr (uniq, ns) = "        " ++
-                           show uniq ++
-                           ": [" ++
-                           intercalate ", " (map (occNameString . nameOccName) ns) ++
-                           "]"
+    pairToDoc :: (Unique, [Name]) -> SDoc
+    pairToDoc (uniq, ns) = text "        " <>
+                           pprUniqueAlways uniq <>
+                           text ": " <>
+                           brackets (pprWithCommas (ppr . nameOccName) ns)
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.

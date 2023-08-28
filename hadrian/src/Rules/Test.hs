@@ -345,7 +345,6 @@ needTestsuitePackages stg = do
   cross <- flag CrossCompiling
   when (not cross) $ needIservBins stg
   root <- buildRoot
-  liftIO $ print stg
   -- require the shims for testing stage1
   when (stg == stage0InTree) $ do
    -- Windows not supported as the wrapper scripts don't work on windows.. we could

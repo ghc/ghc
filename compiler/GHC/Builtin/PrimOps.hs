@@ -35,7 +35,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
 
-import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
+import GHC.Core.TyCon    ( isPrimTyCon, isUnboxedTupleTyCon, PrimRep(..) )
 import GHC.Core.Type
 
 import GHC.Cmm.Type
@@ -55,6 +55,7 @@ import GHC.Types.Unique  ( Unique )
 import GHC.Unit.Types    ( Unit )
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Data.FastString
 
@@ -857,7 +858,7 @@ primOpSig op
 
 data PrimOpResultInfo
   = ReturnsPrim     PrimRep
-  | ReturnsAlg      TyCon
+  | ReturnsTuple
 
 -- Some PrimOps need not return a manifest primitive or algebraic value
 -- (i.e. they might return a polymorphic value).  These PrimOps *must*
@@ -868,7 +869,8 @@ getPrimOpResultInfo op
   = case (primOpInfo op) of
       Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
-                         | otherwise      -> ReturnsAlg tc
+                         | isUnboxedTupleTyCon tc -> ReturnsTuple
+                         | otherwise      -> pprPanic "getPrimOpResultInfo" (ppr op)
                          where
                            tc = tyConAppTyCon ty
                         -- All primops return a tycon-app result
