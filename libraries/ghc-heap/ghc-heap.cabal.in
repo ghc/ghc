@@ -31,7 +31,7 @@ library
   if !os(ghcjs)
     cmm-sources:      cbits/HeapPrim.cmm
                       cbits/Stack.cmm
-  c-sources:        cbits/Stack.c
+  c-sources:        cbits/Stack_c.c
 
   default-extensions: NoImplicitPrelude
 
