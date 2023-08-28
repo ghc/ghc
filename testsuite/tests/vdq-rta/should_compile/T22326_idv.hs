@@ -1,6 +1,7 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NamedWildCards #-}
 
 module T22326_idv where
 
@@ -39,3 +40,7 @@ idv_wild (type _) x = x
 -- Usage (using a wildcard)
 rBool'   = idv (type _) True
 rChar'   = idv (type _) 'x'
+
+-- Usage (using named wildcards)
+rMaybeX         = idv (type (Maybe _a)) Nothing
+rEitherCharChar = idv (type (Either _a _a)) (Left 'x')

@@ -65,7 +65,6 @@
 [GHC-85337] is untested (constructor = TcRnSpecialiseNotVisible)
 [GHC-91382] is untested (constructor = TcRnIllegalKindSignature)
 [GHC-72520] is untested (constructor = TcRnIgnoreSpecialisePragmaOnDefMethod)
-[GHC-10969] is untested (constructor = TcRnTyThingUsedWrong)
 [GHC-61072] is untested (constructor = TcRnGADTDataContext)
 [GHC-16409] is untested (constructor = TcRnMultipleConForNewtype)
 [GHC-54478] is untested (constructor = TcRnRedundantSourceImport)

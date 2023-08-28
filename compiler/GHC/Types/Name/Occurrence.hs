@@ -80,7 +80,7 @@ module GHC.Types.Name.Occurrence (
 
         isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
         isFieldOcc, fieldOcc_maybe,
-        parenSymOcc, startsWithUnderscore,
+        parenSymOcc, startsWithUnderscore, isUnderscore,
 
         isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
         isFieldNameSpace, isTermVarOrFieldNameSpace,
@@ -911,6 +911,9 @@ startsWithUnderscore :: OccName -> Bool
 startsWithUnderscore occ = case unpackFS (occNameFS occ) of
   '_':_ -> True
   _     -> False
+
+isUnderscore :: OccName -> Bool
+isUnderscore occ = occNameFS occ == fsLit "_"
 
 {-
 ************************************************************************
