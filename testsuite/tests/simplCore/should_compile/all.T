@@ -496,3 +496,4 @@ test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -
 
 # The -ddump-simpl of T22404 should have no let-bindings
 test('T22404', [only_ways(['optasm']), check_errmsg(r'let') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T23864', normal, compile, ['-O -dcore-lint -package ghc -Wno-gadt-mono-local-binds'])
