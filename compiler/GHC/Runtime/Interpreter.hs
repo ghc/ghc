@@ -403,7 +403,7 @@ whereFrom interp ref =
     interpCmd interp (WhereFrom hval)
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult ())
+seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult HValueRef)
 seqHValue interp unit_env ref =
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
@@ -426,7 +426,7 @@ evalBreakpointToId eval_break =
       }
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
-handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
+handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus HValueRef -> IO (EvalResult HValueRef)
 handleSeqHValueStatus interp unit_env eval_status =
   case eval_status of
     (EvalBreak _ maybe_break resume_ctxt _) -> do

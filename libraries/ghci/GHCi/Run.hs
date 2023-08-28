@@ -186,15 +186,14 @@ evalStringToString r str = do
 -- The UI process has more and therefore also can show more
 -- information about the breakpoint than the current iserv
 -- process.
-doSeq :: RemoteRef a -> IO (EvalStatus ())
+doSeq :: RemoteRef a -> IO (EvalStatus (RemoteRef a))
 doSeq ref = do
     sandboxIO evalOptsSeq $ do
-      _ <- (void $ evaluate =<< localRef ref)
-      return ()
+      mkRemoteRef =<< evaluate =<< localRef ref
 
 -- | Process a ResumeSeq message. Continue the :force processing     #2950
 -- after a breakpoint.
-resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
+resumeSeq :: RemoteRef (ResumeContext a) -> IO (EvalStatus a)
 resumeSeq hvref = do
     ResumeContext{..} <- localRef hvref
     withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar $

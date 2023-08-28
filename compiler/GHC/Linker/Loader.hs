@@ -65,6 +65,7 @@ import GHC.SysTools
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
@@ -695,10 +696,8 @@ loadDecls interp hsc_env span linkable = do
                        , addr_env = le2_addr_env }
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) (hsc_unit_env hsc_env) le2 cbcs
-          nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
-          let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
-              !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
+          (nms_fhvs, le3) <- linkSomeBCOs interp (pkgs_loaded pls) (hsc_unit_env hsc_env) le2 cbcs
+          let !pls2 = pls { linker_env = le3 }
           return (pls2, (nms_fhvs, links_needed, units_needed))
   where
     cbcs = linkableBCOs linkable
@@ -918,18 +917,16 @@ dynLinkBCOs interp ue pls bcos = do
         ae2 <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le1) cbcs
         let le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
-        names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) ue le2 cbcs
+        (names_and_refs, le3) <- linkSomeBCOs interp (pkgs_loaded pls) ue le2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
-        let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
+        let to_drop = filter (not.isExternalName.fst) names_and_refs
 
-        -- Immediately release any HValueRefs we're not going to add
-        freeHValueRefs interp (map snd to_drop)
-        -- Wrap finalizers on the ones we want to keep
-        new_binds <- makeForeignNamedHValueRefs interp to_add
+        -- Finalize any ForeignHValues we want to drop
+        mapM_ finalizeForeignRef (map snd to_drop)
 
-        let ce2 = extendClosureEnv (closure_env le2) new_binds
-        return $! pls1 { linker_env = le2 { closure_env = ce2 } }
+        let ce = delListFromNameEnv (closure_env le3) (map fst to_drop)
+        return $! pls1 { linker_env = le3 { closure_env = ce } }
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
@@ -937,27 +934,67 @@ linkSomeBCOs :: Interp
              -> UnitEnv
              -> LinkerEnv
              -> [CompiledByteCode]
-             -> IO [(Name,HValueRef)]
+             -> IO ([(Name,ForeignHValue)], LinkerEnv)
                         -- The returned HValueRefs are associated 1-1 with
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs interp pkgs_loaded ue le mods = foldr fun do_link mods []
+linkSomeBCOs interp pkgs_loaded ue le mods = do
+  let flat = Foldable.toList (bc_bcos mods)
+      (static_bcos, bcos) = partition unlinkedBCOIsStatic flat
+      names = map unlinkedBCOName bcos
+      bco_ix = mkNameEnv (zip names [0..])
+  (static_nms_fhvs, le') <- do_link_static bco_ix static_bcos
+  hvs <- do_link le' bco_ix bcos
+  nms_fhvs <- makeForeignNamedHValueRefs interp (zip names hvs)
+  let ce  = extendClosureEnv (closure_env le') nms_fhvs
+  pure (static_nms_fhvs ++ nms_fhvs, le' { closure_env = ce })
  where
-  fun CompiledByteCode{..} inner accum =
-    inner (Foldable.toList bc_bcos : accum)
+  do_link_static :: NameEnv Int -> [UnlinkedBCO] -> IO ([(Name, ForeignHValue)], LinkerEnv)
+  do_link_static bco_ix bcos = do
+    let names = map unlinkedBCOName bcos
+        bco_deps = mkNameEnv
+          [ ( unlinkedBCOName bco
+            , mapMaybe (\case BCOPtrName n | n `elem` names -> Just n; _ -> Nothing) (ssElts (unlinkedBCOPtrs bco))
+            )
+          | bco <- bcos
+          ]
+        name_bco = mkNameEnv [(unlinkedBCOName bco, bco) | bco <- bcos]
 
-  do_link [] = return []
-  do_link mods = do
-    let flat = [ bco | bcos <- mods, bco <- bcos ]
-        names = map unlinkedBCOName flat
-        bco_ix = mkNameEnv (zip names [0..])
-    (resolved, statics) <- unzip <$> sequence
-      [ (\x -> (x, unlinkedBCOIsStatic bco)) <$> linkBCO interp pkgs_loaded le bco_ix bco | bco <- flat ]
-    hvrefs <- createBCOs interp resolved
-    zipWithM_ (\v isU -> when isU $ void . seqHValue interp ue =<< mkForeignRef v (pure ()))
-      hvrefs statics
-    return (zip names hvrefs)
+        -- topological sort
+        go :: LinkerEnv -> NameSet -> [Name] -> IO ([(Name, ForeignHValue)], LinkerEnv)
+        go le _ [] = pure ([], le)
+        go le done (n:ns)
+          | elemNameSet n done = go le done ns
+          | otherwise =
+            case filter (not . flip elemNameSet done) <$> lookupNameEnv bco_deps n of
+              -- not in our bco set
+              Nothing -> go le done ns
+              -- all dependencies have been processed
+              Just [] -> do
+                resolved <- linkBCO interp pkgs_loaded le bco_ix (lookupNameEnv_NF name_bco n)
+                hvrefs <- createBCOs interp [resolved]
+                case hvrefs of
+                  [hvref] -> do
+                    fref <- mkFinalizedHValue interp hvref
+                    result <- seqHValue interp ue fref
+                    case result of
+                      EvalException e -> pprPanic "linkSomeBCOs" (text (show e))
+                      EvalSuccess hv' -> do
+                        fhv' <- mkFinalizedHValue interp hv'
+                        let le' = le { closure_env = extendClosureEnv (closure_env le) [(n, fhv')] }
+                        (nms_fhvs, le'') <- go le' (extendNameSet done n) ns
+                        pure ((n, fhv') : nms_fhvs, le'')
+                  _ -> pprPanic "linkSomeBCOs" (text "Failed to create BCOs")
+              -- still need to process some depeendencies first
+              Just ns' -> go le done (ns' ++ n : ns)
+
+    go le emptyNameSet names
+
+  do_link _ _ [] = return []
+  do_link le bco_ix bcos = do
+    resolved <- traverse (linkBCO interp pkgs_loaded le bco_ix) bcos
+    createBCOs interp resolved
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
 makeForeignNamedHValueRefs
