@@ -36,6 +36,7 @@ test('T23051', normal, compile_fail, [''])
 test('T23153', normal, compile_fail, [''])
 test('T23154', normal, compile_fail, [''])
 test('T23176', normal, compile_fail, ['-XPartialTypeSignatures -fdefer-out-of-scope-variables'])
+test('T23903', normal, compile_fail, [''])
 
 test('EtaExpandDataCon', normal, compile, ['-O'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])
