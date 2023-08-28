@@ -987,7 +987,7 @@ methodNamesCmd (HsCmdLamCase _ _ matches)
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch :: MatchGroup GhcRn (LPat GhcRn) (LHsCmd GhcRn) -> FreeVars
+methodNamesMatch :: MatchGroup GhcRn pat (LHsCmd GhcRn) -> FreeVars
 methodNamesMatch (MG { mg_alts = L _ ms })
   = plusFVs (map do_one ms)
  where

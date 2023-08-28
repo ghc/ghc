@@ -873,7 +873,7 @@ zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           -> LMatch GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc))
           -> ZonkTcM (LMatch GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc)))
 zonkMatch zPat zBody (L loc match@(Match { m_pats = pats
-                                    , m_grhss = grhss }))
+                                         , m_grhss = grhss }))
   = runZonkBndrT (traverse zPat pats) $ \ new_pats ->
   do  { new_grhss <- zonkGRHSs zBody grhss
       ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
