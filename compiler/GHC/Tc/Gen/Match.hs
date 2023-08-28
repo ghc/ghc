@@ -76,7 +76,6 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic
 
 import Control.Monad
 import Control.Arrow ( second )

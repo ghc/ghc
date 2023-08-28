@@ -31,7 +31,7 @@ import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Error
-import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, maxPrec )
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
 import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Utils.Outputable
 import GHC.Unit.Module

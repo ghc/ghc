@@ -51,6 +51,7 @@ import GHC.Data.Bag
 import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))

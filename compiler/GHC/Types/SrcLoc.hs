@@ -88,6 +88,7 @@ module GHC.Types.SrcLoc (
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
         pprLocated,
+        pprPrecLocated,
         pprLocatedAlways,
 
         -- ** Combining and comparing Located values
@@ -797,12 +798,17 @@ instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
                 whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Strict.Nothing)))
              $$ ppr e
 
-
 pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
 pprLocated (L l e) =
                 -- Print spans without the file name etc
                 whenPprDebug (braces (ppr l))
              $$ ppr e
+
+pprPrecLocated :: (Outputable l, OutputablePrec e) => PprPrec -> GenLocated l e -> SDoc
+pprPrecLocated prec (L l e) =
+                -- Print spans without the file name etc
+                whenPprDebug (braces (ppr l))
+             $$ pprPrec prec e
 
 -- | Always prints the location, even without -dppr-debug
 pprLocatedAlways :: (Outputable l, Outputable e) => GenLocated l e -> SDoc

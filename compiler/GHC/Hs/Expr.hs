@@ -790,11 +790,8 @@ pprDebugParendExpr p expr
       True  -> pprParendLExpr p expr
       False -> pprLExpr         expr
 
-instance OutputableBndrId p => OutputablePrec (LocatedA (HsExpr (GhcPass p))) where
-  pprParend = pprParendLExpr
-
 instance OutputableBndrId p => OutputablePrec (HsExpr (GhcPass p)) where
-  pprParend = pprParendExpr
+  pprPrec = pprParendExpr
 
 pprParendLExpr :: (OutputableBndrId p)
                => PprPrec -> LHsExpr (GhcPass p) -> SDoc
@@ -1414,7 +1411,7 @@ pprPatBind pat grhss
 pprMatch :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
          => Match (GhcPass idR) pat body -> SDoc
 pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
-  = sep [ sep (herald : map (nest 2 . pprParend appPrec) other_pats)
+  = sep [ sep (herald : map (nest 2 . pprPrec appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt grhss) ]
   where
     (herald, other_pats)
@@ -1434,9 +1431,9 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                         | null rest -> (pp_infix, [])           -- x &&& y = e
                         | otherwise -> (parens pp_infix, rest)  -- (x &&& y) z = e
                         where
-                          pp_infix = pprParend opPrec p1
+                          pp_infix = pprPrec opPrec p1
                                      <+> pprInfixOcc fun
-                                     <+> pprParend opPrec p2
+                                     <+> pprPrec opPrec p2
                      _ -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
             LambdaExpr -> (char '\\', pats)
@@ -1444,10 +1441,10 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
             -- We don't simply return (empty, pats) to avoid introducing an
             -- additional `nest 2` via the empty herald
             LamCaseAlt LamCases ->
-              maybe (empty, []) (first $ pprParend appPrec) (uncons pats)
+              maybe (empty, []) (first $ pprPrec appPrec) (uncons pats)
 
             ArrowMatchCtxt (ArrowLamCaseAlt LamCases) ->
-              maybe (empty, []) (first $ pprParend appPrec) (uncons pats)
+              maybe (empty, []) (first $ pprPrec appPrec) (uncons pats)
 
             ArrowMatchCtxt KappaExpr -> (char '\\', pats)
 

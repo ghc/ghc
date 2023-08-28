@@ -11,7 +11,6 @@ import GHC.Prelude
 
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Unique.DFM

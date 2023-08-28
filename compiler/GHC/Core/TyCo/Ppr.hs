@@ -50,8 +50,6 @@ import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Basic ( PprPrec(..), topPrec, sigPrec, opPrec
-                       , funPrec, appPrec, maybeParen )
 
 {-
 %************************************************************************

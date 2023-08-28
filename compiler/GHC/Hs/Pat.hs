@@ -301,10 +301,7 @@ pprPatBndr var
       False -> pprPrefixOcc var
 
 instance OutputableBndrId p => OutputablePrec (Pat (GhcPass p)) where
-  pprParend = pprParendPat
-
-instance OutputableBndrId p => OutputablePrec (LocatedA (Pat (GhcPass p))) where
-  pprParend = pprParendLPat
+  pprPrec = pprParendPat
 
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc

@@ -28,6 +28,12 @@ module GHC.Utils.Outputable (
         IsOutput(..), IsLine(..), IsDoc(..),
         HLine, HDoc,
 
+        -- * Precedence
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec,
+        starPrec, appPrec, maxPrec,
+        maybeParen,
+        OutputablePrec(..),
+
         -- * Pretty printing combinators
         SDoc, runSDoc, PDoc(..),
         docToSDoc,
@@ -898,6 +904,96 @@ coloured col sdoc = sdocOption sdocShouldUseColor $ \case
 keyword :: SDoc -> SDoc
 keyword = coloured Col.colBold
 
+{-
+************************************************************************
+*                                                                      *
+                Precedence
+*                                                                      *
+************************************************************************
+-}
+
+-- | A general-purpose pretty-printing precedence type.
+newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
+-- See Note [Precedence in types]
+
+topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec, maxPrec :: PprPrec
+topPrec  = PprPrec 0 -- No parens
+sigPrec  = PprPrec 1 -- Explicit type signatures
+funPrec  = PprPrec 2 -- Function args; no parens for constructor apps
+                     -- See [Type operator precedence] for why both
+                     -- funPrec and opPrec exist.
+opPrec   = PprPrec 2 -- Infix operator
+starPrec = PprPrec 3 -- Star syntax for the type of types, i.e. the * in (* -> *)
+                     -- See Note [Star kind precedence]
+appPrec  = PprPrec 4 -- Constructor args; no parens for atomic
+maxPrec  = appPrec   -- Maximum precendence
+
+maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
+maybeParen ctxt_prec inner_prec pretty
+  | ctxt_prec < inner_prec = pretty
+  | otherwise              = parens pretty
+
+{- Note [Precedence in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many pretty-printing functions have type
+    ppr_ty :: PprPrec -> Type -> SDoc
+
+The PprPrec gives the binding strength of the context.  For example, in
+   T ty1 ty2
+we will pretty-print 'ty1' and 'ty2' with the call
+  (ppr_ty appPrec ty)
+to indicate that the context is that of an argument of a TyConApp.
+
+We use this consistently for Type and HsType.
+
+Note [Type operator precedence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't keep the fixity of type operators in the operator. So the
+pretty printer follows the following precedence order:
+
+   TyConPrec         Type constructor application
+   TyOpPrec/FunPrec  Operator application and function arrow
+
+We have funPrec and opPrec to represent the precedence of function
+arrow and type operators respectively, but currently we implement
+funPrec == opPrec, so that we don't distinguish the two. Reason:
+it's hard to parse a type like
+    a ~ b => c * d -> e - f
+
+By treating opPrec = funPrec we end up with more parens
+    (a ~ b) => (c * d) -> (e - f)
+
+But the two are different constructors of PprPrec so we could make
+(->) bind more or less tightly if we wanted.
+
+Note [Star kind precedence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We parenthesize the (*) kind to avoid two issues:
+
+1. Printing invalid or incorrect code.
+   For example, instead of  type F @(*) x = x
+         GHC used to print  type F @*   x = x
+   However, (@*) is a type operator, not a kind application.
+
+2. Printing kinds that are correct but hard to read.
+   Should  Either * Int  be read as  Either (*) Int
+                              or as  (*) Either Int  ?
+   This depends on whether -XStarIsType is enabled, but it would be
+   easier if we didn't have to check for the flag when reading the code.
+
+At the same time, we cannot parenthesize (*) blindly.
+Consider this Haskell98 kind:          ((* -> *) -> *) -> *
+With parentheses, it is less readable: (((*) -> (*)) -> (*)) -> (*)
+
+The solution is to assign a special precedence to (*), 'starPrec', which is
+higher than 'funPrec' but lower than 'appPrec':
+
+   F * * *   becomes  F (*) (*) (*)
+   F A * B   becomes  F A (*) B
+   Proxy *   becomes  Proxy (*)
+   a * -> *  becomes  a (*) -> *
+-}
+
 -----------------------------------------------------------------------
 -- The @Outputable@ class
 -----------------------------------------------------------------------
@@ -905,6 +1001,9 @@ keyword = coloured Col.colBold
 -- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
     ppr :: a -> SDoc
+
+class Outputable a => OutputablePrec a where
+    pprPrec :: PprPrec -> a -> SDoc
 
 -- There's no Outputable for Char; it's too easy to use Outputable
 -- on String and have ppr "hello" rendered as "h,e,l,l,o".

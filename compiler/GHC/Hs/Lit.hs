@@ -25,7 +25,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
-import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
