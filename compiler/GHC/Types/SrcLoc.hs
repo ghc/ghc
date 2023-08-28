@@ -804,7 +804,7 @@ pprLocated (L l e) =
                 whenPprDebug (braces (ppr l))
              $$ ppr e
 
-pprPrecLocated :: (Outputable l, OutputablePrec e) => PprPrec -> GenLocated l e -> SDoc
+pprPrecLocated :: (Outputable l, Outputable e) => PprPrec -> GenLocated l e -> SDoc
 pprPrecLocated prec (L l e) =
                 -- Print spans without the file name etc
                 whenPprDebug (braces (ppr l))

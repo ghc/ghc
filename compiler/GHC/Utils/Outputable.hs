@@ -32,7 +32,6 @@ module GHC.Utils.Outputable (
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec,
         starPrec, appPrec, maxPrec,
         maybeParen,
-        OutputablePrec(..),
 
         -- * Pretty printing combinators
         SDoc, runSDoc, PDoc(..),
@@ -1000,10 +999,12 @@ higher than 'funPrec' but lower than 'appPrec':
 
 -- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
+    {-# MINIMAL pprPrec | ppr #-}
     ppr :: a -> SDoc
-
-class Outputable a => OutputablePrec a where
     pprPrec :: PprPrec -> a -> SDoc
+
+    pprPrec _prec = ppr
+    ppr = pprPrec topPrec
 
 -- There's no Outputable for Char; it's too easy to use Outputable
 -- on String and have ppr "hello" rendered as "h,e,l,l,o".

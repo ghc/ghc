@@ -486,7 +486,8 @@ data XXExprGhcTc
 ********************************************************************* -}
 
 instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p)) where
-    ppr expr = pprExpr expr
+    ppr = pprExpr
+    pprPrec = pprParendExpr
 
 -----------------------
 -- pprExpr, pprLExpr, pprBinds call pprDeeper;
@@ -789,9 +790,6 @@ pprDebugParendExpr p expr
   = getPprDebug $ \case
       True  -> pprParendLExpr p expr
       False -> pprLExpr         expr
-
-instance OutputableBndrId p => OutputablePrec (HsExpr (GhcPass p)) where
-  pprPrec = pprParendExpr
 
 pprParendLExpr :: (OutputableBndrId p)
                => PprPrec -> LHsExpr (GhcPass p) -> SDoc
@@ -1343,7 +1341,7 @@ type instance XXMatchGroup (GhcPass _) p b = DataConCantHappen
 type instance XCMatch (GhcPass _) p b = EpAnn [AddEpAnn]
 type instance XXMatch (GhcPass _) p b = DataConCantHappen
 
-instance (OutputableBndrId pr, Outputable body, OutputablePrec pat)
+instance (OutputableBndrId pr, Outputable body, Outputable pat)
             => Outputable (Match (GhcPass pr) pat body) where
   ppr = pprMatch
 
@@ -1389,7 +1387,7 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
 
 type instance XXGRHS (GhcPass _) b = DataConCantHappen
 
-pprMatches :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+pprMatches :: (OutputableBndrId idR, Outputable body, Outputable pat)
            => MatchGroup (GhcPass idR) pat body -> SDoc
 pprMatches MG { mg_alts = matches }
     = vcat (map pprMatch (map unLoc (unLoc matches)))
@@ -1408,7 +1406,7 @@ pprPatBind pat grhss
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]
 
-pprMatch :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+pprMatch :: (OutputableBndrId idR, Outputable body, Outputable pat)
          => Match (GhcPass idR) pat body -> SDoc
 pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
   = sep [ sep (herald : map (nest 2 . pprPrec appPrec) other_pats)
@@ -2006,7 +2004,7 @@ matchDoContextErrString (MDoExpr m)  = prependQualified m (text "'mdo' block")
 matchDoContextErrString ListComp     = text "list comprehension"
 matchDoContextErrString MonadComp    = text "monad comprehension"
 
-pprMatchInCtxt :: (OutputableBndrId idR, Outputable body, OutputablePrec pat)
+pprMatchInCtxt :: (OutputableBndrId idR, Outputable body, Outputable pat)
                => Match (GhcPass idR) pat body -> SDoc
 pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
                                         <> colon)

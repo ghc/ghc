@@ -284,6 +284,7 @@ instance (Outputable p, OutputableBndr p, Outputable arg)
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
+    pprPrec = pprParendPat
 
 -- See Note [Rebindable syntax and HsExpansion].
 instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
@@ -299,9 +300,6 @@ pprPatBndr var
       True -> parens (pprBndr LambdaBind var) -- Could pass the site to pprPat
                                               -- but is it worth it?
       False -> pprPrefixOcc var
-
-instance OutputableBndrId p => OutputablePrec (Pat (GhcPass p)) where
-  pprPrec = pprParendPat
 
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc

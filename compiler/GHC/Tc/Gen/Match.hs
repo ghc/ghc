@@ -215,8 +215,8 @@ type AnnoBody body
 
 type AnnoPatBody pat body
   = ( AnnoBody body
-    , OutputablePrec (LocatedA (pat GhcRn))
-    , OutputablePrec (LocatedA (pat GhcTc))
+    , Outputable (LocatedA (pat GhcRn))
+    , Outputable (LocatedA (pat GhcTc))
     , Anno (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcTc (LocatedA (pat GhcTc)) (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     , Anno [LocatedA (Match GhcRn (LocatedA (pat GhcRn)) (LocatedA (body GhcRn)))] ~ SrcSpanAnnL

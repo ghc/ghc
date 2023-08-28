@@ -1408,9 +1408,6 @@ instance (Outputable a) => Outputable (SrcSpanAnn' a) where
 instance (Outputable a, Outputable e)
      => Outputable (GenLocated (SrcSpanAnn' a) e) where
   ppr = pprLocated
-
-instance (Outputable a, OutputablePrec e)
-     => OutputablePrec (GenLocated (SrcSpanAnn' a) e) where
   pprPrec = pprPrecLocated
 
 instance (Outputable a, OutputableBndr e)
