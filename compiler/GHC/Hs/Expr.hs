@@ -208,8 +208,6 @@ data EpAnnUnboundVar = EpAnnUnboundVar
      , hsUnboundHole       :: EpaLocation
      } deriving Data
 
-type instance XVar           (GhcPass _) = NoExtField
-
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
 -- on renaming.
 type instance XRecSel              GhcPs = DataConCantHappen
@@ -429,6 +427,13 @@ type instance XXTupArg         (GhcPass _) = DataConCantHappen
 tupArgPresent :: HsTupArg (GhcPass p) -> Bool
 tupArgPresent (Present {}) = True
 tupArgPresent (Missing {}) = False
+
+tupArgPresent_maybe :: HsTupArg (GhcPass p) -> Maybe (LHsExpr (GhcPass p))
+tupArgPresent_maybe (Present _ e) = Just e
+tupArgPresent_maybe (Missing {})  = Nothing
+
+tupArgsPresent_maybe :: [HsTupArg (GhcPass p)] -> Maybe [LHsExpr (GhcPass p)]
+tupArgsPresent_maybe = traverse tupArgPresent_maybe
 
 
 {- *********************************************************************

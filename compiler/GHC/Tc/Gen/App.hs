@@ -23,6 +23,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 import GHC.Types.Var
 import GHC.Builtin.Types ( multiplicityTy )
 import GHC.Tc.Gen.Head
+import Language.Haskell.Syntax.Basic
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
@@ -51,8 +52,10 @@ import GHC.Builtin.Names
 import GHC.Driver.DynFlags
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
+import GHC.Types.SourceText
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -806,10 +809,210 @@ tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism ch
       -> LHsExpr GhcRn               -- Argument type
       -> TcM (TcType, TcType)
 tcVDQ conc_tvs (tvb, inner_ty) arg
-  = do { hs_ty <- case stripParensLHsExpr arg of
-           L _ (HsEmbTy _ _ hs_ty) -> return hs_ty
-           e -> failWith $ TcRnIllformedTypeArgument e
-       ; tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
+  = do { hs_wc_ty <- expr_to_type arg
+       ; tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_wc_ty }
+
+-- Convert a HsExpr into the equivalent HsType.
+-- See [RequiredTypeArguments and the T2T mapping]
+expr_to_type :: LHsExpr GhcRn -> TcM (LHsWcType GhcRn)
+expr_to_type earg =
+  case stripParensLHsExpr earg of
+    L _ (HsEmbTy _ _ hs_ty) ->
+      -- The entire type argument is guarded with the `type` herald,
+      -- e.g. `vfun (type (Maybe Int))`. This special case supports
+      -- named wildcards. See Note [Wildcards in the T2T translation]
+      return hs_ty
+    e ->
+      -- The type argument is not guarded with the `type` herald, or perhaps
+      -- only parts of it are, e.g. `vfun (Maybe Int)` or `vfun (Maybe (type Int))`.
+      -- Apply a recursive T2T transformation.
+      HsWC [] <$> go e
+  where
+    go :: LHsExpr GhcRn -> TcM (LHsType GhcRn)
+    go (L _ (HsEmbTy _ _ t)) =
+      -- HsEmbTy means there is an explicit `type` herald, e.g. vfun :: forall a -> blah
+      -- and the call   vfun (type Int)
+      --           or   vfun (Int -> type Int)
+      -- The T2T transformation can simply discard the herald and use the embedded type.
+      unwrap_wc t
+    go (L l (HsVar _ lname)) =
+      -- as per #281: variables and constructors (regardless of their namespace)
+      -- are mapped directly, without modification.
+      return (L l (HsTyVar noAnn NotPromoted lname))
+    go (L l (HsApp _ lhs rhs)) =
+      do { lhs' <- go lhs
+         ; rhs' <- go rhs
+         ; return (L l (HsAppTy noExtField lhs' rhs')) }
+    go (L l (HsAppType _ lhs at rhs)) =
+      do { lhs' <- go lhs
+         ; rhs' <- unwrap_wc rhs
+         ; return (L l (HsAppKindTy noExtField lhs' at rhs')) }
+    go (L l e@(OpApp _ lhs op rhs)) =
+      do { lhs' <- go lhs
+         ; op'  <- go op
+         ; rhs' <- go rhs
+         ; op_id <- unwrap_op_tv op'
+         ; return (L l (HsOpTy noAnn NotPromoted lhs' op_id rhs')) }
+      where
+        unwrap_op_tv (L _ (HsTyVar _ _ op_id)) = return op_id
+        unwrap_op_tv _ = failWith $ TcRnIllformedTypeArgument (L l e)
+    go (L l e@(HsOverLit _ lit)) =
+      do { tylit <- case ol_val lit of
+             HsIntegral   n -> return $ HsNumTy NoSourceText (il_value n)
+             HsIsString _ s -> return $ HsStrTy NoSourceText s
+             HsFractional _ -> failWith $ TcRnIllformedTypeArgument (L l e)
+         ; return (L l (HsTyLit noExtField tylit)) }
+    go (L l e@(HsLit _ lit)) =
+      do { tylit <- case lit of
+             HsChar   _ c -> return $ HsCharTy NoSourceText c
+             HsString _ s -> return $ HsStrTy  NoSourceText s
+             _ -> failWith $ TcRnIllformedTypeArgument (L l e)
+         ; return (L l (HsTyLit noExtField tylit)) }
+    go (L l (ExplicitTuple _ tup_args boxity))
+      -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be promoted
+      | isBoxed boxity
+      , Just es <- tupArgsPresent_maybe tup_args
+      = do { ts <- traverse go es
+           ; return (L l (HsExplicitTupleTy noExtField ts)) }
+    go (L l (ExplicitList _ es)) =
+      do { ts <- traverse go es
+         ; return (L l (HsExplicitListTy noExtField NotPromoted ts)) }
+    go (L l (ExprWithTySig _ e sig_ty)) =
+      do { t <- go e
+         ; sig_ki <- (unwrap_sig <=< unwrap_wc) sig_ty
+         ; return (L l (HsKindSig noAnn t sig_ki)) }
+      where
+        unwrap_sig :: LHsSigType GhcRn -> TcM (LHsType GhcRn)
+        unwrap_sig (L _ (HsSig _ HsOuterImplicit{hso_ximplicit=bndrs} body))
+          | null bndrs = return body
+          | otherwise  = illegal_implicit_tvs bndrs
+        unwrap_sig (L l (HsSig _ HsOuterExplicit{hso_bndrs=bndrs} body)) =
+          return $ L l (HsForAllTy noExtField (HsForAllInvis noAnn bndrs) body)
+    go (L l (HsPar _ _ e _)) =
+      do { t <- go e
+         ; return (L l (HsParTy noAnn t)) }
+    go (L l (HsUntypedSplice splice_result splice))
+      | HsUntypedSpliceTop finalizers e <- splice_result
+      = do { t <- go (L l e)
+           ; let splice_result' = HsUntypedSpliceTop finalizers t
+           ; return (L l (HsSpliceTy splice_result' splice)) }
+    go (L l (HsUnboundVar _ rdr))
+      | isUnderscore occ = return (L l (HsWildCardTy noExtField))
+      | startsWithUnderscore occ =
+          -- See Note [Wildcards in the T2T translation]
+          do { wildcards_enabled <- xoptM LangExt.NamedWildCards
+             ; if wildcards_enabled
+               then illegal_wc rdr
+               else not_in_scope }
+      | otherwise = not_in_scope
+      where occ = occName rdr
+            not_in_scope = failWith $ mkTcRnNotInScope rdr NotInScope
+    go (L l (XExpr (HsExpanded orig _))) =
+      -- Use the original, user-written expression (before expansion).
+      -- Example. Say we have   vfun :: forall a -> blah
+      --          and the call  vfun (Maybe [1,2,3])
+      --          expanded to   vfun (Maybe (fromListN 3 [1,2,3]))
+      -- (This happens when OverloadedLists is enabled).
+      -- The expanded expression can't be promoted, as there is no type-level
+      -- equivalent of fromListN, so we must use the original.
+      go (L l orig)
+    go e = failWith $ TcRnIllformedTypeArgument e
+
+    unwrap_wc :: HsWildCardBndrs GhcRn t -> TcM t
+    unwrap_wc (HsWC wcs t)
+      = do { mapM_ (illegal_wc . nameRdrName) wcs
+           ; return t }
+
+    illegal_wc :: RdrName -> TcM t
+    illegal_wc rdr = failWith $ TcRnIllegalNamedWildcardInTypeArgument rdr
+
+    illegal_implicit_tvs :: [Name] -> TcM t
+    illegal_implicit_tvs tvs
+      = do { mapM_ (addErr . TcRnIllegalImplicitTyVarInTypeArgument . nameRdrName) tvs
+           ; failM }
+
+{- Note [RequiredTypeArguments and the T2T mapping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "T2T-Mapping" section of GHC Proposal #281 introduces a term-to-type transformation
+that comes into play when we typecheck function applications to required type arguments.
+Say we have a function that expects a required type argument, vfun :: forall a -> ...
+then it is possible to call it as follows:
+
+  vfun (Maybe Int)
+
+The Maybe Int argument is parsed and renamed as a term. There is no syntactic marker
+to tell GHC that it is actually a type argument.  We only discover this by the time
+we get to type checking, where we know that f's type has a visible forall at the front,
+so we are expecting a type argument. More precisely, this happens in tcVDQ in GHC/Tc/Gen/App.hs:
+
+  tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
+        -> (ForAllTyBinder, TcType)    -- Function type
+        -> LHsExpr GhcRn               -- Argument type
+        -> TcM (TcType, TcType)
+
+What we want is a type to instantiate the forall-bound variable. But what we have is an HsExpr,
+and we need to convert it to an HsType in order to reuse the same code paths as we use for
+checking f @ty (see tc_inst_forall_arg).
+
+  f (Maybe Int)
+  -- ^^^^^^^^^
+  -- parsed and renamed as:   HsApp   (HsVar   "Maybe") (HsVar   "Int")  ::  HsExpr GhcRn
+  -- must be converted to:    HsTyApp (HsTyVar "Maybe") (HsTyVar "Int")  ::  HsType GhcRn
+
+We do this using a helper function:
+
+  expr_to_type :: LHsExpr GhcRn -> TcM (LHsWcType GhcRn)
+
+This conversion is in the TcM monad because
+* It can fail, if the expression is not convertible to a type.
+      vfun [x | x <- xs]     Can't convert list comprehension to a type
+      vfun (\x -> x)         Can't convert a lambda to a type
+* It needs to check for LangExt.NamedWildCards to generate an appropriate
+  error message for HsUnboundVar.
+     vfun _a    Not in scope: ‘_a’
+                   (NamedWildCards disabled)
+     vfun _a    Illegal named wildcard in a required type argument: ‘_a’
+                   (NamedWildCards enabled)
+
+Note [Wildcards in the T2T translation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose f1 :: forall a b. blah
+        f2 :: forall a b -> blah
+
+Consider the terms
+  f1 @_ @(Either _ _)
+  f2 (type _) (type (Either _ _))
+Those `_` wildcards are type wildcards, each standing for a monotype.
+All good.
+
+Now consider this, with -XNamedWildCards:
+  f1 @_a @(Either _a _a)
+  f2 (type _a) (type (Either _a _a))
+Those `_a` are "named wildcards", specified by the user manual like this: "All
+occurrences of the same named wildcard within one type signature will unify to
+the same type".  Note "within one signature".  So each type argument is considered
+separately, and the examples mean the same as:
+  f1 @_a1 @(Either _a2 _a2)
+  f2 (type _a1) (type (Either _a2 _a2))
+The repeated `_a2` ensures that the two arguments of `Either` are the same type;
+but there is no connection with `_a1`.  (NB: `_a1` and `_a2` only scope within
+their respective type, no further.)
+
+Now, consider the T2T translation for
+   f2 _ (Either _ _)
+This is fine: the term wildcard `_` is translated to a type wildcard, so we get
+the same as if we had written
+   f2 (type _) (type (Either _ _))
+
+But what about /named/ wildcards?
+   f2 _a (Either _a _a)
+Now we are in difficulties.  The renamer looks for a /term/ variable `_a` in scope,
+and won't find one.  Even if it did, the three `_a`'s would not be renamed separately
+as above.
+
+Conclusion: we treat a named wildcard in the T2T translation as an error.  If you
+want that, use a `(type ty)` argument instead.
+-}
 
 tc_inst_forall_arg :: ConcreteTyVars            -- See Note [Representation-polymorphism checking built-ins]
                    -> (ForAllTyBinder, TcType)  -- Function type
@@ -890,7 +1093,7 @@ At a call site we may have calls looking like this
     fs             True  -- Specified: type argument omitted
     fs      @Bool  True  -- Specified: type argument supplied
     fr (type Bool) True  -- Required: type argument is compulsory, `type` qualifier used
-    fr       Bool  True  -- Required: type argument is compulsory, `type` qualifier omitted (NB: not implemented)
+    fr       Bool  True  -- Required: type argument is compulsory, `type` qualifier omitted
 
 At definition sites we may have type /patterns/ to abstract over type variables
    fi           x       = rhs   -- Inferred: no type pattern
@@ -953,8 +1156,8 @@ Syntax of applications in HsExpr
 
   Why the difference?  Because we /also/ need to express these /nested/ uses of `type`:
 
-      g (Maybe (type Int))               -- valid for g :: forall (a :: Type) -> t     (NB. not implemented)
-      g (Either (type Int) (type Bool))  -- valid for g :: forall (a :: Type) -> t     (NB. not implemented)
+      g (Maybe (type Int))               -- valid for g :: forall (a :: Type) -> t
+      g (Either (type Int) (type Bool))  -- valid for g :: forall (a :: Type) -> t
 
   This nesting makes `type` rather different from `@`. Remember, the HsEmbTy mainly just
   switches namespace, and is subject to the term-to-type transformation.
@@ -993,7 +1196,7 @@ rnExpr delegates renaming of type arguments to rnHsWcType if possible:
     f (type t)  -- HsApp and HsEmbTy, t is renamed with rnHsWcType
 
 But what about:
-    f t         -- HsApp, no HsEmbTy      (NB. not implemented)
+    f t         -- HsApp, no HsEmbTy
 We simply rename `t` as a term using a recursive call to rnExpr; in particular,
 the type of `f` does not affect name resolution (Lexical Scoping Principle).
 We will later convert `t` from a `HsExpr` to a `Type`, see "Typechecking type
@@ -1057,7 +1260,7 @@ This is done by tcVTA (if Specified) and tcVDQ (if Required).
 tcVDQ unwraps the HsEmbTy and uses the type contained within it.  Crucially, in
 tcVDQ we know that we are expecting a type argument.  This means that we can
 support
-    f (Maybe Int)   -- HsApp, no HsEmbTy      (NB. not implemented)
+    f (Maybe Int)   -- HsApp, no HsEmbTy
 The type argument (Maybe Int) is represented as an HsExpr, but tcVDQ can easily
 convert it to HsType.  This conversion is called the "T2T-Mapping" in GHC
 Proposal #281.

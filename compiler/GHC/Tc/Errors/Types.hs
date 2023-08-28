@@ -712,6 +712,37 @@ data TcRnMessage where
     -> !BadAnonWildcardContext
     -> TcRnMessage
 
+  {-| TcRnIllegalNamedWildcardInTypeArgument is an error that occurs
+      when a named wildcard is used in a required type argument.
+
+      Example:
+
+        vfun :: forall (a :: k) -> ()
+        x = vfun _nwc
+        --       ^^^^
+        -- named wildcards not allowed in type arguments
+
+      Test cases:
+        T23738_fail_wild
+  -}
+  TcRnIllegalNamedWildcardInTypeArgument
+    :: RdrName
+    -> TcRnMessage
+
+  {- TcRnIllegalImplicitTyVarInTypeArgument is an error raised
+     when a type variable is implicitly quantified in a required type argument.
+
+     Example:
+       vfun :: forall (a :: k) -> ()
+       x = vfun (Nothing :: Maybe a)
+       --                        ^^^
+       -- implicit quantification not allowed in type arguments
+
+  -}
+  TcRnIllegalImplicitTyVarInTypeArgument
+    :: RdrName
+    -> TcRnMessage
+
   {-| TcRnDuplicateFieldName is an error that occurs whenever
       there are duplicate field names in a single record.
 
@@ -4112,16 +4143,12 @@ data TcRnMessage where
       that specifies a required type argument (instantiates a visible forall)
       does not have a form that can be interpreted as a type argument.
 
-      At the moment, only expressions constructed using the @type@ keyword
-      are considered well-formed, but this restriction will be relaxed
-      when part 2 of GHC Proposal #281 is implemented.
-
       Example:
 
         vfun :: forall (a :: k) -> ()
-        x = vfun Int
-        --       ^^^
-        --  expected `type Int` instead of `Int`
+        x = vfun (\_ -> _)
+        --       ^^^^^^^^^
+        -- lambdas not allowed in type arguments
 
       Test cases:
         T22326_fail_raw_arg

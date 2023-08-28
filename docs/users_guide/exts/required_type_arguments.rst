@@ -107,7 +107,5 @@ indistinguishble from ordinary function arguments::
   n = id_vdq Integer 42
 
 In this example we pass ``Integer`` as opposed to ``(type Integer)``.
-**This is not currently implemented**, but it demonstrates how
-:extension:`RequiredTypeArguments` is not tied to the ``type`` syntax.
-For this reason, using the ``type`` syntax requires enabling the
-:extension:`ExplicitNamespaces` extension separately.
+This means that :extension:`RequiredTypeArguments` is not tied to the ``type``
+syntax, which belongs to :extension:`ExplicitNamespaces`.

@@ -277,6 +277,14 @@ instance Diagnostic TcRnMessage where
         sole_msg =
           vcat [ text "except as the sole constraint"
                , nest 2 (text "e.g., deriving instance _ => Eq (Foo a)") ]
+    TcRnIllegalNamedWildcardInTypeArgument rdr
+      -> mkSimpleDecorated $
+           hang (text "Illegal named wildcard in a required type argument:")
+                2 (quotes (ppr rdr))
+    TcRnIllegalImplicitTyVarInTypeArgument rdr
+      -> mkSimpleDecorated $
+            hang (text "Illegal implicitly quantified type variable in a required type argument:")
+                2 (quotes (ppr rdr))
     TcRnDuplicateFieldName fld_part dups
       -> mkSimpleDecorated $
            hsep [ text "Duplicate field name"
@@ -1254,9 +1262,7 @@ instance Diagnostic TcRnMessage where
           text "A type pattern must be checked against a visible forall."
     TcRnIllformedTypeArgument e
       -> mkSimpleDecorated $
-          hang (text "Ill-formed type argument:") 2 (ppr e) $$
-          text "Expected a type expression introduced with the"
-            <+> quotes (text "type") <+> text "keyword."
+          hang (text "Ill-formed type argument:") 2 (ppr e)
     TcRnIllegalTypeExpr
       -> mkSimpleDecorated $
           text "Illegal type expression." $$
@@ -1944,6 +1950,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalWildcardInType{}
       -> ErrorWithoutFlag
+    TcRnIllegalNamedWildcardInTypeArgument{}
+      -> ErrorWithoutFlag
+    TcRnIllegalImplicitTyVarInTypeArgument{}
+      -> ErrorWithoutFlag
     TcRnDuplicateFieldName{}
       -> ErrorWithoutFlag
     TcRnIllegalViewPattern{}
@@ -2555,6 +2565,10 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.RecordWildCards]
     TcRnIllegalWildcardInType{}
       -> noHints
+    TcRnIllegalNamedWildcardInTypeArgument{}
+      -> [SuggestAnonymousWildcard]
+    TcRnIllegalImplicitTyVarInTypeArgument tv
+      -> [SuggestExplicitQuantification tv]
     TcRnDuplicateFieldName{}
       -> noHints
     TcRnIllegalViewPattern{}

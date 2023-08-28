@@ -1,0 +1,6 @@
+
+T23738_fail_var.hs:11:12: error: [GHC-10969]
+    • Local identifier ‘a’ used as a type
+    • In the type ‘a’
+      In the expression: vfun a
+      In an equation for ‘f’: f a = vfun a
