@@ -40,7 +40,8 @@ import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
-import GHCi.RemoteTypes        ( ForeignHValue )
+import GHCi.RemoteTypes        ( ForeignHValue, RemotePtr )
+import GHCi.Message            ( LoadedDLL )
 
 import GHC.Types.Var           ( Id )
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
@@ -75,6 +76,57 @@ initialised.
 
 The LinkerEnv maps Names to actual closures (for interpreted code only), for
 use during linking.
+
+Note [Looking up symbols in the relevant objects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #23415, we determined that a lot of time (>10s, or even up to >35s!) was
+being spent on dynamically loading symbols before actually interpreting code
+when `:main` was run in GHCi. The root cause was that for each symbol we wanted
+to lookup, we would traverse the list of loaded objects and try find the symbol
+in each of them with dlsym (i.e. looking up a symbol was, worst case, linear in
+the amount of loaded objects).
+
+To drastically improve load time (XXX(TODO:get better measure against 10s
+baseline rather than 35second one) to <3s), we now:
+
+1. For every of the native objects loaded for a given unit, store the handles returned by `dlopen`.
+  - In `pkgs_loaded` of the `LoaderState`, which maps `UnitId`s to
+    `LoadedPkgInfo`s, where the handles live in its field `loaded_pkg_hs_dlls`.
+
+2. When looking up a Name (e.g. `lookupHsSymbol`), find that name's `UnitId` in
+    the `pkgs_loaded` mapping,
+
+3. And only look for the symbol (with `dlsym`) on the /handles relevant to that
+    unit/, rather than in every loaded object.
+
+Note [Symbols may not be found in pkgs_loaded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Despite storing and looking for symbols in the relevant loaded libraries
+handles for a given unit-id, as described in the note above, we may still have
+to fallback to the "slow" `lookupSymbol` function (see its "fallback" call in
+`lookupHsSymbol`).
+
+TODO: Ben: my understanding here is flawed; could you make this clearer?.
+
+This fallback is still needed because a given unit may be associated with
+static objects (`loaded_pkg_hs_objs`) only and no dynamic libraries, but we
+only `lookupSymbolInDLL` for loaded dynamic libraries. In that case,
+`lookupSymbol` will do the right thing because, besides looking up the symbol
+in every loaded dylib, it will end up searching the static name table and find those symbols.
+
+Arguably, we should rather generalise `lookupSymbolInDLL` to
+`lookupSymbolInObject`, where an object may be a DLL/native object (as in
+`loadNativeObj`), or e.g. a static archive, instead of having a special case
+for dynamic libraries.
+
+This fallback is further needed because we don't look in the haskell objects
+loaded for the home units (see the call to `loadModuleLinkables` in
+`loadDependencies`, as opposed to the call to `loadPackages'` in the same
+function which updates `pkgs_loaded`). We should ultimately keep track of the
+objects loaded (probably in `objs_loaded`, for which `LinkableSet` is a bit
+unsatisfactory, see a suggestion in 51c5c4eb1f2a33e4dc88e6a37b7b7c135234ce9b)
+and be able to lookup symbols specifically in them too (similarly to
+`lookupSymbolInDLL`).
 -}
 
 newtype Loader = Loader { loader_state :: MVar (Maybe LoaderState) }
@@ -146,11 +198,13 @@ data LoadedPkgInfo
   { loaded_pkg_uid         :: !UnitId
   , loaded_pkg_hs_objs     :: ![LibrarySpec]
   , loaded_pkg_non_hs_objs :: ![LibrarySpec]
+  , loaded_pkg_hs_dlls     :: ![RemotePtr LoadedDLL]
+    -- ^ See Note [Looking up symbols in the relevant objects]
   , loaded_pkg_trans_deps  :: UniqDSet UnitId
   }
 
 instance Outputable LoadedPkgInfo where
-  ppr (LoadedPkgInfo uid hs_objs non_hs_objs trans_deps) =
+  ppr (LoadedPkgInfo uid hs_objs non_hs_objs _ trans_deps) =
     vcat [ppr uid
          , ppr hs_objs
          , ppr non_hs_objs
@@ -159,10 +213,10 @@ instance Outputable LoadedPkgInfo where
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
-  linkableTime     :: !UTCTime,          -- ^ Time at which this linkable was built
+  linkableTime     :: !UTCTime,         -- ^ Time at which this linkable was built
                                         -- (i.e. when the bytecodes were produced,
                                         --       or the mod date on the files)
-  linkableModule   :: !Module,           -- ^ The linkable module itself
+  linkableModule   :: !Module,          -- ^ The linkable module itself
   linkableUnlinked :: [Unlinked]
     -- ^ Those files and chunks of code we have yet to link.
     --
