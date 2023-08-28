@@ -172,6 +172,6 @@ loadFramework interp extraPaths rootname
      findLoadDLL (p:ps) errs =
        do { dll <- loadDLL interp (p </> fwk_file)
           ; case dll of
-              Nothing  -> return Nothing
-              Just err -> findLoadDLL ps ((p ++ ": " ++ err):errs)
+              Right _  -> return Nothing
+              Left err -> findLoadDLL ps ((p ++ ": " ++ err):errs)
           }

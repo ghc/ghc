@@ -578,13 +578,11 @@ typedef
 /* A list thereof. */
 static OpenedSO* openedSOs = NULL;
 
-static const char *
-internal_dlopen(const char *dll_name)
+static void *
+internal_dlopen(const char *dll_name, const char **errmsg_ptr)
 {
    OpenedSO* o_so;
    void *hdl;
-   const char *errmsg;
-   char *errmsg_copy;
 
    // omitted: RTLD_NOW
    // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
@@ -619,14 +617,13 @@ internal_dlopen(const char *dll_name)
    RELEASE_LOCK(&ccs_mutex);
 #endif
 
-   errmsg = NULL;
    if (hdl == NULL) {
       /* dlopen failed; return a ptr to the error msg. */
-      errmsg = dlerror();
+      char *errmsg = dlerror();
       if (errmsg == NULL) errmsg = "addDLL: unknown error";
-      errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
+      char *errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
       strcpy(errmsg_copy, errmsg);
-      errmsg = errmsg_copy;
+      *errmsg_ptr = errmsg_copy;
    } else {
       o_so = stgMallocBytes(sizeof(OpenedSO), "addDLL");
       o_so->handle = hdl;
@@ -637,7 +634,7 @@ internal_dlopen(const char *dll_name)
    RELEASE_LOCK(&dl_mutex);
    //--------------- End critical section -------------------
 
-   return errmsg;
+   return hdl;
 }
 
 /*
@@ -725,16 +722,29 @@ internal_dlsym(const char *symbol) {
     // we failed to find the symbol
     return NULL;
 }
+
+void *lookupSymbolInDLL(void *handle, const char *symbol_name)
+{
+#if defined(OBJFORMAT_MACHO)
+    CHECK(symbol_name[0] == '_');
+    symbol_name = symbol_name+1;
+#endif
+
+    ACQUIRE_LOCK(&dl_mutex); // dlsym alters dlerror
+    void *result = dlsym(handle, symbol_name);
+    RELEASE_LOCK(&dl_mutex);
+    return result;
+}
 #  endif
 
-const char *
-addDLL( pathchar *dll_name )
+void *addDLL(pathchar* dll_name, const char **errmsg_ptr)
 {
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    /* ------------------- ELF DLL loader ------------------- */
 
 #define NMATCH 5
    regmatch_t match[NMATCH];
+   void *handle;
    const char *errmsg;
    FILE* fp;
    size_t match_length;
@@ -743,10 +753,10 @@ addDLL( pathchar *dll_name )
    int result;
 
    IF_DEBUG(linker, debugBelch("addDLL: dll_name = '%s'\n", dll_name));
-   errmsg = internal_dlopen(dll_name);
+   handle = internal_dlopen(dll_name, &errmsg);
 
-   if (errmsg == NULL) {
-      return NULL;
+   if (handle != NULL) {
+      return handle;
    }
 
    // GHC #2615
@@ -775,7 +785,8 @@ addDLL( pathchar *dll_name )
       line[match_length] = '\0'; // make sure string is null-terminated
       IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
       if ((fp = __rts_fopen(line, "r")) == NULL) {
-         return errmsg; // return original error if open fails
+         *errmsg_ptr = errmsg; // return original error if open fails
+         return NULL;
       }
       // try to find a GROUP or INPUT ( ... ) command
       while (fgets(line, MAXLINE, fp) != NULL) {
@@ -785,7 +796,7 @@ addDLL( pathchar *dll_name )
             IF_DEBUG(linker, debugBelch("match%s\n",""));
             line[match[2].rm_eo] = '\0';
             stgFree((void*)errmsg); // Free old message before creating new one
-            errmsg = internal_dlopen(line+match[2].rm_so);
+            handle = internal_dlopen(line+match[2].rm_so, errmsg_ptr);
             break;
          }
          // if control reaches here, no GROUP or INPUT ( ... ) directive
@@ -794,9 +805,10 @@ addDLL( pathchar *dll_name )
       }
       fclose(fp);
    }
-   return errmsg;
+   return handle;
 
 #  elif defined(OBJFORMAT_PEi386)
+   // FIXME
    return addDLL_PEi386(dll_name, NULL);
 
 #  else

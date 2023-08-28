@@ -35,6 +35,7 @@ module GHC.Runtime.Interpreter
   -- * The object-code linker
   , initObjLinker
   , lookupSymbol
+  , lookupSymbolInDLL
   , lookupClosure
   , loadDLL
   , loadArchive
@@ -467,6 +468,13 @@ lookupSymbol interp str = case interpInstance interp of
 
     ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
+lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> FastString -> IO (Maybe (Ptr ()))
+lookupSymbolInDLL interp dll str = case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
+#endif
+  ExternalInterp _ -> panic "lookupSymbolInDLL: not implemented for external interpreter" -- FIXME
+
 lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
 lookupClosure interp str =
   interpCmd interp (LookupClosure str)
@@ -485,12 +493,7 @@ purgeLookupSymbolCache interp = case interpInstance interp of
 -- an absolute pathname to the file, or a relative filename
 -- (e.g. "libfoo.so" or "foo.dll").  In the latter case, loadDLL
 -- searches the standard locations for the appropriate library.
---
--- Returns:
---
--- Nothing      => success
--- Just err_msg => failure
-loadDLL :: Interp -> String -> IO (Maybe String)
+loadDLL :: Interp -> String -> IO (Either String (RemotePtr LoadedDLL))
 loadDLL interp str = interpCmd interp (LoadDLL str)
 
 loadArchive :: Interp -> String -> IO ()
