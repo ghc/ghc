@@ -6,5 +6,5 @@ main = do
   initObjLinker RetainCAFs
   result <- loadDLL library_name
   case result of
-    Nothing -> putStrLn (library_name ++ " loaded successfully")
-    Just x  -> putStrLn ("error: " ++ x)
+    Right _ -> putStrLn (library_name ++ " loaded successfully")
+    Left x  -> putStrLn ("error: " ++ x)
