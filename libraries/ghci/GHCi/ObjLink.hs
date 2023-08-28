@@ -18,6 +18,7 @@ module GHCi.ObjLink
   , unloadObj
   , purgeObj
   , lookupSymbol
+  , lookupSymbolInDLL
   , lookupClosure
   , resolveObjs
   , addLibrarySearchPath
@@ -27,16 +28,15 @@ module GHCi.ObjLink
 
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
+import GHCi.Message (LoadedDLL)
 import Control.Exception (throwIO, ErrorCall(..))
 import Control.Monad    ( when )
 import Foreign.C
-import Foreign.Marshal.Alloc ( free )
-import Foreign          ( nullPtr )
+import Foreign.Marshal.Alloc ( alloca, free )
+import Foreign          ( nullPtr, peek )
 import GHC.Exts
 import System.Posix.Internals ( CFilePath, withFilePath, peekFilePath )
 import System.FilePath  ( dropExtension, normalise )
-
-
 
 
 -- ---------------------------------------------------------------------------
@@ -70,6 +70,15 @@ lookupSymbol str_in = do
         then return Nothing
         else return (Just addr)
 
+lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
+lookupSymbolInDLL dll str_in = do
+   let str = prefixUnderscore str_in
+   withCAString str $ \c_str -> do
+     addr <- c_lookupSymbolInDLL dll c_str
+     if addr == nullPtr
+       then return Nothing
+       else return (Just addr)
+
 lookupClosure :: String -> IO (Maybe HValueRef)
 lookupClosure str = do
   m <- lookupSymbol str
@@ -89,7 +98,7 @@ prefixUnderscore
 -- (e.g. "libfoo.so" or "foo.dll").  In the latter case, loadDLL
 -- searches the standard locations for the appropriate library.
 --
-loadDLL :: String -> IO (Maybe String)
+loadDLL :: String -> IO (Either String (Ptr LoadedDLL))
 -- Nothing      => success
 -- Just err_msg => failure
 loadDLL str0 = do
@@ -101,12 +110,16 @@ loadDLL str0 = do
      str | isWindowsHost = dropExtension str0
          | otherwise     = str0
   --
-  maybe_errmsg <- withFilePath (normalise str) $ \dll -> c_addDLL dll
-  if maybe_errmsg == nullPtr
-        then return Nothing
-        else do str <- peekCString maybe_errmsg
-                free maybe_errmsg
-                return (Just str)
+  (maybe_handle, maybe_errmsg) <- withFilePath (normalise str) $ \dll ->
+    alloca $ \errmsg_ptr -> (,)
+      <$> c_addDLL dll errmsg_ptr
+      <*> peek errmsg_ptr
+
+  if maybe_handle == nullPtr
+    then do str <- peekCString maybe_errmsg
+            free maybe_errmsg
+            return (Left str)
+    else return (Right maybe_handle)
 
 loadArchive :: String -> IO ()
 loadArchive str = do
@@ -163,7 +176,8 @@ resolveObjs = do
 -- Foreign declarations to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
 
-foreign import ccall unsafe "addDLL"                  c_addDLL                  :: CFilePath -> IO CString
+foreign import ccall unsafe "addDLL"                  c_addDLL                  :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
+foreign import ccall unsafe "lookupSymbolInDLL"       c_lookupSymbolInDLL       :: Ptr LoadedDLL -> CString -> IO (Ptr a)
 foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
 foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int
