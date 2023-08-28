@@ -66,7 +66,7 @@ run m = case m of
   LookupClosure str           -> lookupJSClosure str
 #else
   InitLinker -> initObjLinker RetainCAFs
-  LoadDLL str -> loadDLL str
+  LoadDLL str -> fmap toRemotePtr <$> loadDLL str
   LoadArchive str -> loadArchive str
   LoadObj str -> loadObj str
   UnloadObj str -> unloadObj str
@@ -81,6 +81,8 @@ run m = case m of
 #endif
   RtsRevertCAFs -> rts_revertCAFs
   LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str
+  LookupSymbolInDLL dll str ->
+    fmap toRemotePtr <$> lookupSymbolInDLL (fromRemotePtr dll) str
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   AddSptEntry fpr r -> localRef r >>= sptAddEntry fpr
   EvalStmt opts r -> evalStmt opts r

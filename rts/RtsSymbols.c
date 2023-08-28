@@ -619,6 +619,7 @@ extern char **environ;
       SymI_HasProto(purgeObj)                                           \
       SymI_HasProto(insertSymbol)                                       \
       SymI_HasProto(lookupSymbol)                                       \
+      SymI_HasProto(lookupSymbolInDLL)                                  \
       SymI_HasDataProto(stg_makeStablePtrzh)                                \
       SymI_HasDataProto(stg_mkApUpd0zh)                                     \
       SymI_HasDataProto(stg_labelThreadzh)                                  \
