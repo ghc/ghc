@@ -405,12 +405,12 @@ loadExternalPluginLib :: FilePath -> IO ()
 loadExternalPluginLib path = do
   -- load library
   loadDLL path >>= \case
-    Just errmsg -> pprPanic "loadExternalPluginLib"
-                    (vcat [ text "Can't load plugin library"
-                          , text "  Library path: " <> text path
-                          , text "  Error       : " <> text errmsg
-                          ])
-    Nothing -> do
+    Left errmsg -> pprPanic "loadExternalPluginLib"
+                     (vcat [ text "Can't load plugin library"
+                           , text "  Library path: " <> text path
+                           , text "  Error       : " <> text errmsg
+                           ])
+    Right _ -> do
       -- resolve objects
       resolveObjs >>= \case
         True -> return ()
