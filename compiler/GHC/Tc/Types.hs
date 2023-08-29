@@ -1774,7 +1774,12 @@ instance Outputable DefaultingProposal where
           <+> ppr (deProposalCts p)
 
 type DefaultingPluginResult = [DefaultingProposal]
-type FillDefaulting = WantedConstraints -> TcPluginM DefaultingPluginResult
+type FillDefaulting
+  = WantedConstraints
+      -- Zonked constraints containing the unfilled metavariables that
+      -- can be defaulted. See wrinkle (DP1) of Note [Defaulting plugins]
+      -- in GHC.Tc.Solver
+  -> TcPluginM [DefaultingProposal]
 
 -- | A plugin for controlling defaulting.
 data DefaultingPlugin = forall s. DefaultingPlugin
