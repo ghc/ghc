@@ -411,6 +411,13 @@ performance.
     Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1``,
     :rts-flag:`profiling <-hc>` nor :rts-flag:`-c`.
 
+.. rts-flag:: -xn
+
+    :default: off
+    :since: 8.10.1
+
+    An alias for :rts-flag:`--nonmoving-gc`
+
 .. rts-flag:: -w
 
     :default: off
@@ -421,13 +428,6 @@ performance.
     Note that this cannot be used in conjunction with heap profiling
     (:rts-flag:`-hT`) unless linked against the profiling runtime system with
     :ghc-flag:`-prof`.
-
-.. rts-flag:: -xn
-
-    :default: off
-    :since: 8.10.1
-
-    An alias for :rts-flag:`--nonmoving-gc`
 
 .. rts-flag:: -A ⟨size⟩
 
