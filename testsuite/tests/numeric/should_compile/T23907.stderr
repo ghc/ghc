@@ -1,0 +1,57 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 90, types: 62, coercions: 0, joins: 0/3}
+
+$WSMGen
+  = \ conrep conrep1 ->
+      case conrep of { W64# unbx ->
+      case conrep1 of { W64# unbx1 -> SMGen unbx unbx1 }
+      }
+
+Rec {
+$wloop
+  = \ ww ww1 ww2 ww3 ->
+      case ww of ds {
+        __DEFAULT ->
+          let { seed' = plusWord64# ww2 ww3 } in
+          let {
+            x#
+              = timesWord64#
+                  (xor64# seed' (uncheckedShiftRL64# seed' 33#))
+                  18397679294719823053#Word64 } in
+          let {
+            x#1
+              = timesWord64#
+                  (xor64# x# (uncheckedShiftRL64# x# 33#))
+                  14181476777654086739#Word64 } in
+          $wloop
+            (-# ds 1#)
+            (+##
+               ww1
+               (*##
+                  (word2Double#
+                     (word64ToWord#
+                        (uncheckedShiftRL64#
+                           (xor64# x#1 (uncheckedShiftRL64# x#1 33#)) 11#)))
+                  1.1102230246251565e-16##))
+            seed'
+            ww3;
+        0# -> (# ww1, ww2, ww3 #)
+      }
+end Rec }
+
+loop
+  = \ ds a s ->
+      case ds of { I# ww ->
+      case a of { D# ww1 ->
+      case s of { SMGen ww2 ww3 ->
+      case $wloop ww ww1 ww2 ww3 of { (# ww4, ww5, ww6 #) ->
+      (D# ww4, SMGen ww5 ww6)
+      }
+      }
+      }
+      }
+
+
+

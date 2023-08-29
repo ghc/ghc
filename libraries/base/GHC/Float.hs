@@ -1810,3 +1810,22 @@ foreign import prim "stg_doubleToWord64zh"
 
 "Word# -> Natural -> Double#"
   forall x. naturalToDouble# (NS x) = word2Double# x #-}
+
+-- We don't have word64ToFloat/word64ToDouble primops (#23908), only
+-- word2Float/word2Double, so we can only perform these transformations when
+-- word-size is 64-bit.
+#if WORD_SIZE_IN_BITS == 64
+{-# RULES
+
+"Int64# -> Integer -> Float#"
+  forall x. integerToFloat# (integerFromInt64# x) = int2Float# (int64ToInt# x)
+
+"Int64# -> Integer -> Double#"
+  forall x. integerToDouble# (integerFromInt64# x) = int2Double# (int64ToInt# x)
+
+"Word64# -> Integer -> Float#"
+  forall x. integerToFloat# (integerFromWord64# x) = word2Float# (word64ToWord# x)
+
+"Word64# -> Integer -> Double#"
+  forall x. integerToDouble# (integerFromWord64# x) = word2Double# (word64ToWord# x) #-}
+#endif
