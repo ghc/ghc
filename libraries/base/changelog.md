@@ -34,6 +34,11 @@
   * Change codebuffers to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
   * Add nominal role annotations to SNat/SSymbol/SChar ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
+  * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
+  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Fixed exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
+  * Implement `copyBytes`, `fillBytes`, `moveBytes` and `stimes` for `Data.Array.Byte.ByteArray` using primops ([CLC proposal #188](https://github.com/haskell/core-libraries-committee/issues/188))
+  * Add rewrite rules for conversion between Int64/Word64 and Float/Double on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
