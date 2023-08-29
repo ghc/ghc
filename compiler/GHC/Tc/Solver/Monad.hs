@@ -69,7 +69,7 @@ module GHC.Tc.Solver.Monad (
     getHasGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
     getInertInsols, getInnermostGivenEqLevel,
-    getInertSet,
+    getInertSet, setInertSet,
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
     insertFunEq, addInertForAll,
