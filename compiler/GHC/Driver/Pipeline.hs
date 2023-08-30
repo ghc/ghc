@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
-
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -122,6 +122,7 @@ import qualified Data.Set as Set
 
 import Data.Time        ( getCurrentTime )
 import GHC.Iface.Recomp
+import GHC.Types.Unique.DSet
 
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m
@@ -472,8 +473,18 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
+        -- pkg_deps is just the direct dependencies so take the transitive closure here
+        -- to decide if we need to relink or not.
+        let pkg_hslibs acc uid
+              | uid `elementOfUniqDSet` acc = acc
+              | Just c <- lookupUnitId unit_state uid =
+                  foldl' @[] pkg_hslibs (addOneToUniqDSet acc uid) (unitDepends c)
+              | otherwise = acc
+
+            all_pkg_deps = foldl' @[] pkg_hslibs emptyUniqDSet pkg_deps
+
         let pkg_hslibs  = [ (collectLibraryDirs (ways dflags) [c], lib)
-                          | Just c <- map (lookupUnitId unit_state) pkg_deps,
+                          | Just c <- map (lookupUnitId unit_state) (uniqDSetToList all_pkg_deps),
                             lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs
