@@ -529,7 +529,7 @@ Things to note:
 
  * The test we perform is exprIsHNF, and /not/ exprOkForSpeculation.
 
-     - exrpIsHNF catches the key case of an evaluated variable
+     - exprIsHNF catches the key case of an evaluated variable
 
      - exprOkForSpeculation is /false/ of an evaluated variable;
        See Note [exprOkForSpeculation and evaluated variables] in GHC.Core.Utils

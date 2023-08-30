@@ -67,7 +67,7 @@
 module GHC.CmmToAsm
    ( nativeCodeGen
 
-   -- * Test-only exports: see trac #12744
+   -- * Test-only exports: see #12744
    -- used by testGraphNoSpills, which needs to access
    -- the register allocator intermediate data structures
    -- cmmNativeGen emits

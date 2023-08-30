@@ -862,7 +862,7 @@ doCase d s p scrut bndr alts
         -- Are we dealing with an unboxed tuple with a tuple return frame?
         --
         -- 'Simple' tuples with at most one non-void component,
-        -- like (# Word# #) or (# Int#, State# RealWorld# #) do not have a
+        -- like (# Word# #) or (# Int#, State# RealWorld #) do not have a
         -- tuple return frame. This is because (# foo #) and (# foo, Void# #)
         -- have the same runtime rep. We have more efficient specialized
         -- return frames for the situations with one non-void element.

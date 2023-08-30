@@ -43,7 +43,7 @@ a GADT data constructor as in the following example::
     main :: IO ()
     main = print $ test (Foo @Float)
 
-In this example, the case in ``test``` is binding an existential variable introduced
+In this example, the case in ``test`` is binding an existential variable introduced
 by ``Foo`` that otherwise could not be named and used.
 
 It's possible to bind variables to any part of the type arguments to a constructor;

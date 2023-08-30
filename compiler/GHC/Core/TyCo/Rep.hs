@@ -296,7 +296,7 @@ When treated as a user type,
     implicitly instantiated
 
   - Coercion types, and non-pred evidence types (i.e. not
-    of kind Constrain), are just regular old types, are
+    of kind Constraint), are just regular old types, are
     visible, and are not implicitly instantiated.
 
 In a FunTy { ft_af = af } and af = FTF_C_T or FTF_C_C, the argument

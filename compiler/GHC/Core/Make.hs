@@ -1251,7 +1251,7 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
 
 mkRuntimeErrorId :: TypeOrConstraint -> Name -> Id
 -- Error function
---   with type:  forall (r:RuntimeRep) (a:TYPE r). Addr# -> a
+--   with type:  forall (r::RuntimeRep) (a::TYPE r). Addr# -> a
 --   with arity: 1
 -- which diverges after being given one argument
 -- The Addr# is expected to be the address of

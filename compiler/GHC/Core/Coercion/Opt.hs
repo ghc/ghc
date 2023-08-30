@@ -528,8 +528,8 @@ of arguments in a `CoTyConApp` can differ. Consider
 
   Any :: forall k. k
 
-  Any * Int                      :: *
-  Any (*->*) Maybe Int  :: *
+  Any @Type Int                :: Type
+  Any @(Type->Type) Maybe Int  :: Type
 
 Hence the need to compare argument lengths; see #13658
 

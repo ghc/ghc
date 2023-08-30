@@ -642,7 +642,7 @@ function test_hadrian() {
     then
       test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
       if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
-        fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) thean requested ($BIGNUM_BACKEND)"
+        fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) than requested ($BIGNUM_BACKEND)"
       fi
     fi
 

@@ -88,7 +88,7 @@ perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do 
 parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','all'],
                         help="Do not fail due to out-of-tolerance perf tests")
 parser.add_argument("--only-report-hadrian-deps", type=argparse.FileType('w'),
-                        help="Dry run the testsuite and report all extra hadrian depenedencies needed on the given file")
+                        help="Dry run the testsuite and report all extra hadrian dependencies needed on the given file")
 
 args = parser.parse_args()
 

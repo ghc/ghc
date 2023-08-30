@@ -180,7 +180,7 @@ several ways
      no longer does that.  So we need a separate map/unsafeCoerce
      RULE, in this module.
 
-     Adding these RULES means we must delay inlinine unsafeCoerce
+     Adding these RULES means we must delay inlining unsafeCoerce
      until the RULES have had a chance to fire; hence the INLINE[1]
      pragma on unsafeCoerce.  (Side note: this has the coincidental
      benefit of making the unsafeCoerce-based version of the `reflection`

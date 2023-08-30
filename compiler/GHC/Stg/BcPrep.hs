@@ -170,7 +170,7 @@ opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
 
 We thus must have *some* strategy for dealing with representation-polymorphic
 and unlifted join points. Representation-polymorphic variables are generally
-not allowed (though representation -polymorphic join points *are*; see
+not allowed (though representation-polymorphic join points *are*; see
 Note [Invariants on join points] in GHC.Core, point 6), and we don't wish to
 evaluate unlifted join points eagerly.
 The questionable join points are *not-necessarily-lifted join points*

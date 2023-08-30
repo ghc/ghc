@@ -13,5 +13,5 @@ foo :: forall f c. (forall a. c a => Show (f a)) => Proxy c -> f Int -> Int
 foo = foo
 
 bar = foo @T @Eq
--- We dont' want to report a redundance (Eq a) constraint
+-- We don't want to report a redundant (Eq a) constraint
 

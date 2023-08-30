@@ -618,7 +618,7 @@ and we seq fvs' before turning it as part of a record.
 The reason is that trim is sometimes something like
     \xs -> intersectNameSet (mkNameSet bound_names) xs
 and we don't want to retain the list bound_names. This showed up in
-trac ticket #1136.
+ticket #1136.
 -}
 
 {- *********************************************************************

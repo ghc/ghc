@@ -2119,7 +2119,7 @@ The type desugarer is phase 2 of dealing with HsTypes.  Specifically:
 
   * It zonks any kinds.  The returned type should have no mutable kind
     or type variables (hence returning Type not TcType):
-      - any unconstrained kind variables are defaulted to (Any *) just
+      - any unconstrained kind variables are defaulted to (Any @Type) just
         as in GHC.Tc.Zonk.Type.
       - there are no mutable type variables because we are
         kind-checking a type
@@ -2130,7 +2130,7 @@ You might worry about nested scopes:
         ..a:kappa in scope..
             let f :: forall b. T '[a,b] -> Int
 In this case, f's type could have a mutable kind variable kappa in it;
-and we might then default it to (Any *) when dealing with f's type
+and we might then default it to (Any @Type) when dealing with f's type
 signature.  But we don't expect this to happen because we can't get a
 lexically scoped type variable with a mutable kind variable in it.  A
 delicate point, this.  If it becomes an issue we might need to
@@ -2155,7 +2155,7 @@ as if $(..blah..) :: forall k. k.
 In the e1 example, the context of the splice fixes kappa to *.  But
 in the e2 example, we'll desugar the type, zonking the kind unification
 variables as we go.  When we encounter the unconstrained kappa, we
-want to default it to '*', not to (Any *).
+want to default it to 'Type', not to (Any @Type).
 
 -}
 

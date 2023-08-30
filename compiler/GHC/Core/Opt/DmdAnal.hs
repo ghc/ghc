@@ -2160,7 +2160,7 @@ Wrinkle (DNB1): we /do/ want to unbox tuple dictionaries (#23398)
              in ...f @a (% sel1 d, sel2 d %)
   and all the tuple building and taking apart will disappear.
 
-Wrinkle (DNB2): we /do/ wnat to unbox equality dictionaries,
+Wrinkle (DNB2): we /do/ want to unbox equality dictionaries,
   for (~), (~~), and Coercible (#23398).  Their payload is a single unboxed
   coercion.  We never want to specialise on `(t1 ~ t2)`.  All that would do is
   to make a copy of the function's RHS with a particular coercion.  Unlike

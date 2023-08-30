@@ -1938,7 +1938,7 @@ warnUnusedImport rdr_env (L loc decl, used, unused)
   where
     -- In warning message, pretty-print identifiers unqualified unconditionally
     -- to improve the consistent for ambiguous/unambiguous identifiers.
-    -- See trac#14881.
+    -- See #14881.
     possible_field n =
       case lookupGRE_Name rdr_env n of
         Just (GRE { gre_par = par, gre_info = IAmRecField info }) ->

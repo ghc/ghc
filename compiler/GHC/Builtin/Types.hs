@@ -464,9 +464,9 @@ In order to compose these two terms as @length []@ a type
 application is required, but there is no constraint on the
 choice.  In this situation GHC uses 'Any',
 
-> length (Any *) ([] (Any *))
+> length @(Any @Type) ([] @(Any @Type))
 
-Above, we print kinds explicitly, as if with --fprint-explicit-kinds.
+Above, we print kinds explicitly, as if with -fprint-explicit-kinds.
 
 The Any tycon used to be quite magic, but we have since been able to
 implement it merely with an empty kind polymorphic type family. See #10886 for a

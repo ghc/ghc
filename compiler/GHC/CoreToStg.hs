@@ -558,7 +558,7 @@ coreToStgApp f args ticks = do
         tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
-    -- profiling for trac #4367
+    -- profiling for #4367
     app `seq` return tapp
 
 -- ---------------------------------------------------------------------------

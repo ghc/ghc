@@ -2903,7 +2903,7 @@ where
 is a top-level dictionary-former.  This actually happened in #22459,
 because of (MP1) of Note [Specialising polymorphic dictionaries].
 
-How can we speicalise $wsplit?  We might try
+How can we specialise $wsplit?  We might try
 
    RULE "SPEC" forall (d :: C T). $wsplit @T d = $s$wsplit
 

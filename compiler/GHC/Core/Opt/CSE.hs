@@ -43,7 +43,7 @@ and apply that to the rest of the program.
 When we then see
         y1 = C a b
         y2 = C y1 b
-we replace the C a b with x1.  But then we *dont* want to
+we replace the C a b with x1.  But then we *don't* want to
 add   x1 -> y1  to the mapping.  Rather, we want the reverse, y1 -> x1
 so that a subsequent binding
         y2 = C y1 b

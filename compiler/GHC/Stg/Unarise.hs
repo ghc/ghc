@@ -896,7 +896,7 @@ mkUbxSum dc ty_args args0 us
       mkTupArg (arg_idx, arg_map, us, wrapper) slot
          | Just stg_arg <- IM.lookup arg_idx arg_map
          =  case castArg us slot stg_arg of
-              -- Slot and arg type missmatched, do a cast
+              -- Slot and arg type mismatched, do a cast
               Just (casted_arg,us',wrapper') ->
                 ( (arg_idx+1, arg_map, us', wrapper . wrapper')
                 , casted_arg)
@@ -963,13 +963,13 @@ For arguments (StgArg) and binders (Id) we have two kind of unarisation:
   - When unarising function arg binders and arguments, we don't want to remove
     void binders and arguments. For example,
 
-      f :: (# (# #), (# #) #) -> Void# -> RealWorld# -> ...
+      f :: (# (# #), (# #) #) -> Void# -> State# RealWorld -> ...
       f x y z = <body>
 
     Here after unarise we should still get a function with arity 3. Similarly
     in the call site we shouldn't remove void arguments:
 
-      f (# (# #), (# #) #) void# rw
+      f (# (# #), (# #) #) void# realWorld#
 
     When unarising <body>, we extend the environment with these binders:
 
@@ -1129,7 +1129,7 @@ voidArg :: StgArg
 voidArg = StgVarArg voidPrimId
 
 mkDefaultLitAlt :: [StgAlt] -> [StgAlt]
--- We have an exhauseive list of literal alternatives
+-- We have an exhaustive list of literal alternatives
 --    1# -> e1
 --    2# -> e2
 -- Since they are exhaustive, we can replace one with DEFAULT, to avoid

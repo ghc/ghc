@@ -372,7 +372,7 @@ as such you shouldn't need to set any of them explicitly. A flag
         sumIO :: [Int] -> IO Int
         sumIO xs = IO $ \s -> case $wsum xs s of
           (# s', r #) -> (# s', I# r #)
-        $wsumIO :: [Int] -> (# RealWorld#, Int# #)
+        $wsumIO :: [Int] -> (# State# RealWorld, Int# #)
         $wsumIO []        s = (# s, 0# #)
         $wsumIO (I# x:xs) s = case $wsumIO xs of
           (# s', r #) -> (# s', x +# r#)
