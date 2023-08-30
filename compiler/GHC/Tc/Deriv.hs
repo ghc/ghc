@@ -1981,7 +1981,7 @@ doDerivInstErrorChecks1 mechanism =
     DerivSpecStock{dsm_stock_dit = dit}
       -> data_cons_in_scope_check dit
     -- No need to 'data_cons_in_scope_check' for newtype deriving.
-    -- Additionally, we also don't need to mark the constructos as
+    -- Additionally, we also don't need to mark the constructors as
     -- used because newtypes are handled separately elsewhere.
     -- See Note [Tracking unused binding and imports] in GHC.Tc.Types
     -- or #17328 for more.

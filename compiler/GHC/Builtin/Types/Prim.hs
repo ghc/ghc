@@ -420,8 +420,8 @@ mkTemplateKiTyVars
                              -- Result is anon arg kinds [ak1, .., akm]
     -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
 -- Example: if you want the tyvars for
---   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
--- call mkTemplateKiTyVars [RuntimeRep] (\[r] -> [TYPE r, *])
+--   forall (r::RuntimeRep) (a::TYPE r) (b::Type). blah
+-- call mkTemplateKiTyVars [RuntimeRep] (\[r] -> [TYPE r, Type])
 mkTemplateKiTyVars kind_var_kinds mk_arg_kinds
   = kv_bndrs ++ tv_bndrs
   where
@@ -435,8 +435,8 @@ mkTemplateKiTyVar
                              -- Result is anon arg kinds [ak1, .., akm]
     -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
 -- Example: if you want the tyvars for
---   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
--- call mkTemplateKiTyVar RuntimeRep (\r -> [TYPE r, *])
+--   forall (r::RuntimeRep) (a::TYPE r) (b::Type). blah
+-- call mkTemplateKiTyVar RuntimeRep (\r -> [TYPE r, Type])
 mkTemplateKiTyVar kind mk_arg_kinds
   = kv_bndr : tv_bndrs
   where
@@ -826,7 +826,7 @@ Wrinkles
      are not Apart. See the FunTy/FunTy case in GHC.Core.Unify.unify_ty.
 
 (W3) Are (TYPE IntRep) and (CONSTRAINT WordRep) apart?  In truth yes,
-     they are.  But it's easier to say that htey are not apart, by
+     they are.  But it's easier to say that they are not apart, by
      reporting "maybeApart" (which is always safe), rather than
      recurse into the arguments (whose kinds may be utterly different)
      to look for apartness inside them.  Again this is in
@@ -846,8 +846,8 @@ Wrinkles
 Note [RuntimeRep polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking, you can't be polymorphic in `RuntimeRep`.  E.g
-   f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
-   f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
+   f :: forall (rr::RuntimeRep) (a::TYPE rr). a -> [a]
+   f = /\(rr::RuntimeRep) (a::rr) \(a::rr). ...
 This is no good: we could not generate code for 'f', because the
 calling convention for 'f' varies depending on whether the argument is
 a a Int, Int#, or Float#.  (You could imagine generating specialised
@@ -856,7 +856,7 @@ code, one for each instantiation of 'rr', but we don't do that.)
 Certain functions CAN be runtime-rep-polymorphic, because the code
 generator never has to manipulate a value of type 'a :: TYPE rr'.
 
-* error :: forall (rr:RuntimeRep) (a:TYPE rr). String -> a
+* error :: forall (rr::RuntimeRep) (a::TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
 * unsafeCoerce#, defined in Desugar.mkUnsafeCoercePair:

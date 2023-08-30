@@ -430,7 +430,7 @@ saturates _       0 = True
 saturates []      _ = False
 saturates (_:tys) n = assert( n >= 0 ) $ saturates tys (n-1)
                        -- Arities are always positive; the assertion just checks
-                       -- that, to avoid an ininite loop in the bad case
+                       -- that, to avoid an infinite loop in the bad case
 
 -- | A helper for 'expandSynTyConApp_maybe' to avoid inlining this cold path
 -- into call-sites.
@@ -816,7 +816,7 @@ runtimeRepLevity_maybe rep
             [lev] -> levityType_maybe lev
             _     -> Nothing  -- Type isn't of kind RuntimeRep
                      -- The latter case happens via the call to isLiftedRuntimeRep
-                     -- in GHC.Tc.Errors.Ppr.pprMisMatchMsg (#22742)
+                     -- in GHC.Tc.Errors.Ppr.pprMismatchMsg (#22742)
     else Just Unlifted
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
@@ -1619,7 +1619,7 @@ splitTyConAppNoView_maybe ty
 -- of a 'FunTy' with an argument of unknown kind 'FunTy'
 -- (e.g. `FunTy (a :: k) Int`, since the kind of @a@ isn't of
 -- the form `TYPE rep`.  This isn't usually a problem but may
--- be temporarily the cas during canonicalization:
+-- be temporarily the case during canonicalization:
 --     see Note [Decomposing FunTy] in GHC.Tc.Solver.Equality
 --     and Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
 --         Wrinkle around FunTy

@@ -19,7 +19,7 @@ set -e
 #                                    tarballs
 #
 #   upload.sh prepare_docs           (deprecated) prepare the documentation directory
-#                                    (this should be unecessary as the script which
+#                                    (this should be unnecessary as the script which
 #                                     fetches artifacts should create this folder from
 #                                     the doc-tarball job)
 #

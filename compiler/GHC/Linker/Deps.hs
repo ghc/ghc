@@ -323,9 +323,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The `-fprefer-byte-code` flag allows a user to specify that they want to use
-byte code (if availble) rather than object code for home module dependenices
+byte code (if available) rather than object code for home module dependencies
 when executing Template Haskell splices.
 
 Why might you want to use byte code rather than object code?
@@ -336,7 +335,7 @@ Why might you want to use byte code rather than object code?
 So we allow the user to choose to use byte code rather than object files if they want to avoid these
 two pitfalls.
 
-When using `-fprefer-byte-code` you have to arrange to have the byte code availble.
+When using `-fprefer-byte-code` you have to arrange to have the byte code available.
 In normal --make mode it will not be produced unless you enable `-fbyte-code-and-object-code`.
 See Note [Home module build products] for some more information about that.
 

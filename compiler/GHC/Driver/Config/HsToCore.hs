@@ -12,7 +12,7 @@ initBangOpts dflags = BangOpts
   { bang_opt_strict_data   = xopt LangExt.StrictData dflags
   , bang_opt_unbox_disable = gopt Opt_OmitInterfacePragmas dflags
       -- Don't unbox if we aren't optimising; rather arbitrarily,
-      -- we use -fomit-iface-pragmas as the indication
+      -- we use -fomit-interface-pragmas as the indication
   , bang_opt_unbox_strict  = gopt Opt_UnboxStrictFields dflags
   , bang_opt_unbox_small   = gopt Opt_UnboxSmallStrictFields dflags
   }

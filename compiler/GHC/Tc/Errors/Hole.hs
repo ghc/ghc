@@ -402,7 +402,7 @@ is discarded.
 
 Note [Speeding up valid hole-fits]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To fix #16875 we noted that a lot of time was being spent on unecessary work.
+To fix #16875 we noted that a lot of time was being spent on unnecessary work.
 
 When we'd call `tcCheckHoleFit hole hole_ty ty`, we would end up by generating
 a constraint to show that `hole_ty ~ ty`, including any constraints in `ty`. For
@@ -956,7 +956,7 @@ tcSubsumes ty_a ty_b = fst <$> tcCheckHoleFit dummyHole ty_a ty_b
                               , th_implics      = []
                               , th_hole         = Nothing }
 
--- | A tcSubsumes which takes into account relevant constraints, to fix trac
+-- | A tcSubsumes which takes into account relevant constraints, to fix
 -- #14273. This makes sure that when checking whether a type fits the hole,
 -- the type has to be subsumed by type of the hole as well as fulfill all
 -- constraints on the type of the hole.

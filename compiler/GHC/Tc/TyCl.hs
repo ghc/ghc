@@ -3402,7 +3402,7 @@ unravelFamInstPats fam_app
         -- The Nothing case cannot happen for type families, because
         -- we don't call unravelFamInstPats until we've solved the
         -- equalities. For data families, it shouldn't happen either,
-        -- we need to fail hard and early if it does. See trac issue #15905
+        -- we need to fail hard and early if it does. See issue #15905
         -- for an example of this happening.
 
 addConsistencyConstraints :: AssocInstInfo -> TcType -> TcM ()
@@ -4746,7 +4746,7 @@ checkValidDataCon dflags existential_ok tc con
 checkNewDataCon :: DataCon -> TcM ()
 -- Further checks for the data constructor of a newtype
 -- You might wonder if we need to check for an unlifted newtype
--- without -XUnliftedNewTypes, such as
+-- without -XUnliftedNewtypes, such as
 --   newtype C = MkC Int#
 -- But they are caught earlier, by GHC.Tc.Gen.HsType.checkDataKindSig
 checkNewDataCon con

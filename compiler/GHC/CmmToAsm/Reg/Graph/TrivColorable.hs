@@ -178,7 +178,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchX86_64    -> 10
                             -- in x86_64 there are 16 XMM registers
                             -- xmm0 .. xmm15, here 10 is a
-                            -- "dont need to solve conflicts" count that
+                            -- "don't need to solve conflicts" count that
                             -- was chosen at some point in the past.
                             ArchPPC       -> 26
                             ArchPPC_64 _  -> 20

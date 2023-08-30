@@ -2677,7 +2677,7 @@ browseModule bang modl exports_only = do
             -- annotate groups of imports with their import modules
             -- the default ordering is somewhat arbitrary, so we group
             -- by header and sort groups; the names themselves should
-            -- really come in order of source appearance.. (trac #1799)
+            -- really come in order of source appearance.. (#1799)
             annotate mts = concatMap (\(m,ts)->labels m:ts)
                          $ sortBy cmpQualifiers $ grp mts
               where cmpQualifiers =

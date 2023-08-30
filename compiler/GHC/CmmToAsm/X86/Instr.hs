@@ -257,7 +257,7 @@ data Instr
         -- We need to support the FSTP (x87 store and pop) instruction
         -- so that we can correctly read off the return value of an
         -- x86 CDECL C function call when its floating point.
-        -- so we dont include a register argument, and just use st(0)
+        -- so we don't include a register argument, and just use st(0)
         -- this instruction is used ONLY for return values of C ffi calls
         -- in x86_32 abi
         | X87Store         Format  AddrMode -- st(0), dst

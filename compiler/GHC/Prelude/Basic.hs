@@ -13,7 +13,7 @@
 
 -- Every module in GHC
 --   * Is compiled with -XNoImplicitPrelude
---   * Explicitly imports GHC.BasicPrelude or GHC.Prelude
+--   * Explicitly imports GHC.Prelude.Basic or GHC.Prelude
 --   * The later provides some functionality with within ghc itself
 --     like pprTrace.
 

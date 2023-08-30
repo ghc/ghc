@@ -2860,7 +2860,7 @@ commonly used commands.
     Sets the function to be used for the prompt displaying in GHCi. The
     function should be of the type ``[String] -> Int -> IO String``. This
     function is called each time the prompt is being made. The first argument
-    stands for the names of the modules currently in scope(the name of the
+    stands for the names of the modules currently in scope (the name of the
     "topmost" module  will begin with a ``*``; see  :ref:`ghci-scope` for
     more information). The second arguments is the line number (as referenced
     in compiler  messages) of the current prompt.

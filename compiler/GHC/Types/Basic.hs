@@ -2211,7 +2211,7 @@ GHC.Tc.Solver.applyDefaultingRules
 GHC.Iface.Type.defaultIfaceTyVarsOfKind
 
   This is a built-in defaulting mechanism that only applies when pretty-printing.
-  It defaults 'RuntimeRep'/'Levity' variables unless -fprint-explicit-kinds is enabled,
+  It defaults 'RuntimeRep'/'Levity' variables unless -fprint-explicit-runtime-reps is enabled,
   and 'Multiplicity' variables unless -XLinearTypes is enabled.
 
 -}

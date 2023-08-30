@@ -1064,7 +1064,7 @@ In order to disambiguate between identifiers from different modules, we qualify
 all names that don't originate in the current module. In order to keep visual
 noise as low as possible, we keep local names unqualified.
 
-For some background on this choice see trac #15269.
+For some background on this choice see #15269.
 -}
 
 -- | Read binary interface, and print it out

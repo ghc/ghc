@@ -742,7 +742,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     checkHowMuch how_much $ do
 
     -- mg2_with_srcimps drops the hi-boot nodes, returning a
-    -- graph with cycles. It is just used for warning about unecessary source imports.
+    -- graph with cycles. It is just used for warning about unnecessary source imports.
     let mg2_with_srcimps :: [SCC ModuleGraphNode]
         mg2_with_srcimps = topSortModuleGraph True mod_graph Nothing
 

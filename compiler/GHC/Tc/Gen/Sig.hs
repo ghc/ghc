@@ -777,7 +777,7 @@ Some wrinkles
 
 tcSpecPrags :: Id -> [LSig GhcRn]
             -> TcM [LTcSpecPrag]
--- Add INLINE and SPECIALSE pragmas
+-- Add INLINE and SPECIALISE pragmas
 --    INLINE prags are added to the (polymorphic) Id directly
 --    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked

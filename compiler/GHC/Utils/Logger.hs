@@ -505,7 +505,7 @@ chooseDumpFile logflags ways flag
 
     getPrefix
          -- dump file location is being forced
-         --      by the --ddump-file-prefix flag.
+         --      by the -ddump-file-prefix flag.
        | Just prefix <- log_dump_prefix_override logflags
           = prefix
          -- dump file locations, module specified to [modulename] set by

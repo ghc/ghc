@@ -98,7 +98,7 @@ coStats :: Coercion -> CoreStats
 coStats co = zeroCS { cs_co = coercionSize co }
 
 coreBindsSize :: [CoreBind] -> Int
--- We use coreBindStats for user printout
+-- We use coreBindsStats for user printout
 -- but this one is a quick and dirty basis for
 -- the simplifier's tick limit
 coreBindsSize bs = sum (map bindSize bs)

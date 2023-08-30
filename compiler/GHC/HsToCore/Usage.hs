@@ -235,7 +235,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
                             else mod
                 -- This lambda function is really just a
                 -- specialised (++); originally came about to
-                -- avoid quadratic behaviour (trac #2680)
+                -- avoid quadratic behaviour (#2680)
                 in extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod' [occ]
             where occ = nameOccName name
 

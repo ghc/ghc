@@ -2081,7 +2081,7 @@ Things to note
 * Why do we need a primop at all?  That is, instead of
       case seq# x s of (# x, s #) -> blah
   why not instead say this?
-      case x of { DEFAULT -> blah)
+      case x of { DEFAULT -> blah }
 
   Reason (see #5129): if we saw
     catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler

@@ -373,7 +373,7 @@ warnUnusedTopBinds gres
                             _        -> False
              -- Don't warn about unused bindings with parents in
              -- .hs-boot files, as you are sometimes required to give
-             -- unused bindings (trac #3449).
+             -- unused bindings (#3449).
              -- HOWEVER, in a signature file, you are never obligated to put a
              -- definition in the main text.  Thus, if you define something
              -- and forget to export it, we really DO want to warn.

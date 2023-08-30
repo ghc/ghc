@@ -199,7 +199,7 @@ So a comparison like `x == int8TyConName` will turn into `getUnique x ==
 int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
 definition will look like:
 
-   int8TyCOnName = case (mkOccName..."Int8") of occ ->
+   int8TyConName = case (mkOccName..."Int8") of occ ->
                    Name gHC_INT occ int8TyConKey
 
 and now the comparison will not optimise.  This matters even more when there are
@@ -606,7 +606,7 @@ instance Eq Name where
 -- | __Caution__: This instance is implemented via `nonDetCmpUnique`, which
 -- means that the ordering is not stable across deserialization or rebuilds.
 --
--- See `nonDetCmpUnique` for further information, and trac #15240 for a bug
+-- See `nonDetCmpUnique` for further information, and #15240 for a bug
 -- caused by improper use of this instance.
 
 -- For a deterministic lexicographic ordering, use `stableNameCmp`.

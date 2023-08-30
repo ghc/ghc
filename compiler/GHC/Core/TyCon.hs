@@ -1337,7 +1337,7 @@ via the PromotedDataCon alternative in GHC.Core.TyCon.
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We define datatypes with no constructors to *not* be
-enumerations; this fixes trac #2578,  Otherwise we
+enumerations; this fixes #2578,  Otherwise we
 end up generating an empty table for
   <mod>_<type>_closure_tbl
 which is used by tagToEnum# to map Int# to constructors
@@ -1869,7 +1869,7 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
 noTcTyConScopedTyVars :: [(Name, TcTyVar)]
 noTcTyConScopedTyVars = []
 
--- | Create an primitive 'TyCon', such as @Int#@, @Type@ or @RealWorld#@
+-- | Create an primitive 'TyCon', such as @Int#@, @Type@ or @RealWorld@
 -- Primitive TyCons are marshalable iff not lifted.
 -- If you'd like to change this, modify marshalablePrimTyCon.
 mkPrimTyCon :: Name -> [TyConBinder]

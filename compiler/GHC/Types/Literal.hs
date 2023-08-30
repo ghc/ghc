@@ -136,8 +136,8 @@ data Literal
   | LitRubbish                  -- ^ A nonsense value; See Note [Rubbish literals].
       TypeOrConstraint          -- t_or_c: whether this is a type or a constraint
       RuntimeRepType            -- rr: a type of kind RuntimeRep
-      -- The type of the literal is forall (a:TYPE rr). a
-      --                         or forall (a:CONSTRAINT rr). a
+      -- The type of the literal is forall (a::TYPE rr). a
+      --                         or forall (a::CONSTRAINT rr). a
       --
       -- INVARIANT: the Type has no free variables
       --    and so substitution etc can ignore it

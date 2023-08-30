@@ -412,7 +412,7 @@ getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
 -- so as to make sure they have the most general type in the case that
 -- user code also uses these functions but with a different type than GHC
 -- internally. (Main offender is treating return type as 'void' instead of
--- 'void *'). Fixes trac #5486.
+-- 'void *'). Fixes #5486.
 ghcInternalFunctions :: LlvmM ()
 ghcInternalFunctions = do
     platform <- getPlatform

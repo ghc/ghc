@@ -643,7 +643,7 @@ There are two cases.
     The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
     Note that forcing 't' makes the pattern match happen,
     but does not force 'v'.  That's why we call `mkBigCoreVarTupSolo`
-    in `mkSeletcorBinds`
+    in `mkSelectorBinds`
 
   * The pattern binds no variables
         let !(True,False) = e in body
@@ -913,7 +913,7 @@ anyway, and the Void# doesn't do much harm.
 mkFailurePair :: CoreExpr       -- Result type of the whole case expression
               -> DsM (CoreBind, -- Binds the newly-created fail variable
                                 -- to \ _ -> expression
-                      CoreExpr) -- Fail variable applied to realWorld#
+                      CoreExpr) -- Fail variable applied to (# #)
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
   = do { fail_fun_var <- newFailLocalDs ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
