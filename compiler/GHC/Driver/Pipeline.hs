@@ -437,9 +437,8 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
             exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
 
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
-
         forM_ mHscMessager $ \hscMessage -> hscMessage linking_needed
-        if not (gopt Opt_ForceRecomp dflags) && (linking_needed == UpToDate)
+        if linking_needed == UpToDate
            then do debugTraceMsg logger 2 (text exe_file <+> text "is up to date, linking not required.")
                    return Succeeded
            else do
@@ -475,10 +474,11 @@ linkJSBinary logger fc dflags unit_env obj_files pkg_deps = do
   jsLinkBinary fc lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
 
 linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
+linkingNeeded _ dflags _ _ _ _ | gopt Opt_ForceRelink dflags = return (NeedsRecompile MustCompile)
 linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
-        -- linking (unless the -fforce-recomp flag was given).
+        -- linking (unless the -fforce-recomp or -fforce-relink flag was given).
   let platform   = ue_platform unit_env
       unit_state = ue_units unit_env
       arch_os    = platformArchOS platform

@@ -663,6 +663,22 @@ The recompilation checker
     existing ``.o`` file in place, if it can be determined that the
     module does not need to be recompiled.
 
+    This flag implies :ghc-flag:`-fforce-relink`.
+
+.. ghc-flag:: -fforce-relink
+    :shortdesc: Turn off relinking checking.
+    :type: dynamic
+    :reverse: -fno-force-relink
+    :category: recompilation
+
+    :since: 9.10.1
+
+    Turn off relinking checking (which is on by default). Normally in ``--make``
+    mode we try to avoid linking if we can determine that linking is not required.
+
+    This can be useful if there is a bug in the relinking checking but you don't
+    want to use the much bigger hammer provided by :ghc-flag:`-fforce-recomp`.
+
 .. ghc-flag:: -fignore-optim-changes
     :shortdesc: Do not recompile modules just to match changes to
         optimisation flags. This is especially useful for avoiding

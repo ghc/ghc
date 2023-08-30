@@ -2370,6 +2370,7 @@ fFlagsDeps = [
   flagSpec "family-application-cache"         Opt_FamAppCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
+  flagSpec "force-relink"                     Opt_ForceRelink,
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
   flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,
   flagSpec "full-laziness"                    Opt_FullLaziness,
@@ -2777,6 +2778,7 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifiedCore)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithStack)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithFallback)
+                ,(Opt_ForceRecomp, turnOn, Opt_ForceRelink)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- General flags that are switched on/off when other general flags are switched

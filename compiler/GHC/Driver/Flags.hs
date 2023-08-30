@@ -339,6 +339,7 @@ data GeneralFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
+   | Opt_ForceRelink
    | Opt_IgnoreOptimChanges
    | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision

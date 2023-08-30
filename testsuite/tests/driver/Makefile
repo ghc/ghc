@@ -809,4 +809,12 @@ T23339B:
 	# Check that the file is kept and is the right one
 	find . -name "*.c" -exec cat {} \; | grep "init__ip_init"
 
+T23912:
+	$(RM) T23912.hi
+	$(RM) T23912$(OBJSUFFIX)
+	$(RM) -rf "$(PWD)/tmp"
+	mkdir -p tmp
+	"$(TEST_HC)" -tmpdir "$(PWD)/tmp" $(TEST_HC_OPTS) -v0 T23912.hs -fforce-relink
+	"$(TEST_HC)" -tmpdir "$(PWD)/tmp" $(TEST_HC_OPTS) -v1 T23912.hs -fforce-relink
+
 
