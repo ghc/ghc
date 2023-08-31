@@ -19,7 +19,7 @@ module GHC.Stg.Lift.Monad (
     -- ** Substitution and binders
     withSubstBndr, withSubstBndrs, withLiftedBndr, withLiftedBndrs,
     -- ** Occurrences
-    substOcc, isLifted, formerFreeVars, liftedIdsExpander
+    substOcc, isLifted, liftedIdsExpander
   ) where
 
 import GHC.Prelude
@@ -64,6 +64,7 @@ data Env
   = Env
   { e_config     :: StgLiftConfig
   -- ^ Read-only.
+
   , e_subst      :: !Subst
   -- ^ We need to track the renamings of local 'InId's to their lifted 'OutId',
   -- because shadowing might make a closure's free variables unavailable at its
@@ -73,6 +74,7 @@ data Env
   -- @
   -- Here, @f@ can't be lifted to top-level, because its free variable @x@ isn't
   -- available at its call site.
+
   , e_expansions :: !(IdEnv DIdSet)
   -- ^ Lifted 'Id's don't occur as free variables in any closure anymore, because
   -- they are bound at the top-level. Every occurrence must supply the formerly
@@ -294,22 +296,26 @@ withLiftedBndrs abs_ids = runContT . traverse (ContT . withLiftedBndr abs_ids)
 
 -- | Substitutes a binder /occurrence/, which was brought in scope earlier by
 -- 'withSubstBndr' \/ 'withLiftedBndr'.
-substOcc :: Id -> LiftM Id
-substOcc id = LiftM (RWS.asks (lookupIdSubst id . e_subst))
+-- Also returns an empty list for a binding that was not lifted and the list of all
+-- local variables the binding abstracts over (so, exactly the additional
+-- arguments at adjusted call sites) otherwise.
+--
+-- We are going to replace f with (f' fvs)
+substOcc :: InId -> LiftM (OutId, [OutId])
+substOcc f = LiftM (RWS.asks subst_occ)
+  where
+    subst_occ :: Env -> (OutId, [OutId])
+    subst_occ (Env { e_subst = subst, e_expansions = expansions })
+      = (lookupIdSubst f subst, get_expansions expansions)
+
+    get_expansions :: IdEnv DIdSet -> [OutId]
+    get_expansions expansions = case lookupVarEnv expansions f of
+                       Nothing  -> []
+                       Just fvs -> dVarSetElems fvs
 
 -- | Whether the given binding was decided to be lambda lifted.
 isLifted :: InId -> LiftM Bool
 isLifted bndr = LiftM (RWS.asks (elemVarEnv bndr . e_expansions))
-
--- | Returns an empty list for a binding that was not lifted and the list of all
--- local variables the binding abstracts over (so, exactly the additional
--- arguments at adjusted call sites) otherwise.
-formerFreeVars :: InId -> LiftM [OutId]
-formerFreeVars f = LiftM $ do
-  expansions <- RWS.asks e_expansions
-  pure $ case lookupVarEnv expansions f of
-    Nothing -> []
-    Just fvs -> dVarSetElems fvs
 
 -- | Creates an /expander function/ for the current set of lifted binders.
 -- This expander function will replace any 'InId' by their corresponding 'OutId'

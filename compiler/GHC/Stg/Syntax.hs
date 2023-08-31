@@ -469,7 +469,7 @@ stgRhsArity (StgRhsClosure _ _ _ bndrs _ _)
 stgRhsArity (StgRhsCon {}) = 0
 
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
-freeVarsOfRhs (StgRhsCon _ _ _ _ args _) = mkDVarSet [ id | StgVarArg id <- args ]
+freeVarsOfRhs (StgRhsCon _ _ _ _ args _) = mkDVarSet [ id | StgVarArg id <- args, isLocalId id ]
 freeVarsOfRhs (StgRhsClosure fvs _ _ _ _ _) = fvs
 
 {-

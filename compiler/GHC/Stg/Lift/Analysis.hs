@@ -43,72 +43,87 @@ import GHC.Types.Var.Set
 
 import Data.Maybe ( mapMaybe )
 
--- Note [When to lift]
--- ~~~~~~~~~~~~~~~~~~~
--- $when
--- The analysis proceeds in two steps:
---
---   1. It tags the syntax tree with analysis information in the form of
---      'BinderInfo' at each binder and 'Skeleton's at each let-binding
---      by 'tagSkeletonTopBind' and friends.
---   2. The resulting syntax tree is treated by the "GHC.Stg.Lift"
---      module, calling out to 'goodToLift' to decide if a binding is worthwhile
---      to lift.
---      'goodToLift' consults argument occurrence information in 'BinderInfo'
---      and estimates 'closureGrowth', for which it needs the 'Skeleton'.
---
--- So the annotations from 'tagSkeletonTopBind' ultimately fuel 'goodToLift',
--- which employs a number of heuristics to identify and exclude lambda lifting
--- opportunities deemed non-beneficial:
---
---  [Top-level bindings] can't be lifted.
---  [Thunks] and data constructors shouldn't be lifted in order not to destroy
---    sharing.
---  [Argument occurrences] #arg_occs# of binders prohibit them to be lifted.
---    Doing the lift would re-introduce the very allocation at call sites that
---    we tried to get rid off in the first place. We capture analysis
---    information in 'BinderInfo'. Note that we also consider a nullary
---    application as argument occurrence, because it would turn into an n-ary
---    partial application created by a generic apply function. This occurs in
---    CPS-heavy code like the CS benchmark.
---  [Join points] should not be lifted, simply because there's no reduction in
---    allocation to be had.
---  [Abstracting over join points] destroys join points, because they end up as
---    arguments to the lifted function.
---  [Abstracting over known local functions] turns a known call into an unknown
---    call (e.g. some @stg_ap_*@), which is generally slower. Can be turned off
---    with @-fstg-lift-lams-known@.
---  [Calling convention] Don't lift when the resulting function would have a
---    higher arity than available argument registers for the calling convention.
---    Can be influenced with @-fstg-lift-(non)rec-args(-any)@.
---  [Closure growth] introduced when former free variables have to be available
---    at call sites may actually lead to an increase in overall allocations
---  resulting from a lift. Estimating closure growth is described in
---  "GHC.Stg.Lift.Analysis#clogro" and is what most of this module is ultimately
---  concerned with.
---
--- There's a <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page> with
--- some more background and history.
+{- Note [When to lift]
+~~~~~~~~~~~~~~~~~~~~~~
+$when
+The analysis proceeds in two steps:
 
--- Note [Estimating closure growth]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- $clogro
--- We estimate closure growth by abstracting the syntax tree into a 'Skeleton',
--- capturing only syntactic details relevant to 'closureGrowth', such as
---
---   * 'ClosureSk', representing closure allocation.
---   * 'RhsSk', representing a RHS of a binding and how many times it's called
---     by an appropriate 'Card'.
---   * 'AltSk', 'BothSk' and 'NilSk' for choice, sequence and empty element.
---
--- This abstraction is mostly so that the main analysis function 'closureGrowth'
--- can stay simple and focused. Also, skeletons tend to be much smaller than
--- the syntax tree they abstract, so it makes sense to construct them once and
--- and operate on them instead of the actual syntax tree.
---
--- A more detailed treatment of computing closure growth, including examples,
--- can be found in the paper referenced from the
--- <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page>.
+  1. It tags the syntax tree with analysis information in the form of
+     'BinderInfo' at each binder and 'Skeleton's at each let-binding
+     by 'tagSkeletonTopBind' and friends.
+  2. The resulting syntax tree is treated by the "GHC.Stg.Lift"
+     module, calling out to 'goodToLift' to decide if a binding is worthwhile
+     to lift.
+     'goodToLift' consults argument occurrence information in 'BinderInfo'
+     and estimates 'closureGrowth', for which it needs the 'Skeleton'.
+
+So the annotations from 'tagSkeletonTopBind' ultimately fuel 'goodToLift',
+which employs a number of heuristics to identify and exclude lambda lifting
+opportunities deemed non-beneficial:
+
+* [WL1: Top-level bindings] can't be lifted.
+
+* [WL2: Thunks] and data constructors shouldn't be lifted in order not to destroy
+  sharing.
+
+* [WL3: Argument occurrences] #arg_occs# of binders prohibit them to be lifted.
+  Doing the lift would re-introduce the very allocation at call sites that
+  we tried to get rid of in the first place. Example
+       g y = let f x = ...x..y...
+             in map f xs
+  No point in lambda-lifting f:
+      f' y x = ...x..y...
+      g y = let f = f' y in map f xs
+  because we still have a closure allocation for f!
+
+  We capture analysis information in 'BinderInfo'. Note that we also consider a
+  nullary application as argument occurrence, because it would turn into an
+  n-ary partial application created by a generic apply function. This occurs in
+  CPS-heavy code like the CS benchmark.
+
+* [WL4: Join points] should not be lifted, simply because there's no reduction in
+  allocation to be had.
+
+* [WL5: Abstracting over join points] destroys join points, because they end up as
+  arguments to the lifted function.
+
+* [WL6: Abstracting over known local functions] turns a known call into an unknown
+  call (e.g. some @stg_ap_*@), which is generally slower. Can be turned off
+  with @-fstg-lift-lams-known@.
+
+* [WL7: Calling convention] Don't lift when the resulting function would have a
+  higher arity than available argument registers for the calling convention.
+  Can be influenced with @-fstg-lift-(non)rec-args(-any)@.
+
+* [WL8: Closure growth] introduced when former free variables have to be available
+  at call sites may actually lead to an increase in overall allocations
+  resulting from a lift. Estimating closure growth is described in
+  "GHC.Stg.Lift.Analysis#clogro" and is what most of this module is ultimately
+  concerned with.
+
+There's a <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page> with
+some more background and history.
+
+Note [Estimating closure growth]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+$clogro
+We estimate closure growth by abstracting the syntax tree into a 'Skeleton',
+capturing only syntactic details relevant to 'closureGrowth', such as
+
+  * 'ClosureSk', representing closure allocation.
+  * 'RhsSk', representing a RHS of a binding and how many times it's called
+    by an appropriate 'Card'.
+  * 'AltSk', 'BothSk' and 'NilSk' for choice, sequence and empty element.
+
+This abstraction is mostly so that the main analysis function 'closureGrowth'
+can stay simple and focused. Also, skeletons tend to be much smaller than
+the syntax tree they abstract, so it makes sense to construct them once and
+and operate on them instead of the actual syntax tree.
+
+A more detailed treatment of computing closure growth, including examples,
+can be found in the paper referenced from the
+<https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page>.
+-}
 
 llTrace :: String -> SDoc -> a -> a
 llTrace _ _ c = c
@@ -282,30 +297,38 @@ goodToLift
   -> Maybe DIdSet       -- ^ @Just abs_ids@ <=> This binding is beneficial to
                         -- lift and @abs_ids@ are the variables it would
                         -- abstract over
-goodToLift cfg top_lvl rec_flag expander pairs scope = decide
-  [ ("top-level", isTopLevel top_lvl) -- keep in sync with Note [When to lift]
-  , ("memoized", any_memoized)
-  , ("argument occurrences", arg_occs)
-  , ("join point", is_join_point)
-  , ("abstracts join points", abstracts_join_ids)
-  , ("abstracts known local function", abstracts_known_local_fun)
-  , ("args spill on stack", args_spill_on_stack)
-  , ("increases allocation", inc_allocs)
-  ] where
+goodToLift cfg top_lvl rec_flag expander pairs scope
+  | not (fancy_or deciders)
+  = llTrace "stgLiftLams:lifting" (ppr bndrs) $
+    Just expanded_abs_ids
+  | otherwise
+  = Nothing
+
+  where
+      deciders :: [(String,Bool)]   -- True <=> do not lift
+      -- Keep in sync with Note [When to lift]
+      deciders
+        = [ ("top-level", isTopLevel top_lvl)             -- [WL1: Top-level bindings]
+          , ("memoized", any_memoized)                    -- [WL2: Thunks]
+          , ("argument occurrences", arg_occs)            -- [WL3: Argument occurrences]
+          , ("join point", is_join_point)                 -- [WL4: Join points]
+          , ("abstracts join points", abstracts_join_ids) -- [WL5: Abstracting over join points]
+          , ("abstracts known local function", abstracts_known_local_fun)
+                                                          -- [WL6: Abstracting over known local functions]
+          , ("args spill on stack", args_spill_on_stack)  -- [WL7: Calling convention]
+          , ("increases allocation", inc_allocs)          -- [WL8: Closure growth]
+          ]
+
       profile  = c_targetProfile cfg
       platform = profilePlatform profile
-      decide deciders
-        | not (fancy_or deciders)
-        = llTrace "stgLiftLams:lifting"
-                  (ppr bndrs <+> ppr abs_ids $$
-                   ppr allocs $$
-                   ppr scope) $
-          Just abs_ids
-        | otherwise
-        = Nothing
       ppr_deciders = vcat . map (text . fst) . filter snd
       fancy_or deciders
-        = llTrace "stgLiftLams:goodToLift" (ppr bndrs $$ ppr_deciders deciders) $
+        = llTrace "stgLiftLams:goodToLift?"
+            (vcat [ text "bndrs:"           <+> ppr bndrs
+                  , text "fvs:"             <+> ppr fvs
+                  , text "abs_ids:"         <+> ppr abs_ids
+                  , text "expanded_abs_ids" <+> ppr expanded_abs_ids
+                  , text "bad deciders:"    <+> ppr_deciders deciders ]) $
           any snd deciders
 
       bndrs = map (binderInfoBndr . fst) pairs
@@ -316,33 +339,41 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
       -- the lifted binding would abstract over. We have to merge the free
       -- variables of all RHS to get the set of variables that will have to be
       -- passed through parameters.
-      fvs = unionDVarSets (map freeVarsOfRhs rhss)
-      -- To lift the binding to top-level, we want to delete the lifted binders
+      --
+      -- delVarSetList: to lift the binding to top-level, we want to delete the lifted binders
       -- themselves from the free var set. Local let bindings track recursive
       -- occurrences in their free variable set. We neither want to apply our
       -- cost model to them (see 'tagSkeletonRhs'), nor pass them as parameters
-      -- when lifted, as these are known calls. We call the resulting set the
-      -- identifiers we abstract over, thus @abs_ids@. These are all 'OutId's.
+      -- when lifted, as these are known calls.
+      --
+      -- expander: map to OutIds, expanding Ids that are themselves lifted
+      --
+      -- The resulting set is `expanded_abs_ids`; we will abstract over them.
       -- We will save the set in 'LiftM.e_expansions' for each of the variables
       -- if we perform the lift.
-      abs_ids = expander (delDVarSetList fvs bndrs)
+      fvs                 = unionDVarSets (map freeVarsOfRhs rhss)  -- InIds
+      abs_ids             = delDVarSetList fvs bndrs                -- InIds
+      expanded_abs_ids    = expander abs_ids                        -- OutIds
+      no_expanded_abs_ids = isEmptyDVarSet expanded_abs_ids  -- A constant expression
 
       -- We don't lift updatable thunks or constructors
-      any_memoized = any is_memoized_rhs rhss
-      is_memoized_rhs StgRhsCon{} = True
-      is_memoized_rhs (StgRhsClosure _ _ upd _ _ _) = isUpdatable upd
+      -- unless there are no Ids to abstract over, so it's a constant
+      any_memoized | no_expanded_abs_ids             = False -- OK to lift
+                   | otherwise                       = any is_memoized_rhs rhss
+      is_memoized_rhs (StgRhsCon{})                  = True  -- Never lift
+      is_memoized_rhs (StgRhsClosure _ _ upd _ _ _)  = isUpdatable upd
 
       -- Don't lift binders occurring as arguments. This would result in complex
       -- argument expressions which would have to be given a name, reintroducing
       -- the very allocation at each call site that we wanted to get rid off in
-      -- the first place.
-      arg_occs = or (mapMaybe (binderInfoOccursAsArg . fst) pairs)
+      -- the first place.  Only matters if abstraction will take place
+      arg_occs = not no_expanded_abs_ids && or (mapMaybe (binderInfoOccursAsArg . fst) pairs)
 
       -- These don't allocate anyway.
       is_join_point = any isJoinId bndrs
 
       -- Abstracting over join points/let-no-escapes spoils them.
-      abstracts_join_ids = any isJoinId (dVarSetElems abs_ids)
+      abstracts_join_ids = anyDVarSet isJoinId abs_ids
 
       -- Abstracting over known local functions that aren't floated themselves
       -- turns a known, fast call into an unknown, slow call:
@@ -361,14 +392,17 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
       -- idArity f > 0 ==> known
       known_fun id = idArity id > 0
       abstracts_known_local_fun
-        = not (c_liftLamsKnown cfg) && any known_fun (dVarSetElems abs_ids)
+        = not (c_liftLamsKnown cfg) && anyDVarSet known_fun expanded_abs_ids
+          -- NB: expanded_abs_ids: if `f` is floated, the abs_ids for
+          --     `g` will mention `f`; but the /expanded/ abs_ids will
+          --     mention f's free vars, not f itself.
 
       -- Number of arguments of a RHS in the current binding group if we decide
       -- to lift it
       n_args
         = length
         . StgToCmm.Closure.nonVoidIds -- void parameters don't appear in Cmm
-        . (dVarSetElems abs_ids ++)
+        . (dVarSetElems expanded_abs_ids ++)
         . rhsLambdaBndrs
       max_n_args
         | isRec rec_flag = c_liftLamsRecArgs cfg
@@ -395,7 +429,8 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
         . expander
         . flip dVarSetMinusVarSet bndrs_set
         $ freeVarsOfRhs rhs
-      clo_growth = closureGrowth expander (idClosureFootprint platform) bndrs_set abs_ids scope
+      clo_growth = closureGrowth expander (idClosureFootprint platform)
+                                 bndrs_set expanded_abs_ids scope
 
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []
@@ -436,8 +471,8 @@ closureGrowth
   -> IdSet
   -- ^ Binding group for which lifting is to be decided
   -> DIdSet
-  -- ^ Free vars of the whole binding group prior to lifting it. These must be
-  --   available at call sites if we decide to lift the binding group.
+  -- ^ Free vars (OutIds) of the whole binding group prior to lifting it. These
+  --   must be available at call sites if we decide to lift the binding group.
   -> Skeleton
   -- ^ Abstraction of the scope of the function
   -> IntWithInf

@@ -31,7 +31,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import Control.Monad ( when )
-import Data.Maybe ( isNothing )
 
 -- Note [Late lambda lifting in STG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,9 +198,12 @@ liftRhs
   -> LlStgRhs
   -> LiftM OutStgRhs
 liftRhs mb_former_fvs rhs@(StgRhsCon ccs con mn ts args typ)
-  = assertPpr (isNothing mb_former_fvs)
+  = assertPpr (case mb_former_fvs of
+                 Nothing -> True
+                 Just fvs -> isEmptyDVarSet fvs)
               (text "Should never lift a constructor"
                $$ pprStgRhs panicStgPprOpts rhs) $
+       -- We should never float a constructor, unless it's a constant
     StgRhsCon ccs con mn ts <$> traverse liftArgs args <*> pure typ
 liftRhs Nothing (StgRhsClosure _ ccs upd infos body typ) =
   -- This RHS wasn't lifted.
@@ -215,17 +217,16 @@ liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body typ) =
 
 liftArgs :: InStgArg -> LiftM OutStgArg
 liftArgs a@(StgLitArg _) = pure a
-liftArgs (StgVarArg occ) = do
-  assertPprM (not <$> isLifted occ) (text "StgArgs should never be lifted" $$ ppr occ)
-  StgVarArg <$> substOcc occ
+liftArgs (StgVarArg x)   = do { (x', fvs') <- substOcc x
+                              ; assertPpr (null fvs') (ppr x <+> ppr x' $$ ppr fvs') $
+                                pure (StgVarArg x') }
 
 liftExpr :: LlStgExpr -> LiftM OutStgExpr
 liftExpr (StgLit lit) = pure (StgLit lit)
 liftExpr (StgTick t e) = StgTick t <$> liftExpr e
 liftExpr (StgApp f args) = do
-  f' <- substOcc f
+  (f',fvs') <- substOcc f
   args' <- traverse liftArgs args
-  fvs' <- formerFreeVars f
   let top_lvl_args = map StgVarArg fvs' ++ args'
   pure (StgApp f' top_lvl_args)
 liftExpr (StgConApp con mn args tys) = StgConApp con mn <$> traverse liftArgs args <*> pure tys
