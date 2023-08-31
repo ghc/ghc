@@ -55,7 +55,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
@@ -145,7 +145,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Ppr055.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax1.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax2.hs" Nothing
- -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
+ "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs" Nothing
  -- "../../testsuite/tests/printer/PprUnicodeSyntax.hs" Nothing
@@ -206,7 +206,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
- "../../testsuite/tests/printer/Test22771.hs" Nothing
+ -- "../../testsuite/tests/printer/Test22771.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 

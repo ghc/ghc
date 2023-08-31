@@ -68,7 +68,6 @@ import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
 import Orphans ()
--- import qualified Orphans as Orphans
 
 import Lookup
 import Utils
@@ -416,7 +415,7 @@ enterAnn NoEntryVal a = do
   debugM $ "enterAnn:done:NO ANN:p =" ++ show (p, astId a)
   return r
 enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
-  -- acceptSpan <- getAcceptSpan
+  acceptSpan <- getAcceptSpan
   setAcceptSpan False
   case anchor' of
     Anchor _ (MovedAnchor _) -> setAcceptSpan True
@@ -435,7 +434,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     CanUpdateAnchor -> pushAppliedComments
     _ -> return ()
   case anchor' of
-    Anchor _ (MovedAnchor dcs) -> do
+    Anchor _ (MovedAnchor _dcs) -> do
       debugM $ "enterAnn:Printing comments:" ++ showGhc (priorComments cs)
       mapM_ printOneComment (map tokComment $ priorComments cs)
       -- debugM $ "enterAnn:Printing EpaDelta comments:" ++ showGhc dcs
@@ -1290,11 +1289,11 @@ markLensKwM (EpAnn anc a cs) l kw = do
 
 -- ---------------------------------------------------------------------
 
-markALocatedA :: (Monad m, Monoid w) => EpAnn AnnListItem -> EP w m (EpAnn AnnListItem)
-markALocatedA EpAnnNotUsed  = return EpAnnNotUsed
-markALocatedA (EpAnn anc a cs) = do
-  t <- markTrailing (lann_trailing a)
-  return (EpAnn anc (a { lann_trailing = t }) cs)
+-- markALocatedA :: (Monad m, Monoid w) => EpAnn AnnListItem -> EP w m (EpAnn AnnListItem)
+-- markALocatedA EpAnnNotUsed  = return EpAnnNotUsed
+-- markALocatedA (EpAnn anc a cs) = do
+--   t <- markTrailing (lann_trailing a)
+--   return (EpAnn anc (a { lann_trailing = t }) cs)
 
 markEpAnnL :: (Monad m, Monoid w)
   => EpAnn ann -> Lens ann [AddEpAnn] -> AnnKeywordId -> EP w m (EpAnn ann)
@@ -1437,11 +1436,11 @@ printOneComment c@(Comment _str loc _r _mo) = do
   updateAndApplyComment c dp'
   printQueuedComment c dp'
 
--- | For comment-related deltas starting on a new line we have an
--- off-by-one problem. Adjust
-unTweakDelta :: DeltaPos  -> DeltaPos
-unTweakDelta (SameLine d) = SameLine d
-unTweakDelta (DifferentLine l d) = DifferentLine l (d+1)
+-- -- | For comment-related deltas starting on a new line we have an
+-- -- off-by-one problem. Adjust
+-- unTweakDelta :: DeltaPos  -> DeltaPos
+-- unTweakDelta (SameLine d) = SameLine d
+-- unTweakDelta (DifferentLine l d) = DifferentLine l (d+1)
 
 
 updateAndApplyComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
@@ -1464,7 +1463,6 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
            if r == 0
              then (ss2delta (r,c+0) la)
              else (ss2delta (r,c)   la)
-      ss -> error ("updateAndApplyComment:ss=" ++ showGhc ss)
     dp' = case anc of
       Anchor r1 UnchangedAnchor ->
           if pp == r1
@@ -5148,8 +5146,8 @@ getPriorEndD = gets dPriorEndPosition
 getAnchorU :: (Monad m, Monoid w) => EP w m RealSrcSpan
 getAnchorU = gets uAnchorSpan
 
--- getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
--- getAcceptSpan = gets pAcceptSpan
+getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
+getAcceptSpan = gets pAcceptSpan
 
 setAcceptSpan ::(Monad m, Monoid w) => Bool -> EP w m ()
 setAcceptSpan f =

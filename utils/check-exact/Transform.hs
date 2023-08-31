@@ -1164,13 +1164,12 @@ unpackFunBind d = d
 packFunBind :: LHsBind GhcPs -> LHsBind GhcPs
 packFunBind (L loc (FunBind x1 fid (MG x2 (L lg (L lm m:matches)))))
   = (L loc'' (FunBind x1 fid (MG x2 (L lg (reverse (L llm' lmtch:ms))))))
-     `debug` ("packFunBind: ="
-              ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
-                          ("lm'",lm'), ("llm",llm), ("llm'", llm')))
+     -- `debug` ("packFunBind: ="
+     --          ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
+     --                      ("lm'",lm'), ("llm",llm), ("llm'", llm')))
   where
     (lm', loc') = transferPriorCommentsA lm loc
     matches' = reverse $ L lm' m:matches
-    -- L llm lmtch = head matches' -- Guaranteed at least one
     (L llm lmtch, ms) = case matches' of
                       mm:ms0 -> (mm,ms0)
                       _ -> error "packFunBind"
