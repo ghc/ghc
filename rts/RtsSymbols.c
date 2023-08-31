@@ -972,7 +972,7 @@ extern char **environ;
 
 // Symbols defined by libc
 #define RTS_LIBC_SYMBOLS                               \
-      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, CODE_TYPE_CODE) /* See Note [Strong symbols] */ \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, SYM_TYPE_CODE) /* See Note [Strong symbols] */ \
       SymI_HasProto(environ)
 
 #if !defined(DYNAMIC) && defined(linux_HOST_OS)
