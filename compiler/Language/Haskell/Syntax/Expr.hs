@@ -315,7 +315,19 @@ data HsExpr p
   --           'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsLamCase (XLamCase p) LamCaseVariant (MatchGroup p (LPat p) (LHsExpr p))
+  | HsLamCase (XLamCase p) (MatchGroup p (LPat p) (LHsExpr p))
+
+  -- | Lambda-cases
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
+  --           'GHC.Parser.Annotation.AnnClose'
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --           'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen',
+  --           'GHC.Parser.Annotation.AnnClose'
+
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  | HsLamCases (XLamCases p) (MatchGroup p (LPat p) (LHsExpr p))
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
@@ -880,8 +892,21 @@ data HsCmd id
   --     'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsCmdLamCase (XCmdLamCase id) LamCaseVariant
+  | HsCmdLamCase (XCmdLamCase id)
                  (MatchGroup id (LPat id) (LHsCmd id)) -- bodies are HsCmd's
+
+  -- | Lambda-cases
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
+
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  | HsCmdLamCases (XCmdLamCases id)
+                  (MatchGroup id (LPat id) (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function

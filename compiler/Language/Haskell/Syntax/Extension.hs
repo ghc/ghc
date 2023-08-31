@@ -415,6 +415,7 @@ type family XOverLitE       x
 type family XLitE           x
 type family XLam            x
 type family XLamCase        x
+type family XLamCases       x
 type family XApp            x
 type family XAppTypeE       x
 type family XOpApp          x
@@ -535,6 +536,7 @@ type family XCmdLam      x
 type family XCmdPar      x
 type family XCmdCase     x
 type family XCmdLamCase  x
+type family XCmdLamCases x
 type family XCmdIf       x
 type family XCmdLet      x
 type family XCmdDo       x

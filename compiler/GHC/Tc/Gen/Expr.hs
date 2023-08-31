@@ -272,14 +272,23 @@ tcExpr (HsLam _ match) res_ty
                       , tcmc_body = tcBody }
     herald = ExpectedFunTyLam match
 
-tcExpr e@(HsLamCase x lc_variant matches) res_ty
+tcExpr e@(HsLamCase x matches) res_ty
   = do { (wrap, matches') <- tcMatchLambda herald match_ctxt matches res_ty
-       ; return (mkHsWrap wrap $ HsLamCase x lc_variant matches') }
+       ; return (mkHsWrap wrap $ HsLamCase x matches') }
   where
-    match_ctxt = TcMC { tcmc_what = LamCaseAlt lc_variant
+    match_ctxt = TcMC { tcmc_what = LamCaseAlt LamCase
                       , tcmc_pats = tcPats
                       , tcmc_body = tcBody }
-    herald = ExpectedFunTyLamCase lc_variant e
+    herald = ExpectedFunTyLamCase LamCase e
+
+tcExpr e@(HsLamCases x matches) res_ty
+  = do { (wrap, matches') <- tcMatchLambda herald match_ctxt matches res_ty
+       ; return (mkHsWrap wrap $ HsLamCases x matches') }
+  where
+    match_ctxt = TcMC { tcmc_what = LamCaseAlt LamCases
+                      , tcmc_pats = tcPats
+                      , tcmc_body = tcBody }
+    herald = ExpectedFunTyLamCase LamCases e
 
 
 

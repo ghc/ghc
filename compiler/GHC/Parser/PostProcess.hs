@@ -1112,7 +1112,8 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
       HsDo _ (MDoExpr m) _     -> check (PsErrMDoInFunAppExpr m)                 expr
       HsLam {}                 -> check PsErrLambdaInFunAppExpr                  expr
       HsCase {}                -> check PsErrCaseInFunAppExpr                    expr
-      HsLamCase _ lc_variant _ -> check (PsErrLambdaCaseInFunAppExpr lc_variant) expr
+      HsLamCase _  _           -> check (PsErrLambdaCaseInFunAppExpr LamCase)    expr
+      HsLamCases _  _          -> check (PsErrLambdaCaseInFunAppExpr LamCases)   expr
       HsLet {}                 -> check PsErrLetInFunAppExpr                     expr
       HsIf {}                  -> check PsErrIfInFunAppExpr                      expr
       HsProc {}                -> check PsErrProcInFunAppExpr                    expr
@@ -1122,7 +1123,8 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
     checkCmd cmd = case unLoc cmd of
       HsCmdLam {}                 -> check PsErrLambdaCmdInFunAppCmd                  cmd
       HsCmdCase {}                -> check PsErrCaseCmdInFunAppCmd                    cmd
-      HsCmdLamCase _ lc_variant _ -> check (PsErrLambdaCaseCmdInFunAppCmd lc_variant) cmd
+      HsCmdLamCase _ _            -> check (PsErrLambdaCaseCmdInFunAppCmd LamCase)    cmd
+      HsCmdLamCases _ _           -> check (PsErrLambdaCaseCmdInFunAppCmd LamCases)   cmd
       HsCmdIf {}                  -> check PsErrIfCmdInFunAppCmd                      cmd
       HsCmdLet {}                 -> check PsErrLetCmdInFunAppCmd                     cmd
       HsCmdDo {}                  -> check PsErrDoCmdInFunAppCmd                      cmd
@@ -1571,8 +1573,12 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)])
              -> EpAnnHsCase -> PV (LocatedA b)
-  -- | Disambiguate "\case" and "\cases"
-  mkHsLamCasePV :: SrcSpan -> LamCaseVariant
+  -- | Disambiguate "\case"
+  mkHsLamCasePV :: SrcSpan
+                -> (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)]) -> [AddEpAnn]
+                -> PV (LocatedA b)
+  -- | Disambiguate "\cases"
+  mkHsLamCasesPV :: SrcSpan
                 -> (LocatedL [LMatch GhcPs (LPat GhcPs) (LocatedA b)]) -> [AddEpAnn]
                 -> PV (LocatedA b)
   -- | Function argument representation
@@ -1715,10 +1721,14 @@ instance DisambECP (HsCmd GhcPs) where
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
     return $ L (noAnnSrcSpan l) (HsCmdCase (EpAnn (spanAsAnchor l) anns cs) c mg)
-  mkHsLamCasePV l lc_variant (L lm m) anns = do
+  mkHsLamCasePV l (L lm m) anns = do
     cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lc_variant (L lm m)
-    return $ L (noAnnSrcSpan l) (HsCmdLamCase (EpAnn (spanAsAnchor l) anns cs) lc_variant mg)
+    let mg = mkLamCaseMatchGroup FromSource LamCase (L lm m)
+    return $ L (noAnnSrcSpan l) (HsCmdLamCase (EpAnn (spanAsAnchor l) anns cs) mg)
+  mkHsLamCasesPV l (L lm m) anns = do
+    cs <- getCommentsFor l
+    let mg = mkLamCaseMatchGroup FromSource LamCases (L lm m)
+    return $ L (noAnnSrcSpan l) (HsCmdLamCases (EpAnn (spanAsAnchor l) anns cs) mg)
   type FunArg (HsCmd GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l c e = do
@@ -1802,10 +1812,14 @@ instance DisambECP (HsExpr GhcPs) where
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
     return $ L (noAnnSrcSpan l) (HsCase (EpAnn (spanAsAnchor l) anns cs) e mg)
-  mkHsLamCasePV l lc_variant (L lm m) anns = do
+  mkHsLamCasePV l (L lm m) anns = do
     cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lc_variant (L lm m)
-    return $ L (noAnnSrcSpan l) (HsLamCase (EpAnn (spanAsAnchor l) anns cs) lc_variant mg)
+    let mg = mkLamCaseMatchGroup FromSource LamCase (L lm m)
+    return $ L (noAnnSrcSpan l) (HsLamCase (EpAnn (spanAsAnchor l) anns cs) mg)
+  mkHsLamCasesPV l (L lm m) anns = do
+    cs <- getCommentsFor l
+    let mg = mkLamCaseMatchGroup FromSource LamCases (L lm m)
+    return $ L (noAnnSrcSpan l) (HsLamCases (EpAnn (spanAsAnchor l) anns cs) mg)
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l e1 e2 = do
@@ -1889,7 +1903,8 @@ instance DisambECP (PatBuilder GhcPs) where
     let anns = EpAnn (spanAsAnchor l) [] cs
     return $ L (noAnnSrcSpan l) $ PatBuilderOpApp p1 op p2 anns
   mkHsCasePV l _ _ _          = addFatalError $ mkPlainErrorMsgEnvelope l PsErrCaseInPat
-  mkHsLamCasePV l lc_variant _ _ = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaCaseInPat lc_variant)
+  mkHsLamCasePV l _ _  = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaCaseInPat LamCase)
+  mkHsLamCasesPV l _ _ = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaCaseInPat LamCases)
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)

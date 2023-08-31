@@ -425,11 +425,19 @@ rnExpr (HsLam x matches)
                       , rnmc_pats = rnPats
                       , rnmc_body = rnLExpr }
 
-rnExpr (HsLamCase x lc_variant matches)
+rnExpr (HsLamCase x matches)
   = do { (matches', fvs_ms) <- rnMatchGroup match_ctxt matches
-       ; return (HsLamCase x lc_variant matches', fvs_ms) }
+       ; return (HsLamCase x matches', fvs_ms) }
   where
-    match_ctxt = RnMC { rnmc_what = LamCaseAlt lc_variant
+    match_ctxt = RnMC { rnmc_what = LamCaseAlt LamCase
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLExpr }
+
+rnExpr (HsLamCases x matches)
+  = do { (matches', fvs_ms) <- rnMatchGroup match_ctxt matches
+       ; return (HsLamCases x matches', fvs_ms) }
+  where
+    match_ctxt = RnMC { rnmc_what = LamCaseAlt LamCases
                       , rnmc_pats = rnPats
                       , rnmc_body = rnLExpr }
 
@@ -920,11 +928,19 @@ rnCmd (HsCmdCase _ expr matches)
                       , rnmc_pats = rnPats
                       , rnmc_body = rnLCmd }
 
-rnCmd (HsCmdLamCase x lc_variant matches)
+rnCmd (HsCmdLamCase x matches)
   = do { (new_matches, ms_fvs) <- rnMatchGroup match_ctxt matches
-       ; return (HsCmdLamCase x lc_variant new_matches, ms_fvs) }
+       ; return (HsCmdLamCase x new_matches, ms_fvs) }
   where
-    match_ctxt = RnMC { rnmc_what = ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant
+    match_ctxt = RnMC { rnmc_what = ArrowMatchCtxt $ ArrowLamCaseAlt LamCase
+                      , rnmc_pats = rnPats
+                      , rnmc_body = rnLCmd }
+
+rnCmd (HsCmdLamCases x matches)
+  = do { (new_matches, ms_fvs) <- rnMatchGroup match_ctxt matches
+       ; return (HsCmdLamCases x new_matches, ms_fvs) }
+  where
+    match_ctxt = RnMC { rnmc_what = ArrowMatchCtxt $ ArrowLamCaseAlt LamCases
                       , rnmc_pats = rnPats
                       , rnmc_body = rnLCmd }
 
@@ -978,7 +994,9 @@ methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match
 
 methodNamesCmd (HsCmdCase _ _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
-methodNamesCmd (HsCmdLamCase _ _ matches)
+methodNamesCmd (HsCmdLamCase _ matches)
+  = methodNamesMatch matches `addOneFV` choiceAName
+methodNamesCmd (HsCmdLamCases _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
 
 --methodNamesCmd _ = emptyFVs

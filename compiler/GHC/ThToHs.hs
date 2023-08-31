@@ -1060,13 +1060,13 @@ cvtl e = wrapLA (cvt e)
                                         [mkSimpleMatch LambdaExpr pats e']}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamCaseAlt LamCase) ms
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLamCase noAnn LamCase . mkMatchGroup th_origin) ms'
+                            ; wrapParLA (HsLamCase noAnn . mkMatchGroup th_origin) ms'
                             }
     cvt (LamCasesE ms)
       | null ms   = failWith CasesExprWithoutAlts
       | otherwise = do { ms' <- mapM (cvtClause $ LamCaseAlt LamCases) ms
                        ; th_origin <- getOrigin
-                       ; wrapParLA (HsLamCase noAnn LamCases . mkMatchGroup th_origin) ms'
+                       ; wrapParLA (HsLamCases noAnn . mkMatchGroup th_origin) ms'
                        }
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed

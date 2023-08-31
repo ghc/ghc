@@ -1115,7 +1115,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsLam _ mg ->
         [ toHie mg
         ]
-      HsLamCase _ _ mg ->
+      HsLamCase _ mg ->
+        [ toHie mg
+        ]
+      HsLamCases _ mg ->
         [ toHie mg
         ]
       HsApp _ a b ->
@@ -1444,7 +1447,10 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         [ toHie expr
         , toHie alts
         ]
-      HsCmdLamCase _ _ alts ->
+      HsCmdLamCase _ alts ->
+        [ toHie alts
+        ]
+      HsCmdLamCases _ alts ->
         [ toHie alts
         ]
       HsCmdIf _ _ a b c ->

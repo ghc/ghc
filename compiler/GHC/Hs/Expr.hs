@@ -248,6 +248,7 @@ type instance XLitE          (GhcPass _) = EpAnnCO
 type instance XLam           (GhcPass _) = NoExtField
 
 type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
+type instance XLamCases      (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XApp           (GhcPass _) = EpAnnCO
 
@@ -606,8 +607,12 @@ ppr_expr (ExplicitSum _ alt arity expr)
 ppr_expr (HsLam _ matches)
   = pprMatches matches
 
-ppr_expr (HsLamCase _ lc_variant matches)
-  = sep [ sep [lamCaseKeyword lc_variant],
+ppr_expr (HsLamCase _ matches)
+  = sep [ sep [lamCaseKeyword LamCase],
+          nest 2 (pprMatches matches) ]
+
+ppr_expr (HsLamCases _ matches)
+  = sep [ sep [lamCaseKeyword LamCases],
           nest 2 (pprMatches matches) ]
 
 ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
@@ -831,6 +836,7 @@ hsExprNeedsParens prec = go
     go (ExplicitSum{})                = False
     go (HsLam{})                      = prec > topPrec
     go (HsLamCase{})                  = prec > topPrec
+    go (HsLamCases{})                 = prec > topPrec
     go (HsCase{})                     = prec > topPrec
     go (HsIf{})                       = prec > topPrec
     go (HsMultiIf{})                  = prec > topPrec
@@ -1129,7 +1135,8 @@ type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
 type instance XCmdCase    GhcTc = NoExtField
 
-type instance XCmdLamCase (GhcPass _) = EpAnn [AddEpAnn]
+type instance XCmdLamCase (GhcPass _)  = EpAnn [AddEpAnn]
+type instance XCmdLamCases (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XCmdIf      GhcPs = EpAnn AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
@@ -1252,8 +1259,11 @@ ppr_cmd (HsCmdCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           nest 2 (pprMatches matches) ]
 
-ppr_cmd (HsCmdLamCase _ lc_variant matches)
-  = sep [ lamCaseKeyword lc_variant, nest 2 (pprMatches matches) ]
+ppr_cmd (HsCmdLamCase _ matches)
+  = sep [ lamCaseKeyword LamCase, nest 2 (pprMatches matches) ]
+
+ppr_cmd (HsCmdLamCases _ matches)
+  = sep [ lamCaseKeyword LamCases, nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), text "then"],

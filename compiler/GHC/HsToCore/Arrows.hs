@@ -534,56 +534,60 @@ is translated to
 multiple scrutinees)
 
 -}
-dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLamCase _ lc_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
-      env_ids = do
-    arg_ids <- newSysLocalsDs arg_tys
+dsCmd ids local_vars stack_ty res_ty lam_case env_ids
+  | HsCmdLamCase _ match <- lam_case
+  = dsCmdLamCase LamCase match
+  | HsCmdLamCases _ match <- lam_case
+  = dsCmdLamCase LamCases match
+  where
+    dsCmdLamCase lc_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } = do
+      arg_ids <- newSysLocalsDs arg_tys
 
-    let match_ctxt = ArrowLamCaseAlt lc_variant
-        pat_vars = mkVarSet arg_ids
-        local_vars' = pat_vars `unionVarSet` local_vars
-        (pat_tys, stack_ty') = splitTypeAt (length arg_tys) stack_ty
+      let match_ctxt = ArrowLamCaseAlt lc_variant
+          pat_vars = mkVarSet arg_ids
+          local_vars' = pat_vars `unionVarSet` local_vars
+          (pat_tys, stack_ty') = splitTypeAt (length arg_tys) stack_ty
 
-    -- construct and desugar a case expression with multiple scrutinees
-    (core_body, free_vars, env_ids') <- trimInput \env_ids -> do
-      stack_id <- newSysLocalDs ManyTy stack_ty'
-      (match', core_choices)
-        <- dsCases ids local_vars' stack_id stack_ty' res_ty match
+      -- construct and desugar a case expression with multiple scrutinees
+      (core_body, free_vars, env_ids') <- trimInput \env_ids -> do
+        stack_id <- newSysLocalDs ManyTy stack_ty'
+        (match', core_choices)
+          <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
-      let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
-          in_ty = envStackType env_ids stack_ty'
-          discrims = map nlHsVar arg_ids
-      (discrim_vars, matching_code)
-        <- matchWrapper (ArrowMatchCtxt match_ctxt) (Just discrims) match'
-      core_body <- flip (bind_vars discrim_vars) matching_code <$>
-        traverse dsLExpr discrims
+        let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
+            in_ty = envStackType env_ids stack_ty'
+            discrims = map nlHsVar arg_ids
+        (discrim_vars, matching_code)
+          <- matchWrapper (ArrowMatchCtxt match_ctxt) (Just discrims) match'
+        core_body <- flip (bind_vars discrim_vars) matching_code <$>
+          traverse dsLExpr discrims
 
-      core_matches <- matchEnvStack env_ids stack_id core_body
-      return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
-              exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars')
+        core_matches <- matchEnvStack env_ids stack_id core_body
+        return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
+                exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars')
 
-    param_ids <- mapM (newSysLocalDs ManyTy) pat_tys
-    stack_id' <- newSysLocalDs ManyTy stack_ty'
+      param_ids <- mapM (newSysLocalDs ManyTy) pat_tys
+      stack_id' <- newSysLocalDs ManyTy stack_ty'
 
-    -- the expression is built from the inside out, so the actions
-    -- are presented in reverse order
+      -- the expression is built from the inside out, so the actions
+      -- are presented in reverse order
 
-    let -- build a new environment, plus what's left of the stack
-        core_expr = buildEnvStack env_ids' stack_id'
-        in_ty = envStackType env_ids stack_ty
-        in_ty' = envStackType env_ids' stack_ty'
+      let -- build a new environment, plus what's left of the stack
+          core_expr = buildEnvStack env_ids' stack_id'
+          in_ty = envStackType env_ids stack_ty
+          in_ty' = envStackType env_ids' stack_ty'
 
-    -- bind the scrutinees to the parameters
-    let match_code = bind_vars arg_ids (map Var param_ids) core_expr
+      -- bind the scrutinees to the parameters
+      let match_code = bind_vars arg_ids (map Var param_ids) core_expr
 
-    -- match the parameters against the top of the old stack
-    (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
-    -- match the old environment and stack against the input
-    select_code <- matchEnvStack env_ids stack_id param_code
-    return (do_premap ids in_ty in_ty' res_ty select_code core_body,
-            free_vars `uniqDSetMinusUniqSet` pat_vars)
-    where
-      bind_vars vars exprs expr = foldr (uncurry bindNonRec) expr $ zip vars exprs
+      -- match the parameters against the top of the old stack
+      (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
+      -- match the old environment and stack against the input
+      select_code <- matchEnvStack env_ids stack_id param_code
+      return (do_premap ids in_ty in_ty' res_ty select_code core_body,
+              free_vars `uniqDSetMinusUniqSet` pat_vars)
+      where
+        bind_vars vars exprs expr = foldr (uncurry bindNonRec) expr $ zip vars exprs
 
 -- D; ys |-a cmd : stk --> t
 -- ----------------------------------
@@ -809,7 +813,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     -- i.e. Void. The choices then effectively become `arr absurd`,
     -- implemented as `arr \case {}`.
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
-      dsExpr (HsLamCase EpAnnNotUsed LamCase
+      dsExpr (HsLamCase EpAnnNotUsed
         (MG { mg_alts = noLocA []
             , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated SkipPmc)
             }))

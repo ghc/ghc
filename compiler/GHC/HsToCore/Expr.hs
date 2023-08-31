@@ -329,8 +329,11 @@ dsExpr (NegApp _ expr neg_expr)
 dsExpr (HsLam _ a_Match)
   = uncurry mkCoreLams <$> matchWrapper LambdaExpr Nothing a_Match
 
-dsExpr (HsLamCase _ lc_variant matches)
-  = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt lc_variant) Nothing matches
+dsExpr (HsLamCase _ matches)
+  = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt LamCase) Nothing matches
+
+dsExpr (HsLamCases _ matches)
+  = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt LamCases) Nothing matches
 
 dsExpr e@(HsApp _ fun arg)
          -- We want to have a special case that uses the PMC information to filter

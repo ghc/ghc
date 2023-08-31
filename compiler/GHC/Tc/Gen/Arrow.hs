@@ -169,13 +169,21 @@ tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
       matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
       return (HsCmdCase x scrut' matches')
 
-tc_cmd env cmd@(HsCmdLamCase x lc_variant match) cmd_ty
+tc_cmd env cmd@(HsCmdLamCase x match) cmd_ty
   = addErrCtxt (cmdCtxt cmd)
-      do { let match_ctxt = ArrowLamCaseAlt lc_variant
+      do { let match_ctxt = ArrowLamCaseAlt LamCase
          ; checkArgCounts (ArrowMatchCtxt match_ctxt) match
          ; (wrap, match') <-
              tcCmdMatchLambda env match_ctxt match cmd_ty
-         ; return (mkHsCmdWrap wrap (HsCmdLamCase x lc_variant match')) }
+         ; return (mkHsCmdWrap wrap (HsCmdLamCase x match')) }
+
+tc_cmd env cmd@(HsCmdLamCases x match) cmd_ty
+  = addErrCtxt (cmdCtxt cmd)
+      do { let match_ctxt = ArrowLamCaseAlt LamCases
+         ; checkArgCounts (ArrowMatchCtxt match_ctxt) match
+         ; (wrap, match') <-
+             tcCmdMatchLambda env match_ctxt match cmd_ty
+         ; return (mkHsCmdWrap wrap (HsCmdLamCases x match')) }
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcCheckMonoExpr pred boolTy

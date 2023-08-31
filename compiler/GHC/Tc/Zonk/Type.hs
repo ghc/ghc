@@ -946,9 +946,13 @@ zonkExpr (HsLam x matches)
   = do new_matches <- zonkMatchGroup zonkPat zonkLExpr matches
        return (HsLam x new_matches)
 
-zonkExpr (HsLamCase x lc_variant matches)
+zonkExpr (HsLamCase x matches)
   = do new_matches <- zonkMatchGroup zonkPat zonkLExpr matches
-       return (HsLamCase x lc_variant new_matches)
+       return (HsLamCase x new_matches)
+
+zonkExpr (HsLamCases x matches)
+  = do new_matches <- zonkMatchGroup zonkPat zonkLExpr matches
+       return (HsLamCases x new_matches)
 
 zonkExpr (HsApp x e1 e2)
   = do new_e1 <- zonkLExpr e1
@@ -1166,9 +1170,13 @@ zonkCmd (HsCmdCase x expr ms)
        new_ms <- zonkMatchGroup zonkPat zonkLCmd ms
        return (HsCmdCase x new_expr new_ms)
 
-zonkCmd (HsCmdLamCase x lc_variant ms)
+zonkCmd (HsCmdLamCase x ms)
   = do new_ms <- zonkMatchGroup zonkPat zonkLCmd ms
-       return (HsCmdLamCase x lc_variant new_ms)
+       return (HsCmdLamCase x new_ms)
+
+zonkCmd (HsCmdLamCases x ms)
+  = do new_ms <- zonkMatchGroup zonkPat zonkLCmd ms
+       return (HsCmdLamCases x new_ms)
 
 zonkCmd (HsCmdIf x eCond ePred cThen cElse)
   = runZonkBndrT (zonkSyntaxExpr eCond) $ \ new_eCond ->
