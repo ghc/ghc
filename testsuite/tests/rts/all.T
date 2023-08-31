@@ -582,6 +582,8 @@ test('decodeMyStack_emptyListForMissingFlag',
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
 
+test('T22012', [js_skip, extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
+
 # Skip for JS platform as the JS RTS is always single threaded
 test('T22795a', [only_ways(['normal']), js_skip, req_ghc_with_threaded_rts], compile_and_run, ['-threaded'])
 test('T22795b', [only_ways(['normal']), js_skip], compile_and_run, ['-single-threaded'])
