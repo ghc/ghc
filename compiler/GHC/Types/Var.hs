@@ -322,7 +322,10 @@ A LocalId is
   * or defined at top level in the module being compiled
   * always treated as a candidate by the free-variable finder
 
-After CoreTidy, top-level LocalIds are turned into GlobalIds
+In the output of CoreTidy, top level Ids are all GlobalIds, which are then
+serialised into interface files. Do note however that CorePrep may introduce new
+LocalIds for local floats (even at the top level). These will be visible in STG
+and end up in generated code.
 
 Note [Multiplicity of let binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
