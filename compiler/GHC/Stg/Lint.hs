@@ -226,7 +226,7 @@ lintStgBinds top_lvl tagged (StgRec pairs)
 lint_binds_help
     :: (OutputablePass a, BinderP a ~ Id)
     => TopLevelFlag
-    -> Bool
+    -> Bool -- have we inferred tags yet?
     -> (Id, GenStgRhs a)
     -> LintM ()
 lint_binds_help top_lvl tagged (binder, rhs)

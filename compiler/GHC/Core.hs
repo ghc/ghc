@@ -405,7 +405,7 @@ for the meaning of "lifted" vs. "unlifted".
 For the non-top-level, non-recursive case see
 Note [Core let-can-float invariant].
 
-At top level, however, there are three exceptions to this rule:
+At top level, however, there are two exceptions to this rule:
 
 (TL1) A top-level binding is allowed to bind primitive string literal,
       (which is unlifted).  See Note [Core top-level string literals].
@@ -526,30 +526,65 @@ parts of the compilation pipeline.
 
 Note [Core top-level unlifted data-con values]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As another exception to the usual rule that top-level binders must be lifted,
-we allow binding unlifted data constructor values at the top level. This allows
-us to store these values directly as data in the binary that we produce, instead
-of allocating them potentially many times if they're inside a tight loop.
+As an exception to the usual rule that top-level binders must be lifted, we
+allow binding unlifted data constructor values at the top level. This allows us
+to store these values directly as data in the binary that we produce, instead of
+allocating them potentially many times if they're inside a tight loop.
 
 However, we have to be very careful that we only allow data constructors that
-are really values.
+do not require evaluation.
 
 * We only consider data constructor workers and not wrappers, because wrappers
   are generally not fully evaluated. See Note [The need for a wrapper].
 
 * Even data constructor workers might still be expanded by the STG rewriter to
   perform some work, if they have arguments that are marked strict.
-  See Note [Data-con worker strictness].
+  See Note [Data-con worker strictness] in GHC.Core.DataCon.
 
-* If the data constructor has unlifted arguments, then those could cause further
-  evaluation to be necessary, unless they are fully evaluated data constructor
-  values themselves.
+    data T :: UnliftedType = MkT ![Int] 
 
-Furthermore, there is another complication. The data constructor worker may be
-applied to a variable which is defined in another module, or worse, in an
-hs-boot file. So, we cannot always get all the information we need and even for
-variables defined in the same module it might still be hard or computationally
-expensive to collect the necessary information.
+    s1,s2 :: [Int]
+    s1 = factorial 20
+    s2 = I# 3#
+
+    t1,t2 :: T
+    t1 = MkT s1 -- unacceptable because `s1` requires further evaluation
+    t2 = MkT s2 -- acceptable because `s2` does not require further evaluation
+
+* The data constructor worker may be applied to a variable which is defined in 
+  another module, or worse, in an hs-boot file. So, we cannot always get all the
+  information we need. For example:
+
+    import M (x)
+
+    data T :: UnliftedType = MkT !Int
+
+    t1 :: T
+    t1 = MkT x
+
+  How would we know whether `x` is fully evaluated?
+  
+* Even for variables defined in the same module it might
+  still be hard or computationally expensive to collect the necessary
+  information. For example:
+
+    data T :: UnliftedType = MkT !S
+    data S = MkS1 | MkS2 !S
+
+    t :: T
+    t = MkT s1
+
+    s1,s2,s3,s4 :: S
+    s1 = MkS2 s2
+    s2 = MkS2 s3
+    s3 = MkS2 s4
+    s4 = MkS1
+
+  To determine whether `t` needs evaluation we need to recursively determine
+  whether `s1` through `s4` need further evaluation. 
+  
+  This could perhaps be done efficiently using a caching mechanism similar to
+  the one described in Note [UnfoldingCache].
 
 So, for the first incarnation of this feature we choose very restrictive
 conditions, which are still useful in practice. We allow top-level unlifted
