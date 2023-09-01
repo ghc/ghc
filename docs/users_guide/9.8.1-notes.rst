@@ -84,7 +84,9 @@ Compiler
   the future extension ``RequiredTypeArguments``.
 
 - Rewrite rules now support a limited form of higher order matching when a
-  pattern variable is applied to distinct locally bound variables. For example: ::
+  pattern variable is applied to distinct locally bound variables, as proposed in
+  `GHC Proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`.
+  For example: ::
 
       forall f. foo (\x -> f x)
 
