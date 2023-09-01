@@ -628,7 +628,8 @@ lookupDocs avail warningMap docMap argMap def_meths_env =
     def_meths = [ (meth, (lookupDoc meth, lookupArgDoc meth))
                   | s <- subs
                   , let dmOcc = mkDefaultMethodOcc (nameOccName s)
-                  , Just meth <- [lookupOccEnv def_meths_env dmOcc]]
+                  , Just meth <- [lookupOccEnv def_meths_env dmOcc]
+                  , availExportsDecl avail ]
     subDocs = [ (s, (lookupDoc s, lookupArgDoc s))
                 | s <- subs
                 ] ++ def_meths

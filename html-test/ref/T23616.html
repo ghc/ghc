@@ -1,0 +1,138 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >T23616</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>T23616</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><a href="#"
+	      >null</a
+	      > :: <a href="#" title="Data.Foldable"
+	      >Foldable</a
+	      > t =&gt; t a -&gt; <a href="#" title="Data.Bool"
+	      >Bool</a
+	      ></li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a id="v:null" class="def"
+	    >null</a
+	    > :: <a href="#" title="Data.Foldable"
+	    >Foldable</a
+	    > t =&gt; t a -&gt; <a href="#" title="Data.Bool"
+	    >Bool</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Test whether the structure is empty.  The default implementation is
+ Left-associative and lazy in both the initial element and the
+ accumulator.  Thus optimised for structures where the first element can
+ be accessed in constant time.  Structures where this is not the case
+ should have a non-default implementation.</p
+	    ><h4 class="subheading details-toggle-control details-toggle" data-details-id="ch:null0"
+	    >Examples</h4
+	    ><details id="ch:null0"
+	    ><summary class="hide-when-js-enabled"
+	      >Expand</summary
+	      ><p
+	      >Basic usage:</p
+	      ><pre class="screen"
+	      ><code class="prompt"
+		>&gt;&gt;&gt; </code
+		><strong class="userinput"
+		><code
+		  >null []
+</code
+		  ></strong
+		>True
+</pre
+	      ><pre class="screen"
+	      ><code class="prompt"
+		>&gt;&gt;&gt; </code
+		><strong class="userinput"
+		><code
+		  >null [1]
+</code
+		  ></strong
+		>False
+</pre
+	      ><p
+	      ><code
+		><a href="#" title="GHC.List"
+		  >null</a
+		  ></code
+		> is expected to terminate even for infinite structures.
+ The default implementation terminates provided the structure
+ is bounded on the left (there is a leftmost element).</p
+	      ><pre class="screen"
+	      ><code class="prompt"
+		>&gt;&gt;&gt; </code
+		><strong class="userinput"
+		><code
+		  >null [1..]
+</code
+		  ></strong
+		>False
+</pre
+	      ></details
+	    ><p
+	    ><em
+	      >Since: base-4.8.0.0</em
+	      ></p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>
