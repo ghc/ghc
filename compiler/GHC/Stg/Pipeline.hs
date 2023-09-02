@@ -119,7 +119,8 @@ stg2stg logger extra_vars opts this_mod binds
     -------------------------------------------
     do_stg_pass :: Module -> [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
     do_stg_pass this_mod binds to_do
-      = case to_do of
+      = withTiming logger (text (stgToDoString to_do)) (const ()) $
+        case to_do of
           StgDoNothing ->
             return binds
 
@@ -178,3 +179,12 @@ data StgToDo
   | StgDoNothing
   -- ^ Useful for building up 'getStgToDo'
   deriving (Show, Read, Eq, Ord)
+
+stgToDoString :: StgToDo -> String
+-- The 'Show' instance shows (much) too much for StgLiftLams
+stgToDoString StgCSE           = "StgCSE"
+stgToDoString (StgLiftLams {}) = "StgLiftLams"
+stgToDoString StgStats         = "StgStats"
+stgToDoString StgUnarise       = "StgUnarise"
+stgToDoString StgBcPrep        = "StgBcPrep"
+stgToDoString StgDoNothing     = "StgDoNothing"

@@ -39,6 +39,7 @@ import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic (assertPpr)
 import GHC.Types.Var.Set
 
 import Data.Maybe ( mapMaybe )
@@ -300,6 +301,7 @@ goodToLift
 goodToLift cfg top_lvl rec_flag expander pairs scope
   | not (fancy_or deciders)
   = llTrace "stgLiftLams:lifting" (ppr bndrs) $
+    assertPpr (not abstracts_join_ids) (ppr pairs $$ ppr expanded_abs_ids) $
     Just expanded_abs_ids
   | otherwise
   = Nothing
@@ -309,10 +311,11 @@ goodToLift cfg top_lvl rec_flag expander pairs scope
       -- Keep in sync with Note [When to lift]
       deciders
         = [ ("top-level", isTopLevel top_lvl)             -- [WL1: Top-level bindings]
+          , ("join point", is_join_point)                 -- [WL4: Join points]
           , ("memoized", any_memoized)                    -- [WL2: Thunks]
           , ("argument occurrences", arg_occs)            -- [WL3: Argument occurrences]
-          , ("join point", is_join_point)                 -- [WL4: Join points]
-          , ("abstracts join points", abstracts_join_ids) -- [WL5: Abstracting over join points]
+--          , ("abstracts join points", abstracts_join_ids) -- [WL5: Abstracting over join points]
+              -- Cannot happen!
           , ("abstracts known local function", abstracts_known_local_fun)
                                                           -- [WL6: Abstracting over known local functions]
           , ("args spill on stack", args_spill_on_stack)  -- [WL7: Calling convention]
@@ -325,8 +328,6 @@ goodToLift cfg top_lvl rec_flag expander pairs scope
       fancy_or deciders
         = llTrace "stgLiftLams:goodToLift?"
             (vcat [ text "bndrs:"           <+> ppr bndrs
-                  , text "fvs:"             <+> ppr fvs
-                  , text "abs_ids:"         <+> ppr abs_ids
                   , text "expanded_abs_ids" <+> ppr expanded_abs_ids
                   , text "bad deciders:"    <+> ppr_deciders deciders ]) $
           any snd deciders
@@ -351,9 +352,10 @@ goodToLift cfg top_lvl rec_flag expander pairs scope
       -- The resulting set is `expanded_abs_ids`; we will abstract over them.
       -- We will save the set in 'LiftM.e_expansions' for each of the variables
       -- if we perform the lift.
-      fvs                 = unionDVarSets (map freeVarsOfRhs rhss)  -- InIds
-      abs_ids             = delDVarSetList fvs bndrs                -- InIds
-      expanded_abs_ids    = expander abs_ids                        -- OutIds
+      expanded_abs_ids_s :: [DIdSet]  -- One for each RHS; set of OutIds
+      expanded_abs_ids_s  = [ expander (freeVarsOfRhs rhs `dVarSetMinusVarSet` bndrs_set)
+                            | rhs <- rhss ]
+      expanded_abs_ids    = unionDVarSets expanded_abs_ids_s
       no_expanded_abs_ids = isEmptyDVarSet expanded_abs_ids  -- A constant expression
 
       -- We don't lift updatable thunks or constructors
@@ -373,7 +375,7 @@ goodToLift cfg top_lvl rec_flag expander pairs scope
       is_join_point = any isJoinId bndrs
 
       -- Abstracting over join points/let-no-escapes spoils them.
-      abstracts_join_ids = anyDVarSet isJoinId abs_ids
+      abstracts_join_ids = anyDVarSet isJoinId expanded_abs_ids
 
       -- Abstracting over known local functions that aren't floated themselves
       -- turns a known, fast call into an unknown, slow call:
@@ -416,21 +418,19 @@ goodToLift cfg top_lvl rec_flag expander pairs scope
       -- We only perform the lift if allocations didn't increase.
       -- Note that @clo_growth@ will be 'infinity' if there was positive growth
       -- under a multi-shot lambda.
-      -- Also, abstracting over LNEs is unacceptable. LNEs might return
-      -- unlifted tuples, which idClosureFootprint can't cope with.
-      inc_allocs = abstracts_join_ids || allocs > 0
-      allocs = clo_growth + mkIntWithInf (negate closuresSize)
+      -- The expanded_abs_ids never include join points; that's important
+      -- because idClosureFootprint can't cope with them
+      -- If there are are no expanded_abs_ids, we are sure not to increase
+      -- allocation, and that is common when floating data structures, so
+      -- we want to optimise for that case.  Example: T9961.
+      inc_allocs = not no_expanded_abs_ids && allocs > 0
+      allocs     = clo_growth + mkIntWithInf (negate closures_size)
       -- We calculate and then add up the size of each binding's closure.
       -- GHC does not currently share closure environments, and we either lift
       -- the entire recursive binding group or none of it.
-      closuresSize = sum $ flip map rhss $ \rhs ->
-        closureSize profile
-        . dVarSetElems
-        . expander
-        . flip dVarSetMinusVarSet bndrs_set
-        $ freeVarsOfRhs rhs
-      clo_growth = closureGrowth expander (idClosureFootprint platform)
-                                 bndrs_set expanded_abs_ids scope
+      closures_size = sum (map (closureSize profile) expanded_abs_ids_s)
+      clo_growth    = closureGrowth expander (idClosureFootprint platform)
+                                    bndrs_set expanded_abs_ids scope
 
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []
@@ -438,7 +438,7 @@ rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _ _) = map binderInfoBndr bndrs
 
 -- | The size in words of a function closure closing over the given 'Id's,
 -- including the header.
-closureSize :: Profile -> [Id] -> WordOff
+closureSize :: Profile -> DIdSet -> WordOff
 closureSize profile ids = words + pc_STD_HDR_SIZE (platformConstants (profilePlatform profile))
   -- We go through sTD_HDR_SIZE rather than fixedHdrSizeW so that we don't
   -- optimise differently when profiling is enabled.
@@ -448,6 +448,7 @@ closureSize profile ids = words + pc_STD_HDR_SIZE (platformConstants (profilePla
       = StgToCmm.Layout.mkVirtHeapOffsets profile StgToCmm.Layout.StdHeader
       . StgToCmm.Closure.addIdReps
       . StgToCmm.Closure.nonVoidIds
+      . dVarSetElems
       $ ids
 
 -- | The number of words a single 'Id' adds to a closure's size.

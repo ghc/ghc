@@ -331,7 +331,7 @@ liftedIdsExpander = LiftM $ do
   -- @goodToLift@/@closureGrowth@ before passing it on to @expander@ is too much
   -- trouble.
   let go set fv = case lookupVarEnv expansions fv of
-        Nothing -> extendDVarSet set (noWarnLookupIdSubst fv subst) -- Not lifted
+        Nothing   -> extendDVarSet set (noWarnLookupIdSubst fv subst) -- Not lifted
         Just fvs' -> unionDVarSet set fvs'
   let expander fvs = foldl' go emptyDVarSet (dVarSetElems fvs)
   pure expander
