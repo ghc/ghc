@@ -109,8 +109,14 @@ define the plugin interface so that it requires the plugin module,
     -- Notice that symbol UnsafeRIO is not exported from this module!
     newtype RIO a = UnsafeRIO { runRIO :: IO a }
 
+    instance Functor RIO where
+        fmap f (UnsafeRIO m) = UnsafeRIO (fmap f m)
+
+    instance Applicative RIO where
+        pure = UnsafeRIO . pure
+        (UnsafeRIO f) <*> (UnsafeRIO m) = UnsafeRIO (f <*> m)
+
     instance Monad RIO where
-        return = UnsafeRIO . return
         (UnsafeRIO m) >>= k = UnsafeRIO $ m >>= runRIO . k
 
     -- Returns True iff access is allowed to file name
