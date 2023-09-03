@@ -171,7 +171,6 @@ mkIndexOffAddrOp e = PrimOpSpec
   , opts = [OptionEffect CanFail]
   }
 
-{-
 mkUnalignedIndexOffAddrOp :: ElementType -> Entry
 mkUnalignedIndexOffAddrOp e = PrimOpSpec
   { cons = "IndexOffAddrOp_Word8As" ++ elt_name e
@@ -183,7 +182,6 @@ mkUnalignedIndexOffAddrOp e = PrimOpSpec
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
   , opts = [OptionEffect CanFail]
   }
--}
 
 mkReadOffAddrOp :: ElementType -> Entry
 mkReadOffAddrOp e = PrimOpSpec
@@ -198,7 +196,6 @@ mkReadOffAddrOp e = PrimOpSpec
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
-{-
 mkUnalignedReadOffAddrOp :: ElementType -> Entry
 mkUnalignedReadOffAddrOp e = PrimOpSpec
   { cons = "ReadOffAddrOp_Word8As" ++ elt_name e
@@ -210,7 +207,6 @@ mkUnalignedReadOffAddrOp e = PrimOpSpec
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
--}
 
 mkWriteOffAddrOp :: ElementType -> Entry
 mkWriteOffAddrOp e = PrimOpSpec
@@ -225,7 +221,6 @@ mkWriteOffAddrOp e = PrimOpSpec
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
-{-
 mkUnalignedWriteOffAddrOp :: ElementType -> Entry
 mkUnalignedWriteOffAddrOp e = PrimOpSpec
   { cons = "WriteOffAddrOp_Word8As" ++ elt_name e
@@ -237,14 +232,13 @@ mkUnalignedWriteOffAddrOp e = PrimOpSpec
   , desc = "Write " ++ elt_desc e ++ "; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
--}
 
 
 addrAccessOps :: [Entry]
 addrAccessOps
   =  map mkIndexOffAddrOp elementTypes
---  ++ map mkUnalignedIndexOffAddrOp unalignedElementTypes
+  ++ map mkUnalignedIndexOffAddrOp unalignedElementTypes
   ++ map mkReadOffAddrOp elementTypes
---  ++ map mkUnalignedReadOffAddrOp unalignedElementTypes
+  ++ map mkUnalignedReadOffAddrOp unalignedElementTypes
   ++ map mkWriteOffAddrOp elementTypes
---  ++ map mkUnalignedWriteOffAddrOp unalignedElementTypes
+  ++ map mkUnalignedWriteOffAddrOp unalignedElementTypes

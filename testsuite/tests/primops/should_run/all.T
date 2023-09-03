@@ -5,6 +5,7 @@ test('T4442',
      [when(wordsize(32), expect_broken(15184))],
      compile_and_run, [''])
 test('T10481', exit_code(1), compile_and_run, [''])
+test('UnalignedAddrPrimOps', normal, compile_and_run, [''])
 test('T10678',
      [ collect_stats('bytes allocated',5),
        only_ways(['normal']),

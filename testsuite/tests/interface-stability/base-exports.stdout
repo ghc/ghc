@@ -3883,6 +3883,20 @@ module GHC.Base where
   indexWord8ArrayAsWord8X32# :: ByteArray# -> Int# -> Word8X32#
   indexWord8ArrayAsWord8X64# :: ByteArray# -> Int# -> Word8X64#
   indexWord8OffAddr# :: Addr# -> Int# -> Word8#
+  indexWord8OffAddrAsAddr# :: Addr# -> Int# -> Addr#
+  indexWord8OffAddrAsChar# :: Addr# -> Int# -> Char#
+  indexWord8OffAddrAsDouble# :: Addr# -> Int# -> Double#
+  indexWord8OffAddrAsFloat# :: Addr# -> Int# -> Float#
+  indexWord8OffAddrAsInt# :: Addr# -> Int# -> Int#
+  indexWord8OffAddrAsInt16# :: Addr# -> Int# -> Int16#
+  indexWord8OffAddrAsInt32# :: Addr# -> Int# -> Int32#
+  indexWord8OffAddrAsInt64# :: Addr# -> Int# -> Int64#
+  indexWord8OffAddrAsStablePtr# :: forall a. Addr# -> Int# -> StablePtr# a
+  indexWord8OffAddrAsWideChar# :: Addr# -> Int# -> Char#
+  indexWord8OffAddrAsWord# :: Addr# -> Int# -> Word#
+  indexWord8OffAddrAsWord16# :: Addr# -> Int# -> Word16#
+  indexWord8OffAddrAsWord32# :: Addr# -> Int# -> Word32#
+  indexWord8OffAddrAsWord64# :: Addr# -> Int# -> Word64#
   indexWord8OffAddrAsWord8X16# :: Addr# -> Int# -> Word8X16#
   indexWord8OffAddrAsWord8X32# :: Addr# -> Int# -> Word8X32#
   indexWord8OffAddrAsWord8X64# :: Addr# -> Int# -> Word8X64#
@@ -4443,6 +4457,20 @@ module GHC.Base where
   readWord8ArrayAsWord8X32# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Word8X32# #)
   readWord8ArrayAsWord8X64# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Word8X64# #)
   readWord8OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8# #)
+  readWord8OffAddrAsAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Addr# #)
+  readWord8OffAddrAsChar# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Char# #)
+  readWord8OffAddrAsDouble# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Double# #)
+  readWord8OffAddrAsFloat# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Float# #)
+  readWord8OffAddrAsInt# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int# #)
+  readWord8OffAddrAsInt16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int16# #)
+  readWord8OffAddrAsInt32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int32# #)
+  readWord8OffAddrAsInt64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int64# #)
+  readWord8OffAddrAsStablePtr# :: forall d a. Addr# -> Int# -> State# d -> (# State# d, StablePtr# a #)
+  readWord8OffAddrAsWideChar# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Char# #)
+  readWord8OffAddrAsWord# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word# #)
+  readWord8OffAddrAsWord16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word16# #)
+  readWord8OffAddrAsWord32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word32# #)
+  readWord8OffAddrAsWord64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word64# #)
   readWord8OffAddrAsWord8X16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X16# #)
   readWord8OffAddrAsWord8X32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X32# #)
   readWord8OffAddrAsWord8X64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X64# #)
@@ -4860,6 +4888,20 @@ module GHC.Base where
   writeWord8ArrayAsWord8X32# :: forall d. MutableByteArray# d -> Int# -> Word8X32# -> State# d -> State# d
   writeWord8ArrayAsWord8X64# :: forall d. MutableByteArray# d -> Int# -> Word8X64# -> State# d -> State# d
   writeWord8OffAddr# :: forall d. Addr# -> Int# -> Word8# -> State# d -> State# d
+  writeWord8OffAddrAsAddr# :: forall d. Addr# -> Int# -> Addr# -> State# d -> State# d
+  writeWord8OffAddrAsChar# :: forall d. Addr# -> Int# -> Char# -> State# d -> State# d
+  writeWord8OffAddrAsDouble# :: forall d. Addr# -> Int# -> Double# -> State# d -> State# d
+  writeWord8OffAddrAsFloat# :: forall d. Addr# -> Int# -> Float# -> State# d -> State# d
+  writeWord8OffAddrAsInt# :: forall d. Addr# -> Int# -> Int# -> State# d -> State# d
+  writeWord8OffAddrAsInt16# :: forall d. Addr# -> Int# -> Int16# -> State# d -> State# d
+  writeWord8OffAddrAsInt32# :: forall d. Addr# -> Int# -> Int32# -> State# d -> State# d
+  writeWord8OffAddrAsInt64# :: forall d. Addr# -> Int# -> Int64# -> State# d -> State# d
+  writeWord8OffAddrAsStablePtr# :: forall a d. Addr# -> Int# -> StablePtr# a -> State# d -> State# d
+  writeWord8OffAddrAsWideChar# :: forall d. Addr# -> Int# -> Char# -> State# d -> State# d
+  writeWord8OffAddrAsWord# :: forall d. Addr# -> Int# -> Word# -> State# d -> State# d
+  writeWord8OffAddrAsWord16# :: forall d. Addr# -> Int# -> Word16# -> State# d -> State# d
+  writeWord8OffAddrAsWord32# :: forall d. Addr# -> Int# -> Word32# -> State# d -> State# d
+  writeWord8OffAddrAsWord64# :: forall d. Addr# -> Int# -> Word64# -> State# d -> State# d
   writeWord8OffAddrAsWord8X16# :: forall d. Addr# -> Int# -> Word8X16# -> State# d -> State# d
   writeWord8OffAddrAsWord8X32# :: forall d. Addr# -> Int# -> Word8X32# -> State# d -> State# d
   writeWord8OffAddrAsWord8X64# :: forall d. Addr# -> Int# -> Word8X64# -> State# d -> State# d
@@ -5964,6 +6006,20 @@ module GHC.Exts where
   indexWord8ArrayAsWord8X32# :: ByteArray# -> Int# -> Word8X32#
   indexWord8ArrayAsWord8X64# :: ByteArray# -> Int# -> Word8X64#
   indexWord8OffAddr# :: Addr# -> Int# -> Word8#
+  indexWord8OffAddrAsAddr# :: Addr# -> Int# -> Addr#
+  indexWord8OffAddrAsChar# :: Addr# -> Int# -> Char#
+  indexWord8OffAddrAsDouble# :: Addr# -> Int# -> Double#
+  indexWord8OffAddrAsFloat# :: Addr# -> Int# -> Float#
+  indexWord8OffAddrAsInt# :: Addr# -> Int# -> Int#
+  indexWord8OffAddrAsInt16# :: Addr# -> Int# -> Int16#
+  indexWord8OffAddrAsInt32# :: Addr# -> Int# -> Int32#
+  indexWord8OffAddrAsInt64# :: Addr# -> Int# -> Int64#
+  indexWord8OffAddrAsStablePtr# :: forall a. Addr# -> Int# -> StablePtr# a
+  indexWord8OffAddrAsWideChar# :: Addr# -> Int# -> Char#
+  indexWord8OffAddrAsWord# :: Addr# -> Int# -> Word#
+  indexWord8OffAddrAsWord16# :: Addr# -> Int# -> Word16#
+  indexWord8OffAddrAsWord32# :: Addr# -> Int# -> Word32#
+  indexWord8OffAddrAsWord64# :: Addr# -> Int# -> Word64#
   indexWord8OffAddrAsWord8X16# :: Addr# -> Int# -> Word8X16#
   indexWord8OffAddrAsWord8X32# :: Addr# -> Int# -> Word8X32#
   indexWord8OffAddrAsWord8X64# :: Addr# -> Int# -> Word8X64#
@@ -6500,6 +6556,20 @@ module GHC.Exts where
   readWord8ArrayAsWord8X32# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Word8X32# #)
   readWord8ArrayAsWord8X64# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Word8X64# #)
   readWord8OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8# #)
+  readWord8OffAddrAsAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Addr# #)
+  readWord8OffAddrAsChar# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Char# #)
+  readWord8OffAddrAsDouble# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Double# #)
+  readWord8OffAddrAsFloat# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Float# #)
+  readWord8OffAddrAsInt# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int# #)
+  readWord8OffAddrAsInt16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int16# #)
+  readWord8OffAddrAsInt32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int32# #)
+  readWord8OffAddrAsInt64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Int64# #)
+  readWord8OffAddrAsStablePtr# :: forall d a. Addr# -> Int# -> State# d -> (# State# d, StablePtr# a #)
+  readWord8OffAddrAsWideChar# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Char# #)
+  readWord8OffAddrAsWord# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word# #)
+  readWord8OffAddrAsWord16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word16# #)
+  readWord8OffAddrAsWord32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word32# #)
+  readWord8OffAddrAsWord64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word64# #)
   readWord8OffAddrAsWord8X16# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X16# #)
   readWord8OffAddrAsWord8X32# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X32# #)
   readWord8OffAddrAsWord8X64# :: forall d. Addr# -> Int# -> State# d -> (# State# d, Word8X64# #)
@@ -6918,6 +6988,20 @@ module GHC.Exts where
   writeWord8ArrayAsWord8X32# :: forall d. MutableByteArray# d -> Int# -> Word8X32# -> State# d -> State# d
   writeWord8ArrayAsWord8X64# :: forall d. MutableByteArray# d -> Int# -> Word8X64# -> State# d -> State# d
   writeWord8OffAddr# :: forall d. Addr# -> Int# -> Word8# -> State# d -> State# d
+  writeWord8OffAddrAsAddr# :: forall d. Addr# -> Int# -> Addr# -> State# d -> State# d
+  writeWord8OffAddrAsChar# :: forall d. Addr# -> Int# -> Char# -> State# d -> State# d
+  writeWord8OffAddrAsDouble# :: forall d. Addr# -> Int# -> Double# -> State# d -> State# d
+  writeWord8OffAddrAsFloat# :: forall d. Addr# -> Int# -> Float# -> State# d -> State# d
+  writeWord8OffAddrAsInt# :: forall d. Addr# -> Int# -> Int# -> State# d -> State# d
+  writeWord8OffAddrAsInt16# :: forall d. Addr# -> Int# -> Int16# -> State# d -> State# d
+  writeWord8OffAddrAsInt32# :: forall d. Addr# -> Int# -> Int32# -> State# d -> State# d
+  writeWord8OffAddrAsInt64# :: forall d. Addr# -> Int# -> Int64# -> State# d -> State# d
+  writeWord8OffAddrAsStablePtr# :: forall a d. Addr# -> Int# -> StablePtr# a -> State# d -> State# d
+  writeWord8OffAddrAsWideChar# :: forall d. Addr# -> Int# -> Char# -> State# d -> State# d
+  writeWord8OffAddrAsWord# :: forall d. Addr# -> Int# -> Word# -> State# d -> State# d
+  writeWord8OffAddrAsWord16# :: forall d. Addr# -> Int# -> Word16# -> State# d -> State# d
+  writeWord8OffAddrAsWord32# :: forall d. Addr# -> Int# -> Word32# -> State# d -> State# d
+  writeWord8OffAddrAsWord64# :: forall d. Addr# -> Int# -> Word64# -> State# d -> State# d
   writeWord8OffAddrAsWord8X16# :: forall d. Addr# -> Int# -> Word8X16# -> State# d -> State# d
   writeWord8OffAddrAsWord8X32# :: forall d. Addr# -> Int# -> Word8X32# -> State# d -> State# d
   writeWord8OffAddrAsWord8X64# :: forall d. Addr# -> Int# -> Word8X64# -> State# d -> State# d

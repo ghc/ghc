@@ -471,6 +471,98 @@ emitPrimOp cfg primop =
   ReadOffAddrOp_Word64 -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing b64 res args
 
+-- IndexWord8OffAddrAsXXX
+
+  IndexOffAddrOp_Word8AsChar -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
+  IndexOffAddrOp_Word8AsWideChar -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+  IndexOffAddrOp_Word8AsInt -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  IndexOffAddrOp_Word8AsWord -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  IndexOffAddrOp_Word8AsAddr -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  IndexOffAddrOp_Word8AsFloat -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing f32 b8 res args
+  IndexOffAddrOp_Word8AsDouble -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing f64 b8 res args
+  IndexOffAddrOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  IndexOffAddrOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b16 b8 res args
+  IndexOffAddrOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b32 b8 res args
+  IndexOffAddrOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b64 b8 res args
+  IndexOffAddrOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b16 b8 res args
+  IndexOffAddrOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b32 b8 res args
+  IndexOffAddrOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b64 b8 res args
+
+-- ReadWord8OffAddrAsXXX, identical to IndexWord8OffAddrAsXXX
+
+  ReadOffAddrOp_Word8AsChar -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
+  ReadOffAddrOp_Word8AsWideChar -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+  ReadOffAddrOp_Word8AsInt -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  ReadOffAddrOp_Word8AsWord -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  ReadOffAddrOp_Word8AsAddr -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  ReadOffAddrOp_Word8AsFloat -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing f32 b8 res args
+  ReadOffAddrOp_Word8AsDouble -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing f64 b8 res args
+  ReadOffAddrOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing (bWord platform) b8 res args
+  ReadOffAddrOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b16 b8 res args
+  ReadOffAddrOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b32 b8 res args
+  ReadOffAddrOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b64 b8 res args
+  ReadOffAddrOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b16 b8 res args
+  ReadOffAddrOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b32 b8 res args
+  ReadOffAddrOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
+    doIndexOffAddrOpAs   Nothing b64 b8 res args
+
+-- WriteWord8ArrayAsXXX
+  WriteOffAddrOp_Word8AsChar -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
+  WriteOffAddrOp_Word8AsWideChar -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b8 res args
+  WriteOffAddrOp_Word8AsInt -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsWord -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsAddr -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsFloat -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsDouble -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+  WriteOffAddrOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
+    doWriteOffAddrOp Nothing b8 res args
+
 -- IndexXXXArray
 
   IndexByteArrayOp_Char -> \args -> opIntoRegs $ \res ->

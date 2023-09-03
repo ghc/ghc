@@ -2,6 +2,54 @@
 
 - Shipped with GHC 9.10.1
 
+- Add unaligned addr access primops. These primops will be emulated on platforms that don't support unaligned access.
+
+         readWord8OffAddrAsChar# :: Addr# -> Int# -> State# s -> (# State# s, Char# #)
+         readWord8OffAddrAsAddr# :: Addr# -> Int# -> State# s -> (# State# s, Addr# #)
+         readWord8OffAddrAsFloat# :: Addr# -> Int# -> State# s -> (# State# s, Float# #)
+         readWord8OffAddrAsDouble# :: Addr# -> Int# -> State# s -> (# State# s, Double# #)
+         readWord8OffAddrAsStablePtr# :: Addr# -> Int# -> State# s -> (# State# s, StablePtr# #)
+         readWord8OffAddrAsInt16# :: Addr# -> Int# -> State# s -> (# State# s, Int16# #)
+         readWord8OffAddrAsInt32# :: Addr# -> Int# -> State# s -> (# State# s, Int32# #)
+         readWord8OffAddrAsInt64# :: Addr# -> Int# -> State# s -> (# State# s, Int64# #)
+         readWord8OffAddrAsInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
+
+         readWord8OffAddrAsWord16# :: Addr# -> Int# -> State# s -> (# State# s, Word16# #)
+         readWord8OffAddrAsWord32# :: Addr# -> Int# -> State# s -> (# State# s, Word32# #)
+         readWord8OffAddrAsWord64# :: Addr# -> Int# -> State# s -> (# State# s, Word64# #)
+         readWord8OffAddrAsWord# :: Addr# -> Int# -> State# s -> (# State# s, Word# #)
+
+         indexWord8OffAddrAsChar# :: Addr# -> Int# -> Char#
+         indexWord8OffAddrAsAddr# :: Addr# -> Int# -> Addr#
+         indexWord8OffAddrAsFloat# :: Addr# -> Int# -> Float#
+         indexWord8OffAddrAsDouble# :: Addr# -> Int# -> Double#
+         indexWord8OffAddrAsStablePtr# :: Addr# -> Int# -> StablePtr#
+         indexWord8OffAddrAsInt16# :: Addr# -> Int# -> Int16#
+         indexWord8OffAddrAsInt32# :: Addr# -> Int# -> Int32#
+         indexWord8OffAddrAsInt64# :: Addr# -> Int# -> Int64#
+         indexWord8OffAddrAsInt# :: Addr# -> Int# -> Int#
+
+         indexWord8OffAddrAsWord16# :: Addr# -> Int# -> Word16#
+         indexWord8OffAddrAsWord32# :: Addr# -> Int# -> Word32#
+         indexWord8OffAddrAsWord64# :: Addr# -> Int# -> Word64#
+         indexWord8OffAddrAsWord# :: Addr# -> Int# -> Word#
+
+         writeWord8OffAddrAsChar# :: Addr# -> Int# -> Char# -> State# s -> State# s
+         writeWord8OffAddrAsAddr# :: Addr# -> Int# -> Addr# -> State# s -> State# s
+         writeWord8OffAddrAsFloat# :: Addr# -> Int# -> Float# -> State# s -> State# s
+         writeWord8OffAddrAsDouble# :: Addr# -> Int# -> Double# -> State# s -> State# s
+         writeWord8OffAddrAsStablePtr# :: Addr# -> Int# -> StablePtr# -> State# s -> State# s
+
+         writeWord8OffAddrAsInt16# :: Addr# -> Int# -> Int16# -> State# s -> State# s
+         writeWord8OffAddrAsInt32# :: Addr# -> Int# -> Int32# -> State# s -> State# s
+         writeWord8OffAddrAsInt64# :: Addr# -> Int# -> Int64# -> State# s -> State# s
+         writeWord8OffAddrAsInt# :: Addr# -> Int# -> Int# -> State# s -> State# s
+
+         writeWord8OffAddrAsWord16# :: Addr# -> Int# -> Word16# -> State# s -> State# s
+         writeWord8OffAddrAsWord32# :: Addr# -> Int# -> Word32# -> State# s -> State# s
+         writeWord8OffAddrAsWord64# :: Addr# -> Int# -> Word64# -> State# s -> State# s
+         writeWord8OffAddrAsWord# :: Addr# -> Int# -> Word# -> State# s -> State# s
+
 - The `unsafeThawByteArray#` primop was added, serving as a inverse to the existing
   `unsafeFreezeByteArray#` primop (see #22710).
 

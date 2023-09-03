@@ -832,6 +832,51 @@ genPrim prof bound ty op = case op of
   WriteOffAddrOp_Word32    -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_u32 a (off32 o i) v
   WriteOffAddrOp_Word64    -> \[] [a,o,i,h,l]   -> pure $ PrimInline $ write_boff_u64 a (off64 o i) h l
 
+  IndexOffAddrOp_Word8AsChar      -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u8  a (off8  o i)
+  IndexOffAddrOp_Word8AsWideChar  -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  IndexOffAddrOp_Word8AsInt       -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  IndexOffAddrOp_Word8AsWord      -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u32 a (off8 o i)
+  IndexOffAddrOp_Word8AsAddr      -> \[ra,ro] [a,o,i] -> pure $ PrimInline $ read_boff_addr a (off8 o i) ra ro
+  IndexOffAddrOp_Word8AsFloat     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_f32 a (off8 o i)
+  IndexOffAddrOp_Word8AsDouble    -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_f64 a (off8 o i)
+  IndexOffAddrOp_Word8AsStablePtr -> \[ra,ro] [a,o,i] -> pure $ PrimInline $ read_boff_stableptr a (off8 o i) ra ro
+  IndexOffAddrOp_Word8AsInt16     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i16 a (off8 o i)
+  IndexOffAddrOp_Word8AsInt32     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  IndexOffAddrOp_Word8AsInt64     -> \[h,l]   [a,o,i] -> pure $ PrimInline $ read_boff_i64 a (off8 o i) h l
+  IndexOffAddrOp_Word8AsWord16    -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u16 a (off8 o i)
+  IndexOffAddrOp_Word8AsWord32    -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u32 a (off8 o i)
+  IndexOffAddrOp_Word8AsWord64    -> \[h,l]   [a,o,i] -> pure $ PrimInline $ read_boff_u64 a (off8 o i) h l
+
+  ReadOffAddrOp_Word8AsChar       -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u8  a (off8  o i)
+  ReadOffAddrOp_Word8AsWideChar   -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  ReadOffAddrOp_Word8AsInt        -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  ReadOffAddrOp_Word8AsWord       -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u32 a (off8 o i)
+  ReadOffAddrOp_Word8AsAddr       -> \[ra,ro] [a,o,i] -> pure $ PrimInline $ read_boff_addr a (off8 o i) ra ro
+  ReadOffAddrOp_Word8AsFloat      -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_f32 a (off8 o i)
+  ReadOffAddrOp_Word8AsDouble     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_f64 a (off8 o i)
+  ReadOffAddrOp_Word8AsStablePtr  -> \[ra,ro] [a,o,i] -> pure $ PrimInline $ read_boff_stableptr a (off8 o i) ra ro
+  ReadOffAddrOp_Word8AsInt16      -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i16 a (off8 o i)
+  ReadOffAddrOp_Word8AsInt32      -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_i32 a (off8 o i)
+  ReadOffAddrOp_Word8AsInt64      -> \[h,l]   [a,o,i] -> pure $ PrimInline $ read_boff_i64 a (off8 o i) h l
+  ReadOffAddrOp_Word8AsWord16     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u16 a (off8 o i)
+  ReadOffAddrOp_Word8AsWord32     -> \[r]     [a,o,i] -> pure $ PrimInline $ r |= read_boff_u32 a (off8 o i)
+  ReadOffAddrOp_Word8AsWord64     -> \[h,l]   [a,o,i] -> pure $ PrimInline $ read_boff_u64 a (off8 o i) h l
+
+  WriteOffAddrOp_Word8AsChar      -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_u8  a (off8  o i) v
+  WriteOffAddrOp_Word8AsWideChar  -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_i32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsInt       -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_i32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsWord      -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_u32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsAddr      -> \[] [a,o,i,va,vo] -> pure $ PrimInline $ write_boff_addr a (off8 o i) va vo
+  WriteOffAddrOp_Word8AsFloat     -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_f32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsDouble    -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_f64 a (off8 o i) v
+  WriteOffAddrOp_Word8AsStablePtr -> \[] [a,o,i,va,vo] -> pure $ PrimInline $ write_boff_stableptr a (off8 o i) va vo
+  WriteOffAddrOp_Word8AsInt16     -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_i16 a (off8 o i) v
+  WriteOffAddrOp_Word8AsInt32     -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_i32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsInt64     -> \[] [a,o,i,h,l]   -> pure $ PrimInline $ write_boff_i64 a (off8 o i) h l
+  WriteOffAddrOp_Word8AsWord16    -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_u16 a (off8 o i) v
+  WriteOffAddrOp_Word8AsWord32    -> \[] [a,o,i,v]     -> pure $ PrimInline $ write_boff_u32 a (off8 o i) v
+  WriteOffAddrOp_Word8AsWord64    -> \[] [a,o,i,h,l]   -> pure $ PrimInline $ write_boff_u64 a (off8 o i) h l
+
 ------------------------------- Mutable variables --------------------------------------
   NewMutVarOp           -> \[r] [x]       -> pure $ PrimInline $ r |= New (app "h$MutVar" [x])
   ReadMutVarOp          -> \[r] [m]       -> pure $ PrimInline $ r |= m .^ "val"

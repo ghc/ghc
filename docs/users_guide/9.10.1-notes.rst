@@ -169,6 +169,29 @@ Runtime system
   exported by ``GHC.Exts``, but with a different type, as described in
   the notes for ``base`` above.
 
+- New primops for unaligned ``Addr#`` access.
+  These primops will be emulated on platforms that don't support unaligned access.
+  These primops take the form
+
+  .. code-block:: haskell
+
+     indexWord8OffAddrAs<ty> :: Addr# -> Int# -> <ty>#
+     readWord8OffAddrAs<ty> :: Addr# -> Int# -> State# s -> (# State# s, <ty># #)
+     writeWord8OffAddrAs<ty> :: Addr# -> Int# -> <ty># -> State# s -> State# s
+
+  where ``<ty>`` is one of:
+
+  - ``Word``
+  - ``Word{16,32,64}``
+  - ``Int``
+  - ``Int{16,32,64,}``
+  - ``Char``
+  - ``WideChar``
+  - ``Addr``
+  - ``Float``
+  - ``Double``
+  - ``StablePtr``
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
