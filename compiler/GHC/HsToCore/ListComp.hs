@@ -33,7 +33,6 @@ import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Tc.Utils.TcType
 import GHC.Data.List.SetOps( getNth )
 

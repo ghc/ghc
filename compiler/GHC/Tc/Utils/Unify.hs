@@ -80,7 +80,6 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Driver.DynFlags
 import GHC.Data.Bag

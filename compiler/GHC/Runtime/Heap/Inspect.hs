@@ -60,7 +60,6 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )

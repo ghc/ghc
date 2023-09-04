@@ -208,7 +208,6 @@ import GHC.Data.BooleanFormula ( mkAnd )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import qualified Data.ByteString.Char8 as BS
 

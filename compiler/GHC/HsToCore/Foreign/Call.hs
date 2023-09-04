@@ -45,7 +45,6 @@ import GHC.Builtin.Names
 import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.Maybe
 

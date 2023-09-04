@@ -156,7 +156,6 @@ import Data.Foldable
 import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import qualified GHC.Data.Strict as Strict
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))

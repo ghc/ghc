@@ -27,7 +27,6 @@ import GHC.Builtin.Types.Prim
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 type Binding = (Id, CoreExpr) -- No rec/nonrec structure;
                               -- the occurrence analyser will sort it all out

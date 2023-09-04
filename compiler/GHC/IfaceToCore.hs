@@ -87,7 +87,6 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 

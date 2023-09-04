@@ -13,7 +13,6 @@ import GHC.Prelude
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim

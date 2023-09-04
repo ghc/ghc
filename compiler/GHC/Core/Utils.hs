@@ -105,7 +105,6 @@ import GHC.Data.OrdList
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.ByteString     ( ByteString )

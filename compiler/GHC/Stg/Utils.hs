@@ -26,7 +26,6 @@ import GHC.Stg.Syntax
 
 import GHC.Utils.Outputable
 
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Panic
 
 import GHC.Data.FastString

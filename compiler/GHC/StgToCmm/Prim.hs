@@ -45,7 +45,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import Data.Maybe
 
 import Control.Monad (liftM, when, unless)

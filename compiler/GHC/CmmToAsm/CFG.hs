@@ -76,7 +76,6 @@ import Data.Bifunctor
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
 --import GHC.Data.OrdList

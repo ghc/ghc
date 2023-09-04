@@ -28,7 +28,6 @@ import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Core.Multiplicity
 import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )

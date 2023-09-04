@@ -49,7 +49,6 @@ import GHC.Unit.Module ( Module )
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.Graph.UnVar

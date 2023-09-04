@@ -43,7 +43,6 @@ import GHC.Data.Maybe
 
 import GHC.Utils.Error
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Binary

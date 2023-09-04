@@ -47,7 +47,6 @@ import GHC.Builtin.Types ( anyTypeOfKind )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Constants( debugIsOn )

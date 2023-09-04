@@ -80,7 +80,6 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Unique.Supply ( getUniqueM )

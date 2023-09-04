@@ -75,7 +75,6 @@ import GHC.Data.EnumSet (EnumSet)
 import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc

@@ -32,7 +32,6 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)

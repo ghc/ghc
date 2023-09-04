@@ -35,7 +35,6 @@ import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
 
 import Data.List ( mapAccumL )

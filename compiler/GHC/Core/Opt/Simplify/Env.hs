@@ -79,7 +79,6 @@ import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
 

@@ -74,13 +74,12 @@ import GHC.Unit.Home.ModInfo
 import GHC.Platform
 import GHC.Settings
 import GHC.Data.Maybe
-import GHC.Utils.Panic.Plain
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
-import GHC.Utils.Panic (pprPanic)
+import GHC.Utils.Panic
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module
 import qualified Data.Set as Set

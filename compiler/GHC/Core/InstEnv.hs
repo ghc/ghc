@@ -62,7 +62,6 @@ import Data.Maybe       ( isJust )
 
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import Data.Semigroup
 
 {-

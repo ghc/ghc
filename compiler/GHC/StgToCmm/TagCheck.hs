@@ -31,8 +31,7 @@ import GHC.Utils.Outputable
 import GHC.Core.DataCon
 import Control.Monad
 import GHC.StgToCmm.Types
-import GHC.Utils.Panic (pprPanic)
-import GHC.Utils.Panic.Plain (panic)
+import GHC.Utils.Panic (pprPanic, panic)
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Closure
 import GHC.Cmm.Switch (mkSwitchTargets)

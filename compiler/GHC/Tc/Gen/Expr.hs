@@ -87,7 +87,6 @@ import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE

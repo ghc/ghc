@@ -30,7 +30,6 @@ import GHC.Types.Var.Env
 import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
 
 import GHC.Utils.Misc

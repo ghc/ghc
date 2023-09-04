@@ -58,7 +58,6 @@ import GHC.Builtin.Names
 import GHC.Utils.Error( Validity'(..), andValid )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Driver.DynFlags

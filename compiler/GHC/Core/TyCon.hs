@@ -173,7 +173,6 @@ import GHC.Builtin.Names
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants

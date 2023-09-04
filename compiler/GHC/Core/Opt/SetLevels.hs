@@ -125,7 +125,6 @@ import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.Maybe
 

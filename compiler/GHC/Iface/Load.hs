@@ -67,7 +67,6 @@ import GHC.Utils.Binary   ( BinData(..) )
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 

@@ -66,7 +66,6 @@ import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain (assert)
 
 import Data.Maybe
 import GHC.Utils.Word64 (word64ToInt)

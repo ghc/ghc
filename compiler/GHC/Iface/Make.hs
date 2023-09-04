@@ -72,7 +72,6 @@ import GHC.Types.SrcLoc ( unLoc )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 
 import GHC.Data.FastString

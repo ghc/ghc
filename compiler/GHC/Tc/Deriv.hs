@@ -61,7 +61,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)

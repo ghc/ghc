@@ -20,7 +20,6 @@ import GHC.Core.DataCon
 import GHC.Builtin.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import Control.Monad.Trans.RWS.CPS
 import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)

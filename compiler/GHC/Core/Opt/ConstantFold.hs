@@ -74,7 +74,6 @@ import GHC.Data.Maybe      ( orElse )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Applicative ( Alternative(..) )
 import Control.Monad

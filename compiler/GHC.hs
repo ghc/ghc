@@ -359,9 +359,6 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-#if !defined(javascript_HOST_ARCH)
-import GHC.Utils.Panic.Plain
-#endif
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 

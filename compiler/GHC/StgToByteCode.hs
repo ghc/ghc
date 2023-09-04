@@ -56,7 +56,6 @@ import GHC.Utils.Error
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds, argPrimRep )
 import GHC.StgToCmm.Layout

@@ -93,7 +93,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Exception ( throwIO, SomeAsyncException )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger

@@ -47,7 +47,6 @@ import GHC.Types.Basic
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 
 import Data.List        ( mapAccumL )

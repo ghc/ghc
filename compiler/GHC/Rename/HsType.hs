@@ -75,7 +75,6 @@ import GHC.Types.Fixity ( compareFixity, negateFixity
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 

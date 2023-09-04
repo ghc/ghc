@@ -77,7 +77,6 @@ import GHC.Types.Unique
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Types.CostCentre
 import GHC.Types.IPE
