@@ -10,7 +10,7 @@ cabal10: clean
 	$(MAKE) clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	$(SETUP) clean
-	$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)'
+	$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)'
 	$(SETUP) build
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db dist/package.conf.inplace Use.hs
 ifneq "$(CLEANUP)" ""

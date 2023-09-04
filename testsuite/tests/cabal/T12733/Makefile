@@ -10,11 +10,11 @@ T12733: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cp p/P.hs.in1 p/P.hs
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register --inplace
 	cd q && $(SETUP) clean
-	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	cd q && $(SETUP) build
 	cd q && $(SETUP) register --inplace
 	# Building q should have taken enough time

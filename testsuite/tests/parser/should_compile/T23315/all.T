@@ -1,3 +1,3 @@
 test('T23315',
-     [extra_files(['Setup.hs']), js_broken(22352)],
+     [extra_files(['Setup.hs'])],
      makefile_test, [])

@@ -179,7 +179,7 @@ test('T13425', normal, compile_and_run, ['-O'])
 test('castFloatWord', normal, compile_and_run, ['-dcmm-lint'])
 test('T13825-unit',
      [ extra_run_opts('"' + config.libdir + '"')
-     , js_broken(22362)
+     , js_skip # test StgToCmm with JS settings (closure header size is 0)
      ],
      compile_and_run,
      ['-package ghc'])

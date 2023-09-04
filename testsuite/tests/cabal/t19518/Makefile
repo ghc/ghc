@@ -17,19 +17,19 @@ t19518: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	# build p
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd p && $(SETUP) build
 	cd p && $(SETUP) copy
 	cd p && $(SETUP) register
 	# build q
 	cd q && $(SETUP) clean
-	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	cd q && $(SETUP) register
 	# build r
 	cd r && $(SETUP) clean
-	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -Wunused-packages' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS) -Wunused-packages' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd r && $(SETUP) build
 	cd r && $(SETUP) copy
 	cd r && $(SETUP) register

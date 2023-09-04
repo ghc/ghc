@@ -11,12 +11,12 @@ cabal08: clean
 	'$(GHC_PKG)' init tmp2.d
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cd p1 && $(SETUP) clean
-	cd p1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp1.d --prefix='$(PWD)/inst-p1' --ipid="p-0.1-aaa"
+	cd p1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp1.d --prefix='$(PWD)/inst-p1' --ipid="p-0.1-aaa"
 	cd p1 && $(SETUP) build
 	cd p1 && $(SETUP) copy
 	cd p1 && $(SETUP) register
 	cd p2 && $(SETUP) clean
-	cd p2 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp2.d --prefix='$(PWD)/inst-p2' --ipid="p-0.1-bbb"
+	cd p2 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp2.d --prefix='$(PWD)/inst-p2' --ipid="p-0.1-bbb"
 	cd p2 && $(SETUP) build
 	cd p2 && $(SETUP) copy
 	cd p2 && $(SETUP) register
