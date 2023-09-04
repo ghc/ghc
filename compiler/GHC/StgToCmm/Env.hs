@@ -43,7 +43,6 @@ import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Builtin.Names (getUnique)
 

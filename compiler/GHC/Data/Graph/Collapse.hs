@@ -25,7 +25,7 @@ import Data.Semigroup
 import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Inductive.Graph
 import GHC.Types.Unique.Supply
-import GHC.Utils.Panic
+import GHC.Utils.Panic hiding (assert)
 
 
 {-|

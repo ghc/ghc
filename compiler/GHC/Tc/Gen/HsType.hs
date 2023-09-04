@@ -123,7 +123,6 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt

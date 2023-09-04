@@ -85,7 +85,6 @@ import GHC.Types.Cpr ( topCprSig )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.Maybe ( isNothing, catMaybes )

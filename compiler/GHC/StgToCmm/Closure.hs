@@ -94,7 +94,6 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe (isNothing)
 

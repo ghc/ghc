@@ -26,7 +26,6 @@ import GHC.Prelude
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 import GHC.Types.SrcLoc
 import GHC.Types.Error

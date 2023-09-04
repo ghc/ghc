@@ -89,7 +89,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 import GHC.Utils.Unique (sameUnique)
 

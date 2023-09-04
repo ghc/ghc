@@ -112,7 +112,6 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.Data hiding (TyCon)
 import Data.Int

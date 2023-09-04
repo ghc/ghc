@@ -4,7 +4,7 @@ import GHC.Types.Basic
 import GHC
 import GHC.Driver.Monad
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic hiding (assert)
 import GHC.Types.RepType
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types

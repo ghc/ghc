@@ -81,7 +81,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Monad
 

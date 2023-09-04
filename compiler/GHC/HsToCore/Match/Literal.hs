@@ -63,7 +63,6 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Unique (sameUnique)
 
 import GHC.Data.FastString

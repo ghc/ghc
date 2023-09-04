@@ -35,7 +35,6 @@ import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Monad
 import GHC.Core.DataCon
 

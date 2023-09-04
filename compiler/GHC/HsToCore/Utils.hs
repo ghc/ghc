@@ -75,7 +75,6 @@ import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc

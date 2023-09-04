@@ -33,7 +33,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Monad   ( zipWithM )
 

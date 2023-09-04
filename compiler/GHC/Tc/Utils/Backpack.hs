@@ -79,7 +79,6 @@ import GHC.Utils.Error
 import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Data.FastString
 import GHC.Data.Maybe

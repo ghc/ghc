@@ -72,7 +72,6 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM

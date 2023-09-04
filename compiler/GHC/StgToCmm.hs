@@ -54,7 +54,6 @@ import GHC.Unit.Module
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 
 import GHC.Utils.TmpFs
@@ -68,7 +67,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
-import GHC.Utils.Panic (assertPpr)
+import GHC.Utils.Panic
 
 codeGen :: Logger
         -> TmpFs

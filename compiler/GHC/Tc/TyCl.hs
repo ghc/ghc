@@ -99,7 +99,6 @@ import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 

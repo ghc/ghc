@@ -53,7 +53,6 @@ import GHC.Core.Coercion ( ltRole )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.FV as FV
 

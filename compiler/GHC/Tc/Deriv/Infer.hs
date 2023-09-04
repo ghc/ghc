@@ -48,7 +48,6 @@ import GHC.Builtin.Types (typeToTypeKind)
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Types.Basic

@@ -59,7 +59,6 @@ import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)

@@ -55,7 +55,6 @@ import GHC.Builtin.Types ( tupleDataCon )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Applicative ( (<|>) )
 import Control.Monad ( zipWithM )

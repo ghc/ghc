@@ -43,7 +43,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 
 import GHC.Types.CompleteMatch

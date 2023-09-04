@@ -66,7 +66,6 @@ import GHC.Types.Basic
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Data.Maybe
 import GHC.Data.Bag

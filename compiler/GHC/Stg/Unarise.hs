@@ -388,7 +388,6 @@ import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Stg.Utils

@@ -79,7 +79,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString

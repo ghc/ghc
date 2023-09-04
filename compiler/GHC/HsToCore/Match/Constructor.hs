@@ -34,7 +34,6 @@ import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import Control.Monad(liftM)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE

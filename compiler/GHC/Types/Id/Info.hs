@@ -110,7 +110,6 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars, noConcreteTyVars )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Stg.InferTags.TagSig
 import GHC.StgToCmm.Types (LambdaFormInfo)
 

@@ -26,7 +26,6 @@ import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.PkgQual

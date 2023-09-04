@@ -69,7 +69,6 @@ import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger

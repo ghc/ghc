@@ -49,7 +49,6 @@ import GHC.Data.Graph.UnVar
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Logger

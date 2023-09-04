@@ -34,7 +34,6 @@ import GHC.Data.SizedSeq
 import GHC.Linker.Types
 
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 
 import GHC.Types.Name

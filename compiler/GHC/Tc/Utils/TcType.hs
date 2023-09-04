@@ -234,7 +234,6 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.IORef ( IORef )
 import Data.List.NonEmpty( NonEmpty(..) )

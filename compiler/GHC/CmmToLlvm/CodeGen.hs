@@ -33,7 +33,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic.Plain (massert)
 import qualified GHC.Utils.Panic as Panic
 import GHC.Utils.Misc
 
@@ -543,7 +542,7 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
                             , MO_AddWordC w
                             , MO_SubWordC w
                             ]
-    massert valid
+    Panic.massert valid
     let width = widthToLlvmInt w
     -- This will do most of the work of generating the call to the intrinsic and
     -- extracting the values from the struct.

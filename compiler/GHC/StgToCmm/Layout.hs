@@ -60,7 +60,6 @@ import GHC.Utils.Misc
 import Data.List (mapAccumL, partition)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import Control.Monad

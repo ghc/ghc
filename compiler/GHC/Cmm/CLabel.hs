@@ -154,7 +154,6 @@ import GHC.Builtin.PrimOps
 import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Platform
 import GHC.Types.Unique.Set

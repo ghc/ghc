@@ -71,7 +71,6 @@ import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 
 import qualified GHC.LanguageExtensions as LangExt

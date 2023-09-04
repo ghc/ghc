@@ -101,7 +101,6 @@ import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)

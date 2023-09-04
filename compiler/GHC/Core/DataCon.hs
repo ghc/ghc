@@ -103,7 +103,6 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB

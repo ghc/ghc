@@ -66,7 +66,6 @@ import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
 import GHC.Types.Error

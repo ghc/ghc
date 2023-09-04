@@ -60,7 +60,6 @@ import GHC.Types.Demand ( argOneShots, argsOneShots )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Builtin.Names( runRWKey )

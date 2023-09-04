@@ -41,7 +41,6 @@ import GHC.Data.TrieMap
 import GHC.Utils.Constants
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 {- *********************************************************************
 *                                                                      *

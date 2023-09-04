@@ -82,7 +82,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.List (mapAccumL)
 

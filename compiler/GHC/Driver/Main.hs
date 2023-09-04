@@ -252,7 +252,6 @@ import GHC.Types.Unique.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

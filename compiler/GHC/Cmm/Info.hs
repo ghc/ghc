@@ -47,7 +47,6 @@ import GHC.Platform.Profile
 import GHC.Data.Maybe
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.Supply
 import GHC.Utils.Logger
 import GHC.Utils.Monad

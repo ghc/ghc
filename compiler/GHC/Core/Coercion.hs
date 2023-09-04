@@ -163,7 +163,6 @@ import qualified GHC.Data.List.Infinite as Inf
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )

@@ -46,7 +46,6 @@ import Data.Maybe
 import GHC.CmmToLlvm.Mangler
 import GHC.SysTools
 import GHC.SysTools.Cpp
-import GHC.Utils.Panic.Plain
 import System.Directory
 import System.FilePath
 import GHC.Utils.Misc

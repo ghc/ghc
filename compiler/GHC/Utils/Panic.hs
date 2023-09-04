@@ -23,17 +23,11 @@ module GHC.Utils.Panic
    , handleGhcException
 
      -- * Command error throwing patterns
-   , pgmError
-   , panic
    , pprPanic
-   , sorry
    , panicDoc
    , sorryDoc
    , pgmErrorDoc
-   , cmdLineError
-   , cmdLineErrorIO
      -- ** Assertions
-   , assertPanic
    , assertPprPanic
    , assertPpr
    , assertPprMaybe
@@ -52,6 +46,7 @@ module GHC.Utils.Panic
    , tryMost
    , throwTo
    , withSignalHandlers
+   , module GHC.Utils.Panic.Plain
    )
 where
 

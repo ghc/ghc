@@ -149,7 +149,6 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 
 import Control.Monad
