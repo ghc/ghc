@@ -71,8 +71,8 @@ module GHC.Tc.Types(
         TcSigInfo(..), TcIdSig(..),
         TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..),
         TcIdSigInst(..),
-        isPartialSig, hasCompleteSig,
-        tcIdSigLoc, tcSigInfoName, completeSigPolyId_maybe,
+        isPartialSig, hasCompleteSig, tcSigInfoName, tcIdSigLoc,
+        completeSigPolyId_maybe,
 
         -- Misc other types
         TcId,

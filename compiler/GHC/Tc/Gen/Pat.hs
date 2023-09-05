@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -123,27 +124,75 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
         not_xstrict _ = checkManyPattern pat_ty
 
 -----------------
-tcMatchPats :: HsMatchContextRn
+tcMatchPats :: forall a.
+               HsMatchContextRn
             -> [LPat GhcRn]             -- ^ patterns
             -> [ExpPatType]             -- ^ types of the patterns
             -> TcM a                    -- ^ checker for the body
             -> TcM ([LPat GhcTc], a)
+-- See Note [tcMatchPats]
+--
+-- PRECONDITION:
+--    number of visible Pats in pats
+--      (@a is invisible)
+--  = number of visible ExpPatTypes in pat_tys
+--      (ExpForAllPatTy v is visible iff b is Required)
+--
+-- POSTCONDITION:
+--   Returns only the /value/ patterns; see Note [tcMatchPats]
 
--- This is the externally-callable wrapper function
--- Typecheck the patterns, extend the environment to bind the variables,
--- do the thing inside, use any existentially-bound dictionaries to
--- discharge parts of the returning LIE, and deal with pattern type
--- signatures
+tcMatchPats match_ctxt pats pat_tys thing_inside
+  = assertPpr (count isVisibleExpPatType pat_tys == length pats)
+              (ppr pats $$ ppr pat_tys) $
+       -- Check PRECONDITION
+       -- When we get @patterns the (length pats) will change
+    do { err_ctxt <- getErrCtxt
+       ; let loop :: [LPat GhcRn] -> [ExpPatType] -> TcM ([LPat GhcTc], a)
 
---   1. Initialise the PatState
---   2. Check the patterns
---   3. Check the body
---   4. Check that no existentials escape
+             -- No more patterns.  Discard excess pat_tys;
+             -- they should all be invisible.  Example:
+             --    f :: Int -> forall a b. blah
+             --    f x @p = rhs
+             -- We will call tcMatchPats with
+             --   pats = [x, @p]
+             --   pat_tys = [Int, @a, @b]
+             loop [] pat_tys
+               = assertPpr (not (any isVisibleExpPatType pat_tys)) (ppr pats $$ ppr pat_tys) $
+                 do { res <- setErrCtxt err_ctxt thing_inside
+                    ; return ([], res) }
 
-tcMatchPats ctxt pats pat_tys thing_inside
-  = tc_tt_lpats pat_tys penv pats thing_inside
+             -- ExpFunPatTy: expecting a value pattern
+             -- tc_lpat will error if it sees a @t type pattern
+             loop (pat : pats) (ExpFunPatTy pat_ty : pat_tys)
+               = do { (p, (ps, res)) <- tc_lpat pat_ty penv pat $
+                                        loop pats pat_tys
+                    ; return (p:ps, res) }
+
+             -- ExpForAllPat: expecting a type pattern
+             loop (pat : pats) (ExpForAllPatTy bndr : pat_tys)
+               | Bndr tv vis <- bndr
+               , isVisibleForAllTyFlag vis
+               = do { (_p, (ps, res)) <- tc_forall_lpat tv penv pat $
+                                        loop pats pat_tys
+
+                    ; return (ps, res) }
+
+               -- Invisible forall in type, and an @a type pattern
+               -- Add an equation here when we have these
+               -- E.g.    f :: forall a. Bool -> a -> blah
+               --         f @b True  x = rhs1  -- b is bound to skolem a
+               --         f @c False y = rhs2  -- c is bound to skolem a
+
+               | otherwise  -- Discard invisible pat_ty
+               = loop (pat:pats) pat_tys
+
+             loop pats@(_:_) [] = pprPanic "tcMatchPats" (ppr pats)
+                    -- Failure of PRECONDITION
+
+       ; loop pats pat_tys }
   where
-    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat match_ctxt, pe_orig = PatOrigin }
+
 
 tcInferPat :: FixedRuntimeRepContext
            -> HsMatchContextRn
@@ -174,7 +223,26 @@ tcCheckPat_O ctxt orig pat (Scaled pat_mult pat_ty) thing_inside
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = orig }
 
 
-{-
+{- Note [tcMatchPats]
+~~~~~~~~~~~~~~~~~~~~~
+tcMatchPats is the externally-callable wrapper function for
+  function definitions  f p1 .. pn = rhs
+  lambdas               \p1 .. pn -> body
+Typecheck the patterns, extend the environment to bind the variables, do the
+thing inside, use any existentially-bound dictionaries to discharge parts of
+the returning LIE, and deal with pattern type signatures
+
+It takes the list of patterns writen by the user, but it returns only the
+/value/ patterns.  For example:
+     f :: forall a. forall b -> a -> Mabye b -> blah
+     f @a w x (Just y) = ....
+tcMatchPats returns only the /value/ patterns [x, Just y].  Why?  The
+desugarer expects only value patterns.  (We could change that, but we would
+have to do so carefullly.)  However, distinguishing value patterns from type
+patterns is a bit tricky; e.g. the `w` in this example.  So it's very
+convenient to filter them out right here.
+
+
 ************************************************************************
 *                                                                      *
                 PatEnv, PatCtxt, LetBndrSpec
@@ -371,14 +439,6 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_tt_lpat :: ExpPatType
-           -> Checker (LPat GhcRn) (LPat GhcTc)
-tc_tt_lpat pat_ty penv (L span pat) thing_inside
-  = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_tt_pat pat_ty penv pat)
-                                          thing_inside
-        ; return (L span pat', res) }
-
 tc_lpats :: [Scaled ExpSigmaTypeFRR]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
@@ -387,38 +447,33 @@ tc_lpats tys penv pats
                penv
                (zipEqual "tc_lpats" pats tys)
 
-tc_tt_lpats :: [ExpPatType] -> Checker [LPat GhcRn] [LPat GhcTc]
-tc_tt_lpats tys penv pats
-  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
-    tcMultiple (\ penv' (p,t) -> tc_tt_lpat t penv' p)
-               penv
-               (zipEqual "tc_tt_lpats" pats tys)
-
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper
 checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin ManyTy (scaledMult pat_ty)
 
-tc_tt_pat
-        :: ExpPatType
-        -- ^ Fully refined result type
-        -> Checker (Pat GhcRn) (Pat GhcTc)
-        -- ^ Translated pattern
-tc_tt_pat pat_ty penv (ParPat x pat) thing_inside = do
-        { (pat', res) <- tc_tt_lpat pat_ty penv pat thing_inside
-        ; return (ParPat x pat', res) }
-tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
-tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
 
-tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
-tc_forall_pat _ (EmbTyPat _ tp, tv) thing_inside
+tc_forall_lpat :: TcTyVar -> Checker (LPat GhcRn) (LPat GhcTc)
+tc_forall_lpat tv penv (L span pat) thing_inside
+  = setSrcSpanA span $
+    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_forall_pat tv penv pat)
+                                          thing_inside
+        ; return (L span pat', res) }
+
+tc_forall_pat :: TcTyVar -> Checker (Pat GhcRn) (Pat GhcTc)
+tc_forall_pat tv penv (ParPat x lpat) thing_inside
+  = do { (lpat', res) <- tc_forall_lpat tv penv lpat thing_inside
+       ; return (ParPat x lpat', res) }
+
+tc_forall_pat tv _ (EmbTyPat _ tp) thing_inside
   -- The entire type pattern is guarded with the `type` herald:
   --    f (type t) (x :: t) = ...
   -- This special case is not necessary for correctness but avoids
   -- a redundant `ExpansionPat` node.
   = do { (arg_ty, result) <- tc_ty_pat tp tv thing_inside
        ; return (EmbTyPat arg_ty tp, result) }
-tc_forall_pat _ (pat, tv) thing_inside
+
+tc_forall_pat tv _ pat thing_inside
   -- The type pattern is not guarded with the `type` herald, or perhaps
   -- only parts of it are, e.g.
   --    f (t :: Type)        (x :: t) = ...    -- no `type` herald
@@ -565,7 +620,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
          -- Expression must be a function
         ; let herald = ExpectedFunTyViewPat $ unLoc expr
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
-            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,[]) expr_ty
+            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_ty) expr_ty
                -- See Note [View patterns and polymorphism]
                -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_sigma)
 

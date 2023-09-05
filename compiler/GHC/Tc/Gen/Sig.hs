@@ -41,7 +41,7 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Validity ( checkValidType )
-import GHC.Tc.Utils.Unify( tcTopSkolemise, unifyType )
+import GHC.Tc.Utils.Unify( DeepSubsumptionFlag(..), tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
@@ -519,7 +519,6 @@ tcInstSig hs_sig@(TcPartialSig (PSig { psig_hs_ty = hs_ty
        ; traceTc "End partial sig }" (ppr inst_sig)
        ; return inst_sig }
 
-
 {- Note [Pattern bindings and complete signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -806,7 +805,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcTopSkolemise ctxt spec_ty $ \ spec_tau ->
+               <- tcSkolemise Shallow ctxt spec_ty $ \spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence

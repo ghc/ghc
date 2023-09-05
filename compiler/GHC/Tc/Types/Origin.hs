@@ -160,10 +160,14 @@ data UserTypeCtxt
 -- | Report Redundant Constraints.
 data ReportRedundantConstraints
   = NoRRC            -- ^ Don't report redundant constraints
-  | WantRRC SrcSpan  -- ^ Report redundant constraints, and here
-                     -- is the SrcSpan for the constraints
-                     -- E.g. f :: (Eq a, Ord b) => blah
-                     -- The span is for the (Eq a, Ord b)
+
+  | WantRRC SrcSpan  -- ^ Report redundant constraints
+      -- The SrcSpan is for the constraints
+      -- E.g. f :: (Eq a, Ord b) => blah
+      --      The span is for the (Eq a, Ord b)
+      -- We need to record the span here because we have
+      -- long since discarded the HsType in favour of a Type
+
   deriving( Eq )  -- Just for checkSkolInfoAnon
 
 reportRedundantConstraints :: ReportRedundantConstraints -> Bool
@@ -436,7 +440,7 @@ in the right place.  So we proceed as follows:
   whatever it tidies to, say a''; and then we walk over the type
   replacing the binder a by the tidied version a'', to give
        forall a''. Eq a'' => forall b''. b'' -> a''
-  We need to do this under (=>) arrows, to match what topSkolemise
+  We need to do this under (=>) arrows and (->), to match what skolemisation
   does.
 
 * Typically a'' will have a nice pretty name like "a", but the point is

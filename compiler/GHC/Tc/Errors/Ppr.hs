@@ -5006,9 +5006,9 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy af w arg res) -- Look under  c => t
-      | isInvisibleFunArg af
-      = ty { ft_mult = tidy_ty env w
+    tidy_ty env ty@(FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+      = -- Look under  c => t and t1 -> t2
+        ty { ft_mult = tidy_ty env w
            , ft_arg  = tidyType env arg
            , ft_res  = tidy_ty env res }
 

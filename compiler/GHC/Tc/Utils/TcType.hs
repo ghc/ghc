@@ -33,7 +33,8 @@ module GHC.Tc.Utils.TcType (
   mkCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
-  ExpPatType(..),
+  ExpPatType(..), mkCheckExpFunPatTy, mkInvisExpPatType,
+  isVisibleExpPatType, isExpFunPatType,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -76,7 +77,7 @@ module GHC.Tc.Utils.TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitAppTyNoView_maybe,
-  tcSplitSigmaTy, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
+  tcSplitSigmaTy, tcSplitSigmaTyBndrs, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
 
   ---------------------------------
   -- Predicates.
@@ -453,16 +454,30 @@ checkingExpType_maybe :: ExpType -> Maybe TcType
 checkingExpType_maybe (Check ty) = Just ty
 checkingExpType_maybe (Infer {}) = Nothing
 
--- | Returns the expected type when in checking mode. Panics if in inference
--- mode.
-checkingExpType :: String -> ExpType -> TcType
-checkingExpType _   (Check ty) = ty
-checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
+-- | Returns the expected type when in checking mode.
+--   Panics if in inference mode.
+checkingExpType :: ExpType -> TcType
+checkingExpType (Check ty)    = ty
+checkingExpType et@(Infer {}) = pprPanic "checkingExpType" (ppr et)
 
 -- Expected type of a pattern in a lambda or a function left-hand side.
 data ExpPatType =
     ExpFunPatTy    (Scaled ExpSigmaTypeFRR)   -- the type A of a function A -> B
-  | ExpForAllPatTy TcTyVar                    -- the binder (a::A) of forall (a::A) -> B
+  | ExpForAllPatTy ForAllTyBinder             -- the binder (a::A) of  forall (a::A) -> B or forall (a :: A). B
+
+mkCheckExpFunPatTy :: Scaled TcType -> ExpPatType
+mkCheckExpFunPatTy (Scaled mult ty) = ExpFunPatTy (Scaled mult (mkCheckExpType ty))
+
+mkInvisExpPatType :: InvisTyBinder -> ExpPatType
+mkInvisExpPatType (Bndr tv spec) = ExpForAllPatTy (Bndr tv (Invisible spec))
+
+isVisibleExpPatType :: ExpPatType -> Bool
+isVisibleExpPatType (ExpForAllPatTy (Bndr _ vis)) = isVisibleForAllTyFlag vis
+isVisibleExpPatType (ExpFunPatTy {})              = True
+
+isExpFunPatType :: ExpPatType -> Bool
+isExpFunPatType ExpFunPatTy{}    = True
+isExpFunPatType ExpForAllPatTy{} = False
 
 instance Outputable ExpPatType where
   ppr (ExpFunPatTy t) = ppr t
@@ -559,7 +574,7 @@ TcTyVar.  This is very convenient to a consumer of a SkolemTv, but it is
 a bit awkward for the /producer/.  Why? Because sometimes we can't produce
 the SkolemInfo until we have the TcTyVars!
 
-Example: in `GHC.Tc.Utils.Unify.tcTopSkolemise` we create SkolemTvs whose
+Example: in `GHC.Tc.Utils.Unify.tcSkolemise` we create SkolemTvs whose
 `SkolemInfo` is `SigSkol`, whose arguments in turn mention the newly-created
 SkolemTvs.  So we a RecrusiveDo idiom, like this:
 
@@ -1435,6 +1450,11 @@ tcSplitSigmaTy ty = case tcSplitForAllInvisTyVars ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 
+tcSplitSigmaTyBndrs :: Type -> ([TcInvisTVBinder], ThetaType, Type)
+tcSplitSigmaTyBndrs ty = case tcSplitForAllInvisTVBinders ty of
+                        (tvs, rho) -> case tcSplitPhiTy rho of
+                                        (theta, tau) -> (tvs, theta, tau)
+
 -- | Split a sigma type into its parts, going underneath as many arrows
 -- and foralls as possible. See Note [tcSplitNestedSigmaTys]
 tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
@@ -1862,18 +1882,22 @@ See also GHC.Tc.TyCl.Utils.checkClassCycles.
 -}
 
 isSigmaTy :: TcType -> Bool
--- isSigmaTy returns true of any qualified type.  It doesn't
--- *necessarily* have any foralls.  E.g
---        f :: (?x::Int) => Int -> Int
-isSigmaTy ty | Just ty' <- coreView ty = isSigmaTy ty'
-isSigmaTy (ForAllTy {})                = True
+-- isSigmaTy returns true of any type with /invisible/ quantifiers at the top:
+--     forall a. blah
+--     Eq a => blah
+--     ?x::Int => blah
+-- But not
+--     forall a -> blah
+isSigmaTy (ForAllTy (Bndr _ af) _)     = isInvisibleForAllTyFlag af
 isSigmaTy (FunTy { ft_af = af })       = isInvisibleFunArg af
+isSigmaTy ty | Just ty' <- coreView ty = isSigmaTy ty'
 isSigmaTy _                            = False
 
+
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
-isRhoTy ty | Just ty' <- coreView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                = False
+isRhoTy (ForAllTy (Bndr _ af) _)     = isVisibleForAllTyFlag af
 isRhoTy (FunTy { ft_af = af })       = isVisibleFunArg af
+isRhoTy ty | Just ty' <- coreView ty = isRhoTy ty'
 isRhoTy _                            = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types

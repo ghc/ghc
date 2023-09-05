@@ -55,7 +55,7 @@ module GHC.Tc.Utils.TcMType (
 
   --------------------------------
   -- Instantiation
-  newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
+  newMetaTyVars, newMetaTyVarX, newMetaTyVarsX, newMetaTyVarBndrsX,
   newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
   newConcreteTyVarX,
@@ -1021,6 +1021,13 @@ newMetaTyVars = newMetaTyVarsX emptySubst
 newMetaTyVarsX :: Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- Just like newMetaTyVars, but start with an existing substitution.
 newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
+
+newMetaTyVarBndrsX :: Subst -> [VarBndr TyVar vis] -> TcM (Subst, [VarBndr TcTyVar vis])
+newMetaTyVarBndrsX subst bndrs = do
+  (subst, bndrs') <- newMetaTyVarsX subst (binderVars bndrs)
+  pure (subst, zipWith mkForAllTyBinder flags bndrs')
+  where
+    flags = binderFlags bndrs
 
 newMetaTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from

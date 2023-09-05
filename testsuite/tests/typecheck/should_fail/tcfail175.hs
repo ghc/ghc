@@ -1,7 +1,7 @@
 
 -- Crashed GHC 6.6!
 -- #1153
- 
+
 module ShouldFail where
 
 eval :: Int -> String -> String ->  String

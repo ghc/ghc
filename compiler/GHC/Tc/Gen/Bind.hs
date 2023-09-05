@@ -622,29 +622,29 @@ tcPolyCheck :: TcPragEnv
 --   it is a FunBind
 --   it has a complete type signature,
 tcPolyCheck prag_fn
-            (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = sig_loc })
+            sig@(CSig { sig_bndr = poly_id, sig_ctxt = ctxt })
             (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
-  = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
+  = do { traceTc "tcPolyCheck" (ppr sig)
 
+       -- Make a new Name, whose SrcSpan is nm_loc.  For a ClassOp
+       -- The original Name, in the FunBind{fun_id}, is bound in the
+       -- class declaration, whereas we want a Name bound right here.
+       -- We pass mono_name to tcFunBindMatches which in turn puts it in
+       -- the BinderStack, whence it shows up in "Relevant bindings.."
        ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
+
        ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; (wrap_gen, (wrap_res, matches'))
-             <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
-                tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
-                -- Unwraps multiple layers; e.g
-                --    f :: forall a. Eq a => forall b. Ord b => blah
-                -- NB: tcSkolemiseScoped makes fresh type variables
-                -- See Note [Instantiate sig with fresh variables]
+             <- tcSkolemiseCompleteSig sig $ \invis_pat_tys rho_ty ->
 
                 let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 -- See Note [Relevant bindings and the binder stack]
 
-                setSrcSpanA bind_loc $
-                tcFunBindMatches (L nm_loc (idName mono_id)) mult matches
-                                 (mkCheckExpType rho_ty)
+                setSrcSpanA bind_loc  $
+                tcFunBindMatches ctxt mono_name mult matches invis_pat_tys (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
        -- just so we have somewhere to put the SpecPrags.
@@ -1373,7 +1373,7 @@ tcMonoBinds is_rec sig_fn no_gen
                  -- function so that in type error messages we show the
                  -- type of the thing whose rhs we are type checking.
                  -- See Note [Relevant bindings and the binder stack]
-               tcFunBindMatches (L nm_loc name) mult matches exp_ty
+               tcFunBindMatches (InfSigCtxt name) name mult matches [] exp_ty
        ; mono_id <- newLetBndr no_gen name mult rhs_ty'
 
         ; return (unitBag $ L b_loc $
@@ -1648,9 +1648,11 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
                  loc mult matches)
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
-    do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcFunBindMatches (L (noAnnSrcSpan loc) (idName mono_id)) mult
-                               matches (mkCheckExpType $ idType mono_id)
+    do  { let mono_ty = idType mono_id
+              mono_name = idName mono_id
+        ; traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr mono_ty)
+        ; (co_fn, matches') <- tcFunBindMatches (InfSigCtxt mono_name) mono_name mult
+                                                matches [] (mkCheckExpType mono_ty)
         ; return ( FunBind { fun_id      = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
                            , fun_ext     = (co_fn, [])

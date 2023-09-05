@@ -77,7 +77,7 @@ module GHC.Core.Type (
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
         ErrorMsgType,
-        userTypeError_maybe, pprUserTypeErrorTy,
+        userTypeError_maybe, deepUserTypeError_maybe, pprUserTypeErrorTy,
 
         coAxNthLHS,
         stripCoercionTy,
@@ -290,8 +290,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 
-import Control.Monad    ( guard )
-import GHC.Data.Maybe   ( orElse, isJust )
+import GHC.Data.Maybe   ( orElse, isJust, firstJust )
 
 -- $type_classification
 -- #type_classification#
@@ -1236,13 +1235,41 @@ type ErrorMsgType = Type
 -- | Is this type a custom user error?
 -- If so, give us the error message.
 userTypeError_maybe :: Type -> Maybe ErrorMsgType
-userTypeError_maybe t
-  = do { (tc, _kind : msg : _) <- splitTyConApp_maybe t
+userTypeError_maybe ty
+  | Just ty' <- coreView ty = userTypeError_maybe ty'
+userTypeError_maybe (TyConApp tc (_kind : msg : _))
+  | tyConName tc == errorMessageTypeErrorFamName
           -- There may be more than 2 arguments, if the type error is
           -- used as a type constructor (e.g. at kind `Type -> Type`).
+  = Just msg
+userTypeError_maybe _
+  = Nothing
 
-       ; guard (tyConName tc == errorMessageTypeErrorFamName)
-       ; return msg }
+deepUserTypeError_maybe :: Type -> Maybe ErrorMsgType
+-- Look for custom user error, deeply inside the type
+deepUserTypeError_maybe ty
+  | Just ty' <- coreView ty = userTypeError_maybe ty'
+deepUserTypeError_maybe (TyConApp tc tys)
+  | tyConName tc == errorMessageTypeErrorFamName
+  , _kind : msg : _ <- tys
+          -- There may be more than 2 arguments, if the type error is
+          -- used as a type constructor (e.g. at kind `Type -> Type`).
+  = Just msg
+
+  | tyConMustBeSaturated tc  -- Don't go looking for user type errors
+                             -- inside type family arguments (see #20241).
+  = foldr (firstJust . deepUserTypeError_maybe) Nothing (drop (tyConArity tc) tys)
+  | otherwise
+  = foldr (firstJust . deepUserTypeError_maybe) Nothing tys
+deepUserTypeError_maybe (ForAllTy _ ty) = deepUserTypeError_maybe ty
+deepUserTypeError_maybe (FunTy { ft_arg = arg, ft_res = res })
+  = deepUserTypeError_maybe arg `firstJust` deepUserTypeError_maybe res
+deepUserTypeError_maybe (AppTy t1 t2)
+  = deepUserTypeError_maybe t1 `firstJust` deepUserTypeError_maybe t2
+deepUserTypeError_maybe (CastTy ty _)
+  = deepUserTypeError_maybe ty
+deepUserTypeError_maybe _   -- TyVarTy, CoercionTy, LitTy
+  = Nothing
 
 -- | Render a type corresponding to a user type error into a SDoc.
 pprUserTypeErrorTy :: ErrorMsgType -> SDoc

@@ -288,22 +288,12 @@ checkUserTypeError ctxt ty
   | TySynCtxt {} <- ctxt  -- Do not complain about TypeError on the
   = return ()             -- RHS of type synonyms. See #20181
 
+  | Just msg <- deepUserTypeError_maybe ty
+  = do { env0 <- liftZonkM tcInitTidyEnv
+       ; let (env1, tidy_msg) = tidyOpenType env0 msg
+       ; failWithTcM (env1, TcRnUserTypeError tidy_msg) }
   | otherwise
-  = check ty
-  where
-  check ty
-    | Just msg    <- userTypeError_maybe ty      = fail_with msg
-    | Just (_,t1) <- splitForAllTyCoVar_maybe ty = check t1
-    | let (_,tys) =  splitAppTys ty              = mapM_ check tys
-    -- splitAppTys keeps type family applications saturated.
-    -- This means we don't go looking for user type errors
-    -- inside type family arguments (see #20241).
-
-  fail_with :: Type -> TcM ()
-  fail_with msg = do { env0 <- liftZonkM tcInitTidyEnv
-                     ; let (env1, tidy_msg) = tidyOpenType env0 msg
-                     ; failWithTcM (env1, TcRnUserTypeError tidy_msg)
-                     }
+  = return ()
 
 
 {- Note [When we don't check for ambiguity]

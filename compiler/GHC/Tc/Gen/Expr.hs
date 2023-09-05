@@ -20,7 +20,7 @@ module GHC.Tc.Gen.Expr
          tcCheckMonoExpr, tcCheckMonoExprNC,
          tcMonoExpr, tcMonoExprNC,
          tcInferRho, tcInferRhoNC,
-         tcPolyExpr, tcExpr,
+         tcPolyLExpr, tcPolyExpr, tcExpr, tcPolyLExprSig,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          ) where
@@ -56,7 +56,8 @@ import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match
+import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
+                       , tcGRHSList, tcDoStmts )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.TcType
@@ -98,7 +99,6 @@ import qualified Data.List.NonEmpty as NE
 ************************************************************************
 -}
 
-
 tcCheckPolyExpr, tcCheckPolyExprNC
   :: LHsExpr GhcRn         -- Expression to type check
   -> TcSigmaType           -- Expected type (could be a polytype)
@@ -112,6 +112,7 @@ tcCheckPolyExpr, tcCheckPolyExprNC
 tcCheckPolyExpr   expr res_ty = tcPolyLExpr   expr (mkCheckExpType res_ty)
 tcCheckPolyExprNC expr res_ty = tcPolyLExprNC expr (mkCheckExpType res_ty)
 
+-----------------
 -- These versions take an ExpType
 tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
@@ -127,6 +128,112 @@ tcPolyLExprNC (L loc expr) res_ty
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
+-----------------
+tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
+tcPolyExpr e (Infer inf) = tcExpr e (Infer inf)
+tcPolyExpr e (Check ty)  = tcPolyExprCheck e (Left ty)
+
+-----------------
+tcPolyLExprSig :: LHsExpr GhcRn -> TcCompleteSig -> TcM (LHsExpr GhcTc)
+tcPolyLExprSig (L loc expr) sig
+  = setSrcSpanA loc $
+    -- No addExprCtxt.  For (e :: ty) we don't want generate
+    --    In the expression e
+    --    In the expression e :: ty
+    -- We have already got an error-context for (e::ty), so when we
+    -- get to `e`, just add the location
+    do { traceTc "tcPolyLExprSig" (ppr loc $$ ppr expr)
+       ; expr' <- tcPolyExprCheck expr (Right sig)
+       ; return (L loc expr') }
+
+-----------------
+tcPolyExprCheck :: HsExpr GhcRn
+                -> Either TcSigmaType TcCompleteSig
+                -> TcM (HsExpr GhcTc)
+-- tcPolyExpCheck deals with the special case for HsLam, in case the pushed-down
+-- type is a forall-type.  E.g.    (\@a -> blah) :: forall b. b -> Int
+--
+-- The (Either TcSigmaType TcCompleteSig) deals with:
+--   Left ty:    (f e) pushes f's argument type `ty` into `e`
+--   Right sig:  (e :: sig) pushes `sig` into `e`
+-- The Either stuff is entirely local to this function and its immediate callers.
+--
+-- See Note [Skolemisation overview] in GHC.Tc.Utils.Unify
+
+tcPolyExprCheck expr res_ty
+  = outer_skolemise res_ty $ \pat_tys rho_ty ->
+    let
+      -- tc_body is a little loop that looks past parentheses
+      tc_body (HsPar x (L loc e))
+        = setSrcSpanA loc $
+          do { e' <- tc_body e
+             ; return (HsPar x (L loc e')) }
+
+      -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
+      tc_body e@(HsLam x lam_variant matches)
+        = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches pat_tys
+                                                   (mkCheckExpType rho_ty)
+               -- NB: tcLambdaMatches concludes with deep skolemisation,
+               --     if DeepSubsumption is on;  hence no need to do that here
+             ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+
+      -- The general case: just do deep skolemisation if necessary,
+      -- before handing off to tcExpr
+      tc_body e = do { ds_flag <- getDeepSubsumptionFlag
+                     ; inner_skolemise ds_flag rho_ty $ \rho_ty' ->
+                       tcExpr e (mkCheckExpType rho_ty') }
+    in tc_body expr
+  where
+    -- `outer_skolemise` is used always
+    -- It only does shallow skolemisation
+    -- It always makes an implication constraint if deferred-errors is on
+    outer_skolemise :: Either TcSigmaType TcCompleteSig
+                    -> ([ExpPatType] -> TcRhoType -> TcM (HsExpr GhcTc))
+                    -> TcM (HsExpr GhcTc)
+    outer_skolemise (Left ty) thing_inside
+      = do { (wrap, expr') <- tcSkolemiseExpectedType ty thing_inside
+           ; return (mkHsWrap wrap expr') }
+    outer_skolemise (Right sig) thing_inside
+      = do { (wrap, expr') <- tcSkolemiseCompleteSig sig thing_inside
+           ; return (mkHsWrap wrap expr') }
+
+    -- inner_skolemise is used when we do not have a lambda
+    -- With deep skolemisation we must remember to deeply skolemise
+    -- after the (always-shallow) tcSkolemiseCompleteSig
+    inner_skolemise :: DeepSubsumptionFlag -> TcRhoType
+                    -> (TcRhoType -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
+    inner_skolemise Shallow rho_ty thing_inside
+      = -- We have already done shallow skolemisation, so nothing further to do
+        thing_inside rho_ty
+    inner_skolemise Deep rho_ty thing_inside
+      = -- Try deep skolemisation
+        do { (wrap, expr') <- tcSkolemise Deep ctxt rho_ty thing_inside
+           ; return (mkHsWrap wrap expr') }
+
+    ctxt = case res_ty of
+             Left {}   -> GenSigCtxt
+             Right sig -> sig_ctxt sig
+
+
+{- *********************************************************************
+*                                                                      *
+        tcExpr: the main expression typechecker
+*                                                                      *
+********************************************************************* -}
+
+tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
+-- Infer a *rho*-type. The return type is always instantiated.
+tcInferRho (L loc expr)
+  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    do { (expr', rho) <- tcInfer (tcExpr expr)
+       ; return (L loc expr', rho) }
+
+tcInferRhoNC (L loc expr)
+  = setSrcSpanA loc $
+    do { (expr', rho) <- tcInfer (tcExpr expr)
+       ; return (L loc expr', rho) }
+
 ---------------
 tcCheckMonoExpr, tcCheckMonoExprNC
     :: LHsExpr GhcRn     -- Expression to type check
@@ -136,6 +243,7 @@ tcCheckMonoExpr, tcCheckMonoExprNC
 tcCheckMonoExpr   expr res_ty = tcMonoExpr   expr (mkCheckExpType res_ty)
 tcCheckMonoExprNC expr res_ty = tcMonoExprNC expr (mkCheckExpType res_ty)
 
+---------------
 tcMonoExpr, tcMonoExprNC
     :: LHsExpr GhcRn     -- Expression to type check
     -> ExpRhoType        -- Expected type
@@ -154,33 +262,6 @@ tcMonoExprNC (L loc expr) res_ty
         ; return (L loc expr') }
 
 ---------------
-tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
--- Infer a *rho*-type. The return type is always instantiated.
-tcInferRho (L loc expr)
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
-    do { (expr', rho) <- tcInfer (tcExpr expr)
-       ; return (L loc expr', rho) }
-
-tcInferRhoNC (L loc expr)
-  = setSrcSpanA loc $
-    do { (expr', rho) <- tcInfer (tcExpr expr)
-       ; return (L loc expr', rho) }
-
-
-{- *********************************************************************
-*                                                                      *
-        tcExpr: the main expression typechecker
-*                                                                      *
-********************************************************************* -}
-
-tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
-tcPolyExpr expr res_ty
-  = do { traceTc "tcPolyExpr" (ppr res_ty)
-       ; (wrap, expr') <- tcSkolemiseExpType GenSigCtxt res_ty $ \ res_ty ->
-                          tcExpr expr res_ty
-       ; return $ mkHsWrap wrap expr' }
-
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 -- Use tcApp to typecheck applications, which are treated specially
@@ -262,11 +343,8 @@ tcExpr e@(HsIPVar _ x) res_ty
   origin = IPOccOrigin x
 
 tcExpr e@(HsLam x lam_variant matches) res_ty
-  = do { (wrap, matches') <- tcLambdaMatches herald matches res_ty
+  = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches [] res_ty
        ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
-  where
-    herald = ExpectedFunTyLam lam_variant e
-
 
 {-
 ************************************************************************
@@ -408,10 +486,9 @@ Not using 'sup' caused #23814.
 -}
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { (ues, alts') <- mapAndUnzipM (\alt -> tcCollectingUsage $
-                                        wrapLocMA (tcGRHS IfAlt tcBody res_ty) alt) alts
+  = do { alts' <- tcGRHSList IfAlt tcBody alts res_ty
+                  -- See Note [MultiWayIf linearity checking]
        ; res_ty <- readExpType res_ty
-       ; tcEmitBindingUsage (supUEs ues)  -- See Note [MultiWayIf linearity checking]
        ; return (HsMultiIf res_ty alts') }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
@@ -825,8 +902,8 @@ tcSynArgE :: CtOrigin
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig op sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
-           <- tcTopSkolemise GenSigCtxt sigma_ty
-                (\ rho_ty -> go rho_ty syn_ty)
+           <- tcSkolemise Shallow GenSigCtxt sigma_ty $ \rho_ty ->
+              go rho_ty syn_ty
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
     go rho_ty SynAny
@@ -895,8 +972,7 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTys herald orig Nothing
-                                (length arg_shapes) sigma_ty
+           <- matchActualFunTys herald orig (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_mults ->
