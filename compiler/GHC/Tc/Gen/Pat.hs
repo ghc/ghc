@@ -138,10 +138,31 @@ tcPats :: HsMatchContext GhcTc
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside
-  = tc_tt_lpats pat_tys penv pats thing_inside
+tcPats ctxt pats pat_tys thing_inside = do
+    pat_tys' <- filter_exp_tys pats pat_tys
+    tc_tt_lpats pat_tys' penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
+
+    filter_exp_tys :: [LPat GhcRn] -> [ExpPatType] -> TcM ([ExpPatType])
+
+    filter_exp_tys [] rest = pure (drop_invis_pats rest)
+
+    -- visible patterns
+    filter_exp_tys pats@(L _ _ : _) (ExpForAllPatTy (Bndr _ Invisible{}) : pat_tys) =
+      filter_exp_tys pats (drop_invis_pats pat_tys)
+    filter_exp_tys (L _ _ : pats) (p : pat_tys) = do
+      (pat_tys') <- filter_exp_tys pats pat_tys
+      pure (p : pat_tys')
+
+    -- invisible patterns
+    -- There are no at the moment
+
+    filter_exp_tys (L _  _ :_) [] =
+      panic "filter_exp_tys: expected patterns more then expected pattern types"
+
+    drop_invis_pats (ExpForAllPatTy (Bndr _ Invisible{}) : pat_tys) = drop_invis_pats pat_tys
+    drop_invis_pats pat_tys = pat_tys
 
 tcInferPat :: FixedRuntimeRepContext
            -> HsMatchContext GhcTc
@@ -406,7 +427,9 @@ tc_tt_pat pat_ty penv (ParPat x pat) thing_inside = do
         { (pat', res) <- tc_tt_lpat pat_ty penv pat thing_inside
         ; return (ParPat x pat', res) }
 tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
-tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
+tc_tt_pat (ExpForAllPatTy (Bndr tv Required))  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
+tc_tt_pat (ExpForAllPatTy (Bndr _tv Invisible{}))  _penv _pat _thing_inside
+  = panic "Patterns for invisible type binders aren't supported yet"
 
 tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
 tc_forall_pat _ (EmbTyPat _ tp, tv) thing_inside

@@ -23,6 +23,8 @@ tcCheckMonoExpr, tcCheckMonoExprNC ::
        -> TcRhoType
        -> TcM (LHsExpr GhcTc)
 
+tcPolyLExpr :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTc)
+
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
 tcExpr     :: HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
 
@@ -42,4 +44,3 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxOpType
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
-

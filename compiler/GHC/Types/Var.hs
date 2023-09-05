@@ -8,6 +8,7 @@
 {-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
              PatternSynonyms, BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -- |
 -- #name_types#
@@ -714,7 +715,7 @@ Currently there are nine different uses of 'VarBndr':
 
 data VarBndr var argf = Bndr var argf
   -- See Note [The VarBndr type and its uses]
-  deriving( Data )
+  deriving( Data, Functor )
 
 -- | Variable Binder
 --

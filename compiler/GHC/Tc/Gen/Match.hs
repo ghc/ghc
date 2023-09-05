@@ -17,6 +17,7 @@
 -- | Typecheck some @Matches@
 module GHC.Tc.Gen.Match
    ( tcMatchesFun
+   , tc_matches_fun
    , tcGRHS
    , tcGRHSsPat
    , tcMatchesCase
@@ -38,9 +39,9 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
-                                       , tcMonoExpr, tcMonoExprNC, tcExpr
+                                       , tcMonoExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
-                                       , tcCheckPolyExpr )
+                                       , tcCheckPolyExpr, tcPolyLExpr )
 
 import GHC.Rename.Utils ( bindLocalNames, isIrrefutableHsPatRn )
 import GHC.Tc.Errors.Types
@@ -81,6 +82,7 @@ import Control.Monad
 import Control.Arrow ( second )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
+import GHC.Types.Var
 
 {-
 ************************************************************************
@@ -100,8 +102,16 @@ tcMatchesFun :: LocatedN Name -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+tcMatchesFun fun_name mult matches = tc_matches_fun fun_name mult matches []
+
+tc_matches_fun :: LocatedN Name -- MatchContext Id
+             -> Mult -- The multiplicity of the binder
+             -> MatchGroup GhcRn (LHsExpr GhcRn)
+             -> [ExpPatType]
+             -> ExpRhoType    -- Expected type of function
+             -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
-tcMatchesFun fun_name mult matches exp_ty
+tc_matches_fun fun_name mult matches implicit_pat_tys exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely
@@ -111,7 +121,8 @@ tcMatchesFun fun_name mult matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
         ; checkArgCounts what matches
 
-        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
+        ; (wrapper, (mult_co_wrap, r)) <-
+            match_expected_fun_tys herald ctxt arity implicit_pat_tys exp_ty $ \ pat_tys rhs_ty ->
                -- NB: exp_type may be polymorphic, but
                --     matchExpectedFunTys can cope with that
             tcScalingUsage mult $
@@ -153,7 +164,7 @@ tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
 tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
               -> MatchGroup GhcRn (LHsExpr GhcRn)
-              -> ExpRhoType
+              -> ExpSigmaType
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
   =  do { checkArgCounts (mc_what match_ctxt) match
@@ -288,8 +299,13 @@ tcMatch ctxt pat_tys rhs_ty match
     -- We filter out type patterns because we have no use for them in HsToCore.
     -- Type variable bindings have already been converted to HsWrappers.
     filter_out_type_pats :: [LPat GhcTc] -> [LPat GhcTc]
-    filter_out_type_pats = filterByList (map is_fun_pat_ty pat_tys)
+    filter_out_type_pats = filterByList (map is_fun_pat_ty vis_pat_tys)
       where
+        vis_pat_tys = filterOut is_inv_pat_ty pat_tys
+
+        is_inv_pat_ty (ExpForAllPatTy (Bndr _ Invisible{})) = True
+        is_inv_pat_ty _ = False
+
         is_fun_pat_ty ExpFunPatTy{}    = True
         is_fun_pat_ty ExpForAllPatTy{} = False
 
@@ -361,10 +377,10 @@ tcDoStmts MonadComp (L l stmts) res_ty
         ; return (HsDo res_ty MonadComp (L l stmts')) }
 tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
 
-tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
+tcBody :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; tcMonoExpr body res_ty
+        ; tcPolyLExpr body res_ty
         }
 
 {-

@@ -20,7 +20,7 @@ module GHC.Tc.Gen.Expr
          tcCheckMonoExpr, tcCheckMonoExprNC,
          tcMonoExpr, tcMonoExprNC,
          tcInferRho, tcInferRhoNC,
-         tcPolyExpr, tcExpr,
+         tcPolyLExpr, tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          ) where
@@ -176,6 +176,18 @@ tcInferRhoNC (L loc expr)
 ********************************************************************* -}
 
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
+tcPolyExpr (HsPar x expr) res_ty
+  = do { expr' <- tcPolyLExprNC expr res_ty
+       ; return (HsPar x expr') }
+
+tcPolyExpr e@(HsLam x lam_variant matches) res_ty
+  = do { (wrap, matches')
+           <- tcMatchLambda herald match_ctxt matches res_ty
+       ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+  where
+    match_ctxt = MC { mc_what = LamAlt lam_variant, mc_body = tcBody }
+    herald = ExpectedFunTyLam lam_variant e
+
 tcPolyExpr expr res_ty
   = do { traceTc "tcPolyExpr" (ppr res_ty)
        ; (wrap, expr') <- tcSkolemiseExpType GenSigCtxt res_ty $ \ res_ty ->
@@ -793,7 +805,7 @@ tcSynArgE :: CtOrigin
 tcSynArgE orig op sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
            <- tcTopSkolemise GenSigCtxt sigma_ty
-                (\ rho_ty -> go rho_ty syn_ty)
+                (\_ rho_ty -> go rho_ty syn_ty)
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
     go rho_ty SynAny

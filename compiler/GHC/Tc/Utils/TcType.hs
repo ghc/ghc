@@ -33,7 +33,7 @@ module GHC.Tc.Utils.TcType (
   mkCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
-  ExpPatType(..),
+  ExpPatType(..), mkInvisExpPatType,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -76,7 +76,7 @@ module GHC.Tc.Utils.TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitAppTyNoView_maybe,
-  tcSplitSigmaTy, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
+  tcSplitSigmaTy, tcSplitSigmaTyBindr, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
 
   ---------------------------------
   -- Predicates.
@@ -462,7 +462,10 @@ checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 -- Expected type of a pattern in a lambda or a function left-hand side.
 data ExpPatType =
     ExpFunPatTy    (Scaled ExpSigmaTypeFRR)   -- the type A of a function A -> B
-  | ExpForAllPatTy TcTyVar                    -- the binder (a::A) of forall (a::A) -> B
+  | ExpForAllPatTy ForAllTyBinder             -- the binder (a::A) of  forall (a::A) -> B or forall (a :: A). B
+
+mkInvisExpPatType :: InvisTyBinder -> ExpPatType
+mkInvisExpPatType = ExpForAllPatTy . fmap Invisible
 
 instance Outputable ExpPatType where
   ppr (ExpFunPatTy t) = ppr t
@@ -1432,6 +1435,11 @@ tcSplitPhiTy ty
 -- will implicitly instantiate.
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllInvisTyVars ty of
+                        (tvs, rho) -> case tcSplitPhiTy rho of
+                                        (theta, tau) -> (tvs, theta, tau)
+
+tcSplitSigmaTyBindr :: Type -> ([TcInvisTVBinder], ThetaType, Type)
+tcSplitSigmaTyBindr ty = case tcSplitForAllInvisTVBinders ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 

@@ -32,7 +32,7 @@ module GHC.Tc.Utils.Unify (
   matchExpectedListTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
-  matchExpectedFunTys,
+  matchExpectedFunTys, match_expected_fun_tys,
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
@@ -361,6 +361,15 @@ Example:
        with the type signature.
 -}
 
+matchExpectedFunTys :: forall a.
+                       ExpectedFunTyOrigin
+                    -> UserTypeCtxt
+                    -> Arity
+                    -> ExpRhoType
+                    -> ([ExpPatType] -> ExpRhoType -> TcM a)
+                    -> TcM (HsWrapper, a)
+matchExpectedFunTys herald ctx arity = match_expected_fun_tys herald ctx arity []
+
 -- | Use this function to split off arguments types when you have an
 -- \"expected\" type.
 --
@@ -370,28 +379,29 @@ Example:
 -- to a list of argument types which all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
-matchExpectedFunTys :: forall a.
-                       ExpectedFunTyOrigin -- See Note [Herald for matchExpectedFunTys]
+match_expected_fun_tys :: forall a.
+                      ExpectedFunTyOrigin -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> Arity
-                    -> ExpRhoType      -- Skolemised
+                    -> [ExpPatType] -- implicit, previously skolemised pattern types
+                    -> ExpRhoType
                     -> ([ExpPatType] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (wrap, _)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald ctx arity orig_ty thing_inside
-  = case orig_ty of
-      Check ty -> go [] arity ty
-      _        -> defer [] arity orig_ty
+match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
+  = case orig_ty of    -- go collects pat tys in reversed order
+      Check ty -> go    (reverse imp_pat_tys) arity ty
+      _        -> defer (reverse imp_pat_tys) arity orig_ty
   where
     -- Skolemise any /invisible/ foralls /before/ the zero-arg case
     -- so that we guarantee to return a rho-type
     go acc_arg_tys n ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty  -- Invisible binders only!
       , not (null tvs && null theta)          -- Visible ones handled below
-      = do { (wrap_gen, (wrap_res, result)) <- tcTopSkolemise ctx ty $ \ty' ->
-                                               go acc_arg_tys n ty'
+      = do { (wrap_gen, (wrap_res, result)) <- tcTopSkolemise ctx ty $ \imp_ty_pats ty' ->
+                      go (acc_arg_tys ++ reverse (map mkInvisExpPatType imp_ty_pats)) n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ coreView, so
@@ -416,7 +426,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-        do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
+        do { let arg_pos = 1 + length (filterOut is_invis_pat_ty acc_arg_tys) -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
            ; (wrap_res, result) <- go ((ExpFunPatTy $ Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
@@ -456,14 +466,14 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
          ; let ty' = substTy subst' ty
          ; (ev_binds, (wrap_res, result)) <-
               checkConstraints (getSkolemInfo skol_info) [tv'] [] $
-              go (ExpForAllPatTy tv' : acc_arg_tys) (n - 1) ty'
+              go (ExpForAllPatTy (mkForAllTyBinder Required tv') : acc_arg_tys) (n - 1) ty'
          ; let wrap_gen = mkWpVisTyLam tv' ty' <.> mkWpLet ev_binds
          ; return (wrap_gen <.> wrap_res, result) }
 
     ------------
     defer :: [ExpPatType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
-      = do { let last_acc_arg_pos = length acc_arg_tys
+      = do { let last_acc_arg_pos = length (filterOut is_invis_pat_ty acc_arg_tys)
            ; more_arg_tys <- mapM new_exp_arg_ty [last_acc_arg_pos + 1 .. last_acc_arg_pos + n]
            ; res_ty       <- newInferExpType
            ; result       <- thing_inside (reverse acc_arg_tys ++ map ExpFunPatTy more_arg_tys) res_ty
@@ -479,14 +489,17 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       = mkScaled <$> newFlexiTyVarTy multiplicityTy
                  <*> newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
 
+    is_invis_pat_ty (ExpForAllPatTy (Bndr _ Invisible{})) = True
+    is_invis_pat_ty _                                     = False
+
     ------------
     mk_ctxt :: [ExpPatType] -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
-        arg_tys' = map prepare_arg_ty (reverse arg_tys)
+        arg_tys' = map prepare_arg_ty (reverse (filterOut is_invis_pat_ty arg_tys))
         prepare_arg_ty (ExpFunPatTy (Scaled u v)) = Anon (Scaled u (checkingExpType "matchExpectedFunTys" v)) visArgTypeLike
-        prepare_arg_ty (ExpForAllPatTy tv)        = Named (Bndr tv Required)
+        prepare_arg_ty (ExpForAllPatTy tv)        = Named tv
             -- this is safe b/c we're called from "go"
 
 mkFunTysMsg :: TidyEnv
@@ -1046,7 +1059,7 @@ tc_sub_type_shallow unify inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
 
        ; (sk_wrap, inner_wrap)
-           <- tcTopSkolemise ctxt ty_expected $ \ sk_rho ->
+           <- tcTopSkolemise ctxt ty_expected $ \_ sk_rho ->
               do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
                  ; cow           <- unify rho_a sk_rho
                  ; return (mkWpCastN cow <.> wrap) }
@@ -1069,7 +1082,7 @@ tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
 
        ; (sk_wrap, inner_wrap)
-           <- tcDeeplySkolemise ctxt ty_expected $ \ sk_rho ->
+           <- tcDeeplySkolemise ctxt ty_expected $ \_ sk_rho ->
               -- See Note [Deep subsumption]
               tc_sub_type_ds unify inst_orig ctxt ty_actual sk_rho
 
@@ -1372,7 +1385,7 @@ tc_sub_type_ds unify inst_orig ctxt ty_actual ty_expected
 
 tcDeeplySkolemise
     :: UserTypeCtxt -> TcSigmaType
-    -> (TcType -> TcM result)
+    -> ([TcInvisTVBinder] -> TcType -> TcM result)
     -> TcM (HsWrapper, result)
         -- ^ The wrapper has type: spec_ty ~> expected_ty
 -- Just like tcTopSkolemise, but calls
@@ -1380,29 +1393,16 @@ tcDeeplySkolemise
 -- See Note [Deep skolemisation]
 tcDeeplySkolemise ctxt expected_ty thing_inside
   | isTauTy expected_ty  -- Short cut for common case
-  = do { res <- thing_inside expected_ty
+  = do { res <- thing_inside [] expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = do  { -- This (unpleasant) rec block allows us to pass skol_info to deeplySkolemise;
-          -- but skol_info can't be built until we have tv_prs
-          rec { (wrap, tv_prs, given, rho_ty) <- deeplySkolemise skol_info expected_ty
-              ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
-
-        ; traceTc "tcDeeplySkolemise" (ppr expected_ty $$ ppr rho_ty $$ ppr tv_prs)
-
-        ; let skol_tvs  = map snd tv_prs
-        ; (ev_binds, result)
-              <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
-                 thing_inside rho_ty
-
-        ; return (wrap <.> mkWpLet ev_binds, result) }
-          -- The ev_binds returned by checkConstraints is very
-          -- often empty, in which case mkWpLet is a no-op
+  = tcSkolemiseGeneral deeplySkolemise ctxt expected_ty (\tv_prs tc_ty ->
+      thing_inside (map snd tv_prs) tc_ty)
 
 deeplySkolemise :: SkolemInfo -> TcSigmaType
                 -> TcM ( HsWrapper
-                       , [(Name,TyVar)]     -- All skolemised variables
-                       , [EvVar]            -- All "given"s
+                       , [(Name,TcInvisTVBinder)]     -- All skolemised variables
+                       , [EvVar]                      -- All "given"s
                        , TcRhoType )
 -- See Note [Deep skolemisation]
 deeplySkolemise skol_info ty
@@ -1411,14 +1411,14 @@ deeplySkolemise skol_info ty
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
-      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
+      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTyBndr_maybe ty
       = do { let arg_tys' = substScaledTys subst arg_tys
            ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
-           ; (subst', tvs1) <- tcInstSkolTyVarsX skol_info subst tvs
+           ; (subst', tvs1) <- tcInstSkolTyBindrVarsX skol_info subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
+           ; let tv_prs1 = map (tyVarName . binderVar) tvs `zip` tvs1
+           ; return ( mkWpEta ids1 (mkWpTyLams (binderVars tvs1)
                                     <.> mkWpEvLams ev_vars1
                                     <.> wrap)
                     , tv_prs1  ++ tvs_prs2
@@ -1450,21 +1450,31 @@ deeplyInstantiate orig ty
       = do { let ty' = substTy subst ty
            ; return (idHsWrapper, ty') }
 
-tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([Scaled TcType], [TyVar], ThetaType, TcSigmaType)
+
+
+tcDeepSplit_maybe :: (Type -> ([a], ThetaType, Type)) -> TcSigmaType -> Maybe ([Scaled TcType], [a], ThetaType, TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 
-tcDeepSplitSigmaTy_maybe ty
-  | Just (arg_ty, res_ty)           <- tcSplitFunTy_maybe ty
-  , Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe res_ty
-  = Just (arg_ty:arg_tys, tvs, theta, rho)
+tcDeepSplit_maybe splitter = go where
+  go ty
+    | Just (arg_ty, res_ty)           <- tcSplitFunTy_maybe ty
+    , Just (arg_tys, tvs, theta, rho) <- go res_ty
+    = Just (arg_ty:arg_tys, tvs, theta, rho)
 
-  | (tvs, theta, rho) <- tcSplitSigmaTy ty
-  , not (null tvs && null theta)
-  = Just ([], tvs, theta, rho)
+    | (tvs, theta, rho) <- splitter ty
+    , not (null tvs && null theta)
+    = Just ([], tvs, theta, rho)
 
-  | otherwise = Nothing
+    | otherwise = Nothing
+
+tcDeepSplitSigmaTy_maybe
+  :: TcSigmaType -> Maybe ([Scaled TcType], [TyVar], ThetaType, TcSigmaType)
+tcDeepSplitSigmaTy_maybe = tcDeepSplit_maybe tcSplitSigmaTy
+
+tcDeepSplitSigmaTyBndr_maybe
+  :: TcSigmaType -> Maybe ([Scaled TcType], [TcInvisTVBinder], ThetaType, TcSigmaType)
+tcDeepSplitSigmaTyBndr_maybe = tcDeepSplit_maybe tcSplitSigmaTyBindr
 
 
 {- *********************************************************************
@@ -1504,9 +1514,30 @@ tcSkolemiseScoped is very similar, but differs in two ways:
   See Note [When to build an implication] below.
 -}
 
+tcSkolemiseGeneral ::
+  (SkolemInfo -> TcType -> TcM (HsWrapper, [(Name, VarBndr TcTyVar vis)], [EvVar], TcType))
+  -> UserTypeCtxt
+  -> TcType
+  -> ([(Name, VarBndr TcTyVar vis)] -> TcType -> IOEnv (Env TcGblEnv TcLclEnv) result)
+  -> TcM (HsWrapper, result)
+tcSkolemiseGeneral skolemise ctxt expected_ty thing_inside
+  = do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+         --           in GHC.Tc.Utils.TcType
+         rec { (wrap, tv_prs, given, rho_ty) <- skolemise skol_info expected_ty
+             ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty (map (fmap binderVar) tv_prs)) }
+
+       ; let skol_tvs = map (binderVar . snd) tv_prs
+       ; (ev_binds, result)
+             <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
+                thing_inside tv_prs rho_ty
+
+       ; return (wrap <.> mkWpLet ev_binds, result) }
+         -- The ev_binds returned by checkConstraints is very
+         -- often empty, in which case mkWpLet is a no-op
+
 tcTopSkolemise, tcSkolemiseScoped
     :: UserTypeCtxt -> TcSigmaType
-    -> (TcType -> TcM result)
+    -> ([TcInvisTVBinder] -> TcType -> TcM result)
     -> TcM (HsWrapper, result)
         -- ^ The wrapper has type: spec_ty ~> expected_ty
 -- See Note [Skolemisation] for the differences between
@@ -1516,37 +1547,17 @@ tcSkolemiseScoped ctxt expected_ty thing_inside
   = do { deep_subsumption <- xoptM LangExt.DeepSubsumption
        ; let skolemise | deep_subsumption = deeplySkolemise
                        | otherwise        = topSkolemise
-       ; -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
-         --           in GHC.Tc.Utils.TcType
-         rec { (wrap, tv_prs, given, rho_ty) <- skolemise skol_info expected_ty
-             ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
-
-       ; let skol_tvs = map snd tv_prs
-       ; (ev_binds, res)
-             <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
-                tcExtendNameTyVarEnv tv_prs               $
-                thing_inside rho_ty
-
-       ; return (wrap <.> mkWpLet ev_binds, res) }
+       ; tcSkolemiseGeneral skolemise ctxt expected_ty $ \tv_prs rho_ty ->
+                tcExtendNameTyVarEnv (map (fmap binderVar) tv_prs) $
+                thing_inside (map snd tv_prs) rho_ty }
 
 tcTopSkolemise ctxt expected_ty thing_inside
   | isRhoTy expected_ty  -- Short cut for common case
-  = do { res <- thing_inside expected_ty
+  = do { res <- thing_inside [] expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
-         --           in GHC.Tc.Utils.TcType
-         rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
-             ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
-
-       ; let skol_tvs = map snd tv_prs
-       ; (ev_binds, result)
-             <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
-                thing_inside rho_ty
-
-       ; return (wrap <.> mkWpLet ev_binds, result) }
-         -- The ev_binds returned by checkConstraints is very
-        -- often empty, in which case mkWpLet is a no-op
+  = tcSkolemiseGeneral topSkolemise ctxt expected_ty $ \tv_prs rho_ty ->
+      thing_inside (map snd tv_prs) rho_ty
 
 -- | Variant of 'tcTopSkolemise' that takes an ExpType
 tcSkolemiseExpType :: UserTypeCtxt -> ExpSigmaType
@@ -1558,7 +1569,7 @@ tcSkolemiseExpType ctxt (Check ty) thing_inside
   = do { deep_subsumption <- xoptM LangExt.DeepSubsumption
        ; let skolemise | deep_subsumption = tcDeeplySkolemise
                        | otherwise        = tcTopSkolemise
-       ; skolemise ctxt ty $ \rho_ty ->
+       ; skolemise ctxt ty $ \_ rho_ty ->
          thing_inside (mkCheckExpType rho_ty) }
 
 checkConstraints :: SkolemInfoAnon

@@ -19,7 +19,7 @@ module GHC.Tc.Utils.Instantiate (
 
      tcInstType, tcInstTypeBndrs,
      tcSkolemiseInvisibleBndrs,
-     tcInstSkolTyVars, tcInstSkolTyVarsX,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyBindrVarsX,
      tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
      freshenTyVarBndrs, freshenCoVarBndrsX,
@@ -172,8 +172,8 @@ In general,
 topSkolemise :: SkolemInfo
              -> TcSigmaType
              -> TcM ( HsWrapper
-                    , [(Name,TyVar)]     -- All skolemised variables
-                    , [EvVar]            -- All "given"s
+                    , [(Name,TcInvisTVBinder)]     -- All skolemised variables
+                    , [EvVar]                      -- All "given"s
                     , TcRhoType )
 -- See Note [Skolemisation]
 topSkolemise skolem_info ty
@@ -183,13 +183,13 @@ topSkolemise skolem_info ty
 
     -- Why recursive?  See Note [Skolemisation]
     go subst wrap tv_prs ev_vars ty
-      | (tvs, theta, inner_ty) <- tcSplitSigmaTy ty
+      | (tvs, theta, inner_ty) <- tcSplitSigmaTyBindr ty
       , not (null tvs && null theta)
-      = do { (subst', tvs1) <- tcInstSkolTyVarsX skolem_info subst tvs
+      = do { (subst', tvs1) <- tcInstSkolTyBindrVarsX skolem_info subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; go subst'
-                (wrap <.> mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1)
-                (tv_prs ++ (map tyVarName tvs `zip` tvs1))
+                (wrap <.> mkWpTyLams (binderVars tvs1) <.> mkWpEvLams ev_vars1)
+                (tv_prs ++ (map (tyVarName . binderVar) tvs `zip` tvs1))
                 (ev_vars ++ ev_vars1)
                 inner_ty }
 
@@ -513,6 +513,13 @@ tcInstSkolTyVars skol_info = tcInstSkolTyVarsX skol_info emptySubst
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]
 tcInstSkolTyVarsX skol_info = tcInstSkolTyVarsPushLevel skol_info False
+
+tcInstSkolTyBindrVarsX :: SkolemInfo -> Subst -> [VarBndr TyCoVar vis] -> TcM (Subst, [VarBndr TyCoVar vis])
+tcInstSkolTyBindrVarsX skol_info subs bndrs = do
+  (subst', bndrs') <- tcInstSkolTyVarsX skol_info subs (binderVars bndrs)
+  pure (subst', zipWith mkForAllTyBinder flags bndrs')
+  where
+    flags = binderFlags bndrs
 
 tcInstSuperSkolTyVars :: SkolemInfo -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]

@@ -23,7 +23,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun )
+import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun, tc_matches_fun )
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcCheckMonoExpr )
 import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 
@@ -625,7 +625,7 @@ tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id
                          , sig_ctxt  = ctxt
                          , sig_loc   = sig_loc })
-            (L bind_loc (FunBind { fun_id = L nm_loc name
+            (L bind_loc (FunBind { fun_id = (L nm_loc name)
                                  , fun_matches = matches }))
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
@@ -633,7 +633,7 @@ tcPolyCheck prag_fn
        ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; (wrap_gen, (wrap_res, matches'))
              <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
-                tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
+                tcSkolemiseScoped ctxt (idType poly_id) $ \imp_ty_vars rho_ty ->
                 -- Unwraps multiple layers; e.g
                 --    f :: forall a. Eq a => forall b. Ord b => blah
                 -- NB: tcSkolemiseScoped makes fresh type variables
@@ -645,8 +645,8 @@ tcPolyCheck prag_fn
                 --    See Note [Relevant bindings and the binder stack]
 
                 setSrcSpanA bind_loc $
-                tcMatchesFun (L nm_loc (idName mono_id)) mult matches
-                             (mkCheckExpType rho_ty)
+                tc_matches_fun (L nm_loc (idName mono_id)) mult matches
+                            (map mkInvisExpPatType imp_ty_vars) (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
        -- just so we have somewhere to put the SpecPrags.

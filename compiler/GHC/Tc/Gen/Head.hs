@@ -984,9 +984,17 @@ tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc,
 tcExprSig ctxt expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id
-       ; (wrap, expr') <- tcSkolemiseScoped ctxt poly_ty $ \rho_ty ->
-                          tcCheckMonoExprNC expr rho_ty
+       ; (wrap, expr') <- check_expr poly_ty
        ; return (mkLHsWrap wrap expr', poly_ty) }
+    where
+      check_expr poly_ty = do
+        stv <- xoptM LangExt.ScopedTypeVariables
+        if stv then
+          tcSkolemiseScoped ctxt poly_ty $ \_ rho_ty ->
+          tcCheckMonoExprNC expr rho_ty
+        else
+          do { res <- tcCheckPolyExprNC expr poly_ty
+             ; pure (idHsWrapper, res)}
 
 tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint

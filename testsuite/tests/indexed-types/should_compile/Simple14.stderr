@@ -7,7 +7,7 @@ Simple14.hs:22:27: error: [GHC-83865]
         inside the constraints: Maybe m ~ Maybe n
         bound by a type expected by the context:
                    (Maybe m ~ Maybe n) => EQ_ z0 z0
-        at Simple14.hs:22:26-41
+        at Simple14.hs:22:27-40
       ‘n’ is a rigid type variable bound by
         the type signature for:
           foo :: forall m n. EQ_ (Maybe m) (Maybe n)
