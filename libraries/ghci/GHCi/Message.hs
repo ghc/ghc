@@ -30,11 +30,13 @@ import GHCi.RemoteTypes
 import GHCi.FFI
 import GHCi.TH.Binary () -- For Binary instances
 import GHCi.BreakArray
+import GHCi.ResolvedBCO
 
 import GHC.LanguageExtensions
 import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
+import GHC.Conc (pseq, par)
 import Control.Concurrent
 import Control.Exception
 import Data.Binary
@@ -84,10 +86,10 @@ data Message a where
   -- Interpreter -------------------------------------------
 
   -- | Create a set of BCO objects, and return HValueRefs to them
-  -- Note: Each ByteString contains a Binary-encoded [ResolvedBCO], not
-  -- a ResolvedBCO. The list is to allow us to serialise the ResolvedBCOs
-  -- in parallel. See @createBCOs@ in compiler/GHC/Runtime/Interpreter.hs.
-  CreateBCOs :: [LB.ByteString] -> Message [HValueRef]
+  -- See @createBCOs@ in compiler/GHC/Runtime/Interpreter.hs.
+  -- NB: this has a custom Binary behavior,
+  -- see Note [Parallelize CreateBCOs serialization]
+  CreateBCOs :: [ResolvedBCO] -> Message [HValueRef]
 
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()
@@ -513,7 +515,8 @@ getMessage = do
       9  -> Msg <$> RemoveLibrarySearchPath <$> get
       10 -> Msg <$> return ResolveObjs
       11 -> Msg <$> FindSystemLibrary <$> get
-      12 -> Msg <$> CreateBCOs <$> get
+      12 -> Msg <$> (CreateBCOs . concatMap (runGet get)) <$> (get :: Get [LB.ByteString])
+                    -- See Note [Parallelize CreateBCOs serialization]
       13 -> Msg <$> FreeHValueRefs <$> get
       14 -> Msg <$> MallocData <$> get
       15 -> Msg <$> MallocStrings <$> get
@@ -557,7 +560,8 @@ putMessage m = case m of
   RemoveLibrarySearchPath ptr -> putWord8 9  >> put ptr
   ResolveObjs                 -> putWord8 10
   FindSystemLibrary str       -> putWord8 11 >> put str
-  CreateBCOs bco              -> putWord8 12 >> put bco
+  CreateBCOs bco              -> putWord8 12 >> put (serializeBCOs bco)
+                              -- See Note [Parallelize CreateBCOs serialization]
   FreeHValueRefs val          -> putWord8 13 >> put val
   MallocData bs               -> putWord8 14 >> put bs
   MallocStrings bss           -> putWord8 15 >> put bss
@@ -585,6 +589,34 @@ putMessage m = case m of
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
   NewBreakModule name          -> putWord8 39 >> put name
+
+{-
+Note [Parallelize CreateBCOs serialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Serializing ResolvedBCO is expensive, so we do it in parallel.
+We split the list [ResolvedBCO] into chunks of length <= 100,
+and serialize every chunk in parallel, getting a [LB.ByteString]
+where every bytestring corresponds to a single chunk (multiple ResolvedBCOs).
+
+Previously, we stored [LB.ByteString] in the Message object, but that
+incurs unneccessary serialization with the internal interpreter (#23919).
+-}
+
+serializeBCOs :: [ResolvedBCO] -> [LB.ByteString]
+serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
+ where
+  -- make sure we force the whole lazy ByteString
+  doChunk c = pseq (LB.length bs) bs
+    where bs = runPut (put c)
+
+  -- We don't have the parallel package, so roll our own simple parMap
+  parMap _ [] = []
+  parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
+    where fx = f x; fxs = parMap f xs
+
+  chunkList :: Int -> [a] -> [[a]]
+  chunkList _ [] = []
+  chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

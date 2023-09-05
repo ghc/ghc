@@ -38,7 +38,7 @@ For each splice
 1. GHC compiles a splice to byte code, and sends it to the server: in
    a CreateBCOs message:
 
-   CreateBCOs :: [LB.ByteString] -> Message [HValueRef]
+   CreateBCOs :: [ResolvedBCOs] -> Message [HValueRef]
 
 2. The server creates the real byte-code objects in its heap, and
    returns HValueRefs to GHC.  HValueRef is the same as RemoteRef
