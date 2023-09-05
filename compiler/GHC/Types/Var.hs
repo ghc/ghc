@@ -7,6 +7,7 @@
 
 {-# LANGUAGE MultiWayIf, PatternSynonyms #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -- |
 -- #name_types#
@@ -90,7 +91,7 @@ module GHC.Types.Var (
         binderVar, binderVars, binderFlag, binderFlags, binderType,
         mkForAllTyBinder, mkForAllTyBinders,
         mkTyVarBinder, mkTyVarBinders,
-        isTyVarBinder,
+        isVisibleForAllTyBinder, isInvisibleForAllTyBinder, isTyVarBinder,
         tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs,
 
@@ -741,6 +742,12 @@ tyVarReqToBinders = map tyVarReqToBinder
 
 tyVarReqToBinder :: VarBndr a () -> VarBndr a ForAllTyFlag
 tyVarReqToBinder (Bndr tv _) = Bndr tv Required
+
+isVisibleForAllTyBinder :: ForAllTyBinder -> Bool
+isVisibleForAllTyBinder (Bndr _ vis) = isVisibleForAllTyFlag vis
+
+isInvisibleForAllTyBinder :: ForAllTyBinder -> Bool
+isInvisibleForAllTyBinder (Bndr _ vis) = isInvisibleForAllTyFlag vis
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v

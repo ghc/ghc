@@ -1,13 +1,13 @@
 
 T23427.hs:10:7: error: [GHC-39999]
-    • Could not deduce ‘C a0’
+    • Could not deduce ‘C t0’
         arising when matching required constraints
         in a group involving ‘doTail’
       from the context: C a
         bound by the type signature for:
                    indent :: forall a. C a => a -> a
         at T23427.hs:7:1-23
-      The type variable ‘a0’ is ambiguous
+      The type variable ‘t0’ is ambiguous
     • In an equation for ‘indent’:
           indent n
             = doText n

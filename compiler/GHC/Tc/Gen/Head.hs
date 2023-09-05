@@ -23,14 +23,13 @@ module GHC.Tc.Gen.Head
        , leadingValArgs, isVisibleArg, pprHsExprArgTc
 
        , tcInferAppHead, tcInferAppHead_maybe
-       , tcInferId, tcCheckId
-       , obviousSig
+       , tcInferId, tcCheckId, obviousSig
        , tyConOf, tyConOfET, fieldNotInType
        , nonBidirectionalErr
 
        , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 
 import GHC.Prelude
 import GHC.Hs
@@ -40,7 +39,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
 
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
-import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
+import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
@@ -82,7 +81,7 @@ import GHC.Driver.Env
 import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
@@ -997,21 +996,17 @@ tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
 tcExprWithSig expr hs_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade
                      tcUserTypeSig loc hs_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig ctxt expr sig_info
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
   where
     loc = getLocA (dropWildCards hs_ty)
-    ctxt = ExprSigCtxt (lhsSigWcTypeContextSpan hs_ty)
 
-tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSig -> TcM (LHsExpr GhcTc, TcSigmaType)
-tcExprSig ctxt expr (TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
-  = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { let poly_ty = idType poly_id
-       ; (wrap, expr') <- tcSkolemiseScoped ctxt poly_ty $ \rho_ty ->
-                          tcCheckMonoExprNC expr rho_ty
-       ; return (mkLHsWrap wrap expr', poly_ty) }
+tcExprSig :: LHsExpr GhcRn -> TcIdSig -> TcM (LHsExpr GhcTc, TcSigmaType)
+tcExprSig expr (TcCompleteSig sig)
+   = do { expr' <- tcPolyLExprSig expr sig
+        ; return (expr', idType (sig_bndr sig)) }
 
-tcExprSig _ expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
+tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
@@ -1102,8 +1097,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
            thing    = NameThing from_name
            mb_thing = Just thing
            herald   = ExpectedFunTyArg thing (HsLit noAnn hs_lit)
-       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing
-                                                      (1, []) from_ty
+       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing (1, from_ty) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
        -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast

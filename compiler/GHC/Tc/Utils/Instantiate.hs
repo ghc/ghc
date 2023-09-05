@@ -19,7 +19,7 @@ module GHC.Tc.Utils.Instantiate (
 
      tcInstType, tcInstTypeBndrs,
      tcSkolemiseInvisibleBndrs,
-     tcInstSkolTyVars, tcInstSkolTyVarsX,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarBndrsX,
      tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
      freshenTyVarBndrs, freshenCoVarBndrsX,
@@ -157,9 +157,10 @@ Examples:
     =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
     where wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
 
-This second example is the reason for the recursive 'go'
-function in topSkolemise: we must remove successive layers
-of foralls and (=>).
+This second example is the reason for the recursive 'go' function in
+topSkolemise: we remove successive layers of foralls and (=>).  This
+is really just an optimisation; see wrinkle (SK1) in GHC.Tc.Utils.Unify
+Note [Skolemisation overview].
 
 In general,
   if      topSkolemise ty = (wrap, tvs, evs, rho)
@@ -172,8 +173,8 @@ In general,
 topSkolemise :: SkolemInfo
              -> TcSigmaType
              -> TcM ( HsWrapper
-                    , [(Name,TyVar)]     -- All skolemised variables
-                    , [EvVar]            -- All "given"s
+                    , [(Name,TcInvisTVBinder)]     -- All skolemised variables
+                    , [EvVar]                      -- All "given"s
                     , TcRhoType )
 -- See Note [Skolemisation]
 topSkolemise skolem_info ty
@@ -183,13 +184,17 @@ topSkolemise skolem_info ty
 
     -- Why recursive?  See Note [Skolemisation]
     go subst wrap tv_prs ev_vars ty
-      | (tvs, theta, inner_ty) <- tcSplitSigmaTy ty
+      | (bndrs, theta, inner_ty) <- tcSplitSigmaTyBndrs ty
+      , let tvs = binderVars bndrs
       , not (null tvs && null theta)
-      = do { (subst', tvs1) <- tcInstSkolTyVarsX skolem_info subst tvs
-           ; ev_vars1       <- newEvVars (substTheta subst' theta)
+      = do { (subst', bndrs1) <- tcInstSkolTyVarBndrsX skolem_info subst bndrs
+           ; let tvs1 = binderVars bndrs1
+           ; traceTc "topSkol" (vcat [ ppr tvs <+> vcat (map (ppr . getSrcSpan) tvs)
+                                     , ppr tvs1 <+> vcat (map (ppr . getSrcSpan) tvs1) ])
+           ; ev_vars1 <- newEvVars (substTheta subst' theta)
            ; go subst'
                 (wrap <.> mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1)
-                (tv_prs ++ (map tyVarName tvs `zip` tvs1))
+                (tv_prs ++ (map tyVarName tvs `zip` bndrs1))
                 (ev_vars ++ ev_vars1)
                 inner_ty }
 
@@ -513,6 +518,13 @@ tcInstSkolTyVars skol_info = tcInstSkolTyVarsX skol_info emptySubst
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]
 tcInstSkolTyVarsX skol_info = tcInstSkolTyVarsPushLevel skol_info False
+
+tcInstSkolTyVarBndrsX :: SkolemInfo -> Subst -> [VarBndr TyCoVar vis] -> TcM (Subst, [VarBndr TyCoVar vis])
+tcInstSkolTyVarBndrsX skol_info subs bndrs = do
+  (subst', bndrs') <- tcInstSkolTyVarsX skol_info subs (binderVars bndrs)
+  pure (subst', zipWith mkForAllTyBinder flags bndrs')
+  where
+    flags = binderFlags bndrs
 
 tcInstSuperSkolTyVars :: SkolemInfo -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]

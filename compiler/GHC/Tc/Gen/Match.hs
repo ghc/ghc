@@ -1,10 +1,10 @@
-
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -17,11 +17,10 @@
 -- | Typecheck some @Matches@
 module GHC.Tc.Gen.Match
    ( tcFunBindMatches
-   , tcGRHS
-   , tcGRHSsPat
    , tcCaseMatches
    , tcLambdaMatches
-   , TcMatchAltChecker
+   , tcGRHSList
+   , tcGRHSsPat
    , TcStmtChecker
    , TcExprStmtChecker
    , TcCmdStmtChecker
@@ -38,9 +37,9 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
-                                       , tcMonoExpr, tcMonoExprNC, tcExpr
+                                       , tcMonoExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
-                                       , tcCheckPolyExpr )
+                                       , tcCheckPolyExpr, tcPolyLExpr )
 
 import GHC.Rename.Utils ( bindLocalNames, isIrrefutableHsPat )
 import GHC.Tc.Errors.Types
@@ -73,11 +72,10 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags ( getDynFlags )
 
-import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic
+import GHC.Types.Basic( Arity, isDoExpansionGenerated )
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -95,47 +93,73 @@ import qualified GHC.LanguageExtensions as LangExt
 ************************************************************************
 
 `tcFunBindMatches` typechecks a `[Match]` list which occurs in a
-`FunMonoBind`.  The second argument is the name of the function, which
+`FunBind`.  The second argument is the name of the function, which
 is used in error messages.  It checks that all the equations have the
 same number of arguments before using `tcMatches` to do the work.
 -}
 
-tcFunBindMatches :: LocatedN Name -- MatchContext Id
-                 -> Mult          -- The multiplicity of the binder
+tcFunBindMatches :: UserTypeCtxt
+                 -> Name            -- Function name
+                 -> Mult            -- The multiplicity of the binder
                  -> MatchGroup GhcRn (LHsExpr GhcRn)
-                 -> ExpRhoType    -- Expected type of function
+                 -> [ExpPatType]    -- Scoped skolemised binders
+                 -> ExpRhoType      -- Expected type of function; caller
+                                    -- has skolemised any outer forall's
                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
-                                  -- Returns type of body
-tcFunBindMatches fun_name mult matches exp_ty
-  = do  {  -- Check that they all have the same no of arguments
-           -- Location is in the monad, set the caller so that
-           -- any inter-equation error messages get some vaguely
-           -- sensible location.        Note: we have to do this odd
-           -- ann-grabbing, because we don't always have annotations in
-           -- hand when we call tcFunBindMatches...
-          traceTc "tcFunBindMatches" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
-        ; checkArgCounts (Just what) matches
+-- See Note [Skolemisation overview] in GHC.Tc.Utils.Unify
+tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
+  = assertPpr (funBindPrecondition matches) (pprMatches matches) $
+    do  {  -- Check that they all have the same no of arguments
+          arity <- checkArgCounts matches
 
-        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
-               -- NB: exp_type may be polymorphic, but
-               --     matchExpectedFunTys can cope with that
-            tcScalingUsage mult $
-               -- Makes sure that if the binding is unrestricted, it counts as
-               -- consuming its rhs Many times.
-            tcMatches tcBody pat_tys rhs_ty matches
+        ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
+
+        ; (wrap_fun, (wrap_mult, r))
+             <- matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
+                tcScalingUsage mult $
+                   -- Makes sure that if the binding is unrestricted, it counts as
+                   -- consuming its rhs Many times.
+
+                do { traceTc "tcFunBindMatches 2" (vcat [ pprUserTypeCtxt ctxt, ppr invis_pat_tys
+                                                      , ppr pat_tys $$ ppr rhs_ty ])
+                   ; tcMatches tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
+
+        ; return (wrap_fun <.> wrap_mult, r) }
+  where
+    herald        = ExpectedFunTyMatches (NameThing fun_name) matches
+
+funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
+funBindPrecondition (MG { mg_alts = L _ alts })
+  = not (null alts) && all is_fun_rhs alts
+  where
+    is_fun_rhs (L _ (Match { m_ctxt = FunRhs {} })) = True
+    is_fun_rhs _                                    = False
+
+tcLambdaMatches :: HsExpr GhcRn -> HsLamVariant
+                -> MatchGroup GhcRn (LHsExpr GhcRn)
+                -> [ExpPatType]  -- Already skolemised
+                -> ExpSigmaType  -- NB can be a sigma-type
+                -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
+  =  do { arity <- checkArgCounts matches
+            -- Check argument counts since this is also used for \cases
+
+        ; (wrapper, (mult_co_wrap, r))
+            <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
+               tcMatches tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
+
         ; return (wrapper <.> mult_co_wrap, r) }
   where
-    arity  = matchGroupArity matches
-    herald = ExpectedFunTyMatches (NameThing (unLoc fun_name)) matches
-    ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
-                         -- But that's wrong for f :: Int -> forall a. blah
-    what   = FunRhs { mc_fun = fun_name, mc_fixity = Prefix, mc_strictness = strictness }
-    strictness
-      | [L _ match] <- unLoc $ mg_alts matches
-      , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
-      = SrcStrict
-      | otherwise
-      = NoSrcStrict
+    herald = ExpectedFunTyLam lam_variant e
+             -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
+
+    tc_body | isDoExpansionGenerated (mg_ext matches)
+              -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
+              -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
+            = tcBodyNC -- NB: Do not add any error contexts
+                       -- It has already been done
+            | otherwise
+            = tcBody
 
 {-
 @tcCaseMatches@ doesn't do the argument-count check because the
@@ -143,41 +167,18 @@ parser guarantees that each equation has exactly one argument.
 -}
 
 tcCaseMatches :: (AnnoBody body, Outputable (body GhcTc))
-              => TcMatchAltChecker body      -- ^ Case context
-              -> Scaled TcSigmaTypeFRR -- ^ Type of scrutinee
+              => TcMatchAltChecker body    -- ^ Typecheck the alternative RHSS
+              -> Scaled TcSigmaTypeFRR     -- ^ Type of scrutinee
               -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
               -> ExpRhoType                               -- ^ Type of the whole case expression
               -> TcM (HsWrapper, MatchGroup GhcTc (LocatedA (body GhcTc)))
-                  -- Translated alternatives
-                  -- wrapper goes from MatchGroup's ty to expected ty
+                -- Translated alternatives
+                -- wrapper goes from MatchGroup's ty to expected ty
 
-tcCaseMatches ctxt (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches ctxt [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
-
-tcLambdaMatches :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
-                -> MatchGroup GhcRn (LHsExpr GhcRn)
-                -> ExpRhoType
-                -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
-tcLambdaMatches herald match res_ty
-  =  do { checkArgCounts Nothing match
-        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
-            -- checking argument counts since this is also used for \cases
-            tcMatches match_alt_checker pat_tys rhs_ty match
-        ; return (wrapper <.> mult_co_wrap, r) }
-  where
-    n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
-           | otherwise               = matchGroupArity match
-
-    match_alt_checker
-           | isDoExpansionGenerated (mg_ext match)
-            -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`. Testcase: Typeable1
-           = tcBodyNC -- NB: Do not add any error contexts
-                      -- It has already been done
-           | otherwise
-           = tcBody
+tcCaseMatches tc_body (Scaled scrut_mult scrut_ty) matches res_ty
+  = tcMatches tc_body [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
-
 tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
            -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 -- Used for pattern bindings
@@ -228,8 +229,8 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (HsWrapper, MatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
-                                  , mg_ext = origin })
+tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
+                                     , mg_ext = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
@@ -242,7 +243,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                  }) }
 
   | otherwise
-  = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
+  = do { umatches <- mapM (tcCollectingUsage . tcMatch tc_body pat_tys rhs_ty) matches
        ; let (usages, wmatches) = unzip umatches
        ; let (wrappers, matches') = unzip wmatches
        ; let wrapper = mconcat wrappers
@@ -269,36 +270,31 @@ tcMatch :: (AnnoBody body)
         -> LMatch GhcRn (LocatedA (body GhcRn))
         -> TcM (HsWrapper, LMatch GhcTc (LocatedA (body GhcTc)))
 
-tcMatch alt_checker pat_tys rhs_ty match
-  = do { (L loc (wrapper, r)) <- wrapLocMA (tc_match alt_checker pat_tys rhs_ty) match
+tcMatch tc_body pat_tys rhs_ty match
+  = do { (L loc (wrapper, r)) <- wrapLocMA (tc_match pat_tys rhs_ty) match
        ; return (wrapper, L loc r) }
   where
-    tc_match match_alt_checker pat_tys rhs_ty
+    tc_match pat_tys rhs_ty
              match@(Match { m_ctxt = ctxt, m_pats = pats, m_grhss = grhss })
-      = add_match_ctxt match $
+      = add_match_ctxt $
         do { (pats', (wrapper, grhss')) <- tcMatchPats ctxt pats pat_tys $
-                                           tcGRHSs ctxt match_alt_checker grhss rhs_ty
-           ; return (wrapper, Match { m_ext = noAnn
-                                    , m_ctxt = ctxt
-                                    , m_pats = filter_out_type_pats pats'
+                                           tcGRHSs ctxt tc_body grhss rhs_ty
+             -- NB: pats' are just the /value/ patterns
+             -- See Note [tcMatchPats] in GHC.Tc.Gen.Pat
+
+           ; return (wrapper, Match { m_ext   = noAnn
+                                    , m_ctxt  = ctxt
+                                    , m_pats  = pats'
                                     , m_grhss = grhss' }) }
+      where
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         --     so we don't want to add "In the lambda abstraction \x->e"
         -- But for \cases with many alternatives, it is helpful to say
         --     which particular alternative we are looking at
-    add_match_ctxt match thing_inside
-        = case (m_ctxt match) of
+        add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
-
-    -- We filter out type patterns because we have no use for them in HsToCore.
-    -- Type variable bindings have already been converted to HsWrappers.
-    filter_out_type_pats :: [LPat GhcTc] -> [LPat GhcTc]
-    filter_out_type_pats = filterByList (map is_fun_pat_ty pat_tys)
-      where
-        is_fun_pat_ty ExpFunPatTy{}    = True
-        is_fun_pat_ty ExpForAllPatTy{} = False
 
 -------------
 tcGRHSs :: AnnoBody body
@@ -312,24 +308,30 @@ tcGRHSs :: AnnoBody body
 --      f = \(x::forall a.a->a) -> <stuff>
 -- We used to force it to be a monotype when there was more than one guard
 -- but we don't need to do that any more
-tcGRHSs ctxt alt_checker (GRHSs _ grhss binds) res_ty
-  = do  { (binds', wrapper, grhss')
-            <- tcLocalBinds binds $ do
-               { ugrhss <- mapM (tcCollectingUsage . wrapLocMA (tcGRHS ctxt alt_checker res_ty)) grhss
-               ; let (usages, grhss') = unzip ugrhss
-               ; tcEmitBindingUsage $ supUEs usages
-               ; return grhss' }
+tcGRHSs ctxt tc_body (GRHSs _ grhss binds) res_ty
+  = do  { (binds', wrapper, grhss') <- tcLocalBinds binds $ do
+                                       tcGRHSList ctxt tc_body grhss res_ty
         ; return (wrapper, GRHSs emptyComments grhss' binds') }
--------------
-tcGRHS :: HsMatchContextRn -> TcMatchAltChecker body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn))
-       -> TcM (GRHS GhcTc (LocatedA (body GhcTc)))
-tcGRHS ctxt alt_checker res_ty (GRHS _ guards rhs)
-  = do  { (guards', rhs')
-            <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
-               alt_checker rhs
-        ; return (GRHS noAnn guards' rhs') }
-  where
-    stmt_ctxt  = PatGuard ctxt
+
+tcGRHSList :: forall body. AnnoBody body
+           => HsMatchContextRn -> TcMatchAltChecker body
+           -> [LGRHS GhcRn (LocatedA (body GhcRn))] -> ExpRhoType
+           -> TcM [LGRHS GhcTc (LocatedA (body GhcTc))]
+tcGRHSList ctxt tc_body grhss res_ty
+   = do { (usages, grhss') <- mapAndUnzipM (wrapLocSndMA tc_alt) grhss
+        ; tcEmitBindingUsage $ supUEs usages
+        ; return grhss' }
+   where
+     stmt_ctxt = PatGuard ctxt
+
+     tc_alt :: GRHS GhcRn (LocatedA (body GhcRn))
+            -> TcM (UsageEnv, GRHS GhcTc (LocatedA (body GhcTc)))
+     tc_alt (GRHS _ guards rhs)
+       = tcCollectingUsage $
+         do  { (guards', rhs')
+                   <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
+                      tc_body rhs
+             ; return (GRHS noAnn guards' rhs') }
 
 {-
 ************************************************************************
@@ -376,7 +378,7 @@ tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; tcMonoExpr body res_ty
+        ; tcPolyLExpr body res_ty
         }
 
 tcBodyNC :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
@@ -1199,29 +1201,34 @@ the variables they bind into scope, and typecheck the thing_inside.
 -}
 
 -- | @checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
--- number of args are used in each equation.
+-- number of /required/ args are used in each equation.
+-- Returns the arity, the number of required args
+-- E.g.  f @a True  y = ...
+--       f    False z = ...
+--       The MatchGroup for `f` has arity 2, not 3
 checkArgCounts :: AnnoBody body
-          => Maybe HsMatchContextRn
-          -> MatchGroup GhcRn (LocatedA (body GhcRn))
-          -> TcM ()
-checkArgCounts _ (MG { mg_alts = L _ [] })
-    = return ()
-checkArgCounts mb_ctxt (MG { mg_alts = L _ (match1:matches) })
+               => MatchGroup GhcRn (LocatedA (body GhcRn))
+               -> TcM Arity
+checkArgCounts (MG { mg_alts = L _ [] })
+    = return 1 -- See Note [Empty MatchGroups] in GHC.Rename.Bind
+               --   case e of {} or \case {}
+               -- Both have arity 1
+
+checkArgCounts (MG { mg_alts = L _ (match1:matches) })
     | null matches  -- There was only one match; nothing to check
-    = return ()
+    = return n_args1
 
     -- Two or more matches: check that they agree on arity
     | Just bad_matches <- mb_bad_matches
-    = failWithTc $ TcRnMatchesHaveDiffNumArgs ctxt
+    = failWithTc $ TcRnMatchesHaveDiffNumArgs (m_ctxt (unLoc match1))
                  $ MatchArgMatches match1 bad_matches
     | otherwise
-    = return ()
+    = return n_args1
   where
-    ctxt = case mb_ctxt of
-             Nothing -> m_ctxt (unLoc match1)
-             Just x  -> x
-    n_args1 = args_in_match match1
-    mb_bad_matches = NE.nonEmpty [m | m <- matches, args_in_match m /= n_args1]
+    n_args1 = reqd_args_in_match match1
+    mb_bad_matches = NE.nonEmpty [m | m <- matches, reqd_args_in_match m /= n_args1]
 
-    args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
-    args_in_match (L _ (Match { m_pats = pats })) = length pats
+    reqd_args_in_match :: LocatedA (Match GhcRn body1) -> Arity
+    -- Counts the number of /required/ args in the match
+    -- IMPORTANT: THIS WILL NEED TO CHANGE WHEN @ty BECOMES A PATTERN
+    reqd_args_in_match (L _ (Match { m_pats = pats })) = length pats

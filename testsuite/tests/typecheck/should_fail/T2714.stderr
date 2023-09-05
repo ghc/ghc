@@ -4,8 +4,8 @@ T2714.hs:8:7: error: [GHC-25897]
       Expected: c -> a
         Actual: f0 (a -> b) -> f0 b
       ‘c’ is a rigid type variable bound by
-        a type expected by the context:
-          forall c. c -> a
+        the type signature for:
+          f :: ((a -> b) -> b) -> forall c. c -> a
         at T2714.hs:8:1-13
     • In the expression: ffmap x
       In an equation for ‘f’: f x = ffmap x

@@ -3,7 +3,7 @@ T8518.hs:14:18: error: [GHC-83865]
     • Couldn't match expected type: Z c -> B c -> t0
                   with actual type: F c
     • The function ‘rpt’ is applied to four value arguments,
-        but its type ‘Int -> c -> F c’ has only two
+        but its type ‘t1 -> t2 -> F t2’ has only two
       In the expression: rpt (4 :: Int) c z b
       In an equation for ‘callCont’:
           callCont c z b

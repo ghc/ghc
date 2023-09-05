@@ -642,8 +642,10 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     -- Rule ITVDQ from the GHC Proposal #281
     go1 delta acc so_far fun_ty ((EValArg { eva_arg = ValArg arg }) : rest_args)
       | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
-      , binderFlag tvb == Required
-      = do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
+      = assertPpr (binderFlag tvb == Required) (ppr fun_ty $$ ppr arg) $
+        -- Any invisible binders have been instantiated by IALL above,
+        -- so this forall must be visible (i.e. Required)
+        do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
            ; let wrap = mkWpTyApps [ty_arg]
            ; go delta (addArgWrap wrap acc) so_far inst_body rest_args }
 
@@ -731,7 +733,8 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                 -- taking apart the arrow type (a -> Int).
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
-                  (n_val_args, so_far) fun_ty
+                  (n_val_args, fun_sigma) fun_ty
+
            ; (delta', arg') <- if do_ql
                                then addArgCtxt ctxt arg $
                                     -- Context needed for constraints
