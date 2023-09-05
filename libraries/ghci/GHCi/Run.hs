@@ -17,8 +17,6 @@ import Prelude -- See note [Why do we import Prelude here?]
 #if !defined(javascript_HOST_ARCH)
 import GHCi.CreateBCO
 import GHCi.InfoTable
-import Data.Binary
-import Data.Binary.Get
 #endif
 
 import GHCi.FFI
@@ -78,7 +76,7 @@ run m = case m of
     toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
-  CreateBCOs bcos -> createBCOs (concatMap (runGet get) bcos)
+  CreateBCOs bcos -> createBCOs bcos
   LookupClosure str -> lookupClosure str
 #endif
   RtsRevertCAFs -> rts_revertCAFs

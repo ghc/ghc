@@ -93,7 +93,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
 import GHC.Utils.Outputable(brackets, ppr, showSDocUnsafe)
 import GHC.Utils.Fingerprint
-import GHC.Utils.Misc
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -110,9 +109,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask)
 import Data.Binary
-import Data.Binary.Put
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as LB
 import Data.Array ((!))
 import Data.IORef
 import Foreign hiding (void)
@@ -120,7 +117,6 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
-import GHC.Conc (pseq, par)
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -353,19 +349,7 @@ mkCostCentres interp mod ccs =
 -- | Create a set of BCOs that may be mutually recursive.
 createBCOs :: Interp -> [ResolvedBCO] -> IO [HValueRef]
 createBCOs interp rbcos = do
-  -- Serializing ResolvedBCO is expensive, so we do it in parallel
-  interpCmd interp (CreateBCOs puts)
- where
-  puts = parMap doChunk (chunkList 100 rbcos)
-
-  -- make sure we force the whole lazy ByteString
-  doChunk c = pseq (LB.length bs) bs
-    where bs = runPut (put c)
-
-  -- We don't have the parallel package, so roll our own simple parMap
-  parMap _ [] = []
-  parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
-    where fx = f x; fxs = parMap f xs
+  interpCmd interp (CreateBCOs rbcos)
 
 addSptEntry :: Interp -> Fingerprint -> ForeignHValue -> IO ()
 addSptEntry interp fpr ref =

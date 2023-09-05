@@ -37,8 +37,6 @@ module GHC.Utils.Misc (
         isSingleton, only, expectOnly, GHC.Utils.Misc.singleton,
         notNull, expectNonEmpty, snocView,
 
-        chunkList,
-
         holes,
 
         changeLast,
@@ -493,11 +491,6 @@ expectOnly _   [a]   = a
 expectOnly _   (a:_) = a
 #endif
 expectOnly msg _     = panic ("expectOnly: " ++ msg)
-
--- | Split a list into chunks of /n/ elements
-chunkList :: Int -> [a] -> [[a]]
-chunkList _ [] = []
-chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
 
 -- | Compute all the ways of removing a single element from a list.
 --
