@@ -119,7 +119,6 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     -- See Note [Exporting built-in items]
     special_exports
       | mdl == gHC_PRIM   = funAvail
-      | mdl == pRELUDE    = funAvail
       | otherwise         = []
     !exportedNames = concatMap availNames
                                (special_exports <> mi_exports mod_iface)
@@ -176,8 +175,6 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocString "Builtin syntax") [])
       bonus_ds mods
         | mdl == gHC_PRIM   = [ builtinTys, DsiExports funAvail ] <> mods
-        | mdl == pRELUDE    = let (hs, rest) = splitAt 2 mods
-                              in hs <> [ DsiExports funAvail ] <> rest
         | otherwise         = mods
 
   let
