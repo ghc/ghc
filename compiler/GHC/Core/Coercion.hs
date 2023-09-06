@@ -1160,8 +1160,12 @@ mkSelCo_maybe cs co
     Pair ty1 ty2 = coercionKind co
 
     go cs co
-      | Just (ty, r) <- isReflCo_maybe co
-      = Just (mkReflCo r (getNthFromType cs ty))
+      | Just (ty, _co_role) <- isReflCo_maybe co
+      = let new_role = coercionRole (SelCo cs co)
+        in Just (mkReflCo new_role (getNthFromType cs ty))
+        -- The role of the result (new_role) does not have to
+        -- be equal to _co_role, the role of co, per Note [SelCo].
+        -- This was revealed by #23938.
 
     go SelForAll (ForAllCo _ kind_co _)
       = Just kind_co
