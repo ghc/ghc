@@ -1313,13 +1313,17 @@ echo "----------------------------------------------------------------------
 "
 
 echo "\
-For a standard build of GHC (fully optimised with profiling), type (g)make.
+For a standard build of GHC (fully optimised with profiling), type
+   ./hadrian/build
 
-To make changes to the default build configuration, copy the file
-mk/build.mk.sample to mk/build.mk, and edit the settings in there.
+You can customise the build with flags such as
+   ./hadrian/build -j --flavour=devel2 [--freeze1]
+
+To make changes to the default build configuration, see the file
+   hadrian/src/UserSettings.hs
 
 For more information on how to configure your GHC build, see
-   https://gitlab.haskell.org/ghc/ghc/wikis/building
+   https://gitlab.haskell.org/ghc/ghc/-/wikis/building/hadrian
 "]
 
 # Currently we don't validate the /host/ GHC toolchain because configure
