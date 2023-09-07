@@ -48,7 +48,7 @@ import GHC.Core.DataCon
 import GHC.Core.Predicate( Pred(..), classifyPredType, eqRelRole )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Builtin.Names ( gHC_ERR )
+import GHC.Builtin.Names ( gHC_ERR, uNSAFE_COERCE )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -823,8 +823,8 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                               _ -> discard_it }
                _ -> discard_it }
         where
-          -- We want to filter out undefined and the likes from GHC.Err
-          not_trivial id = nameModule_maybe (idName id) /= Just gHC_ERR
+          -- We want to filter out undefined and the likes from GHC.Err (#17940)
+          not_trivial id = nameModule_maybe (idName id) `notElem` [Just gHC_ERR, Just uNSAFE_COERCE]
 
           lookup :: HoleFitCandidate -> TcM (Maybe (Id, Type))
           lookup (IdHFCand id) = return (Just (id, idType id))
