@@ -999,6 +999,7 @@ job_groups =
      , allowFailureGroup (onlyRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
      , fastCI (standardBuilds AArch64 Darwin)
      , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
+     , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
      , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.
