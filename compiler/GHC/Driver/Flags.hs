@@ -692,8 +692,9 @@ data WarningFlag =
    | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
    | Opt_WarnIncompleteExportWarnings                -- Since 9.8
-   | Opt_WarnIncompleteRecordSelectors                  -- Since 9.10
+   | Opt_WarnIncompleteRecordSelectors               -- Since 9.10
    | Opt_WarnBadlyStagedTypes                        -- Since 9.10
+   | Opt_WarnInconsistentFlags                       -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -804,8 +805,9 @@ warnFlagNames wflag = case wflag of
   Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
   Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
-  Opt_WarnIncompleteRecordSelectors                  -> "incomplete-record-selectors" :| []
+  Opt_WarnIncompleteRecordSelectors               -> "incomplete-record-selectors" :| []
   Opt_WarnBadlyStagedTypes                        -> "badly-staged-types" :| []
+  Opt_WarnInconsistentFlags                       -> "inconsistent-flags" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -945,7 +947,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnGADTMonoLocalBinds,
         Opt_WarnLoopySuperclassSolve,
         Opt_WarnBadlyStagedTypes,
-        Opt_WarnTypeEqualityRequiresOperators
+        Opt_WarnTypeEqualityRequiresOperators,
+        Opt_WarnInconsistentFlags
       ]
 
 -- | Things you get with -W
