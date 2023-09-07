@@ -2511,6 +2511,20 @@ of ``-W(no-)*``.
     issued. Another example is :ghc-flag:`-dynamic` is ignored when :ghc-flag:`-dynamic-too`
     is passed.
 
+.. ghc-flag:: -Winconsistent-flags
+    :shortdesc: warn when command line options are inconsistent in some way.
+    :type: dynamic
+    :reverse: -Wno-inconsistent-flags
+
+    :since: 9.8.1
+    :default: on
+
+    Warn when command line options are inconsistent in some way.
+
+    For example, when using GHCi, optimisation flags are ignored and a warning is
+    issued. Another example is :ghc-flag:`-dynamic` is ignored when :ghc-flag:`-dynamic-too`
+    is passed.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
