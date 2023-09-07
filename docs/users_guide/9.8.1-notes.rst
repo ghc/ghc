@@ -208,6 +208,10 @@ Compiler
   by default for now whilst we consider more carefully an appropiate fix.
   (See :ghc-ticket:`23469`, :ghc-ticket:`23109`, :ghc-ticket:`21229`, :ghc-ticket:`23445`)
 
+- The warning about incompatible command line flags can now be controlled with the
+  :ghc-flag:`-Winconsistent-flags`. In particular this allows you to silence a warning
+  when using optimisation flags with :ghc-flag:`--interactive` mode.
+
 GHCi
 ~~~~
 

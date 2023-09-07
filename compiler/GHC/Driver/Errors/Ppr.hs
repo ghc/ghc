@@ -294,7 +294,7 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverInterfaceError reason -> diagnosticReason reason
     DriverInconsistentDynFlags {}
-      -> WarningWithoutFlag
+      -> WarningWithFlag Opt_WarnInconsistentFlags
     DriverSafeHaskellIgnoredExtension {}
       -> WarningWithoutFlag
     DriverPackageTrustIgnored {}

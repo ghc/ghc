@@ -78,6 +78,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
+        * :ghc-flag:`-Winconsistent-flags`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2426,7 +2427,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-role-annotations-signatures
     :category:
 
-    :since: 9.8
+    :since: 9.8.1
     :default: off
 
     .. index::
@@ -2448,7 +2449,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-implicit-rhs-quantification
     :category:
 
-    :since: 9.8
+    :since: 9.8.1
     :default: off
 
     In accordance with `GHC Proposal #425
@@ -2465,9 +2466,6 @@ of ``-W(no-)*``.
 
     This warning detects code that will be affected by this breaking change.
 
-If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
-It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
-sanity, not yours.)
 
 .. ghc-flag:: -Wincomplete-export-warnings
     :shortdesc: warn when some but not all of exports for a name are warned about
@@ -2496,5 +2494,23 @@ sanity, not yours.)
           )
         import A
 
-     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports 
+     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
      that are not deprecating a name that is deprecated with another export in that module.
+
+.. ghc-flag:: -Winconsistent-flags
+    :shortdesc: warn when command line options are inconsistent in some way.
+    :type: dynamic
+    :reverse: -Wno-inconsistent-flags
+
+    :since: 9.8.1
+    :default: on
+
+    Warn when command line options are inconsistent in some way.
+
+    For example, when using GHCi, optimisation flags are ignored and a warning is
+    issued. Another example is :ghc-flag:`-dynamic` is ignored when :ghc-flag:`-dynamic-too`
+    is passed.
+
+If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
+It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
+sanity, not yours.)
