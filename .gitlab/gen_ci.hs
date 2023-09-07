@@ -108,8 +108,12 @@ data Opsys
   | Windows deriving (Eq)
 
 data LinuxDistro
-  = Debian11 | Debian10 | Debian9
+  = Debian12
+  | Debian11
+  | Debian10
+  | Debian9
   | Fedora33
+  | Fedora38
   | Ubuntu2004
   | Ubuntu1804
   | Centos7
@@ -282,10 +286,12 @@ tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
 distroName :: LinuxDistro -> String
+distroName Debian12  = "deb12"
 distroName Debian11  = "deb11"
 distroName Debian10   = "deb10"
 distroName Debian9   = "deb9"
 distroName Fedora33  = "fedora33"
+distroName Fedora38  = "fedora38"
 distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
@@ -895,6 +901,7 @@ job_groups =
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
+     , disableValidate (standardBuilds Amd64 (Linux Debian12))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
@@ -908,6 +915,7 @@ job_groups =
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
+     , disableValidate (standardBuilds Amd64 (Linux Fedora38))
      , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
