@@ -6,6 +6,7 @@ Multi-parameter type classes
 .. extension:: MultiParamTypeClasses
     :shortdesc: Enable multi parameter type classes.
          Implied by :extension:`FunctionalDependencies`.
+         Implies :extension:`ConstrainedClassMethods`.
 
     :implies: :extension:`ConstrainedClassMethods`
     :implied by: :extension:`FunctionalDependencies`

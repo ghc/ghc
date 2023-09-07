@@ -5,10 +5,13 @@ Constrained class method types
 
 .. extension:: ConstrainedClassMethods
     :shortdesc: Enable constrained class methods.
+        Implied by :extension:`MultiParamTypeClasses`.
 
     :since: 6.8.1
 
     :status: Included in :extension:`GHC2021`
+
+    :implied by: :extension:`MultiParamTypeClasses`
 
     Allows the definition of further constraints on individual class methods.
 
