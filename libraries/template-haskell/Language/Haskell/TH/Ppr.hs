@@ -392,7 +392,7 @@ pprPat _ (TypeP t) = parens $ text "type" <+> ppr t
 instance Ppr Dec where
     ppr = ppr_dec True
 
-ppr_dec :: Bool     -- declaration on the toplevel?
+ppr_dec :: Bool     -- ^ declaration on the toplevel?
         -> Dec
         -> Doc
 ppr_dec _ (FunD f cs)   = vcat $ map (\c -> pprPrefixOcc f <+> ppr c) cs
@@ -400,12 +400,12 @@ ppr_dec _ (ValD p r ds) = ppr p <+> pprBody True r
                           $$ where_clause ds
 ppr_dec _ (TySynD t xs rhs)
   = ppr_tySyn empty (Just t) (hsep (map ppr xs)) rhs
-ppr_dec _ (DataD ctxt t xs ksig cs decs)
-  = ppr_data empty ctxt (Just t) (hsep (map ppr xs)) ksig cs decs
-ppr_dec _ (NewtypeD ctxt t xs ksig c decs)
-  = ppr_newtype empty ctxt (Just t) (sep (map ppr xs)) ksig c decs
-ppr_dec _ (TypeDataD t xs ksig cs)
-  = ppr_type_data empty [] (Just t) (hsep (map ppr xs)) ksig cs []
+ppr_dec isTop (DataD ctxt t xs ksig cs decs)
+  = ppr_data isTop empty ctxt (Just t) (hsep (map ppr xs)) ksig cs decs
+ppr_dec isTop (NewtypeD ctxt t xs ksig c decs)
+  = ppr_newtype isTop empty ctxt (Just t) (sep (map ppr xs)) ksig c decs
+ppr_dec isTop (TypeDataD t xs ksig cs)
+  = ppr_type_data isTop empty [] (Just t) (hsep (map ppr xs)) ksig cs []
 ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
@@ -427,13 +427,13 @@ ppr_dec isTop (DataFamilyD tc tvs kind)
     maybeKind | (Just k') <- kind = dcolon <+> ppr k'
               | otherwise = empty
 ppr_dec isTop (DataInstD ctxt bndrs ty ksig cs decs)
-  = ppr_data (maybeInst <+> ppr_bndrs bndrs)
+  = ppr_data isTop (maybeInst <+> ppr_bndrs bndrs)
              ctxt Nothing (ppr ty) ksig cs decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
 ppr_dec isTop (NewtypeInstD ctxt bndrs ty ksig c decs)
-  = ppr_newtype (maybeInst <+> ppr_bndrs bndrs)
+  = ppr_newtype isTop (maybeInst <+> ppr_bndrs bndrs)
                 ctxt Nothing (ppr ty) ksig c decs
   where
     maybeInst | isTop     = text "instance"
@@ -494,27 +494,31 @@ ppr_overlap o = text $
     Overlapping   -> "{-# OVERLAPPING #-}"
     Incoherent    -> "{-# INCOHERENT #-}"
 
-ppr_data :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
+ppr_data :: Bool     -- ^ declaration on the toplevel?
+         -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
          -> Doc
 ppr_data = ppr_typedef "data"
 
-ppr_newtype :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
+ppr_newtype :: Bool     -- ^ declaration on the toplevel?
+            -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
             -> Doc
-ppr_newtype maybeInst ctxt t argsDoc ksig c decs = ppr_typedef "newtype" maybeInst ctxt t argsDoc ksig [c] decs
+ppr_newtype isTop maybeInst ctxt t argsDoc ksig c decs
+  = ppr_typedef "newtype" isTop maybeInst ctxt t argsDoc ksig [c] decs
 
-ppr_type_data :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
-         -> Doc
+ppr_type_data :: Bool     -- ^ declaration on the toplevel?
+              -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
+              -> Doc
 ppr_type_data = ppr_typedef "type data"
 
-ppr_typedef :: String -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause] -> Doc
-ppr_typedef data_or_newtype maybeInst ctxt t argsDoc ksig cs decs
+ppr_typedef :: String -> Bool -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause] -> Doc
+ppr_typedef data_or_newtype isTop maybeInst ctxt t argsDoc ksig cs decs
   = sep [text data_or_newtype <+> maybeInst
             <+> pprCxt ctxt
             <+> case t of
                  Just n -> pprName' Applied n <+> argsDoc
                  Nothing -> argsDoc
             <+> ksigDoc <+> maybeWhere,
-         nest nestDepth (vcat (pref $ map ppr cs)),
+         nest nestDepth (layout (pref $ map ppr cs)),
          if null decs
            then empty
            else nest nestDepth
@@ -524,6 +528,10 @@ ppr_typedef data_or_newtype maybeInst ctxt t argsDoc ksig cs decs
     pref xs | isGadtDecl = xs
     pref []              = []      -- No constructors; can't happen in H98
     pref (d:ds)          = (char '=' <+> d):map (bar <+>) ds
+
+    layout :: [Doc] -> Doc
+    layout | isGadtDecl && not isTop = braces . semiSepWith id
+           | otherwise = vcat
 
     maybeWhere :: Doc
     maybeWhere | isGadtDecl = text "where"
