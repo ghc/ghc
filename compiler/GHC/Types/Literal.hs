@@ -1006,8 +1006,9 @@ data type. Here are the moving parts:
    take apart a case scrutinisation on, or arg occurrence of, e.g.,
    `RUBBISH[TupleRep[IntRep,DoubleRep]]` (which may stand in for `(# Int#, Double# #)`)
    into its sub-parts `RUBBISH[IntRep]` and `RUBBISH[DoubleRep]`, similar to
-   unboxed tuples. `RUBBISH[VoidRep]` is erased.
-   See 'unariseRubbish_maybe' and also Note [Post-unarisation invariants].
+   unboxed tuples.
+
+   See 'unariseLiteral_maybe' and also Note [Post-unarisation invariants].
 
 4. Cmm: We translate 'LitRubbish' to their actual rubbish value in 'cgLit'.
    The particulars are boring, and only matter when debugging illicit use of

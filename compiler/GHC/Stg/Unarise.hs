@@ -356,20 +356,17 @@ Note [Post-unarisation invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 STG programs after unarisation have these invariants:
 
-  * No unboxed sums at all.
+ 1. No unboxed sums at all.
 
-  * No unboxed tuple binders. Tuples only appear in return position.
+ 2. No unboxed tuple binders. Tuples only appear in return position.
 
-  * DataCon applications (StgRhsCon and StgConApp) don't have void arguments.
+ 3. Binders and literals always have zero (for void arguments) or one PrimRep.
+
+ 4. DataCon applications (StgRhsCon and StgConApp) don't have void arguments.
     This means that it's safe to wrap `StgArg`s of DataCon applications with
     `GHC.StgToCmm.Env.NonVoid`, for example.
 
-  * Similar to unboxed tuples, Note [Rubbish literals] of TupleRep may only
-    appear in return position.
-
-  * Alt binders (binders in patterns) are always non-void.
-
-  * Binders always have zero (for void arguments) or one PrimRep.
+ 5. Alt binders (binders in patterns) are always non-void.
 -}
 
 module GHC.Stg.Unarise (unarise) where
@@ -554,7 +551,7 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
 
   -- See (3) of Note [Rubbish literals] in GHC.Types.Literal
   | StgLit lit <- scrut
-  , Just args' <- unariseRubbish_maybe lit
+  , Just args' <- unariseLiteral_maybe lit
   = elimCase rho args' bndr alt_ty alts
 
   -- general case
@@ -591,20 +588,24 @@ unariseUbxSumOrTupleArgs rho us dc args ty_args
   | otherwise
   = panic "unariseUbxSumOrTupleArgs: Constructor not a unboxed sum or tuple"
 
--- Doesn't return void args.
-unariseRubbish_maybe :: Literal -> Maybe [OutStgArg]
-unariseRubbish_maybe (LitRubbish torc rep)
+-- Returns @Nothing@ if the given literal is already unary (exactly
+-- one PrimRep).  Doesn't return void args.
+--
+-- This needs to exist because rubbish literals can have any representation.
+-- See also Note [Rubbish literals] in GHC.Types.Literal.
+unariseLiteral_maybe :: Literal -> Maybe [OutStgArg]
+unariseLiteral_maybe (LitRubbish torc rep)
   | [prep] <- preps
-  , not (isVoidRep prep)
+  , assert (not (isVoidRep prep)) True
   = Nothing   -- Single, non-void PrimRep. Nothing to do!
 
   | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
   = Just [ StgLitArg (LitRubbish torc (primRepToRuntimeRep prep))
-         | prep <- preps, not (isVoidRep prep) ]
+         | prep <- preps, assert (not (isVoidRep prep)) True ]
   where
-    preps = runtimeRepPrimRep (text "unariseRubbish_maybe") rep
+    preps = runtimeRepPrimRep (text "unariseLiteral_maybe") rep
 
-unariseRubbish_maybe _ = Nothing
+unariseLiteral_maybe _ = Nothing
 
 --------------------------------------------------------------------------------
 
@@ -1051,7 +1052,11 @@ unariseFunArg rho (StgVarArg x) =
     Just (MultiVal as)  -> as
     Just (UnaryVal arg) -> [arg]
     Nothing             -> [StgVarArg x]
-unariseFunArg _ arg = [arg]
+unariseFunArg _ arg@(StgLitArg lit) = case unariseLiteral_maybe lit of
+  -- forgetting to unariseLiteral_maybe here caused #23914
+  Just [] -> [voidArg]
+  Just as -> as
+  Nothing -> [arg]
 
 unariseFunArgs :: UnariseEnv -> [StgArg] -> [StgArg]
 unariseFunArgs = concatMap . unariseFunArg
@@ -1077,7 +1082,7 @@ unariseConArg rho (StgVarArg x) =
                                      -- is a void, and so should be eliminated
       | otherwise -> [StgVarArg x]
 unariseConArg _ arg@(StgLitArg lit)
-  | Just as <- unariseRubbish_maybe lit
+  | Just as <- unariseLiteral_maybe lit
   = as
   | otherwise
   = assert (not (isZeroBitTy (literalType lit))) -- We have no non-rubbish void literals
