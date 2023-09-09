@@ -175,9 +175,34 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
     lint_bind (StgTopLifted bind) = lintStgBinds TopLevel bind
     lint_bind (StgTopStringLit v _) = return [v]
 
-lintStgArg :: StgArg -> LintM ()
-lintStgArg (StgLitArg _) = return ()
-lintStgArg (StgVarArg v) = lintStgVar v
+lintStgConArg :: StgArg -> LintM ()
+lintStgConArg arg = do
+  unarised <- lf_unarised <$> getLintFlags
+  when unarised $ case typePrimRep_maybe (stgArgType arg) of
+    -- Note [Post-unarisation invariants], invariant 4
+    Just [_] -> pure ()
+    badRep   -> addErrL $
+      text "Non-unary constructor arg: " <> ppr arg $$
+      text "Its PrimReps are: " <> ppr badRep
+
+  case arg of
+    StgLitArg _ -> pure ()
+    StgVarArg v -> lintStgVar v
+
+lintStgFunArg :: StgArg -> LintM ()
+lintStgFunArg arg = do
+  unarised <- lf_unarised <$> getLintFlags
+  when unarised $ case typePrimRep_maybe (stgArgType arg) of
+    -- Note [Post-unarisation invariants], invariant 3
+    Just []  -> pure ()
+    Just [_] -> pure ()
+    badRep   -> addErrL $
+      text "Function arg is not unary or void: " <> ppr arg $$
+      text "Its PrimReps are: " <> ppr badRep
+
+  case arg of
+    StgLitArg _ -> pure ()
+    StgVarArg v -> lintStgVar v
 
 lintStgVar :: Id -> LintM ()
 lintStgVar id = checkInScope id
@@ -248,16 +273,13 @@ lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
 
     lintConApp con args (pprStgRhs opts rhs)
 
-    mapM_ lintStgArg args
-    mapM_ checkPostUnariseConArg args
-
 lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
 lintStgExpr e@(StgApp fun args) = do
   lintStgVar fun
-  mapM_ lintStgArg args
+  mapM_ lintStgFunArg args
   lintAppCbvMarks e
   lintStgAppReps fun args
 
@@ -275,11 +297,8 @@ lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     opts <- getStgPprOpts
     lintConApp con args (pprStgExpr opts app)
 
-    mapM_ lintStgArg args
-    mapM_ checkPostUnariseConArg args
-
 lintStgExpr (StgOpApp _ args _) =
-    mapM_ lintStgArg args
+    mapM_ lintStgFunArg args
 
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
@@ -322,12 +341,14 @@ lintAlt GenStgAlt{ alt_con   = DataAlt _
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
 
--- Post unarise check we apply constructors to the right number of args.
--- This can be violated by invalid use of unsafeCoerce as showcased by test
--- T9208
-lintConApp :: Foldable t => DataCon -> t a -> SDoc -> LintM ()
+lintConApp :: DataCon -> [StgArg] -> SDoc -> LintM ()
 lintConApp con args app = do
+    mapM_ lintStgConArg args
     unarised <- lf_unarised <$> getLintFlags
+
+    -- Post unarise check we apply constructors to the right number of args.
+    -- This can be violated by invalid use of unsafeCoerce as showcased by test
+    -- T9208; see also #23865
     when (unarised &&
           not (isUnboxedTupleDataCon con) &&
           length (dataConRuntimeRepStrictness con) /= length args) $ do
@@ -361,6 +382,8 @@ lintStgAppReps fun args = do
         = match_args actual_reps_left expected_reps_left
 
         -- Check for void rep which can be either an empty list *or* [VoidRep]
+           -- No, typePrimRep_maybe will never return a result containing VoidRep.
+           -- We should refactor to make this obvious from the types.
         | isVoidRep actual_rep && isVoidRep expected_rep
         = match_args actual_reps_left expected_reps_left
 
@@ -506,20 +529,6 @@ checkPostUnariseBndr bndr = do
           text "After unarisation, binder " <>
           ppr bndr <> text " has " <> text unexpected <> text " type " <>
           ppr (idType bndr)
-
--- Arguments shouldn't have sum, tuple, or void types.
-checkPostUnariseConArg :: StgArg -> LintM ()
-checkPostUnariseConArg arg = case arg of
-    StgLitArg _ ->
-      return ()
-    StgVarArg id -> do
-      lf <- getLintFlags
-      when (lf_unarised lf) $
-        forM_ (checkPostUnariseId id) $ \unexpected ->
-          addErrL $
-            text "After unarisation, arg " <>
-            ppr id <> text " has " <> text unexpected <> text " type " <>
-            ppr (idType id)
 
 -- Post-unarisation args and case alt binders should not have unboxed tuple,
 -- unboxed sum, or void types. Return what the binder is if it is one of these.

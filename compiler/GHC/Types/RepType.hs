@@ -602,8 +602,10 @@ kindPrimRep_maybe ki
   = pprPanic "kindPrimRep" (ppr ki)
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
--- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
--- The [PrimRep] is the final runtime representation /after/ unarisation
+-- it encodes. See also Note [Getting from RuntimeRep to PrimRep].
+-- The @[PrimRep]@ is the final runtime representation /after/ unarisation.
+--
+-- The result does not contain any VoidRep.
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> RuntimeRepType -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
@@ -615,9 +617,11 @@ runtimeRepPrimRep doc rr_ty
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
--- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
--- The [PrimRep] is the final runtime representation /after/ unarisation
--- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
+-- it encodes. See also Note [Getting from RuntimeRep to PrimRep].
+-- The @[PrimRep]@ is the final runtime representation /after/ unarisation
+-- and does not contain VoidRep.
+--
+-- Returns @Nothing@ if rep can't be determined. Eg. levity polymorphic types.
 runtimeRepPrimRep_maybe :: Type -> Maybe [PrimRep]
 runtimeRepPrimRep_maybe rr_ty
   | Just rr_ty' <- coreView rr_ty
