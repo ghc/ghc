@@ -254,6 +254,7 @@ test('T13658', normal, compile, ['-dcore-lint'])
 test('T14779a', normal, compile, ['-dcore-lint'])
 test('T14779b', normal, compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
+test('T14003', [only_ways(['optasm']), grep_errmsg('SC:')], compile, ['-ddump-spec-constr'])
 
 # thunk should inline here, so check whether or not it appears in the Core
 # (we skip profasm because it might not inline there)
