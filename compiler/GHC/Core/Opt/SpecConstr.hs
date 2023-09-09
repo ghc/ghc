@@ -520,14 +520,17 @@ This is all quite ugly; we ought to come up with a better design.
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
 sc_force to True when calling specLoop. This flag does four things:
 
-  * Ignore specConstrThreshold, to specialise functions of arbitrary size
+(FS1) Ignore specConstrThreshold, to specialise functions of arbitrary size
         (see scTopBind)
-  * Ignore specConstrCount, to make arbitrary numbers of specialisations
+(FS2) Ignore specConstrCount, to make arbitrary numbers of specialisations
         (see specialise)
-  * Specialise even for arguments that are not scrutinised in the loop
+(FS3) Specialise even for arguments that are not scrutinised in the loop
         (see argToPat; #4448)
-  * Only specialise on recursive types a finite number of times
-        (see is_too_recursive; #5550; Note [Limit recursive specialisation])
+(FS4) Only specialise on recursive types a finite number of times
+        (see sc_recursive; #5550; Note [Limit recursive specialisation])
+(FS5) Lift the restriction on the maximum number of arguments which
+        the optimisation will specialise.
+        (see `too_many_worker_args` in `callsToNewPats`; #14003)
 
 The flag holds only for specialising a single binding group, and NOT
 for nested bindings.  (So really it should be passed around explicitly
@@ -1404,7 +1407,7 @@ scBind top_lvl env (NonRec bndr rhs) do_body
 scBind top_lvl env (Rec prs) do_body
   | isTopLevel top_lvl
   , Just threshold <- sc_size (sc_opts env)
-  , not force_spec
+  , not force_spec -- See Note [Forcing specialisation], point (FS1)
   , not (all (couldBeSmallEnoughToInline (sc_uf_opts (sc_opts env)) threshold) rhss)
   = -- Do no specialisation if the RHSs are too big
     -- ToDo: I'm honestly not sure of the rationale of this size-testing, nor
@@ -1774,6 +1777,7 @@ specRec env body_calls rhs_infos
       , sc_force env || isNothing (sc_count opts)
            -- If both of these are false, the sc_count
            -- threshold will prevent non-termination
+           -- See Note [Forcing specialisation], point (FS4) and (FS2)
       , any ((> the_limit) . si_n_specs) spec_infos
       = -- Give up on specialisation, but don't forget to include the rhs_usg
         -- for the unspecialised function, since it may now be called
@@ -2400,8 +2404,11 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               non_dups = nubBy samePat new_pats
 
               -- Remove ones that have too many worker variables
-              small_pats = filterOut too_big non_dups
-              too_big (CP { cp_qvars = vars, cp_args = args })
+              small_pats = filterOut too_many_worker_args non_dups
+
+              too_many_worker_args _
+                | sc_force env = False -- See (FS5) of Note [Forcing specialisation]
+              too_many_worker_args (CP { cp_qvars = vars, cp_args = args })
                 = not (isWorkerSmallEnough (sc_max_args $ sc_opts env) (valArgCount args) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
@@ -2694,6 +2701,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   -- In that case it counts as "interesting"
 argToPat1 env in_scope val_env (Var v) arg_occ arg_str
   | sc_force env || specialisableArgOcc arg_occ  -- (a)
+    -- See Note [Forcing specialisation], point (FS3)
   , is_value                                     -- (b)
        -- Ignoring sc_keen here to avoid gratuitously incurring Note [Reboxing]
        -- So sc_keen focused just on f (I# x), where we have freshly-allocated
