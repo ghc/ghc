@@ -5,8 +5,9 @@
   "compiler-id": "ghc-9.4.4",
   "install-plan": [
     {
+      "component-name": "lib",
       "depends": [
-        "Cabal-syntax-3.8.1.0",
+        "Cabal-syntax-3.10.1.0-a7e09e0ed12b8981fd4bb5283acfafac1e1e07aeb2b44507502ae461bb01f1b4",
         "array-0.5.4.0",
         "base-4.17.0.0",
         "bytestring-0.11.3.1",
@@ -23,12 +24,25 @@
         "transformers-0.5.6.2",
         "unix-2.7.3"
       ],
-      "id": "Cabal-3.8.1.0",
+      "exe-depends": [],
+      "flags": {},
+      "id": "Cabal-3.10.1.0-08e8e38266cef863dfe810047ea2fb0574df80fd2bdeee7f2fbd09dadd0ddc38",
+      "pkg-cabal-sha256": "6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94",
       "pkg-name": "Cabal",
-      "pkg-version": "3.8.1.0",
-      "type": "pre-existing"
+      "pkg-src": {
+        "repo": {
+          "type": "secure-repo",
+          "uri": "http://hackage.haskell.org/"
+        },
+        "type": "repo-tar"
+      },
+      "pkg-src-sha256": "0bdbab8e4c3178016fb0f070d8b62bc3067f93afabfbd3aa17c8065d0ecc98ee",
+      "pkg-version": "3.10.1.0",
+      "style": "global",
+      "type": "configured"
     },
     {
+      "component-name": "lib",
       "depends": [
         "array-0.5.4.0",
         "base-4.17.0.0",
@@ -46,10 +60,22 @@
         "transformers-0.5.6.2",
         "unix-2.7.3"
       ],
-      "id": "Cabal-syntax-3.8.1.0",
+      "exe-depends": [],
+      "flags": {},
+      "id": "Cabal-syntax-3.10.1.0-a7e09e0ed12b8981fd4bb5283acfafac1e1e07aeb2b44507502ae461bb01f1b4",
+      "pkg-cabal-sha256": "bb835ebab577fd0f9c11dab96210dbb8d68ffc62652576f4b092563c345930e7",
       "pkg-name": "Cabal-syntax",
-      "pkg-version": "3.8.1.0",
-      "type": "pre-existing"
+      "pkg-src": {
+        "repo": {
+          "type": "secure-repo",
+          "uri": "http://hackage.haskell.org/"
+        },
+        "type": "repo-tar"
+      },
+      "pkg-src-sha256": "3b80092355327768a0de8298ac50ee906b7e82462e2ba14542730573b453f522",
+      "pkg-version": "3.10.1.0",
+      "style": "global",
+      "type": "configured"
     },
     {
       "depends": [
@@ -341,7 +367,7 @@
       "build-info": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.4.4/hadrian-0.1.0.0/x/hadrian/build-info.json",
       "component-name": "exe:hadrian",
       "depends": [
-        "Cabal-3.8.1.0",
+        "Cabal-3.10.1.0-08e8e38266cef863dfe810047ea2fb0574df80fd2bdeee7f2fbd09dadd0ddc38",
         "base-4.17.0.0",
         "base16-bytestring-1.0.2.0-2c05b63cefa5d7007acd478c1dbfe18a190bfba61d8945d4d5b87798ed9ca8c2",
         "bytestring-0.11.3.1",

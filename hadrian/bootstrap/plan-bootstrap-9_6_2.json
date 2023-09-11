@@ -95,22 +95,22 @@
   ],
   "dependencies": [
     {
-      "cabal_sha256": "ed2d937ba6c6a20b75850349eedd41374885fc42369ef152d69e2ba70f44f593",
+      "cabal_sha256": "bb835ebab577fd0f9c11dab96210dbb8d68ffc62652576f4b092563c345930e7",
       "flags": [],
       "package": "Cabal-syntax",
-      "revision": 3,
+      "revision": 0,
       "source": "hackage",
-      "src_sha256": "07e8ddb19fe01781485f1522b6afc22aba680b0ab28ebe6bbfb84a2dd698ce0f",
-      "version": "3.8.1.0"
+      "src_sha256": "3b80092355327768a0de8298ac50ee906b7e82462e2ba14542730573b453f522",
+      "version": "3.10.1.0"
     },
     {
-      "cabal_sha256": "77121d8e1aff14a0fd95684b751599db78a7dd26d55862d9fcef27c88b193e9d",
+      "cabal_sha256": "6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94",
       "flags": [],
       "package": "Cabal",
-      "revision": 2,
+      "revision": 0,
       "source": "hackage",
-      "src_sha256": "7464cbe6c2f3d7e5d0232023a1a7330621f8b24853cb259fc89a2af85b736608",
-      "version": "3.8.1.0"
+      "src_sha256": "0bdbab8e4c3178016fb0f070d8b62bc3067f93afabfbd3aa17c8065d0ecc98ee",
+      "version": "3.10.1.0"
     },
     {
       "cabal_sha256": "64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a",
@@ -229,10 +229,10 @@
       "version": "3.3.1"
     },
     {
-      "cabal_sha256": "826bf2a702a26ef87532a135808abad69d74f70ead39f26c06d034b1f0537a19",
+      "cabal_sha256": "d0ff45fa6e61f92af23611ceb8b9a6a04c236b50fb70c60e2ed3bfa532703670",
       "flags": [],
       "package": "primitive",
-      "revision": 0,
+      "revision": 1,
       "source": "hackage",
       "src_sha256": "5553c21b4a789f9b591eed69e598cc58484c274af29250e517b5a8bcc62b995f",
       "version": "0.8.0.0"

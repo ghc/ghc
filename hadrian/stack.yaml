@@ -17,3 +17,7 @@ nix:
    - ncurses
    - perl
    - ghc-toolchain
+
+extra-deps:
+   - Cabal-3.10.1.0
+   - Cabal-syntax-3.10.1.0
