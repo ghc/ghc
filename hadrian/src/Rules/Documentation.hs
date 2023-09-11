@@ -256,7 +256,6 @@ buildPackageDocumentation = do
     -- Per-package haddocks
     root -/- htmlRoot -/- "libraries/*/haddock-prologue.txt" %> \file -> do
         ctx <- pkgDocContext <$> getPkgDocTarget root file
-        -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
         syn  <- pkgSynopsis    (Context.package ctx)
         desc <- pkgDescription (Context.package ctx)
         let prologue = if null desc then syn else desc

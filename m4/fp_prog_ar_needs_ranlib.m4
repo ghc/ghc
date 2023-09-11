@@ -29,7 +29,7 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 
     # workaround for AC_PROG_RANLIB which sets RANLIB to `:' when
     # ranlib is missing on the target OS. The problem is that
-    # ghc-cabal cannot execute `:' which is a shell built-in but can
+    # other programs cannot execute `:' which is a shell built-in but can
     # execute `true' which is usually simple program supported by the
     # OS.
     # Fixes #8795

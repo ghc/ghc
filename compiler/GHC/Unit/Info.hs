@@ -234,8 +234,7 @@ unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibrar
         -- will eventually be unused.
         --
         -- This change elevates the need to add custom hooks
-        -- and handling specifically for the `rts` package for
-        -- example in ghc-cabal.
+        -- and handling specifically for the `rts` package.
         addSuffix rts@"HSrts"       = rts       ++ (expandTag rts_tag)
         addSuffix rts@"HSrts-1.0.2" = rts       ++ (expandTag rts_tag)
         addSuffix other_lib         = other_lib ++ (expandTag tag)

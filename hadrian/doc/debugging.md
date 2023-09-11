@@ -42,6 +42,11 @@ Adding `-V`, `-VV`, `-VVV` can output more information from Shake and Hadrian fo
 
 Example:
 
+> TODO
+>
+> Make a new example because `ghc-cabal` no longer exists.
+> New developers will not know what it is and thus find the example below more confusing.
+
 ```
 Error when running Shake build system:
 * OracleQ (PackageDataKey ("_build/stage1/libraries/unix/package-data.mk","COMPONENT_ID"))
