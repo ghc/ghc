@@ -17,36 +17,178 @@
 
 #include <string.h>
 
-// I don't think this code is all that perf critical.
-// So we just allocate a new buffer each time around.
+// Including zero byte
+static size_t escaped_size(char const* str)
+{
+    size_t escaped_size = 0;
+    for (; *str != '\0'; str++) {
+        const unsigned char c = *str;
+        switch (c)
+            {
+                // quotation mark (0x22)
+                case '"':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                case '\\':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                // backspace (0x08)
+                case '\b':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                // formfeed (0x0c)
+                case '\f':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                // newline (0x0a)
+                case '\n':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                // carriage return (0x0d)
+                case '\r':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                // horizontal tab (0x09)
+                case '\t':
+                {
+                    escaped_size += 2;
+                    break;
+                }
+
+                default:
+                {
+                    if (c <= 0x1f)
+                    {
+                        // print character c as \uxxxx
+                        escaped_size += 6;
+                    }
+                    else
+                    {
+                        escaped_size ++;
+                    }
+                    break;
+                }
+            }
+    }
+    escaped_size++; // null byte
+
+    return escaped_size;
+}
+
 static void escapeString(char const* str, char **buf)
 {
     char *out;
-    size_t req_size; //Max required size for decoding.
-    size_t in_size;  //Input size, including zero.
+    size_t out_size; //Max required size for decoding.
+    size_t pos = 0;
 
-    in_size = strlen(str) + 1;
-    // The strings are generally small and short
-    // lived so should be ok to just double the size.
-    req_size = in_size * 2;
-    out = stgMallocBytes(req_size, "writeCCSReportJson");
-    *buf = out;
-    // We provide an outputbuffer twice the size of the input,
-    // and at worse double the output size. So we can skip
-    // length checks.
+    out_size = escaped_size(str); //includes trailing zero byte
+    out = stgMallocBytes(out_size, "writeCCSReportJson");
     for (; *str != '\0'; str++) {
-        char c = *str;
-        if (c == '\\') {
-            *out = '\\'; out++;
-            *out = '\\'; out++;
-        } else if (c == '\n') {
-            *out = '\\'; out++;
-            *out = 'n';  out++;
-        } else {
-            *out = c; out++;
-        }
+        const unsigned char c = *str;
+        switch (c)
+            {
+                // quotation mark (0x22)
+                case '"':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = '"';
+                    pos += 2;
+                    break;
+                }
+
+                // reverse solidus (0x5c)
+                case '\\':
+                {
+                    out[pos] = '\\';
+                    out[pos+1] = '\\';
+                    pos += 2;
+                    break;
+                }
+
+                // backspace (0x08)
+                case '\b':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = 'b';
+                    pos += 2;
+                    break;
+                }
+
+                // formfeed (0x0c)
+                case '\f':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = 'f';
+                    pos += 2;
+                    break;
+                }
+
+                // newline (0x0a)
+                case '\n':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = 'n';
+                    pos += 2;
+                    break;
+                }
+
+                // carriage return (0x0d)
+                case '\r':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = 'r';
+                    pos += 2;
+                    break;
+                }
+
+                // horizontal tab (0x09)
+                case '\t':
+                {
+                    out[pos] = '\\';
+                    out[pos + 1] = 't';
+                    pos += 2;
+                    break;
+                }
+
+                default:
+                {
+                    if (c <= 0x1f)
+                    {
+                        // print character c as \uxxxx
+                        out[pos] = '\\';
+                        sprintf(&out[pos + 1], "u%04x", (int)c);
+                        pos += 6;
+                    }
+                    else
+                    {
+                        // all other characters are added as-is
+                        out[pos++] = c;
+                    }
+                    break;
+                }
+            }
     }
-    *out = '\0';
+    out[pos++] = '\0';
+    assert(pos == out_size);
+    *buf = out;
 }
 
 static void
