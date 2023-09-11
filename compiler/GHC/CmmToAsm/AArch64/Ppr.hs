@@ -30,10 +30,14 @@ import GHC.Utils.Panic
 
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
-  pprSectionAlign config section $$ pprDatas config dats
+  let platform = ncgPlatform config
+  in
+  pprSectionAlign config section $$ pprDatas platform dats
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
-  let platform = ncgPlatform config in
+  let platform = ncgPlatform config
+      with_dwarf = ncgDwarfEnabled config
+  in
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
@@ -41,7 +45,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- do not
         -- pprProcAlignment config $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
-        vcat (map (pprBasicBlock config top_info) blocks) $$
+        vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
         (if ncgDwarfEnabled config
          then line (pprAsmLabel platform (mkAsmTempEndLabel lbl) <> char ':') else empty) $$
         pprSizeDecl platform lbl
@@ -52,7 +56,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if platformHasSubsectionsViaSymbols platform
           then line (pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> char ':')
           else empty) $$
-      vcat (map (pprBasicBlock config top_info) blocks) $$
+      vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -100,13 +104,13 @@ pprSizeDecl platform lbl
    then line (text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl)
    else empty
 
-pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
+pprBasicBlock :: IsDoc doc => Platform -> {- dwarf enabled -} Bool -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
-pprBasicBlock config info_env (BasicBlock blockid instrs)
+pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
   = maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
-    (if  ncgDwarfEnabled config
+    (if  with_dwarf
       then line (pprAsmLabel platform (mkAsmTempEndLabel asmLbl) <> char ':')
       else empty
     )
@@ -117,16 +121,15 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
             f _ = True
 
     asmLbl = blockLbl blockid
-    platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
        Nothing   -> c
        Just (CmmStaticsRaw info_lbl info) ->
           --  pprAlignForSection platform Text $$
            infoTableLoc $$
-           vcat (map (pprData config) info) $$
+           vcat (map (pprData platform) info) $$
            pprLabel platform info_lbl $$
            c $$
-           (if ncgDwarfEnabled config
+           (if with_dwarf
              then line (pprAsmLabel platform (mkAsmTempEndLabel info_lbl) <> char ':')
              else empty)
     -- Make sure the info table has the right .loc for the block
@@ -135,34 +138,31 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
       (l@LOCATION{} : _) -> pprInstr platform l
       _other             -> empty
 
-pprDatas :: IsDoc doc => NCGConfig -> RawCmmStatics -> doc
+pprDatas :: IsDoc doc => Platform -> RawCmmStatics -> doc
 -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
-  = pprGloblDecl (ncgPlatform config) alias
-    $$ line (text ".equiv" <+> pprAsmLabel (ncgPlatform config) alias <> comma <> pprAsmLabel (ncgPlatform config) ind')
+  = pprGloblDecl platform alias
+    $$ line (text ".equiv" <+> pprAsmLabel platform alias <> comma <> pprAsmLabel platform ind')
 
-pprDatas config (CmmStaticsRaw lbl dats)
-  = vcat (pprLabel platform lbl : map (pprData config) dats)
-   where
-      platform = ncgPlatform config
+pprDatas platform (CmmStaticsRaw lbl dats)
+  = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: IsDoc doc => NCGConfig -> CmmStatic -> doc
-pprData _config (CmmString str) = line (pprString str)
-pprData _config (CmmFileEmbed path _) = line (pprFileEmbed path)
+pprData :: IsDoc doc => Platform -> CmmStatic -> doc
+pprData _platform (CmmString str) = line (pprString str)
+pprData _platform (CmmFileEmbed path _) = line (pprFileEmbed path)
 
-pprData config (CmmUninitialised bytes)
- = line $ let platform = ncgPlatform config
-          in if platformOS platform == OSDarwin
+pprData platform (CmmUninitialised bytes)
+ = line $ if platformOS platform == OSDarwin
                 then text ".space " <> int bytes
                 else text ".skip "  <> int bytes
 
-pprData config (CmmStaticLit lit) = pprDataItem config lit
+pprData platform (CmmStaticLit lit) = pprDataItem platform lit
 
 pprGloblDecl :: IsDoc doc => Platform -> CLabel -> doc
 pprGloblDecl platform lbl
@@ -196,12 +196,10 @@ pprTypeDecl platform lbl
       then line (text ".type " <> pprAsmLabel platform lbl <> text ", " <> pprLabelType' platform lbl)
       else empty
 
-pprDataItem :: IsDoc doc => NCGConfig -> CmmLit -> doc
-pprDataItem config lit
+pprDataItem :: IsDoc doc => Platform -> CmmLit -> doc
+pprDataItem platform lit
   = lines_ (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
-        platform = ncgPlatform config
-
         imm = litToImm lit
 
         ppr_item II8  _ = [text "\t.byte\t"  <> pprImm platform imm]
