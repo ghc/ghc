@@ -19,5 +19,7 @@ AmbigFDs.hs:10:8: error: [GHC-25897]
           foo :: forall a b1 b2. (C a b1, C a b2) => a -> Int
         at AmbigFDs.hs:10:8-35
     • In the ambiguity check for ‘foo’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: foo :: (C a b1, C a b2) => a -> Int

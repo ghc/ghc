@@ -236,7 +236,7 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
-         do { (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
+         do { (_wrap, wanted) <- addErrCtxt msg $
                                  captureConstraints $
                                  tcSubTypeAmbiguity ctxt ty ty
                                  -- See Note [Ambiguity check and deep subsumption]
@@ -248,10 +248,11 @@ checkAmbiguity ctxt ty
   | otherwise
   = return ()
  where
-   mk_msg allow_ambiguous
-     = vcat [ text "In the ambiguity check for" <+> what
-            , ppUnless allow_ambiguous ambig_msg ]
-   ambig_msg = text "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes"
+   msg = vcat [ text "In the ambiguity check for" <+> what,
+                text "You can fix this by adding a Proxy argument",
+                text "for every undetermined type variable.",
+                text "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes"
+              ]
    what | Just n <- isSigMaybe ctxt = quotes (ppr n)
         | otherwise                 = pprUserTypeCtxt ctxt
 

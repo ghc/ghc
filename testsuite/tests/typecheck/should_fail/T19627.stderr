@@ -12,6 +12,8 @@ T19627.hs:108:3: error: [GHC-05617]
         NB: ‘Not’ is a non-injective type family
         The type variable ‘p0’ is ambiguous
     • In the ambiguity check for ‘apartR’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         apartR :: forall (p :: * -> * -> *) a b.
@@ -37,6 +39,8 @@ T19627.hs:108:3: error: [GHC-05617]
         bound by a quantified context at T19627.hs:108:3-34
         The type variable ‘p0’ is ambiguous
     • In the ambiguity check for ‘apartR’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         apartR :: forall (p :: * -> * -> *) a b.

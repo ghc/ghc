@@ -3,6 +3,8 @@ T8550.hs:8:3: error: [GHC-40404]
     • Reduction stack overflow; size = 201
       When simplifying the following type: F ()
     • In the ambiguity check for ‘A’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the definition of data constructor ‘A’
       In the data type declaration for ‘A’

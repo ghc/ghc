@@ -5,6 +5,8 @@ T8030.hs:9:3: error: [GHC-83865]
         NB: ‘Pr’ is a non-injective type family
         The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op1’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         op1 :: forall k (a :: k). C a => Pr a
@@ -18,6 +20,8 @@ T8030.hs:10:3: error: [GHC-83865]
         NB: ‘Pr’ is a non-injective type family
         The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op2’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         op2 :: forall k (a :: k). C a => Pr a -> Pr a -> Pr a

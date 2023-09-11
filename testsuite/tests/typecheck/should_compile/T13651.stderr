@@ -15,6 +15,8 @@ T13651.hs:12:8: error: [GHC-25897]
                  Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
         at T13651.hs:(12,8)-(14,65)
     • In the ambiguity check for ‘foo’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:
         foo :: (F cr cu ~ Bar h (Bar r u),

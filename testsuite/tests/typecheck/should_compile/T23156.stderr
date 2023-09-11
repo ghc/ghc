@@ -8,6 +8,8 @@ T23156.hs:51:6: warning: [GHC-05617] [-Wdeferred-type-errors (in -Wdefault)]
       NB: ‘BooleanOf2’ is a non-injective type family
       The type variables ‘r0’, ‘r0’ are ambiguous
     • In the ambiguity check for ‘f’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: f :: forall r. (ADReady r) => ()
 

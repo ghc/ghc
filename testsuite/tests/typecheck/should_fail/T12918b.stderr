@@ -21,6 +21,8 @@ T12918b.hs:12:11: error: [GHC-39999]
         at T12918b.hs:12:11-14
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘bar2’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         bar2 :: forall a b. Foo1 a => a -> b

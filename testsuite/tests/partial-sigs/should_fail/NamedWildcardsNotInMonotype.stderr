@@ -13,6 +13,8 @@ NamedWildcardsNotInMonotype.hs:5:1: error: [GHC-39999]
         ...plus four instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the ambiguity check for the inferred type for ‘foo’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
         foo :: forall {a} {w}. (Show a, Eq w, Eq a) => a -> a -> String

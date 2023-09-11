@@ -9,5 +9,7 @@ T5287.hs:7:10: error: [GHC-39999]
       Potentially matching instance:
         instance A Int Bool -- Defined at T5287.hs:13:10
     • In the ambiguity check for an instance declaration
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the instance declaration for ‘Read (D a)’

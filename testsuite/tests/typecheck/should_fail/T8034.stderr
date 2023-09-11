@@ -7,6 +7,8 @@ T8034.hs:7:3: error: [GHC-83865]
         NB: ‘F’ is a non-injective type family
         The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘foo’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method: foo :: forall a. C a => F a -> F a
       In the class declaration for ‘C’

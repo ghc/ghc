@@ -13,5 +13,7 @@ T7279.hs:6:10: error: [GHC-39999]
         ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the ambiguity check for an instance declaration
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the instance declaration for ‘Eq (T a)’

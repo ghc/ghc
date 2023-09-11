@@ -7,6 +7,8 @@ T1897a.hs:9:1: error: [GHC-39999]
         at T1897a.hs:9:1-24
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘foo’
+      You can fix this by adding a Proxy argument
+      for every undetermined type variable.
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
         foo :: forall {a} {b}. Wob a b => b -> [b]
