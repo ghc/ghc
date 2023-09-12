@@ -80,7 +80,6 @@ import GHC.Types.Error
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
-import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -246,8 +245,9 @@ instantiateSigma orig concs tvs theta body_ty
 
       ; return (inst_tvs, wrap, inst_body) }
   where
-    free_tvs = tyCoVarsOfType body_ty `unionVarSet` tyCoVarsOfTypes theta
-    in_scope = mkInScopeSet (free_tvs `delVarSetList` tvs)
+    in_scope = mkInScopeSet (tyCoVarsOfType (mkSpecSigmaTy tvs theta body_ty))
+               -- mkSpecSigmaTy: Inferred vs Specified is not important here;
+               --                We just want an accurate free-var set
     empty_subst = mkEmptySubst in_scope
     new_meta :: Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
     new_meta final_subst subst tv
