@@ -87,6 +87,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
+import Data.Maybe( isJust )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2356,7 +2358,7 @@ perform eta reduction on an expression with n leading lambdas `\xs. e xs`
 (checked in 'is_eta_reduction_sound' in 'tryEtaReduce', which focuses on the
 case where `e` is trivial):
 
- A. It is sound to eta-reduce n arguments as long as n does not exceed the
+(A) It is sound to eta-reduce n arguments as long as n does not exceed the
     `exprArity` of `e`. (Needs Arity analysis.)
     This criterion exploits information about how `e` is *defined*.
 
@@ -2365,7 +2367,7 @@ case where `e` is trivial):
     By contrast, it would be *unsound* to eta-reduce 2 args, `\x y. e x y` to `e`:
     `e 42` diverges when `(\x y. e x y) 42` does not.
 
- S. It is sound to eta-reduce n arguments in an evaluation context in which all
+(S) It is sound to eta-reduce n arguments in an evaluation context in which all
     calls happen with at least n arguments. (Needs Strictness analysis.)
     NB: This treats evaluations like a call with 0 args.
     NB: This criterion exploits information about how `e` is *used*.
@@ -2392,13 +2394,13 @@ case where `e` is trivial):
     See Note [Eta reduction based on evaluation context] for the implementation
     details. This criterion is tested extensively in T21261.
 
- R. Note [Eta reduction in recursive RHSs] tells us that we should not
+(R) Note [Eta reduction in recursive RHSs] tells us that we should not
     eta-reduce `f` in its own RHS and describes our fix.
     There we have `f = \x. f x` and we should not eta-reduce to `f=f`. Which
     might change a terminating program (think @f `seq` e@) to a non-terminating
     one.
 
- E. (See fun_arity in tryEtaReduce.) As a perhaps special case on the
+(E) (See fun_arity in tryEtaReduce.) As a perhaps special case on the
     boundary of (A) and (S), when we know that a fun binder `f` is in
     WHNF, we simply assume it has arity 1 and apply (A).  Example:
        g f = f `seq` \x. f x
@@ -2408,7 +2410,7 @@ case where `e` is trivial):
 And here are a few more technical criteria for when it is *not* sound to
 eta-reduce that are specific to Core and GHC:
 
- L. With linear types, eta-reduction can break type-checking:
+(L) With linear types, eta-reduction can break type-checking:
       f :: A ⊸ B
       g :: A -> B
       g = \x. f x
@@ -2416,13 +2418,13 @@ eta-reduce that are specific to Core and GHC:
     complain that g and f don't have the same type. NB: Not unsound in the
     dynamic semantics, but unsound according to the static semantics of Core.
 
- J. We may not undersaturate join points.
+(J) We may not undersaturate join points.
     See Note [Invariants on join points] in GHC.Core, and #20599.
 
- B. We may not undersaturate functions with no binding.
+(B) We may not undersaturate functions with no binding.
     See Note [Eta expanding primops].
 
- W. We may not undersaturate StrictWorkerIds.
+(W) We may not undersaturate StrictWorkerIds.
     See Note [CBV Function Ids] in GHC.Types.Id.Info.
 
 Here is a list of historic accidents surrounding unsound eta-reduction:
@@ -2679,7 +2681,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
            || all_calls_with_arity incoming_arity)   -- criterion (S)
       -- ... and that the function can be eta reduced to arity 0
       -- without violating invariants of Core and GHC
-      && canEtaReduceToArity fun 0 0              -- criteria (L), (J), (W), (B)
+      && not (cantEtaReduceFun fun)                  -- criteria (L), (J), (W), (B)
     all_calls_with_arity n = isStrict (fst $ peelManyCalls n eval_sd)
        -- See Note [Eta reduction based on evaluation context]
 
@@ -2729,19 +2731,18 @@ tryEtaReduce rec_ids bndrs body eval_sd
 
     ok_arg _ _ _ _ = Nothing
 
--- | Can we eta-reduce the given function to the specified arity?
+-- | Can we eta-reduce the given function
 -- See Note [Eta reduction soundness], criteria (B), (J), (W) and (L).
-canEtaReduceToArity :: Id -> JoinArity -> Arity -> Bool
-canEtaReduceToArity fun dest_join_arity dest_arity =
-  not $
-        hasNoBinding fun -- (B)
+cantEtaReduceFun :: Id -> Bool
+cantEtaReduceFun fun
+  =    hasNoBinding fun -- (B)
        -- Don't undersaturate functions with no binding.
 
-    ||  ( isJoinId fun && dest_join_arity < idJoinArity fun ) -- (J)
+    ||  isJoinId fun    -- (J)
        -- Don't undersaturate join points.
        -- See Note [Invariants on join points] in GHC.Core, and #20599
 
-    || ( dest_arity < idCbvMarkArity fun ) -- (W)
+    || (isJust (idCbvMarks_maybe fun)) -- (W)
        -- Don't undersaturate StrictWorkerIds.
        -- See Note [CBV Function Ids] in GHC.Types.Id.Info.
 
