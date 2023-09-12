@@ -1,3 +1,8 @@
+{-# OPTIONS_GHC -fno-cse #-}
+    -- Avoid depending on flukey CSE; there are really 4 independent
+    -- tests in this module, and we don't want them to interact.
+    -- See #23925
+
 import GHC.Exts
 import Data.Int
 

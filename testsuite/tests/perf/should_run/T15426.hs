@@ -1,3 +1,8 @@
+{-# OPTIONS_GHC -fno-cse #-}
+    -- Avoid depending on flukey CSE; there are really 5 independent
+    -- tests in this module, and we don't want them to interact.
+    -- See #23925
+
 import Control.Exception (evaluate)
 import qualified Data.List as L
 
