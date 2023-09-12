@@ -1055,17 +1055,17 @@ cvtl e = wrapLA (cvt e)
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; let pats = map (parenthesizePat appPrec) ps'
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLam noExtField . mkMatchGroup th_origin)
-                                        [mkSimpleMatch LambdaExpr pats e']}
-    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamCaseAlt LamCase) ms
+                            ; wrapParLA (HsLam noAnn LamSingle . mkMatchGroup th_origin)
+                                        [mkSimpleMatch (LamAlt LamSingle) pats e']}
+    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamAlt LamCase) ms
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLamCase noAnn LamCase . mkMatchGroup th_origin) ms'
+                            ; wrapParLA (HsLam noAnn LamCase . mkMatchGroup th_origin) ms'
                             }
     cvt (LamCasesE ms)
       | null ms   = failWith CasesExprWithoutAlts
-      | otherwise = do { ms' <- mapM (cvtClause $ LamCaseAlt LamCases) ms
+      | otherwise = do { ms' <- mapM (cvtClause $ LamAlt LamCases) ms
                        ; th_origin <- getOrigin
-                       ; wrapParLA (HsLamCase noAnn LamCases . mkMatchGroup th_origin) ms'
+                       ; wrapParLA (HsLam noAnn LamCases . mkMatchGroup th_origin) ms'
                        }
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed

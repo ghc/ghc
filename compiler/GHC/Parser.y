@@ -2865,26 +2865,26 @@ aexp    :: { ECP }
         | PREFIX_MINUS aexp     { ECP $
                                    unECP $2 >>= \ $2 ->
                                    mkHsNegAppPV (comb2 $1 $>) $2 [mj AnnMinus $1] }
-
-        | '\\' apats '->' exp
-                   {  ECP $
-                      unECP $4 >>= \ $4 ->
-                      mkHsLamPV (comb2 $1 $>) (\cs -> mkMatchGroup FromSource
-                            (sLLa $1 $>
-                            [sLLa $1 $>
-                                         $ Match { m_ext = EpAnn (glR $1) [mj AnnLam $1] cs
-                                                 , m_ctxt = LambdaExpr
-                                                 , m_pats = $2
-                                                 , m_grhss = unguardedGRHSs (comb2 $3 $4) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2 $1 $>) (hsTok $1) (unLoc $2) (hsTok $3) $4 }
+        | '\\' apats '->' exp
+                   {  ECP $
+                      unECP $4 >>= \ $4 ->
+                      mkHsLamPV (comb2 $1 $>) LamSingle
+                            (sLLl $1 $>
+                            [sLLa $1 $>
+                                         $ Match { m_ext = EpAnn (glR $1) [] emptyComments
+                                                 , m_ctxt = LamAlt LamSingle
+                                                 , m_pats = $2
+                                                 , m_grhss = unguardedGRHSs (comb2 $3 $4) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])
+                            [mj AnnLam $1] }
         | '\\' 'lcase' altslist(pats1)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamCasePV (comb2 $1 $>) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
+                 mkHsLamPV (comb2 $1 $>) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
         | '\\' 'lcases' altslist(apats)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamCasePV (comb2 $1 $>) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
+                 mkHsLamPV (comb2 $1 $>) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                             return $ ECP $
@@ -4134,6 +4134,10 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 {-# INLINE sLLa #-}
 sLLa :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedAn t c
 sLLa x y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
+
+{-# INLINE sLLl #-}
+sLLl :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedL c
+sLLl x y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLAsl #-}
 sLLAsl :: (HasLoc a) => [a] -> Located b -> c -> Located c

@@ -2262,16 +2262,19 @@ exactMatch (Match an mctxt pats grhss) = do
                     rest' <- mapM markAnnotated rest
                     return (an1, FunRhs fun' fixity strictness, p1':p2':rest')
               _ -> panic "FunRhs"
-      LambdaExpr -> do
+
+      -- ToDo: why is LamSingle treated differently?
+      LamAlt LamSingle -> do
         an0' <- markEpAnnL an lidl AnnLam
         pats' <- markAnnotated pats
-        return (an0', LambdaExpr, pats')
+        return (an0', LamAlt LamSingle, pats')
+      LamAlt v -> do
+        pats' <- markAnnotated pats
+        return (an, LamAlt v, pats')
+
       CaseAlt -> do
         pats' <- markAnnotated pats
         return (an, CaseAlt, pats')
-      LamCaseAlt v -> do
-        pats' <- markAnnotated pats
-        return (an, LamCaseAlt v, pats')
       _ -> do
         mctxt' <- withPpr mctxt
         return (an, mctxt', pats)
@@ -2655,8 +2658,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsIPVar an _)               = fromAnn an
   getAnnotationEntry (HsOverLit an _)             = fromAnn an
   getAnnotationEntry (HsLit an _)                 = fromAnn an
-  getAnnotationEntry (HsLam _ _)                  = NoEntryVal
-  getAnnotationEntry (HsLamCase an _ _)           = fromAnn an
+  getAnnotationEntry (HsLam an _ _)               = fromAnn an
   getAnnotationEntry (HsApp an _ _)               = fromAnn an
   getAnnotationEntry (HsAppType _ _ _ _)          = NoEntryVal
   getAnnotationEntry (OpApp an _ _ _)             = fromAnn an
@@ -2694,8 +2696,7 @@ instance ExactPrint (HsExpr GhcPs) where
   setAnnotationAnchor (HsIPVar an a)         anc cs = (HsIPVar (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsOverLit an a)       anc cs = (HsOverLit (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsLit an a)           anc cs = (HsLit (setAnchorEpa an anc cs) a)
-  setAnnotationAnchor a@(HsLam _ _)            _ _s = a
-  setAnnotationAnchor (HsLamCase an a b)     anc cs = (HsLamCase (setAnchorEpa an anc cs) a b)
+  setAnnotationAnchor (HsLam an a b)         anc cs = (HsLam (setAnchorEpa an anc cs) a b)
   setAnnotationAnchor (HsApp an a b)         anc cs = (HsApp (setAnchorEpa an anc cs) a b)
   setAnnotationAnchor a@(HsAppType {})      _ _s = a
   setAnnotationAnchor (OpApp an a b c)       anc cs = (OpApp (setAnchorEpa an anc cs) a b c)
@@ -2760,16 +2761,15 @@ instance ExactPrint (HsExpr GhcPs) where
   exact (HsLit an lit) = do
     lit' <- withPpr lit
     return (HsLit an lit')
-  exact (HsLam x mg) = do
-    mg' <- markAnnotated mg
-    return (HsLam x mg')
 
-  exact (HsLamCase an lc_variant mg) = do
+  exact (HsLam an lam_variant mg) = do
     an0 <- markEpAnnL an lidl AnnLam
-    an1 <- markEpAnnL an0 lidl (case lc_variant of LamCase -> AnnCase
-                                                   LamCases -> AnnCases)
+    an1 <- case lam_variant of
+             LamSingle -> return an0
+             LamCase -> markEpAnnL an0 lidl AnnCase
+             LamCases -> markEpAnnL an0 lidl AnnCases
     mg' <- markAnnotated mg
-    return (HsLamCase an1 lc_variant mg')
+    return (HsLam an1 lam_variant mg')
 
   exact (HsApp an e1 e2) = do
     p <- getPosP
@@ -3227,10 +3227,9 @@ instance ExactPrint (HsCmd GhcPs) where
   getAnnotationEntry (HsCmdArrApp an _ _ _ _)   = fromAnn an
   getAnnotationEntry (HsCmdArrForm an _ _ _ _ ) = fromAnn an
   getAnnotationEntry (HsCmdApp an _ _ )         = fromAnn an
-  getAnnotationEntry (HsCmdLam {})              = NoEntryVal
   getAnnotationEntry (HsCmdPar an _ _ _)        = fromAnn an
   getAnnotationEntry (HsCmdCase an _ _)         = fromAnn an
-  getAnnotationEntry (HsCmdLamCase an _ _)      = fromAnn an
+  getAnnotationEntry (HsCmdLam an _ _)          = fromAnn an
   getAnnotationEntry (HsCmdIf an _ _ _ _)       = fromAnn an
   getAnnotationEntry (HsCmdLet an _ _ _ _)      = fromAnn an
   getAnnotationEntry (HsCmdDo an _)             = fromAnn an
@@ -3238,10 +3237,13 @@ instance ExactPrint (HsCmd GhcPs) where
   setAnnotationAnchor (HsCmdArrApp an a b c d)   anc cs = (HsCmdArrApp (setAnchorEpa an anc cs) a b c d)
   setAnnotationAnchor (HsCmdArrForm an a b c d ) anc cs = (HsCmdArrForm (setAnchorEpa an anc cs) a b c d )
   setAnnotationAnchor (HsCmdApp an a b )         anc cs = (HsCmdApp (setAnchorEpa an anc cs) a b )
-  setAnnotationAnchor a@(HsCmdLam {})              _ _s = a
+
+  -- ToDo: why is LamSingle treated differently?
+  setAnnotationAnchor a@(HsCmdLam _ LamSingle _) _   _s = a
+  setAnnotationAnchor (HsCmdLam an a b)          anc cs = (HsCmdLam (setAnchorEpa an anc cs) a b)
+
   setAnnotationAnchor (HsCmdPar an a b c)        anc cs = (HsCmdPar (setAnchorEpa an anc cs) a b c)
   setAnnotationAnchor (HsCmdCase an a b)         anc cs = (HsCmdCase (setAnchorEpa an anc cs) a b)
-  setAnnotationAnchor (HsCmdLamCase an a b)      anc cs = (HsCmdLamCase (setAnchorEpa an anc cs) a b)
   setAnnotationAnchor (HsCmdIf an a b c d)       anc cs = (HsCmdIf (setAnchorEpa an anc cs) a b c d)
   setAnnotationAnchor (HsCmdLet an a b c d)      anc cs = (HsCmdLet (setAnchorEpa an anc cs) a b c d)
   setAnnotationAnchor (HsCmdDo an a)             anc cs = (HsCmdDo (setAnchorEpa an anc cs) a)
@@ -3282,9 +3284,14 @@ instance ExactPrint (HsCmd GhcPs) where
     e2' <- markAnnotated e2
     return (HsCmdApp an e1' e2')
 
-  exact (HsCmdLam a match) = do
-    match' <- markAnnotated match
-    return (HsCmdLam a match')
+  exact (HsCmdLam an lam_variant matches) = do
+    an0 <- markEpAnnL an lidl AnnLam
+    an1 <- case lam_variant of
+             LamSingle -> return an0
+             LamCase -> markEpAnnL an0 lidl AnnCase
+             LamCases -> markEpAnnL an0 lidl AnnCases
+    matches' <- markAnnotated matches
+    return (HsCmdLam an1 lam_variant matches')
 
   exact (HsCmdPar an lpar e rpar) = do
     lpar' <- markToken lpar
@@ -3301,13 +3308,6 @@ instance ExactPrint (HsCmd GhcPs) where
     alts' <- markAnnotated alts
     an4 <- markEpAnnL an3 lhsCaseAnnsRest AnnCloseC
     return (HsCmdCase an4 e' alts')
-
-  exact (HsCmdLamCase an lc_variant matches) = do
-    an0 <- markEpAnnL an lidl AnnLam
-    an1 <- markEpAnnL an0 lidl (case lc_variant of LamCase -> AnnCase
-                                                   LamCases -> AnnCases)
-    matches' <- markAnnotated matches
-    return (HsCmdLamCase an1 lc_variant matches')
 
   exact (HsCmdIf an a e1 e2 e3) = do
     an0 <- markLensKw an laiIf AnnIf

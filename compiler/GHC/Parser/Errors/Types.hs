@@ -249,17 +249,14 @@ data PsMessage
    -- | If-then-else syntax in pattern
    | PsErrIfThenElseInPat
 
-   -- | Lambda-case in pattern
-   | PsErrLambdaCaseInPat LamCaseVariant
+   -- | Lambda or Lambda-case in pattern
+   | PsErrLambdaInPat HsLamVariant
 
    -- | case..of in pattern
    | PsErrCaseInPat
 
    -- | let-syntax in pattern
    | PsErrLetInPat
-
-   -- | Lambda-syntax in pattern
-   | PsErrLambdaInPat
 
    -- | Arrow expression-syntax in pattern
    | PsErrArrowExprInPat !(HsExpr GhcPs)
@@ -310,14 +307,11 @@ data PsMessage
    -- | @-operator in a pattern position
    | PsErrAtInPatPos
 
-   -- | Unexpected lambda command in function application
-   | PsErrLambdaCmdInFunAppCmd !(LHsCmd GhcPs)
-
    -- | Unexpected case command in function application
    | PsErrCaseCmdInFunAppCmd !(LHsCmd GhcPs)
 
-   -- | Unexpected \case(s) command in function application
-   | PsErrLambdaCaseCmdInFunAppCmd !LamCaseVariant !(LHsCmd GhcPs)
+   -- | Unexpected lambda or \case(s) command in function application
+   | PsErrLambdaCmdInFunAppCmd !HsLamVariant !(LHsCmd GhcPs)
 
    -- | Unexpected if command in function application
    | PsErrIfCmdInFunAppCmd !(LHsCmd GhcPs)
@@ -334,14 +328,11 @@ data PsMessage
    -- | Unexpected mdo block in function application
    | PsErrMDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
 
-   -- | Unexpected lambda expression in function application
-   | PsErrLambdaInFunAppExpr !(LHsExpr GhcPs)
-
    -- | Unexpected case expression in function application
    | PsErrCaseInFunAppExpr !(LHsExpr GhcPs)
 
-   -- | Unexpected \case(s) expression in function application
-   | PsErrLambdaCaseInFunAppExpr !LamCaseVariant !(LHsExpr GhcPs)
+   -- | Unexpected lambda or \case(s) expression in function application
+   | PsErrLambdaInFunAppExpr !HsLamVariant !(LHsExpr GhcPs)
 
    -- | Unexpected let expression in function application
    | PsErrLetInFunAppExpr !(LHsExpr GhcPs)

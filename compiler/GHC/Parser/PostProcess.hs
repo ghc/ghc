@@ -1118,25 +1118,23 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
   where
     checkExpr :: LHsExpr GhcPs -> PV ()
     checkExpr expr = case unLoc expr of
-      HsDo _ (DoExpr m) _      -> check (PsErrDoInFunAppExpr m)                  expr
-      HsDo _ (MDoExpr m) _     -> check (PsErrMDoInFunAppExpr m)                 expr
-      HsLam {}                 -> check PsErrLambdaInFunAppExpr                  expr
-      HsCase {}                -> check PsErrCaseInFunAppExpr                    expr
-      HsLamCase _ lc_variant _ -> check (PsErrLambdaCaseInFunAppExpr lc_variant) expr
-      HsLet {}                 -> check PsErrLetInFunAppExpr                     expr
-      HsIf {}                  -> check PsErrIfInFunAppExpr                      expr
-      HsProc {}                -> check PsErrProcInFunAppExpr                    expr
+      HsDo _ (DoExpr m) _      -> check (PsErrDoInFunAppExpr m)               expr
+      HsDo _ (MDoExpr m) _     -> check (PsErrMDoInFunAppExpr m)              expr
+      HsCase {}                -> check PsErrCaseInFunAppExpr                 expr
+      HsLam _ lam_variant _    -> check (PsErrLambdaInFunAppExpr lam_variant) expr
+      HsLet {}                 -> check PsErrLetInFunAppExpr                  expr
+      HsIf {}                  -> check PsErrIfInFunAppExpr                   expr
+      HsProc {}                -> check PsErrProcInFunAppExpr                 expr
       _                        -> return ()
 
     checkCmd :: LHsCmd GhcPs -> PV ()
     checkCmd cmd = case unLoc cmd of
-      HsCmdLam {}                 -> check PsErrLambdaCmdInFunAppCmd                  cmd
-      HsCmdCase {}                -> check PsErrCaseCmdInFunAppCmd                    cmd
-      HsCmdLamCase _ lc_variant _ -> check (PsErrLambdaCaseCmdInFunAppCmd lc_variant) cmd
-      HsCmdIf {}                  -> check PsErrIfCmdInFunAppCmd                      cmd
-      HsCmdLet {}                 -> check PsErrLetCmdInFunAppCmd                     cmd
-      HsCmdDo {}                  -> check PsErrDoCmdInFunAppCmd                      cmd
-      _                           -> return ()
+      HsCmdLam _ lam_variant _ -> check (PsErrLambdaCmdInFunAppCmd lam_variant) cmd
+      HsCmdCase {}             -> check PsErrCaseCmdInFunAppCmd                 cmd
+      HsCmdIf {}               -> check PsErrIfCmdInFunAppCmd                   cmd
+      HsCmdLet {}              -> check PsErrLetCmdInFunAppCmd                  cmd
+      HsCmdDo {}               -> check PsErrDoCmdInFunAppCmd                   cmd
+      _                        -> return ()
 
     check err a = do
       blockArguments <- getBit BlockArgumentsBit
@@ -1558,9 +1556,6 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
   mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
-  -- | Disambiguate "\... -> ..." (lambda)
-  mkHsLamPV
-    :: SrcSpan -> (EpAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
     :: SrcSpan
@@ -1581,10 +1576,10 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LocatedA b)])
              -> EpAnnHsCase -> PV (LocatedA b)
-  -- | Disambiguate "\case" and "\cases"
-  mkHsLamCasePV :: SrcSpan -> LamCaseVariant
-                -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> [AddEpAnn]
-                -> PV (LocatedA b)
+  -- | Disambiguate "\... -> ..." (lambda), "\case" and "\cases"
+  mkHsLamPV :: SrcSpan -> HsLamVariant
+            -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> [AddEpAnn]
+            -> PV (LocatedA b)
   -- | Function argument representation
   type FunArg b
   -- | Bring superclass constraints on FunArg into scope.
@@ -1709,26 +1704,29 @@ instance DisambECP (HsCmd GhcPs) where
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $
                                                  PsErrOverloadedRecordDotInvalid
-  mkHsLamPV l mg = do
+  mkHsLamPV l lam_variant (L lm m) anns = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsCmdLam NoExtField (mg cs))
+    let mg = mkLamCaseMatchGroup FromSource lam_variant (L lm m)
+    return $ L (noAnnSrcSpan l) (HsCmdLam (EpAnn (spanAsAnchor l) anns cs) lam_variant mg)
+
   mkHsLetPV l tkLet bs tkIn e = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdLet (EpAnn (spanAsAnchor l) NoEpAnns cs) tkLet bs tkIn e)
+
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
+
   superInfixOp m = m
+
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (l2l $ getLoc c) $ HsCmdTop noExtField c
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLocL op) Infix Nothing [cmdArg c1, cmdArg c2]
+
   mkHsCasePV l c (L lm m) anns = do
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
     return $ L (noAnnSrcSpan l) (HsCmdCase (EpAnn (spanAsAnchor l) anns cs) c mg)
-  mkHsLamCasePV l lc_variant (L lm m) anns = do
-    cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lc_variant (L lm m)
-    return $ L (noAnnSrcSpan l) (HsCmdLamCase (EpAnn (spanAsAnchor l) anns cs) lc_variant mg)
+
   type FunArg (HsCmd GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l c e = do
@@ -1781,10 +1779,10 @@ instance DisambECP (HsCmd GhcPs) where
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ mkPlainErrorMsgEnvelope loc $ PsErrParseErrorInCmd e
 
-checkLamMatchGroup :: SrcSpan -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
-checkLamMatchGroup l (MG { mg_alts = (L _ (matches:_))}) = do
+checkLamMatchGroup :: SrcSpan -> HsLamVariant -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
+checkLamMatchGroup l LamSingle (MG { mg_alts = (L _ (matches:_))}) = do
   when (null (hsLMatchPats matches)) $ addError $ mkPlainErrorMsgEnvelope l PsErrEmptyLambda
-checkLamMatchGroup _ _ = return ()
+checkLamMatchGroup _ _ _ = return ()
 
 instance DisambECP (HsExpr GhcPs) where
   type Body (HsExpr GhcPs) = HsExpr
@@ -1795,11 +1793,6 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsProjUpdatePV l fields arg isPun anns = do
     cs <- getCommentsFor l
     return $ mkRdrProjUpdate (noAnnSrcSpan l) fields arg isPun (EpAnn (spanAsAnchor l) anns cs)
-  mkHsLamPV l mg = do
-    cs <- getCommentsFor l
-    let mg' = mg cs
-    checkLamMatchGroup l mg'
-    return $ L (noAnnSrcSpan l) (HsLam NoExtField mg')
   mkHsLetPV l tkLet bs tkIn c = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsLet (EpAnn (spanAsAnchor l) NoEpAnns cs) tkLet bs tkIn c)
@@ -1812,10 +1805,11 @@ instance DisambECP (HsExpr GhcPs) where
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
     return $ L (noAnnSrcSpan l) (HsCase (EpAnn (spanAsAnchor l) anns cs) e mg)
-  mkHsLamCasePV l lc_variant (L lm m) anns = do
+  mkHsLamPV l lam_variant (L lm m) anns = do
     cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lc_variant (L lm m)
-    return $ L (noAnnSrcSpan l) (HsLamCase (EpAnn (spanAsAnchor l) anns cs) lc_variant mg)
+    let mg = mkLamCaseMatchGroup FromSource lam_variant (L lm m)
+    checkLamMatchGroup l lam_variant mg
+    return $ L (noAnnSrcSpan l) (HsLam (EpAnn (spanAsAnchor l) anns cs) lam_variant mg)
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l e1 e2 = do
@@ -1889,7 +1883,6 @@ instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (L l c)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInPat c
   ecpFromExp' (L l e)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowExprInPat e
-  mkHsLamPV l _          = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLambdaInPat
   mkHsLetPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLetInPat
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrOverloadedRecordDotInvalid
   type InfixOp (PatBuilder GhcPs) = RdrName
@@ -1898,8 +1891,10 @@ instance DisambECP (PatBuilder GhcPs) where
     cs <- getCommentsFor l
     let anns = EpAnn (spanAsAnchor l) [] cs
     return $ L (noAnnSrcSpan l) $ PatBuilderOpApp p1 op p2 anns
-  mkHsCasePV l _ _ _          = addFatalError $ mkPlainErrorMsgEnvelope l PsErrCaseInPat
-  mkHsLamCasePV l lc_variant _ _ = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaCaseInPat lc_variant)
+
+  mkHsLamPV l lam_variant _ _     = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaInPat lam_variant)
+
+  mkHsCasePV l _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrCaseInPat
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)

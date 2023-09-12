@@ -269,11 +269,13 @@ tcMatch ctxt pat_tys rhs_ty match
                            , m_grhss = grhss' }) }
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
-        -- so we don't want to add "In the lambda abstraction \x->e"
+        --     so we don't want to add "In the lambda abstraction \x->e"
+        -- But for \cases with many alternatives, it is helpful to say
+        --     which particular alternative we are looking at
     add_match_ctxt match thing_inside
         = case mc_what ctxt of
-            LambdaExpr -> thing_inside
-            _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
+            LamAlt LamSingle -> thing_inside
+            _                -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
     -- We filter out type patterns because we have no use for them in HsToCore.
     -- Type variable bindings have already been converted to HsWrappers.
@@ -1180,6 +1182,10 @@ checkArgCounts :: AnnoBody body
 checkArgCounts _ (MG { mg_alts = L _ [] })
     = return ()
 checkArgCounts matchContext (MG { mg_alts = L _ (match1:matches) })
+    | null matches  -- There was only one match; nothing to check
+    = return ()
+
+    -- Two or more matches: check that they agree on arity
     | Just bad_matches <- mb_bad_matches
     = failWithTc $ TcRnMatchesHaveDiffNumArgs matchContext
                  $ MatchArgMatches match1 bad_matches

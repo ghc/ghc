@@ -1281,8 +1281,8 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
   where
     mustn't_be_empty = case ctxt of
-      LamCaseAlt LamCases -> return True
-      ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> return True
+      LamAlt LamCases -> return True
+      ArrowMatchCtxt (ArrowLamAlt LamCases) -> return True
       _ -> not <$> xoptM LangExt.EmptyCase
 
 rnMatch :: AnnoBody body

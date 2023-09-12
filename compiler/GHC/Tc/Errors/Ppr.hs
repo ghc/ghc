@@ -1300,17 +1300,17 @@ instance Diagnostic TcRnMessage where
     TcRnEmptyCase ctxt -> mkSimpleDecorated message
       where
         pp_ctxt = case ctxt of
-          CaseAlt                                  -> text "case expression"
-          LamCaseAlt LamCase                       -> text "\\case expression"
-          ArrowMatchCtxt (ArrowLamCaseAlt LamCase) -> text "\\case command"
-          ArrowMatchCtxt ArrowCaseAlt              -> text "case command"
-          ArrowMatchCtxt KappaExpr                 -> text "kappa abstraction"
-          _                                        -> text "(unexpected)"
-                                                      <+> pprMatchContextNoun ctxt
+          CaseAlt                                -> text "case expression"
+          LamAlt LamCase                         -> text "\\case expression"
+          ArrowMatchCtxt (ArrowLamAlt LamSingle) -> text "kappa abstraction"
+          ArrowMatchCtxt (ArrowLamAlt LamCase)   -> text "\\case command"
+          ArrowMatchCtxt ArrowCaseAlt            -> text "case command"
+          _                                      -> text "(unexpected)"
+                                                    <+> pprMatchContextNoun ctxt
 
         message = case ctxt of
-          LamCaseAlt LamCases -> lcases_msg <+> text "expression"
-          ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> lcases_msg <+> text "command"
+          LamAlt LamCases -> lcases_msg <+> text "expression"
+          ArrowMatchCtxt (ArrowLamAlt LamCases) -> lcases_msg <+> text "command"
           _ -> text "Empty list of alternatives in" <+> pp_ctxt
 
         lcases_msg =
@@ -2904,8 +2904,8 @@ instance Diagnostic TcRnMessage where
     TcRnOrphanCompletePragma{}
       -> noHints
     TcRnEmptyCase ctxt -> case ctxt of
-      LamCaseAlt LamCases -> noHints -- cases syntax doesn't support empty case.
-      ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> noHints
+      LamAlt LamCases -> noHints -- cases syntax doesn't support empty case.
+      ArrowMatchCtxt (ArrowLamAlt LamCases) -> noHints
       _ -> [suggestExtension LangExt.EmptyCase]
     TcRnNonStdGuards{}
       -> [suggestExtension LangExt.PatternGuards]

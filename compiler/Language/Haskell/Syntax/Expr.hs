@@ -296,16 +296,7 @@ data HsExpr p
   | HsLit     (XLitE p)
               (HsLit p)      -- ^ Simple (non-overloaded) literals
 
-  | HsLam     (XLam p)
-              (MatchGroup p (LHsExpr p))
-                       -- ^ Lambda abstraction. Currently always a single match
-       --
-       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-       --       'GHC.Parser.Annotation.AnnRarrow',
-
-       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
-  -- | Lambda-case
+  -- | Lambda, Lambda-case, and Lambda-cases
   --
   -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
   --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
@@ -315,7 +306,17 @@ data HsExpr p
   --           'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsLamCase (XLamCase p) LamCaseVariant (MatchGroup p (LHsExpr p))
+  | HsLam     (XLam p)
+              HsLamVariant -- ^ Tells whether this is for lambda, \case, or \cases
+              (MatchGroup p (LHsExpr p))
+                       -- ^ LamSingle: one match
+                       --   LamCase: many arity-1 matches
+                       --   LamCases: many matches of uniform arity
+       --
+       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+       --       'GHC.Parser.Annotation.AnnRarrow',
+
+       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
@@ -636,9 +637,10 @@ data HsTupArg id
                              -- in Language.Haskell.Syntax.Extension
 
 -- | Which kind of lambda case are we dealing with?
-data LamCaseVariant
-  = LamCase -- ^ `\case`
-  | LamCases -- ^ `\cases`
+data HsLamVariant
+  = LamSingle  -- ^ `\p -> e`
+  | LamCase    -- ^ `\case pi -> ei `
+  | LamCases   -- ^ `\cases psi -> ei`
   deriving (Data, Eq)
 
 {-
@@ -845,12 +847,18 @@ data HsCmd id
                 (LHsCmd id)
                 (LHsExpr id)
 
-  | HsCmdLam    (XCmdLam id)
-                (MatchGroup id (LHsCmd id))     -- kappa
-       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-       --       'GHC.Parser.Annotation.AnnRarrow',
+  -- | Lambda-case
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
 
-       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  | HsCmdLam (XCmdLamCase id) HsLamVariant
+             (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdPar    (XCmdPar id)
                !(LHsToken "(" id)
@@ -869,19 +877,6 @@ data HsCmd id
     --       'GHC.Parser.Annotation.AnnClose' @'}'@
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
-  -- | Lambda-case
-  --
-  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-  --     'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
-  --     'GHC.Parser.Annotation.AnnClose' @'}'@
-  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-  --     'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen' @'{'@,
-  --     'GHC.Parser.Annotation.AnnClose' @'}'@
-
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsCmdLamCase (XCmdLamCase id) LamCaseVariant
-                 (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function
@@ -1561,9 +1556,8 @@ data HsMatchContext p
       , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                        -- See Note [FunBind vs PatBind]
       }
-  | LambdaExpr                  -- ^Patterns of a lambda
   | CaseAlt                     -- ^Patterns and guards in a case alternative
-  | LamCaseAlt LamCaseVariant   -- ^Patterns and guards in @\case@ and @\cases@
+  | LamAlt HsLamVariant         -- ^Patterns and guards in @\@, @\case@ and @\cases@
   | IfAlt                       -- ^Guards of a multi-way if alternative
   | ArrowMatchCtxt              -- ^A pattern match inside arrow notation
       HsArrowMatchContext
@@ -1616,8 +1610,7 @@ data HsStmtContext p
 data HsArrowMatchContext
   = ProcExpr                       -- ^ A proc expression
   | ArrowCaseAlt                   -- ^ A case alternative inside arrow notation
-  | ArrowLamCaseAlt LamCaseVariant -- ^ A \case or \cases alternative inside arrow notation
-  | KappaExpr                      -- ^ An arrow kappa abstraction
+  | ArrowLamAlt HsLamVariant       -- ^ A \, \case or \cases alternative inside arrow notation
 
 data HsDoFlavour
   = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }

@@ -261,20 +261,12 @@ tcExpr e@(HsIPVar _ x) res_ty
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
-tcExpr (HsLam _ match) res_ty
-  = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
-        ; return (mkHsWrap wrap (HsLam noExtField match')) }
+tcExpr e@(HsLam x lam_variant matches) res_ty
+  = do { (wrap, matches') <- tcMatchLambda herald match_ctxt matches res_ty
+       ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
   where
-    match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
-    herald = ExpectedFunTyLam match
-
-tcExpr e@(HsLamCase x lc_variant matches) res_ty
-  = do { (wrap, matches')
-           <- tcMatchLambda herald match_ctxt matches res_ty
-       ; return (mkHsWrap wrap $ HsLamCase x lc_variant matches') }
-  where
-    match_ctxt = MC { mc_what = LamCaseAlt lc_variant, mc_body = tcBody }
-    herald = ExpectedFunTyLamCase lc_variant e
+    match_ctxt = MC { mc_what = LamAlt lam_variant, mc_body = tcBody }
+    herald = ExpectedFunTyLam lam_variant e
 
 
 

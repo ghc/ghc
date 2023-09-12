@@ -415,13 +415,6 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
             free_vars `unionDVarSet`
               (exprFreeIdsDSet core_arg `uniqDSetIntersectUniqSet` local_vars))
 
-dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam _ (MG { mg_alts
-          = (L _ [L _ (Match { m_pats  = pats
-                             , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
-        env_ids
-  = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
-
 dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ _ cmd _) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
 
@@ -535,11 +528,18 @@ multiple scrutinees)
 
 -}
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLamCase _ lc_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
+        (HsCmdLam _ LamSingle (MG { mg_alts
+          = (L _ [L _ (Match { m_pats  = pats
+                             , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
+        env_ids
+  = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
+
+dsCmd ids local_vars stack_ty res_ty
+      (HsCmdLam _ lam_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
       env_ids = do
     arg_ids <- newSysLocalsDs arg_tys
 
-    let match_ctxt = ArrowLamCaseAlt lc_variant
+    let match_ctxt = ArrowLamAlt lam_variant
         pat_vars = mkVarSet arg_ids
         local_vars' = pat_vars `unionVarSet` local_vars
         (pat_tys, stack_ty') = splitTypeAt (length arg_tys) stack_ty
@@ -646,8 +646,6 @@ dsCmd ids local_vars stack_ty res_ty (XCmd (HsWrap wrap cmd)) env_ids = do
     dsHsWrapper wrap $ \core_wrap ->
       return (core_wrap core_cmd, env_ids')
 
-dsCmd _ _ _ _ c@(HsCmdLam {}) _ = pprPanic "dsCmd" (ppr c)
-
 -- D; ys |-a c : stk --> t      (ys <= xs)
 -- ---------------------
 -- D; xs |-a c : stk --> t      ---> premap (\ ((xs),stk) -> ((ys),stk)) c
@@ -738,10 +736,11 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
         core_expr = buildEnvStack env_ids' stack_id'
         in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty'
+        lam_cxt = ArrowMatchCtxt (ArrowLamAlt LamSingle)
 
-    fail_expr <- mkFailExpr (ArrowMatchCtxt KappaExpr) in_ty'
+    fail_expr <- mkFailExpr lam_cxt in_ty'
     -- match the patterns against the parameters
-    match_code <- matchSimplys (map Var param_ids) (ArrowMatchCtxt KappaExpr) pats core_expr
+    match_code <- matchSimplys (map Var param_ids) lam_cxt pats core_expr
                     fail_expr
     -- match the parameters against the top of the old stack
     (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
@@ -809,7 +808,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     -- i.e. Void. The choices then effectively become `arr absurd`,
     -- implemented as `arr \case {}`.
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
-      dsExpr (HsLamCase EpAnnNotUsed LamCase
+      dsExpr (HsLam EpAnnNotUsed LamCase
         (MG { mg_alts = noLocA []
             , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated SkipPmc)
             }))

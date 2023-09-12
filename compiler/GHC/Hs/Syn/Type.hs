@@ -105,8 +105,7 @@ hsExprType (HsOverLabel v _ _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
 hsExprType (HsLit _ lit) = hsLitType lit
-hsExprType (HsLam     _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
-hsExprType (HsLamCase _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
+hsExprType (HsLam _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _ _) = piResultTy (lhsExprType f) x
 hsExprType (OpApp v _ _ _) = dataConCantHappen v

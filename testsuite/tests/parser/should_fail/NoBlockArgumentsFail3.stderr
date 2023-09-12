@@ -1,5 +1,5 @@
 
-NoBlockArgumentsFail3.hs:7:22: error: [GHC-77182]
+NoBlockArgumentsFail3.hs:7:22: error: [GHC-06074]
     Unexpected \case expression in function application:
         \case Just 3 -> print x
     Suggested fixes:

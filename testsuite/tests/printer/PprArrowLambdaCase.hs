@@ -9,6 +9,11 @@ main = do
   putStrLn $ foo (Just 500)
   putStrLn $ foo Nothing
 
+foo :: t -> String
+foo = proc x ->
+  (| id (\y -> returnA -< "big ")
+  |) 1 x
+
 foo :: ArrowChoice p => p (Maybe Int) String
 foo = proc x ->
   (| id (\case
