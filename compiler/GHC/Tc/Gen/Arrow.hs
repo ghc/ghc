@@ -162,20 +162,10 @@ tc_cmd env (HsCmdLet x tkLet binds tkIn (L body_loc body)) res_ty
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
-      (scrut', scrut_ty) <- tcInferRho scrut
-      hasFixedRuntimeRep_syntactic
-        (FRRArrow $ ArrowCmdCase)
-        scrut_ty
-      matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
-      return (HsCmdCase x scrut' matches')
-
-tc_cmd env cmd@(HsCmdLamCase x lc_variant match) cmd_ty
-  = addErrCtxt (cmdCtxt cmd)
-      do { let match_ctxt = ArrowLamCaseAlt lc_variant
-         ; checkArgCounts (ArrowMatchCtxt match_ctxt) match
-         ; (wrap, match') <-
-             tcCmdMatchLambda env match_ctxt match cmd_ty
-         ; return (mkHsCmdWrap wrap (HsCmdLamCase x lc_variant match')) }
+    do { (scrut', scrut_ty) <- tcInferRho scrut
+       ; hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdCase) scrut_ty
+       ; matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
+       ; return (HsCmdCase x scrut' matches') }
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcCheckMonoExpr pred boolTy
@@ -268,9 +258,14 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
 -- ------------------------------
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
-tc_cmd env (HsCmdLam x match) cmd_ty
-  = do { (wrap, match') <- tcCmdMatchLambda env KappaExpr match cmd_ty
-       ; return (mkHsCmdWrap wrap (HsCmdLam x match')) }
+tc_cmd env cmd@(HsCmdLam x lam_variant match) cmd_ty
+  = (case lam_variant of   -- Add context only for \case and \cases
+        LamSingle -> id    -- Avoids clutter in the vanilla-lambda form
+        _         -> addErrCtxt (cmdCtxt cmd)) $
+    do { let match_ctxt = ArrowLamAlt lam_variant
+       ; checkArgCounts (ArrowMatchCtxt match_ctxt) match
+       ; (wrap, match') <- tcCmdMatchLambda env match_ctxt match cmd_ty
+       ; return (mkHsCmdWrap wrap (HsCmdLam x lam_variant match')) }
 
 -------------------------------------------
 --              Do notation

@@ -1527,13 +1527,13 @@ repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
         -- HsOverlit can definitely occur
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam _ (MG { mg_alts = (L _ [m]) })) = repLambda m
-repE e@(HsLam _ (MG { mg_alts = (L _ _) })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
-repE (HsLamCase _ LamCase (MG { mg_alts = (L _ ms) }))
+repE (HsLam _ LamSingle (MG { mg_alts = L _ [m] })) = repLambda m
+repE e@(HsLam _ LamSingle (MG { mg_alts = L _ _ })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
+repE (HsLam _ LamCase (MG { mg_alts = L _ ms }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCase core_ms }
-repE (HsLamCase _ LamCases (MG { mg_alts = (L _ ms) }))
+repE (HsLam _ LamCases (MG { mg_alts = (L _ ms) }))
                    = do { ms' <- mapM repClauseTup ms
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCases core_ms }

@@ -74,9 +74,7 @@ import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
-import Data.List (uncons)
 import Data.List.NonEmpty (NonEmpty)
-import Data.Bifunctor (first)
 
 {- *********************************************************************
 *                                                                      *
@@ -218,8 +216,6 @@ type instance XRecSel              GhcPs = DataConCantHappen
 type instance XRecSel              GhcRn = NoExtField
 type instance XRecSel              GhcTc = NoExtField
 
-type instance XLam           (GhcPass _) = NoExtField
-
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
 type instance XOverLabel     GhcPs = EpAnnCO
@@ -243,11 +239,7 @@ type instance XIPVar         GhcRn = EpAnnCO
 type instance XIPVar         GhcTc = DataConCantHappen
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
-
-type instance XLam           (GhcPass _) = NoExtField
-
-type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
-
+type instance XLam           (GhcPass _) = EpAnn [AddEpAnn]
 type instance XApp           (GhcPass _) = EpAnnCO
 
 type instance XAppTypeE      GhcPs = NoExtField
@@ -601,12 +593,11 @@ ppr_expr (ExplicitSum _ alt arity expr)
   where
     ppr_bars n = hsep (replicate n (char '|'))
 
-ppr_expr (HsLam _ matches)
-  = pprMatches matches
-
-ppr_expr (HsLamCase _ lc_variant matches)
-  = sep [ sep [lamCaseKeyword lc_variant],
-          nest 2 (pprMatches matches) ]
+ppr_expr (HsLam _ lam_variant matches)
+  = case lam_variant of
+       LamSingle -> pprMatches matches
+       _         -> sep [ sep [lamCaseKeyword lam_variant]
+                        , nest 2 (pprMatches matches) ]
 
 ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
@@ -822,7 +813,6 @@ hsExprNeedsParens prec = go
     go (ExplicitTuple{})              = False
     go (ExplicitSum{})                = False
     go (HsLam{})                      = prec > topPrec
-    go (HsLamCase{})                  = prec > topPrec
     go (HsCase{})                     = prec > topPrec
     go (HsIf{})                       = prec > topPrec
     go (HsMultiIf{})                  = prec > topPrec
@@ -1234,15 +1224,14 @@ ppr_cmd (HsCmdApp _ c e)
     collect_args (L _ (HsCmdApp _ fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
 
-ppr_cmd (HsCmdLam _ matches)
+ppr_cmd (HsCmdLam _ LamSingle matches)
   = pprMatches matches
+ppr_cmd (HsCmdLam _ lam_variant matches)
+  = sep [ lamCaseKeyword lam_variant, nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           nest 2 (pprMatches matches) ]
-
-ppr_cmd (HsCmdLamCase _ lc_variant matches)
-  = sep [ lamCaseKeyword lc_variant, nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), text "then"],
@@ -1397,6 +1386,12 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt grhss) ]
   where
+    -- lam_cases_result: we don't simply return (empty, pats) to avoid
+    -- introducing an additional `nest 2` via the empty herald
+    lam_cases_result = case pats of
+                          []     -> (empty, [])
+                          (p:ps) -> (pprParendLPat appPrec p, ps)
+
     (herald, other_pats)
         = case ctxt of
             FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
@@ -1419,17 +1414,10 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                                      <+> pprParendLPat opPrec p2
                      _ -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
-            LambdaExpr -> (char '\\', pats)
-
-            -- We don't simply return (empty, pats) to avoid introducing an
-            -- additional `nest 2` via the empty herald
-            LamCaseAlt LamCases ->
-              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
-
-            ArrowMatchCtxt (ArrowLamCaseAlt LamCases) ->
-              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
-
-            ArrowMatchCtxt KappaExpr -> (char '\\', pats)
+            LamAlt LamSingle                       -> (char '\\', pats)
+            ArrowMatchCtxt (ArrowLamAlt LamSingle) -> (char '\\', pats)
+            LamAlt LamCases                        -> lam_cases_result
+            ArrowMatchCtxt (ArrowLamAlt LamCases)  -> lam_cases_result
 
             ArrowMatchCtxt ProcExpr -> (text "proc", pats)
 
@@ -1909,9 +1897,8 @@ pp_dotdot = text " .. "
 
 instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
   ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
-  ppr LambdaExpr              = text "LambdaExpr"
   ppr CaseAlt                 = text "CaseAlt"
-  ppr (LamCaseAlt lc_variant) = text "LamCaseAlt" <+> ppr lc_variant
+  ppr (LamAlt lam_variant)    = text "LamAlt" <+> ppr lam_variant
   ppr IfAlt                   = text "IfAlt"
   ppr (ArrowMatchCtxt c)      = text "ArrowMatchCtxt" <+> ppr c
   ppr PatBindRhs              = text "PatBindRhs"
@@ -1922,24 +1909,25 @@ instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
   ppr ThPatQuote              = text "ThPatQuote"
   ppr PatSyn                  = text "PatSyn"
 
-instance Outputable LamCaseVariant where
+instance Outputable HsLamVariant where
   ppr = text . \case
-    LamCase  -> "LamCase"
-    LamCases -> "LamCases"
+    LamSingle -> "LamSingle"
+    LamCase   -> "LamCase"
+    LamCases  -> "LamCases"
 
-lamCaseKeyword :: LamCaseVariant -> SDoc
-lamCaseKeyword LamCase  = text "\\case"
-lamCaseKeyword LamCases = text "\\cases"
+lamCaseKeyword :: HsLamVariant -> SDoc
+lamCaseKeyword LamSingle = text "lambda"
+lamCaseKeyword LamCase   = text "\\case"
+lamCaseKeyword LamCases  = text "\\cases"
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 
 instance Outputable HsArrowMatchContext where
-  ppr ProcExpr                     = text "ProcExpr"
-  ppr ArrowCaseAlt                 = text "ArrowCaseAlt"
-  ppr (ArrowLamCaseAlt lc_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lc_variant
-  ppr KappaExpr                    = text "KappaExpr"
+  ppr ProcExpr                  = text "ProcExpr"
+  ppr ArrowCaseAlt              = text "ArrowCaseAlt"
+  ppr (ArrowLamAlt lam_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lam_variant
 
 pprHsArrType :: HsArrAppType -> SDoc
 pprHsArrType HsHigherOrderApp = text "higher order arrow application"
@@ -1956,12 +1944,11 @@ matchContextErrString :: OutputableBndrId p
                       => HsMatchContext (GhcPass p) -> SDoc
 matchContextErrString (FunRhs{mc_fun=L _ fun})      = text "function" <+> ppr fun
 matchContextErrString CaseAlt                       = text "case"
-matchContextErrString (LamCaseAlt lc_variant)       = lamCaseKeyword lc_variant
+matchContextErrString (LamAlt lam_variant)          = lamCaseKeyword lam_variant
 matchContextErrString IfAlt                         = text "multi-way if"
 matchContextErrString PatBindRhs                    = text "pattern binding"
 matchContextErrString PatBindGuards                 = text "pattern binding guards"
 matchContextErrString RecUpd                        = text "record update"
-matchContextErrString LambdaExpr                    = text "lambda"
 matchContextErrString (ArrowMatchCtxt c)            = matchArrowContextErrString c
 matchContextErrString ThPatSplice                   = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                    = panic "matchContextErrString"  -- Not used at runtime
@@ -1973,10 +1960,10 @@ matchContextErrString (StmtCtxt (ArrowExpr))        = text "'do' block"
 matchContextErrString (StmtCtxt (HsDoStmt flavour)) = matchDoContextErrString flavour
 
 matchArrowContextErrString :: HsArrowMatchContext -> SDoc
-matchArrowContextErrString ProcExpr                     = text "proc"
-matchArrowContextErrString ArrowCaseAlt                 = text "case"
-matchArrowContextErrString (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
-matchArrowContextErrString KappaExpr                    = text "kappa"
+matchArrowContextErrString ProcExpr                  = text "proc"
+matchArrowContextErrString ArrowCaseAlt              = text "case"
+matchArrowContextErrString (ArrowLamAlt LamSingle)   = text "kappa"
+matchArrowContextErrString (ArrowLamAlt lam_variant) = lamCaseKeyword lam_variant
 
 matchDoContextErrString :: HsDoFlavour -> SDoc
 matchDoContextErrString GhciStmtCtxt = text "interactive GHCi command"
@@ -2015,9 +2002,8 @@ pprStmtInCtxt ctxt stmt
 matchSeparator :: HsMatchContext p -> SDoc
 matchSeparator FunRhs{}         = text "="
 matchSeparator CaseAlt          = text "->"
-matchSeparator LamCaseAlt{}     = text "->"
+matchSeparator LamAlt{}         = text "->"
 matchSeparator IfAlt            = text "->"
-matchSeparator LambdaExpr       = text "->"
 matchSeparator ArrowMatchCtxt{} = text "->"
 matchSeparator PatBindRhs       = text "="
 matchSeparator PatBindGuards    = text "="
@@ -2033,17 +2019,18 @@ pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
   where
-    want_an (FunRhs {})                = True  -- Use "an" in front
-    want_an (ArrowMatchCtxt ProcExpr)  = True
-    want_an (ArrowMatchCtxt KappaExpr) = True
-    want_an _                          = False
+    want_an (FunRhs {})                              = True  -- Use "an" in front
+    want_an (ArrowMatchCtxt ProcExpr)                = True
+    want_an (ArrowMatchCtxt (ArrowLamAlt LamSingle)) = True
+    want_an _                                        = False
 
 pprMatchContextNoun :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                     => HsMatchContext p -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
                                                 <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
 pprMatchContextNoun CaseAlt                 = text "case alternative"
-pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+pprMatchContextNoun (LamAlt LamSingle)      = text "lambda abstraction"
+pprMatchContextNoun (LamAlt lam_variant)    = lamCaseKeyword lam_variant
                                               <+> text "alternative"
 pprMatchContextNoun IfAlt                   = text "multi-way if alternative"
 pprMatchContextNoun RecUpd                  = text "record update"
@@ -2051,7 +2038,6 @@ pprMatchContextNoun ThPatSplice             = text "Template Haskell pattern spl
 pprMatchContextNoun ThPatQuote              = text "Template Haskell pattern quotation"
 pprMatchContextNoun PatBindRhs              = text "pattern binding"
 pprMatchContextNoun PatBindGuards           = text "pattern binding guards"
-pprMatchContextNoun LambdaExpr              = text "lambda abstraction"
 pprMatchContextNoun (ArrowMatchCtxt c)      = pprArrowMatchContextNoun c
 pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
                                               $$ pprAStmtContext ctxt
@@ -2070,15 +2056,16 @@ pprMatchContextNouns ctxt                    = pprMatchContextNoun ctxt <> char 
 pprArrowMatchContextNoun :: HsArrowMatchContext -> SDoc
 pprArrowMatchContextNoun ProcExpr                     = text "arrow proc pattern"
 pprArrowMatchContextNoun ArrowCaseAlt                 = text "case alternative within arrow notation"
-pprArrowMatchContextNoun (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
-                                                        <+> text "alternative within arrow notation"
-pprArrowMatchContextNoun KappaExpr                    = text "arrow kappa abstraction"
+pprArrowMatchContextNoun (ArrowLamAlt LamSingle)   = text "arrow kappa abstraction"
+pprArrowMatchContextNoun (ArrowLamAlt lam_variant) = lamCaseKeyword lam_variant
+                                                     <+> text "alternative within arrow notation"
 
 pprArrowMatchContextNouns :: HsArrowMatchContext -> SDoc
-pprArrowMatchContextNouns ArrowCaseAlt                 = text "case alternatives within arrow notation"
-pprArrowMatchContextNouns (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
-                                                         <+> text "alternatives within arrow notation"
-pprArrowMatchContextNouns ctxt                         = pprArrowMatchContextNoun ctxt <> char 's'
+pprArrowMatchContextNouns ArrowCaseAlt              = text "case alternatives within arrow notation"
+pprArrowMatchContextNouns (ArrowLamAlt LamSingle)   = text "arrow kappa abstractions"
+pprArrowMatchContextNouns (ArrowLamAlt lam_variant) = lamCaseKeyword lam_variant
+                                                      <+> text "alternatives within arrow notation"
+pprArrowMatchContextNouns ctxt                      = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
 pprAStmtContext, pprStmtContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))

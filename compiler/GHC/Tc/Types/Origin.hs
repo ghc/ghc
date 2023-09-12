@@ -712,8 +712,7 @@ exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
-exprCtOrigin (HsLam _ matches)    = matchesCtOrigin matches
-exprCtOrigin (HsLamCase _ _ ms)   = matchesCtOrigin ms
+exprCtOrigin (HsLam _ _ ms)       = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _ _) = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
@@ -1425,16 +1424,8 @@ data ExpectedFunTyOrigin
   -- | Ensure that a lambda abstraction has a function type.
   --
   -- Test cases for representation-polymorphism checks:
-  --   RepPolyLambda
-  | ExpectedFunTyLam
-      !(MatchGroup GhcRn (LHsExpr GhcRn))
-
-  -- | Ensure that a lambda case expression has a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyMatch
-  | ExpectedFunTyLamCase
-      LamCaseVariant
+  --   RepPolyLambda, RepPolyMatch
+  | ExpectedFunTyLam HsLamVariant
       !(HsExpr GhcRn)
        -- ^ the entire lambda-case expression
 
@@ -1462,8 +1453,7 @@ pprExpectedFunTyOrigin funTy_origin i =
       | otherwise
       -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
      <+> text "for" <+> quotes (ppr fun)
-    ExpectedFunTyLam {} -> binder_of $ text "lambda"
-    ExpectedFunTyLamCase lc_variant _ -> binder_of $ lamCaseKeyword lc_variant
+    ExpectedFunTyLam lam_variant _ -> binder_of $ lamCaseKeyword lam_variant
   where
     the_arg_of :: SDoc
     the_arg_of = text "The" <+> speakNth i <+> text "argument of"
@@ -1481,15 +1471,11 @@ pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
         , text "is applied to" ]
 pprExpectedFunTyHerald (ExpectedFunTyMatches fun (MG { mg_alts = L _ alts }))
   = text "The equation" <> plural alts <+> text "for" <+> quotes (ppr fun) <+> hasOrHave alts
-pprExpectedFunTyHerald (ExpectedFunTyLam match)
-  = sep [ text "The lambda expression" <+>
-                   quotes (pprSetDepth (PartWay 1) $
-                           pprMatches match)
-        -- The pprSetDepth makes the lambda abstraction print briefly
+pprExpectedFunTyHerald (ExpectedFunTyLam lam_variant expr)
+  = sep [ text "The" <+> lamCaseKeyword lam_variant <+> text "expression"
+                     <+> quotes (pprSetDepth (PartWay 1) (ppr expr))
+               -- The pprSetDepth makes the lambda abstraction print briefly
         , text "has" ]
-pprExpectedFunTyHerald (ExpectedFunTyLamCase _ expr)
-  = sep [ text "The function" <+> quotes (ppr expr)
-        , text "requires" ]
 
 {- *******************************************************************
 *                                                                    *

@@ -800,8 +800,8 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }
              body' = noLocA $
-                     HsLam noExtField $
-                     MG{ mg_alts = noLocA [mkSimpleMatch LambdaExpr
+                     HsLam noAnn LamSingle $
+                     MG{ mg_alts = noLocA [mkSimpleMatch (LamAlt LamSingle)
                                                          args body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }

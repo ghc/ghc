@@ -225,12 +225,12 @@ mkMatchGroup origin matches = MG { mg_ext = origin
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
-                    -> LamCaseVariant
+                    -> HsLamVariant
                     -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                     -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkLamCaseMatchGroup origin lc_variant (L l matches)
+mkLamCaseMatchGroup origin lam_variant (L l matches)
   = mkMatchGroup origin (L l $ map fixCtxt matches)
-  where fixCtxt (L a match) = L a match{m_ctxt = LamCaseAlt lc_variant}
+  where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
 
 mkLocatedList :: Semigroup a
   => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
@@ -272,10 +272,10 @@ mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         => [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
-mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
+mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
   where
     matches = mkMatchGroup (Generated SkipPmc)
-                           (noLocA [mkSimpleMatch LambdaExpr pats' body])
+                           (noLocA [mkSimpleMatch (LamAlt LamSingle) pats' body])
     pats' = map (parenthesizePat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
@@ -606,7 +606,7 @@ nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
 -- AZ:Is this used?
-nlHsLam match = noLocA $ HsLam noExtField
+nlHsLam match = noLocA $ HsLam noAnn LamSingle
               $ mkMatchGroup (Generated SkipPmc) (noLocA [match])
 nlHsPar e     = noLocA (gHsPar e)
 

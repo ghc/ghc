@@ -325,11 +325,8 @@ dsExpr (NegApp _ expr neg_expr)
   = do { expr' <- dsLExpr expr
        ; dsSyntaxExpr neg_expr [expr'] }
 
-dsExpr (HsLam _ a_Match)
-  = uncurry mkCoreLams <$> matchWrapper LambdaExpr Nothing a_Match
-
-dsExpr (HsLamCase _ lc_variant matches)
-  = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt lc_variant) Nothing matches
+dsExpr (HsLam _ variant a_Match)
+  = uncurry mkCoreLams <$> matchWrapper (LamAlt variant) Nothing a_Match
 
 dsExpr e@(HsApp _ fun arg)
          -- We want to have a special case that uses the PMC information to filter
@@ -805,9 +802,9 @@ dsDo ctx stmts
         rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated SkipPmc)
-        mfix_arg     = noLocA $ HsLam noExtField
+        mfix_arg     = noLocA $ HsLam noAnn LamSingle
                            (MG { mg_alts = noLocA [mkSimpleMatch
-                                                    LambdaExpr
+                                                    (LamAlt LamSingle)
                                                     [mfix_pat] body]
                                , mg_ext = match_group
                                })

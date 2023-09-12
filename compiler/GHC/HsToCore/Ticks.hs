@@ -479,10 +479,8 @@ addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsEmbTy {})            = return e
-addTickHsExpr (HsLam x mg)              = liftM (HsLam x)
+addTickHsExpr (HsLam x v mg)            = liftM (HsLam x v)
                                                 (addTickMatchGroup True mg)
-addTickHsExpr (HsLamCase x lc_variant mgs) = liftM (HsLamCase x lc_variant)
-                                                   (addTickMatchGroup True mgs)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)
                                                           (addTickLHsExpr      e2)
 addTickHsExpr (HsAppType x e at ty) = do
@@ -814,8 +812,8 @@ addTickLHsCmd (L pos c0) = do
         return $ L pos c1
 
 addTickHsCmd :: HsCmd GhcTc -> TM (HsCmd GhcTc)
-addTickHsCmd (HsCmdLam x matchgroup) =
-        liftM (HsCmdLam x) (addTickCmdMatchGroup matchgroup)
+addTickHsCmd (HsCmdLam x lam_variant mgs) =
+        liftM (HsCmdLam x lam_variant) (addTickCmdMatchGroup mgs)
 addTickHsCmd (HsCmdApp x c e) =
         liftM2 (HsCmdApp x) (addTickLHsCmd c) (addTickLHsExpr e)
 {-
@@ -833,8 +831,6 @@ addTickHsCmd (HsCmdCase x e mgs) =
         liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
                 (addTickCmdMatchGroup mgs)
-addTickHsCmd (HsCmdLamCase x lc_variant mgs) =
-        liftM (HsCmdLamCase x lc_variant) (addTickCmdMatchGroup mgs)
 addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
         liftM3 (HsCmdIf x cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
