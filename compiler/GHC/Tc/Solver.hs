@@ -1360,7 +1360,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
              ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
-             ; skol_info <- mkSkolemInfo (InferSkol [ (name, mkSigmaTy [] full_theta ty)
+             ; skol_info <- mkSkolemInfo (InferSkol [ (name, mkPhiTy full_theta ty)
                                                     | (name, ty) <- name_taus ])
        }
 
@@ -1425,7 +1425,7 @@ emitResidualConstraints rhs_tclvl ev_binds_var
                                    , wc_impl   = implics }) }
   where
     full_theta = map idType full_theta_vars
-    skol_info = InferSkol [ (name, mkSigmaTy [] full_theta ty)
+    skol_info = InferSkol [ (name, mkPhiTy full_theta ty)
                           | (name, ty) <- name_taus ]
     -- We don't add the quantified variables here, because they are
     -- also bound in ic_skols and we want them to be tidied
