@@ -16,7 +16,7 @@ import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Types.IPE
 import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan)
+import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan )
 import GHC.Data.FastString
 
 import Control.Monad (when)
@@ -68,21 +68,25 @@ collectStgBind (StgRec pairs) = do
     return (StgRec es)
 
 collectStgRhs :: Id -> StgRhs -> M StgRhs
-collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
-  let
-    name = idName bndr
-    -- If the name has a span, use that initially as the source position in-case
-    -- we don't get anything better.
-    with_span = case nameSrcSpan name of
-                  RealSrcSpan pos _ -> withSpan (pos, occNameString (getOccName name))
-                  _ -> id
-  e' <- with_span $ collectExpr e
-  recordInfo bndr e'
-  return $ StgRhsClosure ext cc us bs e'
-collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args) = do
-  n' <- numberDataCon dc ticks
-  return (StgRhsCon cc dc n' ticks args)
-
+collectStgRhs bndr rhs =
+    case rhs of
+      StgRhsClosure ext cc us bs e -> do
+        e' <- with_span $ collectExpr e
+        recordInfo bndr e'
+        return $ StgRhsClosure ext cc us bs e'
+      StgRhsCon cc dc _mn ticks args -> do
+        n' <- with_span $ numberDataCon dc ticks
+        return (StgRhsCon cc dc n' ticks args)
+  where
+    -- If the binder name has a span, use that initially as the source position
+    -- in case we don't get anything better
+    with_span :: M a -> M a
+    with_span =
+      let name = idName bndr in
+      case nameSrcSpan name of
+        RealSrcSpan pos _ ->
+          withSpan (pos, occNameString (getOccName name))
+        _ -> id
 
 recordInfo :: Id -> StgExpr -> M ()
 recordInfo bndr new_rhs = do
