@@ -147,7 +147,7 @@ Unboxed tuples
 --------------
 
 .. extension:: UnboxedTuples
-    :shortdesc: Enable the use of unboxed tuple syntax.
+    :shortdesc: Allow the use of unboxed tuple syntax.
 
     :implies: :extension:`UnboxedSums`
 
@@ -214,7 +214,7 @@ Unboxed sums
 ------------
 
 .. extension:: UnboxedSums
-    :shortdesc: Enable unboxed sums.
+    :shortdesc: Allow the use of unboxed sum syntax.
 
     :implied by: :extension:`UnboxedTuples`
     :since: 8.2.1
@@ -315,7 +315,7 @@ Unlifted Newtypes
 -----------------
 
 .. extension:: UnliftedNewtypes
-    :shortdesc: Enable unlifted newtypes.
+    :shortdesc: Allow definition of unlifted newtypes.
 
     :since: 8.10.1
 
@@ -388,7 +388,7 @@ Unlifted Datatypes
 ------------------
 
 .. extension:: UnliftedDatatypes
-    :shortdesc: Enable unlifted data types.
+    :shortdesc: Allow the definition of unlifted data types.
 
     :implies: :extension:`DataKinds`, :extension:`StandaloneKindSignatures`
     :since: 9.2.1

@@ -4,8 +4,7 @@ Constrained class method types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: ConstrainedClassMethods
-    :shortdesc: Enable constrained class methods.
-        Implied by :extension:`MultiParamTypeClasses`.
+    :shortdesc: Allow class methods to have non-empty contexts.
 
     :since: 6.8.1
 

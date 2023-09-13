@@ -8,7 +8,7 @@ Parallel List Comprehensions
    single: parallel list comprehensions
 
 .. extension:: ParallelListComp
-    :shortdesc: Enable parallel list comprehensions.
+    :shortdesc: Allow parallel list comprehension syntax.
 
     :since: 6.8.1
 

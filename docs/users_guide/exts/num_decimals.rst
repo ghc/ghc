@@ -4,7 +4,7 @@ Fractional looking integer literals
 -----------------------------------
 
 .. extension:: NumDecimals
-    :shortdesc: Enable support for 'fractional' integer literals.
+    :shortdesc: Allow use of scientific notation syntax for integer literals.
 
     :since: 7.8.1
 

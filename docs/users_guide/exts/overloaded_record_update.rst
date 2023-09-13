@@ -4,11 +4,11 @@ Overloaded record update
 ------------------------
 
 .. extension:: OverloadedRecordUpdate
-    :shortdesc: Record '.' syntax record updates
+    :shortdesc: Allow ``.`` syntax in record updates
 
     :since: 9.2.0
 
-    Provides record '.' syntax in record updates e.g. ``x{foo.bar = 1}``.
+    Provides record ``.`` syntax in record updates e.g. ``x{foo.bar = 1}``.
 
 **EXPERIMENTAL**
 *This design of this extension may well change in the future. It would be inadvisable to start using this extension for long-lived libraries just yet.*

@@ -4,7 +4,7 @@ Liberalised type synonyms
 -------------------------
 
 .. extension:: LiberalTypeSynonyms
-    :shortdesc: Enable liberalised type synonyms.
+    :shortdesc: Relax many of Haskell 98's rules on type synonym definitions.
 
     :implies: :extension:`ExplicitForAll`
     :since: 6.8.1

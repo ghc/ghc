@@ -4,8 +4,7 @@ Explicitly-kinded quantification
 --------------------------------
 
 .. extension:: KindSignatures
-    :shortdesc: Enable kind signatures.
-        Implied by :extension:`TypeFamilies` and :extension:`PolyKinds`.
+    :shortdesc: Allow kind signatures to be given for types.
 
     :implied by: :extension:`TypeFamilies`, :extension:`PolyKinds`
     :since: 6.8.1

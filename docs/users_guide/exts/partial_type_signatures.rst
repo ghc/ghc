@@ -4,7 +4,7 @@ Partial Type Signatures
 =======================
 
 .. extension:: PartialTypeSignatures
-    :shortdesc: Enable partial type signatures.
+    :shortdesc: Allow type signatures to contain wildcards.
 
     :since: 7.10.1
 
@@ -121,7 +121,7 @@ Named Wildcards
 ~~~~~~~~~~~~~~~
 
 .. extension:: NamedWildCards
-    :shortdesc: Enable named wildcards.
+    :shortdesc: Allow named wildcards in types.
 
     :since: 7.10.1
 

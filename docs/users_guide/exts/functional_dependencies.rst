@@ -4,8 +4,7 @@ Functional dependencies
 -----------------------
 
 .. extension:: FunctionalDependencies
-    :shortdesc: Enable functional dependencies.
-        Implies :extension:`MultiParamTypeClasses`.
+    :shortdesc: Allow functional dependencies to be given on typeclass declarations.
 
     :implies: :extension:`MultiParamTypeClasses`
     :since: 6.8.1

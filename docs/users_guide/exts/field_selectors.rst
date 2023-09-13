@@ -4,7 +4,7 @@ Field selectors
 ---------------
 
 .. extension:: FieldSelectors
-    :shortdesc: Control visibility of field selector functions.
+    :shortdesc: Make record field selector functions visible in expressions.
 
     :since: 9.2.1
     :status: Included in :extension:`GHC2024`, :extension:`GHC2021`, :extension:`Haskell2010`, :extension:`Haskell98`

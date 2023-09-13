@@ -16,8 +16,7 @@ Kind polymorphism
     (and hence :extension:`KindSignatures`) and :extension:`DataKinds`.
 
 .. extension:: PolyKinds
-    :shortdesc: Enable kind polymorphism.
-        Implies :extension:`KindSignatures`.
+    :shortdesc: Allow kind polymorphism.
 
     :implies: :extension:`KindSignatures`
     :since: 7.4.1
@@ -251,7 +250,7 @@ Complete user-supplied kind signatures and polymorphic recursion
 ----------------------------------------------------------------
 
 .. extension:: CUSKs
-    :shortdesc: Enable detection of complete user-supplied kind signatures.
+    :shortdesc: Detect complete user-supplied kind signatures.
 
     :since: 8.10.1
     :status: Included in :extension:`Haskell98`, :extension:`Haskell2010`
@@ -385,7 +384,7 @@ Standalone kind signatures and polymorphic recursion
 ----------------------------------------------------
 
 .. extension:: StandaloneKindSignatures
-    :shortdesc: Allow the use of standalone kind signatures.
+    :shortdesc: Allow standalone kind signature declarations.
 
     :implies: :extension:`NoCUSKs`
     :since: 8.10.1

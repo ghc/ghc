@@ -4,7 +4,7 @@ Declaring data types with explicit constructor signatures
 ---------------------------------------------------------
 
 .. extension:: GADTSyntax
-    :shortdesc: Enable generalised algebraic data type syntax.
+    :shortdesc: Allow generalised algebraic data type syntax.
 
     :implied by: :extension:`GADTs`
     :since: 7.2.1

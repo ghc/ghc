@@ -4,7 +4,7 @@ Sized primitive literal syntax
 ------------------------------
 
 .. extension:: ExtendedLiterals
-    :shortdesc: Enable numeric literal postfix syntax for unboxed integers.
+    :shortdesc: Allow numeric literal postfix syntax for unboxed integers.
 
     :since: 9.8.1
 

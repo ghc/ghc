@@ -4,8 +4,7 @@ Record wildcards
 ----------------
 
 .. extension:: RecordWildCards
-    :shortdesc: Enable record wildcards.
-        Implies :extension:`DisambiguateRecordFields`.
+    :shortdesc: Allow use of record wildcard syntax.
 
     :implies: :extension:`DisambiguateRecordFields`.
     :since: 6.8.1

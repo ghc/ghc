@@ -4,8 +4,7 @@ Arbitrary-rank polymorphism
 ===========================
 
 .. extension:: RankNTypes
-    :shortdesc: Enable rank-N types.
-        Implied by :extension:`ImpredicativeTypes`.
+    :shortdesc: Allow types of rank greater than one.
 
     :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
@@ -15,7 +14,6 @@ Arbitrary-rank polymorphism
 
 .. extension:: Rank2Types
     :shortdesc: Enable rank-2 types.
-        Synonym for :extension:`RankNTypes`.
 
     :since: 6.8.1
     :status: Deprecated
@@ -212,7 +210,7 @@ A similar phenomenon occurs for operator sections. For example,
 expanding it to ``\x -> x \`g3a\` "hello"``.
 
 .. extension:: DeepSubsumption
-    :shortdesc: Enable deep subsumption
+    :shortdesc: Use GHC's deep subsumption checking.
 
     :since: 9.2.4
 

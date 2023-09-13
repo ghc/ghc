@@ -7,7 +7,7 @@ Static pointers
    single: Static pointers
 
 .. extension:: StaticPointers
-    :shortdesc: Enable static pointers.
+    :shortdesc: Allow ``static`` syntax.
 
     :since: 7.10.1
 

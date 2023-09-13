@@ -8,7 +8,7 @@ Qualified do-notation
    single: do-notation; Qualified
 
 .. extension:: QualifiedDo
-    :shortdesc: Enable qualified do-notation desugaring.
+    :shortdesc: Allow qualified ``do``-notation desugaring.
 
     :since: 9.0.1
 

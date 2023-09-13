@@ -4,7 +4,7 @@ Arrow notation
 ==============
 
 .. extension:: Arrows
-    :shortdesc: Enable arrow notation extension
+    :shortdesc: Allow arrow notation (e.g. ``proc``)
 
     :since: 6.8.1
 

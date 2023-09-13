@@ -4,7 +4,7 @@ Hexadecimal floating point literals
 -----------------------------------
 
 .. extension:: HexFloatLiterals
-    :shortdesc: Enable support for :ref:`hexadecimal floating point literals <hex-float-literals>`.
+    :shortdesc: Allow hexadecimal floating-point literal syntax.
 
     :since: 8.4.1
 

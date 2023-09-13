@@ -30,7 +30,7 @@ Syntax
 ------
 
 .. extension:: TemplateHaskell
-    :shortdesc: Enable Template Haskell.
+    :shortdesc: Allow Template Haskell's splice and quotation syntax.
 
     :implies: :extension:`TemplateHaskellQuotes`
     :since: 6.0. Typed splices introduced in GHC 7.8.1.
@@ -38,12 +38,11 @@ Syntax
     Enable Template Haskell's splice and quotation syntax.
 
 .. extension:: TemplateHaskellQuotes
-    :shortdesc: Enable quotation subset of
-        :ref:`Template Haskell <template-haskell>`.
+    :shortdesc: Allow :ref:`Template Haskell <template-haskell>`'s quotation syntax.
 
     :since: 8.0.1
 
-    Enable only Template Haskell's quotation syntax.
+    Enable Template Haskell's quotation syntax.
 
 Template Haskell has the following new syntactic constructions. You need to use
 the extension :extension:`TemplateHaskell` to switch these syntactic extensions on.
@@ -54,8 +53,8 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
 -  A splice is written ``$x``, where ``x`` is an arbitrary expression.
    There must be no space between the "$" and the expression.
-   This use of "$" overrides its meaning as an infix operator, just as "M.x"
-   overrides the meaning of "." as an infix operator. If you want the
+   This use of ``$`` overrides its meaning as an infix operator, just as ``M.x``
+   overrides the meaning of ``.`` as an infix operator. If you want the
    infix operator, put spaces around it.
 
    A top-level splice can occur in place of
@@ -693,7 +692,7 @@ Template Haskell Quasi-quotation
 --------------------------------
 
 .. extension:: QuasiQuotes
-    :shortdesc: Enable quasiquotation.
+    :shortdesc: Allow quasiquotation syntax.
 
     :since: 6.10.1
 

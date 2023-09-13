@@ -2,7 +2,7 @@ Required type arguments
 =======================
 
 .. extension:: RequiredTypeArguments
-    :shortdesc: Enable required type arguments in terms.
+    :shortdesc: Allow use of required type argument syntax in terms.
 
     :since: 9.10.1
     :status: Experimental

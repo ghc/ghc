@@ -4,7 +4,7 @@ Default method signatures
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DefaultSignatures
-    :shortdesc: Enable default signatures.
+    :shortdesc: Allow default signatures for typeclass methods.
 
     :since: 7.2.1
 

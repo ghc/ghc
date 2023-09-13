@@ -6,7 +6,7 @@ Lexically scoped type variables
 ===============================
 
 .. extension:: ScopedTypeVariables
-    :shortdesc: Enable lexically-scoped type variables.
+    :shortdesc: Lexically scope explicitly-introduced type variables.
 
     :implies: :extension:`ExplicitForAll`
 

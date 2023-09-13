@@ -4,7 +4,7 @@ The recursive do-notation
 -------------------------
 
 .. extension:: RecursiveDo
-    :shortdesc: Enable recursive do (mdo) notation.
+    :shortdesc: Allow recursive do (e.g. ``mdo``) notation.
 
     :since: 6.8.1
 

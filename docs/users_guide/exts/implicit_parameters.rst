@@ -4,7 +4,7 @@ Implicit parameters
 ===================
 
 .. extension:: ImplicitParams
-    :shortdesc: Enable Implicit Parameters.
+    :shortdesc: Allow implicit parameter constraints.
 
     :since: 6.8.1
 

@@ -4,7 +4,7 @@ Binary integer literals
 -----------------------
 
 .. extension:: BinaryLiterals
-    :shortdesc: Enable support for binary literals.
+    :shortdesc: Allow binary literal syntax.
 
     :since: 7.10.1
 

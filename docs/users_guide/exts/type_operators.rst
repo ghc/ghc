@@ -4,8 +4,7 @@ Type operators
 --------------
 
 .. extension:: TypeOperators
-    :shortdesc: Enable type operators.
-        Implies :extension:`ExplicitNamespaces`.
+    :shortdesc: Allow type constructors to be given operator names.
 
     :implies: :extension:`ExplicitNamespaces`
 

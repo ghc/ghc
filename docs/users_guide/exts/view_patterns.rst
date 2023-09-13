@@ -4,7 +4,7 @@ View patterns
 -------------
 
 .. extension:: ViewPatterns
-    :shortdesc: Enable view patterns.
+    :shortdesc: Allow view pattern syntax.
 
     :since: 6.10.1
 

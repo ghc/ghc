@@ -4,7 +4,7 @@ Stand-alone deriving declarations
 ---------------------------------
 
 .. extension:: StandaloneDeriving
-    :shortdesc: Enable standalone deriving.
+    :shortdesc: Allow standalone instance deriving declarations.
 
     :since: 6.8.1
 

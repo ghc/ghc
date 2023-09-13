@@ -4,7 +4,7 @@ Package-qualified imports
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: PackageImports
-    :shortdesc: Enable package-qualified imports.
+    :shortdesc: Allow package-qualified ``import`` syntax.
 
     :since: 6.10.1
 

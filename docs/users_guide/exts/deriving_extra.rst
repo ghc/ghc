@@ -50,8 +50,7 @@ Deriving ``Functor`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveFunctor
-    :shortdesc: Enable deriving for the Functor class.
-        Implied by :extension:`DeriveTraversable`.
+    :shortdesc: Allow deriving for the ``Functor`` class.
 
     :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
@@ -246,8 +245,7 @@ Deriving ``Foldable`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveFoldable
-    :shortdesc: Enable deriving for the Foldable class.
-        Implied by :extension:`DeriveTraversable`.
+    :shortdesc: Allow deriving for the ``Foldable`` class.
 
     :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
@@ -389,8 +387,7 @@ Deriving ``Traversable`` instances
 
 
 .. extension:: DeriveTraversable
-    :shortdesc: Enable deriving for the Traversable class.
-        Implies :extension:`DeriveFunctor` and :extension:`DeriveFoldable`.
+    :shortdesc: Allow deriving for the ``Traversable`` class.
 
     :implies: :extension:`DeriveFoldable`, :extension:`DeriveFunctor`
     :implied by: :extension:`GHC2021`
@@ -469,7 +466,7 @@ Deriving ``Data`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveDataTypeable
-    :shortdesc: Enable deriving for the ``Data`` class.
+    :shortdesc: Allow deriving for the ``Data`` class.
 
     :since: 6.8.1
     :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
@@ -523,7 +520,7 @@ Deriving ``Lift`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveLift
-    :shortdesc: Enable deriving for the Lift class
+    :shortdesc: Allow deriving for the ``Lift`` class
 
     :since: 8.0.1
     :status: Included in :extension:`GHC2024`, :extension:`GHC2021`

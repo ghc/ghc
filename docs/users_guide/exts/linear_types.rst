@@ -4,7 +4,7 @@ Linear types
 ============
 
 .. extension:: LinearTypes
-    :shortdesc: Enable linear types.
+    :shortdesc: Allow writing of linear arrow types.
         Implies :extension:`MonoLocalBinds`.
 
     :implies: :extension:`MonoLocalBinds`

@@ -4,7 +4,7 @@ Overloaded record dot
 ---------------------
 
 .. extension:: OverloadedRecordDot
-    :shortdesc: Record '.' syntax
+    :shortdesc: Allow ``.`` to be used for record field access.
 
     :since: 9.2.0
 

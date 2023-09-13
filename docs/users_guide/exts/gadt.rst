@@ -4,8 +4,7 @@ Generalised Algebraic Data Types (GADTs)
 ----------------------------------------
 
 .. extension:: GADTs
-    :shortdesc: Enable generalised algebraic data types.
-        Implies :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
+    :shortdesc: Allow definition of generalised algebraic data types.
 
     :implies: :extension:`MonoLocalBinds`, :extension:`GADTSyntax`
     :since: 6.8.1

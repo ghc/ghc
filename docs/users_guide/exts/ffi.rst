@@ -8,7 +8,7 @@ Foreign function interface (FFI)
    single: interfacing with native code
 
 .. extension:: ForeignFunctionInterface
-    :shortdesc: Enable foreign function interface.
+    :shortdesc: Allow foreign function interface syntax.
 
     :since: 6.8.1
 
@@ -114,7 +114,7 @@ Unlifted FFI Types
 ~~~~~~~~~~~~~~~~~~
 
 .. extension:: UnliftedFFITypes
-    :shortdesc: Enable unlifted FFI types
+    :shortdesc: Allow the types of foreign imports to contain certain unlifted types.
 
     :since: 6.8.1
 
@@ -282,7 +282,7 @@ Primitive imports
 ~~~~~~~~~~~~~~~~~
 
 .. extension:: GHCForeignImportPrim
-    :shortdesc: Enable prim calling convention. Intended for internal use only.
+    :shortdesc: Allow ``prim`` calling convention. Intended for internal use only.
 
     :since: 6.12.1
 
@@ -310,7 +310,7 @@ Interruptible foreign calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: InterruptibleFFI
-    :shortdesc: Enable interruptible FFI.
+    :shortdesc: Allow ``interruptible`` FFI imports.
 
     :since: 7.2.1
 
@@ -394,7 +394,7 @@ The CAPI calling convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: CApiFFI
-    :shortdesc: Enable the CAPI calling convention.
+    :shortdesc: Allow ``foreign import``\ s to be declared with the ``capi`` calling convention.
 
     :since: 7.6.1
 

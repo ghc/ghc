@@ -3,13 +3,13 @@
 Traditional record syntax
 -------------------------
 
-.. extension:: NoTraditionalRecordSyntax
-    :shortdesc: Disable support for traditional record syntax
-        (as supported by Haskell 98) ``C {f = x}``
+.. extension:: TraditionalRecordSyntax
+    :shortdesc: Allow traditional record syntax (e.g. ``C {f = x}``).
 
     :since: 7.4.1
+    :status: Enabled by default.
 
-    Disallow use of record syntax.
+    Allow traditional record syntax (e.g. ``C {f = x}``).
 
 Traditional record syntax, such as ``C {f = x}``, is enabled by default.
 To disable it, you can use the :extension:`NoTraditionalRecordSyntax` extension.

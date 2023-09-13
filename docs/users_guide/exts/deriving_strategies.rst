@@ -4,7 +4,7 @@ Deriving strategies
 -------------------
 
 .. extension:: DerivingStrategies
-    :shortdesc: Enables deriving strategies.
+    :shortdesc: Allow use of instance deriving strategies.
 
     :since: 8.2.1
 

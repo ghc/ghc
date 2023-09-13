@@ -42,8 +42,7 @@ Relaxed rules for the instance head
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: TypeSynonymInstances
-    :shortdesc: Enable type synonyms in instance heads.
-      Implied by :extension:`FlexibleInstances`.
+    :shortdesc: Allow type synonyms to be mentioned in instance heads.
 
     :implied by: :extension:`FlexibleInstances`
     :since: 6.8.1
@@ -53,8 +52,7 @@ Relaxed rules for the instance head
     Allow definition of type class instances for type synonyms.
 
 .. extension:: FlexibleInstances
-    :shortdesc: Enable flexible instances.
-        Implies :extension:`TypeSynonymInstances`.
+    :shortdesc: Allow instance heads to mention arbitrary nested types.
 
     :implies: :extension:`TypeSynonymInstances`
 
@@ -65,7 +63,7 @@ Relaxed rules for the instance head
     Allow definition of type class instances with arbitrary nested types in the
     instance head.
 
-In Haskell 98 the head of an instance declaration must be of the form
+In Haskell 2010 the head of an instance declaration must be of the form
 ``C (T a1 ... an)``, where ``C`` is the class, ``T`` is a data type
 constructor, and the ``a1 ... an`` are distinct type variables. In the
 case of multi-parameter type classes, this rule applies to each
@@ -319,7 +317,7 @@ Undecidable instances and loopy superclasses
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: UndecidableInstances
-    :shortdesc: Enable undecidable instances.
+    :shortdesc: Allow definition of instances which may make solving undecidable.
 
     :since: 6.8.1
 
@@ -412,7 +410,7 @@ Overlapping instances
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: OverlappingInstances
-    :shortdesc: Enable overlapping instances.
+    :shortdesc: Allow definition of overlapping instances.
 
     :since: 6.8.1
 
@@ -422,8 +420,9 @@ Overlapping instances
     termination.
 
 .. extension:: IncoherentInstances
-    :shortdesc: Enable incoherent instances.
-        Implies :extension:`OverlappingInstances`.
+    :shortdesc: Allow definitions of instances that may result in incoherence.
+
+    :implies: :extension:`OverlappingInstances`.
 
     :since: 6.8.1
 
@@ -667,7 +666,7 @@ Instance signatures: type signatures in instance declarations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: InstanceSigs
-    :shortdesc: Enable instance signatures.
+    :shortdesc: Allow type signatures to be written for instance methods.
 
     :since: 7.6.1
 

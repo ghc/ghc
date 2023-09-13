@@ -4,7 +4,7 @@ Lambda-case
 -----------
 
 .. extension:: LambdaCase
-    :shortdesc: Enable lambda-case expressions.
+    :shortdesc: Allow ``\case`` expressions.
 
     :since: 7.6.1
     :status: Included in :extension:`GHC2024`

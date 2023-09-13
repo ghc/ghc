@@ -4,8 +4,7 @@ Impredicative polymorphism
 ==========================
 
 .. extension:: ImpredicativeTypes
-    :shortdesc: Enable impredicative types.
-        Implies :extension:`RankNTypes`.
+    :shortdesc: Allow impredicative types.
 
     :implies: :extension:`RankNTypes`
     :since: 9.2.1 (unreliable in 6.10 - 9.0)

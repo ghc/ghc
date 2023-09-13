@@ -4,8 +4,7 @@ Let-generalisation
 ------------------
 
 .. extension:: MonoLocalBinds
-    :shortdesc: Enable do not generalise local bindings.
-        Implied by :extension:`TypeFamilies` and :extension:`GADTs`.
+    :shortdesc: Do not generalise types of local bindings.
 
     :implied by: :extension:`TypeFamilies`, :extension:`GADTs`
     :since: 6.12.1

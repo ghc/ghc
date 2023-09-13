@@ -8,7 +8,7 @@ Applicative do-notation
    single: do-notation; Applicative
 
 .. extension:: ApplicativeDo
-    :shortdesc: Enable Applicative do-notation desugaring
+    :shortdesc: Allow do-notation statements to be desugared via ``Applicative``.
 
     :since: 8.0.1
 

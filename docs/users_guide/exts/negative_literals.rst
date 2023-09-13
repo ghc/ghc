@@ -4,7 +4,7 @@ Negative literals
 -----------------
 
 .. extension:: NegativeLiterals
-    :shortdesc: Enable support for negative literals.
+    :shortdesc: Allow negative numeric literal syntax.
 
     :since: 7.8.1
 

@@ -4,8 +4,7 @@ Record field disambiguation
 ---------------------------
 
 .. extension:: DisambiguateRecordFields
-    :shortdesc: Enable record field disambiguation.
-        Implied by :extension:`RecordWildCards`.
+    :shortdesc: Automatically disambiguate some record field references.
 
     :since: 6.8.1
     :implied by: :extension:`RecordWildCards`, :extension:`DuplicateRecordFields`

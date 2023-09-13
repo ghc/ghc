@@ -2,7 +2,7 @@ Type-level data declarations
 ============================
 
 .. extension:: TypeData
-    :shortdesc: Enable type data declarations.
+    :shortdesc: Allow ``type data`` declarations.
 
     :since: 9.6.1
 
