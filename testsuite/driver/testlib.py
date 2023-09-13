@@ -642,17 +642,18 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         else:
             metrics = { metrics }
 
+    # Compiler performance numbers change when debugging is on, making the results
+    # useless and confusing. Therefore, don't collect statistics with a DEBUG compiler.
+    # We still do, however, test for correctness.
+    if config.compiler_debugged and is_compiler_stats_test:
+        return
+
     opts.is_stats_test = True
     if is_compiler_stats_test:
         opts.is_compiler_stats_test = True
         tag = 'compile_time'
     else:
         tag = 'runtime'
-
-    # Compiler performance numbers change when debugging is on, making the results
-    # useless and confusing. Therefore, skip if debugging is on.
-    if config.compiler_debugged and is_compiler_stats_test:
-        opts.skip = True
 
     # If there are any residency testing metrics then turn on RESIDENCY_OPTS and
     # omit nonmoving GC ways, which don't support profiling.
