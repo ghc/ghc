@@ -498,3 +498,4 @@ test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -
 test('T22404', [only_ways(['optasm']), check_errmsg(r'let') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T23864', normal, compile, ['-O -dcore-lint -package ghc -Wno-gadt-mono-local-binds'])
 test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -v0'])
+test('T23922a', normal, compile, ['-O'])
