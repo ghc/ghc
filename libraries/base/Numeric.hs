@@ -117,6 +117,14 @@ readHex = readP_to_S L.readHexP
 
 -- | Reads an /unsigned/ 'RealFrac' value,
 -- expressed in decimal scientific notation.
+--
+-- Note that this function takes time linear in the magnitude of its input
+-- which can scale exponentially with input size (e.g. @"1e100000000"@ is a
+-- very large number while having a very small textual form).
+-- For this reason, users should take care to avoid using this function on
+-- untrusted input. Users needing to parse floating point values
+-- (e.g. 'Float') are encouraged to instead use 'read', which does
+-- not suffer from this issue.
 readFloat :: RealFrac a => ReadS a
 readFloat = readP_to_S readFloatP
 
