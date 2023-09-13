@@ -494,3 +494,4 @@ test('T23272', [only_ways(['ghci']), extra_hc_opts('-fno-unoptimized-core-for-in
 test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -v0'])
 test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -v0'])
 test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 -O'])
+test('T23922a', normal, compile, ['-O'])
