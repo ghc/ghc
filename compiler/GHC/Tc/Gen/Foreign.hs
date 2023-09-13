@@ -356,7 +356,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
       dflags <- getDynFlags
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-      checkMissingAmpersand idecl (map scaledThing arg_tys) res_ty
+      checkMissingAmpersand idecl target (map scaledThing arg_tys) res_ty
       case target of
           StaticTarget _ _ _ False
            | not (null arg_tys) ->
@@ -373,8 +373,10 @@ checkCTarget idecl (StaticTarget _ str _ _) = do
 
 checkCTarget _ DynamicTarget = panic "checkCTarget DynamicTarget"
 
-checkMissingAmpersand :: ForeignImport GhcRn -> [Type] -> Type -> TcM ()
-checkMissingAmpersand idecl arg_tys res_ty
+checkMissingAmpersand :: ForeignImport GhcRn -> CCallTarget -> [Type] -> Type -> TcM ()
+checkMissingAmpersand _ (StaticTarget _ _ _ False) _ _ = return ()
+
+checkMissingAmpersand idecl _ arg_tys res_ty
   | null arg_tys && isFunPtrTy res_ty
   = addDiagnosticTc $ TcRnFunPtrImportWithoutAmpersand idecl
   | otherwise

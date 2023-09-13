@@ -47,3 +47,5 @@ test('T22043', normal, compile, [''])
 
 test('T22774', unless(js_arch(), expect_fail), compile, [''])
 
+test('cc018', normal, compile, [''])
+
