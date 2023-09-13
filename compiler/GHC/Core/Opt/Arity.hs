@@ -2328,18 +2328,6 @@ This test is made by `ok_fun` in tryEtaReduce.
      * `/\a. \x. f @(Maybe a) x -->  /\a. f @(Maybe a)`
    See Note [Do not eta reduce PAPs] for why we insist on a trivial head.
 
-2. Type and dictionary abstraction. Regardless of whether 'f' is a value, it
-   is always sound to reduce /type lambdas/, thus:
-        (/\a -> f a)  -->   f
-   Moreover, we always want to, because it makes RULEs apply more often:
-      This RULE:    `forall g. foldr (build (/\a -> g a))`
-      should match  `foldr (build (/\b -> ...something complex...))`
-   and the simplest way to do so is eta-reduce `/\a -> g a` in the RULE to `g`.
-
-   The type checker can insert these eta-expanded versions,
-   with both type and dictionary lambdas; hence the slightly
-   ad-hoc (all ok_lam bndrs)
-
 Of course, eta reduction is not always sound. See Note [Eta reduction soundness]
 for when it is.
 
@@ -2426,6 +2414,25 @@ case where `e` is trivial):
        g f = f `seq` \x. f x
     Here it's sound eta-reduce `\x. f x` to `f`, because `f` can't be bottom
     after the `seq`. This turned up in #7542.
+
+ T. If the binders are all type arguments, it's always safe to eta-reduce,
+    regardless of the arity of f.
+       /\a b. f @a @b  --> f
+
+2. Type and dictionary abstraction. Regardless of whether 'f' is a value, it
+   is always sound to reduce /type lambdas/, thus:
+        (/\a -> f a)  -->   f
+   Moreover, we always want to, because it makes RULEs apply more often:
+      This RULE:    `forall g. foldr (build (/\a -> g a))`
+      should match  `foldr (build (/\b -> ...something complex...))`
+   and the simplest way to do so is eta-reduce `/\a -> g a` in the RULE to `g`.
+
+   More debatably, we extend this to dictionary arguments too, because the type
+   checker can insert these eta-expanded versions, with both type and dictionary
+   lambdas; hence the slightly ad-hoc (all ok_lam bndrs).  That is, we eta-reduce
+        \(d::Num a). f d   -->   f
+   regardless of f's arity. Its not clear whether or not this is important, and
+   it is not in general sound.  But that's the way it is right now.
 
 And here are a few more technical criteria for when it is *not* sound to
 eta-reduce that are specific to Core and GHC:
@@ -2688,20 +2695,25 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_fun (App fun (Type {})) = ok_fun fun
     ok_fun (Cast fun _)        = ok_fun fun
     ok_fun (Tick _ expr)       = ok_fun expr
-    ok_fun (Var fun_id)        = is_eta_reduction_sound fun_id || all ok_lam bndrs
+    ok_fun (Var fun_id)        = is_eta_reduction_sound fun_id
     ok_fun _fun                = False
 
     ---------------
     -- See Note [Eta reduction soundness], this is THE place to check soundness!
-    is_eta_reduction_sound fun =
-      -- Don't eta-reduce in fun in its own recursive RHSs
-      not (fun `elemUnVarSet` rec_ids)               -- criterion (R)
-      -- Check that eta-reduction won't make the program stricter...
-      && (fun_arity fun >= incoming_arity            -- criterion (A) and (E)
-           || all_calls_with_arity incoming_arity)   -- criterion (S)
-      -- ... and that the function can be eta reduced to arity 0
-      -- without violating invariants of Core and GHC
-      && not (cantEtaReduceFun fun)                  -- criteria (L), (J), (W), (B)
+    is_eta_reduction_sound fun
+      | fun `elemUnVarSet` rec_ids          -- Criterion (R)
+      = False -- Don't eta-reduce in fun in its own recursive RHSs
+
+      | cantEtaReduceFun fun                -- Criteria (L), (J), (W), (B)
+      = False -- Function can't be eta reduced to arity 0
+              -- without violating invariants of Core and GHC
+
+      | otherwise
+      = -- Check that eta-reduction won't make the program stricter...
+        fun_arity fun >= incoming_arity          -- Criterion (A) and (E)
+        || all_calls_with_arity incoming_arity   -- Criterion (S)
+        || all ok_lam bndrs                      -- Criterion (T)
+
     all_calls_with_arity n = isStrict (fst $ peelManyCalls n eval_sd)
        -- See Note [Eta reduction based on evaluation context]
 
