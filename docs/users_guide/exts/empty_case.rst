@@ -4,7 +4,7 @@ Empty case alternatives
 -----------------------
 
 .. extension:: EmptyCase
-    :shortdesc: Allow empty case alternatives.
+    :shortdesc: Allow ``case`` expressions with no alternatives.
 
     :since: 7.8.1
     :status: Included in :extension:`GHC2024`, :extension:`GHC2021`

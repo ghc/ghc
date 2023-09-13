@@ -4,9 +4,7 @@ Explicit universal quantification (forall)
 ------------------------------------------
 
 .. extension:: ExplicitForAll
-    :shortdesc: Enable explicit universal quantification.
-        Implied by :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
-        :extension:`RankNTypes` and :extension:`ExistentialQuantification`.
+    :shortdesc: Allow explicit universal quantification.
 
     :implied by: :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
         :extension:`RankNTypes`, :extension:`ExistentialQuantification`

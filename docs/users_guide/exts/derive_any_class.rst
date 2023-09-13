@@ -4,7 +4,7 @@ Deriving any other class
 ------------------------
 
 .. extension:: DeriveAnyClass
-    :shortdesc: Enable deriving for any class.
+    :shortdesc: Allow ``deriving`` syntax to be used for any class.
 
     :since: 7.10.1
 

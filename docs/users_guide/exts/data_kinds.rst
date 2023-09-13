@@ -4,7 +4,7 @@ Datatype promotion
 ==================
 
 .. extension:: DataKinds
-    :shortdesc: Enable datatype promotion.
+    :shortdesc: Allow use of data constructors in types.
 
     :since: 7.4.1
 

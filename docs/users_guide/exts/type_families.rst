@@ -4,9 +4,7 @@ Type families
 =============
 
 .. extension:: TypeFamilies
-    :shortdesc: Enable type families.
-        Implies :extension:`ExplicitNamespaces`, :extension:`KindSignatures`,
-        and :extension:`MonoLocalBinds`.
+    :shortdesc: Allow definition of type families.
 
     :implies: :extension:`MonoLocalBinds`, :extension:`KindSignatures`,
               :extension:`ExplicitNamespaces`
@@ -1126,8 +1124,7 @@ Injective type families
 -----------------------
 
 .. extension:: TypeFamilyDependencies
-    :shortdesc: Enable injective type families.
-        Implies :extension:`TypeFamilies`.
+    :shortdesc: Allow injectivity annotations on type families.
 
     :implies: :extension:`TypeFamilies`
 

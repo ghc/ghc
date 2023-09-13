@@ -4,7 +4,7 @@ Numeric underscores
 -------------------
 
 .. extension:: NumericUnderscores
-    :shortdesc: Enable support for :ref:`numeric underscores <numeric-underscores>`.
+    :shortdesc: Allow underscores in numeric literals.
 
     :since: 8.6.1
 

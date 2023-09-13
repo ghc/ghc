@@ -92,7 +92,7 @@ containers, such as ``map``. Note that ``Generic1`` ranges over types of kind
 enabled, then it can range of types of kind ``k -> Type``, for any kind ``k``.
 
 .. extension:: DeriveGeneric
-    :shortdesc: Enable deriving for the Generic class.
+    :shortdesc: Allow deriving of ``Generic`` instances.
 
     :since: 7.2.1
 

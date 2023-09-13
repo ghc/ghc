@@ -4,7 +4,7 @@ Overloaded lists
 ----------------
 
 .. extension:: OverloadedLists
-    :shortdesc: Enable overloaded lists.
+    :shortdesc: Desugar list syntax via the ``IsList`` class.
 
     :since: 7.8.1
 

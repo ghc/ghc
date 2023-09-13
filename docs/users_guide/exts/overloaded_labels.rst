@@ -4,7 +4,7 @@ Overloaded labels
 -----------------
 
 .. extension:: OverloadedLabels
-    :shortdesc: Enable overloaded labels.
+    :shortdesc: Allow overloaded label syntax.
 
     :since: 8.0.1
 

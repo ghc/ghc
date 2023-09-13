@@ -4,7 +4,7 @@ Existentially quantified data constructors
 ------------------------------------------
 
 .. extension:: ExistentialQuantification
-    :shortdesc: Enable liberalised type synonyms.
+    :shortdesc: Allow existentially quantified type variables in types.
 
     :implies: :extension:`ExplicitForAll`
     :since: 6.8.1

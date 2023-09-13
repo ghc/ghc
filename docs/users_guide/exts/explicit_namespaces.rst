@@ -4,9 +4,8 @@ Explicit namespaces in import/export
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: ExplicitNamespaces
-    :shortdesc: Enable using the keyword ``type`` to specify the namespace of
-        entries in imports and exports (:ref:`explicit-namespaces`).
-        Implied by :extension:`TypeOperators` and :extension:`TypeFamilies`.
+    :shortdesc: Allow use of the keyword ``type`` to specify the namespace of
+        entries in imports and exports.
 
     :implied by: :extension:`TypeOperators`, :extension:`TypeFamilies`
     :since: 7.6.1

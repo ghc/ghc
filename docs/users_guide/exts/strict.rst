@@ -37,7 +37,7 @@ Bang patterns
 -------------
 
 .. extension:: BangPatterns
-    :shortdesc: Enable bang patterns.
+    :shortdesc: Allow bang pattern syntax.
 
     :since: 6.8.1
 
@@ -158,7 +158,7 @@ Strict-by-default data types
 ----------------------------
 
 .. extension:: StrictData
-    :shortdesc: Enable default strict datatype fields.
+    :shortdesc: Treat datatype fields as strict by default.
 
     :since: 8.0.1
 

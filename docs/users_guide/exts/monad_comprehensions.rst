@@ -7,7 +7,7 @@ Monad comprehensions
    single: monad comprehensions
 
 .. extension:: MonadComprehensions
-    :shortdesc: Enable monad comprehensions.
+    :shortdesc: Allow list comprehension syntax to be used at monads other than ``List``.
 
     :since: 7.2.1
 

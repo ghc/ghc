@@ -4,7 +4,7 @@ Record puns
 -----------
 
 .. extension:: NamedFieldPuns
-    :shortdesc: Enable record puns.
+    :shortdesc: Allow record field punning syntax.
 
     :since: 6.10.1
 

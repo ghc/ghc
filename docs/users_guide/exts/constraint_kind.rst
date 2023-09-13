@@ -4,7 +4,7 @@ The ``Constraint`` kind
 -----------------------
 
 .. extension:: ConstraintKinds
-    :shortdesc: Enable a kind of constraints.
+    :shortdesc: Allow constraints to be used as types of kind ``Constraint``.
 
     :since: 7.4.1
 

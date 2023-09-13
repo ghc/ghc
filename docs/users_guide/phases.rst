@@ -287,7 +287,7 @@ Options affecting the C pre-processor
 -------------------------------------
 
 .. extension:: CPP
-    :shortdesc: Enable the C preprocessor.
+    :shortdesc: Resolve C preprocessor directives.
 
     :since: 6.8.1
 

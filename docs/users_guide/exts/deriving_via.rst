@@ -4,9 +4,8 @@ Deriving via
 ------------
 
 .. extension:: DerivingVia
-    :shortdesc: Enable deriving instances ``via`` types of the same runtime
+    :shortdesc: Allow deriving instances ``via`` types of the same runtime
         representation.
-        Implies :extension:`DerivingStrategies`.
 
     :implies: :extension:`DerivingStrategies`
 

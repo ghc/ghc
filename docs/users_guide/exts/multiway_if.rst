@@ -4,7 +4,7 @@ Multi-way if-expressions
 ------------------------
 
 .. extension:: MultiWayIf
-    :shortdesc: Enable multi-way if-expressions.
+    :shortdesc: Allow multi-way ``if``-expressions.
 
     :since: 7.6.1
 

@@ -4,7 +4,7 @@ Pattern synonyms
 ================
 
 .. extension:: PatternSynonyms
-    :shortdesc: Enable pattern synonyms.
+    :shortdesc: Allow definition of pattern synonyms.
 
     :since: 7.8.1
 

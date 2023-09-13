@@ -4,7 +4,7 @@ Visible type application
 ========================
 
 .. extension:: TypeApplications
-    :shortdesc: Enable type application syntax in terms and types.
+    :shortdesc: Allow type application syntax in terms and types.
 
     :since: 8.0.1
 

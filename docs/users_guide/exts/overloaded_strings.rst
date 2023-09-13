@@ -4,7 +4,7 @@ Overloaded string literals
 --------------------------
 
 .. extension:: OverloadedStrings
-    :shortdesc: Enable overloaded string literals.
+    :shortdesc: Desugar string literals via ``IsString`` class.
 
     :since: 6.8.1
 

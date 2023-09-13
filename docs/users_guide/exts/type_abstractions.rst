@@ -2,7 +2,7 @@ Type abstractions
 =================
 
 .. extension:: TypeAbstractions
-    :shortdesc: Enable type abstraction syntax in patterns and type variable binders.
+    :shortdesc: Allow type abstraction syntax in patterns and type variable binders.
 
     :since: 9.8.1
 

@@ -10,7 +10,7 @@ Generalised (SQL-like) List Comprehensions
    single: SQL
 
 .. extension:: TransformListComp
-    :shortdesc: Enable generalised list comprehensions.
+    :shortdesc: Allow generalised list comprehension syntax.
 
     :since: 6.10.1
 

@@ -4,7 +4,7 @@ Writing qualified in postpositive position
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: ImportQualifiedPost
-    :shortdesc: ``ImportQualifiedPost`` allows the syntax ``import M qualified``
+    :shortdesc: Allows the syntax ``import M qualified``
 
     :since: 8.10.1
 

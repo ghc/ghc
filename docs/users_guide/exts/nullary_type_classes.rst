@@ -4,7 +4,7 @@ Nullary type classes
 ~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: NullaryTypeClasses
-    :shortdesc: Deprecated, does nothing. nullary (no parameter) type
+    :shortdesc: Deprecated, does nothing. nullary type
         classes are now enabled using :extension:`MultiParamTypeClasses`.
 
     :since: 7.8.1

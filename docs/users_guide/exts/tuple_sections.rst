@@ -4,7 +4,7 @@ Tuple sections
 --------------
 
 .. extension:: TupleSections
-    :shortdesc: Enable tuple sections.
+    :shortdesc: Allow use of tuple section synxtax.
 
     :since: 6.12
 

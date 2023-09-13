@@ -5,7 +5,7 @@ Generalised derived instances for newtypes
 
 .. extension:: GeneralisedNewtypeDeriving
                GeneralizedNewtypeDeriving
-    :shortdesc: Enable newtype deriving.
+    :shortdesc: Allow instances to be derived via ``newtype`` deriving.
 
     :since: 6.8.1. British spelling since 8.6.1.
 
