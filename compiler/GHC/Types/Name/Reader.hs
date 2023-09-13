@@ -45,7 +45,7 @@ module GHC.Types.Name.Reader (
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
-        localRdrEnvElts, minusLocalRdrEnv,
+        localRdrEnvElts, minusLocalRdrEnv, minusLocalRdrEnvList,
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnvX, GlobalRdrEnv, IfGlobalRdrEnv,
@@ -485,6 +485,10 @@ inLocalRdrEnvScope name (LRE { lre_in_scope = ns }) = name `elemNameSet` ns
 minusLocalRdrEnv :: LocalRdrEnv -> OccEnv a -> LocalRdrEnv
 minusLocalRdrEnv lre@(LRE { lre_env = env }) occs
   = lre { lre_env = minusOccEnv env occs }
+
+minusLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
+minusLocalRdrEnvList lre@(LRE { lre_env = env }) occs
+  = lre { lre_env = delListFromOccEnv env occs }
 
 {-
 Note [Local bindings with Exact Names]
