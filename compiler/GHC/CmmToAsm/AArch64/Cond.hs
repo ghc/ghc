@@ -1,6 +1,6 @@
 module GHC.CmmToAsm.AArch64.Cond  where
 
-import GHC.Prelude
+import GHC.Prelude hiding (EQ)
 
 -- https://developer.arm.com/documentation/den0024/a/the-a64-instruction-set/data-processing-instructions/conditional-instructions
 
@@ -60,7 +60,13 @@ data Cond
     | UOGE   -- b.pl
     | UOGT   -- b.hi
     -- others
-    | NEVER  -- b.nv
+    -- NEVER -- b.nv
+             -- I removed never. According to the ARM spec:
+             -- >   The Condition code NV exists only to provide a valid disassembly of
+             -- >   the 0b1111 encoding, otherwise its behavior is identical to AL.
+             -- This can only lead to disaster. Better to not have it than someone
+             -- using it assuming it actually means never.
+
     | VS     -- oVerflow set
     | VC     -- oVerflow clear
     deriving Eq

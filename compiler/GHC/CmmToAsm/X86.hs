@@ -38,7 +38,7 @@ ncgX86_64 config = NcgImpl
    , maxSpillSlots             = X86.maxSpillSlots config
    , allocatableRegs           = X86.allocatableRegs platform
    , ncgAllocMoreStack         = X86.allocMoreStack platform
-   , ncgMakeFarBranches        = const id
+   , ncgMakeFarBranches        = \_p _i bs -> pure bs
    , extractUnwindPoints       = X86.extractUnwindPoints
    , invertCondBranches        = X86.invertCondBranches
    }
