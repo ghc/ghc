@@ -2567,12 +2567,12 @@ Here are the key kinding rules for types
           -- in GHC.Builtin.Types.Prim
 
           torc is TYPE or CONSTRAINT
-          ty : torc rep
+          ty : body_torc rep
           ki : Type
           `a` is a type variable
           `a` is not free in rep
 (FORALL1) -----------------------
-          forall (a::ki). ty : torc rep
+          forall (a::ki). ty : body_torc rep
 
           torc is TYPE or CONSTRAINT
           ty : body_torc rep
