@@ -456,7 +456,7 @@ ppr_dec _ (ClosedTypeFamilyD tfhead eqns)
     ppr_eqn (TySynEqn mb_bndrs lhs rhs)
       = ppr_bndrs mb_bndrs <+> ppr lhs <+> text "=" <+> ppr rhs
 ppr_dec _ (RoleAnnotD name roles)
-  = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
+  = hsep [ text "type role", pprName' Applied name ] <+> hsep (map ppr roles)
 ppr_dec _ (StandaloneDerivD ds cxt ty)
   = hsep [ text "deriving"
          , maybe empty ppr_deriv_strategy ds
