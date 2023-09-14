@@ -655,13 +655,14 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                 text "cfg not in lockstep") ()
 
         ---- sequence blocks
-        let sequenced :: [NatCmmDecl statics instr]
-            sequenced =
-                checkLayout shorted $
-                {-# SCC "sequenceBlocks" #-}
-                map (BlockLayout.sequenceTop
-                        ncgImpl optimizedCFG)
-                    shorted
+        -- sequenced :: [NatCmmDecl statics instr]
+        let (sequenced, us_seq) =
+                        {-# SCC "sequenceBlocks" #-}
+                        initUs usAlloc $ mapM (BlockLayout.sequenceTop
+                                ncgImpl optimizedCFG)
+                            shorted
+
+        massert (checkLayout shorted sequenced)
 
         let branchOpt :: [NatCmmDecl statics instr]
             branchOpt =
@@ -684,7 +685,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 addUnwind acc proc =
                     acc `mapUnion` computeUnwinding config ncgImpl proc
 
-        return  ( usAlloc
+        return  ( us_seq
                 , fileIds'
                 , branchOpt
                 , lastMinuteImports ++ imports
@@ -704,10 +705,10 @@ maybeDumpCfg logger (Just cfg) msg proc_name
 
 -- | Make sure all blocks we want the layout algorithm to place have been placed.
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
-            -> [NatCmmDecl statics instr]
+            -> Bool
 checkLayout procsUnsequenced procsSequenced =
         assertPpr (setNull diff) (text "Block sequencing dropped blocks:" <> ppr diff)
-        procsSequenced
+        True
   where
         blocks1 = foldl' (setUnion) setEmpty $
                         map getBlockIds procsUnsequenced :: LabelSet
