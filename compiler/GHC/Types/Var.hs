@@ -75,7 +75,7 @@ module GHC.Types.Var (
         mkFunTyFlag, visArg, invisArg,
         visArgTypeLike, visArgConstraintLike,
         invisArgTypeLike, invisArgConstraintLike,
-        funTyFlagResultTypeOrConstraint,
+        funTyFlagArgTypeOrConstraint, funTyFlagResultTypeOrConstraint,
         TypeOrConstraint(..),  -- Re-export this: it's an argument of FunTyFlag
 
         -- * PiTyBinder
@@ -588,6 +588,12 @@ isFUNArg :: FunTyFlag -> Bool
 -- This one, FUN, or (->), has an extra multiplicity argument
 isFUNArg FTF_T_T = True
 isFUNArg _       = False
+
+funTyFlagArgTypeOrConstraint :: FunTyFlag -> TypeOrConstraint
+-- Whether it /takes/ a type or a constraint
+funTyFlagArgTypeOrConstraint FTF_T_T = TypeLike
+funTyFlagArgTypeOrConstraint FTF_T_C = TypeLike
+funTyFlagArgTypeOrConstraint _       = ConstraintLike
 
 funTyFlagResultTypeOrConstraint :: FunTyFlag -> TypeOrConstraint
 -- Whether it /returns/ a type or a constraint
