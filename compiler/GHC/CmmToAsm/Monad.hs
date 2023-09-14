@@ -93,7 +93,8 @@ data NcgImpl statics instr jumpDest = NcgImpl {
                               -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
-    ncgMakeFarBranches        :: LabelMap RawCmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr],
+    ncgMakeFarBranches        :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
+                              -> UniqSM [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
@@ -140,7 +141,7 @@ mistake would readily show up in performance tests). -}
 data NatM_State
         = NatM_State {
                 natm_us          :: UniqSupply,
-                natm_delta       :: Int,
+                natm_delta       :: Int, -- ^ Stack offset for unwinding information
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
                 natm_config      :: NCGConfig,

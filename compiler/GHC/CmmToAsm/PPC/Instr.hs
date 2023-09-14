@@ -677,12 +677,13 @@ takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: LabelMap RawCmmStatics
+        :: Platform
+        -> LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
-        -> [NatBasicBlock Instr]
-makeFarBranches info_env blocks
-    | NE.last blockAddresses < nearLimit = blocks
-    | otherwise = zipWith handleBlock blockAddressList blocks
+        -> UniqSM [NatBasicBlock Instr]
+makeFarBranches _platform info_env blocks
+    | NE.last blockAddresses < nearLimit = return blocks
+    | otherwise = return $ zipWith handleBlock blockAddressList blocks
     where
         blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
         blockAddressList = toList blockAddresses
