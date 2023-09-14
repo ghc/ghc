@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 
-module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl, pprInstr) where
+module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl, pprInstr, pprBasicBlock) where
 
 import GHC.Prelude hiding (EQ)
 
@@ -364,7 +364,10 @@ pprInstr platform instr = case instr of
   LOCATION file line col _name
     -> text "\t.loc" <+> ppr file <+> ppr line <+> ppr col
   DELTA d    -> asmComment $ text ("\tdelta = " ++ show d)
-  NEWBLOCK _ -> panic "PprInstr: NEWBLOCK"
+  NEWBLOCK blockid -> -- This is invalid assembly. But NEWBLOCK should never be contained
+                      -- in the final instruction stream. But we still want to be able to
+                      -- print it for debugging purposes.
+                      text "BLOCK " <> pprLabel platform (blockLbl blockid)
   LDATA _ _  -> panic "pprInstr: LDATA"
 
   -- Pseudo Instructions -------------------------------------------------------
@@ -560,7 +563,7 @@ pprCond c = case c of
   UGE    -> text "hs" -- Carry set/unsigned higher or same ; Greater than or equal, or unordered
   UGT    -> text "hi" -- Unsigned higher                   ; Greater than, or unordered
 
-  NEVER  -> text "nv" -- Never
+  -- NEVER  -> text "nv" -- Never
   VS     -> text "vs" -- Overflow                          ; Unordered (at least one NaN operand)
   VC     -> text "vc" -- No overflow                       ; Not unordered
 

@@ -675,12 +675,13 @@ takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: LabelMap RawCmmStatics
+        :: Platform
+        -> LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
-        -> [NatBasicBlock Instr]
-makeFarBranches info_env blocks
-    | last blockAddresses < nearLimit = blocks
-    | otherwise = zipWith handleBlock blockAddresses blocks
+        -> UniqSM [NatBasicBlock Instr]
+makeFarBranches _platform info_env blocks
+    | last blockAddresses < nearLimit = return blocks
+    | otherwise = return $ zipWith handleBlock blockAddresses blocks
     where
         blockAddresses = scanl (+) 0 $ map blockLen blocks
         blockLen (BasicBlock _ instrs) = length instrs
