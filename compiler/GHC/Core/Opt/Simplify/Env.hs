@@ -58,29 +58,33 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Multiplicity     ( scaleScaled )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv)
-import GHC.Types.Var
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
-import GHC.Data.OrdList
-import GHC.Data.Graph.UnVar
-import GHC.Types.Id as Id
+import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
-import GHC.Builtin.Types
-import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, substCo
                                 , extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
-import GHC.Platform ( Platform )
+import qualified GHC.Core.Type as Type
+
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Id as Id
 import GHC.Types.Basic
+import GHC.Types.Unique.FM      ( pprUniqFM )
+
+import GHC.Data.OrdList
+import GHC.Data.Graph.UnVar
+
+import GHC.Builtin.Types
+import GHC.Platform ( Platform )
+
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List ( intersperse, mapAccumL )
 
@@ -1170,21 +1174,34 @@ adjustJoinPointType mult new_res_ty join_id
   = assert (isJoinId join_id) $
     setIdType join_id new_join_ty
   where
-    orig_ar = idJoinArity join_id
-    orig_ty = idType join_id
+    join_arity = idJoinArity join_id
+    orig_ty    = idType join_id
+    res_torc   = typeTypeOrConstraint new_res_ty :: TypeOrConstraint
 
-    new_join_ty = go orig_ar orig_ty :: Type
+    new_join_ty = go join_arity orig_ty :: Type
 
-    go 0 _  = new_res_ty
-    go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
-            = mkPiTy (scale_bndr arg_bndr) $
-              go (n-1) res_ty
-            | otherwise
-            = pprPanic "adjustJoinPointType" (ppr orig_ar <+> ppr orig_ty)
+    go :: JoinArity -> Type -> Type
+    go n ty
+      | n == 0
+      = new_res_ty
 
-    -- See Note [Bangs in the Simplifier]
-    scale_bndr (Anon t af) = (Anon $! (scaleScaled mult t)) af
-    scale_bndr b@(Named _) = b
+      | Just (arg_bndr, body_ty) <- splitPiTy_maybe ty
+      , let body_ty' = go (n-1) body_ty
+      = case arg_bndr of
+          Named b                          -> mkForAllTy b body_ty'
+          Anon (Scaled arg_mult arg_ty) af -> mkFunTy af' arg_mult' arg_ty body_ty'
+              where
+                -- Using "!": See Note [Bangs in the Simplifier]
+                -- mkMultMul: see Note [Scaling join point arguments]
+                !arg_mult' = arg_mult `mkMultMul` mult
+
+                -- the new_res_ty might be ConstraintLike while the original
+                -- one was TypeLike.  So we may need to adjust the FunTyFlag.
+                -- (see #23952)
+                !af' = mkFunTyFlag (funTyFlagArgTypeOrConstraint af) res_torc
+
+      | otherwise
+      = pprPanic "adjustJoinPointType" (ppr join_arity <+> ppr orig_ty)
 
 {- Note [Scaling join point arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
