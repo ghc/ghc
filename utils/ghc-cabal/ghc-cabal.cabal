@@ -20,7 +20,7 @@ Executable ghc-cabal
     Main-Is: Main.hs
 
     Build-Depends: base         >= 3   && < 5,
-                   bytestring   >= 0.10 && < 0.12,
+                   bytestring   >= 0.10 && < 0.13,
                    Cabal        >= 3.7 && < 3.9,
                    Cabal-syntax >= 3.7 && < 3.9,
                    directory    >= 1.1 && < 1.4,

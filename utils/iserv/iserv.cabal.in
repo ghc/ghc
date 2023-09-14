@@ -33,7 +33,7 @@ Executable iserv
     Build-Depends: array      >= 0.5 && < 0.6,
                    base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.11,
-                   bytestring >= 0.10 && < 0.12,
+                   bytestring >= 0.10 && < 0.13,
                    containers >= 0.5 && < 0.7,
                    deepseq    >= 1.4 && < 1.6,
                    ghci       == @ProjectVersionMunged@
