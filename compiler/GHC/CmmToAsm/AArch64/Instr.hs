@@ -739,6 +739,7 @@ data Target
     = TBlock BlockId
     | TLabel CLabel
     | TReg   Reg
+    deriving (Eq, Ord)
 
 
 -- Extension

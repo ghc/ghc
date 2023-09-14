@@ -34,9 +34,9 @@ ncgAArch64 config
        ,maxSpillSlots             = AArch64.maxSpillSlots config
        ,allocatableRegs           = AArch64.allocatableRegs platform
        ,ncgAllocMoreStack         = AArch64.allocMoreStack platform
-       ,ncgMakeFarBranches        = const id
+       ,ncgMakeFarBranches        = AArch64.makeFarBranches
        ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
+       ,invertCondBranches        = \_ _ blocks -> blocks
   }
     where
       platform = ncgPlatform config

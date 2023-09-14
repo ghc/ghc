@@ -50,6 +50,7 @@ import Data.STRef
 import Control.Monad.ST.Strict
 import Control.Monad (foldM, unless)
 import GHC.Data.UnionFind
+import GHC.Types.Unique.Supply (UniqSM)
 
 {-
   Note [CFG based code layout]
@@ -799,29 +800,32 @@ sequenceTop
     => NcgImpl statics instr jumpDest
     -> Maybe CFG -- ^ CFG if we have one.
     -> NatCmmDecl statics instr -- ^ Function to serialize
-    -> NatCmmDecl statics instr
+    -> UniqSM (NatCmmDecl statics instr)
 
-sequenceTop _       _           top@(CmmData _ _) = top
-sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks))
-  = let
-      config     = ncgConfig ncgImpl
-      platform   = ncgPlatform config
+sequenceTop _       _           top@(CmmData _ _) = pure top
+sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
+    let config     = ncgConfig ncgImpl
+        platform   = ncgPlatform config
 
-    in CmmProc info lbl live $ ListGraph $ ncgMakeFarBranches ncgImpl info $
-         if -- Chain based algorithm
-            | ncgCfgBlockLayout config
-            , backendMaintainsCfg platform
-            , Just cfg <- edgeWeights
-            -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+        seq_blocks =
+                  if -- Chain based algorithm
+                      | ncgCfgBlockLayout config
+                      , backendMaintainsCfg platform
+                      , Just cfg <- edgeWeights
+                      -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
 
-            -- Old algorithm without edge weights
-            | ncgCfgWeightlessLayout config
-               || not (backendMaintainsCfg platform)
-            -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
+                      -- Old algorithm without edge weights
+                      | ncgCfgWeightlessLayout config
+                        || not (backendMaintainsCfg platform)
+                      -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
 
-            -- Old algorithm with edge weights (if any)
-            | otherwise
-            -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
+                      -- Old algorithm with edge weights (if any)
+                      | otherwise
+                      -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
+
+    far_blocks <- (ncgMakeFarBranches ncgImpl) platform info seq_blocks
+    pure $ CmmProc info lbl live $ ListGraph far_blocks
+
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of
