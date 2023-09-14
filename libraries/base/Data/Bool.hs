@@ -31,10 +31,10 @@ import GHC.Base
 -- $setup
 -- >>> import Prelude
 
--- | Case analysis for the 'Bool' type. @'bool' x y p@ evaluates to @x@
--- when @p@ is 'False', and evaluates to @y@ when @p@ is 'True'.
+-- | Case analysis for the 'Bool' type. @'bool' f t p@ evaluates to @f@
+-- when @p@ is 'False', and evaluates to @t@ when @p@ is 'True'.
 --
--- This is equivalent to @if p then y else x@; that is, one can
+-- This is equivalent to @if p then t else f@; that is, one can
 -- think of it as an if-then-else construct with its arguments
 -- reordered.
 --
@@ -49,14 +49,14 @@ import GHC.Base
 -- >>> bool "foo" "bar" False
 -- "foo"
 --
--- Confirm that @'bool' x y p@ and @if p then y else x@ are
+-- Confirm that @'bool' f t p@ and @if p then t else f@ are
 -- equivalent:
 --
--- >>> let p = True; x = "bar"; y = "foo"
--- >>> bool x y p == if p then y else x
+-- >>> let p = True; f = "bar"; t = "foo"
+-- >>> bool f t p == if p then t else f
 -- True
 -- >>> let p = False
--- >>> bool x y p == if p then y else x
+-- >>> bool f t p == if p then t else f
 -- True
 --
 bool :: a -> a -> Bool -> a
