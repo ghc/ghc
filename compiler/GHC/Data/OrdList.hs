@@ -16,8 +16,8 @@ module GHC.Data.OrdList (
         OrdList, pattern NilOL, pattern ConsOL, pattern SnocOL,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         headOL,
-        mapOL, mapOL', fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
-        strictlyEqOL, strictlyOrdOL
+        mapOL, mapOL', fromOL, toOL, foldrOL, foldlOL,
+        partitionOL, reverseOL, fromOLReverse, strictlyEqOL, strictlyOrdOL
 ) where
 
 import GHC.Prelude
@@ -219,6 +219,25 @@ foldlOL k z (Cons x xs) = let !z' = (k z x) in foldlOL k z' xs
 foldlOL k z (Snoc xs x) = let !z' = (foldlOL k z xs) in k z' x
 foldlOL k z (Two b1 b2) = let !z' = (foldlOL k z b1) in foldlOL k z' b2
 foldlOL k z (Many xs)   = foldl' k z xs
+
+partitionOL :: (a -> Bool) -> OrdList a -> (OrdList a, OrdList a)
+partitionOL _ None = (None,None)
+partitionOL f (One x)
+  | f x       = (One x, None)
+  | otherwise = (None, One x)
+partitionOL f (Two xs ys) = (Two ls1 ls2, Two rs1 rs2)
+  where !(!ls1,!rs1) = partitionOL f xs
+        !(!ls2,!rs2) = partitionOL f ys
+partitionOL f (Cons x xs)
+  | f x       = (Cons x ls, rs)
+  | otherwise = (ls, Cons x rs)
+  where !(!ls,!rs) = partitionOL f xs
+partitionOL f (Snoc xs x)
+  | f x       = (Snoc ls x, rs)
+  | otherwise = (ls, Snoc rs x)
+  where !(!ls,!rs) = partitionOL f xs
+partitionOL f (Many xs) = (toOL ls, toOL rs)
+  where !(!ls,!rs) = NE.partition f xs
 
 toOL :: [a] -> OrdList a
 toOL [] = None
