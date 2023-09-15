@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.18.2.0 *January 2024*
+  * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
+
 ## 4.18.1.0 *September 2023*
 
    * Add missing int64/word64-to-double/float rules ([CLC Proposal #203](https://github.com/haskell/core-libraries-committee/issues/203))
