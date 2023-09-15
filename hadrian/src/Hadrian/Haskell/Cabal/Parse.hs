@@ -144,17 +144,21 @@ configurePackage context@Context {..} = do
     need deps
 
     -- Figure out what hooks we need.
+    let configureFile = replaceFileName (pkgCabalFile package) "configure"
+        -- induce dependency on the file
+        autoconfUserHooks = do
+          need [configureFile]
+          pure C.autoconfUserHooks
     hooks <- case C.buildType (C.flattenPackageDescription gpd) of
-        C.Configure -> pure C.autoconfUserHooks
+        C.Configure -> autoconfUserHooks
         C.Simple -> pure C.simpleUserHooks
         C.Make -> fail "build-type: Make is not supported"
         -- The 'time' package has a 'C.Custom' Setup.hs, but it's actually
         -- 'C.Configure' plus a @./Setup test@ hook. However, Cabal is also
         -- 'C.Custom', but doesn't have a configure script.
         C.Custom -> do
-            configureExists <- doesFileExist $
-                replaceFileName (pkgCabalFile package) "configure"
-            pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
+            configureExists <- doesFileExist configureFile
+            if configureExists then autoconfUserHooks else pure C.simpleUserHooks
 
     -- Compute the list of flags, and the Cabal configuration arguments
     flagList    <- interpret (target context (Cabal Flags stage) [] []) getArgs
