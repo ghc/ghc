@@ -387,6 +387,13 @@ data ParFlags = ParFlags
              , Generic -- ^ @since 4.15.0.0
              )
 
+-- | Parameters pertaining to Haskell program coverage (HPC)
+data HpcFlags = HpcFlags
+    { emitTixFile :: Bool
+    }
+    deriving (Show
+             , Generic
+             )
 -- | Parameters of the runtime system
 --
 -- @since 4.8.0.0
@@ -400,6 +407,7 @@ data RTSFlags = RTSFlags
     , traceFlags      :: TraceFlags
     , tickyFlags      :: TickyFlags
     , parFlags        :: ParFlags
+    , hpcFlags        :: HpcFlags
     } deriving ( Show -- ^ @since 4.8.0.0
                , Generic -- ^ @since 4.15.0.0
                )
@@ -417,6 +425,7 @@ getRTSFlags =
            <*> getTraceFlags
            <*> getTickyFlags
            <*> getParFlags
+           <*> getHpcFlags
 
 peekFilePath :: Ptr () -> IO (Maybe FilePath)
 peekFilePath ptr
@@ -487,6 +496,10 @@ getParFlags = do
     <*> #{peek PAR_FLAGS, parGcThreads} ptr
     <*> (toBool <$>
           (#{peek PAR_FLAGS, setAffinity} ptr :: IO CBool))
+
+
+getHpcFlags :: IO HpcFlags
+getHpcFlags = error "TODO: Implement getHpcFlags"
 
 getConcFlags :: IO ConcFlags
 getConcFlags = do

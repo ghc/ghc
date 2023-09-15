@@ -294,6 +294,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
+    RtsFlags.HpcFlags.emitTixFile        = true;
 }
 
 static const char *
@@ -1039,6 +1040,11 @@ error = true;
                       } else {
                         RtsFlags.GcFlags.nonmovingDenseAllocatorCount = threshold;
                       }
+                  }
+                  else if (strequal("emit-tix-file=false",
+                              &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.emitTixFile = false;
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)

@@ -394,7 +394,7 @@ exitHpc(void) {
 #else
   bool is_subprocess = false;
 #endif
-  if (!is_subprocess) {
+  if (!is_subprocess && RtsFlags.HpcFlags.emitTixFile) {
     FILE *f = __rts_fopen(tixFilename,"w+");
     writeTix(f);
   }
