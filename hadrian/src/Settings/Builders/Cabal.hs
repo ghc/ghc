@@ -83,7 +83,6 @@ cabalSetupArgs = builder (Cabal Setup) ? do
 
 commonCabalArgs :: Stage -> Args
 commonCabalArgs stage = do
-  verbosity <- expr getVerbosity
   pkg       <- getPackage
   package_id <- expr $ pkgUnitId stage pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
@@ -127,9 +126,7 @@ commonCabalArgs stage = do
             , with Alex
             , with Happy
             -- Update Target.trackArgument if changing these:
-            , verbosity < Verbose ?
-              pure [ "-v0", "--configure-option=--quiet"
-                   , "--configure-option=--disable-option-checking" ] ]
+            ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?

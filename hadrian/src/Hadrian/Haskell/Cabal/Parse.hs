@@ -165,8 +165,8 @@ configurePackage context@Context {..} = do
     argList     <- interpret (target context (Cabal Setup stage) [] []) getArgs
     trackArgsHash (target context (Cabal Flags stage) [] [])
     trackArgsHash (target context (Cabal Setup stage) [] [])
-    verbosity   <- getVerbosity
-    let v = if verbosity >= Diagnostic then "-v3" else "-v0"
+    verbosity <- getVerbosity
+    let v = shakeVerbosityToCabalFlag verbosity
         argList' = argList ++ ["--flags=" ++ unwords flagList, v]
     when (verbosity >= Verbose) $
         putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList'
@@ -189,12 +189,17 @@ copyPackage context@Context {..} = do
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath (PackageDbLoc stage iplace)
     verbosity <- getVerbosity
-    let v = if verbosity >= Diagnostic then "-v3" else "-v0"
+    let v = shakeVerbosityToCabalFlag verbosity
     traced "cabal-copy" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
-
+shakeVerbosityToCabalFlag :: Verbosity -> String
+shakeVerbosityToCabalFlag = \case
+    Diagnostic -> "-v3"
+    Verbose -> "-v2"
+    Silent -> "-v0"
+    _ -> "-v1"
 
 -- | What type of file is Main
 data MainSourceType = HsMain | CppMain | CMain
