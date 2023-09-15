@@ -1,0 +1,190 @@
+.. _release-9-6-3:
+
+Version 9.6.3
+==============
+
+The significant changes to the various parts of the compiler are listed below.
+See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.6>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+11, 12, 13, 14 or 15.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Disable Polymorphic Specialisation by default. It was discovered that Polymorphic
+  Specialisation as currently implemented in GHC can lead to hard to diagnose bugs
+  resulting in incorrect runtime results. Users wishing to use this optimisation
+  despite the caveats will now have to explicitly enable the new ``-fpolymorphic-specialisation``
+  flag. For more details see :ghc-ticket:`23469` as well as :ghc-ticket:`23109`,
+  :ghc-ticket:`21229`, :ghc-ticket:`23445`.
+
+- Fix a panic with the typechecker, reporting a type error instead of panicing
+  on certain programs (:ghc-ticket:`22707`).
+
+- Fix a bug preventing temporary directories created by GHC from being cleaned up
+  after compilation (:ghc-ticket:`22952`).
+
+- Fix the behaviour of the ``-keep-tmp-files`` when used in a ``OPTIONS_GHC``
+  pragma (:ghc-ticket:`23339`).
+
+- Fix a bug with certain warnings being swallowed when ``-fdefer-diagnostics``
+  is enabled (:ghc-ticket:`23305`).
+
+- Fix a bug leading to incorrect "Redundant Constraint" warnings
+  (:ghc-ticket:`23323`, :ghc-ticket:`23143`).
+
+- Fix the behaviour of ``-fsplit-sections`` on Windows (:ghc-ticket:`22834`).
+
+- Fix some segfaults affecting users of ``UnliftedDatatypes``
+  (:ghc-ticket:`23146`, :ghc-ticket:`23231`).
+
+- Fix compiler panics with certain RULE pragmas (:ghc-ticket:`23208`,
+  :ghc-ticket:`22761`).
+
+- Fix a bug with ``.hie`` files containing spurious references to generated
+  functions in files with partial field selectors (:ghc-ticket:`23492`).
+
+- Fix a specialiser bug leading to compiler panics (:ghc-ticket:`23567`).
+
+- Fix a bug preventing using the command line to compile ``.cmm`` files to
+  assembly (:ghc-ticket:`23610`).
+
+- Fix a compiler panic on certain programs with typed holes (:ghc-ticket:`22684`).
+
+- Fix some simplifier panics due to incorrect scope tracking (:ghc-ticket:`23630`).
+
+- Ensure array read operations have proper memory barriers (:ghc-ticket:`23541`).
+
+- Make type equality ``(~)`` checks in the presence of quantified contrains more
+  robust to argument ordering (:ghc-ticket:`23333`).
+
+- Fix a number of bugs having to do with default representation polymorphic type
+  variables (:ghc-ticket:`23153`, :ghc-ticket:`23154`, :ghc-ticket:`23176`).
+
+- Fix the behaviour of the ``MulMayOflo`` operation on x86 and aarch64 (:ghc-ticket:`23721`).
+
+- Make the recompilation check more robust when code generation flags are changed (:ghc-ticket:`23369`).
+
+- With the aarch64 backend, fix a bug arising from lack of zero-extension for
+  8/16 bit add/sub with immediate (:ghc-ticket:`23749`).
+
+- Fix a bug in the STG rewriter leading to excess allocations in certain circumstances (:ghc-ticket:`23783`).
+
+- Fix a typechecker bug leading to incorrect multiplicity checking with
+  ``-XLinearTypes`` and ``-XMultiWayIf`` (:ghc-ticket:`23814`).
+
+- Improve zonking behavior for defaulting plugins (:ghc-ticket:`23821`).
+
+- Fix a recompilation checking bug impacting the relinking step, where we failed to
+  relink if transitive dependencies were changed (:ghc-ticket:`23724`).
+
+- Fix a code generator panic with unboxed tuples (:ghc-ticket:`23914`).
+
+- Fix a simplifier panic due to incorrect eta reduction of a join point (:ghc-ticket:`23922`).
+
+- Fix a simplifer bug leading to ``-dcore-lint`` failures (:ghc-ticket:`23938`).
+
+- Add ``-finfo-table-map-with-fallback`` and ``-finfo-table-map-with-stack`` flags
+  for info table profiling (:ghc-ticket:`23702`).
+
+- Improve compile time and code generation performance when ``-finfo-table-map``
+  is enabled (:ghc-ticket:`23103`).
+
+Runtime system
+--------------
+
+- Performance improvements for the ELF linker (:ghc-ticket:`23464`).
+
+- Fix warnings with clang 14.0.3 (:ghc-ticket:`23561`).
+
+- Prevent some segfaults by ensuring that pinned allocations respect block size
+  (:ghc-ticket:`23400`).
+
+- Prevent runtime crashes in statically linked GHCi sessions on AArch64 by providing
+  some missing symbols from the RTS linker (:ghc-ticket:`22012`).
+
+- Improve bounds checking with ``-fcheck-prim-bounds`` (:ghc-ticket:`21054`).
+
+- On Windows, ensure reliability of IO manager shutdown (:ghc-ticket:`23691`).
+
+- Fix a bug with the GHC linker on windows (:ghc-ticket:`22941`).
+
+- Properly escape characters when writing JSON profiles (``-pJ``) (:ghc-ticket:`23924`).
+
+Build system and packaging
+--------------------------
+
+- Make hadrian more robust in the presence of symlinks (:ghc-ticket:`22451`).
+
+- Allow building documentation with sphinx versions older than ``4.0`` along
+  with older versions of ``python`` (:ghc-ticket:`23807`, :ghc-ticket:`23818`).
+
+- Also build vanilla (non-static) alpine bindists (:ghc-ticket:`23349`, :ghc-ticket:`23828`).
+
+
+Core libraries
+--------------
+
+- Bump ``base`` to 4.18.1.0
+
+- base: Restore``mingwex`` dependency on Windows (:ghc-ticket:`23309`).
+
+- Bump ``bytestring`` to 0.11.5.2
+
+- Bump ``filepath`` to 1.4.100.4
+
+- Bump ``haddock`` to 2.29.0
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
