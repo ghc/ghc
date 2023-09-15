@@ -149,7 +149,8 @@ instance Uniquable Module where
 
 instance Binary a => Binary (GenModule a) where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
-  get bh = do p <- get bh; n <- get bh; return (Module p n)
+  -- Module has strict fields, so use $! in order not to allocate a thunk
+  get bh = do p <- get bh; n <- get bh; return $! Module p n
 
 instance NFData (GenModule a) where
   rnf (Module unit name) = unit `seq` name `seq` ()
@@ -317,13 +318,14 @@ instance Binary InstantiatedUnit where
     cid   <- get bh
     insts <- get bh
     let fs = mkInstantiatedUnitHash cid insts
-    return InstantiatedUnit {
-            instUnitInstanceOf = cid,
-            instUnitInsts = insts,
-            instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
-            instUnitFS = fs,
-            instUnitKey = getUnique fs
-           }
+    -- InstantiatedUnit has strict fields, so use $! in order not to allocate a thunk
+    return $! InstantiatedUnit {
+                instUnitInstanceOf = cid,
+                instUnitInsts = insts,
+                instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
+                instUnitFS = fs,
+                instUnitKey = getUnique fs
+              }
 
 instance IsUnitId u => Eq (GenUnit u) where
   uid1 == uid2 = unitUnique uid1 == unitUnique uid2
@@ -369,10 +371,12 @@ instance Binary Unit where
   put_ bh HoleUnit =
     putByte bh 2
   get bh = do b <- getByte bh
-              case b of
+              u <- case b of
                 0 -> fmap RealUnit (get bh)
                 1 -> fmap VirtUnit (get bh)
                 _ -> pure HoleUnit
+              -- Unit has strict fields that need forcing; otherwise we allocate a thunk.
+              pure $! u
 
 -- | Retrieve the set of free module holes of a 'Unit'.
 unitFreeModuleHoles :: GenUnit u -> UniqDSet ModuleName
