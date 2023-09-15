@@ -68,6 +68,8 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Updated to `Unicode 15.1.0 <https://www.unicode.org/versions/Unicode15.1.0/>`_.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
