@@ -194,12 +194,13 @@ copyPackage context@Context {..} = do
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
+-- | Increase by 1 by because 'simpleUserHooks' calls 'lessVerbose'
 shakeVerbosityToCabalFlag :: Verbosity -> String
 shakeVerbosityToCabalFlag = \case
     Diagnostic -> "-v3"
-    Verbose -> "-v2"
+    Verbose -> "-v3"
     Silent -> "-v0"
-    _ -> "-v1"
+    _ -> "-v2"
 
 -- | What type of file is Main
 data MainSourceType = HsMain | CppMain | CMain
