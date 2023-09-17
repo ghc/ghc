@@ -866,9 +866,6 @@ dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime], UseLibrt=YES, UseLibrt=NO)
 AC_SUBST([UseLibrt])
 
-FP_CHECK_PTHREAD_LIB
-AC_SUBST([UseLibpthread])
-
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 

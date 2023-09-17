@@ -1,3 +1,6 @@
 -- External symbols referenced by the RTS
+#ifdef NEED_PTHREAD_LIB
+extra-libraries: pthread
+#endif
 ld-options:
 #include "external-symbols.flags"

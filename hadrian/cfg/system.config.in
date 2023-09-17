@@ -124,5 +124,4 @@ use-lib-m         = @UseLibm@
 use-lib-rt        = @UseLibrt@
 use-lib-dl        = @UseLibdl@
 use-lib-bfd       = @UseLibbfd@
-use-lib-pthread   = @UseLibpthread@
 need-libatomic    = @NeedLibatomic@

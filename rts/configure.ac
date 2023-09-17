@@ -242,6 +242,10 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
+dnl ** for pthread_getthreadid_np, pthread_create, ...
+FP_CHECK_PTHREAD_LIB
+AS_IF([test "$UseLibpthread" "YES"],
+    [buildinfoExtraDefs+=' -DNEED_PTHREAD_LIB'])
 FP_CHECK_PTHREAD_FUNCS
 
 dnl ** check for eventfd which is needed by the I/O manager
@@ -423,7 +427,7 @@ dnl ######################################################################
 
 [
 cat $srcdir/rts.buildinfo.in \
-    | "$CC" -E -P -traditional - -o - \
+    | "$CC" $buildinfoExtraDeps -E -P -traditional - -o - \
     | sed -e '/^ *$/d' \
     > rts.buildinfo \
     || exit 1

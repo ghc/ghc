@@ -36,7 +36,6 @@ data Flag = CrossCompiling
           | UseLibrt
           | UseLibdl
           | UseLibbfd
-          | UseLibpthread
           | NeedLibatomic
           | UseGhcToolchain
 
@@ -60,7 +59,6 @@ flag f = do
             UseLibrt             -> "use-lib-rt"
             UseLibdl             -> "use-lib-dl"
             UseLibbfd            -> "use-lib-bfd"
-            UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
             UseGhcToolchain      -> "use-ghc-toolchain"
     value <- lookupSystemConfig key

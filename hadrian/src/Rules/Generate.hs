@@ -296,7 +296,6 @@ rtsCabalFlags = mconcat
     , flag "CabalHaveLibm" UseLibm
     , flag "CabalHaveLibrt" UseLibrt
     , flag "CabalHaveLibdl" UseLibdl
-    , flag "CabalNeedLibpthread" UseLibpthread
     , flag "CabalHaveLibbfd" UseLibbfd
     , flag "CabalHaveLibNuma" UseLibnuma
     , flag "CabalHaveLibZstd" UseLibzstd
