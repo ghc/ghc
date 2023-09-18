@@ -1,7 +1,7 @@
 .. _ffi-javascript:
 
 FFI and the JavaScript Backend
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+==============================
 
 .. index::
    single: FFI and the JavaScript Backend
@@ -22,8 +22,46 @@ look like:
   foreign import javascript "((x,y) => { return x + y; })"
     js_add :: Int -> Int -> Int
 
+.. _`JavaScript FFI Types`:
+
+JavaScript FFI Types
+--------------------
+
+Some types are able to be used directly in the type signatures of foreign
+exports, without conversion to a ``JSVal``. We saw in the first example
+that ``Int`` is one of these.
+
+There are a number of supported types that can be passed directly in this
+way, and they act as primitives within GHC's JavaScript RTS. This is in
+comparison to data structures that are implemented in Haskell, such as
+``String`` - being a list, this doesn't have a primitive JavaScript implementation,
+and isn't equivalent to a JavaScript string.
+
+The following types are supported in this way:
+
+* ``Int``, including ``Int32`` and other sized numerical values.
+* ``Int64``, and other 64 bit numbers are passed as two variables to the function,
+  where the first includes the sign and the higher bits
+* ``Bool``
+* ``Char``
+* ``Any``
+* ``ByteArray#``
+* ``Double`` and ``Float``
+* ``MVar#``, and other RTS objects
+* Unboxed tuples (e.g. ``(# a, b #)``) can appear in the return type, and are
+  constructed in JavaScript using macros such as ``RETURN_UBX_TUP2(x, y)``.
+
+As in the C FFI, types in the JavaScript FFI can't be type checked against the foreign code, so
+the following example would compile successfully - despite `5` not being a valid JavaScript value
+for the Haskell `Bool` type:
+
+.. code-block:: haskell
+
+  foreign import javascript "((x) => { return 5; })"
+    type_error :: Bool -> Bool
+
 JSVal
-~~~~~
+^^^^^
 
 The JavaScript backend has a concept of an untyped 'plain' JavaScript
 value, under the guise of the type ``JSVal``. Values having this type
@@ -46,36 +84,9 @@ It also contains functions for working with objects:
 * ``isUndefined :: JSVal -> Bool`` - test for the JavaScript ``undefined``
 * ``getProp :: JSVal -> String -> JSVal`` - object field access
 
-JavaScript FFI Types
-~~~~~~~~~~~~~~~~~~~~
-
-Some types are able to be used directly in the type signatures of foreign
-exports, without conversion to a ``JSVal``. We saw in the first example
-that ``Int`` is one of these.
-
-The supported types are those with primitive JavaScript representations
-that match the Haskell type. This means types such as the Haskell ``String``
-type aren't supported directly, because they're lists - which don't have
-a primitive JavaScript representation, and so are incompatible with each
-other.
-
-The following types are supported in this way:
-
-* ``Int``
-* ``Bool``
-* ``Char``
-
-As in the C FFI, types in the JavaScript FFI can't be type checked against the foreign code, so
-the following example would compile successfully - despite `5` not being a valid JavaScript value
-for the Haskell `Bool` type:
-
-.. code-block:: haskell
-
-  foreign import javascript "((x) => { return 5; })"
-    type_error :: Bool -> Bool
 
 JavaScript Callbacks
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 The JavaScript execution model is based around callback functions, and
 GHC's JavaScript backend implements these as a type in order to support
@@ -173,3 +184,240 @@ We have to make sure not to use ``releaseCallback`` on any functions that
 are to be available in HTML, because we want these functions to be in
 memory indefinitely.
 
+Writing Replacement Implementations for Libraries with C FFI Functions
+----------------------------------------------------------------------
+
+Many libraries make use of C FFI functions to accomplish low-level or
+performance sensitive operations - known as ``cbits`` and often kept in
+a folder with this name. For such a library to support the JavaScript
+backend, the ``cbits`` must have replacement implementations.
+
+In principle, it is possible for the JavaScript backend to automatically
+compile ``cbits`` using Emscripten, but this requires wrappers to convert
+data between the JS backend's RTS data format, and the format expected by
+Emscripten-compiled functions. Since C functions are often used where
+performance is more critical, there's potential for the data conversions
+to negate this purpose.
+
+Instead, it is more effective for a library to provide an alternate
+implementation for functions using the C FFI - either by providing direct
+one-to-one replacement JavaScript functions, or by using C preprocessor
+directives to replace C FFI imports with some combination of JS FFI imports
+and pure-Haskell implementation.
+
+Direct Implementation of C FFI Imports in JavaScript as ``jsbits``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When the JavaScript backend generates code for a C FFI import, it will call
+the function named in the import string, prepended by ``h$`` - so the imported
+C function ``open`` will look for the JavaScript function ``h$open``. No verification
+is done to ensure that these functions are actually implemented in the linked
+JavaScript files, so there can be runtime errors when a missing JavaScript
+function is called.
+
+Based on this, implementing a C function in JavaScript is a matter of providing
+a function of the correct shape (based on the C FFI import type signature) in
+any of the linked JavaScript sources. External JavaScript sources are linked
+by either providing them as an argument to GHC, or listing them in the ``js-sources``
+field of the cabal file - in which case it would usually be inside a predicate to
+detect the ``javascript`` architecture, such as:
+
+.. code-block:: cabal
+
+  library
+
+    if arch(javascript)
+      js-sources:
+        jsbits/example.js
+
+Note that ``js-sources`` requires Cabal 3.10 to be used with library targets, and
+Cabal 3.12 to be used with executable targets.
+
+The shape required of the JavaScript function will depend on the particular
+C types used:
+
+* primitives, such as ``CInt`` will map directly to a single JavaScript argument
+  using JavaScript primitives. In the case of ``CInt``, this will be a JavaScript
+  number. Note that in the case of return values, a JavaScript number will usually
+  need to be rounded or cast back to an integral value in cases where mathematical
+  operations are used
+
+* pointer values, including ``CString``, are passed as an unboxed ``(ptr, offset)``
+  pair. For arguments, being unboxed will mean these are passed as two top-level
+  arguments to the function. For return values, unboxed values should be returned
+  from JavaScript functions by using a special C preprocessor macro,
+  ``RETURN_UBX_TUP2(ptr, offset)``
+
+* ``CString``, in addition to the above pointer handling, will need to be decoded
+  and encoded to convert them between character arrays and JavaScript strings.
+
+* other RTS primitive types are discussed previously in `JavaScript FFI Types`_.
+
+As an example, let's consider the implementation of ``getcwd``:
+
+.. code-block:: haskell
+
+  -- unix:System.Posix.Directory
+
+  foreign import ccall unsafe "getcwd" c_getcwd :: Ptr CChar -> CSize -> IO (Ptr CChar)
+
+.. code-block:: javascript
+
+  // libraries/base/jsbits/base.js
+
+  //#OPTIONS: CPP
+
+  function h$getcwd(buf, off, buf_size) {
+    try {
+      var cwd = h$encodeUtf8(process.cwd());
+      if (buf_size < cwd.len && buf_size !== 0) {
+        h$setErrno("ERANGE");
+        RETURN_UBX_TUP2(null, 0);
+      } else if (buf !== null) {
+        h$copyMutableByteArray(cwd, 0, buf, off, cwd.len);
+        RETURN_UBX_TUP2(buf, off);
+      } else if (buf_size === 0) {
+        RETURN_UBX_TUP2(cwd, 0);
+      } else {
+        var out = h$newByteArray(buf_size);
+        h$copyMutableByteArray(cwd, 0, out, off, cwd.len);
+      }
+    } catch (e) {
+      h$setErrno(e);
+      RETURN_UBX_TUP2(null, 0);
+    }
+  }
+
+Here, the C function ``getcwd`` maps to the JavaScript function ``h$getcwd``, which
+exists in a ``.js`` file within ``base``'s ``jsbits`` subdirectory. ``h$getcwd``
+expects a ``CString`` (passed as the equivalent ``Ptr CChar``) and a
+``CSize`` argument. This results in three arguments to the JavaScript function - two
+for the string's pointer and offset, and one for the size, which will be passed as a
+JavaScript number.
+
+Next, the JavaScript ``h$getcwd`` function demonstrates several details:
+
+* In the try clause, the ``cwd`` value is first accessed using a NodeJS-provided method.
+  This value is immediately encoded using ``h$encodeUtf8``, which is provided by the
+  JavaScript backend. This function will only return the pointer for the encoded value,
+  and the offset will always be 0
+
+* Next, we select one of several cases - based on the specification of the C function
+  that we're trying to immitate
+
+* In the first case where the given buffer size is too small, but not zero, the function
+  must set the ``ERANGE`` error code, which we do here with ``h$setErrno``, and return
+  ``null``. As we saw in the function arguments, pointers are passed as a ``(ptr, offset)``
+  pair - meaning ``null`` is represented by returning the unboxed pair ``(null, 0)``
+
+* In the second case where there is enough space in ``buf`` to successfully copy the
+  bytes, we do so using ``h$copyMutableByteArray`` - a function supplied by GHC's JavaScript
+  RTS
+
+* In the third case where ``buf_size`` is 0, this indicates in the C function's specification
+  that we can allocate a new buffer of the appropriate size to return. We already have
+  this in the form of the previously encoded ``cwd``, so we can just return it, along
+  with the 0 offset
+
+* In the last case where ``buf`` is null, and ``buf_size`` is large enough, we allocate a
+  new buffer, this time with ``buf_size`` bytes of space using ``h$newByteArray``, and
+  we again perform a mutable copy
+
+* To use C preprocessor macros in linked JavaScript files, the file must open with the
+  ``//#OPTIONS: CPP`` line, as is shown towards the start of this snippet
+
+* If an error occurs, the catch clause will pass it to ``h$setErrno`` and return the
+  ``(null, 0)`` pointer and offset pair - which is a behaviour expected by the C function
+  in the error case.
+
+Writing JavaScript Functions to be NodeJS and Browser Aware
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the above example of implementing ``getcwd``, the function we use in the JavaScript
+implementation is from NodeJS, and the behaviour doesn't make sense to implement in a
+browser. Therefore, the actual implementation will include a C preprocessor condition
+to check if we're compiling for the browser, in which case ``h$unsupported(-1)`` will
+be called. There can be multiple non-browser JavaScript runtimes, so we'll also have
+to check at runtime to make sure that NodeJS is in use.
+
+.. code-block:: javascript
+
+  function h$getcwd(buf, off, buf_size) {
+  #ifndef GHCJS_BROWSER
+    if (h$isNode()) {
+      try {
+        var cwd = h$encodeUtf8(process.cwd());
+        if (buf_size < cwd.len && buf_size !== 0) {
+          h$setErrno("ERANGE");
+          return (null, 0);
+        } else if (buf !== null) {
+          h$copyMutableByteArray(cwd, 0, buf, off, cwd.len);
+          RETURN_UBX_TUP2(buf, off);
+        } else if (buf_size === 0) {
+          RETURN_UBX_TUP2(cwd, 0);
+        } else {
+          var out = h$newByteArray(buf_size);
+          h$copyMutableByteArray(cwd, 0, out, off, cwd.len);
+        }
+      } catch (e) {
+        h$setErrno(e);
+        RETURN_UBX_TUP2(null, 0);
+      }
+    } else
+  #endif
+      h$unsupported();
+      RETURN_UBX_TUP2(null, 0);
+  }
+
+Replacing C FFI Imports with Pure Haskell and JavaScript
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Instead of providing a direct JavaScript implementation for each C FFI import, we can
+instead use the C preprocessor to conditionally remove these C imports (and possibly
+use sites as well). Then, some combination of JavaScript FFI imports and Haskell
+implementation can be added instead. As in the direct implementation section, any
+linked JavaScript files should usually be in a ``if arch(javascript)`` condition in
+the cabal file.
+
+As an example of a mixed Haskell and JavaScript implementation replacing a C
+implementation, consider ``base:GHC.Clock``:
+
+.. code-block:: haskell
+
+  #if defined(javascript_HOST_ARCH)
+  getMonotonicTimeNSec :: IO Word64
+  getMonotonicTimeNSec = do
+    w <- getMonotonicTimeMSec
+    return (floor w * 1000000)
+
+  foreign import javascript unsafe "performance.now"
+    getMonotonicTimeMSec :: IO Double
+
+  #else
+  foreign import ccall unsafe "getMonotonicNSec"
+    getMonotonicTimeNSec :: IO Word64
+  #endif
+
+Here, the ``getMonotonicTimeNSec`` C FFI import is replaced by the JavaScript FFI
+import ``getMonotonicTimeMSec``, which imports the standard JavaScript function
+``performance.now``. However, because this JavaScript implementation
+returns the time as a ``Double`` of floating point milliseconds, it must be wrapped
+by a Haskell function to extract the integral value that's expected.
+
+In this case, the choice of using a mixed Haskell and JavaScript replacement
+implementation was caused by the limitation of clocks being system calls. In a lot
+of cases, C functions are used for similar system-level functionality. In such
+cases, it's recommended to import the required system functions from standard
+JavaScript libraries (or from the runtime, as was required for ``getcwd``), and
+use Haskell wrapper functions to convert the imported functions to the appropriate
+format.
+
+In other cases, C functions are used for performance. For these cases, pure-Haskell
+implementations are the preferred first step for compatibility with the JavaScript
+backend since it would be more future-proof against changes to the RTS data format.
+Depending on the use case, compiler-optimised JS code might be hard to complete with
+using hand-written JavaScript. Generally, the most likely performance gains from
+hand-written JavaScript come from functions with data that stays as JavaScript
+primitive types for a long time, especially strings. For this, ``JSVal`` allows
+values to be passed between ``Haskell`` and ``JavaScript`` without a marshalling
+penalty.
