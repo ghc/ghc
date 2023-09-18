@@ -657,9 +657,6 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
       | allLazyTop floats
       = return (floats, rhs)
 
-      | Just floats <- canFloat floats rhs
-      = return floats
-
       | otherwise
       = dontFloat floats rhs
 
@@ -1953,32 +1950,6 @@ deFloatTop (Floats _ floats)
     get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
-
-canFloat :: Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
-canFloat (Floats ok_to_spec fs) rhs
-  | OkToSpec <- ok_to_spec           -- Worth trying
-  , Just fs' <- go nilOL (fromOL fs)
-  = Just (Floats OkToSpec fs', rhs)
-  | otherwise
-  = Nothing
-  where
-    go :: OrdList FloatingBind -> [FloatingBind]
-       -> Maybe (OrdList FloatingBind)
-
-    go (fbs_out) [] = Just fbs_out
-
-    go fbs_out (fb@(FloatLet _) : fbs_in)
-      = go (fbs_out `snocOL` fb) fbs_in
-
-    go fbs_out (fb@FloatString{} : fbs_in)
-      -- See Note [ANF-ising literal string arguments]
-      = go (fbs_out `snocOL` fb) fbs_in
-
-    go fbs_out (ft@FloatTick{} : fbs_in)
-      = go (fbs_out `snocOL` ft) fbs_in
-
-    go _ (FloatCase{} : _) = Nothing
-
 
 wantFloatNested :: RecFlag -> Demand -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec dmd rhs_is_unlifted floats rhs
