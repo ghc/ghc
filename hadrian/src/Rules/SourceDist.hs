@@ -187,4 +187,5 @@ prepareTree dest = do
         , (stage0InTree , hpcBin,        "src/HpcParser.y",    "src/HpcParser.hs")
         , (stage0InTree , genprimopcode, "Parser.y",           "Parser.hs")
         , (stage0InTree , genprimopcode, "Lexer.x",            "Lexer.hs")
+        , (stage0InTree , cabalSyntax  , "src/Distribution/Fields/Lexer.x",  "src/Distribution/Fields/Lexer.hs")
         ]
