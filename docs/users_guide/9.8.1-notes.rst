@@ -230,6 +230,7 @@ Runtime system
 ~~~~~~~~~~~~~~~~
 
 - :base-ref:`Data.Tuple` now exports ``getSolo :: Solo a -> a``.
+- Updated to `Unicode 15.1.0 <https://www.unicode.org/versions/Unicode15.1.0/>`_.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
