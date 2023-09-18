@@ -3,7 +3,7 @@ packages: ./
           ../libraries/ghc-platform/
 
 -- This essentially freezes the build plan for hadrian
-index-state: 2023-03-30T10:00:00Z
+index-state: 2023-09-18T18:43:12Z
 
 -- N.B. Compile with -O0 since this is not a performance-critical executable
 -- and the Cabal takes nearly twice as long to build with -O1. See #16817.
