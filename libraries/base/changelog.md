@@ -4,7 +4,6 @@
   * Export `foldl'` from `Prelude` ([CLC proposal #167](https://github.com/haskell/core-libraries-committee/issues/167))
   * Add a `RULE` to `Prelude.lookup`, allowing it to participate in list fusion ([CLC proposal #174](https://github.com/haskell/core-libraries-committee/issues/175))
   * The `Enum Int64` and `Enum Word64` instances now use native operations on 32-bit platforms, increasing performance by up to 1.5x on i386 and up to 5.6x with the JavaScript backend. ([CLC proposal #187](https://github.com/haskell/core-libraries-committee/issues/187))
-  * Add rewrite rules for conversion between Int64/Word64 and Float/Double on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
 
 ## 4.19.0.0 *TBA*
@@ -44,6 +43,7 @@
   * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
   * Fixed exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
   * Implement `copyBytes`, `fillBytes`, `moveBytes` and `stimes` for `Data.Array.Byte.ByteArray` using primops ([CLC proposal #188](https://github.com/haskell/core-libraries-committee/issues/188))
+  * Add rewrite rules for conversion between Int64/Word64 and Float/Double on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
