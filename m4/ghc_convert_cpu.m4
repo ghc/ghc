@@ -74,6 +74,12 @@ case "$1" in
   sh4)
     $2="sh4"
     ;;
+  sparc64*)
+    $2="sparc64"
+    ;;
+  sparc*)
+    $2="sparc"
+    ;;
   vax)
     $2="vax"
     ;;
