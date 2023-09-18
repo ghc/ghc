@@ -36,6 +36,7 @@ module GHC.RTS.Flags
   , TraceFlags (..)
   , TickyFlags (..)
   , ParFlags (..)
+  , HpcFlags (..)
   , IoSubSystem (..)
   , getRTSFlags
   , getGCFlags
@@ -48,6 +49,7 @@ module GHC.RTS.Flags
   , getTraceFlags
   , getTickyFlags
   , getParFlags
+  , getHpcFlags
   ) where
 
 #include "Rts.h"
