@@ -253,6 +253,12 @@ bindistRules = do
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
 
+        -- Include LICENSE files and related data.
+        -- On Windows LICENSE files are in _build/lib/doc, which is
+        -- already included above.
+        unless windowsHost $ do
+          copyDirectory (ghcBuildDir -/- "share") bindistFilesDir
+
         -- Include bash-completion script in binary distributions. We don't
         -- currently install this but merely include it for the user's
         -- reference. See #20802.
