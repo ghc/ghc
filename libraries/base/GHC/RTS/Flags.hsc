@@ -501,7 +501,11 @@ getParFlags = do
 
 
 getHpcFlags :: IO HpcFlags
-getHpcFlags = error "TODO: Implement getHpcFlags"
+getHpcFlags = do
+  let ptr = (#ptr RTS_FLAGS, HpcFlags) rtsFlagsPtr
+  HpcFlags
+    <$> (toBool <$>
+          (#{peek HPC_FLAGS, emitTixFile} ptr :: IO CBool))
 
 getConcFlags :: IO ConcFlags
 getConcFlags = do
