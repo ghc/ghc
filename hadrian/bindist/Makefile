@@ -67,6 +67,7 @@ endif
 
 install: install_bin install_lib
 install: install_man install_docs update_package_db
+install: install_data
 
 ActualBinsDir=${ghclibdir}/bin
 ifeq "$(RelocatableBuild)" "YES"
@@ -198,6 +199,15 @@ install_docs:
 		$(INSTALL_DATA) docs-utils/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"; \
 		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"; \
 	fi
+
+.PHONY: install_data
+install_data:
+	@echo "Copying data to $(DESTDIR)share"
+	$(INSTALL_DIR) "$(DESTDIR)$(datadir)"
+	cd share; $(FIND) . -type f -exec sh -c \
+		'$(INSTALL_DIR) "$(DESTDIR)$(datadir)/`dirname $$1`" && \
+		$(INSTALL_DATA) "$$1" "$(DESTDIR)$(datadir)/`dirname $$1`"' \
+		sh '{}' ';';
 
 MAN_SECTION := 1
 MAN_PAGES := manpage/ghc.1
