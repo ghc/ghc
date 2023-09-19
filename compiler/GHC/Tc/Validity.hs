@@ -47,7 +47,6 @@ import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
-import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
@@ -85,6 +84,8 @@ import Control.Monad
 import Data.Foldable
 import Data.Function
 import Data.List        ( (\\) )
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
 ************************************************************************
@@ -2163,6 +2164,10 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
+-- See also the separate 'checkFamPatBinders' which performs scoping checks
+-- on a type family equation.
+-- (It's separate because it expects 'TyFamEqnValidityInfo', which comes from a
+-- separate place e.g. for associated type defaults.)
 checkValidCoAxBranch :: TyCon -> CoAxBranch -> TcM ()
 checkValidCoAxBranch fam_tc
                     (CoAxBranch { cab_lhs = typats
@@ -2173,6 +2178,11 @@ checkValidCoAxBranch fam_tc
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
 -- polytypes.
+--
+-- See also the separate 'checkFamPatBinders' which performs scoping checks
+-- on a type family equation.
+-- (It's separate because it expects 'TyFamEqnValidityInfo', which comes from a
+-- separate place e.g. for associated type defaults.)
 checkValidTyFamEqn :: TyCon    -- ^ of the type family
                    -> [Type]   -- ^ Type patterns
                    -> Type     -- ^ Rhs
@@ -2296,6 +2306,15 @@ checkTyFamEqnValidityInfo fam_tc = \ case
     setSrcSpan loc $
     checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 
+-- | Check binders for a type or data family declaration.
+--
+-- Specifically, this function checks for:
+--
+--  - type variables used on the RHS but not bound (explicitly or implicitly)
+--    in the LHS,
+--  - variables bound by a forall in the LHS but not used in the RHS.
+--
+-- See Note [Check type family instance binders].
 checkFamPatBinders :: TyCon
                    -> [TcTyVar]   -- ^ Bound on LHS of family instance
                    -> TyVarSet    -- ^ non-user-written tyvars
@@ -2312,7 +2331,7 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
               , text "cpt_tvs:" <+> ppr cpt_tvs
               , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs
               , text "bad_rhs_tvs:" <+> ppr bad_rhs_tvs
-              , text "bad_qtvs:" <+> ppr bad_qtvs ]
+              , text "bad_qtvs:" <+> ppr (map ifiqtv bad_qtvs) ]
 
          -- Check for implicitly-bound tyvars, mentioned on the
          -- RHS but not bound on the LHS
@@ -2320,36 +2339,18 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
          --    data family D Int = MkD (forall (a::k). blah)
          -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
          -- We catch the former in kcDeclHeader, and the latter right here
-         -- See Note [Check type-family instance binders]
+         -- See Note [Check type family instance binders]
        ; check_tvs (FamInstRHSOutOfScopeTyVars (Just (fam_tc, pats, dodgy_tvs)))
-                   bad_rhs_tvs
+                   (map tyVarName bad_rhs_tvs)
 
          -- Check for explicitly forall'd variable that is not bound on LHS
          --    data instance forall a.  T Int = MkT Int
          -- See Note [Unused explicitly bound variables in a family pattern]
-         -- See Note [Check type-family instance binders]
+         -- See Note [Check type family instance binders]
        ; check_tvs FamInstLHSUnusedBoundTyVars bad_qtvs
        }
   where
-    rhs_fvs
-      -- Special treatment for data family instances.
-      --
-      -- See Note [Out of scope tvs in data family instances].
-      | Just (tc_rep, _rep_args) <- splitTyConApp_maybe rhs
-      , Just (fam_tc', _fam_args, _) <- tyConFamInstSig_maybe tc_rep
-      , fam_tc' == fam_tc
-      = if isGadtSyntaxTyCon tc_rep
-        then emptyFV
-        else
-          let datacons_fvs =
-                unionsFV
-                  [ delFVs user_tvbs (tyCoFVsOfTypes arg_tys)
-                  | dc <- tyConDataCons tc_rep
-                  , let arg_tys = map scaledThing $ dataConOrigArgTys dc
-                        user_tvbs = mkVarSet $ dataConUserTyVars dc ]
-          in datacons_fvs
-      | otherwise
-      = tyCoFVsOfType rhs
+    rhs_fvs = tyCoFVsOfType rhs
 
     cpt_tvs     = tyCoVarsOfTypes pats
     inj_cpt_tvs = fvVarSet $ injectiveVarsOfTypes False pats
@@ -2362,71 +2363,40 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
       -- since the order of `inj_cpt_tvs` is never revealed in an error
       -- message.
 
-    used_tvs    = cpt_tvs `unionVarSet` fvVarSet rhs_fvs
-
     -- Bound but not used at all
-    bad_qtvs    = filterOut ((`elemVarSet` used_tvs) <||> (`elemVarSet` non_user_tvs))
-                  qtvs
-      -- Filter out non-user-tvs in order to only report user-written type variables,
-      -- e.g. type instance forall a. F = ()
-      -- -XPolyKinds introduces the binder 'k' for the kind of 'a', but
-      -- we don't want the error message to complain about 'k' being unused,
-      -- as the user has not written it.
+    bad_qtvs    = mapMaybe bad_qtv_maybe qtvs
+
+    bad_qtv_maybe qtv
+      | not_bound_in_pats
+      = let reason
+              | dodgy
+              = InvalidFamInstQTvDodgy
+              | used_in_rhs
+              = InvalidFamInstQTvNotBoundInPats
+              | otherwise
+              = InvalidFamInstQTvNotUsedInRHS
+        in Just $ InvalidFamInstQTv
+                    { ifiqtv = qtv
+                    , ifiqtv_user_written = not $ qtv `elemVarSet` non_user_tvs
+                    , ifiqtv_reason = reason
+                    }
+      | otherwise
+      = Nothing
+        where
+          not_bound_in_pats = not $ qtv `elemVarSet` inj_cpt_tvs
+          dodgy             = not_bound_in_pats && qtv `elemVarSet` cpt_tvs
+          used_in_rhs       = qtv `elemVarSet` fvVarSet rhs_fvs
 
     -- Used on RHS but not bound on LHS
-    bad_rhs_tvs = filterOut (`elemVarSet` inj_cpt_tvs) (fvVarList rhs_fvs)
+    bad_rhs_tvs = filterOut ((`elemVarSet` inj_cpt_tvs) <||> (`elem` qtvs)) (fvVarList rhs_fvs)
 
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs mk_err tvs
-      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
+      = for_ (NE.nonEmpty tvs) $ \ ne_tvs@(tv0 :| _) ->
+        addErrAt (getSrcSpan tv0) $
         TcRnIllegalInstance $ IllegalFamilyInstance $
-        mk_err (map tyVarName tvs)
-
-{- Note [Out of scope tvs in data family instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following data family instance declaration, which we want to reject:
-
-  type D :: Type
-  data family D
-  data instance forall (a :: Type). D = MkD
-
-The problem is that the user quantified the type variable `a` in the instance,
-but didn't use it anywhere.
-
-However, from the perspective of GHC, the RHS of the instance declaration
-is "R:D a", where "R:D" is the representation TyCon that
-GHC.Tc.TyCl.Instance.tcDataFamInstDecl builds; it always includes ALL the
-quantified variables. This means that naively computing the free tyvars of the
-RHS would cause us to report `a` as used on the RHS, which is rather confusing
-for the user (as reported in #23778):
-
-    * Type variable `a' is mentioned in the RHS,
-      but not bound on the LHS of the family instance
-
-To avoid this, we manually compute which type variables are used on the RHS
-of the data family instance in terms of the types of the data family instance
-constructors:
-
-  Vanilla data instance declarations
-
-    For a vanilla data declaration, we collect the free type variables of
-    the data constructors. For example
-
-      data instance D1 x a = K1 a | forall b. K2 a b c
-
-    will give rise to RHS FVs {a,c}.
-
-  GADT data instance declarations
-
-    A GADT data declarations brings its own type variables into scope, e.g.
-
-      data instance D3 y b where
-        C1 :: ...
-        C2 :: ...
-
-    So in this case we use emptyFVs for the RHS tyvars.
--}
+        mk_err ne_tvs
 
 -- | Checks that a list of type patterns is valid in a matching (LHS)
 -- position of a class instances or type/data family instance.
@@ -2532,7 +2502,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                    | otherwise                   = BindMe
 
 
-{- Note [Check type-family instance binders]
+{- Note [Check type family instance binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a type family instance, we require (of course), type variables
 used on the RHS are matched on the LHS. This is checked by

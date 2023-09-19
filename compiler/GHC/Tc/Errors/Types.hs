@@ -137,6 +137,7 @@ module GHC.Tc.Errors.Types (
   , IllegalHasFieldInstance(..)
   , CoverageProblem(..), FailedCoverageCondition(..)
   , IllegalFamilyInstanceReason(..)
+  , InvalidFamInstQTv(..), InvalidFamInstQTvReason(..)
   , InvalidAssoc(..), InvalidAssocInstance(..)
   , InvalidAssocDefault(..), AssocDefaultBadArgs(..)
 
@@ -180,7 +181,7 @@ import GHC.Types.Avail
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
-import GHC.Types.Name (Name, OccName, getSrcLoc, getSrcSpan)
+import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile (HsBootOrSig(..))
@@ -4547,13 +4548,46 @@ data IllegalFamilyInstanceReason
         -- ^ family 'TyCon', arguments, and set of "dodgy" type variables
         -- See Note [Dodgy binding sites in type family instances]
         -- in GHC.Tc.Validity
-      ![Name] -- ^ the out-of-scope type variables
+      !(NE.NonEmpty Name) -- ^ the out-of-scope type variables
 
   | FamInstLHSUnusedBoundTyVars
-      ![Name] -- ^ the unused bound type variables
+      !(NE.NonEmpty InvalidFamInstQTv) -- ^ the unused bound type variables
 
   | InvalidAssoc !InvalidAssoc
   deriving Generic
+
+-- | A quantified type variable in a type or data family equation that
+-- is either not bound in any LHS patterns or not used in the RHS (or both).
+data InvalidFamInstQTv
+  = InvalidFamInstQTv
+    { ifiqtv :: TcTyVar
+    , ifiqtv_user_written :: Bool
+       -- ^ Did the user write this type variable, or was introduced by GHC?
+       -- For example: with @-XPolyKinds@, in @type instance forall a. F = ()@,
+       -- we have a user-written @a@ but GHC introduces a kind variable @k@
+       -- as well. See #23734.
+    , ifiqtv_reason       :: InvalidFamInstQTvReason
+      -- ^ For what reason was the quantified type variable invalid?
+    }
+
+data InvalidFamInstQTvReason
+  -- | A dodgy binder, i.e. a variable that syntactically appears in
+  -- LHS patterns but only in non-injective positions.
+  --
+  -- See Note [Dodgy binding sites in type family instances]
+  -- in GHC.Tc.Validity.
+  = InvalidFamInstQTvDodgy
+  -- | A quantified type variable in a type or data family equation
+  -- that is not bound in any LHS patterns.
+  | InvalidFamInstQTvNotBoundInPats
+  -- | A quantified type variable in a type or data family equation
+  -- that is not used on the RHS.
+  | InvalidFamInstQTvNotUsedInRHS
+
+-- The 'check_tvs' function in 'GHC.Tc.Validity.checkFamPatBinders'
+-- uses 'getSrcSpan', so this 'NamedThing' instance is convenient.
+instance NamedThing InvalidFamInstQTv where
+  getName = getName . ifiqtv
 
 data InvalidAssoc
   -- | An invalid associated family instance.

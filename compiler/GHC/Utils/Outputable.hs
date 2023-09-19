@@ -51,6 +51,7 @@ module GHC.Utils.Outputable (
         ppWhen, ppUnless, ppWhenOption, ppUnlessOption,
         speakNth, speakN, speakNOf, plural, singular,
         isOrAre, doOrDoes, itsOrTheir, thisOrThese, hasOrHave,
+        itOrThey,
         unicodeSyntax,
 
         coloured, keyword,
@@ -1523,6 +1524,15 @@ doOrDoes _   = text "do"
 itsOrTheir :: [a] -> SDoc
 itsOrTheir [_] = text "its"
 itsOrTheir _   = text "their"
+
+-- | 'it' or 'they', depeneding on the length of the list.
+--
+-- > itOrThey [x]   = text "it"
+-- > itOrThey [x,y] = text "they"
+-- > itOrThey []    = text "they"  -- probably avoid this
+itOrThey :: [a] -> SDoc
+itOrThey [_] = text "it"
+itOrThey _   = text "they"
 
 
 -- | Determines the form of subject appropriate for the length of a list:

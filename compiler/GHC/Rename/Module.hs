@@ -71,9 +71,9 @@ import GHC.Core.DataCon ( isSrcStrict )
 
 import Control.Monad
 import Control.Arrow ( first )
-import Data.Foldable ( toList )
+import Data.Foldable ( toList, for_ )
 import Data.List ( mapAccumL )
-import Data.List.NonEmpty ( NonEmpty(..), head )
+import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import GHC.Types.GREInfo (ConInfo, mkConInfo, conInfoFields)
@@ -725,9 +725,10 @@ rnFamEqn doc atfi
                && not (cls_tkv `elemNameSet` pat_fvs)
                     -- ...but not bound on the LHS.
              bad_tvs = filter improperly_scoped inst_head_tvs
-       ; unless (null bad_tvs) $ addErr $
+       ; for_ (nonEmpty bad_tvs) $ \ ne_bad_tvs ->
+           addErr $
            TcRnIllegalInstance $ IllegalFamilyInstance $
-             FamInstRHSOutOfScopeTyVars Nothing bad_tvs
+             FamInstRHSOutOfScopeTyVars Nothing ne_bad_tvs
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
              -- See Note [Type family equations and occurrences]
