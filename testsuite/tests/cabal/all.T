@@ -54,3 +54,5 @@ test('shadow', [], makefile_test, [])
 test('T12485a', [extra_files(['shadow1.pkg', 'shadow2.pkg', 'shadow3.pkg'])], makefile_test, [])
 
 test('T13703', [extra_files(['test13703a.pkg', 'test13703b.pkg'])], makefile_test, [])
+
+test('fileStatus', normal, compile_and_run, [''])
