@@ -4,10 +4,6 @@ variables:
   # Commit of ghc/ci-images repository from which to pull Docker images
   DOCKER_REV: 572353e0644044fe3a5465bba4342a9a0b0eb60e
 
-  # Commit of ghc/ci-images repository from which to pull Docker images
-  # for bootstrapping
-  BOOTSTRAP_DOCKER_REV: 245d4c047dcf9e6d1894d12defcc3f46b787a5ae
-
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
   CACHE_REV: 10
