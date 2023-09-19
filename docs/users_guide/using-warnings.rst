@@ -1077,6 +1077,9 @@ of ``-W(no-)*``.
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
 
+    This flag is broken since GHC 9.6.1. See :ghc-ticket:`23520` for more
+    details.
+
 .. ghc-flag:: -Wmissing-deriving-strategies
     :shortdesc: warn when a deriving clause is missing a deriving strategy
     :type: dynamic

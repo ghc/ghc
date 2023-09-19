@@ -694,6 +694,9 @@ Bugs in GHC
 -  Because of a toolchain limitation we are unable to support full Unicode paths
    on Windows. On Windows we support up to Latin-1. See :ghc-ticket:`12971` for more.
 
+- ``-Wincomplete-record-updates`` does not warn about record updates for records with
+  partial record fields since GHC 9.6.1. See :ghc-ticket:`23520` for more details.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)
