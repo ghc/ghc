@@ -6181,7 +6181,7 @@ pprIllegalFamilyInstance = \case
     hang (text "Mismatched type name in type family instance.")
        2 (vcat [ text "Expected:" <+> ppr fam_tc_name
                , text "  Actual:" <+> ppr eqn_tc_name ])
-  FamInstRHSOutOfScopeTyVars mb_dodgy tvs ->
+  FamInstRHSOutOfScopeTyVars mb_dodgy (NE.toList -> tvs) ->
     hang (text "Out of scope type variable" <> plural tvs
          <+> pprWithCommas (quotes . ppr) tvs
          <+> text "in the RHS of a family instance.")
@@ -6194,13 +6194,60 @@ pprIllegalFamilyInstance = \case
     mk_extra = case mb_dodgy of
       Nothing -> empty
       Just (fam_tc, pats, dodgy_tvs) ->
-        ppWhen (any (`elemVarSetByKey` dodgy_tvs) (map nameUnique tvs)) $
+        ppWhen (any (`elemVarSetByKey` dodgy_tvs) (fmap nameUnique tvs)) $
           hang (text "The real LHS (expanding synonyms) is:")
              2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
-  FamInstLHSUnusedBoundTyVars tvs ->
-    hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
-          <+> isOrAre tvs <+> text "bound by a forall,")
-       2 (text "but not used in the family instance.")
+  FamInstLHSUnusedBoundTyVars (NE.toList -> bad_qtvs) ->
+    vcat [ not_bound_msg, not_used_msg, dodgy_msg ]
+    where
+
+      -- Filter to only keep user-written variables,
+      -- unless none were user-written in which case we report all of them
+      -- (as we need to report an error).
+      filter_user tvs
+        = map ifiqtv
+        $ case filter ifiqtv_user_written tvs of { [] -> tvs ; qvs -> qvs }
+
+      (not_bound, not_used, dodgy)
+        = case foldr acc_tv ([], [], []) bad_qtvs of
+            (nb, nu, d) -> (filter_user nb, filter_user nu, filter_user d)
+
+      acc_tv tv (nb, nu, d) = case ifiqtv_reason tv of
+        InvalidFamInstQTvNotUsedInRHS   -> (nb, tv : nu, d)
+        InvalidFamInstQTvNotBoundInPats -> (tv : nb, nu, d)
+        InvalidFamInstQTvDodgy          -> (nb, nu, tv : d)
+
+      -- Error message for type variables not bound in LHS patterns.
+      not_bound_msg
+        | null not_bound
+        = empty
+        | otherwise
+        = vcat [ text "The type variable" <> plural not_bound <+> pprQuotedList not_bound
+            <+> isOrAre not_bound <+> text "bound by a forall,"
+              , text "but" <+> doOrDoes not_bound <+> text "not appear in any of the LHS patterns of the family instance." ]
+
+      -- Error message for type variables bound by a forall but not used
+      -- in the RHS.
+      not_used_msg =
+        if null not_used
+        then empty
+        else text "The type variable" <> plural not_used <+> pprQuotedList not_used
+             <+> isOrAre not_used <+> text "bound by a forall," $$
+             text "but" <+> itOrThey not_used <+>
+             isOrAre not_used <> text "n't used in the family instance."
+
+      -- Error message for dodgy type variables.
+      -- See Note [Dodgy binding sites in type family instances] in GHC.Tc.Validity.
+      dodgy_msg
+        | null dodgy
+        = empty
+        | otherwise
+        = hang (text "Dodgy type variable" <> plural dodgy <+> pprQuotedList dodgy
+               <+> text "in the LHS of a family instance:")
+             2 (text "the type variable" <> plural dodgy <+> pprQuotedList dodgy
+                <+> text "syntactically appear" <> singular dodgy <+> text "in LHS patterns,"
+               $$ text "but" <+> itOrThey dodgy <+> doOrDoes dodgy <> text "n't appear in an injective position.")
+
 
 illegalFamilyInstanceHints :: IllegalFamilyInstanceReason -> [GhcHint]
 illegalFamilyInstanceHints = \case

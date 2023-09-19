@@ -1,6 +1,6 @@
 
-T7536.hs:8:18: error: [GHC-53634]
-    • Out of scope type variable ‘a’ in the RHS of a family instance.
-        All such variables must be bound on the LHS.
-      The real LHS (expanding synonyms) is: TF Int
+T7536.hs:8:18: error: [GHC-30337]
+    • Dodgy type variable ‘a’ in the LHS of a family instance:
+        the type variable ‘a’ syntactically appears in LHS patterns,
+        but it doesn't appear in an injective position.
     • In the type instance declaration for ‘TF’
