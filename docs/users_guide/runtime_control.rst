@@ -1332,6 +1332,34 @@ the binary eventlog file by using the ``-l`` option.
 
 .. _rts-options-debugging:
 
+
+RTS options for Haskell program coverage
+----------------------------------------
+
+When a program is compiled with the ``-fhpc`` option, then the generated code
+is instrumented with instructions which keep track of the executed code during
+the runtime of the program. This functionality is implemented by the runtime
+system and can be controlled by the following flags.
+
+.. index::
+    single: RTS options, hpc
+
+.. rts-flag:: --emit-tix-file
+
+    :default: enabled
+    :since: 9.X
+
+    By default, the runtime system writes a file ``<program>.tix`` at the end
+    of execution if the executable is compiled with the ``-fhpc`` option.
+    This file is not written if the ``--emit-tix-file=false`` option is passed
+    to the runtime system.
+
+    This option is useful if you want to use the functionality provided by the
+    ``Trace.Hpc.Reflect`` module of the ``hpc`` library. These functions allow
+    to inspect the state of the Tix files during runtime so that the executable
+    can write them to disk itself.
+
+
 RTS options for hackers, debuggers, and over-interested souls
 -------------------------------------------------------------
 
