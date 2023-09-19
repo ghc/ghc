@@ -4,6 +4,12 @@ variables:
   # Commit of ghc/ci-images repository from which to pull Docker images
   DOCKER_REV: 8035736da0a70f09bd9b63a696cf2eb7977694ec
 
+  # Commit of ghc/ci-images repository from which to pull Docker images for bootstrapping hadrian
+  # We use a seperate docker revision for these images because bootstrap plans
+  # need to be updated frequently and forcing simultaneous updates of all images
+  # used for building simultaneously may lead to unexpected breakage.
+  BOOTSTRAP_DOCKER_REV: 245d4c047dcf9e6d1894d12defcc3f46b787a5ae
+
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
   CACHE_REV: 10
@@ -101,10 +107,10 @@ workflow:
 # which versions of GHC to allow bootstrap with
 .bootstrap_matrix : &bootstrap_matrix
   matrix:
-    - GHC_VERSION: 9.4.3
-      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+    - GHC_VERSION: 9.4.7
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_4:$BOOTSTRAP_DOCKER_REV"
     - GHC_VERSION: 9.6.2
-      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_6:$DOCKER_REV"
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_6:$BOOTSTRAP_DOCKER_REV"
 
 # Allow linters to fail on draft MRs.
 # This must be explicitly transcluded in lint jobs which
