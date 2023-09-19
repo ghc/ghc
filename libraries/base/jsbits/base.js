@@ -648,13 +648,16 @@ function h$base_fillStat(fs, b, off) {
 
     var atimeS = Math.floor(fs.atimeMs/1000);
     var atimeNs = (fs.atimeMs/1000 - atimeS) * 1000000000;
-    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_ATIME, SIZEOF_STAT_ST_ATIME,  atimeS, atimeNs);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_ATIME, SIZEOF_STAT_ST_ATIME, atimeS);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_ATIM_TV_NSEC, SIZEOF_STAT_ST_ATIM_TV_NSEC, atimeNs);
     var mtimeS = Math.floor(fs.mtimeMs/1000);
     var mtimeNs = (fs.mtimeMs/1000 - mtimeS) * 1000000000;
-    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_MTIME, SIZEOF_STAT_ST_MTIME,  mtimeS, mtimeNs);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_MTIME, SIZEOF_STAT_ST_MTIME, mtimeS);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_MTIM_TV_NSEC, SIZEOF_STAT_ST_MTIM_TV_NSEC, mtimeNs);
     var ctimeS = Math.floor(fs.ctimeMs/1000);
     var ctimeNs = (fs.ctimeMs/1000 - ctimeS) * 1000000000;
-    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_CTIME, SIZEOF_STAT_ST_CTIME,  ctimeS, ctimeNs);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_CTIME, SIZEOF_STAT_ST_CTIME, ctimeS);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_CTIM_TV_NSEC, SIZEOF_STAT_ST_CTIM_TV_NSEC, ctimeNs);
 }
 #endif
 
@@ -666,19 +669,12 @@ function h$base_store_field_number(ptr, ptr_off, field_off, field_size, val) {
         ptr.i3[(ptr_off>>2)+(field_off>>2)] = val;
     } else if(field_size === 8) {
         h$long_from_number(val, (h,l) => {
-            ptr.i3[(ptr_off>>2)+(field_off>>2)] = h;
-            ptr.i3[(ptr_off>>2)+(field_off>>2)+1] = l;
+            ptr.i3[(ptr_off>>2)+(field_off>>2)] = l;
+            ptr.i3[(ptr_off>>2)+(field_off>>2)+1] = h;
         });
     } else {
         throw new Error("unsupported field size: " + field_size);
     }
-}
-
-function h$base_store_field_number_2(ptr, ptr_off, field_off, field_size, val1, val2) {
-    if(field_size%2) throw new Error("unsupported field size: " + field_size);
-    var half_field_size = field_size>>1;
-    h$base_store_field_number(ptr, ptr_off, field_off, half_field_size, val1);
-    h$base_store_field_number(ptr, ptr_off, field_off+half_field_size, half_field_size, val2);
 }
 
 function h$base_return_field(ptr, ptr_off, field_off, field_size) {
@@ -687,7 +683,7 @@ function h$base_return_field(ptr, ptr_off, field_off, field_size) {
     if(field_size === 4) {
         return ptr.i3[(ptr_off>>2) + (field_off>>2)];
     } else if(field_size === 8) {
-        RETURN_UBX_TUP2(ptr.i3[(ptr_off>>2) + (field_off>>2)], ptr.i3[(ptr_off>>2) + (field_off>>2)+1]);
+        RETURN_UBX_TUP2(ptr.i3[(ptr_off>>2) + (field_off>>2)+1], ptr.i3[(ptr_off>>2) + (field_off>>2)]);
     } else {
         throw new Error("unsupported field size: " + field_size);
     }
