@@ -103,12 +103,23 @@ data ClassATItem
 -- is used solely for validity checking.
 -- See @Note [Type-checking default assoc decls]@ in "GHC.Tc.TyCl".
 data ATValidityInfo
-  = NoATVI               -- Used for associated type families that are imported
-                         -- from another module, for which we don't need to
-                         -- perform any validity checking.
+  -- | Used for associated type families that are imported
+  -- from another module, for which we don't need to
+  -- perform any validity checking.
+  = NoATVI
 
-  | ATVI SrcSpan [Type]  -- Used for locally defined associated type families.
-                         -- The [Type] are the LHS patterns.
+  -- | Used for locally-defined associated type families.
+  | ATVI
+    { atvi_loc :: SrcSpan
+    , atvi_qtvs :: [TyVar]
+      -- ^ LHS quantified type variables
+    , atvi_pats :: [Type]
+      -- ^ LHS patterns
+    , atvi_rhs :: Type
+      -- ^ original RHS of the type family default declaration,
+      -- before applying the substitution from
+      -- Note [Type-checking default assoc decls] in GHC.Tc.TyCl.
+    }
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
 

@@ -2783,7 +2783,8 @@ tcDefaultAssocDecl fam_tc
                        -- simply create an empty substitution and let GHC fall
                        -- over later, in GHC.Tc.Validity.checkValidAssocTyFamDeflt.
                        -- See Note [Type-checking default assoc decls].
-       ; pure $ Just (substTyUnchecked subst rhs_ty, ATVI (locA loc) pats)
+
+       ; pure $ Just (substTyUnchecked subst rhs_ty, ATVI (locA loc) qtvs pats rhs_ty)
            -- We perform checks for well-formedness and validity later, in
            -- GHC.Tc.Validity.checkValidAssocTyFamDeflt.
      }
@@ -4884,14 +4885,14 @@ checkValidClass cls
                         -- since there is no possible ambiguity (#10020)
 
              -- Check that any default declarations for associated types are valid
-           ; whenIsJust m_dflt_rhs $ \ (rhs, at_validity_info) ->
+           ; whenIsJust m_dflt_rhs $ \ (_, at_validity_info) ->
              case at_validity_info of
                NoATVI -> pure ()
-               ATVI loc pats ->
+               ATVI loc qtvs pats orig_rhs ->
                  setSrcSpan loc $
                  tcAddFamInstCtxt (text "default type instance") (getName fam_tc) $
                  do { checkValidAssocTyFamDeflt fam_tc pats
-                    ; checkValidTyFamEqn fam_tc fam_tvs (mkTyVarTys fam_tvs) rhs }}
+                    ; checkValidTyFamEqn fam_tc qtvs pats orig_rhs }}
         where
           fam_tvs = tyConTyVars fam_tc
 
