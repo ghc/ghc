@@ -423,7 +423,8 @@ distroVariables Alpine = mconcat
   , "BROKEN_TESTS" =: "encoding004 T10458"
   ]
 distroVariables Centos7 = mconcat [
-  "HADRIAN_ARGS" =: "--docs=no-sphinx"
+    "HADRIAN_ARGS" =: "--docs=no-sphinx"
+  , "BROKEN_TESTS" =: "T22012" -- due to #23979
   ]
 distroVariables Rocky8 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"

@@ -910,6 +910,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-validate",
+      "BROKEN_TESTS": "T22012",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -2667,6 +2668,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-release+no_split_sections",
+      "BROKEN_TESTS": "T22012",
       "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
