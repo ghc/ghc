@@ -1,6 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.19.0.0 *TBA*
+## 4.19.0.0 *October 2023*
+
+  * Shipped with GHC 9.8.1
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/87) and [#114](https://github.com/haskell/core-libraries-committee/issues/114))
@@ -41,6 +43,7 @@
   * Add rewrite rules for conversion between Int64/Word64 and Float/Double on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
 
 ## 4.18.0.0 *March 2023*
+
   * Shipped with GHC 9.6.1
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
