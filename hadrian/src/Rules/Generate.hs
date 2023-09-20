@@ -320,7 +320,21 @@ packageVersions = foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaske
   where
     f :: Package -> Interpolations
     f pkg = interpolateVar var $ version <$> readPackageData pkg
-      where var = "LIBRARY_" <> pkgName pkg <> "_VERSION"
+      where var = "LIBRARY_" <> escapedPkgName pkg <> "_VERSION"
+
+packageUnitIds :: Stage -> Interpolations
+packageUnitIds stage =
+    foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaskell, ghcCompact, array ]
+  where
+    f :: Package -> Interpolations
+    f pkg = interpolateVar var $ pkgUnitId stage pkg
+      where var = "LIBRARY_" <> escapedPkgName pkg <> "_UNIT_ID"
+
+escapedPkgName :: Package -> String
+escapedPkgName = map f . pkgName
+  where
+    f '-'   = '_'
+    f other = other
 
 templateRule :: FilePath -> Interpolations -> Rules ()
 templateRule outPath interps = do
@@ -348,6 +362,7 @@ templateRules = do
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
   templateRule "docs/index.html" $ packageVersions
+  templateRule "docs/users_guide/ghc_config.py" $ packageUnitIds Stage1
 
 
 -- Generators
