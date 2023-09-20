@@ -101,7 +101,6 @@ PACKAGES = {
         Package('ghc-boot', Path("libraries/ghc-boot"), prep_ghc_boot),
         Package('ghc-boot-th', Path("libraries/ghc-boot-th"), no_prep),
         Package('ghc-compact', Path("libraries/ghc-compact"), no_prep),
-        Package('libiserv', Path("libraries/libiserv"), no_prep),
         Package('ghc', Path("compiler"), prep_ghc),
     ]
 }
