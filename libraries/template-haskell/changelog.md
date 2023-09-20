@@ -2,6 +2,8 @@
 
 ## 2.21.0.0
 
+  * Shipped with GHC 9.8.1
+
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of
     the record field. This is the name of the first constructor of the parent type,
     even if this constructor does not have the field in question.  
