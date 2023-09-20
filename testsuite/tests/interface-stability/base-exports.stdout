@@ -8958,7 +8958,7 @@ module GHC.RTS.Flags where
   type GiveGCStats :: *
   data GiveGCStats = NoGCStats | CollectGCStats | OneLineGCStats | SummaryGCStats | VerboseGCStats
   type HpcFlags :: *
-  data HpcFlags = HpcFlags {emitTixFile :: GHC.Types.Bool}
+  data HpcFlags = HpcFlags {writeTixFile :: GHC.Types.Bool}
   type IoSubSystem :: *
   data IoSubSystem = IoPOSIX | IoNative
   type MiscFlags :: *

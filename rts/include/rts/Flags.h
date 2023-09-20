@@ -283,7 +283,7 @@ typedef struct _PAR_FLAGS {
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _HPC_FLAGS {
-  bool           emitTixFile;    /* Whether the RTS should write a tix
+  bool           writeTixFile;   /* Whether the RTS should write a tix
                                     file at the end of execution */
 } HPC_FLAGS;
 
