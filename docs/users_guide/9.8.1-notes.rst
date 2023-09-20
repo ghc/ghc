@@ -85,7 +85,7 @@ Compiler
 
 - Rewrite rules now support a limited form of higher order matching when a
   pattern variable is applied to distinct locally bound variables, as proposed in
-  `GHC Proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`.
+  `GHC Proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`_.
   For example: ::
 
       forall f. foo (\x -> f x)
@@ -142,9 +142,9 @@ Compiler
   Complementary support for this feature in ``cabal-install`` will come soon.
 
 - GHC Proposal `#433
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst>`_
+  <https://github.com/ghc-proposals/ghc-proposals/blob/0c7667673fcb33ea8b38503e16f88de5b8b3d270/proposals/0433-unsatisfiable.rst>`_
   has been implemented. This adds the class ``Unsatisfiable :: ErrorMessage -> Constraint``
-  to the :base-ref:`GHC.TypeError` module. Constraints of the form ``Unsatisfiable msg``
+  to the :base-ref:`GHC.TypeError.` module. Constraints of the form ``Unsatisfiable msg``
   provide a mechanism for custom type errors that reports the errors in a more
   predictable behaviour than ``TypeError``, as these constraints are
   handled purely during constraint solving.
