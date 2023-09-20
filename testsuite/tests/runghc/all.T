@@ -9,9 +9,9 @@ test('T6132', [],
 
 test('T17171a',
      [req_interp, exit_code(2), ignore_stdout, grep_errmsg(r'main')],
-     run_command, ['$MAKE -s --no-print-directory T17171a'])
-test('T17171b', req_interp, run_command,
-     ['$MAKE -s --no-print-directory T17171b'])
+     makefile_test, [])
+
+test('T17171b', req_interp, makefile_test, [])
 
 test('T-signals-child',
      [ when(opsys('mingw32'), skip), req_interp
