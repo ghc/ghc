@@ -294,7 +294,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
-    RtsFlags.HpcFlags.emitTixFile        = true;
+    RtsFlags.HpcFlags.writeTixFile       = true;
 }
 
 static const char *
@@ -549,6 +549,10 @@ usage_text[] = {
 "             The amount of allocation after the program receives a",
 "             HeapOverflow exception before the exception is thrown again, if",
 "             the program is still exceeding the heap limit.",
+"",
+"  --write-tix-file=<yes|no>",
+"             Whether to write <program>.tix at the end of execution.",
+"             (default: yes)",
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
 "",
@@ -1041,10 +1045,15 @@ error = true;
                         RtsFlags.GcFlags.nonmovingDenseAllocatorCount = threshold;
                       }
                   }
-                  else if (strequal("emit-tix-file=false",
+                  else if (strequal("write-tix-file=yes",
                               &rts_argv[arg][2])) {
                        OPTION_UNSAFE;
-                       RtsFlags.HpcFlags.emitTixFile = false;
+                       RtsFlags.HpcFlags.writeTixFile = true;
+                  }
+                  else if (strequal("write-tix-file=no",
+                              &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.writeTixFile = false;
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)

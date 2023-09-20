@@ -390,11 +390,15 @@ data ParFlags = ParFlags
              )
 
 -- | Parameters pertaining to Haskell program coverage (HPC)
+--
+-- @since 4.22.0.0
 data HpcFlags = HpcFlags
-    { emitTixFile :: Bool
+    { writeTixFile :: Bool
+      -- ^ Controls whether the @<program>.tix@ file should be
+      -- written after the execution of the program.
     }
-    deriving (Show
-             , Generic
+    deriving (Show -- ^ @since 4.22.0.0
+             , Generic -- ^ @since 4.22.0.0
              )
 -- | Parameters of the runtime system
 --
@@ -505,7 +509,7 @@ getHpcFlags = do
   let ptr = (#ptr RTS_FLAGS, HpcFlags) rtsFlagsPtr
   HpcFlags
     <$> (toBool <$>
-          (#{peek HPC_FLAGS, emitTixFile} ptr :: IO CBool))
+          (#{peek HPC_FLAGS, writeTixFile} ptr :: IO CBool))
 
 getConcFlags :: IO ConcFlags
 getConcFlags = do
