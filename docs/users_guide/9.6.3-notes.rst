@@ -141,7 +141,7 @@ Core libraries
 
 - Bump ``filepath`` to 1.4.100.4
 
-- Bump ``haddock`` to 2.29.0
+- Bump ``haddock`` to 2.29.1
 
 Included libraries
 ------------------
