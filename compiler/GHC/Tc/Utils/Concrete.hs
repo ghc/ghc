@@ -35,7 +35,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.TcType
 
-import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
+import GHC.Types.Basic         ( TypeOrKind(KindLevel), TypeOrConstraint(..) )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -453,8 +453,10 @@ checkFRR_with check_kind frr_ctxt ty
   = do { th_stage <- getStage
        ; ty <- liftZonkM $ zonkTcType ty
        ; case sORTKind_maybe (typeKind ty) of
-           Just _ -> return ()
-           Nothing -> pprPanic "hasFixedRuntimeRep" (ppr ty $$ ppr (typeKind ty))
+           Just (TypeLike, _) -> return ()
+           Just (ConstraintLike, _) -> pprPanic "hasFixedRuntimeRep: constraint" (ppr ty $$ ppr (typeKind ty))
+
+           Nothing -> return ()
        ; if
           -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
           | TyConApp tc [] <- ki
