@@ -81,7 +81,7 @@ cabalBuildRules = do
                   | pkg == hpcBin = "hpc"
                   | otherwise     = pkgName pkg
             let cabal_bin_out = work_dir -/- "cabal-bin" -/- (pgmName bin_pkg)
-            needed_wrappers <- pkgToWrappers bin_pkg
+            needed_wrappers <- pkgToWrappers Stage2 bin_pkg
             forM_ needed_wrappers $ \wrapper_name -> do
               let wrapper_prefix = unlines
                     ["#!/usr/bin/env sh"

@@ -27,6 +27,7 @@ import Base
 import Context
 import Oracles.Flag
 import Oracles.Setting
+import GHC.Toolchain.Target (targetPlatformTriple)
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
@@ -164,11 +165,19 @@ linter name = program name ("linters" -/- name)
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
 
+-- | Whether the StageN compiler is a cross-compiler or not.
+crossStage :: Stage -> Action Bool
+crossStage st = do
+  st_target <- targetStage st
+  st_host   <- targetStage (predStage st)
+  return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
+
+
 -- | Target prefix to prepend to executable names.
-crossPrefix :: Action String
-crossPrefix = do
-    cross <- flag CrossCompiling
-    targetPlatform <- setting TargetPlatformFull
+crossPrefix :: Stage -> Action String
+crossPrefix st = do
+    cross <- crossStage st
+    targetPlatform <- targetPlatformTriple <$> targetStage st
     return $ if cross then targetPlatform ++ "-" else ""
 
 -- | Given a 'Context', compute the name of the program that is built in it
@@ -177,7 +186,7 @@ crossPrefix = do
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do
-    prefix <- crossPrefix
+    prefix <- crossPrefix stage
     -- TODO: Can we extract this information from Cabal files?
     -- Alp: We could, but then the iserv package would have to
     --      use Cabal conditionals + a 'profiling' flag

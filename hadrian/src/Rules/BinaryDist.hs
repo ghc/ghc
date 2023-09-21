@@ -274,7 +274,7 @@ bindistRules = do
 
         -- todo: do we need these wrappers on windows
         forM_ bin_targets $ \(pkg, _) -> do
-          needed_wrappers <- pkgToWrappers pkg
+          needed_wrappers <- pkgToWrappers Stage2 pkg
           forM_ needed_wrappers $ \wrapper_name -> do
             let suffix = if useGhcPrefix pkg
                            then "ghc-" ++ version
@@ -412,9 +412,9 @@ useGhcPrefix pkg
   | otherwise = True
 
 -- | Which wrappers point to a specific package
-pkgToWrappers :: Package -> Action [String]
-pkgToWrappers pkg = do
-    prefix <- crossPrefix
+pkgToWrappers :: Stage -> Package -> Action [String]
+pkgToWrappers stage pkg = do
+    prefix <- crossPrefix stage
     if  -- ghc also has the ghci script wrapper
         -- N.B. programName would add the crossPrefix therefore we must do the
         -- same here.
@@ -456,8 +456,8 @@ commonWrapper = pure $ "exec \"$executablename\" ${1+\"$@\"}\n"
 -- echo 'HSC2HS_EXTRA="$(addprefix --cflag=,$(CONF_CC_OPTS_STAGE1)) $(addprefix --lflag=,$(CONF_GCC_LINKER_OPTS_STAGE1))"' >> "$(WRAPPER)"
 hsc2hsWrapper :: Action String
 hsc2hsWrapper = do
-  ccArgs <- map ("--cflag=" <>) . prgFlags . ccProgram . tgtCCompiler <$> targetStage Stage1
-  linkFlags <- map ("--lflag=" <>) . prgFlags . ccLinkProgram . tgtCCompilerLink <$> targetStage Stage1
+  ccArgs <- map ("--cflag=" <>) . prgFlags . ccProgram . tgtCCompiler <$> targetStage Stage2
+  linkFlags <- map ("--lflag=" <>) . prgFlags . ccLinkProgram . tgtCCompilerLink <$> targetStage Stage2
   wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
     ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ linkFlags) <> "\""

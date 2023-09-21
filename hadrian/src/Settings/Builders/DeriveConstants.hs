@@ -19,6 +19,8 @@ deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
     outs   <- getOutputs
+    stage <- getStage
+    let stage = Stage1
     let (outputFile, mode, tempDir) = case outs of
             [ofile, mode, tmpdir] -> (ofile,mode,tmpdir)
             [ofile, tmpdir]
@@ -31,12 +33,12 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         [ arg mode
         , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
-        , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)
+        , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC stage)
         , pure $ concatMap (\a -> ["--gcc-flag", a]) cFlags
-        , arg "--nm-program", arg =<< getBuilderPath (Nm Stage1)
+        , arg "--nm-program", arg =<< getBuilderPath (Nm stage)
         , isSpecified Objdump ? mconcat [ arg "--objdump-program"
                                         , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", arg =<< queryTarget Stage1 queryOS ]
+        , arg "--target-os", arg =<< queryTarget stage queryOS ]
 
 includeCcArgs :: Args
 includeCcArgs = do
