@@ -79,8 +79,10 @@ new :: IO E.Backend
 new = do
   kqfd <- kqueue
   events <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue kqfd events)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue kqfd events) supportedEvents
   return be
+  where
+    supportedEvents = evtRead <> evtWrite <> evtClose
 
 delete :: KQueue -> IO ()
 delete kq = do

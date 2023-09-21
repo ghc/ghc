@@ -55,6 +55,7 @@ data Backend = forall a. Backend {
                          -> IO Bool
 
     , _beDelete :: a -> IO ()
+    , _beSupportedEvents :: !Event
     }
 
 backend :: (a -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int)
@@ -62,31 +63,40 @@ backend :: (a -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int)
         -> (a -> Fd -> Event -> IO Bool)
         -> (a -> IO ())
         -> a
+        -> Event
         -> Backend
-backend bPoll bModifyFd bModifyFdOnce bDelete state =
-  Backend state bPoll bModifyFd bModifyFdOnce bDelete
+backend bPoll bModifyFd bModifyFdOnce bDelete state supportedEvents =
+  Backend state bPoll bModifyFd bModifyFdOnce bDelete supportedEvents
 {-# INLINE backend #-}
 
 poll :: Backend -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int
-poll (Backend bState bPoll _ _ _) = bPoll bState
+poll (Backend bState bPoll _ _ _ _) = bPoll bState
 {-# INLINE poll #-}
 
 -- | Returns 'True' if the modification succeeded.
 -- Returns 'False' if this backend does not support
 -- event notifications on this type of file.
 modifyFd :: Backend -> Fd -> Event -> Event -> IO Bool
-modifyFd (Backend bState _ bModifyFd _ _) = bModifyFd bState
+modifyFd (Backend bState _ bModifyFd _ _ sup) fd old new
+  | sup `isEvent` new
+  = bModifyFd bState fd old new
+  | otherwise
+  = ioError unsupportedOperation
 {-# INLINE modifyFd #-}
 
 -- | Returns 'True' if the modification succeeded.
 -- Returns 'False' if this backend does not support
 -- event notifications on this type of file.
 modifyFdOnce :: Backend -> Fd -> Event -> IO Bool
-modifyFdOnce (Backend bState _ _ bModifyFdOnce _) = bModifyFdOnce bState
+modifyFdOnce (Backend bState _ _ bModifyFdOnce _ sup) fd ev
+  | sup `isEvent` ev
+  = bModifyFdOnce bState
+  | otherwise
+  = ioError unsupportedOperation
 {-# INLINE modifyFdOnce #-}
 
 delete :: Backend -> IO ()
-delete (Backend bState _ _ _ bDelete) = bDelete bState
+delete (Backend bState _ _ _ bDelete _) = bDelete bState
 {-# INLINE delete #-}
 
 -- | Throw an 'Prelude.IOError' corresponding to the current value of

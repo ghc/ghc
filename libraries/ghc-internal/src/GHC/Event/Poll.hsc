@@ -51,8 +51,10 @@ data Poll = Poll {
     }
 
 new :: IO E.Backend
-new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) `liftM`
+new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) supportedEvents `liftM`
       liftM2 Poll (newMVar =<< A.empty) A.empty
+  where
+    supportedEvents = evtRead <> evtWrite <> evtClose
 
 modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd p fd oevt nevt =

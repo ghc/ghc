@@ -69,8 +69,10 @@ new :: IO E.Backend
 new = do
   epfd <- epollCreate
   evts <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts) supportedEvents
   return be
+  where
+    supportedEvents = evtRead <> evtWrite <> evtClose
 
 delete :: EPoll -> IO ()
 delete be = do
