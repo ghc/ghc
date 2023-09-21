@@ -25,7 +25,7 @@ import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
                                , mkGReflRightMCo, mkNomReflCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy)
+import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy, sORTKind_maybe )
 
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
@@ -33,6 +33,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Zonk.TcType
 
 import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
 import GHC.Types.Id
@@ -43,6 +44,7 @@ import GHC.Types.Var           ( tyVarKind, tyVarName )
 
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString     ( FastString, fsLit )
 
 
@@ -449,6 +451,10 @@ checkFRR_with :: HasDebugCallStack
                   -- and @frr_@ty has a fixed 'RuntimeRep'.
 checkFRR_with check_kind frr_ctxt ty
   = do { th_stage <- getStage
+       ; ty <- liftZonkM $ zonkTcType ty
+       ; case sORTKind_maybe (typeKind ty) of
+           Just _ -> return ()
+           Nothing -> pprPanic "hasFixedRuntimeRep" (ppr ty $$ ppr (typeKind ty))
        ; if
           -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
           | TyConApp tc [] <- ki

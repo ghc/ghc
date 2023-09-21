@@ -469,7 +469,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ map ExpFunPatTy more_arg_tys) res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkScaledFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = tcMkScaledFunTys more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
