@@ -113,7 +113,8 @@ test('linker_unload_native',
      [extra_files(['LinkerUnload.hs', 'Test.hs']),
       req_rts_linker,
       unless(have_dynamic(), skip),
-      when(opsys('darwin') or opsys('mingw32'), skip)],
+      when(opsys('darwin') or opsys('mingw32'), skip),
+      fragile(23993)],
      makefile_test, ['linker_unload_native'])
 
 ######################################
