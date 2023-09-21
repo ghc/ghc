@@ -322,13 +322,14 @@ runTestBuilderArgs = builder Testsuite ? do
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args
 getTestArgs = do
+    stage <- getStage
     -- targets specified in the TEST env var
     testEnvTargets <- maybe [] words <$> expr (liftIO $ lookupEnv "TEST")
     args            <- expr $ userSetting defaultTestArgs
     bindir          <- expr $ getBinaryDirectory (testCompiler args)
     compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
-    cross_prefix    <- expr crossPrefix
+    cross_prefix    <- expr (crossPrefix (succStage stage))
     -- the testsuite driver will itself tell us if we need to generate the docs target
     -- So we always pass the haddock path if the hadrian configuration allows us to build
     -- docs

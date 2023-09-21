@@ -165,12 +165,6 @@ linter name = program name ("linters" -/- name)
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
 
--- | Whether the StageN compiler is a cross-compiler or not.
-crossStage :: Stage -> Action Bool
-crossStage st = do
-  st_target <- targetStage st
-  st_host   <- targetStage (predStage st)
-  return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
 
 
 -- | Target prefix to prepend to executable names.

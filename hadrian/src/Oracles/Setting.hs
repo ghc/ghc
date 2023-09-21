@@ -6,7 +6,7 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath, targetStage, queryTarget, queryTargetTarget,
+    libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -263,4 +263,11 @@ queryTarget s f = expr (f <$> targetStage s)
 
 queryTargetTarget :: Stage -> (Target -> a) -> Action a
 queryTargetTarget s f = f <$> targetStage s
+
+-- | Whether the StageN compiler is a cross-compiler or not.
+crossStage :: Stage -> Action Bool
+crossStage st = do
+  st_target <- targetStage st
+  st_host   <- targetStage (predStage st)
+  return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
 
