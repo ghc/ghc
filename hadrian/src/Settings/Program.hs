@@ -13,7 +13,7 @@ import Packages
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- askGhcProfiled stage
-    dynGhcProgs <- askDynGhcPrograms --dynamicGhcPrograms =<< flavour
+    dynGhcProgs <- askDynGhcPrograms stage --dynamicGhcPrograms =<< flavour
     return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
     where wayFor prof dyn

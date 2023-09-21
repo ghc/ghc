@@ -16,7 +16,7 @@ module Hadrian.Oracles.TextFile (
     lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig, lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, textFileOracle,
     getBuildTarget, getHostTarget, getTargetTarget,
-    queryBuildTarget, queryHostTarget, queryTargetTarget
+    queryBuildTarget, queryHostTarget
     ) where
 
 import Control.Monad
@@ -114,8 +114,6 @@ queryBuildTarget f = f <$> getBuildTarget
 queryHostTarget :: (Toolchain.Target -> a) -> Action a
 queryHostTarget f = f <$> getHostTarget
 
-queryTargetTarget :: (Toolchain.Target -> a) -> Action a
-queryTargetTarget f = f <$> getTargetTarget
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

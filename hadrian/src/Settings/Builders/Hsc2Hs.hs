@@ -16,15 +16,15 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     top     <- expr topDirectory
     hArch   <- queryHost queryArch
     hOs     <- queryHost queryOS
-    tArch   <- queryTarget queryArch
-    tOs     <- queryTarget queryOS
+    tArch   <- queryTarget stage queryArch
+    tOs     <- queryTarget stage queryOS
     version <- case stage of
                   Stage0 {} -> expr ghcCanonVersion
                   _ ->  getSetting ProjectVersionInt
     tmpl <- (top -/-) <$> expr (templateHscPath stage0Boot)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notM isWinTarget ? notM (flag CrossCompiling) ? arg "--cross-safe"
+            , notM (isWinTarget stage) ? notM (flag CrossCompiling) ? arg "--cross-safe"
             , pure $ map ("-I" ++) (words gmpDir)
             , map ("--cflag=" ++) <$> getCFlags
             , map ("--lflag=" ++) <$> getLFlags
@@ -41,7 +41,8 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
               -- compiler complains about non-constant expressions even though
               -- they are constant and end up as constants in the assembly.
               -- See #12849
-            , flag CrossCompiling ? isWinTarget ? arg "--via-asm"
+              -- MP: Wrong use of CrossCompiling
+            , flag CrossCompiling ? isWinTarget stage ? arg "--via-asm"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 

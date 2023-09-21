@@ -32,9 +32,9 @@ getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting 
     msg = "Cannot parse test setting " ++ quote (show key)
 
 -- | Extra flags to send to the Haskell compiler to run tests.
-runTestGhcFlags :: Action String
-runTestGhcFlags = do
-    unregisterised <- queryTargetTarget tgtUnregisterised
+runTestGhcFlags :: Stage -> Action String
+runTestGhcFlags stage = do
+    unregisterised <- queryTargetTarget stage tgtUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt
@@ -101,11 +101,11 @@ inTreeCompilerArgs stg = do
     hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
     -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
     -- have different values? Currently not possible to express.
-    leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
-    withInterpreter     <- ghcWithInterpreter
-    unregisterised      <- queryTargetTarget tgtUnregisterised
-    tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP
+    leadingUnderscore   <- queryTargetTarget stg tgtSymbolsHaveLeadingUnderscore
+    withInterpreter     <- ghcWithInterpreter stg
+    unregisterised      <- queryTargetTarget stg tgtUnregisterised
+    tables_next_to_code <- queryTargetTarget stg tgtTablesNextToCode
+    targetWithSMP       <- targetSupportsSMP stg
 
     cross <- flag CrossCompiling
 
@@ -117,14 +117,14 @@ inTreeCompilerArgs stg = do
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- queryHostTarget queryOS
-    arch        <- queryTargetTarget queryArch
+    arch        <- queryTargetTarget stg queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- queryTargetTarget targetPlatformTriple
-    wordsize    <- show @Int . (*8) <$> queryTargetTarget (wordSize2Bytes . tgtWordSize)
+    platform    <- queryTargetTarget stg targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryTargetTarget stg (wordSize2Bytes . tgtWordSize)
 
     llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
@@ -161,7 +161,10 @@ outOfTreeCompilerArgs = do
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP
+    -- MP: Wrong
+--    targetWithSMP       <- targetSupportsSMP stage
+    let targetWithSMP   = True
+
     debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
     os          <- getTestSetting TestHostOS
@@ -203,6 +206,7 @@ assertSameCompilerArgs stg = do
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder Testsuite ? do
     ctx <- getContext
+    stage <- getStage
     pkgs     <- expr $ stagePackages (C.stage ctx)
     libTests <- expr $ filterM doesDirectoryExist $ concat
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
@@ -232,7 +236,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
     threads     <- shakeThreads <$> expr getShakeOptions
     top         <- expr $ topDirectory
-    ghcFlags    <- expr runTestGhcFlags
+    ghcFlags    <- expr (runTestGhcFlags stage)
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
     let defaultRootdirs = ("testsuite" -/- "tests") : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs

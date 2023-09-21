@@ -291,7 +291,7 @@ bindistRules = do
               IO.createFileLink versioned_wrapper unversioned_wrapper_path
 
     let buildBinDist compressor = do
-          win_target <- isWinTarget
+          win_target <- isWinTarget Stage2
           when win_target (error "normal binary-dist does not work for windows target, use `reloc-binary-dist-*` target instead.")
           buildBinDistX "binary-dist-dir" "bindist" compressor
         buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist"
@@ -358,7 +358,7 @@ data Compressor = Gzip | Bzip2 | Xz
 -- Information from the build configuration which needs to be propagated to config.mk.in
 generateBuildMk :: Action String
 generateBuildMk = do
-  dynamicGhc <- askDynGhcPrograms
+  dynamicGhc <- askDynGhcPrograms Stage1
   rtsWays <- unwords . map show . Set.toList <$> interpretInContext (vanillaContext Stage1 rts) getRtsWays
   return $ unlines [ "GhcRTSWays" =. rtsWays
                    , "DYNAMIC_GHC_PROGRAMS" =. yesNo dynamicGhc ]

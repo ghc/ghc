@@ -14,6 +14,7 @@ deriveConstantsPairs =
   , ("DerivedConstants.h", "--gen-header")
   ]
 
+-- MP: Why is Stage1 hard-coded here, looks wrong
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
@@ -32,10 +33,10 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "--tmpdir", arg tempDir
         , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)
         , pure $ concatMap (\a -> ["--gcc-flag", a]) cFlags
-        , arg "--nm-program", arg =<< getBuilderPath Nm
+        , arg "--nm-program", arg =<< getBuilderPath (Nm Stage1)
         , isSpecified Objdump ? mconcat [ arg "--objdump-program"
                                         , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", arg =<< queryTarget queryOS ]
+        , arg "--target-os", arg =<< queryTarget Stage1 queryOS ]
 
 includeCcArgs :: Args
 includeCcArgs = do
@@ -44,9 +45,9 @@ includeCcArgs = do
     mconcat [ cArgs
             , cWarnings
             , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage Stage1)
-            , queryTargetTarget tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , queryTargetTarget Stage1 tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"
-            , notM targetSupportsSMP ? arg "-DNOSMP"
+            , notM (targetSupportsSMP Stage1) ? arg "-DNOSMP"
             , arg "-fcommon" ]

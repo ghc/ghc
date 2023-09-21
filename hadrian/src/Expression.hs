@@ -52,6 +52,7 @@ package p = (p ==) <$> getPackage
 packageOneOf :: [Package] -> Predicate
 packageOneOf ps = (`elem` ps) <$> getPackage
 
+
 -- | This type class allows the user to construct both precise builder
 -- predicates, such as @builder (Ghc CompileHs Stage1)@, as well as predicates
 -- covering a set of similar builders. For example, @builder (Ghc CompileHs)@
@@ -163,6 +164,8 @@ cabalFlag pred flagName = do
 
 infixr 3 `cabalFlag`
 
+
+-- MP: Delete this
 cross :: Predicate
 cross = expr (flag CrossCompiling)
 

@@ -139,9 +139,10 @@ libraryArgs = do
     flavourWays <- getLibraryWays
     contextWay  <- getWay
     package     <- getPackage
-    withGhci    <- expr ghcWithInterpreter
-    dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
-    ghciObjsSupported <- expr platformSupportsGhciObjects
+    stage       <- getStage
+    withGhci    <- expr (ghcWithInterpreter stage)
+    dynPrograms <- expr (flavour >>= flip dynamicGhcPrograms stage)
+    ghciObjsSupported <- expr (targetSupportsGhciObjects stage)
     let ways = Set.insert contextWay flavourWays
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways

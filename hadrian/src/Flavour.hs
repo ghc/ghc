@@ -263,14 +263,14 @@ enableProfiledGhc flavour =
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
-disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
+disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = const (pure False) }
 
 -- | Don't build libraries in dynamic 'Way's.
 disableDynamicLibs :: Flavour -> Flavour
 disableDynamicLibs flavour =
   flavour { libraryWays = prune $ libraryWays flavour,
             rtsWays = prune $ rtsWays flavour,
-            dynamicGhcPrograms = pure False
+            dynamicGhcPrograms = const (pure False)
           }
   where
     prune :: Ways -> Ways

@@ -71,11 +71,11 @@ packageArgs = do
 
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
-            , anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
+            , anyTargetOs stage [OSOpenBSD] ? arg "--ld-options=-E"
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), notStage0] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"
@@ -96,7 +96,7 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), notStage0] `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
@@ -164,8 +164,8 @@ packageArgs = do
         -- The Solaris linker does not support --export-dynamic option. It also
         -- does not need it since it exports all dynamic symbols by default
         , package iserv
-          ? expr isElfTarget
-          ? notM (expr $ anyTargetOs [OSFreeBSD, OSSolaris2])? mconcat
+          ? expr (isElfTarget stage)
+          ? notM (expr $ anyTargetOs stage [OSFreeBSD, OSSolaris2])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
         -------------------------------- haddock -------------------------------
@@ -268,6 +268,7 @@ ghcBignumArgs = package ghcBignum ? do
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
+    stage <- getStage
     projectVersion <- getSetting ProjectVersion
     hostPlatform   <- queryHost targetPlatformTriple
     hostArch       <- queryHost queryArch
@@ -277,12 +278,12 @@ rtsPackageArgs = package rts ? do
     buildArch      <- queryBuild queryArch
     buildOs        <- queryBuild queryOS
     buildVendor    <- queryBuild queryVendor
-    targetPlatform <- queryTarget targetPlatformTriple
-    targetArch     <- queryTarget queryArch
-    targetOs       <- queryTarget queryOS
-    targetVendor   <- queryTarget queryVendor
-    ghcUnreg       <- yesNo <$> queryTarget tgtUnregisterised
-    ghcEnableTNC   <- yesNo <$> queryTarget tgtTablesNextToCode
+    targetPlatform <- queryTarget stage targetPlatformTriple
+    targetArch     <- queryTarget stage queryArch
+    targetOs       <- queryTarget stage queryOS
+    targetVendor   <- queryTarget stage queryVendor
+    ghcUnreg       <- yesNo <$> queryTarget stage tgtUnregisterised
+    ghcEnableTNC   <- yesNo <$> queryTarget stage tgtTablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -305,12 +306,12 @@ rtsPackageArgs = package rts ? do
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
-          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , notM (targetSupportsSMP stage)           ? arg "-DNOSMP"
           , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
+          , notM (targetSupportsSMP stage)           ? pure [ "-DNOSMP"
                                                     , "-optc-DNOSMP" ]
           ]
 
@@ -361,13 +362,13 @@ rtsPackageArgs = package rts ? do
 
           , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
-          , speedHack ?
+          , speedHack stage ?
             inputs [ "**/Evac.c", "**/Evac_thr.c"
                    , "**/Scav.c", "**/Scav_thr.c"
                    , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
           -- @-static@ is necessary for these bits, as otherwise the NCG
           -- generates dynamic references.
-          , speedHack ?
+          , speedHack stage ?
             inputs [ "**/Updates.c", "**/StgMiscClosures.c"
                    , "**/PrimOps.c", "**/Apply.c"
                    , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
@@ -397,7 +398,7 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
           , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
-          , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
+          , targetUseLibffiForAdjustors stage     `cabalFlag` "libffi-adjustors"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
@@ -447,10 +448,10 @@ rtsPackageArgs = package rts ? do
 --   ...
 -- ld: fatal: relocations remain against allocatable but non-writable sections
 -- collect2: ld returned 1 exit status
-speedHack :: Action Bool
-speedHack = do
-    i386   <- anyTargetArch [ArchX86]
-    goodOS <- not <$> anyTargetOs [OSDarwin, OSSolaris2]
+speedHack :: Stage -> Action Bool
+speedHack stage = do
+    i386   <- anyTargetArch stage [ArchX86]
+    goodOS <- not <$> anyTargetOs stage [OSDarwin, OSSolaris2]
     return $ i386 && goodOS
 
 -- See @rts/ghc.mk@.

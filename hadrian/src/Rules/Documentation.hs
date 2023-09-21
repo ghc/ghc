@@ -268,7 +268,7 @@ buildPackageDocumentation = do
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
-        dynamicPrograms <- dynamicGhcPrograms =<< flavour
+        dynamicPrograms <- flip dynamicGhcPrograms (stage context)=<< flavour
         let haddockWay = if dynamicPrograms then dynamic else vanilla
 
         -- Build the dependencies of the package we are going to build documentation for

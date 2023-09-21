@@ -241,13 +241,13 @@ testRules = do
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
-        ghcFlags        <- runTestGhcFlags
+        ghcFlags        <- runTestGhcFlags stg
         let ghciFlags = ghcFlags ++ unwords
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history", "-fprint-error-index-links=never"
               ]
-        ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-        ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+        ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+        ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
 
         pythonPath      <- builderPath Python
 
