@@ -384,6 +384,9 @@ generateGhcPlatformH = do
     trackGenerateHs
     stage    <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    -- The current context stage is the stage of the compiler we are building with.
+    -- The information here needs to be information for the stage of the built compiler (ie succStage)
+    stage    <- succStage <$> getStage
     buildPlatform  <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     buildArch      <- chooseSetting (queryBuild queryArch)   (queryHost queryArch)
     buildOs        <- chooseSetting (queryBuild queryOS)     (queryHost queryOS)
@@ -429,7 +432,7 @@ generateGhcPlatformH = do
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
-    stage <- getStage
+    stage <- succStage <$> getStage
     settings <- traverse sequence $
         [ ("C compiler command",   queryTarget stage ccPath)
         , ("C compiler flags",     queryTarget stage ccFlags)
@@ -520,7 +523,7 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
-    let queryTarget f = f <$> expr (targetStage stage)
+    let queryTarget f = f <$> expr (targetStage (succStage stage))
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
     trackGenerateHs
