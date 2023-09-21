@@ -10,7 +10,8 @@ module GHC.Tc.Utils.Concrete
     hasFixedRuntimeRep
   , hasFixedRuntimeRep_syntactic
 
-  , unifyConcrete
+  , unifyConcrete_kind
+  , unifyConcrete_rep
 
   , idConcreteTvs
   )
@@ -19,13 +20,15 @@ module GHC.Tc.Utils.Concrete
 import GHC.Prelude
 
 import GHC.Builtin.Names       ( unsafeCoercePrimName )
-import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
+import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon, runtimeRepTy )
 
 import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
                                , mkGReflRightMCo, mkNomReflCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy)
+import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy,
+                                 typeOrConstraintKind, typeTypeOrConstraint,
+                                 sORTKind_maybe )
 
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
@@ -43,10 +46,12 @@ import GHC.Types.Var           ( tyVarKind, tyVarName )
 
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString     ( FastString, fsLit )
 
 
 import Control.Monad      ( void )
+import Data.Maybe         ( isJust )
 import Data.Functor       ( ($>) )
 import Data.List.NonEmpty ( NonEmpty((:|)) )
 
@@ -405,7 +410,7 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
 hasFixedRuntimeRep frr_ctxt ty =
-  checkFRR_with (unifyConcrete (fsLit "cx") . ConcreteFRR) frr_ctxt ty
+  checkFRR_with (unifyConcrete_kind (fsLit "cx") . ConcreteFRR) frr_ctxt ty
 
 -- | Like 'hasFixedRuntimeRep', but we perform an eager syntactic check.
 --
@@ -489,9 +494,30 @@ checkFRR_with check_kind frr_ctxt ty
 --
 -- We assume the provided type is already at the kind-level
 -- (this only matters for error messages).
-unifyConcrete :: HasDebugCallStack
+unifyConcrete_kind :: HasDebugCallStack
               => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
-unifyConcrete occ_fs conc_orig ty
+unifyConcrete_kind occ_fs conc_orig ty
+  = do { massertPpr (isJust $ sORTKind_maybe ty) (ppr ty)
+       ; (ty, errs) <- makeTypeConcrete conc_orig ty
+       ; case errs of
+           -- We were able to make the type fully concrete.
+         { [] -> return MRefl
+           -- The type could not be made concrete; perhaps it contains
+           -- a skolem type variable, a type family application, ...
+           --
+           -- Create a new ConcreteTv metavariable @concrete_tv@
+           -- and unify @ty ~# concrete_tv@.
+         ; _  ->
+    do { conc_tv <- newConcreteTyVar conc_orig occ_fs runtimeRepTy
+       ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (typeOrConstraintKind (typeTypeOrConstraint ty) (mkTyVarTy conc_tv)) } } }
+  where
+    orig :: CtOrigin
+    orig = case conc_orig of
+      ConcreteFRR frr_orig -> FRROrigin frr_orig
+
+unifyConcrete_rep :: HasDebugCallStack
+              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+unifyConcrete_rep occ_fs conc_orig ty
   = do { (ty, errs) <- makeTypeConcrete conc_orig ty
        ; case errs of
            -- We were able to make the type fully concrete.

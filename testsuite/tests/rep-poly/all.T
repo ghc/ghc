@@ -106,6 +106,10 @@ test('RepPolyWrappedVar2', [js_skip], compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 
+test('T23883a', normal, compile_fail, [''])
+test('T23883b', normal, compile_fail, [''])
+test('T23883c', normal, compile_fail, [''])
+
 ###############################################################################
 ## The following tests require rewriting in RuntimeReps,                     ##
 ## i.e. PHASE 2 of the FixedRuntimeRep plan.                                 ##

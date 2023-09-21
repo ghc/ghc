@@ -30,7 +30,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
+import GHC.Tc.Utils.Concrete  ( unifyConcrete_rep, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
@@ -839,7 +839,7 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
              ->
              -- Example: user wrote e.g. (#,#) @(F Bool) for a type family F.
              -- Emit [W] F Bool ~ kappa[conc] and pretend the user wrote (#,#) @kappa.
-             do { mco <- unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
+             do { mco <- unifyConcrete_rep (occNameFS $ getOccName $ tv_nm) conc ty_arg0
                 ; return $ case mco of { MRefl -> ty_arg0; MCo co -> coercionRKind co } }
 
        ; let fun_ty    = mkForAllTy tvb inner_ty
