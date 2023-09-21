@@ -708,7 +708,7 @@ lvlMFE env strict_ctxt ann_expr
 
     is_con_app (Cast e _) = is_con_app e
     is_con_app (Var v)    = isDataConWorkId v
-    is_con_app e          = False
+    is_con_app _          = False
 
     -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
