@@ -10,6 +10,7 @@
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
   * Introduce `Data.Bounded` exporting the `Bounded` typeclass ([CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
   * Introduce `Data.Enum` exporting the `Enum` typeclass ([CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
+  * The `Data.Bounded.enumerate` function was introduced ([CLC TODO]())
   * Fix `withFile`, `withFileBlocking`, and `withBinaryFile` to not incorrectly annotate exceptions raised in wrapped computation. ([CLC proposal #237](https://github.com/haskell/core-libraries-committee/issues/237))
   * Fix `fdIsNonBlocking` to always be `0` for regular files and block devices on unix, regardless of `O_NONBLOCK`
   * Always use `safe` call to `read` for regular files and block devices on unix if the RTS is multi-threaded, regardless of `O_NONBLOCK`.
