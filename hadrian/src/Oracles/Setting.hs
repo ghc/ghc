@@ -254,7 +254,7 @@ targetStage :: Stage -> Action Target
 -- but the cross compiler should really be stage2 (#19174).
 -- When we get there, we'll need to change the definition here.
 targetStage (Stage0 {}) = getHostTarget
-targetStage (Stage1 {}) = getTargetTarget
+targetStage (Stage1 {}) = getHostTarget
 targetStage (Stage2 {}) = getTargetTarget -- the last two only make sense if the target can be executed locally
 targetStage (Stage3 {}) = getTargetTarget
 

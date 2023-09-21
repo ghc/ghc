@@ -11,8 +11,8 @@ configureBuilderArgs = do
     gmpPath    <- expr (gmpBuildPath stage)
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
-                targetArch <- queryTarget queryArch
-                targetPlatform <- queryTarget targetPlatformTriple
+                targetArch <- queryArch <$> (expr $ targetStage stage)
+                targetPlatform <- targetPlatformTriple <$> (expr $ targetStage stage)
                 buildPlatform <- queryBuild targetPlatformTriple
                 pure $ [ "--enable-shared=no"
                      , "--with-pic=yes"

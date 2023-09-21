@@ -102,9 +102,9 @@ buildProgram bin ctx@(Context{..}) rs = do
   cross <- flag CrossCompiling
   -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
   case (cross, stage) of
-    (True, s) | s > stage0InTree -> do
-        srcDir <- buildRoot <&> (-/- (stageString stage0InTree -/- "bin"))
-        copyFile (srcDir -/- takeFileName bin) bin
+    --(True, s) | s > stage0InTree -> do
+    --    srcDir <- buildRoot <&> (-/- (stageString stage0InTree -/- "bin"))
+    --    copyFile (srcDir -/- takeFileName bin) bin
     (False, s) | s > stage0InTree && (package `elem` [touchy, unlit]) -> do
         srcDir <- stageLibPath stage0InTree <&> (-/- "bin")
         copyFile (srcDir -/- takeFileName bin) bin

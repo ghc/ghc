@@ -384,6 +384,7 @@ generateGhcPlatformH = do
     trackGenerateHs
     stage    <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    let queryTarget f = f <$> expr (targetStage stage)
     buildPlatform  <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     buildArch      <- chooseSetting (queryBuild queryArch)   (queryHost queryArch)
     buildOs        <- chooseSetting (queryBuild queryOS)     (queryHost queryOS)
@@ -429,6 +430,7 @@ generateGhcPlatformH = do
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
+    let queryTarget f = f <$> expr (targetStage (Context.stage ctx))
     settings <- traverse sequence $
         [ ("C compiler command",   queryTarget ccPath)
         , ("C compiler flags",     queryTarget ccFlags)
@@ -456,6 +458,7 @@ generateSettings = do
         , ("touch command", expr $ settingsFileSetting ToolchainSetting_TouchCommand)
         , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+-- MP: TODO wrong, needs to be per-stage
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", queryTarget targetPlatformTriple)
         , ("target os",        queryTarget (show . archOS_OS . tgtArchOs))
@@ -518,6 +521,7 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    let queryTarget f = f <$> expr (targetStage stage)
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
     trackGenerateHs
