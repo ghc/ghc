@@ -811,3 +811,8 @@ Test23885:
 	# ppr is not currently unicode aware
 	# $(CHECK_PPR)   $(LIBDIR) Test23885.hs
 	$(CHECK_EXACT) $(LIBDIR) Test23885.hs
+
+.PHONY: Test23984
+Test23984:
+	$(CHECK_PPR)   $(LIBDIR) Test23984.hs
+	$(CHECK_EXACT) $(LIBDIR) Test23984.hs
