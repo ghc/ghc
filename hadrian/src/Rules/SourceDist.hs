@@ -156,7 +156,8 @@ prepareTree dest = do
       , pkgPath terminfo -/- "configure"
       , "configure"
       , "aclocal.m4"
-      , "mk" -/- "config.h.in" ]
+      , "mk" -/- "unused.h.in"
+      ]
 
     copyAlexHappyFiles =
       forM_ alexHappyFiles $ \(stg, pkg, inp, out) -> do
