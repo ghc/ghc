@@ -48,7 +48,7 @@ cabalBuildRules = do
     priority 2.0 $ root -/- "stage-cabal" -/- "bin" -/- ".stamp" %> \stamp -> do
         -- We 'need' all binaries and libraries
         all_pkgs <- stagePackages Stage1
-        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
+        (lib_targets, bin_targets) <- partitionEithers <$> mapM (pkgTarget Stage1 Stage1) all_pkgs
         cross <- flag CrossCompiling
         iserv_targets <- if cross then pure [] else iservBins
         need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))

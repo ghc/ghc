@@ -130,10 +130,12 @@ buildBinDistDir :: FilePath -> Stage -> Stage -> Action ()
 buildBinDistDir root library_stage executable_stage = do
     -- We 'need' all binaries and libraries
     lib_pkgs <- stagePackages library_stage
-    (lib_targets, _) <- partitionEithers <$> mapM pkgTarget lib_pkgs
+    (lib_targets, _) <- partitionEithers <$> mapM (pkgTarget library_stage executable_stage) lib_pkgs
 
     bin_pkgs <- stagePackages executable_stage
-    (_, bin_targets) <- partitionEithers <$> mapM pkgTarget bin_pkgs
+    (_, bin_targets) <- partitionEithers <$> mapM (pkgTarget library_stage executable_stage) bin_pkgs
+
+    liftIO $ print (library_stage, executable_stage, lib_targets, bin_targets)
 
 
     cross <- flag CrossCompiling
@@ -409,11 +411,11 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Package -> Action (Either FilePath (Package, FilePath))
-pkgTarget pkg
-    | isLibrary pkg = Left <$> pkgConfFile (vanillaContext Stage1 pkg)
+pkgTarget :: Stage -> Stage -> Package -> Action (Either FilePath (Package, FilePath))
+pkgTarget library_stage executable_stage pkg
+    | isLibrary pkg = Left <$> pkgConfFile (vanillaContext library_stage pkg)
     | otherwise     = do
-        path <- programPath =<< programContext Stage1 pkg
+        path <- programPath =<< programContext executable_stage pkg
         return (Right (pkg, path))
 
 useGhcPrefix :: Package -> Bool
