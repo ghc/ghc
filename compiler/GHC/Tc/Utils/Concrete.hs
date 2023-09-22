@@ -20,14 +20,15 @@ module GHC.Tc.Utils.Concrete
 import GHC.Prelude
 
 import GHC.Builtin.Names       ( unsafeCoercePrimName )
-import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon, runtimeRepTy )
+import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon, runtimeRepTy
+                               , tYPETyCon, cONSTRAINTTyCon )
 
 import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
-                               , mkGReflRightMCo, mkNomReflCo )
+                               , mkGReflRightMCo, mkNomReflCo
+                               , mkTyConAppCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
 import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy,
-                                 typeOrConstraintKind, typeTypeOrConstraint,
                                  sORTKind_maybe )
 
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
@@ -37,7 +38,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 
-import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
+import GHC.Types.Basic         ( TypeOrKind(KindLevel), TypeOrConstraint(..) )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -51,7 +52,6 @@ import GHC.Data.FastString     ( FastString, fsLit )
 
 
 import Control.Monad      ( void )
-import Data.Maybe         ( isJust )
 import Data.Functor       ( ($>) )
 import Data.List.NonEmpty ( NonEmpty((:|)) )
 
@@ -495,28 +495,22 @@ checkFRR_with check_kind frr_ctxt ty
 -- We assume the provided type is already at the kind-level
 -- (this only matters for error messages).
 unifyConcrete_kind :: HasDebugCallStack
-              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+                   => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
 unifyConcrete_kind occ_fs conc_orig ty
-  = do { massertPpr (isJust $ sORTKind_maybe ty) (ppr ty)
-       ; (ty, errs) <- makeTypeConcrete conc_orig ty
-       ; case errs of
-           -- We were able to make the type fully concrete.
-         { [] -> return MRefl
-           -- The type could not be made concrete; perhaps it contains
-           -- a skolem type variable, a type family application, ...
-           --
-           -- Create a new ConcreteTv metavariable @concrete_tv@
-           -- and unify @ty ~# concrete_tv@.
-         ; _  ->
-    do { conc_tv <- newConcreteTyVar conc_orig occ_fs runtimeRepTy
-       ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (typeOrConstraintKind (typeTypeOrConstraint ty) (mkTyVarTy conc_tv)) } } }
-  where
-    orig :: CtOrigin
-    orig = case conc_orig of
-      ConcreteFRR frr_orig -> FRROrigin frr_orig
+  = case sORTKind_maybe ty of
+      Nothing -> pprPanic "unifyConcrete: not a TYPE rep" (ppr ty $$ ppr (typeKind ty))
+      Just (torc, rep) ->
+        do { let tc = case torc of
+                        TypeLike -> tYPETyCon
+                        ConstraintLike -> cONSTRAINTTyCon
+           ; mco <- unifyConcrete_rep occ_fs conc_orig rep
+           ; case mco of
+               MRefl -> return MRefl
+               MCo co -> return $ MCo $ mkTyConAppCo Nominal tc [co] }
 
+-- Precondition: 'ty' has kind RuntimeRep
 unifyConcrete_rep :: HasDebugCallStack
-              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+                  => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
 unifyConcrete_rep occ_fs conc_orig ty
   = do { (ty, errs) <- makeTypeConcrete conc_orig ty
        ; case errs of
@@ -528,12 +522,9 @@ unifyConcrete_rep occ_fs conc_orig ty
            -- Create a new ConcreteTv metavariable @concrete_tv@
            -- and unify @ty ~# concrete_tv@.
          ; _  ->
-    do { conc_tv <- newConcreteTyVar conc_orig occ_fs ki
-           -- NB: newConcreteTyVar asserts that 'ki' is concrete.
+    do { conc_tv <- newConcreteTyVar conc_orig occ_fs runtimeRepTy
        ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (mkTyVarTy conc_tv) } } }
   where
-    ki :: TcKind
-    ki = typeKind ty
     orig :: CtOrigin
     orig = case conc_orig of
       ConcreteFRR frr_orig -> FRROrigin frr_orig
