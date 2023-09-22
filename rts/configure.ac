@@ -33,6 +33,10 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** ARM outline atomics
+dnl --------------------------------------------------------------
+FP_ARM_OUTLINE_ATOMICS
+
 dnl ** IPE data compression
 dnl --------------------------------------------------------------
 AC_DEFINE_UNQUOTED([HAVE_LIBZSTD], [$CABAL_FLAG_libzstd], [Define to 1 if you

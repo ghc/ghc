@@ -1120,10 +1120,6 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 
-dnl ** ARM outline atomics
-dnl --------------------------------------------------------------
-FP_ARM_OUTLINE_ATOMICS
-
 dnl ** IPE data compression
 dnl --------------------------------------------------------------
 FP_FIND_LIBZSTD
