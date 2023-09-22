@@ -22,6 +22,8 @@ import Hadrian.Oracles.TextFile
 import Hadrian.Oracles.Path
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (runMaybeT)
+import Debug.Trace
+import GHC.Stack
 
 import Base
 
@@ -248,11 +250,9 @@ libsuf st way
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
 
+-- Build libraries for this stage targetting this Target
+-- For example, we want to build RTS with stage1 for the host target as we produce a host executable with stage1  (which cross-compiles to stage2)
 targetStage :: Stage -> Action Target
--- TODO(#19174):
--- We currently only support cross-compiling a stage1 compiler,
--- but the cross compiler should really be stage2 (#19174).
--- When we get there, we'll need to change the definition here.
 targetStage (Stage0 {}) = getHostTarget
 targetStage (Stage1 {}) = getHostTarget
 targetStage (Stage2 {}) = getTargetTarget
@@ -265,9 +265,10 @@ queryTargetTarget :: Stage -> (Target -> a) -> Action a
 queryTargetTarget s f = f <$> targetStage s
 
 -- | Whether the StageN compiler is a cross-compiler or not.
-crossStage :: Stage -> Action Bool
+crossStage :: HasCallStack => Stage -> Action Bool
 crossStage st = do
-  st_target <- targetStage st
-  st_host   <- targetStage (predStage st)
+  st_target <- targetStage (succStage st)
+  st_host   <- targetStage st
+  traceShowM (targetPlatformTriple st_target, targetPlatformTriple st_host, st)
   return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
 

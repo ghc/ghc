@@ -384,17 +384,15 @@ generateGhcPlatformH = do
     trackGenerateHs
     stage    <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
-    -- The current context stage is the stage of the compiler we are building with.
-    -- The information here needs to be information for the stage of the built compiler (ie succStage)
-    stage    <- succStage <$> getStage
+    -- Not right for stage 3
     buildPlatform  <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     buildArch      <- chooseSetting (queryBuild queryArch)   (queryHost queryArch)
     buildOs        <- chooseSetting (queryBuild queryOS)     (queryHost queryOS)
     buildVendor    <- chooseSetting (queryBuild queryVendor) (queryHost queryVendor)
-    hostPlatform   <- chooseSetting (queryHost targetPlatformTriple) (queryTarget stage targetPlatformTriple)
-    hostArch       <- chooseSetting (queryHost queryArch)    (queryTarget stage queryArch)
-    hostOs         <- chooseSetting (queryHost queryOS)      (queryTarget stage queryOS)
-    hostVendor     <- chooseSetting (queryHost queryVendor)  (queryTarget stage queryVendor)
+    hostPlatform   <- queryTarget stage targetPlatformTriple
+    hostArch       <- queryTarget stage queryArch
+    hostOs         <- queryTarget stage queryOS
+    hostVendor     <- queryTarget stage queryVendor
     ghcUnreg       <- queryTarget stage tgtUnregisterised
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
@@ -460,8 +458,7 @@ generateSettings = do
         , ("touch command", expr $ settingsFileSetting ToolchainSetting_TouchCommand)
         , ("windres command", queryTarget stage (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
--- MP: TODO wrong, needs to be per-stage
-        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
+        , ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
         , ("target platform string", queryTarget stage targetPlatformTriple)
         , ("target os",        queryTarget stage (show . archOS_OS . tgtArchOs))
         , ("target arch",      queryTarget stage (show . archOS_arch . tgtArchOs))
@@ -523,9 +520,10 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
-    let queryTarget f = f <$> expr (targetStage (succStage stage))
+    let queryTarget f = f <$> expr (targetStage stage)
+    -- Not right for stage3
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
-    hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
+    hostPlatform <- queryTarget targetPlatformTriple
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion

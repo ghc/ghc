@@ -20,7 +20,6 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
     outs   <- getOutputs
     stage <- getStage
-    let stage = Stage1
     let (outputFile, mode, tempDir) = case outs of
             [ofile, mode, tmpdir] -> (ofile,mode,tmpdir)
             [ofile, tmpdir]
@@ -46,10 +45,10 @@ includeCcArgs = do
     rtsPath <- expr $ rtsBuildPath stage
     mconcat [ cArgs
             , cWarnings
-            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage Stage1)
-            , queryTargetTarget Stage1 tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage stage)
+            , queryTargetTarget stage tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"
-            , notM (targetSupportsSMP Stage1) ? arg "-DNOSMP"
+            , notM (targetSupportsSMP stage) ? arg "-DNOSMP"
             , arg "-fcommon" ]
