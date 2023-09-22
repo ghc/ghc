@@ -714,6 +714,9 @@ lvlMFE env _strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && (  (is_bot_lam && escapes_value_lam)
                    || (exprIsExpandable expr && not (is_con_app expr)) )
+-- escapes_value_lam very important
+--   f x = let fail = error ("foo" ++ x) in ...
+-- We want to float this out
 {-
                 && (floatConsts env || is_function || is_bot_lam)
                             -- Always float constant lambdas
