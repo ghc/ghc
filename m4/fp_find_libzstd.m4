@@ -1,3 +1,13 @@
+# FP_FIND_LIBZSTD
+# --------------------------------------------------------------
+# Check whether we are we want IPE data compression, whether we have
+# libzstd in order to do it, and whether zstd will be statically linked.
+#
+# Sets variables:
+#   - UseLibZstd: [YES|NO]
+#   - UseStaticLibZstd: [YES|NO]
+#   - LibZstdLibDir: optional path
+#   - LibZstdIncludeDir: optional path
 AC_DEFUN([FP_FIND_LIBZSTD],
 [
   dnl ** Is IPE data compression enabled?
@@ -41,8 +51,6 @@ AC_DEFUN([FP_FIND_LIBZSTD],
         ]
       )
 
-    AC_SUBST(LibZstdLibDir)
-
     AC_ARG_WITH(
         libzstd-includes,
         [AS_HELP_STRING(
@@ -54,8 +62,6 @@ AC_DEFUN([FP_FIND_LIBZSTD],
           LIBZSTD_CFLAGS="-I$withval"
         ]
       )
-
-    AC_SUBST(LibZstdIncludeDir)
 
     CFLAGS2="$CFLAGS"
     CFLAGS="$LIBZSTD_CFLAGS $CFLAGS"
@@ -90,16 +96,8 @@ AC_DEFUN([FP_FIND_LIBZSTD],
     LDFLAGS="$LDFLAGS2"
   fi
 
-  AC_DEFINE_UNQUOTED([HAVE_LIBZSTD], [$HaveLibZstd], [Define to 1 if you
-    wish to compress IPE data in compiler results (requires libzstd)])
-
-  AC_DEFINE_UNQUOTED([STATIC_LIBZSTD], [$StaticLibZstd], [Define to 1 if you
-    wish to statically link the libzstd compression library in the compiler
-    (requires libzstd)])
-
   if test $HaveLibZstd = "1" ; then
-    AC_SUBST([UseLibZstd],[YES])
-    AC_SUBST([CabalHaveLibZstd],[True])
+    UseLibZstd=YES
     if test $StaticLibZstd = "1" ; then
       case "${host_os}" in
           darwin*)
@@ -107,14 +105,11 @@ AC_DEFUN([FP_FIND_LIBZSTD],
                   [--enable-static-libzstd is not compatible with darwin]
                 )
       esac
-      AC_SUBST([UseStaticLibZstd],[YES])
-      AC_SUBST([CabalStaticLibZstd],[True])
+      UseStaticLibZstd=YES
     else
-      AC_SUBST([UseStaticLibZstd],[NO])
-      AC_SUBST([CabalStaticLibZstd],[False])
+      UseStaticLibZstd=NO
     fi
   else
-    AC_SUBST([UseLibZstd],[NO])
-    AC_SUBST([CabalHaveLibZstd],[False])
+    UseLibZstd=NO
   fi
 ])

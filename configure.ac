@@ -1127,6 +1127,10 @@ FP_ARM_OUTLINE_ATOMICS
 dnl ** IPE data compression
 dnl --------------------------------------------------------------
 FP_FIND_LIBZSTD
+AC_SUBST(UseLibZstd)
+AC_SUBST(UseStaticLibZstd)
+AC_SUBST(LibZstdLibDir)
+AC_SUBST(LibZstdIncludeDir)
 
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
@@ -1289,14 +1293,11 @@ echo "\
    cabal-install : $CABAL
 "
 
-USING_LIBZSTD=$(if [ "$HaveLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
-STATIC_LIBZSTD=$(if [ "$StaticLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
-
 echo "\
    Using optional dependencies:
       libnuma : $UseLibNuma
-      libzstd : $USING_LIBZSTD
-         statically linked? : $STATIC_LIBZSTD
+      libzstd : $UseLibZstd
+         statically linked? : ${UseStaticLibZstd:-N/A}
       libdw   : $UseLibdw
 
    Using LLVM tools

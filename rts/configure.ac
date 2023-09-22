@@ -33,6 +33,15 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** IPE data compression
+dnl --------------------------------------------------------------
+AC_DEFINE_UNQUOTED([HAVE_LIBZSTD], [$CABAL_FLAG_libzstd], [Define to 1 if you
+  wish to compress IPE data in compiler results (requires libzstd)])
+
+AC_DEFINE_UNQUOTED([STATIC_LIBZSTD], [$CABAL_FLAG_static_libzstd], [Define to 1 if you
+  wish to statically link the libzstd compression library in the compiler
+  (requires libzstd)])
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 AC_DEFINE_UNQUOTED([USE_LIBDW], [$CABAL_FLAG_libdw], [Set to 1 to use libdw])
