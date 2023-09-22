@@ -10,6 +10,7 @@ module GHC.Tc.Utils.Concrete
     hasFixedRuntimeRep
   , hasFixedRuntimeRep_syntactic
 
+  , unifyConcrete_kind
   , unifyConcrete
 
   , idConcreteTvs
@@ -19,13 +20,16 @@ module GHC.Tc.Utils.Concrete
 import GHC.Prelude
 
 import GHC.Builtin.Names       ( unsafeCoercePrimName )
-import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
+import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon
+                               , tYPETyCon, cONSTRAINTTyCon )
 
 import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
-                               , mkGReflRightMCo, mkNomReflCo )
+                               , mkGReflRightMCo, mkNomReflCo
+                               , mkTyConAppCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy)
+import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy,
+                                 sORTKind_maybe )
 
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
@@ -34,7 +38,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 
-import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
+import GHC.Types.Basic         ( TypeOrKind(KindLevel), TypeOrConstraint(..) )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -43,6 +47,7 @@ import GHC.Types.Var           ( tyVarKind, tyVarName )
 
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString     ( FastString, fsLit )
 
 
@@ -632,7 +637,7 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
 hasFixedRuntimeRep frr_ctxt ty =
-  checkFRR_with (unifyConcrete (fsLit "cx") . ConcreteFRR) frr_ctxt ty
+  checkFRR_with (unifyConcrete_kind (fsLit "cx") . ConcreteFRR) frr_ctxt ty
 
 -- | Like 'hasFixedRuntimeRep', but we perform an eager syntactic check.
 --
@@ -700,24 +705,51 @@ checkFRR_with check_kind frr_ctxt ty
     frr_orig :: FixedRuntimeRepOrigin
     frr_orig = FixedRuntimeRepOrigin { frr_type = ty, frr_context = frr_ctxt }
 
--- | Ensure that the given type @ty@ can unify with a concrete type,
+-- | Ensure that the given kind @ki@ can unify with a concrete type,
 -- in the sense of Note [Concrete types].
+--
+-- Returns a coercion @co :: ki ~# conc_ki@, where @conc_ki@ is
+-- concrete.
+--
+-- If the kind is already syntactically concrete, this
+-- immediately returns a reflexive coercion. Otherwise,
+-- it creates a new concrete metavariable @concrete_ki@
+-- and emits an equality constraint @ki ~# concrete_ki@,
+-- to be handled by the constraint solver.
+--
+-- Precondition: @ki@ must be of the form @TYPE rep@ or @CONSTRAINT rep@.
+unifyConcrete_kind :: HasDebugCallStack
+                   => FastString -- ^ name to use when creating concrete metavariables
+                   -> ConcreteTvOrigin
+                   -> TcKind
+                   -> TcM TcMCoercionN
+unifyConcrete_kind occ_fs conc_orig ki
+  = case sORTKind_maybe ki of
+      Nothing -> pprPanic "unifyConcrete_kind: kind is not of the form 'TYPE rep' or 'CONSTRAINT rep'" $
+                   ppr ki <+> dcolon <+> ppr (typeKind ki)
+      Just (torc, rep) ->
+        do { let tc = case torc of
+                        TypeLike -> tYPETyCon
+                        ConstraintLike -> cONSTRAINTTyCon
+           ; mco <- unifyConcrete occ_fs conc_orig rep
+           ; case mco of
+               MRefl -> return MRefl
+               MCo co -> return $ MCo $ mkTyConAppCo Nominal tc [co] }
+
+-- | Ensure the given type can be unified with
+-- a concrete type, in the sense of Note [Concrete types].
 --
 -- Returns a coercion @co :: ty ~# conc_ty@, where @conc_ty@ is
 -- concrete.
 --
--- If the type is already syntactically concrete, this
--- immediately returns a reflexive coercion. Otherwise,
--- it creates a new concrete metavariable @concrete_tv@
--- and emits an equality constraint @ty ~# concrete_tv@,
--- to be handled by the constraint solver.
+-- Precondition: the kind of the supplied type is concrete.
 --
--- Invariant: the kind of the supplied type must be concrete.
---
--- We assume the provided type is already at the kind-level
--- (this only matters for error messages).
+-- Assumes that the given type is at the kind-level (for error messages).
 unifyConcrete :: HasDebugCallStack
-              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+              => FastString -- ^ name to use when creating concrete metavariables
+              -> ConcreteTvOrigin
+              -> TcType
+              -> TcM TcMCoercionN
 unifyConcrete occ_fs conc_orig ty
   = do { (ty, errs) <- makeTypeConcrete conc_orig ty
        ; case errs of
@@ -729,8 +761,7 @@ unifyConcrete occ_fs conc_orig ty
            -- Create a new ConcreteTv metavariable @concrete_tv@
            -- and unify @ty ~# concrete_tv@.
          ; _  ->
-    do { conc_tv <- newConcreteTyVar conc_orig occ_fs ki
-           -- NB: newConcreteTyVar asserts that 'ki' is concrete.
+    do { conc_tv <- newConcreteTyVar conc_orig occ_fs ki -- NB: ki must be concrete.
        ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (mkTyVarTy conc_tv) } } }
   where
     ki :: TcKind

@@ -1,0 +1,6 @@
+
+T23883a.hs:6:1: error: [GHC-55287]
+    The first pattern in the equation for ‘setField’
+    does not have a fixed runtime representation.
+    Its type is:
+      a :: TYPE a_rep
