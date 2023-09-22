@@ -229,7 +229,7 @@ section "The word size story."
          must contain at least 30 bits. GHC always implements
          'Int' using the primitive type 'Int#', whose size equals
          the @MachDeps.h@ constant @WORD\_SIZE\_IN\_BITS@.
-         This is normally set based on the @config.h@ parameter
+         This is normally set based on the RTS @ghcautoconf.h@ parameter
          @SIZEOF\_HSWORD@, i.e., 32 bits on 32-bit machines, 64
          bits on 64-bit machines.
 

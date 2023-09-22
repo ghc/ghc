@@ -28,7 +28,7 @@ if [ ! -f b1-stamp ]; then
 
    # For cross-compilation, at this stage you may want to set up a source
    # tree on the target machine, run the configure script there, and bring
-   # the resulting mk/config.h file back into this tree before building
+   # the resulting rts/ghcautoconf.h.autoconf file back into this tree before building
    # the libraries.
 
    touch mk/build.mk
@@ -38,7 +38,7 @@ if [ ! -f b1-stamp ]; then
 
    # We could optimise slightly by not building hslibs here.  Also, building
    # the RTS is not necessary (and might not be desirable if we're using
-   # a config.h from the target system).
+   # a ghcautoconf.h from the target system).
    make stage1
 
   cd ..
