@@ -50,8 +50,6 @@ flag libzstd
   default: @CabalHaveLibZstd@
 flag static-libzstd
   default: @CabalStaticLibZstd@
-flag leading-underscore
-  default: @CabalLeadingUnderscore@
 flag smp
   default: True
 flag find-ptr

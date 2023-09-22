@@ -303,7 +303,6 @@ rtsCabalFlags = mconcat
     , flag "CabalNeedLibatomic" NeedLibatomic
     , flag "CabalUseSystemLibFFI" UseSystemFfi
     , targetFlag "CabalLibffiAdjustors" tgtUseLibffiForAdjustors
-    , targetFlag "CabalLeadingUnderscore" tgtSymbolsHaveLeadingUnderscore
     ]
   where
     flag = interpolateCabalFlag

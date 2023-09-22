@@ -216,7 +216,8 @@ AC_C_BIGENDIAN
 FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 
 dnl ** check for leading underscores in symbol names
-if test "$CABAL_FLAG_leading_underscore" = 1; then
+FP_LEADING_UNDERSCORE
+if test x"$fptools_cv_leading_underscore" = xyes; then
    AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
 fi
 
