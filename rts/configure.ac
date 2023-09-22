@@ -376,9 +376,9 @@ touch include/ghcautoconf.h
 
 echo "#if !defined(__GHCAUTOCONF_H__)" >> include/ghcautoconf.h
 echo "#define __GHCAUTOCONF_H__" >> include/ghcautoconf.h
-# Copy the contents of $srcdir/../mk/config.h, turning '#define PACKAGE_FOO
+# Copy the contents of ghcautoconf.h.autoconf, turning '#define PACKAGE_FOO
 # "blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
-cat $srcdir/../mk/config.h ghcautoconf.h.autoconf | sed \
+cat ghcautoconf.h.autoconf | sed \
    -e 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$,\1/* #undef \2 */,' \
    -e '/__GLASGOW_HASKELL/d' \
    -e '/REMOVE ME/d' \

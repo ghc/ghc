@@ -184,8 +184,6 @@ _darcs/
 /linter.log
 /mk/are-validating.mk
 /mk/build.mk
-/mk/config.h
-/mk/config.h.in
 /mk/config.mk
 /mk/config.mk.old
 /mk/system-cxx-std-lib-1.0.conf
