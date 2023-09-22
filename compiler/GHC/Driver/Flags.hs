@@ -696,6 +696,7 @@ data WarningFlag =
    | Opt_WarnIncompleteRecordSelectors               -- Since 9.10
    | Opt_WarnBadlyStagedTypes                        -- Since 9.10
    | Opt_WarnInconsistentFlags                       -- Since 9.8
+   | Opt_WarnDataKindsTC                             -- Since 9.10
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -809,6 +810,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnIncompleteRecordSelectors               -> "incomplete-record-selectors" :| []
   Opt_WarnBadlyStagedTypes                        -> "badly-staged-types" :| []
   Opt_WarnInconsistentFlags                       -> "inconsistent-flags" :| []
+  Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -949,7 +951,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnLoopySuperclassSolve,
         Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators,
-        Opt_WarnInconsistentFlags
+        Opt_WarnInconsistentFlags,
+        Opt_WarnDataKindsTC
       ]
 
 -- | Things you get with -W

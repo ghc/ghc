@@ -56,7 +56,7 @@ module GHC.Core.TyCon(
         tyConMustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isDataKindsPromotedDataCon,
-        isKindTyCon, isLiftedTypeKindTyConName,
+        isKindTyCon, isKindName, isLiftedTypeKindTyConName,
         isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
         isDataTyCon,
@@ -2284,16 +2284,32 @@ isDataKindsPromotedDataCon (TyCon { tyConDetails = details })
               = not (isTypeDataCon dc)
   | otherwise = False
 
--- | Is this tycon really meant for use at the kind level? That is,
--- should it be permitted without -XDataKinds?
+-- | Is this 'TyCon' really meant for use at the kind level? That is,
+-- should it be permitted without @DataKinds@?
 isKindTyCon :: TyCon -> Bool
-isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
+isKindTyCon = isKindUniquable
+
+-- | This is 'Name' really meant for use at the kind level? That is,
+-- should it be permitted wihout @DataKinds@?
+isKindName :: Name -> Bool
+isKindName = isKindUniquable
+
+-- | The workhorse for 'isKindTyCon' and 'isKindName'.
+isKindUniquable :: Uniquable a => a -> Bool
+isKindUniquable thing = getUnique thing `elementOfUniqSet` kindTyConKeys
 
 -- | These TyCons should be allowed at the kind level, even without
 -- -XDataKinds.
 kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
-  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey ]
+  -- Make sure to keep this in sync with the following:
+  --
+  -- - The Overview section in docs/users_guide/exts/data_kinds.rst in the GHC
+  --   User's Guide.
+  --
+  -- - The typecheck/should_compile/T22141f.hs test case, which ensures that all
+  --   of these can successfully be used without DataKinds.
+  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey, cONSTRAINTTyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, levityTyCon
                                           , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )

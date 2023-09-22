@@ -647,6 +647,7 @@ test('T20588', [extra_files(['T20588.hs', 'T20588.hs-boot', 'T20588_aux.hs'])], 
 test('T20588c', [extra_files(['T20588c.hs', 'T20588c.hs-boot', 'T20588c_aux.hs'])], multimod_compile_fail, ['T20588c_aux.hs', '-v0'])
 test('T20189', normal, compile_fail, [''])
 test('T20873c', normal, compile_fail, [''])
+test('T20873d', normal, compile_fail, [''])
 test('FunDepOrigin1b', normal, compile_fail, [''])
 test('FD1', normal, compile_fail, [''])
 test('FD2', normal, compile_fail, [''])

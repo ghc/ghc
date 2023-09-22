@@ -18,6 +18,25 @@ Language
 
   This feature is guarded behind :extension:`RequiredTypeArguments` and :extension:`ExplicitNamespaces`.
 
+- Due to an oversight, previous GHC releases (starting from 9.4) allowed the use
+  of promoted data types in kinds, even when :extension:`DataKinds` was not
+  enabled. That is, GHC would erroneously accept the following code: ::
+
+    {-# LANGUAGE NoDataKinds #-}
+
+    import Data.Kind (Type)
+    import GHC.TypeNats (Nat)
+
+    -- Nat shouldn't be allowed here without DataKinds
+    data Vec :: Nat -> Type -> Type
+
+  This oversight has now been fixed. If you wrote code that took advantage of
+  this oversight, you may need to enable :extension:`DataKinds` in your code to
+  allow it to compile with GHC 9.10.
+
+  For more information on what types are allowed in kinds, see the
+  :ref:`promotion` section.
+
 Compiler
 ~~~~~~~~
 

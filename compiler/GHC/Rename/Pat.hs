@@ -79,6 +79,7 @@ import GHC.Types.Literal   ( inCharRange )
 import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields )
 import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
+import GHC.Core.TyCon      ( isKindName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, unless )
@@ -1255,9 +1256,14 @@ rn_ty_pat_var lrdr@(L l rdr) = do
 -- For the difference between `rn_ty_pat` and `rnHsTyKi` see Note [CpsRn monad]
 -- and Note [Implicit and explicit type variable binders]
 rn_ty_pat :: HsType GhcPs -> TPRnM (HsType GhcRn)
-rn_ty_pat (HsTyVar an prom lrdr) = do
-  name <- rn_ty_pat_var lrdr
-  pure (HsTyVar an prom name)
+rn_ty_pat tv@(HsTyVar an prom lrdr) = do
+  lname@(L _ name) <- rn_ty_pat_var lrdr
+  when (isDataConName name && not (isKindName name)) $
+    -- Any use of a promoted data constructor name (that is not specifically
+    -- exempted by isKindName) is illegal without the use of DataKinds.
+    -- See Note [Checking for DataKinds] in GHC.Tc.Validity.
+    check_data_kinds tv
+  pure (HsTyVar an prom lname)
 
 rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
   bindHsForAllTelescope ctxt tele $ \tele' -> do
@@ -1331,8 +1337,7 @@ rn_ty_pat (HsDocTy an ty haddock_doc) = do
   pure (HsDocTy an ty' haddock_doc')
 
 rn_ty_pat ty@(HsExplicitListTy _ prom tys) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel ty))
+  check_data_kinds ty
 
   unless (isPromoted prom) $
     liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
@@ -1341,14 +1346,12 @@ rn_ty_pat ty@(HsExplicitListTy _ prom tys) = do
   pure (HsExplicitListTy noExtField prom tys')
 
 rn_ty_pat ty@(HsExplicitTupleTy _ tys) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel ty))
+  check_data_kinds ty
   tys' <- mapM rn_lty_pat tys
   pure (HsExplicitTupleTy noExtField tys')
 
 rn_ty_pat tyLit@(HsTyLit src t) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel tyLit))
+  check_data_kinds tyLit
   t' <- liftRn $ rnHsTyLit t
   pure (HsTyLit src t')
 
@@ -1405,6 +1408,11 @@ rn_ty_pat_arrow (HsLinearArrow (HsLolly arr)) = pure (HsLinearArrow (HsLolly arr
 rn_ty_pat_arrow (HsExplicitMult pct p arr)
   = rn_lty_pat p <&> (\mult -> HsExplicitMult pct mult arr)
 
+check_data_kinds :: HsType GhcPs -> TPRnM ()
+check_data_kinds thing = liftRn $ do
+  data_kinds <- xoptM LangExt.DataKinds
+  unless data_kinds $
+    addErr $ TcRnDataKindsError TypeLevel $ Left thing
 
 {- Note [Locally bound names in type patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
