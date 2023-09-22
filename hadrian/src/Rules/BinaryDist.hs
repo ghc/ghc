@@ -125,6 +125,160 @@ installTo relocatable prefix = do
                 NotRelocatable -> []
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
+
+buildBinDistDir :: FilePath -> Stage -> Stage -> Action ()
+buildBinDistDir root library_stage executable_stage = do
+    -- We 'need' all binaries and libraries
+    lib_pkgs <- stagePackages library_stage
+    (lib_targets, _) <- partitionEithers <$> mapM pkgTarget lib_pkgs
+
+    bin_pkgs <- stagePackages executable_stage
+    (_, bin_targets) <- partitionEithers <$> mapM pkgTarget bin_pkgs
+
+
+    cross <- flag CrossCompiling
+    iserv_targets <- if cross then pure [] else iservBins
+    need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+
+    version        <- setting ProjectVersion
+    targetPlatform <- setting TargetPlatformFull
+    distDir        <- Context.distDir (succStage executable_stage)
+    rtsDir         <- pkgUnitId library_stage rts
+    -- let rtsDir  = "rts"
+
+    let ghcBuildDir      = root -/- stageString library_stage
+        bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
+        ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+        rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
+                           -/- "include"
+
+    -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
+    -- and populate it with Stage2 build results
+    createDirectory bindistFilesDir
+    createDirectory (bindistFilesDir -/- "bin")
+    createDirectory (bindistFilesDir -/- "lib")
+    -- Also create wrappers with version suffixes (#20074)
+    forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path) -> do
+        let orig_filename = takeFileName prog_path
+            (name, ext) = splitExtensions orig_filename
+            suffix = if useGhcPrefix pkg
+                      then "ghc-" ++ version
+                      else version
+            version_prog = name ++ "-" ++ suffix ++ ext
+            -- Install the actual executable with a version suffix
+            install_path = bindistFilesDir -/- "bin" -/- version_prog
+            -- The wrapper doesn't have a version
+            unversioned_install_path = (bindistFilesDir -/- "bin" -/- orig_filename)
+        -- 1. Copy the executable to the versioned executable name in
+        -- the directory
+        copyFile prog_path install_path
+        -- 2. Either make a symlink for the unversioned version or
+        -- a wrapper script on platforms (windows) which don't support symlinks.
+        if windowsHost
+          then createVersionWrapper executable_stage pkg version_prog unversioned_install_path
+          else liftIO $ do
+            -- Use the IO versions rather than createFileLink because
+            -- we need to create a relative symlink.
+            IO.removeFile unversioned_install_path <|> return ()
+            IO.createFileLink version_prog unversioned_install_path
+
+        -- If we have runghc, also need runhaskell (#19571)
+        -- Make links for both versioned and unversioned runhaskell to
+        -- normal runghc
+        when (pkg == runGhc) $ do
+          let unversioned_runhaskell_path =
+                bindistFilesDir -/- "bin" -/- "runhaskell" ++ ext
+              versioned_runhaskell_path =
+                bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ version ++ ext
+          if windowsHost
+            then do
+              createVersionWrapper executable_stage pkg version_prog unversioned_runhaskell_path
+              createVersionWrapper executable_stage pkg version_prog versioned_runhaskell_path
+            else liftIO $ do
+              -- Unversioned
+              IO.removeFile unversioned_runhaskell_path <|> return ()
+              IO.createFileLink version_prog unversioned_runhaskell_path
+              -- Versioned
+              IO.removeFile versioned_runhaskell_path <|> return ()
+              IO.createFileLink version_prog versioned_runhaskell_path
+
+    copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
+    copyDirectory (rtsIncludeDir)         bindistFilesDir
+    when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
+
+    -- Call ghc-pkg recache, after copying so the package.cache is
+    -- accurate, then it's on the distributor to use `cp -a` to install
+    -- a relocatable bindist.
+    --
+    -- N.B. the ghc-pkg executable may be prefixed with a target triple
+    -- (c.f. #20267).
+
+    -- Not going to work for cross
+    ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
+    cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
+
+
+    unless cross $ need ["docs"]
+
+    -- TODO: we should only embed the docs that have been generated
+    -- depending on the current settings (flavours' "ghcDocs" field and
+    -- "--docs=.." command-line flag)
+    -- Currently we embed the "docs" directory if it exists but it may
+    -- contain outdated or even invalid data.
+
+    -- Use the IO version of doesDirectoryExist because the Shake Action
+    -- version should not be used for directories the build system can
+    -- create. Using the Action version caused documentation to not be
+    -- included in the bindist in the past (part of the problem in #18669).
+    whenM (liftIO (IO.doesDirectoryExist (root -/- "doc"))) $ do
+      copyDirectory (root -/- "doc") bindistFilesDir
+      copyFile ("libraries" -/- "prologue.txt") (bindistFilesDir -/- "docs-utils" -/- "prologue.txt")
+      copyFile ("libraries" -/- "gen_contents_index") (bindistFilesDir -/- "docs-utils" -/- "gen_contents_index" )
+
+    when windowsHost $ do
+      copyDirectory (root -/- "mingw") bindistFilesDir
+      -- we use that opportunity to delete the .stamp file that we use
+      -- as a proxy for the whole mingw toolchain, there's no point in
+      -- shipping it
+      removeFile (bindistFilesDir -/- mingwStamp)
+
+    -- Include bash-completion script in binary distributions. We don't
+    -- currently install this but merely include it for the user's
+    -- reference. See #20802.
+    copyDirectory ("utils" -/- "completion") bindistFilesDir
+
+    -- Copy the manpage into the binary distribution
+    whenM (liftIO (IO.doesDirectoryExist (root -/- "manpage"))) $ do
+      copyDirectory (root -/- "manpage") bindistFilesDir
+
+    -- We then 'need' all the files necessary to configure and install
+    -- (as in, './configure [...] && make install') this build on some
+    -- other machine.
+    need $ map (bindistFilesDir -/-)
+              (["configure", "Makefile"] ++ bindistInstallFiles)
+    copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
+    generateBuildMk >>= writeFile' (bindistFilesDir -/- "build.mk")
+    copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
+    copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
+
+    -- todo: do we need these wrappers on windows
+    forM_ bin_targets $ \(pkg, _) -> do
+      needed_wrappers <- pkgToWrappers executable_stage pkg
+      forM_ needed_wrappers $ \wrapper_name -> do
+        let suffix = if useGhcPrefix pkg
+                       then "ghc-" ++ version
+                       else version
+        wrapper_content <- wrapper wrapper_name
+        let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
+            versioned_wrapper = wrapper_name ++ "-" ++ suffix
+            versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
+        -- Write the wrapper to the versioned path
+        writeFile' versioned_wrapper_path wrapper_content
+        -- Create a symlink from the non-versioned to the versioned.
+        liftIO $ do
+          IO.removeFile unversioned_wrapper_path <|> return ()
+          IO.createFileLink versioned_wrapper unversioned_wrapper_path
+
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
@@ -145,150 +299,9 @@ bindistRules = do
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
         installTo NotRelocatable installPrefix
 
-    phony "binary-dist-dir" $ do
-        -- We 'need' all binaries and libraries
-        all_pkgs <- stagePackages Stage1
-        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
-        cross <- flag CrossCompiling
-        iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
-
-        version        <- setting ProjectVersion
-        targetPlatform <- setting TargetPlatformFull
-        distDir        <- Context.distDir Stage1
-        rtsDir         <- pkgUnitId Stage1 rts
-        -- let rtsDir  = "rts"
-
-        let ghcBuildDir      = root -/- stageString Stage1
-            bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
-            ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
-            rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
-                               -/- "include"
-
-        -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
-        -- and populate it with Stage2 build results
-        createDirectory bindistFilesDir
-        createDirectory (bindistFilesDir -/- "bin")
-        createDirectory (bindistFilesDir -/- "lib")
-        -- Also create wrappers with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path) -> do
-            let orig_filename = takeFileName prog_path
-                (name, ext) = splitExtensions orig_filename
-                suffix = if useGhcPrefix pkg
-                          then "ghc-" ++ version
-                          else version
-                version_prog = name ++ "-" ++ suffix ++ ext
-                -- Install the actual executable with a version suffix
-                install_path = bindistFilesDir -/- "bin" -/- version_prog
-                -- The wrapper doesn't have a version
-                unversioned_install_path = (bindistFilesDir -/- "bin" -/- orig_filename)
-            -- 1. Copy the executable to the versioned executable name in
-            -- the directory
-            copyFile prog_path install_path
-            -- 2. Either make a symlink for the unversioned version or
-            -- a wrapper script on platforms (windows) which don't support symlinks.
-            if windowsHost
-              then createVersionWrapper pkg version_prog unversioned_install_path
-              else liftIO $ do
-                -- Use the IO versions rather than createFileLink because
-                -- we need to create a relative symlink.
-                IO.removeFile unversioned_install_path <|> return ()
-                IO.createFileLink version_prog unversioned_install_path
-
-            -- If we have runghc, also need runhaskell (#19571)
-            -- Make links for both versioned and unversioned runhaskell to
-            -- normal runghc
-            when (pkg == runGhc) $ do
-              let unversioned_runhaskell_path =
-                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ ext
-                  versioned_runhaskell_path =
-                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ version ++ ext
-              if windowsHost
-                then do
-                  createVersionWrapper pkg version_prog unversioned_runhaskell_path
-                  createVersionWrapper pkg version_prog versioned_runhaskell_path
-                else liftIO $ do
-                  -- Unversioned
-                  IO.removeFile unversioned_runhaskell_path <|> return ()
-                  IO.createFileLink version_prog unversioned_runhaskell_path
-                  -- Versioned
-                  IO.removeFile versioned_runhaskell_path <|> return ()
-                  IO.createFileLink version_prog versioned_runhaskell_path
-
-        copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
-        copyDirectory (rtsIncludeDir)         bindistFilesDir
-        when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
-
-        -- Call ghc-pkg recache, after copying so the package.cache is
-        -- accurate, then it's on the distributor to use `cp -a` to install
-        -- a relocatable bindist.
-        --
-        -- N.B. the ghc-pkg executable may be prefixed with a target triple
-        -- (c.f. #20267).
-        ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
-        cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
-
-
-        unless cross $ need ["docs"]
-
-        -- TODO: we should only embed the docs that have been generated
-        -- depending on the current settings (flavours' "ghcDocs" field and
-        -- "--docs=.." command-line flag)
-        -- Currently we embed the "docs" directory if it exists but it may
-        -- contain outdated or even invalid data.
-
-        -- Use the IO version of doesDirectoryExist because the Shake Action
-        -- version should not be used for directories the build system can
-        -- create. Using the Action version caused documentation to not be
-        -- included in the bindist in the past (part of the problem in #18669).
-        whenM (liftIO (IO.doesDirectoryExist (root -/- "doc"))) $ do
-          copyDirectory (root -/- "doc") bindistFilesDir
-          copyFile ("libraries" -/- "prologue.txt") (bindistFilesDir -/- "docs-utils" -/- "prologue.txt")
-          copyFile ("libraries" -/- "gen_contents_index") (bindistFilesDir -/- "docs-utils" -/- "gen_contents_index" )
-
-        when windowsHost $ do
-          copyDirectory (root -/- "mingw") bindistFilesDir
-          -- we use that opportunity to delete the .stamp file that we use
-          -- as a proxy for the whole mingw toolchain, there's no point in
-          -- shipping it
-          removeFile (bindistFilesDir -/- mingwStamp)
-
-        -- Include bash-completion script in binary distributions. We don't
-        -- currently install this but merely include it for the user's
-        -- reference. See #20802.
-        copyDirectory ("utils" -/- "completion") bindistFilesDir
-
-        -- Copy the manpage into the binary distribution
-        whenM (liftIO (IO.doesDirectoryExist (root -/- "manpage"))) $ do
-          copyDirectory (root -/- "manpage") bindistFilesDir
-
-        -- We then 'need' all the files necessary to configure and install
-        -- (as in, './configure [...] && make install') this build on some
-        -- other machine.
-        need $ map (bindistFilesDir -/-)
-                  (["configure", "Makefile"] ++ bindistInstallFiles)
-        copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
-        generateBuildMk >>= writeFile' (bindistFilesDir -/- "build.mk")
-        copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
-        copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
-
-        -- todo: do we need these wrappers on windows
-        forM_ bin_targets $ \(pkg, _) -> do
-          needed_wrappers <- pkgToWrappers Stage2 pkg
-          forM_ needed_wrappers $ \wrapper_name -> do
-            let suffix = if useGhcPrefix pkg
-                           then "ghc-" ++ version
-                           else version
-            wrapper_content <- wrapper wrapper_name
-            let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
-                versioned_wrapper = wrapper_name ++ "-" ++ suffix
-                versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
-            -- Write the wrapper to the versioned path
-            writeFile' versioned_wrapper_path wrapper_content
-            -- Create a symlink from the non-versioned to the versioned.
-            liftIO $ do
-              IO.removeFile unversioned_wrapper_path <|> return ()
-              IO.createFileLink versioned_wrapper unversioned_wrapper_path
+    phony "binary-dist-dir" $ buildBinDistDir root Stage1 Stage1
+    phony "binary-dist-cross" $ buildBinDistDir root Stage2 Stage1
+    phony "binary-dist-dir-stage3" $ buildBinDistDir root Stage2 Stage2
 
     let buildBinDist compressor = do
           win_target <- isWinTarget Stage2
@@ -495,9 +508,9 @@ iservBins = do
 -- See Note [Two Types of Wrappers]
 
 -- | Create a wrapper script calls the executable given as first argument
-createVersionWrapper :: Package -> String -> FilePath -> Action ()
-createVersionWrapper pkg versioned_exe install_path = do
-  ghcPath <- builderPath (Ghc CompileCWithGhc Stage2)
+createVersionWrapper :: Stage -> Package -> String -> FilePath -> Action ()
+createVersionWrapper executable_stage pkg versioned_exe install_path = do
+  ghcPath <- builderPath (Ghc CompileCWithGhc (succStage executable_stage))
   top <- topDirectory
   let version_wrapper_dir = top -/- "hadrian" -/- "bindist" -/- "cwrappers"
       wrapper_files = [ version_wrapper_dir -/- file | file <- ["version-wrapper.c", "getLocation.c", "cwrapper.c"]]
