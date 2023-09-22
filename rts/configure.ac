@@ -33,6 +33,25 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** Use MMAP in the runtime linker?
+dnl --------------------------------------------------------------
+
+case ${HostOS} in
+    linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
+        RtsLinkerUseMmap=1
+        ;;
+    darwin|ios|watchos|tvos)
+        RtsLinkerUseMmap=1
+        ;;
+    *)
+        # Windows (which doesn't have mmap) and everything else.
+        RtsLinkerUseMmap=0
+        ;;
+    esac
+
+AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
+                   [Use mmap in the runtime linker])
+
 dnl ** ARM outline atomics
 dnl --------------------------------------------------------------
 FP_ARM_OUTLINE_ATOMICS

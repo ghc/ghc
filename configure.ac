@@ -1097,26 +1097,6 @@ if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
 fi
 
-dnl ** Use MMAP in the runtime linker?
-dnl --------------------------------------------------------------
-
-case ${TargetOS} in
-    linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
-        RtsLinkerUseMmap=1
-        ;;
-    darwin|ios|watchos|tvos)
-        RtsLinkerUseMmap=1
-        ;;
-    *)
-        # Windows (which doesn't have mmap) and everything else.
-        RtsLinkerUseMmap=0
-        ;;
-    esac
-
-AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
-                   [Use mmap in the runtime linker])
-
-
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 
