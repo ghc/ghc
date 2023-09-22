@@ -1025,7 +1025,6 @@ instance Diagnostic TcRnMessage where
                                        <+> quotes (pprTheta theta)
 
                      FamDataConPE   -> text "it comes from a data family instance"
-                     NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                      PatSynPE       -> text "pattern synonyms cannot be promoted"
                      RecDataConPE   -> same_rec_group_msg
                      ClassPE        -> same_rec_group_msg
@@ -1655,8 +1654,21 @@ instance Diagnostic TcRnMessage where
                 , inHsDocContext doc ]
 
     TcRnDataKindsError typeOrKind thing
-      -> mkSimpleDecorated $
-           text "Illegal" <+> (text $ levelString typeOrKind) <> colon <+> quotes (ppr thing)
+      -- See Note [Checking for DataKinds] (Wrinkle: Migration story for
+      -- DataKinds typechecker errors) in GHC.Tc.Validity for why we give
+      -- different diagnostic messages below.
+      -> case thing of
+           Left renamer_thing ->
+             mkSimpleDecorated $
+               text "Illegal" <+> ppr_level <> colon <+> quotes (ppr renamer_thing)
+           Right typechecker_thing ->
+             mkSimpleDecorated $ vcat
+               [ text "An occurrence of" <+> quotes (ppr typechecker_thing) <+>
+                 text "in a" <+> ppr_level <+> text "requires DataKinds."
+               , text "Future versions of GHC will turn this warning into an error."
+               ]
+      where
+        ppr_level = text $ levelString typeOrKind
 
     TcRnTypeSynonymCycle decl_or_tcs
       -> mkSimpleDecorated $
@@ -2401,8 +2413,17 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnusedQuantifiedTypeVar{}
       -> WarningWithFlag Opt_WarnUnusedForalls
-    TcRnDataKindsError{}
-      -> ErrorWithoutFlag
+    TcRnDataKindsError _ thing
+      -- DataKinds errors can arise from either the renamer (Left) or the
+      -- typechecker (Right). The latter category of DataKinds errors are a
+      -- fairly recent addition to GHC (introduced in GHC 9.10), and in order
+      -- to prevent these new errors from breaking users' code, we temporarily
+      -- downgrade these errors to warnings. See Note [Checking for DataKinds]
+      -- (Wrinkle: Migration story for DataKinds typechecker errors)
+      -- in GHC.Tc.Validity.
+      -> case thing of
+           Left  _ -> ErrorWithoutFlag
+           Right _ -> WarningWithFlag Opt_WarnDataKindsTC
     TcRnTypeSynonymCycle{}
       -> ErrorWithoutFlag
     TcRnZonkerMessage msg

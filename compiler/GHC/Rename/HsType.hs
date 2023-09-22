@@ -48,6 +48,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
+import GHC.Core.TyCon    ( isKindName )
 import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
@@ -528,7 +529,7 @@ rnHsTyKi env (HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                           , hst_body =  tau' }
                 , fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
+rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
   = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
          unlessXOptM LangExt.PolyKinds $ addErr $
          TcRnWithHsDocContext (rtke_ctxt env) $
@@ -539,6 +540,12 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
        ; this_mod <- getModule
        ; when (nameIsLocalOrFrom this_mod name) $
          checkThLocalTyName name
+       ; when (isDataConName name && not (isKindName name)) $
+           -- Any use of a promoted data constructor name (that is not
+           -- specifically exempted by isKindName) is illegal without the use
+           -- of DataKinds. See Note [Checking for DataKinds] in
+           -- GHC.Tc.Validity.
+           checkDataKinds env tv
        ; when (isDataConName name && not (isPromoted ip)) $
          -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
             addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
@@ -593,9 +600,8 @@ rnHsTyKi env (HsFunTy u mult ty1 ty2)
                 , plusFVs [fvs1, fvs2, w_fvs]) }
 
 rnHsTyKi env listTy@(HsListTy x ty)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; when (not data_kinds && isRnKindLevel env)
-              (addErr (dataKindsErr env listTy))
+  = do { when (isRnKindLevel env) $
+           checkDataKinds env listTy
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsListTy x ty', fvs) }
 
@@ -610,23 +616,20 @@ rnHsTyKi env (HsKindSig x ty k)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; when (not data_kinds && isRnKindLevel env)
-              (addErr (dataKindsErr env tupleTy))
+  = do { when (isRnKindLevel env) $
+           checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsTupleTy x tup_con tys', fvs) }
 
 rnHsTyKi env sumTy@(HsSumTy x tys)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; when (not data_kinds && isRnKindLevel env)
-              (addErr (dataKindsErr env sumTy))
+  = do { when (isRnKindLevel env) $
+           checkDataKinds env sumTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsSumTy x tys', fvs) }
 
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
 rnHsTyKi env tyLit@(HsTyLit src t)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; unless data_kinds (addErr (dataKindsErr env tyLit))
+  = do { checkDataKinds env tyLit
        ; t' <- rnHsTyLit t
        ; return (HsTyLit src t', emptyFVs) }
 
@@ -675,16 +678,14 @@ rnHsTyKi env (XHsType ty)
             TcRnNotInScope (notInScopeErr WL_LocalOnly rdr_name) rdr_name [] []
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; unless data_kinds (addErr (dataKindsErr env ty))
+  = do { checkDataKinds env ty
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; unless (isPromoted ip) $
            addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
 rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
-  = do { data_kinds <- xoptM LangExt.DataKinds
-       ; unless data_kinds (addErr (dataKindsErr env ty))
+  = do { checkDataKinds env ty
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsExplicitTupleTy noExtField tys', fvs) }
 
@@ -1631,11 +1632,16 @@ badKindSigErr doc (L loc ty)
     TcRnWithHsDocContext doc $
     TcRnKindSignaturesDisabled (Left ty)
 
-dataKindsErr :: RnTyKiEnv -> HsType GhcPs -> TcRnMessage
-dataKindsErr env thing
-  = TcRnDataKindsError type_or_Kind thing
+-- | Check for DataKinds violations in a type context, as well as \"obvious\"
+-- violations in kind contexts.
+-- See @Note [Checking for DataKinds]@ in "GHC.Tc.Validity" for more on this.
+checkDataKinds :: RnTyKiEnv -> HsType GhcPs -> TcM ()
+checkDataKinds env thing
+  = do data_kinds <- xoptM LangExt.DataKinds
+       unless data_kinds $
+         addErr $ TcRnDataKindsError type_or_kind $ Left thing
   where
-    type_or_Kind | isRnKindLevel env = KindLevel
+    type_or_kind | isRnKindLevel env = KindLevel
                  | otherwise         = TypeLevel
 
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed

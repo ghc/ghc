@@ -96,6 +96,23 @@ There are only a couple of exceptions to this rule:
      data Foo :: Type -> Type where
        MkFoo :: Show a => Foo a    -- not promotable
 
+The following kinds and promoted data constructors can be used even when
+:extension:`DataKinds` is not enabled:
+
+- ``Type``
+- ``TYPE`` (see :ref:`_runtime-rep`)
+- ``Constraint`` (see :ref:`constraint-kind`)
+- ``CONSTRAINT``
+- ``Multiplicity`` and its promoted data constructors (see :extension:`LinearTypes`)
+- ``LiftedRep`` (see :ref:`_runtime-rep`)
+- ``RuntimeRep`` and its promoted data constructors (see :ref:`_runtime-rep`)
+- ``Levity`` and its promoted data constructors (see :ref:`_runtime-rep`)
+- ``VecCount`` and its promoted data constructors
+- ``VecElem`` and its promoted data constructors
+
+It is also possible to use kinds declared with ``type data`` (see
+:extension:`TypeData`) without enabling :extension:`DataKinds`.
+
 .. _promotion-syntax:
 
 Distinguishing between types and constructors
@@ -208,3 +225,71 @@ parameter to ``UnEx``, the kind is not escaping the existential, and the
 above code is valid.
 
 See also :ghc-ticket:`7347`.
+
+.. _promotion-type-synonyms:
+
+:extension:`DataKinds` and type synonyms
+----------------------------------------
+
+The :extensions:`DataKinds` extension interacts with type synonyms in the
+following ways:
+
+1. In a *type* context: :extension:`DataKinds` is not required to use a type
+   synonym that expands to a type that would otherwise require the extension.
+   For example: ::
+
+     {-# LANGUAGE DataKinds #-}
+     module A where
+
+       type MyTrue = 'True
+
+     {-# LANGUAGE NoDataKinds #-}
+     module B where
+
+       import A
+       import Data.Proxy
+
+       f :: Proxy MyTrue
+       f = Proxy
+
+   GHC will accept the type signature for ``f`` even though
+   :extension:`DataKinds` is not enabled, as the promoted data constructor
+   ``True`` is tucked underneath the ``MyTrue`` type synonym. If the user
+   had written ``Proxy 'True`` directly, however, then :extension:`DataKinds`
+   would be required.
+
+2. In a *kind* context: :extension:`DataKinds` applies to all types mentioned
+   in the kind, *including the expansions of type synonyms*. For instance,
+   given this module: ::
+
+     module C where
+
+       type MyType = Type
+       type MySymbol = Symbol
+
+   We would accept or reject the following definitions in this module, which
+   makes use of :ref:`standalone-kind-signatures`: ::
+
+     {-# LANGUAGE NoDataKinds #-}
+     module D where
+
+       import C
+
+       -- ACCEPTED: The kind only mentions Type, which doesn't require DataKinds
+       type D1 :: Type -> Type
+       data D1 a
+
+       -- REJECTED: The kind mentions Symbol, which requires DataKinds to use in
+       -- a kind position
+       data D2 :: Symbol -> Type
+       data D2 a
+
+       -- ACCEPTED: The kind mentions a type synonym MyType that expands to
+       -- Type, which doesn't require DataKinds
+       data D3 :: MyType -> Type
+       data D3 a
+
+       -- REJECTED: The kind mentions a type synonym MySymbol that expands to
+       -- Symbol, which requires DataKinds to use in a kind position
+       data D4 :: MySymbol -> Type
+       data D4 a

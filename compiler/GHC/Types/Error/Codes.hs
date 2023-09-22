@@ -869,7 +869,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "FamDataConPE"                                  = 64578
   GhcDiagnosticCode "ConstrainedDataConPE"                          = 28374
   GhcDiagnosticCode "RecDataConPE"                                  = 56753
-  GhcDiagnosticCode "NoDataKindsDC"                                 = 71015
   GhcDiagnosticCode "TermVariablePE"                                = 45510
   GhcDiagnosticCode "TypeVariablePE"                                = 47557
 

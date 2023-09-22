@@ -60,7 +60,8 @@ import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.Error
-import GHC.Types.Basic   ( UnboxedTupleOrSum(..), unboxedTupleOrSumExtension )
+import GHC.Types.Basic   ( TypeOrKind(..), UnboxedTupleOrSum(..)
+                         , unboxedTupleOrSumExtension )
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -779,9 +780,18 @@ check_type ve ty@(TyConApp tc tys)
   = check_ubx_tuple_or_sum UnboxedSumType   ve ty tys
 
   | otherwise
-  = mapM_ (check_arg_type False ve) tys
+  = do { -- We require DataKinds to use a type constructor in a kind, unless it
+         -- is exempted (e.g., Type, TYPE, etc., which is checked by
+         -- isKindTyCon) or a `type data` type constructor.
+         -- See Note [Checking for DataKinds].
+         unless (isKindTyCon tc || isTypeDataTyCon tc) $
+         checkDataKinds ve ty
+       ; mapM_ (check_arg_type False ve) tys }
 
-check_type _ (LitTy {}) = return ()
+check_type ve ty@(LitTy {}) =
+  -- Type-level literals are forbidden from appearing in kinds unless DataKinds
+  -- is enabled. See Note [Checking for DataKinds].
+  checkDataKinds ve ty
 
 check_type ve (CastTy ty _) = check_type ve ty
 
@@ -929,6 +939,10 @@ check_ubx_tuple_or_sum tup_or_sum (ve@ValidityEnv{ve_tidy_env = env}) ty tys
         ; checkTcM ub_thing_allowed
             (env, TcRnUnboxedTupleOrSumTypeFuncArg tup_or_sum (tidyType env ty))
 
+          -- Unboxed tuples and sums are forbidden from appearing in kinds
+          -- unless DataKinds is enabled. See Note [Checking for DataKinds].
+        ; checkDataKinds ve ty
+
         ; impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = if impred then ArbitraryRank else MonoTypeTyConArg
                 -- c.f. check_arg_type
@@ -1004,6 +1018,22 @@ checkVdqOK ve tvbs ty = do
     no_vdq = all (isInvisibleForAllTyFlag . binderFlag) tvbs
     ValidityEnv{ve_tidy_env = env, ve_ctxt = ctxt} = ve
 
+-- | Check for a DataKinds violation in a kind context.
+-- See @Note [Checking for DataKinds]@.
+--
+-- Note that emitting DataKinds errors from the typechecker is a fairly recent
+-- addition to GHC (introduced in GHC 9.10), and in order to prevent these new
+-- errors from breaking users' code, we temporarily downgrade these errors to
+-- warnings. (This is why we use 'diagnosticTcM' below.) See
+-- @Note [Checking for DataKinds] (Wrinkle: Migration story for DataKinds
+-- typechecker errors)@.
+checkDataKinds :: ValidityEnv -> Type -> TcM ()
+checkDataKinds (ValidityEnv{ ve_ctxt = ctxt, ve_tidy_env = env }) ty = do
+  data_kinds <- xoptM LangExt.DataKinds
+  diagnosticTcM
+    (not (data_kinds || typeLevelUserTypeCtxt ctxt)) $
+    (env, TcRnDataKindsError KindLevel (Right (tidyType env ty)))
+
 {- Note [No constraints in kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC does not allow constraints in kinds. Equality constraints
@@ -1076,6 +1106,104 @@ caught properly. But be careful! We can't make the rank-n case /last/ either,
 as the FunTy case must came after the rank-n case. Otherwise, something like
 (Eq a => Int) would be treated as a function type (FunTy), which just
 wouldn't do.
+
+Note [Checking for DataKinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Checking whether a piece of code requires -XDataKinds or not is surprisingly
+complicated, so here is a specification (adapted from #22141) for what
+-XDataKinds does and does not allow. First, some definitions:
+
+* A user-written type (i.e. part of the source text of a program) is in a
+  /kind context/ if it follows a `::` in:
+  * A standalone kind signature, e.g.,
+      type T :: Nat -> Type
+  * A kind signature in a type, e.g.:
+    - forall (a :: Nat -> Type). blah
+    - type F = G :: Nat -> Type
+    - etc.
+  * A result kind signature in a type declaration, e.g.:
+    - data T a :: Nat -> Type where ...
+    - type family Fam :: Nat -> Type
+    - etc.
+
+* All other contexts where types can appear are referred to as /type contexts/.
+
+* The /kind type constructors/ are (see GHC.Core.TyCon.isKindTyCon):
+  * TYPE and Type
+  * CONSTRAINT and Constraint
+  * LiftedRep
+  * RuntimeRep, Levity, and their data constructors
+  * Multiplicity and its data construtors
+  * VecCount, VecElem, and their data constructors
+
+* A `type data` type constructor is defined using the -XTypeData extension, such
+  as the T in `type data T = A | B`.
+
+* The following are rejected in type contexts unless -XDataKinds is enabled:
+  * Promoted data constructors (e.g., 'Just), except for those data constructors
+    listed under /kind type constructors/
+  * Promoted list or tuple syntax (e.g., '[Int, Bool] or '(Int, Bool))
+  * Type-level literals (e.g., 42, "hello", or 'a' at the type level)
+
+* The following are rejected in kind contexts unless -XDataKinds is enabled:
+  * Everything that is rejected in a type context.
+  * Any type constructor that is not a kind type constructor or a `type data`
+    type constructor (e.g., Maybe, [], Char, Nat, Symbol, etc.)
+
+    Note that this includes rejecting occurrences of non-kind type construtors
+    in type synomym (or type family) applications, even it the expansion would
+    be legal. For example:
+
+      type T a = Type
+      f :: forall (x :: T Int). blah
+
+    Here the `Int` in `T Int` is rejected even though the expansion is just
+    `Type`. This is consistent with, for example, rejecting `T (forall a. a->a)`
+    without -XImpredicativeTypes.
+
+    This check only occurs in kind contexts. It is always permissible to mention
+    type synonyms in a type context without enabling -XDataKinds, even if the
+    type synonym expands to something that would otherwise require -XDataKinds.
+
+Because checking for DataKinds in a kind context requires looking beneath type
+synonyms, it is natural to implement these checks in checkValidType, which has
+the necessary machinery to check for language extensions in the presence of
+type synonyms. For the exact same reason, checkValidType is *not* a good place
+to check for DataKinds in a type context, since we deliberately do not want to
+look beneath type synonyms there. As a result, we check for DataKinds in two
+different places in the code:
+
+* We check for DataKinds violations in kind contexts in the typechecker. See
+  checkDataKinds in this module.
+* We check for DataKinds violations in type contexts in the renamer. See
+  checkDataKinds in GHC.Rename.HsType and check_data_kinds in GHC.Rename.Pat.
+
+  Note that the renamer can also catch "obvious" kind-level violations such as
+  `data Dat :: Proxy 42 -> Type` (where 42 is not hidden beneath a type
+  synonym), so we also catch a subset of kind-level violations in the renamer
+  to allow for earlier reporting of these errors.
+
+-----
+-- Wrinkle: Migration story for DataKinds typechecker errors
+-----
+
+As mentioned above, DataKinds is checked in two different places: the renamer
+and the typechecker. The checks in the renamer have been around since DataKinds
+was introduced. The checks in the typechecker, on the other hand, are a fairly
+recent addition, having been introduced in GHC 9.10. As such, it is possible
+that there are some programs in the wild that (1) do not enable DataKinds, and
+(2) were accepted by a previous GHC version, but would now be rejected by the
+new DataKinds checks in the typechecker.
+
+To prevent the new DataKinds checks in the typechecker from breaking users'
+code, we temporarily allow programs to compile if they violate a DataKinds
+check in the typechecker, but GHC will emit a warning if such a violation
+occurs. Users can then silence the warning by enabling DataKinds in the module
+where the affected code lives. It is fairly straightforward to distinguish
+between DataKinds violations arising from the renamer versus the typechecker,
+as TcRnDataKindsError (the error message type classifying all DataKinds errors)
+stores an Either field that is Left when the error comes from the renamer and
+Right when the error comes from the typechecker.
 
 ************************************************************************
 *                                                                      *

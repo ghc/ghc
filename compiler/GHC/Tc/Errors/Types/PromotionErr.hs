@@ -26,7 +26,6 @@ data PromotionErr
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
   | TermVariablePE   -- See Note [Promoted variables in types]
-  | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
   | TypeVariablePE   -- See Note [Type variable scoping errors during typechecking]
   deriving (Generic)
 
@@ -37,7 +36,6 @@ instance Outputable PromotionErr where
   ppr FamDataConPE         = text "FamDataConPE"
   ppr (ConstrainedDataConPE theta) = text "ConstrainedDataConPE" <+> parens (ppr theta)
   ppr RecDataConPE         = text "RecDataConPE"
-  ppr NoDataKindsDC        = text "NoDataKindsDC"
   ppr TermVariablePE       = text "TermVariablePE"
   ppr TypeVariablePE       = text "TypeVariablePE"
 
@@ -51,7 +49,6 @@ peCategory PatSynPE             = "pattern synonym"
 peCategory FamDataConPE         = "data constructor"
 peCategory ConstrainedDataConPE{} = "data constructor"
 peCategory RecDataConPE         = "data constructor"
-peCategory NoDataKindsDC        = "data constructor"
 peCategory TermVariablePE       = "term variable"
 peCategory TypeVariablePE       = "type variable"
 
