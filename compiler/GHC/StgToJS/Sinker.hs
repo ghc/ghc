@@ -15,10 +15,10 @@ import GHC.Unit.Module
 import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 
+import GHC.Utils.Misc (partitionWith)
 import GHC.StgToJS.Utils
 
 import Data.Char
-import Data.Either
 import Data.List (partition)
 import Data.Maybe
 
@@ -38,7 +38,7 @@ sinkPgm m pgm = (sunk, map StgTopLifted pgm'' ++ stringLits)
   where
     selectLifted (StgTopLifted b) = Left b
     selectLifted x                = Right x
-    (pgm', stringLits) = partitionEithers (map selectLifted pgm)
+    (pgm', stringLits) = partitionWith selectLifted pgm
     (sunk, pgm'')      = sinkPgm' m pgm'
 
 sinkPgm'

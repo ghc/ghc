@@ -130,7 +130,6 @@ import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
 import Data.Dynamic
-import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
@@ -808,7 +807,7 @@ findGlobalRdrEnv :: HscEnv -> [InteractiveImport]
 findGlobalRdrEnv hsc_env imports
   = do { idecls_env <- hscRnImportDecls hsc_env idecls
                     -- This call also loads any orphan modules
-       ; return $ case partitionEithers (map mkEnv imods) of
+       ; return $ case partitionWith mkEnv imods of
          (err : _, _)     -> Left err
          ([], imods_env0) ->
             -- Need to rehydrate the 'GlobalRdrEnv' to recover the 'GREInfo's.

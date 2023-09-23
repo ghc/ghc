@@ -91,7 +91,6 @@ import Control.Monad (foldM, forM, guard, mzero, when, filterM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Coerce
-import Data.Either   (partitionEithers)
 import Data.Foldable (foldlM, minimumBy, toList)
 import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
@@ -608,7 +607,7 @@ addPhiCts nabla cts = runMaybeT $ do
   inhabitationTest initFuel (nabla_ty_st nabla) nabla''
 
 partitionPhiCts :: PhiCts -> ([PredType], [PhiCt])
-partitionPhiCts = partitionEithers . map to_either . toList
+partitionPhiCts = partitionWith to_either . toList
   where
     to_either (PhiTyCt pred_ty) = Left pred_ty
     to_either ct                = Right ct

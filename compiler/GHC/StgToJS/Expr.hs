@@ -496,9 +496,10 @@ optimizeFree offset ids = do
       l    = length ids'
   slots <- drop offset . take l . (++repeat SlotUnknown) <$> getSlots
   let slm                = M.fromList (zip slots [0..])
-      (remaining, fixed) = partitionEithers $
-         map (\inp@(i,n) -> maybe (Left inp) (\j -> Right (i,n,j,True))
-            (M.lookup (SlotId i n) slm)) ids'
+      (remaining, fixed) = partitionWith (\inp@(i,n) -> maybe (Left inp)
+                                                              (\j -> Right (i,n,j,True))
+                                                              (M.lookup (SlotId i n) slm))
+                                         ids'
       takenSlots         = S.fromList (fmap (\(_,_,x,_) -> x) fixed)
       freeSlots          = filter (`S.notMember` takenSlots) [0..l-1]
       remaining'         = zipWith (\(i,n) j -> (i,n,j,False)) remaining freeSlots

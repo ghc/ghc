@@ -58,6 +58,7 @@ import GHC.Types.SourceFile ( hscSourceString )
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
 import qualified Data.Map as Map
@@ -68,7 +69,6 @@ import GHC.Unit.Module
 import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
-import Data.Either
 import Data.Function
 import Data.List (sort)
 import GHC.Data.List.SetOps
@@ -336,7 +336,7 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
   (graphFromEdgedVerticesUniq nodes, lookup_node)
   where
     -- Map from module to extra boot summary dependencies which need to be merged in
-    (boot_summaries, nodes) = bimap Map.fromList id $ partitionEithers (map go numbered_summaries)
+    (boot_summaries, nodes) = bimap Map.fromList id $ partitionWith go numbered_summaries
 
       where
         go (s, key) =

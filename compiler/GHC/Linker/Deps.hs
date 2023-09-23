@@ -55,7 +55,6 @@ import Control.Applicative
 import qualified Data.Set as Set
 import qualified Data.Map as M
 import Data.List (isSuffixOf)
-import Data.Either
 
 import System.FilePath
 import System.Directory
@@ -131,7 +130,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       let
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
-            (mods_needed, links_got) = partitionEithers (map split_mods mods_s)
+            (mods_needed, links_got) = partitionWith split_mods mods_s
             pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
 
             split_mods mod =
