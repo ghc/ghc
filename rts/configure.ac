@@ -50,6 +50,13 @@ fi
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 
+dnl ** Do a build with tables next to code?
+dnl --------------------------------------------------------------
+
+AS_IF(
+  [test "$CABAL_FLAG_tables_next_to_code" = 1],
+  [AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])])
+
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
 AC_PROG_CC([cc gcc clang])

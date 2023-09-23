@@ -305,6 +305,7 @@ rtsCabalFlags = mconcat
     , flag "CabalUseSystemLibFFI" UseSystemFfi
     , targetFlag "CabalLibffiAdjustors" tgtUseLibffiForAdjustors
     , targetFlag "CabalLeadingUnderscore" tgtSymbolsHaveLeadingUnderscore
+    , targetFlag "CabalTablesNextToCode" tgtTablesNextToCode
     ]
   where
     flag = interpolateCabalFlag

@@ -315,9 +315,6 @@ dnl ** Do a build with tables next to code?
 dnl --------------------------------------------------------------
 
 GHC_TABLES_NEXT_TO_CODE
-if test x"$TablesNextToCode" = xYES; then
-   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])
-fi
 AC_SUBST(TablesNextToCode)
 
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.

@@ -54,6 +54,8 @@ flag static-libzstd
   default: @CabalStaticLibZstd@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
+flag tables-next-to-code
+  default: @CabalTablesNextToCode@
 flag smp
   default: True
 flag find-ptr
