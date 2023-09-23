@@ -54,6 +54,8 @@ flag static-libzstd
   default: False
 flag leading-underscore
   default: False
+flag tables-next-to-code
+  default: False
 flag smp
   default: True
 flag find-ptr

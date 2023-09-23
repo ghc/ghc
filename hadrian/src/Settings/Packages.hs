@@ -281,8 +281,8 @@ rtsPackageArgs = package rts ? do
     targetArch     <- queryTarget queryArch
     targetOs       <- queryTarget queryOS
     targetVendor   <- queryTarget queryVendor
-    ghcUnreg       <- yesNo <$> queryTarget tgtUnregisterised
-    ghcEnableTNC   <- yesNo <$> queryTarget tgtTablesNextToCode
+    ghcUnreg       <- queryTarget tgtUnregisterised
+    ghcEnableTNC   <- queryTarget tgtTablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -355,8 +355,8 @@ rtsPackageArgs = package rts ? do
             , "-DTargetArch="                ++ show targetArch
             , "-DTargetOS="                  ++ show targetOs
             , "-DTargetVendor="              ++ show targetVendor
-            , "-DGhcUnregisterised="         ++ show ghcUnreg
-            , "-DTablesNextToCode="          ++ show ghcEnableTNC
+            , "-DGhcUnregisterised="         ++ show (yesNo ghcUnreg)
+            , "-DTablesNextToCode="          ++ show (yesNo ghcEnableTNC)
             , "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
 
@@ -414,6 +414,7 @@ rtsPackageArgs = package rts ? do
           , flag UseLibzstd                 `cabalFlag` "libzstd"
           , flag StaticLibzstd              `cabalFlag` "static-libzstd"
           , queryTargetTarget tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
+          , ghcEnableTNC                    `cabalFlag` "tables-next-to-code"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
