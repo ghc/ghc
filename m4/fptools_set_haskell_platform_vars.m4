@@ -82,7 +82,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         solaris2)
             test -z "[$]2" || eval "[$]2=OSSolaris2"
             ;;
-        mingw32|windows)
+        mingw32|mingw64|windows)
             test -z "[$]2" || eval "[$]2=OSMinGW32"
             ;;
         freebsd)
