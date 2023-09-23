@@ -22,7 +22,7 @@ AC_DEFUN([GHC_CONVERT_OS],[
       openbsd*)
         $3="openbsd"
         ;;
-      windows|mingw32)
+      windows|mingw32|mingw64)
         $3="mingw32"
         ;;
       # As far as I'm aware, none of these have relevant variants
