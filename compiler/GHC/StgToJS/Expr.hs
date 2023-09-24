@@ -80,7 +80,6 @@ import qualified GHC.Data.List.SetOps as ListSetOps
 import Data.Monoid
 import Data.Maybe
 import Data.Function
-import Data.Either
 import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -509,7 +508,7 @@ optimizeFree offset ids = do
 -- | Allocate local closures
 allocCls :: Maybe JStat -> [(Id, CgStgRhs)] -> G JStat
 allocCls dynMiddle xs = do
-   (stat, dyn) <- partitionEithers <$> mapM toCl xs
+   (stat, dyn) <- partitionWithM toCl xs
    ac <- allocDynAll False dynMiddle dyn
    pure (mconcat stat <> ac)
   where

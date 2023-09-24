@@ -26,11 +26,11 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
+import GHC.Utils.Misc ( partitionWithM )
 
 import GHC.Platform
 
 import Control.Monad
-import Data.Either (partitionEithers)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -50,9 +50,7 @@ cmmPipeline logger cmm_config srtInfo prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform cmm_config) prog
-
-     let (procs, data_) = partitionEithers tops
+     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) prog
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 

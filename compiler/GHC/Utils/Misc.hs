@@ -23,7 +23,7 @@ module GHC.Utils.Misc (
 
         mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAndUnzip4,
-        filterOut, partitionWith,
+        filterOut, partitionWith, partitionWithM,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
 
@@ -218,6 +218,16 @@ partitionWith f (x:xs) = case f x of
                          Left  b -> (b:bs, cs)
                          Right c -> (bs, c:cs)
     where (bs,cs) = partitionWith f xs
+
+partitionWithM :: Monad m => (a -> m (Either b c)) -> [a] -> m ([b], [c])
+-- ^ Monadic version of `partitionWith`
+partitionWithM _ [] = return ([], [])
+partitionWithM f (x:xs) = do
+  y <- f x
+  (bs, cs) <- partitionWithM f xs
+  case y of
+    Left  b -> return (b:bs, cs)
+    Right c -> return (bs, c:cs)
 
 chkAppend :: [a] -> [a] -> [a]
 -- Checks for the second argument being empty

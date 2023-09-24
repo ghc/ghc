@@ -48,7 +48,6 @@ import qualified Data.IntSet as IS
 import qualified GHC.Data.Word64Map as WM
 import GHC.Data.Word64Map (Word64Map)
 import Data.Array
-import Data.Either
 import Data.Word
 import Control.Monad
 
@@ -101,9 +100,9 @@ genDependencyData mod units = do
              -> Int
              -> StateT DependencyDataCache G (Int, BlockDeps, Bool, [ExportedFun])
       oneDep (LinkableUnit _ idExports otherExports idDeps pseudoIdDeps otherDeps req _frefs) n = do
-        (edi, bdi) <- partitionEithers <$> mapM (lookupIdFun n) idDeps
-        (edo, bdo) <- partitionEithers <$> mapM lookupOtherFun otherDeps
-        (edp, bdp) <- partitionEithers <$> mapM (lookupPseudoIdFun n) pseudoIdDeps
+        (edi, bdi) <- partitionWithM (lookupIdFun n) idDeps
+        (edo, bdo) <- partitionWithM lookupOtherFun otherDeps
+        (edp, bdp) <- partitionWithM (lookupPseudoIdFun n) pseudoIdDeps
         expi <- mapM lookupExportedId (filter isExportedId idExports)
         expo <- mapM lookupExportedOther otherExports
         -- fixme thin deps, remove all transitive dependencies!

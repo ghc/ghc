@@ -1569,9 +1569,8 @@ downsweep :: HscEnv
                 -- which case there can be repeats
 downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = do
-       rootSummaries <- mapM getRootSummary roots
-       let (root_errs, rootSummariesOk) = partitionEithers rootSummaries -- #17549
-           root_map = mkRootMap rootSummariesOk
+       (root_errs, rootSummariesOk) <- partitionWithM getRootSummary roots -- #17549
+       let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        (deps, pkg_deps, map0) <- loopSummaries rootSummariesOk (M.empty, Set.empty, root_map)
        let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env) (hsc_all_home_unit_ids hsc_env) (Set.toList pkg_deps)

@@ -124,7 +124,6 @@ import System.IO
 import Control.Monad
 import qualified Control.Monad.Catch as MC (handle)
 import Data.Maybe
-import Data.Either      ( partitionEithers )
 import qualified Data.Set as Set
 
 import Data.Time        ( getCurrentTime )
@@ -489,8 +488,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
     Right t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
-        e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let (errs,extra_times) = partitionEithers e_extra_times
+        (errs,extra_times) <- partitionWithM (tryIO . getModificationUTCTime) extra_ld_inputs
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
             then return $ needsRecompileBecause ObjectsChanged
@@ -514,9 +512,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs
         if any isNothing pkg_libfiles then return $ needsRecompileBecause LibraryChanged else do
-        e_lib_times <- mapM (tryIO . getModificationUTCTime)
-                          (catMaybes pkg_libfiles)
-        let (lib_errs,lib_times) = partitionEithers e_lib_times
+        (lib_errs,lib_times) <- partitionWithM (tryIO . getModificationUTCTime) (catMaybes pkg_libfiles)
         if not (null lib_errs) || any (t <) lib_times
            then return $ needsRecompileBecause LibraryChanged
            else do
