@@ -84,7 +84,8 @@ import GHC.Core.DataCon ( DataCon, dataConName )
 
 import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (lexer, lexerDbg)
+import GHC.Parser.PreProcess
 import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
@@ -764,8 +765,22 @@ TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
+-- Ghc CPP
+'#define'       { L _ ITcppDefine }
+'#include'      { L _ ITcppInclude }
+'#undef'        { L _ ITcppUndef }
+'#error'        { L _ ITcppError }
+'#if'           { L _ ITcppIf }
+'#ifdef'        { L _ ITcppIfdef }
+'#ifndef'       { L _ ITcppIfndef }
+'#elif'         { L _ ITcppElif }
+'#else'         { L _ ITcppElse }
+'#endif'        { L _ ITcppEndif }
+'defined'       { L _ ITcppDefined }
+
 %monad { P } { >>= } { return }
-%lexer { (lexer True) } { L _ ITeof }
+-- %lexer { (lexer True) } { L _ ITeof }
+%lexer { (lexerDbg True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
   -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
