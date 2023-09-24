@@ -1823,6 +1823,10 @@ GHC can also be configured using various environment variables.
 .. envvar:: GHC_NO_UNICODE
 
     When non-empty, disables Unicode diagnostics output regardless of locale settings.
+    GHC can usually determine that locale is not Unicode-capable and fallback to ASCII
+    automatically, but in some corner cases (e. g., when GHC output is redirected)
+    you might hit ``invalid argument (cannot encode character '\8216')``,
+    in which case do set ``GHC_NO_UNICODE``.
 
 .. envvar:: GHC_CHARENC
 
