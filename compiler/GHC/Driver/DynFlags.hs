@@ -495,6 +495,8 @@ class ContainsDynFlags t where
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  let
+ -- This is not bulletproof: we test that 'localeEncoding' is Unicode-capable,
+ -- but potentially 'hGetEncoding' 'stdout' might be different. Still good enough.
  canUseUnicode <- do let enc = localeEncoding
                          str = "‘’"
                      (withCString enc str $ \cstr ->
