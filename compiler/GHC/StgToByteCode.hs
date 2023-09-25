@@ -57,7 +57,7 @@ import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
-import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds, argPrimRep )
+import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -1385,16 +1385,16 @@ generatePrimCall d s p target _mb_unit _result_ty args
          non_void _       = True
 
          nv_args :: [StgArg]
-         nv_args = filter (non_void . argPrimRep) args
+         nv_args = filter (non_void . stgArgRep1) args
 
          (args_info, args_offsets) =
               layoutNativeCall profile
                                NativePrimCall
                                0
-                               (primRepCmmType platform . argPrimRep)
+                               (primRepCmmType platform . stgArgRep1)
                                nv_args
 
-         prim_args_offsets = mapFst argPrimRep args_offsets
+         prim_args_offsets = mapFst stgArgRep1 args_offsets
          shifted_args_offsets = mapSnd (+ d) args_offsets
 
          push_target = PUSH_UBX (LitLabel target Nothing IsFunction) 1

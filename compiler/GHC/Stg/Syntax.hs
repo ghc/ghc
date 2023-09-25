@@ -56,6 +56,10 @@ module GHC.Stg.Syntax (
         stgRhsArity, freeVarsOfRhs,
         isDllConApp,
         stgArgType,
+        stgArgRep,
+        stgArgRep1,
+        stgArgRep_maybe,
+
         stgCaseBndrInScope,
 
         -- ppr
@@ -86,7 +90,7 @@ import GHC.Types.Name        ( isDynLinkName )
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.RepType ( typePrimRep1, typePrimRep )
+import GHC.Types.RepType ( typePrimRep1, typePrimRep, typePrimRep_maybe )
 
 import GHC.Unit.Module       ( Module )
 import GHC.Utils.Outputable
@@ -181,15 +185,30 @@ isAddrRep _            = False
 -- | Type of an @StgArg@
 --
 -- Very half baked because we have lost the type arguments.
+--
+-- This function should be avoided: in STG we aren't supposed to
+-- look at types, but only PrimReps.
+-- Use 'stgArgRep', 'stgArgRep_maybe', 'stgArgRep1' instaed.
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
+
+stgArgRep :: StgArg -> [PrimRep]
+stgArgRep ty = typePrimRep (stgArgType ty)
+
+stgArgRep_maybe :: StgArg -> Maybe [PrimRep]
+stgArgRep_maybe ty = typePrimRep_maybe (stgArgType ty)
+
+-- | Assumes that the argument has one PrimRep, which holds after unarisation.
+-- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
+stgArgRep1 :: StgArg -> PrimRep
+stgArgRep1 ty = typePrimRep1 (stgArgType ty)
 
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.
 --
 -- Case binders of unboxed tuple or unboxed sum type always dead after the
--- unariser has run. See Note [Post-unarisation invariants].
+-- unariser has run. See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 stgCaseBndrInScope :: AltType -> Bool {- ^ unarised? -} -> Bool
 stgCaseBndrInScope alt_ty unarised =
     case alt_ty of

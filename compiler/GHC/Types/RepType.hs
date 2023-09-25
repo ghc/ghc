@@ -4,7 +4,7 @@
 module GHC.Types.RepType
   (
     -- * Code generator views onto Types
-    UnaryType, NvUnaryType, isNvUnaryType,
+    UnaryType, NvUnaryType, isNvUnaryRep,
     unwrapType,
 
     -- * Predicates on types
@@ -19,7 +19,7 @@ module GHC.Types.RepType
     runtimeRepPrimRep_maybe, kindPrimRep_maybe, typePrimRep_maybe,
 
     -- * Unboxed sum representation type
-    ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
+    ubxSumRepType, layoutUbxSum, repSlotTy, SlotTy (..),
     slotPrimRep, primRepSlot,
 
     -- * Is this type known to be data?
@@ -76,12 +76,9 @@ type UnaryType   = Type
      --   UnaryType   : never an unboxed tuple or sum;
      --                 can be Void# or (# #)
 
-isNvUnaryType :: Type -> Bool
-isNvUnaryType ty
-  | [_] <- typePrimRep ty
-  = True
-  | otherwise
-  = False
+isNvUnaryRep :: [PrimRep] -> Bool
+isNvUnaryRep [_] = True
+isNvUnaryRep _ = False
 
 -- INVARIANT: the result list is never empty.
 typePrimRepArgs :: HasDebugCallStack => Type -> NonEmpty PrimRep
@@ -307,11 +304,11 @@ instance Outputable SlotTy where
   ppr FloatSlot       = text "FloatSlot"
   ppr (VecSlot n e)   = text "VecSlot" <+> ppr n <+> ppr e
 
-typeSlotTy :: UnaryType -> Maybe SlotTy
-typeSlotTy ty = case typePrimRep ty of
+repSlotTy :: [PrimRep] -> Maybe SlotTy
+repSlotTy reps = case reps of
                   [] -> Nothing
                   [rep] -> Just (primRepSlot rep)
-                  reps -> pprPanic "typeSlotTy" (ppr ty $$ ppr reps)
+                  _ -> pprPanic "repSlotTy" (ppr reps)
 
 primRepSlot :: PrimRep -> SlotTy
 primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")

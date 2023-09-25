@@ -446,10 +446,10 @@ instance Outputable UnariseVal where
 -- See Note [UnariseEnv]
 extendRho :: UnariseEnv -> Id -> UnariseVal -> UnariseEnv
 extendRho env x (MultiVal args)
-  = assert (all (isNvUnaryType . stgArgType) args)
+  = assert (all (isNvUnaryRep . stgArgRep) args)
     env { ue_rho = extendVarEnv (ue_rho env) x (MultiVal args) }
 extendRho env x (UnaryVal val)
-  = assert (isNvUnaryType (stgArgType val))
+  = assert (isNvUnaryRep (stgArgRep val))
     env { ue_rho = extendVarEnv (ue_rho env) x (UnaryVal val) }
 -- Properly shadow things from an outer scope.
 -- See Note [UnariseEnv]
@@ -745,7 +745,7 @@ mapTupleIdBinders
   -> UnariseEnv
   -> UnariseEnv
 mapTupleIdBinders ids args0 rho0
-  = assert (not (any (isZeroBitTy . stgArgType) args0)) $
+  = assert (not (any (null . stgArgRep) args0)) $
     let
       ids_unarised :: [(Id, [PrimRep])]
       ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
@@ -779,13 +779,13 @@ mapSumIdBinders
   -> UniqSM (UnariseEnv, OutStgExpr)
 
 mapSumIdBinders alt_bndr args rhs rho0
-  = assert (not (any (isZeroBitTy . stgArgType) args)) $ do
+  = assert (not (any (null . stgArgRep) args)) $ do
     uss <- listSplitUniqSupply <$> getUniqueSupplyM
     let
       fld_reps = typePrimRep (idType alt_bndr)
 
       -- Slots representing the whole sum
-      arg_slots = map primRepSlot $ concatMap (typePrimRep . stgArgType) args
+      arg_slots = map primRepSlot $ concatMap stgArgRep args
       -- The slots representing the field of the sum we bind.
       id_slots  = map primRepSlot $ fld_reps
       layout1   = layoutUbxSum arg_slots id_slots
@@ -879,7 +879,7 @@ mkUbxSum dc ty_args args0 us
   = let
       _ :| sum_slots = ubxSumRepType (map typePrimRep ty_args)
       -- drop tag slot
-      field_slots = (mapMaybe (typeSlotTy . stgArgType) args0)
+      field_slots = (mapMaybe (repSlotTy . stgArgRep) args0)
       tag = dataConTag dc
       layout'  = layoutUbxSum sum_slots field_slots
 
@@ -912,9 +912,9 @@ mkUbxSum dc ty_args args0 us
       castArg :: UniqSupply -> SlotTy -> StgArg -> Maybe (StgArg,UniqSupply,StgExpr -> StgExpr)
       castArg us slot_ty arg
         -- Cast the argument to the type of the slot if required
-        | slotPrimRep slot_ty /= typePrimRep1 (stgArgType arg)
+        | slotPrimRep slot_ty /= stgArgRep1 arg
         , out_ty <- primRepToType $ slotPrimRep slot_ty
-        , (ops,types) <- unzip $ getCasts (typePrimRep1 $ stgArgType arg) $ typePrimRep1 out_ty
+        , (ops,types) <- unzip $ getCasts (stgArgRep1 arg) $ typePrimRep1 out_ty
         , not . null $ ops
         = let (us1,us2) = splitUniqSupply us
               cast_uqs = uniqsFromSupply us1
