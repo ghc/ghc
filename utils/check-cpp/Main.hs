@@ -1,4 +1,3 @@
-
 -- Note: this file formatted with fourmolu
 
 import Control.Monad.IO.Class
@@ -17,7 +16,7 @@ import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpContext (..), PpState (..), Token (..))
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpState (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.Error
@@ -45,21 +44,57 @@ ppLexerDbg queueComments cont = ppLexer queueComments contDbg
 -- That sorts out
 --    - ALR
 --    - queueing comments
-ppLexer _queueComments cont = do
-    tok <- ppLexToken
-    trace ("ppLexer:" ++ show (unLoc tok)) $ do
-        tok' <- case tok of
-            L _ ITcppIf -> preprocessIf tok
-            L _ ITcppDefine -> preprocessDefine tok
-            L _ ITcppIfdef -> preprocessIfDef tok
-            L _ ITcppElse -> preprocessElse tok
-            L _ ITcppEndif -> preprocessEnd tok
-            L l _ -> do
-                accepting <- getAccepting
-                if accepting
-                    then return tok
-                    else return (L l (ITcppIgnored [tok]))
-        cont tok'
+-- ppLexer _queueComments cont = do
+--     tok <- ppLexToken
+--     trace ("ppLexer:" ++ show (unLoc tok)) $ do
+--         tok' <- case tok of
+--             L _ ITcppIf -> preprocessIf tok
+--             L _ ITcppDefine -> preprocessDefine tok
+--             L _ ITcppIfdef -> preprocessIfDef tok
+--             L _ ITcppElse -> preprocessElse tok
+--             L _ ITcppEndif -> preprocessEnd tok
+--             L l _ -> do
+--                 accepting <- getAccepting
+--                 if accepting
+--                     then return tok
+--                     else return (L l (ITcppIgnored [tok]))
+--         cont tok'
+
+ppLexer queueComments cont =
+    Lexer.lexer
+        queueComments
+        ( \tk@(L lt _) ->
+            let
+                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                contPush = pushContext (unLoc tk) >> contInner (L lt (ITcppIgnored [tk]))
+             in
+                case tk of
+                    L _ ITcppDefine -> contPush
+                    L _ ITcppIf -> contPush
+                    L _ ITcppIfdef -> contPush
+                    L _ ITcppElse -> do
+                      tk' <- preprocessElse tk
+                      contInner tk'
+                    L _ ITcppEndif -> do
+                      tk' <- preprocessEnd tk
+                      contInner tk'
+                    L l tok -> do
+                        state <- getCppState
+                        case (trace ("CPP state:" ++ show state) state) of
+                            CppIgnoring -> contInner (L l (ITcppIgnored [tk]))
+                            CppInDefine -> do
+                                ppDefine (trace ("ppDefine:" ++ show tok) (show tok))
+                                popContext
+                                contInner (L l (ITcppIgnored [tk]))
+                            CppInIfdef -> do
+                                defined <- ppIsDefined (show tok)
+                                if defined
+                                    then setAccepting True
+                                    else setAccepting False
+                                popContext
+                                contInner (L l (ITcppIgnored [tk]))
+                            _ -> contInner tk
+        )
 
 -- Swallow tokens until ITcppEndif
 preprocessIf :: Located Token -> P (Located Token)
@@ -72,13 +107,13 @@ preprocessIf tok = go [tok]
             L l ITcppEndif -> return $ L l (ITcppIgnored (reverse (tok' : acc)))
             _ -> go (tok' : acc)
 
-preprocessDefine :: Located Token -> P (Located Token)
-preprocessDefine tok@(L l ITcppDefine) = do
-    L ll cond <- ppLexToken
-    -- ppDefine (show cond)
-    ppDefine (trace ("ppDefine:" ++ show cond) (show cond))
-    return (L l (ITcppIgnored [tok, L ll cond]))
-preprocessDefine tok = return tok
+-- preprocessDefine :: Located Token -> P (Located Token)
+-- preprocessDefine tok@(L l ITcppDefine) = do
+--     L ll cond <- ppLexToken
+--     -- ppDefine (show cond)
+--     ppDefine (trace ("ppDefine:" ++ show cond) (show cond))
+--     return (L l (ITcppIgnored [tok, L ll cond]))
+-- preprocessDefine tok = return tok
 
 preprocessIfDef :: Located Token -> P (Located Token)
 preprocessIfDef tok@(L l ITcppIfdef) = do
@@ -86,7 +121,7 @@ preprocessIfDef tok@(L l ITcppIfdef) = do
     defined <- ppIsDefined (show cond)
     if defined
         then do
-            pushContext (PpContextIf [tok, L ll cond])
+            pushContext ITcppIfdef
             setAccepting True
         else setAccepting False
     return (L l (ITcppIgnored [tok, L ll cond]))
@@ -107,11 +142,50 @@ preprocessEnd tok@(L l _) = do
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
 
+data CppState
+    = CppIgnoring
+    | CppInDefine
+    | CppInIfdef
+    | CppNormal
+    deriving (Show)
+
+getCppState :: P CppState
+getCppState = do
+    context <- peekContext
+    accepting <- getAccepting
+    case context of
+        ITcppDefine -> return CppInDefine
+        ITcppIfdef -> return CppInIfdef
+        _ ->
+            if accepting
+                then return CppNormal
+                else return CppIgnoring
+
 -- pp_context stack start -----------------
 
-pushContext :: PpContext -> P ()
+pushContext :: Token -> P ()
 pushContext new =
     P $ \s -> POk s{pp = (pp s){pp_context = new : pp_context (pp s)}} ()
+
+popContext :: P ()
+popContext =
+    P $ \s ->
+        let
+            new_context = case pp_context (pp s) of
+                [] -> []
+                (_ : t) -> t
+         in
+            POk s{pp = (pp s){pp_context = new_context}} ()
+
+peekContext :: P Token
+peekContext =
+    P $ \s ->
+        let
+            r = case pp_context (pp s) of
+                [] -> ITeof -- Anthing really, for now, except a CPP one
+                (h : _) -> h
+         in
+            POk s r
 
 setAccepting :: Bool -> P ()
 setAccepting on =
@@ -335,6 +409,15 @@ happyError = Lexer.srcParseFail
 -- =====================================================================
 -- ---------------------------------------------------------------------
 
+printToks :: Int -> [Located Token] -> IO ()
+printToks indent toks = mapM_ go toks
+  where
+    go (L _ (ITcppIgnored ts)) = do
+      putStr "ITcppIgnored ["
+      printToks (indent + 4) ts
+      putStrLn "]"
+    go (L _ tk) = putStrLn (show tk)
+
 -- Testing
 
 libdirNow :: LibDir
@@ -343,7 +426,8 @@ libdirNow = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib
 t0 :: IO ()
 t0 = do
     tks <- parseString libdirNow "#define FOO\n#ifdef FOO\nx = 1\n#endif\n"
-    putStrLn $ show (reverse $ map unLoc tks)
+    -- putStrLn $ show (reverse $ map unLoc tks)
+    printToks 0 (reverse tks)
 
 t1 :: IO ()
 t1 = do
