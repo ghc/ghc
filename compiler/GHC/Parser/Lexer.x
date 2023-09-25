@@ -1263,14 +1263,14 @@ begin code _span _str _len _buf2 = do pushLexState code; lexToken
 pop :: Action
 pop _span _buf _len _buf2 =
   do _ <- popLexState
-     -- lexToken
-     trace "pop" $ do lexToken
+     lexToken
+     -- trace "pop" $ do lexToken
 
 cppToken :: Int ->  Token -> Action
 cppToken code t span _buf _len _buf2 =
   do pushLexState code
-     -- return (L span t)
-     trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
+     return (L span t)
+     -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action
@@ -2716,12 +2716,12 @@ isEOF :: AlexInput -> Bool
 isEOF (AI _ buf) = atEnd buf
 
 pushLexState :: Int -> P ()
--- pushLexState ls = P $ \s@PState{ lex_state=l } -> POk s{lex_state=ls:l} ()
-pushLexState ls = P $ \s@PState{ lex_state= l } -> POk s{lex_state= trace ("pushLexState:" ++ show ls) ls:l} ()
+pushLexState ls = P $ \s@PState{ lex_state=l } -> POk s{lex_state=ls:l} ()
+-- pushLexState ls = P $ \s@PState{ lex_state= l } -> POk s{lex_state= trace ("pushLexState:" ++ show ls) ls:l} ()
 
 popLexState :: P Int
--- popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state=l } ls
-popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state= trace ("popLexState:" ++ show (ls,l)) l } ls
+popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state=l } ls
+-- popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state= trace ("popLexState:" ++ show (ls,l)) l } ls
 
 getLexState :: P Int
 getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
@@ -2974,8 +2974,8 @@ disableHaddock opts = upd_bitmap (xunset HaddockBit)
 
 -- | Set parser options for parsing OPTIONS pragmas
 initPragState :: ParserOpts -> StringBuffer -> RealSrcLoc -> PState
--- initPragState options buf loc = (initParserState options buf loc)
-initPragState options buf loc = (initParserState options buf (trace ("initPragState:" ++ show bol) loc))
+initPragState options buf loc = (initParserState options buf loc)
+-- initPragState options buf loc = (initParserState options buf (trace ("initPragState:" ++ show bol) loc))
    { lex_state = [bol, option_prags, 0]
    }
 
@@ -3478,8 +3478,8 @@ lexToken = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   exts <- getExts
-  -- case alexScanUser exts inp sc of
-  case alexScanUser exts inp (trace ("lexToken:state=" ++ show sc) sc) of
+  case alexScanUser exts inp sc of
+  -- case alexScanUser exts inp (trace ("lexToken:state=" ++ show sc) sc) of
     AlexEOF -> do
         let span = mkPsSpan loc1 loc1
         lc <- getLastLocIncludingComments
