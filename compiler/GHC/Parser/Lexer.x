@@ -2567,7 +2567,8 @@ data PState = PState {
 data PpState = PpState {
         pp_defines :: !(Set String),
         pp_pushed_back :: !(Maybe (Located Token)),
-        pp_context :: ![PpContext],
+        -- pp_context :: ![PpContext],
+        pp_context :: ![Token], -- What preprocessor directive we are currently processing
         pp_accepting :: !Bool
      }
     deriving (Show)
