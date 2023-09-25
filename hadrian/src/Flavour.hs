@@ -162,7 +162,7 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc f =
-    (addArgs (orM [stage1, cross] ? mconcat
+    (addArgs (stage1 ? mconcat
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
       ]) f) { ghcThreaded = (< Stage2) }

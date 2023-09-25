@@ -126,14 +126,35 @@ installTo relocatable prefix = do
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
 
-buildBinDistDir :: FilePath -> Stage -> Stage -> Action ()
-buildBinDistDir root library_stage executable_stage = do
+data BindistConfig = BindistConfig { library_stage :: Stage -- ^ The stage compiler which builds the libraries
+                                   , executable_stage :: Stage -- ^ The stage compiler which builds the executables
+                                   }
+
+-- | A bindist for when the host = target, non cross-compilation setting.
+-- Both the libraries and final executables are built with stage1 compiler.
+normalBindist :: BindistConfig
+normalBindist = BindistConfig { library_stage = Stage1, executable_stage = Stage1 }
+
+-- | A bindist which contains a cross compiler (when host /= target)
+-- The cross compiler is produced by the stage1 compiler, but then we must compile
+-- all the boot libraries with the cross compiler (hence stage2 for libraries)
+crossBindist :: BindistConfig
+crossBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage1 }
+
+-- | A bindist which contains executables for the target, which produce code for the
+-- target. These are produced as "Stage3" build products, produced by a stage2 cross compiler.
+targetBindist ::  BindistConfig
+targetBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage2 }
+
+
+buildBinDistDir :: FilePath -> BindistConfig -> Action ()
+buildBinDistDir root conf@BindistConfig{..} = do
     -- We 'need' all binaries and libraries
     lib_pkgs <- stagePackages library_stage
-    (lib_targets, _) <- partitionEithers <$> mapM (pkgTarget library_stage executable_stage) lib_pkgs
+    (lib_targets, _) <- partitionEithers <$> mapM (pkgTarget conf) lib_pkgs
 
     bin_pkgs <- stagePackages executable_stage
-    (_, bin_targets) <- partitionEithers <$> mapM (pkgTarget library_stage executable_stage) bin_pkgs
+    (_, bin_targets) <- partitionEithers <$> mapM (pkgTarget conf) bin_pkgs
 
     liftIO $ print (library_stage, executable_stage, lib_targets, bin_targets)
 
@@ -301,9 +322,9 @@ bindistRules = do
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
         installTo NotRelocatable installPrefix
 
-    phony "binary-dist-dir" $ buildBinDistDir root Stage1 Stage1
-    phony "binary-dist-cross" $ buildBinDistDir root Stage2 Stage1
-    phony "binary-dist-dir-stage3" $ buildBinDistDir root Stage2 Stage2
+    phony "binary-dist-dir" $ buildBinDistDir root normalBindist
+    phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
+    phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 
     let buildBinDist compressor = do
           win_target <- isWinTarget Stage2
@@ -411,8 +432,8 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Stage -> Stage -> Package -> Action (Either FilePath (Package, FilePath))
-pkgTarget library_stage executable_stage pkg
+pkgTarget :: BindistConfig -> Package -> Action (Either FilePath (Package, FilePath))
+pkgTarget BindistConfig{..} pkg
     | isLibrary pkg = Left <$> pkgConfFile (vanillaContext library_stage pkg)
     | otherwise     = do
         path <- programPath =<< programContext executable_stage pkg

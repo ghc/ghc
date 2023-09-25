@@ -24,11 +24,11 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     tmpl <- (top -/-) <$> expr (templateHscPath stage0Boot)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notM (isWinTarget stage) ? notM (flag CrossCompiling) ? arg "--cross-safe"
+            , notM (isWinTarget stage) ? notM (crossStage stage) ? arg "--cross-safe"
             , pure $ map ("-I" ++) (words gmpDir)
             , map ("--cflag=" ++) <$> getCFlags
             , map ("--lflag=" ++) <$> getLFlags
-            , notStage0 ? flag CrossCompiling ? arg "--cross-compile"
+            , notStage0 ? crossStage stage ? arg "--cross-compile"
             , stage0    ? arg ("--cflag=-D" ++ hArch ++ "_HOST_ARCH=1")
             , stage0    ? arg ("--cflag=-D" ++ hOs   ++ "_HOST_OS=1"  )
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
@@ -42,7 +42,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
               -- they are constant and end up as constants in the assembly.
               -- See #12849
               -- MP: Wrong use of CrossCompiling
-            , flag CrossCompiling ? isWinTarget stage ? arg "--via-asm"
+            , crossStage stage ? isWinTarget stage ? arg "--via-asm"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
