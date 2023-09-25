@@ -777,8 +777,8 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 'defined'       { L _ ITcppDefined }
 
 %monad { P } { >>= } { return }
--- %lexer { (lexer True) } { L _ ITeof }
-%lexer { (lexerDbg True) } { L _ ITeof }
+%lexer { (lexer True) } { L _ ITeof }
+-- %lexer { (lexerDbg True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
   -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
