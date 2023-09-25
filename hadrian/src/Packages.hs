@@ -25,7 +25,6 @@ import Hadrian.Utilities
 
 import Base
 import Context
-import Oracles.Flag
 import Oracles.Setting
 import GHC.Toolchain.Target (targetPlatformTriple)
 

@@ -322,7 +322,14 @@ bindistRules = do
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
         installTo NotRelocatable installPrefix
 
-    phony "binary-dist-dir" $ buildBinDistDir root normalBindist
+    phony "binary-dist-dir" $ do
+      -- A "normal" bindist doesn't make sense when cross compiled because there would be
+      -- libraries built for the host, but the distributed compiler would produce files for
+      -- the target.
+      cross <- flag CrossCompiling
+      if cross
+        then need ["binary-dist-dir-cross"]
+        else buildBinDistDir root normalBindist
     phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
     phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 

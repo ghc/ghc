@@ -22,8 +22,6 @@ import Hadrian.Oracles.TextFile
 import Hadrian.Oracles.Path
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (runMaybeT)
-import Debug.Trace
-import GHC.Stack
 
 import Base
 
@@ -264,11 +262,10 @@ queryTarget s f = expr (f <$> targetStage s)
 queryTargetTarget :: Stage -> (Target -> a) -> Action a
 queryTargetTarget s f = f <$> targetStage s
 
--- | Whether the StageN compiler is a cross-compiler or not.
-crossStage :: HasCallStack => Stage -> Action Bool
+-- | A 'Stage' is a cross-stage if the produced compiler is a cross-compiler.
+crossStage :: Stage -> Action Bool
 crossStage st = do
   st_target <- targetStage (succStage st)
   st_host   <- targetStage st
-  traceShowM (targetPlatformTriple st_target, targetPlatformTriple st_host, st)
   return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
 
