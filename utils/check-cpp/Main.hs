@@ -1,96 +1,65 @@
 
+-- Note: this file formatted with fourmolu
+
 import Control.Monad.IO.Class
+import Data.Data hiding (Fixity)
+import qualified Data.Set as Set
+import Debug.Trace (trace)
+import GHC
 import qualified GHC.Data.EnumSet as EnumSet
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString
 import GHC.Data.Maybe
-import Data.Set (Set)
-import qualified Data.Set as Set
-import GHC.Data.OrdList
 import GHC.Data.StringBuffer
-import GHC.Types.Error
-import GHC.Types.Unique.FM
-import GHC.Utils.Error
-import GHC.Utils.Misc (readHexSignificandExponentPair, readSignificandExponentPair)
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-
-import GHC
 import GHC.Driver.Config.Parser
 import GHC.Driver.Errors.Types
-import qualified GHC.Driver.Session as GHC
-import GHC.Hs
-import GHC.Hs.Doc
-import GHC.Types.Basic (InlineSpec (..), RuleMatchInfo (..))
-import GHC.Types.SourceText
-import GHC.Types.SrcLoc
-import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.FastString   as GHC
-import qualified GHC.Data.StringBuffer as GHC
-import qualified GHC.Driver.Config.Parser as GHC
-import qualified GHC.Driver.Env        as GHC
 import qualified GHC.Driver.Errors.Types as GHC
-import qualified GHC.Driver.Phases     as GHC
-import qualified GHC.Driver.Pipeline   as GHC
-import qualified GHC.Fingerprint.Type  as GHC
-import qualified GHC.Parser.Lexer      as GHC
-import qualified GHC.Settings          as GHC
-import qualified GHC.Types.Error       as GHC
-import qualified GHC.Types.SourceError as GHC
-import qualified GHC.Types.SourceFile  as GHC
-import qualified GHC.Types.SrcLoc      as GHC
-import qualified GHC.Utils.Error       as GHC
-import qualified GHC.Utils.Fingerprint as GHC
-import qualified GHC.Utils.Outputable  as GHC
-
-import GHC.Parser.CharClass
-
-import Debug.Trace (trace)
-import GHC.Driver.Flags
-import GHC.Parser.Annotation
-import GHC.Parser.Errors.Basic
+import qualified GHC.Driver.Session as GHC
+import GHC.Hs.Dump
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.Errors.Types
-import GHC.Parser.Lexer (P (..), Token (..), PState(..), PpState(..), PpContext(..), ParseResult(..) )
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpContext (..), PpState (..), Token (..))
+import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
-import GHC.Prelude
+import GHC.Types.Error
+import GHC.Types.SrcLoc
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+
+-- ---------------------------------------------------------------------
+
+showAst :: (Data a) => a -> String
+showAst ast =
+    showSDocUnsafe
+        $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 -- =====================================================================
--- Temporary home until moved into Parser/Preprocessor
--- data PpState = PpState
---     { pp_defines :: !(Set.Set String)
---     , pp_pushed_back :: !(Maybe Token)
---     , pp_context :: ![PpContext]
---     , pp_accepting :: !Bool
---     }
---     deriving (Show)
-
--- data PpContext = PpContextIf [Token]
---     deriving (Show)
-
--- initPpState :: PpState
--- initPpState = PpState{pp_defines = Set.empty, pp_pushed_back = Nothing, pp_context = [], pp_accepting = True}
 
 ppLexer, ppLexerDbg :: Bool -> (Located Token -> P a) -> P a
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
 ppLexerDbg queueComments cont = ppLexer queueComments contDbg
   where
     contDbg tok = trace ("pptoken: " ++ show (unLoc tok)) (cont tok)
+
+-- NOTE: instead of pulling tokens and calling cont, consider putting
+-- this inside Lexer.lexer, much like the queueComments stuff
+-- That sorts out
+--    - ALR
+--    - queueing comments
 ppLexer _queueComments cont = do
     tok <- ppLexToken
     trace ("ppLexer:" ++ show (unLoc tok)) $ do
-     tok' <- case tok of
-        L _ ITcppIf -> preprocessIf tok
-        L _ ITcppDefine -> preprocessDefine tok
-        L _ ITcppIfdef -> preprocessIfDef tok
-        L _ ITcppElse -> preprocessElse tok
-        L _ ITcppEndif -> preprocessEnd tok
-        L l _ -> do
-            accepting <- getAccepting
-            if accepting
-                then return tok
-                else return (L l (ITcppIgnored [tok]))
-     cont tok'
+        tok' <- case tok of
+            L _ ITcppIf -> preprocessIf tok
+            L _ ITcppDefine -> preprocessDefine tok
+            L _ ITcppIfdef -> preprocessIfDef tok
+            L _ ITcppElse -> preprocessElse tok
+            L _ ITcppEndif -> preprocessEnd tok
+            L l _ -> do
+                accepting <- getAccepting
+                if accepting
+                    then return tok
+                    else return (L l (ITcppIgnored [tok]))
+        cont tok'
 
 -- Swallow tokens until ITcppEndif
 preprocessIf :: Located Token -> P (Located Token)
@@ -98,16 +67,17 @@ preprocessIf tok = go [tok]
   where
     go :: [Located Token] -> P (Located Token)
     go acc = do
-        tok <- ppLexToken
-        case tok of
-            L l ITcppEndif -> return $ L l (ITcppIgnored (reverse (tok : acc)))
-            _ -> go (tok : acc)
+        tok' <- ppLexToken
+        case tok' of
+            L l ITcppEndif -> return $ L l (ITcppIgnored (reverse (tok' : acc)))
+            _ -> go (tok' : acc)
 
 preprocessDefine :: Located Token -> P (Located Token)
 preprocessDefine tok@(L l ITcppDefine) = do
-    L l cond <- ppLexToken
-    ppDefine (show cond)
-    return (L l (ITcppIgnored [tok]))
+    L ll cond <- ppLexToken
+    -- ppDefine (show cond)
+    ppDefine (trace ("ppDefine:" ++ show cond) (show cond))
+    return (L l (ITcppIgnored [tok, L ll cond]))
 preprocessDefine tok = return tok
 
 preprocessIfDef :: Located Token -> P (Located Token)
@@ -116,10 +86,10 @@ preprocessIfDef tok@(L l ITcppIfdef) = do
     defined <- ppIsDefined (show cond)
     if defined
         then do
-            pushContext (PpContextIf [tok])
+            pushContext (PpContextIf [tok, L ll cond])
             setAccepting True
         else setAccepting False
-    return (L l (ITcppIgnored [tok]))
+    return (L l (ITcppIgnored [tok, L ll cond]))
 preprocessIfDef tok = return tok
 
 preprocessElse :: Located Token -> P (Located Token)
@@ -160,11 +130,11 @@ pushBack tok = P $ \s ->
         then
             PFailed
                 $ s
-                    -- { errors =
-                    --     ("pushBack: " ++ show tok ++ ", we already have a token:" ++ show (pp_pushed_back (pp s)))
-                    --         : errors s
-                    -- }
-        else
+        else -- { errors =
+        --     ("pushBack: " ++ show tok ++ ", we already have a token:" ++ show (pp_pushed_back (pp s)))
+        --         : errors s
+        -- }
+
             let
                 ppVal = pp s
                 pp' = ppVal{pp_pushed_back = Just tok}
@@ -182,11 +152,11 @@ ppLexToken :: P (Located Token)
 ppLexToken = do
     mtok <- getPushBack
     case mtok of
-      Just t -> return t
-      Nothing -> do
-        -- TODO: do we need this? Issues with ALR, comments, etc being bypassed
-        (L sp tok) <- Lexer.lexToken
-        return (L (mkSrcSpanPs sp) tok)
+        Just t -> return t
+        Nothing -> do
+            -- TODO: do we need this? Issues with ALR, comments, etc being bypassed
+            (L sp tok) <- Lexer.lexToken
+            return (L (mkSrcSpanPs sp) tok)
 
 -- pp_pushed_back token end ----------------
 
@@ -208,82 +178,85 @@ type LibDir = FilePath
 -- parseString :: LibDir -> String -> IO (WarningMessages, Either ErrorMessages [Located Token])
 parseString :: LibDir -> String -> IO [Located Token]
 parseString libdir str = ghcWrapper libdir $ do
-  dflags0 <- initDynFlags
-  let dflags = dflags0 { extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
-  let pflags = initParserOpts dflags
-  -- return $ strParser str dflags "fake_test_file.hs"
-  liftIO $ putStrLn "-- parsing ----------"
-  liftIO $ putStrLn str
-  liftIO $ putStrLn "---------------------"
-  return $ strGetToks pflags "fake_test_file.hs" str
+    dflags0 <- initDynFlags
+    let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
+    let pflags = initParserOpts dflags
+    -- return $ strParser str dflags "fake_test_file.hs"
+    liftIO $ putStrLn "-- parsing ----------"
+    liftIO $ putStrLn str
+    liftIO $ putStrLn "---------------------"
+    return $ strGetToks pflags "fake_test_file.hs" str
 
 strGetToks :: Lexer.ParserOpts -> FilePath -> String -> [Located Token]
 strGetToks popts filename str = reverse $ lexAll pstate
- where
-  pstate = Lexer.initParserState popts buf loc
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  buf = stringToStringBuffer str
-  -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
+  where
+    pstate = Lexer.initParserState popts buf loc
+    loc = mkRealSrcLoc (mkFastString filename) 1 1
+    buf = stringToStringBuffer str
+    -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
 
-  lexAll state = case unP (ppLexerDbg True return) state of
-                   POk _      t@(L _ ITeof) -> [t]
-                   POk state' t -> t : lexAll state'
-                                            -- (trace ("lexAll: " ++ show (unLoc t)) state')
-                   PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
-                   _ -> [L (mkSrcSpanPs (last_loc state)) ITeof]
+    lexAll state = case unP (ppLexerDbg True return) state of
+        POk _ t@(L _ ITeof) -> [t]
+        POk state' t -> t : lexAll state'
+        -- (trace ("lexAll: " ++ show (unLoc t)) state')
+        PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+
+-- _ -> [L (mkSrcSpanPs (last_loc state)) ITeof]
 
 showErrorMessages :: Messages GhcMessage -> String
 showErrorMessages msgs =
-  renderWithContext defaultSDocContext
-    $ vcat
-    $ pprMsgEnvelopeBagWithLocDefault
-    $ getMessages
-    $ msgs
+    renderWithContext defaultSDocContext
+        $ vcat
+        $ pprMsgEnvelopeBagWithLocDefault
+        $ getMessages
+        $ msgs
 
--- | Parse a file, using the emulated haskell parser, returning the
--- resulting tokens only
-strParser :: String         -- ^ Haskell module source text (full Unicode is supported)
-          -> DynFlags       -- ^ the flags
-          -> FilePath       -- ^ the filename (for source locations)
-          -> (WarningMessages, Either ErrorMessages [Located Token])
-
+{- | Parse a file, using the emulated haskell parser, returning the
+resulting tokens only
+-}
+strParser ::
+    -- | Haskell module source text (full Unicode is supported)
+    String ->
+    -- | the flags
+    DynFlags ->
+    -- | the filename (for source locations)
+    FilePath ->
+    (WarningMessages, Either ErrorMessages [Located Token])
 strParser str dflags filename =
-   let
-       loc  = mkRealSrcLoc (mkFastString filename) 1 1
-       buf  = stringToStringBuffer str
-   in
-   case unP parseModuleNoHaddock (Lexer.initParserState (initParserOpts dflags) buf loc) of
+    let
+        loc = mkRealSrcLoc (mkFastString filename) 1 1
+        buf = stringToStringBuffer str
+     in
+        case unP parseModuleNoHaddock (Lexer.initParserState (initParserOpts dflags) buf loc) of
+            PFailed pst ->
+                let (warns, errs) = Lexer.getPsMessages pst
+                 in (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
+            POk pst rdr_module ->
+                let (warns, _) = Lexer.getPsMessages pst
+                 in (GhcPsMessage <$> warns, Right rdr_module)
 
-     PFailed pst ->
-         let (warns,errs) = Lexer.getPsMessages pst in
-         (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
-
-     POk pst rdr_module ->
-         let (warns,_) = Lexer.getPsMessages pst in
-         (GhcPsMessage <$> warns, Right rdr_module)
-
-
-initDynFlags :: GHC.GhcMonad m => m GHC.DynFlags
+initDynFlags :: (GHC.GhcMonad m) => m GHC.DynFlags
 initDynFlags = do
-  -- Based on GHC backpack driver doBackPack
-  dflags0         <- GHC.getSessionDynFlags
-  let parser_opts0 = initParserOpts dflags0
-  -- (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
-  -- (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
-  -- Turn this on last to avoid T10942
-  let dflags2 = dflags0 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
-  -- Prevent parsing of .ghc.environment.* "package environment files"
-  (dflags3, _, _) <- GHC.parseDynamicFlagsCmdLine
-    dflags2
-    [GHC.noLoc "-hide-all-packages"]
-  _ <- GHC.setSessionDynFlags dflags3
-  return dflags3
+    -- Based on GHC backpack driver doBackPack
+    dflags0 <- GHC.getSessionDynFlags
+    -- let parser_opts0 = initParserOpts dflags0
+    -- (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
+    -- (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
+    -- Turn this on last to avoid T10942
+    let dflags2 = dflags0 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
+    -- Prevent parsing of .ghc.environment.* "package environment files"
+    (dflags3, _, _) <-
+        GHC.parseDynamicFlagsCmdLine
+            dflags2
+            [GHC.noLoc "-hide-all-packages"]
+    _ <- GHC.setSessionDynFlags dflags3
+    return dflags3
 
 -- | Internal function. Default runner of GHC.Ghc action in IO.
 ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
-  GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
-    $ GHC.runGhc (Just libdir) a
+    GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
+        $ GHC.runGhc (Just libdir) a
 
 -- ---------------------------------------------------------------------
 
@@ -337,11 +310,10 @@ happyAccept _j tk _st _sts stk =
 
 happyShift :: Int -> Int -> Located Token -> Int -> [Int] -> [Located Token] -> P [Located Token]
 happyShift new_state _i tk st sts stk = do
-    happyNewToken new_state (st:sts) (tk:stk)
+    happyNewToken new_state (st : sts) (tk : stk)
+
 -- happyShift new_state i tk st sts stk =
 --      happyNewToken new_state (HappyCons (st) (sts)) ((happyInTok (tk))`HappyStk`stk)
-
-
 
 happyFail :: [String] -> Int -> Located Token -> p2 -> p3 -> p4 -> P a
 happyFail explist i tk _old_st _ _stk =
@@ -365,14 +337,15 @@ happyError = Lexer.srcParseFail
 
 -- Testing
 
+libdirNow :: LibDir
+libdirNow = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
 
-libdir = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
 t0 :: IO ()
-
 t0 = do
-  tks <- parseString libdir "#define FOO\n#ifdef FOO\nx = 1\n#endif\n"
-  putStrLn $ show (reverse $ map unLoc tks)
+    tks <- parseString libdirNow "#define FOO\n#ifdef FOO\nx = 1\n#endif\n"
+    putStrLn $ show (reverse $ map unLoc tks)
 
+t1 :: IO ()
 t1 = do
-  tks <- parseString libdir "data X = X\n"
-  putStrLn $ show (reverse $ map unLoc tks)
+    tks <- parseString libdirNow "data X = X\n"
+    putStrLn $ show (reverse $ map unLoc tks)
