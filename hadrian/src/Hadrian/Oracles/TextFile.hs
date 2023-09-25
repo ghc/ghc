@@ -82,8 +82,8 @@ lookupDependencies depFile file = do
           | otherwise            = 1
     deps <- fmap (sortOn weigh) <$> lookupValues depFile file
     case deps of
-        Nothing -> error $ "No dependencies found for file " ++ quote file
-        Just [] -> error $ "No source file found for file " ++ quote file
+        Nothing -> error $ "No dependencies found for file " ++ quote file ++ " in " ++ quote depFile
+        Just [] -> error $ "No source file found for file " ++ quote file ++ " in " ++ quote depFile
         Just (source : files) -> return (source, files)
 
 -- | Parse a target from a text file, tracking the result. The file is expected
