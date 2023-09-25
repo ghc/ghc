@@ -229,8 +229,13 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+Note that this is not an exhaustive list of changes in ``base``. See the
+``base`` changelog for full details.
+
+- Added ``{-# WARNING in "x-partial" #-}`` to ``Data.List.{head,tail}``.
 - :base-ref:`Data.Tuple` now exports ``getSolo :: Solo a -> a``.
 - Updated to `Unicode 15.1.0 <https://www.unicode.org/versions/Unicode15.1.0/>`_.
+- Fixed exponent overflow/underflow bugs in the ``Read`` instances for ``Float`` and ``Double`` (`CLC proposal #192 <https://github.com/haskell/core-libraries-committee/issues/192>`_)
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
