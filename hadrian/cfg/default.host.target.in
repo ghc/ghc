@@ -18,10 +18,10 @@ Target
 , tgtHsCPreprocessor = HsCpp {hsCppProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @HaskellCPPArgsList@}}
 , tgtCCompilerLink = CcLink
 { ccLinkProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @CONF_GCC_LINKER_OPTS_STAGE0List@}
-, ccLinkSupportsNoPie = False
-, ccLinkSupportsCompactUnwind = False
-, ccLinkSupportsFilelist = False
-, ccLinkIsGnu = False
+, ccLinkSupportsNoPie = @CONF_GCC_SUPPORTS_NO_PIE_STAGE0Bool@
+, ccLinkSupportsCompactUnwind = @LdHasNoCompactUnwind_STAGE0Bool@
+, ccLinkSupportsFilelist = @LdHasFilelist_STAGE0Bool@
+, ccLinkIsGnu = @LdIsGNULd_STAGE0Bool@
 }
 
 , tgtAr = Ar
