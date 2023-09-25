@@ -9181,6 +9181,8 @@ module GHC.RTS.Flags where
                numaMask :: GHC.Types.Word}
   type GiveGCStats :: *
   data GiveGCStats = NoGCStats | CollectGCStats | OneLineGCStats | SummaryGCStats | VerboseGCStats
+  type HpcFlags :: *
+  data HpcFlags = HpcFlags {writeTixFile :: GHC.Types.Bool}
   type IoSubSystem :: *
   data IoSubSystem = IoPOSIX | IoNative
   type MiscFlags :: *
@@ -9190,7 +9192,7 @@ module GHC.RTS.Flags where
   type ProfFlags :: *
   data ProfFlags = ProfFlags {doHeapProfile :: DoHeapProfile, heapProfileInterval :: RtsTime, heapProfileIntervalTicks :: GHC.Types.Word, startHeapProfileAtStartup :: GHC.Types.Bool, showCCSOnException :: GHC.Types.Bool, maxRetainerSetSize :: GHC.Types.Word, ccsLength :: GHC.Types.Word, modSelector :: GHC.Maybe.Maybe GHC.Base.String, descrSelector :: GHC.Maybe.Maybe GHC.Base.String, typeSelector :: GHC.Maybe.Maybe GHC.Base.String, ccSelector :: GHC.Maybe.Maybe GHC.Base.String, ccsSelector :: GHC.Maybe.Maybe GHC.Base.String, retainerSelector :: GHC.Maybe.Maybe GHC.Base.String, bioSelector :: GHC.Maybe.Maybe GHC.Base.String}
   type RTSFlags :: *
-  data RTSFlags = RTSFlags {gcFlags :: GCFlags, concurrentFlags :: ConcFlags, miscFlags :: MiscFlags, debugFlags :: DebugFlags, costCentreFlags :: CCFlags, profilingFlags :: ProfFlags, traceFlags :: TraceFlags, tickyFlags :: TickyFlags, parFlags :: ParFlags}
+  data RTSFlags = RTSFlags {gcFlags :: GCFlags, concurrentFlags :: ConcFlags, miscFlags :: MiscFlags, debugFlags :: DebugFlags, costCentreFlags :: CCFlags, profilingFlags :: ProfFlags, traceFlags :: TraceFlags, tickyFlags :: TickyFlags, parFlags :: ParFlags, hpcFlags :: HpcFlags}
   type RtsTime :: *
   type RtsTime = GHC.Word.Word64
   type TickyFlags :: *
@@ -9201,6 +9203,7 @@ module GHC.RTS.Flags where
   getConcFlags :: GHC.Types.IO ConcFlags
   getDebugFlags :: GHC.Types.IO DebugFlags
   getGCFlags :: GHC.Types.IO GCFlags
+  getHpcFlags :: GHC.Types.IO HpcFlags
   getIoManagerFlag :: GHC.Types.IO IoSubSystem
   getMiscFlags :: GHC.Types.IO MiscFlags
   getParFlags :: GHC.Types.IO ParFlags
@@ -11840,6 +11843,7 @@ instance GHC.Generics.Generic GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.R
 instance GHC.Generics.Generic GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Generics.Generic GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Generics.Generic GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Generics.Generic GHC.RTS.Flags.HpcFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Generics.Generic GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Generics.Generic GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Generics.Generic GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS.Flags’
@@ -12323,6 +12327,7 @@ instance GHC.Show.Show GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.RTS.Flag
 instance GHC.Show.Show GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Show.Show GHC.RTS.Flags.HpcFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.IoSubSystem -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
