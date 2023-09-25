@@ -228,6 +228,7 @@ partitionWithM f (x:xs) = do
   case y of
     Left  b -> return (b:bs, cs)
     Right c -> return (bs, c:cs)
+{-# INLINEABLE partitionWithM #-}
 
 chkAppend :: [a] -> [a] -> [a]
 -- Checks for the second argument being empty
