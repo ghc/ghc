@@ -178,7 +178,7 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
 lintStgConArg :: StgArg -> LintM ()
 lintStgConArg arg = do
   unarised <- lf_unarised <$> getLintFlags
-  when unarised $ case typePrimRep_maybe (stgArgType arg) of
+  when unarised $ case stgArgRep_maybe arg of
     -- Note [Post-unarisation invariants], invariant 4
     Just [_] -> pure ()
     badRep   -> addErrL $
@@ -192,7 +192,7 @@ lintStgConArg arg = do
 lintStgFunArg :: StgArg -> LintM ()
 lintStgFunArg arg = do
   unarised <- lf_unarised <$> getLintFlags
-  when unarised $ case typePrimRep_maybe (stgArgType arg) of
+  when unarised $ case stgArgRep_maybe arg of
     -- Note [Post-unarisation invariants], invariant 3
     Just []  -> pure ()
     Just [_] -> pure ()
@@ -371,7 +371,7 @@ lintStgAppReps fun args = do
       -- and we abort kind checking.
       fun_arg_tys_reps, actual_arg_reps :: [Maybe [PrimRep]]
       fun_arg_tys_reps = map typePrimRep_maybe fun_arg_tys'
-      actual_arg_reps = map (typePrimRep_maybe . stgArgType) args
+      actual_arg_reps = map stgArgRep_maybe args
 
       match_args :: [Maybe [PrimRep]] -> [Maybe [PrimRep]] -> LintM ()
       match_args (Nothing:_) _   = return ()

@@ -331,7 +331,7 @@ getArgRepsAmodes args = do
            | V <- rep  = return (V, Nothing)
            | otherwise = do expr <- getArgAmode (NonVoid arg)
                             return (rep, Just expr)
-           where rep = toArgRep platform (argPrimRep arg)
+           where rep = toArgRep platform (stgArgRep1 arg)
 
 nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
 nonVArgs [] = []
@@ -605,7 +605,7 @@ getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 --     so the result list may be shorter than the argument list
 getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
-  | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
+  | isVoidRep (stgArgRep1 arg) = getNonVoidArgAmodes args
   | otherwise = do { amode  <- getArgAmode (NonVoid arg)
                    ; amodes <- getNonVoidArgAmodes args
                    ; return ( amode : amodes ) }

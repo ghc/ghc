@@ -602,7 +602,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         ticks' = map (coreToStgTick arg_ty) (stripTicksT (not . tickishIsCode) arg)
         arg' = getStgArgFromTrivialArg arg
         arg_rep = typePrimRep arg_ty
-        stg_arg_rep = typePrimRep (stgArgType arg')
+        stg_arg_rep = stgArgRep arg'
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
     massertPpr (length ticks' <= 1) (text "More than one Tick in trivial arg:" <+> ppr arg)

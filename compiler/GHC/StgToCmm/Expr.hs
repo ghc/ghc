@@ -1001,7 +1001,7 @@ cgIdApp fun_id args = do
         fun            = idInfoToAmode fun_info
         lf_info        = cg_lf         fun_info
         n_args         = length args
-        v_args         = length $ filter (isZeroBitTy . stgArgType) args
+        v_args         = length $ filter (null . stgArgRep) args
     case getCallMethod cfg fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop of
             -- A value in WHNF, so we can just return it.
         ReturnIt
