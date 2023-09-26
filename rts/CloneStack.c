@@ -25,6 +25,13 @@
 
 #include <string.h>
 
+
+static StgWord getStackFrameCount(StgStack* stack);
+static StgWord getStackChunkClosureCount(StgStack* stack);
+static void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack);
+static StgClosure* createPtrClosure(Capability* cap, InfoProvEnt* ipe);
+static StgMutArrPtrs* allocateMutableArray(StgWord size);
+
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 {
   StgWord spOffset = stack->sp - stack->stack;
