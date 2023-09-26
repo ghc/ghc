@@ -82,13 +82,19 @@ clampReadSize  = min 0x7ffff000
 data FD = FD {
   fdFD :: {-# UNPACK #-} !CInt,
 #if defined(mingw32_HOST_OS)
-  -- On Windows, a socket file descriptor needs to be read and written
+  -- | On Windows, a socket file descriptor needs to be read and written
   -- using different functions (send/recv).
   fdIsSocket_ :: {-# UNPACK #-} !Int
 #else
-  -- On Unix we need to know whether this FD has O_NONBLOCK set.
-  -- If it has, then we can use more efficient routines to read/write to it.
-  -- It is always safe for this to be off.
+  -- | On Unix we need to know whether this 'FD' has @O_NONBLOCK@ set.
+  -- If it has, then we can use more efficient routines (namely, unsafe FFI)
+  -- to read/write to it. Otherwise safe FFI is used.
+  --
+  -- @O_NONBLOCK@ has no effect on regular files and block devices at the moment,
+  -- thus this flag should be off for them. While reading from a file cannot
+  -- block indefinitely (as opposed to reading from a socket or a pipe), it can block
+  -- the entire runtime for a "brief" moment of time: you cannot read a file from
+  -- a floppy drive or network share without delay.
   fdIsNonBlocking :: {-# UNPACK #-} !Int
 #endif
  }
@@ -197,6 +203,9 @@ openFileWith
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
+              --   This has no effect on regular files and block devices:
+              --   they are always opened in blocking mode.
+              --   See 'fdIsNonBlocking' for more discussion.
   -> (FD -> IODeviceType -> IO r) -- ^ @act1@: An action to perform
                     -- on the file descriptor with the masking state
                     -- restored and an exception handler that closes
@@ -332,7 +341,11 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
 
     return (FD{ fdFD = fd,
 #if !defined(mingw32_HOST_OS)
-                fdIsNonBlocking = fromEnum is_nonblock
+                -- As https://man7.org/linux/man-pages/man2/open.2.html explains,
+                -- O_NONBLOCK has no effect on regular files and block devices;
+                -- utilities inspecting fdIsNonBlocking (such as readRawBufferPtr)
+                -- should not be tricked to think otherwise.
+                fdIsNonBlocking = fromEnum (is_nonblock && fd_type /= RegularFile && fd_type /= RawDevice)
 #else
                 fdIsSocket_ = fromEnum is_socket
 #endif
@@ -452,11 +465,19 @@ dup2 fd fdto = do
 
 setNonBlockingMode :: FD -> Bool -> IO FD
 setNonBlockingMode fd set = do
-  setNonBlockingFD (fdFD fd) set
+  -- This mirrors the behaviour of mkFD:
+  -- O_NONBLOCK has no effect on regular files and block devices;
+  -- utilities inspecting fdIsNonBlocking (such as readRawBufferPtr)
+  -- should not be tricked to think otherwise.
+  is_nonblock <- if set then do
+    (fd_type, _, _) <- fdStat (fdFD fd)
+    pure $ fd_type /= RegularFile && fd_type /= RawDevice
+    else pure False
+  setNonBlockingFD (fdFD fd) is_nonblock
 #if defined(mingw32_HOST_OS)
   return fd
 #else
-  return fd{ fdIsNonBlocking = fromEnum set }
+  return fd{ fdIsNonBlocking = fromEnum is_nonblock }
 #endif
 
 ready :: FD -> Bool -> Int -> IO Bool
