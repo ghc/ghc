@@ -126,6 +126,14 @@ library
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         DerivedConstants.h
                         stg/MachRegs.h
+                        stg/MachRegs/arm32.h
+                        stg/MachRegs/arm64.h
+                        stg/MachRegs/loongarch64.h
+                        stg/MachRegs/ppc.h
+                        stg/MachRegs/riscv64.h
+                        stg/MachRegs/s390x.h
+                        stg/MachRegs/wasm32.h
+                        stg/MachRegs/x86.h
                         stg/MachRegsForHost.h
                         stg/Types.h
 
@@ -296,6 +304,14 @@ library
                         rts/storage/TSO.h
                         stg/DLL.h
                         stg/MachRegs.h
+                        stg/MachRegs/arm32.h
+                        stg/MachRegs/arm64.h
+                        stg/MachRegs/loongarch64.h
+                        stg/MachRegs/ppc.h
+                        stg/MachRegs/riscv64.h
+                        stg/MachRegs/s390x.h
+                        stg/MachRegs/wasm32.h
+                        stg/MachRegs/x86.h
                         stg/MachRegsForHost.h
                         stg/MiscClosures.h
                         stg/Prim.h

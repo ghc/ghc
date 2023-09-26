@@ -34,6 +34,14 @@ extra-source-files:
     ClosureTypes.h
     FunTypes.h
     MachRegs.h
+    MachRegs/arm32.h
+    MachRegs/arm64.h
+    MachRegs/loongarch64.h
+    MachRegs/ppc.h
+    MachRegs/riscv64.h
+    MachRegs/s390x.h
+    MachRegs/wasm32.h
+    MachRegs/x86.h
     ghc-llvm-version.h
 
 

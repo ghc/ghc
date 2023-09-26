@@ -15,7 +15,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
 
--- | Native code generator
+-- | Note [Native code generator]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- The native-code generator has machine-independent and
 -- machine-dependent modules.
@@ -23,45 +24,39 @@
 -- This module ("GHC.CmmToAsm") is the top-level machine-independent
 -- module.  Before entering machine-dependent land, we do some
 -- machine-independent optimisations (defined below) on the
--- 'CmmStmts's.
+-- 'CmmStmts's. (Which ideally would be folded into CmmOpt ...)
 --
 -- We convert to the machine-specific 'Instr' datatype with
 -- 'cmmCodeGen', assuming an infinite supply of registers.  We then use
--- a machine-independent register allocator ('regAlloc') to rejoin
+-- a (mostly) machine-independent register allocator to rejoin
 -- reality.  Obviously, 'regAlloc' has machine-specific helper
--- functions (see about "RegAllocInfo" below).
+-- functions (see the used register allocator for details).
 --
 -- Finally, we order the basic blocks of the function so as to minimise
 -- the number of jumps between blocks, by utilising fallthrough wherever
 -- possible.
 --
--- The machine-dependent bits break down as follows:
+-- The machine-dependent bits are generally contained under
+--  GHC/CmmToAsm/<Arch>/* and generally breaks down as follows:
 --
---   * ["MachRegs"]  Everything about the target platform's machine
+--   * "Regs": Everything about the target platform's machine
 --     registers (and immediate operands, and addresses, which tend to
 --     intermingle/interact with registers).
 --
---   * ["MachInstrs"]  Includes the 'Instr' datatype (possibly should
---     have a module of its own), plus a miscellany of other things
+--   * "Instr":  Includes the 'Instr' datatype plus a miscellany of other things
 --     (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
 --
---   * ["MachCodeGen"]  is where 'Cmm' stuff turns into
+--   * "CodeGen":  is where 'Cmm' stuff turns into
 --     machine instructions.
 --
---   * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
+--   * "Ppr": 'pprInstr' turns an 'Instr' into text (well, really
 --     a 'SDoc').
 --
---   * ["RegAllocInfo"] In the register allocator, we manipulate
---     'MRegsState's, which are 'BitSet's, one bit per machine register.
---     When we want to say something about a specific machine register
---     (e.g., ``it gets clobbered by this instruction''), we set/unset
---     its bit.  Obviously, we do this 'BitSet' thing for efficiency
---     reasons.
+-- The register allocators lives under GHC.CmmToAsm.Reg.*, there is both a Linear and a Graph
+-- based register allocator. Both of which have their own notes describing them. They
+-- are mostly platform independent but there are some platform specific files
+-- encoding architecture details under Reg/<Allocator>/<Arch.hs>
 --
---     The 'RegAllocInfo' module collects together the machine-specific
---     info needed to do register allocation.
---
---    * ["RegisterAlloc"] The (machine-independent) register allocator.
 -- -}
 --
 module GHC.CmmToAsm

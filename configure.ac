@@ -578,6 +578,15 @@ ln -f rts/include/rts/Bytecodes.h compiler/
 ln -f rts/include/rts/storage/ClosureTypes.h compiler/
 ln -f rts/include/rts/storage/FunTypes.h compiler/
 ln -f rts/include/stg/MachRegs.h compiler/
+mkdir -p compiler/MachRegs
+ln -f rts/include/stg/MachRegs/arm32.h compiler/MachRegs/arm32.h
+ln -f rts/include/stg/MachRegs/arm64.h compiler/MachRegs/arm64.h
+ln -f rts/include/stg/MachRegs/loongarch64.h compiler/MachRegs/loongarch64.h
+ln -f rts/include/stg/MachRegs/ppc.h compiler/MachRegs/ppc.h
+ln -f rts/include/stg/MachRegs/riscv64.h compiler/MachRegs/riscv64.h
+ln -f rts/include/stg/MachRegs/s390x.h compiler/MachRegs/s390x.h
+ln -f rts/include/stg/MachRegs/wasm32.h compiler/MachRegs/wasm32.h
+ln -f rts/include/stg/MachRegs/x86.h compiler/MachRegs/x86.h
 AC_MSG_NOTICE([done.])
 
 dnl ** Copy the files from the "fs" utility into the right folders.
