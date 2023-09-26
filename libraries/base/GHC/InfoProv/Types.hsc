@@ -30,6 +30,7 @@ data InfoProv = InfoProv {
   ipDesc :: String,
   ipTyDesc :: String,
   ipLabel :: String,
+  ipUnitId :: String,
   ipMod :: String,
   ipSrcFile :: String,
   ipSrcSpan :: String
@@ -62,10 +63,11 @@ getIPE obj fail k = allocaBytes (#size InfoProvEnt) $ \p -> IO $ \s ->
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = (#ptr InfoProvEnt, prov) p
 
-peekIpName, peekIpDesc, peekIpLabel, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
+peekIpName, peekIpDesc, peekIpLabel, peekIpUnitId, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
 peekIpName p    =  (# peek InfoProv, table_name) p
 peekIpDesc p    =  (# peek InfoProv, closure_desc) p
 peekIpLabel p   =  (# peek InfoProv, label) p
+peekIpUnitId p  =  (# peek InfoProv, unit_id) p
 peekIpModule p  =  (# peek InfoProv, module) p
 peekIpSrcFile p =  (# peek InfoProv, src_file) p
 peekIpSrcSpan p =  (# peek InfoProv, src_span) p
@@ -77,6 +79,7 @@ peekInfoProv infop = do
   desc <- peekCString utf8 =<< peekIpDesc infop
   tyDesc <- peekCString utf8 =<< peekIpTyDesc infop
   label <- peekCString utf8 =<< peekIpLabel infop
+  unit_id <- peekCString utf8 =<< peekIpUnitId infop
   mod <- peekCString utf8 =<< peekIpModule infop
   file <- peekCString utf8 =<< peekIpSrcFile infop
   span <- peekCString utf8 =<< peekIpSrcSpan infop
@@ -85,6 +88,7 @@ peekInfoProv infop = do
       ipDesc = desc,
       ipTyDesc = tyDesc,
       ipLabel = label,
+      ipUnitId = unit_id,
       ipMod = mod,
       ipSrcFile = file,
       ipSrcSpan = span
