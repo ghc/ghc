@@ -23,10 +23,4 @@ StgMutArrPtrs* decodeClonedStack(Capability *cap, StgStack* stack);
 void handleCloneStackMessage(MessageCloneStack *msg);
 #endif
 
-StgWord getStackFrameCount(StgStack* stack);
-StgWord getStackChunkClosureCount(StgStack* stack);
-void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack);
-StgClosure* createPtrClosure(Capability* cap, InfoProvEnt* ipe);
-StgMutArrPtrs* allocateMutableArray(StgWord size);
-
 #include "EndPrivate.h"
