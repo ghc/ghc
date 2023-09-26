@@ -196,6 +196,9 @@ void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack) {
       index++;
     }
 
+    // Ensure that we didn't overflow the result array
+    ASSERT(index-1 < arr->ptrs);
+
     // check whether the stack ends in an underflow frame
     StgUnderflowFrame *frame = (StgUnderflowFrame *) (last_stack->stack
       + last_stack->stack_size - sizeofW(StgUnderflowFrame));
