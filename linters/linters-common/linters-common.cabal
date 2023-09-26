@@ -11,14 +11,10 @@ library
     Haskell2010
 
   build-depends:
-    process
-      ^>= 1.6,
-    base
-       >= 4.14 && < 5,
-    text
-       >= 1.2  && < 2.1,
-    deepseq
-       >= 1.1,
+    base >= 4.14 && < 5,
+    process ^>= 1.6,
+    text >= 1.2 && < 2.2,
+    deepseq >= 1.1,
 
   hs-source-dirs:
     .
