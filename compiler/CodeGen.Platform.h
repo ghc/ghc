@@ -480,6 +480,7 @@ import GHC.Platform.Reg
 
 #endif
 
+-- See also Note [Caller saves and callee-saves regs.]
 callerSaves :: GlobalReg -> Bool
 #if defined(CALLER_SAVES_Base)
 callerSaves BaseReg           = True
