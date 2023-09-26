@@ -56,10 +56,8 @@ typedef struct {
     StringIdx closure_desc;
     StringIdx ty_desc;
     StringIdx label;
-    StringIdx module_name;
     StringIdx src_file;
     StringIdx src_span;
-    uint32_t _padding;
 } IpeBufferEntry;
 
 GHC_STATIC_ASSERT(sizeof(IpeBufferEntry) % (WORD_SIZE_IN_BITS / 8) == 0, "sizeof(IpeBufferEntry) must be a multiple of the word size");
@@ -83,6 +81,9 @@ typedef struct IpeBufferListNode_ {
 
     const char *string_table;
     StgWord string_table_size; // decompressed size
+
+    // Shared by all entries
+    StringIdx module_name;
 } IpeBufferListNode;
 
 void registerInfoProvList(IpeBufferListNode *node);
