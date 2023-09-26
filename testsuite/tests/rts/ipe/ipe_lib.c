@@ -48,11 +48,6 @@ IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, int i) {
     snprintf(label, labelLength, "label_%03i", i);
     provEnt.label = add_string(st, label);
 
-    unsigned int moduleLength = strlen("module_") + 3 /* digits */ + 1 /* null character */;
-    char *module = malloc(sizeof(char) * moduleLength);
-    snprintf(module, moduleLength, "module_%03i", i);
-    provEnt.module_name = add_string(st, module);
-
     unsigned int srcFileLength = strlen("src_file_") + 3 /* digits */ + 1 /* null character */;
     char *srcFile = malloc(sizeof(char) * srcFileLength);
     snprintf(srcFile, srcFileLength, "src_file_%03i", i);
@@ -76,6 +71,11 @@ IpeBufferListNode *makeAnyProvEntries(Capability *cap, int start, int end) {
 
     StringTable st;
     init_string_table(&st);
+
+    unsigned int moduleLength = strlen("module_") + 3 /* digits */ + 1 /* null character */;
+    char *module = malloc(sizeof(char) * moduleLength);
+    snprintf(module, moduleLength, "module_%03i", start);
+    node->module_name = add_string(&st, module);
 
     // Make the entries and fill the buffers
     for (int i=start; i < end; i++) {

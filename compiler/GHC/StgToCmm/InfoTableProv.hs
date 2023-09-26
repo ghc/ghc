@@ -83,9 +83,10 @@ emitIpeBufferListNode this_mod ents = do
         platform = stgToCmmPlatform cfg
         int n    = mkIntCLit platform n
 
-        (cg_ipes, strtab) = flip runState emptyStringTable $ do
+        ((cg_ipes, module_name), strtab) = flip runState emptyStringTable $ do
           module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)
-          mapM (toCgIPE platform ctx module_name) ents
+          cg_ipes <- mapM (toCgIPE platform ctx) ents
+          return (cg_ipes, module_name)
 
         tables :: [CmmStatic]
         tables = map (CmmStaticLit . CmmLabel . ipeInfoTablePtr) cg_ipes
@@ -136,6 +137,9 @@ emitIpeBufferListNode this_mod ents = do
 
             -- 'string_table_size' field (decompressed size)
           , int $ BS.length uncompressed_strings
+
+            -- 'module_name' field
+          , CmmInt (fromIntegral module_name) W32
           ]
 
     -- Emit the list of info table pointers
@@ -173,10 +177,8 @@ toIpeBufferEntries byte_order cg_ipes =
       , ipeClosureDesc cg_ipe
       , ipeTypeDesc cg_ipe
       , ipeLabel cg_ipe
-      , ipeModuleName cg_ipe
       , ipeSrcFile cg_ipe
       , ipeSrcSpan cg_ipe
-      , 0 -- padding
       ]
 
     word32Builder :: Word32 -> BSB.Builder
@@ -184,8 +186,8 @@ toIpeBufferEntries byte_order cg_ipes =
       BigEndian    -> BSB.word32BE
       LittleEndian -> BSB.word32LE
 
-toCgIPE :: Platform -> SDocContext -> StrTabOffset -> InfoProvEnt -> State StringTable CgInfoProvEnt
-toCgIPE platform ctx module_name ipe = do
+toCgIPE :: Platform -> SDocContext -> InfoProvEnt -> State StringTable CgInfoProvEnt
+toCgIPE platform ctx ipe = do
     table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform (infoTablePtr ipe))
     closure_desc <- lookupStringTable $ ST.pack $ show (infoProvEntClosureType ipe)
     type_desc <- lookupStringTable $ ST.pack $ infoTableType ipe
@@ -205,7 +207,6 @@ toCgIPE platform ctx module_name ipe = do
                            , ipeClosureDesc = closure_desc
                            , ipeTypeDesc = type_desc
                            , ipeLabel = label
-                           , ipeModuleName = module_name
                            , ipeSrcFile = src_file
                            , ipeSrcSpan = src_span
                            }
@@ -216,7 +217,6 @@ data CgInfoProvEnt = CgInfoProvEnt
                                , ipeClosureDesc :: !StrTabOffset
                                , ipeTypeDesc :: !StrTabOffset
                                , ipeLabel :: !StrTabOffset
-                               , ipeModuleName :: !StrTabOffset
                                , ipeSrcFile :: !StrTabOffset
                                , ipeSrcSpan :: !StrTabOffset
                                }

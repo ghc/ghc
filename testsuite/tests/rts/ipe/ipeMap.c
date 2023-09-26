@@ -53,6 +53,8 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     StringTable st;
     init_string_table(&st);
 
+    node->module_name = add_string(&st, "TheModule");
+
     HaskellObj fortyTwo = UNTAG_CLOSURE(rts_mkInt(cap, 42));
     node->next = NULL;
     node->compressed = 0;
@@ -71,7 +73,7 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     assertStringsEqual(result.prov.closure_desc, "closure_desc_042");
     assertStringsEqual(result.prov.ty_desc, "ty_desc_042");
     assertStringsEqual(result.prov.label, "label_042");
-    assertStringsEqual(result.prov.module, "module_042");
+    assertStringsEqual(result.prov.module, "TheModule");
     assertStringsEqual(result.prov.src_file, "src_file_042");
     assertStringsEqual(result.prov.src_span, "src_span_042");
 
@@ -87,6 +89,8 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
 
     StringTable st;
     init_string_table(&st);
+
+    node->module_name = add_string(&st, "TheModule");
 
     HaskellObj twentyThree = UNTAG_CLOSURE(rts_mkInt8(cap, 23));
     node->next = NULL;
