@@ -83,10 +83,11 @@ emitIpeBufferListNode this_mod ents = do
         platform = stgToCmmPlatform cfg
         int n    = mkIntCLit platform n
 
-        ((cg_ipes, module_name), strtab) = flip runState emptyStringTable $ do
-          module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)
+        ((cg_ipes, unit_id, module_name), strtab) = flip runState emptyStringTable $ do
+          unit_id <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr $ moduleName this_mod)
+          module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr $ moduleUnit this_mod)
           cg_ipes <- mapM (toCgIPE platform ctx) ents
-          return (cg_ipes, module_name)
+          return (cg_ipes, unit_id, module_name)
 
         tables :: [CmmStatic]
         tables = map (CmmStaticLit . CmmLabel . ipeInfoTablePtr) cg_ipes
@@ -140,6 +141,9 @@ emitIpeBufferListNode this_mod ents = do
 
             -- 'module_name' field
           , CmmInt (fromIntegral module_name) W32
+
+            -- 'unit_id' field
+          , CmmInt (fromIntegral unit_id) W32
           ]
 
     -- Emit the list of info table pointers

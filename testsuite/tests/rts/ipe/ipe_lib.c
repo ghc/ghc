@@ -72,6 +72,11 @@ IpeBufferListNode *makeAnyProvEntries(Capability *cap, int start, int end) {
     StringTable st;
     init_string_table(&st);
 
+    unsigned int unitIdLength = strlen("unit_id_") + 3 /* digits */ + 1 /* null character */;
+    char *unitId = malloc(sizeof(char) * unitIdLength);
+    snprintf(unitId, unitIdLength, "unit_id_%03i", start);
+    node->unit_id = add_string(&st, unitId);
+
     unsigned int moduleLength = strlen("module_") + 3 /* digits */ + 1 /* null character */;
     char *module = malloc(sizeof(char) * moduleLength);
     snprintf(module, moduleLength, "module_%03i", start);
