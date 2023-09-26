@@ -407,7 +407,7 @@ ppr_dec isTop (NewtypeD ctxt t xs ksig c decs)
 ppr_dec isTop (TypeDataD t xs ksig cs)
   = ppr_type_data isTop empty [] (Just t) (hsep (map ppr xs)) ksig cs []
 ppr_dec _  (ClassD ctxt c xs fds ds)
-  = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
+  = text "class" <+> pprCxt ctxt <+> pprName' Applied c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
 ppr_dec _ (InstanceD o ctxt i ds) =
         text "instance" <+> maybe empty ppr_overlap o <+> pprCxt ctxt <+> ppr i
@@ -420,7 +420,7 @@ ppr_dec _ (DefaultD tys) =
         text "default" <+> parens (sep $ punctuate comma $ map ppr tys)
 ppr_dec _ (PragmaD p)   = ppr p
 ppr_dec isTop (DataFamilyD tc tvs kind)
-  = text "data" <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
+  = text "data" <+> maybeFamily <+> pprName' Applied tc <+> hsep (map ppr tvs) <+> maybeKind
   where
     maybeFamily | isTop     = text "family"
                 | otherwise = empty
@@ -552,7 +552,7 @@ ppr_typedef data_or_newtype isTop maybeInst ctxt t argsDoc ksig cs decs
 ppr_deriv_clause :: DerivClause -> Doc
 ppr_deriv_clause (DerivClause ds ctxt)
   = text "deriving" <+> pp_strat_before
-                    <+> ppr_cxt_preds ctxt
+                    <+> ppr_cxt_preds appPrec ctxt
                     <+> pp_strat_after
   where
     -- @via@ is unique in that in comes /after/ the class being derived,
@@ -871,11 +871,11 @@ pprInfixT p = \case
 instance Ppr Type where
     ppr = pprType noPrec
 instance Ppr TypeArg where
-    ppr (TANormal ty) = parensIf (isStarT ty) (ppr ty)
+    ppr (TANormal ty) = ppr ty
     ppr (TyArg ki) = char '@' <> parensIf (isStarT ki) (ppr ki)
 
 pprParendTypeArg :: TypeArg -> Doc
-pprParendTypeArg (TANormal ty) = parensIf (isStarT ty) (pprParendType ty)
+pprParendTypeArg (TANormal ty) = pprParendType ty
 pprParendTypeArg (TyArg ki) = char '@' <> parensIf (isStarT ki) (pprParendType ki)
 
 isStarT :: Type -> Bool
@@ -980,14 +980,12 @@ instance Ppr Role where
 ------------------------------
 pprCxt :: Cxt -> Doc
 pprCxt [] = empty
-pprCxt ts = ppr_cxt_preds ts <+> text "=>"
+pprCxt ts = ppr_cxt_preds funPrec ts <+> text "=>"
 
-ppr_cxt_preds :: Cxt -> Doc
-ppr_cxt_preds [] = empty
-ppr_cxt_preds [t@ImplicitParamT{}] = parens (ppr t)
-ppr_cxt_preds [t@ForallT{}] = parens (ppr t)
-ppr_cxt_preds [t] = ppr t
-ppr_cxt_preds ts = parens (commaSep ts)
+ppr_cxt_preds :: Precedence -> Cxt -> Doc
+ppr_cxt_preds _ [] = text "()"
+ppr_cxt_preds p [t] = pprType p t
+ppr_cxt_preds _ ts = parens (commaSep ts)
 
 ------------------------------
 instance Ppr Range where
