@@ -83,7 +83,7 @@ module GHC.Parser.Lexer (
    adjustChar,
    addPsMessage,
    -- * for integration with the preprocessor
-   lexToken
+   queueIgnoredToken
   ) where
 
 import GHC.Prelude
@@ -3659,6 +3659,18 @@ queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
 
+queueIgnoredToken :: PsLocated Token -> P()
+queueIgnoredToken (L l tok) = do
+  ll <- getLastLocIncludingComments
+  let
+     -- TODO:AZ: make the tok the right type
+     comment = mkLEpaComment (psRealSpan l) ll (EpaCppIgnored [L l (show tok)])
+     push c = P $ \s  -> POk s {
+          comment_q = c : comment_q s
+          } ()
+  push comment
+
+
 allocateComments
   :: RealSrcSpan
   -> [LEpaComment]
@@ -3728,6 +3740,7 @@ commentToAnnotation :: RealLocated Token -> LEpaComment
 commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComment s)
 commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
+commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
 
