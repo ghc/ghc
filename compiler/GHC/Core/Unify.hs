@@ -1149,8 +1149,8 @@ unify_ty env ty1 ty2 _kco
   -- TYPE and CONSTRAINT are not Apart
   -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
   -- NB: at this point we know that the two TyCons do not match
-  | Just {} <- sORTKind_maybe ty1
-  , Just {} <- sORTKind_maybe ty2
+  | KnownSort{} <- sORTKind_maybe ty1
+  , KnownSort{} <- sORTKind_maybe ty2
   = maybeApart MARTypeVsConstraint
     -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
     -- Note [Type and Constraint are not apart]

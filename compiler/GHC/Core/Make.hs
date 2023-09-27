@@ -228,7 +228,7 @@ mkLitRubbish ty
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where
-    Just (torc, rep) = sORTKind_maybe (typeKind ty)
+    KnownSort torc rep = sORTKind_maybe (typeKind ty)
 
 {-
 ************************************************************************

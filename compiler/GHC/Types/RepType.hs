@@ -598,7 +598,7 @@ kindPrimRep doc ki
 -- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
 kindPrimRep_maybe :: HasDebugCallStack => Kind -> Maybe [PrimRep]
 kindPrimRep_maybe ki
-  | Just (_torc, rep) <- sORTKind_maybe ki
+  | KnownSort _torc rep <- sORTKind_maybe ki
   = runtimeRepPrimRep_maybe rep
   | otherwise
   = pprPanic "kindPrimRep" (ppr ki)

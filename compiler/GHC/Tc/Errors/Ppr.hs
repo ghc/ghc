@@ -4072,7 +4072,7 @@ pprMismatchMsg ctxt
   = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   $$ maybe empty pprSameOccInfo mb_same_occ
   where
-    msg | Just (torc, rep) <- sORTKind_maybe exp
+    msg | KnownSort torc rep <- sORTKind_maybe exp
         = msg_for_exp_sort torc rep
 
         | Just nargs_msg <- num_args_msg
@@ -4098,7 +4098,7 @@ pprMismatchMsg ctxt
 
       -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
     msg_for_exp_sort exp_torc exp_rep
-      | Just (act_torc, act_rep) <- sORTKind_maybe act
+      | KnownSort act_torc act_rep <- sORTKind_maybe act
       = -- (TYPE exp_rep) ~ (CONSTRAINT act_rep) etc
         msg_torc_torc act_torc act_rep
       | otherwise

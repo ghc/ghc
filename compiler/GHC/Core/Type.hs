@@ -126,6 +126,7 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         sORTKind_maybe, typeTypeOrConstraint,
+        SORTKindResult(..),
         typeLevity_maybe, tyConIsTYPEorCONSTRAINT,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
@@ -638,8 +639,8 @@ kindRep k = case kindRep_maybe k of
 -- Returns 'Nothing' if the kind is not of form (TYPE rr)
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 kindRep_maybe kind
-  | Just (_, rep) <- sORTKind_maybe kind = Just rep
-  | otherwise                            = Nothing
+  | KnownSort _ rep <- sORTKind_maybe kind = Just rep
+  | otherwise                              = Nothing
 
 -- | Returns True if the argument is (lifted) Type or Constraint
 -- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim
@@ -2662,13 +2663,15 @@ typeKind ty@(ForAllTy {})
 
     lifted_kind_from_body  -- Implements (FORALL2)
       = case sORTKind_maybe body_kind of
-          Just (ConstraintLike, _) -> constraintKind
-          Just (TypeLike,       _) -> liftedTypeKind
-          Nothing -> pprPanic "typeKind" (ppr body_kind)
+          KnownSort ConstraintLike _ -> constraintKind
+          KnownSort TypeLike       _ -> liftedTypeKind
+          UnknownSort -> pprPanic "typeKind" (ppr body_kind)
 
 ---------------------------------------------
 
-sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
+data SORTKindResult = UnknownSort | KnownSort TypeOrConstraint RuntimeRepType
+
+sORTKind_maybe :: Kind -> SORTKindResult
 -- Sees if the argument is of form (TYPE rep) or (CONSTRAINT rep)
 -- and if so returns which, and the runtime rep
 --
@@ -2676,8 +2679,8 @@ sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- to avoid the faff with FunTy
 sORTKind_maybe (TyConApp tc tys)
   -- First, short-cuts for Type and Constraint that do no allocation
-  | tc_uniq == liftedTypeKindTyConKey = assert( null tys ) $ Just (TypeLike,       liftedRepTy)
-  | tc_uniq == constraintKindTyConKey = assert( null tys ) $ Just (ConstraintLike, liftedRepTy)
+  | tc_uniq == liftedTypeKindTyConKey = assert( null tys ) $ KnownSort TypeLike       liftedRepTy
+  | tc_uniq == constraintKindTyConKey = assert( null tys ) $ KnownSort ConstraintLike liftedRepTy
   | tc_uniq == tYPETyConKey           = get_rep TypeLike
   | tc_uniq == cONSTRAINTTyConKey     = get_rep ConstraintLike
   | Just ty' <- expandSynTyConApp_maybe tc tys = sORTKind_maybe ty'
@@ -2687,10 +2690,10 @@ sORTKind_maybe (TyConApp tc tys)
      -- by evaluating tc_uniq, and then ends up with a single case with a 4-way branch
 
     get_rep torc = case tys of
-                     (rep:_reps) -> assert (null _reps) $ Just (torc, rep)
-                     []          -> Nothing
+                     (rep:_reps) -> assert (null _reps) $ KnownSort torc rep
+                     []          -> UnknownSort
 
-sORTKind_maybe _ = Nothing
+sORTKind_maybe _ = UnknownSort
 
 typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 -- Precondition: expects a type that classifies values.
@@ -2699,7 +2702,7 @@ typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 typeTypeOrConstraint ty
    = case coreFullView ty of
        FunTy { ft_af = af } -> funTyFlagResultTypeOrConstraint af
-       ty' | Just (torc, _) <- sORTKind_maybe (typeKind ty')
+       ty' | KnownSort torc _ <- sORTKind_maybe (typeKind ty')
           -> torc
           | otherwise
           -> pprPanic "typeOrConstraint" (ppr ty <+> dcolon <+> ppr (typeKind ty))
@@ -2716,7 +2719,9 @@ isPredTy ty = case typeTypeOrConstraint ty of
 -- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
 isTYPEorCONSTRAINT :: Kind -> Bool
 -- ^ True of a kind `TYPE _` or `CONSTRAINT _`
-isTYPEorCONSTRAINT k = isJust (sORTKind_maybe k)
+isTYPEorCONSTRAINT k = case sORTKind_maybe k of
+                          KnownSort _ _ -> True
+                          UnknownSort -> False
 
 tyConIsTYPEorCONSTRAINT :: TyCon -> Bool
 tyConIsTYPEorCONSTRAINT tc
@@ -2728,20 +2733,20 @@ isConstraintLikeKind :: Kind -> Bool
 -- True of (CONSTRAINT _)
 isConstraintLikeKind kind
   = case sORTKind_maybe kind of
-      Just (ConstraintLike, _) -> True
-      _                        -> False
+      KnownSort ConstraintLike _ -> True
+      _                          -> False
 
 isConstraintKind :: Kind -> Bool
 -- True of (CONSTRAINT LiftedRep)
 isConstraintKind kind
   = case sORTKind_maybe kind of
-      Just (ConstraintLike, rep) -> isLiftedRuntimeRep rep
-      _                          -> False
+      KnownSort ConstraintLike rep -> isLiftedRuntimeRep rep
+      _                            -> False
 
 tcIsLiftedTypeKind :: Kind -> Bool
 -- ^ Is this kind equivalent to 'Type' i.e. TYPE LiftedRep?
 tcIsLiftedTypeKind kind
-  | Just (TypeLike, rep) <- sORTKind_maybe kind
+  | KnownSort TypeLike rep <- sORTKind_maybe kind
   = isLiftedRuntimeRep rep
   | otherwise
   = False
@@ -2749,7 +2754,7 @@ tcIsLiftedTypeKind kind
 tcIsBoxedTypeKind :: Kind -> Bool
 -- ^ Is this kind equivalent to @TYPE (BoxedRep l)@ for some @l :: Levity@?
 tcIsBoxedTypeKind kind
-  | Just (TypeLike, rep) <- sORTKind_maybe kind
+  | KnownSort TypeLike rep <- sORTKind_maybe kind
   = isBoxedRuntimeRep rep
   | otherwise
   = False
@@ -2760,8 +2765,8 @@ tcIsBoxedTypeKind kind
 isTypeLikeKind :: Kind -> Bool
 isTypeLikeKind kind
   = case sORTKind_maybe kind of
-      Just (TypeLike, _) -> True
-      _                  -> False
+      KnownSort TypeLike _ -> True
+      _                    -> False
 
 returnsConstraintKind :: Kind -> Bool
 -- True <=> the Kind ultimately returns a Constraint
