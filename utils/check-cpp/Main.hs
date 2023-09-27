@@ -1,7 +1,9 @@
 -- Note: this file formatted with fourmolu
+{-# LANGUAGE BangPatterns #-}
 
 import Control.Monad.IO.Class
 import Data.Data hiding (Fixity)
+import Data.List
 import qualified Data.Set as Set
 import Debug.Trace (trace)
 import GHC
@@ -73,11 +75,11 @@ ppLexer queueComments cont =
                     L _ ITcppIf -> contPush
                     L _ ITcppIfdef -> contPush
                     L _ ITcppElse -> do
-                      tk' <- preprocessElse tk
-                      contInner tk'
+                        tk' <- preprocessElse tk
+                        contInner tk'
                     L _ ITcppEndif -> do
-                      tk' <- preprocessEnd tk
-                      contInner tk'
+                        tk' <- preprocessEnd tk
+                        contInner tk'
                     L l tok -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
@@ -413,9 +415,9 @@ printToks :: Int -> [Located Token] -> IO ()
 printToks indent toks = mapM_ go toks
   where
     go (L _ (ITcppIgnored ts)) = do
-      putStr "ITcppIgnored ["
-      printToks (indent + 4) ts
-      putStrLn "]"
+        putStr "ITcppIgnored ["
+        printToks (indent + 4) ts
+        putStrLn "]"
     go (L _ tk) = putStrLn (show tk)
 
 -- Testing
@@ -423,13 +425,26 @@ printToks indent toks = mapM_ go toks
 libdirNow :: LibDir
 libdirNow = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
 
+doTest :: [String] -> IO ()
+doTest strings = do
+    let test = intercalate "\n" strings
+    !tks <- parseString libdirNow test
+    putStrLn "-----------------------------------------"
+    printToks 0 (reverse tks)
+
 t0 :: IO ()
 t0 = do
-    tks <- parseString libdirNow "#define FOO\n#ifdef FOO\nx = 1\n#endif\n"
-    -- putStrLn $ show (reverse $ map unLoc tks)
-    printToks 0 (reverse tks)
+    doTest
+        [ "#define FOO"
+        , "#ifdef FOO"
+        , "x = 1"
+        , "#endif"
+        , ""
+        ]
 
 t1 :: IO ()
 t1 = do
-    tks <- parseString libdirNow "data X = X\n"
-    putStrLn $ show (reverse $ map unLoc tks)
+    doTest
+        [ "data X = X"
+        , ""
+        ]
