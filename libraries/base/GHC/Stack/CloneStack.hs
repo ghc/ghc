@@ -26,7 +26,8 @@ import Control.Concurrent.MVar
 import Data.Maybe (catMaybes)
 import Foreign
 import GHC.Conc.Sync
-import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
+import GHC.Ptr (Ptr(..))
+import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, ByteArray#, sizeofByteArray#, indexAddrArray#, State#, StablePtr#)
 import GHC.IO (IO (..), unIO, unsafeInterleaveIO)
 import GHC.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE, StgInfoTable)
 import GHC.Stable
@@ -36,7 +37,7 @@ import GHC.Stable
 -- @since 4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
 
-foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr StgInfoTable) #)
+foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, ByteArray# #)
 
 foreign import prim "stg_cloneMyStackzh" cloneMyStack# :: State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -243,15 +244,16 @@ toStackEntry infoProv =
 getDecodedStackArray :: StackSnapshot -> IO [Maybe StackEntry]
 getDecodedStackArray (StackSnapshot s) =
   IO $ \s0 -> case decodeStack# s s0 of
-    (# s1, arr #) -> unIO (go arr (I# (sizeofArray# arr) - 1)) s1
+    (# s1, arr #) ->
+      let n = I# (sizeofByteArray# arr) `div` 8 - 1
+       in unIO (go arr n) s1
   where
-    go :: Array# (Ptr StgInfoTable) -> Int -> IO [Maybe StackEntry]
+    go :: ByteArray# -> Int -> IO [Maybe StackEntry]
     go _stack (-1) = return []
     go stack i = do
       infoProv <- lookupIPE (stackEntryAt stack i)
       rest <- unsafeInterleaveIO $ go stack (i-1)
       return ((toStackEntry `fmap` infoProv) : rest)
 
-    stackEntryAt :: Array# (Ptr StgInfoTable) -> Int -> Ptr StgInfoTable
-    stackEntryAt stack (I# i) = case indexArray# stack i of
-      (# se #) -> se
+    stackEntryAt :: ByteArray# -> Int -> Ptr StgInfoTable
+    stackEntryAt stack (I# i) = Ptr (indexAddrArray# stack i)
