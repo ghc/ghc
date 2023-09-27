@@ -224,7 +224,7 @@ partitionWithM :: Monad m => (a -> m (Either b c)) -> [a] -> m ([b], [c])
 partitionWithM _ [] = return ([], [])
 partitionWithM f (x:xs) = do
   y <- f x
-  (bs, cs) <- partitionWithM f xs
+  ~(bs, cs) <- partitionWithM f xs
   case y of
     Left  b -> return (b:bs, cs)
     Right c -> return (bs, c:cs)
