@@ -9,7 +9,7 @@ import Debug.Trace (trace)
 import GHC
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
-import GHC.Data.Maybe
+import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser
 import GHC.Driver.Errors.Types
@@ -40,55 +40,61 @@ ppLexer, ppLexerDbg :: Bool -> (Located Token -> P a) -> P a
 ppLexerDbg queueComments cont = ppLexer queueComments contDbg
   where
     contDbg tok = trace ("pptoken: " ++ show (unLoc tok)) (cont tok)
-
 ppLexer queueComments cont =
     Lexer.lexer
         queueComments
-        ( \tk@(L lt _) ->
+        ( \tk ->
             let
                 contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                contPush = pushContext (unLoc tk) >> contInner (L lt (ITcppIgnored [tk]))
+                -- contPush = pushContext (unLoc tk) >> contInner (L lt (ITcppIgnored [tk]))
+                contPush = pushContext (unLoc tk) >> contIgnoreTok tk
+                contIgnoreTok (L l tok) = do
+                    case l of
+                        RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
+                        _ -> return ()
+                    ppLexer queueComments cont
              in
                 case tk of
                     L _ ITcppDefine -> contPush
                     L _ ITcppIf -> contPush
                     L _ ITcppIfdef -> contPush
+                    L _ ITcppIfndef -> contPush
                     L _ ITcppElse -> do
-                        tk' <- preprocessElse tk
-                        contInner tk'
+                        preprocessElse
+                        contIgnoreTok tk
                     L _ ITcppEndif -> do
-                        tk' <- preprocessEnd tk
-                        contInner tk'
-                    L l tok -> do
+                        preprocessEnd
+                        contIgnoreTok tk
+                    L _ tok -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
-                            CppIgnoring -> contInner (L l (ITcppIgnored [tk]))
+                            CppIgnoring -> contIgnoreTok tk
                             CppInDefine -> do
                                 ppDefine (trace ("ppDefine:" ++ show tok) (show tok))
                                 popContext
-                                contInner (L l (ITcppIgnored [tk]))
+                                contIgnoreTok tk
                             CppInIfdef -> do
                                 defined <- ppIsDefined (show tok)
-                                if defined
-                                    then setAccepting True
-                                    else setAccepting False
+                                setAccepting defined
                                 popContext
-                                contInner (L l (ITcppIgnored [tk]))
+                                contIgnoreTok tk
+                            CppInIfndef -> do
+                                defined <- ppIsDefined (show tok)
+                                setAccepting (not defined)
+                                popContext
+                                contIgnoreTok tk
                             _ -> contInner tk
         )
 
-
-preprocessElse :: Located Token -> P (Located Token)
-preprocessElse tok@(L l _) = do
+preprocessElse :: P ()
+preprocessElse = do
     accepting <- getAccepting
     setAccepting (not accepting)
-    return (L l (ITcppIgnored [tok]))
 
-preprocessEnd :: Located Token -> P (Located Token)
-preprocessEnd tok@(L l _) = do
+preprocessEnd :: P ()
+preprocessEnd = do
     -- TODO: nested context
     setAccepting True
-    return (L l (ITcppIgnored [tok]))
 
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
@@ -97,6 +103,7 @@ data CppState
     = CppIgnoring
     | CppInDefine
     | CppInIfdef
+    | CppInIfndef
     | CppNormal
     deriving (Show)
 
@@ -107,6 +114,7 @@ getCppState = do
     case context of
         ITcppDefine -> return CppInDefine
         ITcppIfdef -> return CppInIfdef
+        ITcppIfndef -> return CppInIfndef
         _ ->
             if accepting
                 then return CppNormal
@@ -146,34 +154,6 @@ getAccepting :: P Bool
 getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 -- pp_context stack end -------------------
-
--- pp_pushed_back token start --------------
-
-pushBack :: Located Token -> P ()
-pushBack tok = P $ \s ->
-    if isJust (pp_pushed_back (pp s))
-        then
-            PFailed
-                $ s
-        else -- { errors =
-        --     ("pushBack: " ++ show tok ++ ", we already have a token:" ++ show (pp_pushed_back (pp s)))
-        --         : errors s
-        -- }
-
-            let
-                ppVal = pp s
-                pp' = ppVal{pp_pushed_back = Just tok}
-                s' = s{pp = pp'}
-             in
-                POk s' ()
-
--- | Destructive read of the pp_pushed back token (if any)
-getPushBack :: P (Maybe (Located Token))
-getPushBack = P $ \s ->
-    POk s{pp = (pp s){pp_pushed_back = Nothing}} (pp_pushed_back (pp s))
-
-
--- pp_pushed_back token end ----------------
 
 -- definitions start --------------------
 
@@ -385,5 +365,17 @@ t1 :: IO ()
 t1 = do
     doTest
         [ "data X = X"
+        , ""
+        ]
+
+t2 :: IO ()
+t2 = do
+    doTest
+        [ "#define FOO"
+        , "#ifndef FOO"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
         , ""
         ]
