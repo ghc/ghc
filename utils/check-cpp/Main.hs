@@ -41,27 +41,6 @@ ppLexerDbg queueComments cont = ppLexer queueComments contDbg
   where
     contDbg tok = trace ("pptoken: " ++ show (unLoc tok)) (cont tok)
 
--- NOTE: instead of pulling tokens and calling cont, consider putting
--- this inside Lexer.lexer, much like the queueComments stuff
--- That sorts out
---    - ALR
---    - queueing comments
--- ppLexer _queueComments cont = do
---     tok <- ppLexToken
---     trace ("ppLexer:" ++ show (unLoc tok)) $ do
---         tok' <- case tok of
---             L _ ITcppIf -> preprocessIf tok
---             L _ ITcppDefine -> preprocessDefine tok
---             L _ ITcppIfdef -> preprocessIfDef tok
---             L _ ITcppElse -> preprocessElse tok
---             L _ ITcppEndif -> preprocessEnd tok
---             L l _ -> do
---                 accepting <- getAccepting
---                 if accepting
---                     then return tok
---                     else return (L l (ITcppIgnored [tok]))
---         cont tok'
-
 ppLexer queueComments cont =
     Lexer.lexer
         queueComments
@@ -98,36 +77,6 @@ ppLexer queueComments cont =
                             _ -> contInner tk
         )
 
--- Swallow tokens until ITcppEndif
-preprocessIf :: Located Token -> P (Located Token)
-preprocessIf tok = go [tok]
-  where
-    go :: [Located Token] -> P (Located Token)
-    go acc = do
-        tok' <- ppLexToken
-        case tok' of
-            L l ITcppEndif -> return $ L l (ITcppIgnored (reverse (tok' : acc)))
-            _ -> go (tok' : acc)
-
--- preprocessDefine :: Located Token -> P (Located Token)
--- preprocessDefine tok@(L l ITcppDefine) = do
---     L ll cond <- ppLexToken
---     -- ppDefine (show cond)
---     ppDefine (trace ("ppDefine:" ++ show cond) (show cond))
---     return (L l (ITcppIgnored [tok, L ll cond]))
--- preprocessDefine tok = return tok
-
-preprocessIfDef :: Located Token -> P (Located Token)
-preprocessIfDef tok@(L l ITcppIfdef) = do
-    L ll cond <- ppLexToken
-    defined <- ppIsDefined (show cond)
-    if defined
-        then do
-            pushContext ITcppIfdef
-            setAccepting True
-        else setAccepting False
-    return (L l (ITcppIgnored [tok, L ll cond]))
-preprocessIfDef tok = return tok
 
 preprocessElse :: Located Token -> P (Located Token)
 preprocessElse tok@(L l _) = do
@@ -223,16 +172,6 @@ getPushBack :: P (Maybe (Located Token))
 getPushBack = P $ \s ->
     POk s{pp = (pp s){pp_pushed_back = Nothing}} (pp_pushed_back (pp s))
 
--- | Get next token, which may be the pushed back one
-ppLexToken :: P (Located Token)
-ppLexToken = do
-    mtok <- getPushBack
-    case mtok of
-        Just t -> return t
-        Nothing -> do
-            -- TODO: do we need this? Issues with ALR, comments, etc being bypassed
-            (L sp tok) <- Lexer.lexToken
-            return (L (mkSrcSpanPs sp) tok)
 
 -- pp_pushed_back token end ----------------
 
