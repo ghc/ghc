@@ -27,8 +27,8 @@ import Data.Maybe (catMaybes)
 import Foreign
 import GHC.Conc.Sync
 import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
-import GHC.IO (IO (..))
-import GHC.InfoProv.Types (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
+import GHC.IO (IO (..), unIO, unsafeInterleaveIO)
+import GHC.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE, StgInfoTable)
 import GHC.Stable
 
 -- | A frozen snapshot of the state of an execution stack.
@@ -36,7 +36,7 @@ import GHC.Stable
 -- @since 4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
 
-foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr InfoProvEnt) #)
+foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr StgInfoTable) #)
 
 foreign import prim "stg_cloneMyStackzh" cloneMyStack# :: State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -228,37 +228,30 @@ data StackEntry = StackEntry
 --
 -- @since 4.17.0.0
 decode :: StackSnapshot -> IO [StackEntry]
-decode stackSnapshot = do
-    stackEntries <- getDecodedStackArray stackSnapshot
-    ipes <- mapM unmarshal stackEntries
-    return $ catMaybes ipes
+decode stackSnapshot = catMaybes <$> getDecodedStackArray stackSnapshot
 
-    where
-      unmarshal :: Ptr InfoProvEnt -> IO (Maybe StackEntry)
-      unmarshal ipe = if ipe == nullPtr then
-                          pure Nothing
-                       else do
-                          infoProv <- (peekInfoProv . ipeProv) ipe
-                          pure $ Just (toStackEntry infoProv)
-      toStackEntry :: InfoProv -> StackEntry
-      toStackEntry infoProv =
-        StackEntry
-        { functionName = ipLabel infoProv,
-          moduleName = ipMod infoProv,
-          srcLoc = ipLoc infoProv,
-          -- read looks dangerous, be we can trust that the closure type is always there.
-          closureType = read . ipDesc $ infoProv
-        }
+toStackEntry :: InfoProv -> StackEntry
+toStackEntry infoProv =
+  StackEntry
+  { functionName = ipLabel infoProv,
+    moduleName = ipMod infoProv,
+    srcLoc = ipLoc infoProv,
+    -- read looks dangerous, be we can trust that the closure type is always there.
+    closureType = read . ipDesc $ infoProv
+  }
 
-getDecodedStackArray :: StackSnapshot -> IO [Ptr InfoProvEnt]
+getDecodedStackArray :: StackSnapshot -> IO [Maybe StackEntry]
 getDecodedStackArray (StackSnapshot s) =
   IO $ \s0 -> case decodeStack# s s0 of
-    (# s1, a #) -> (# s1, (go a ((I# (sizeofArray# a)) - 1)) #)
+    (# s1, arr #) -> unIO (go arr (I# (sizeofArray# arr) - 1)) s1
   where
-    go :: Array# (Ptr InfoProvEnt) -> Int -> [Ptr InfoProvEnt]
-    go stack 0 = [stackEntryAt stack 0]
-    go stack i = (stackEntryAt stack i) : go stack (i - 1)
+    go :: Array# (Ptr StgInfoTable) -> Int -> IO [Maybe StackEntry]
+    go _stack (-1) = return []
+    go stack i = do
+      infoProv <- lookupIPE (stackEntryAt stack i)
+      rest <- unsafeInterleaveIO $ go stack (i-1)
+      return ((toStackEntry `fmap` infoProv) : rest)
 
-    stackEntryAt :: Array# (Ptr InfoProvEnt) -> Int -> Ptr InfoProvEnt
+    stackEntryAt :: Array# (Ptr StgInfoTable) -> Int -> Ptr StgInfoTable
     stackEntryAt stack (I# i) = case indexArray# stack i of
       (# se #) -> se

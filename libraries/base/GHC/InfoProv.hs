@@ -29,7 +29,6 @@ module GHC.InfoProv
     ) where
 
 import GHC.Base
-import GHC.Ptr (nullPtr)
 import GHC.InfoProv.Types
 
 -- | Get information about where a value originated from.
@@ -44,14 +43,5 @@ import GHC.InfoProv.Types
 --
 -- @since 4.16.0.0
 whereFrom :: a -> IO (Maybe InfoProv)
-whereFrom obj = do
-  ipe <- getIPE obj
-  -- The primop returns the null pointer in two situations at the moment
-  -- 1. The lookup fails for whatever reason
-  -- 2. -finfo-table-map is not enabled.
-  -- It would be good to distinguish between these two cases somehow.
-  if ipe == nullPtr
-    then return Nothing
-    else do
-      infoProv <- peekInfoProv (ipeProv ipe)
-      return $ Just infoProv
+whereFrom obj = getIPE obj Nothing $ \p ->
+    Just `fmap` peekInfoProv (ipeProv p)
