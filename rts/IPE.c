@@ -76,6 +76,7 @@ static HashTable *ipeMap = NULL;
 static IpeBufferListNode *ipeBufferList = NULL;
 
 static void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode*);
+static void updateIpeMap(void);
 
 #if defined(THREADED_RTS)
 

@@ -14,7 +14,6 @@
 #include "BeginPrivate.h"
 
 void dumpIPEToEventLog(void);
-void updateIpeMap(void);
 void initIpe(void);
 void exitIpe(void);
 
