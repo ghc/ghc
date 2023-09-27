@@ -100,9 +100,12 @@ Compiler
   This is convenient for TH code generation, as you can now uniformly use record wildcards
   regardless of number of fields.
 
-- Incoherent instance applications are no longer specialised. The previous implementation of
-  specialisation resulted in nondeterministic instance resolution in certain cases, breaking
-  the specification described in the documentation of the :pragma:`INCOHERENT` pragma. See :ghc-ticket:`22448` for further details.
+- Specialisation of incoherent instance applications can now be disabled with
+  :ghc-flag:`-fno-specialise-incoherents`. This is necessary as the current
+  specialisation implementation can result in in nondeterministic instance
+  resolution in certain cases, breaking the specification described in the
+  documentation of the :pragma:`INCOHERENT` pragma. See :ghc-ticket:`22448` for
+  further details.
 
 - Fix a bug in TemplateHaskell evaluation causing excessive calls to ``setNumCapabilities`` when :ghc-flag:`-j[⟨n⟩]` is greater than :rts-flag:`-N`.
   See :ghc-ticket:`23049`.
