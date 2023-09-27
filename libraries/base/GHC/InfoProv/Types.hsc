@@ -12,12 +12,16 @@ module GHC.InfoProv.Types
     , InfoProvEnt
     , peekInfoProv
     , getIPE
+    , StgInfoTable
+    , lookupIPE
     ) where
 
 import GHC.Base
 import GHC.Show (Show)
 import GHC.Ptr (Ptr(..), plusPtr)
 import GHC.Foreign (CString, peekCString)
+import Foreign.C.Types (CBool(..))
+import Foreign.Marshal.Alloc (allocaBytes)
 import GHC.IO.Encoding (utf8)
 import Foreign.Storable (peekByteOff)
 
@@ -36,10 +40,24 @@ ipLoc ipe = ipSrcFile ipe ++ ":" ++ ipSrcSpan ipe
 
 data InfoProvEnt
 
-getIPE :: a -> IO (Ptr InfoProvEnt)
-getIPE obj = IO $ \s ->
-   case whereFrom## obj s of
-     (## s', addr ##) -> (## s', Ptr addr ##)
+data StgInfoTable
+
+foreign import ccall "lookupIPE" c_lookupIPE :: Ptr StgInfoTable -> Ptr InfoProvEnt -> IO CBool
+
+lookupIPE :: Ptr StgInfoTable -> IO (Maybe InfoProv)
+lookupIPE itbl = allocaBytes (#size InfoProvEnt) $ \p -> do
+  res <- c_lookupIPE itbl p
+  case res of
+    1 -> Just `fmap` peekInfoProv (ipeProv p)
+    _ -> return Nothing
+
+getIPE :: a -> r -> (Ptr InfoProvEnt -> IO r) -> IO r
+getIPE obj fail k = allocaBytes (#size InfoProvEnt) $ \p -> IO $ \s ->
+  case whereFrom## obj (unPtr p) s of
+    (## s', 1## ##) -> unIO (k p) s'
+    (## s', _   ##) -> (## s', fail ##)
+  where
+    unPtr (Ptr p) = p
 
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = (#ptr InfoProvEnt, prov) p

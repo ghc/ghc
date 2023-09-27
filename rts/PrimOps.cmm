@@ -2553,13 +2553,13 @@ stg_closureSizzezh (P_ clos)
     return (len);
 }
 
-stg_whereFromzh (P_ clos)
+stg_whereFromzh (P_ clos, W_ buf)
 {
-    P_ ipe;
+    CBool success;
     W_ info;
     info = GET_INFO(UNTAG(clos));
-    (ipe) = foreign "C" lookupIPE(info "ptr");
-    return (ipe);
+    (success) = foreign "C" lookupIPE(info, buf);
+    return (TO_W_(success));
 }
 
 /* -----------------------------------------------------------------------------
