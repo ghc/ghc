@@ -2743,7 +2743,12 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Type arg_ty) co fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
-           Just (Bndr _ vis, _) -> Just (mkHomoForAllCos [Bndr tv vis] co, [])
+           Just (Bndr _ vis, _) -> Just (fco, [])
+             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag kco co
+                   -- The lambda we are eta-reducing always has visibility
+                   -- 'coreTyLamForAllTyFlag' which may or may not match
+                   -- the visibility on the inner function (#24014)
+                   kco = mkNomReflCo (tyVarKind tv)
            Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty
