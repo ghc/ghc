@@ -641,6 +641,7 @@ kindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 kindRep_maybe kind
   | KnownSort _ rep <- sORTKind_maybe kind = Just rep
   | otherwise                              = Nothing
+{-# INLINE kindRep_maybe #-}
 
 -- | Returns True if the argument is (lifted) Type or Constraint
 -- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim
@@ -781,6 +782,7 @@ splitRuntimeRep_maybe rep
   = Just (rr_tc, args)
   | otherwise
   = Nothing
+{-# INLINE splitRuntimeRep_maybe #-}
 
 -- | See 'isBoxedRuntimeRep_maybe'.
 isBoxedRuntimeRep :: RuntimeRepType -> Bool
