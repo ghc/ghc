@@ -501,3 +501,4 @@ test('T23864', normal, compile, ['-O -dcore-lint -package ghc -Wno-gadt-mono-loc
 test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -v0'])
 test('T23922a', normal, compile, ['-O'])
 test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 -O'])
+test('T24014', normal, compile, ['-dcore-lint'])
