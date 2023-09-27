@@ -1190,7 +1190,9 @@ defaultFlags settings
       Opt_ShowErrorContext,
       Opt_SuppressStgReps,
       Opt_UnoptimizedCoreForInterpreter,
-      Opt_SpecialiseIncoherents
+      Opt_SpecialiseIncoherents,
+      Opt_DeferTypeErrors,
+      Opt_DeferOutOfScopeVariables
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
