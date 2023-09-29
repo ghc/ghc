@@ -675,8 +675,9 @@ lvlMFE env _strict_ctxt ann_expr
     is_bot_lam   = isJust mb_bot_str   -- True of bottoming thunks too!
     is_function  = isFunction ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
-                           -- See Note [Bottoming floats]
-                           -- esp Bottoming floats (2)
+                   -- See Note [Bottoming floats], esp Bottoming floats (2)
+                   -- NB: exprBotStrictness_maybe does not look deeply into expr
+                   --     which can be
     expr_ok_for_spec = exprOkForSpeculation expr
     abs_vars = abstractVars dest_lvl env fvs
     dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam
@@ -706,15 +707,18 @@ lvlMFE env _strict_ctxt ann_expr
                  && not float_is_new_lam  -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
-    is_con_app (Cast e _) = is_con_app e
-    is_con_app (App f _)  = is_con_app f
-    is_con_app (Var v)    = isDataConWorkId v
-    is_con_app _          = False
+    send_rhs_to_top (_, AnnCast e _) = send_rhs_to_top e
+    send_rhs_to_top (_, AnnApp f _)  = send_rhs_to_top f
+    send_rhs_to_top (_, AnnLam {})   = True
+    send_rhs_to_top (_, AnnVar v)    = case idDetails v of
+                                         DFunId {} -> True
+                                         _         -> floatConsts env
+    send_rhs_to_top _ = floatConsts env
 
     -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
-                && (  (is_bot_lam && escapes_value_lam)
-                   || (exprIsExpandable expr && not (is_con_app expr)) )
+                && (  send_rhs_to_top ann_expr
+                   || (escapes_value_lam && is_bot_lam) )
 -- escapes_value_lam very important
 --   f x = let fail = error ("foo" ++ x) in ...
 -- We want to float this out
@@ -1721,10 +1725,8 @@ addLvls dest_lvl env vs = foldl' (addLvl dest_lvl) env vs
 floatLams :: LevelEnv -> Maybe Int
 floatLams le = floatOutLambdas (le_switches le)
 
-{-
 floatConsts :: LevelEnv -> Bool
 floatConsts le = floatOutConstants (le_switches le)
--}
 
 floatOverSat :: LevelEnv -> Bool
 floatOverSat le = floatOutOverSatApps (le_switches le)

@@ -286,13 +286,12 @@ getCoreToDo dflags hpt_rule_base extra_vars
         --        f_el22 (f_el21 r_midblock)
         runWhen full_laziness $ CoreDoFloatOutwards $ FloatOutSwitches
                { floatOutLambdas     = floatLamArgs dflags
-               , floatOutConstants   = False
+               , floatOutConstants   = True
                , floatOutOverSatApps = True
                , floatToTopLevelOnly = False
                , floatJoinsToTop     = True },
                 -- floatJoinsToTop: floating joins to the top makes a huge difference to
                 -- spectral/minimax; see XXX
-
 
         runWhen cse CoreCSE,
                 -- We want CSE to follow the final full-laziness pass, because it may

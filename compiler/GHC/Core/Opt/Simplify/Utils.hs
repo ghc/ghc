@@ -1487,8 +1487,8 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     one_occ OneOcc{ occ_n_br = 1, occ_in_lam = in_lam, occ_int_cxt = int_cxt }
        | is_value_lam rhs, IsInteresting <- int_cxt
        = True
-       | NotInsideLam <- in_lam
-       , not (isTopLevel top_lvl) || not (exprIsExpandable rhs)
+       | NotInsideLam <- in_lam    -- Once things are flattened to top level, don't
+       , not (isTopLevel top_lvl)  -- re-inline them.  See Note [Floating to the top]
        = True
        | otherwise
        = False
