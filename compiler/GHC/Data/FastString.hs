@@ -506,6 +506,10 @@ bucket_match fs sbs = go fs
         go (fs@(FastString {fs_sbs=fs_sbs}) : ls)
           | fs_sbs == sbs = Just fs
           | otherwise     = go ls
+-- bucket_match used to inline before changes to instance Eq ShortByteString
+-- in bytestring-0.12, which made it slighhtly larger than inlining threshold.
+-- Non-inlining causes a small, but measurable performance regression, so let's force it.
+{-# INLINE bucket_match #-}
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
