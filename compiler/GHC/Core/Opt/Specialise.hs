@@ -1,3 +1,6 @@
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 {-
@@ -56,7 +59,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Error
 
 import GHC.Utils.Error ( mkMCDiagnostic )
-import GHC.Utils.Monad    ( foldlM )
+import GHC.Utils.Monad    ( foldlM, MonadIO )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -3434,12 +3437,22 @@ deleteCallsFor bndrs calls = delDVarEnvList calls bndrs
 ************************************************************************
 -}
 
-type SpecM a = UniqSM a
+newtype SpecM result
+    = SpecM
+        { unSpecM :: IO result
+        }
+  deriving newtype (Functor, Applicative, Monad, MonadIO)
+
+-- See Note [Uniques for wired-in prelude things and known masks] in GHC.Builtin.Uniques
+specMask :: Char
+specMask = 't'
+
+instance MonadUnique SpecM where
+  getUniqueSupplyM = liftIO $ mkSplitUniqSupply specMask
+  getUniqueM = liftIO $ uniqFromMask specMask
 
 runSpecM :: SpecM a -> CoreM a
-runSpecM thing_inside
-  = do { us <- getUniqueSupplyM
-       ; return (initUs_ us thing_inside) }
+runSpecM = liftIO . unSpecM
 
 mapAndCombineSM :: (a -> SpecM (b, UsageDetails)) -> [a] -> SpecM ([b], UsageDetails)
 mapAndCombineSM _ []     = return ([], emptyUDs)
