@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications           #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -57,8 +58,11 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Error
+import GHC.Types.DumpSpecInfo
 
 import GHC.Utils.Error ( mkMCDiagnostic )
+import GHC.Utils.Logger (Logger)
+import qualified GHC.Utils.Logger as Logger
 import GHC.Utils.Monad    ( foldlM, MonadIO )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -646,6 +650,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules  = local_rules
                           , mg_binds  = binds })
   = do { dflags   <- getDynFlags
+       ; logger   <- Logger.getLogger
        ; rule_env <- initRuleEnv guts
                      -- See Note [Fire rules in the specialiser]
 
@@ -660,7 +665,8 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                       --  bindersOfBinds binds
                           , se_module = this_mod
                           , se_rules  = rule_env
-                          , se_dflags = dflags }
+                          , se_dflags = dflags
+                          , se_logger = logger }
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
@@ -1171,6 +1177,7 @@ data SpecEnv
        , se_module :: Module
        , se_rules  :: RuleEnv  -- From the home package and this module
        , se_dflags :: DynFlags
+       , se_logger :: Logger
      }
 
 instance Outputable SpecEnv where
@@ -1677,6 +1684,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     is_dfun   = isDFunId fn
     dflags    = se_dflags env
     this_mod  = se_module env
+    logger    = se_logger env
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
@@ -1748,7 +1756,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  -- See Note [Specialisations Must Be Lifted]
                  -- C.f. GHC.Core.Opt.WorkWrap.Utils.needsVoidWorkerArg
                  add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
-                 (spec_bndrs, spec_rhs, spec_fn_ty)
+                 (spec_bndrs, spec_rhs, spec_fn_type)
                    | add_void_arg = ( voidPrimId : spec_bndrs1
                                     , Lam voidArgId spec_rhs1
                                     , mkVisFunTyMany unboxedUnitTy spec_fn_ty1)
@@ -1792,7 +1800,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                        DFunId is_nt        -> DFunId is_nt
                        _                   -> VanillaId
 
-           ; spec_fn <- newSpecIdSM (idName fn) spec_fn_ty spec_fn_details spec_fn_info
+           ; spec_fn <- newSpecIdSM (idName fn) spec_fn_type spec_fn_details spec_fn_info
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall x @b d1' d2'.
@@ -1809,11 +1817,26 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
                 spec_f_w_arity = spec_fn
 
-                _rule_trace_doc = vcat [ ppr fn <+> dcolon <+> ppr fn_type
-                                       , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty
+                unspec_fn_doc = ppr fn <+> dcolon <+> ppr fn_type
+                spec_fn_doc = ppr spec_fn <+> dcolon <+> ppr spec_fn_type
+
+                _rule_trace_doc = vcat [ unspec_fn_doc
+                                       , spec_fn_doc
                                        , ppr rhs_bndrs, ppr call_args
                                        , ppr spec_rule
                                        ]
+
+             -- Dump the specialisation if -ddump-specialisations is enabled
+           ; dumpSpecialisationWithLogger @Module @Id @Type logger $
+               DumpSpecInfo
+                { dumpSpecInfo_module = this_mod
+                , dumpSpecInfo_fromPragma = False
+                , dumpSpecInfo_polyId = fn
+                , dumpSpecInfo_polyTy = fn_type
+                , dumpSpecInfo_specId = spec_fn
+                , dumpSpecInfo_specTy = spec_fn_type
+                , dumpSpecInfo_dicts = map varType rule_bndrs
+                }
 
            ; -- pprTrace "spec_call: rule" _rule_trace_doc
              return ( spec_rule                  : rules_acc
