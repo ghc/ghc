@@ -329,6 +329,7 @@ Allocation of unique supply characters:
         n       Native/LLVM codegen
         r       Hsc name cache
         s       simplifier
+        t       specialiser
         u       Cmm pipeline
         y       GHCi bytecode generator
         z       anonymous sums
