@@ -335,6 +335,15 @@ subexpression elimination pass.
 
     Dump output of specialisation pass
 
+.. ghc-flag:: -ddump-specializations
+.. ghc-flag:: -ddump-specialisations
+    :shortdesc: Dump information about generated specialisations
+    :type: dynamic
+
+    Dump information about any specialisations resulting from pragmas or the
+    specialiser logic. Currently, the identifiers and types of the unspecialised
+    function and the generated specialised function are dumped.
+
 .. ghc-flag:: -ddump-rules
     :shortdesc: Dump rewrite rules
     :type: dynamic
