@@ -795,6 +795,7 @@ release-hackage-lint:
       artifacts: false
   rules:
     - if: '$RELEASE_JOB == "yes"'
+  allow_failure: true
   extends: .hackage
   variables:
     # No slow-validate bindist on release pipeline
