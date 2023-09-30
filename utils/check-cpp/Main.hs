@@ -2,6 +2,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 import Control.Monad.IO.Class
+import Data.Char
 import Data.Data hiding (Fixity)
 import Data.List
 import qualified Data.Set as Set
@@ -46,7 +47,6 @@ ppLexer queueComments cont =
         ( \tk ->
             let
                 contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                -- contPush = pushContext (unLoc tk) >> contInner (L lt (ITcppIgnored [tk]))
                 contPush = pushContext (unLoc tk) >> contIgnoreTok tk
                 contIgnoreTok (L l tok) = do
                     case l of
@@ -54,35 +54,33 @@ ppLexer queueComments cont =
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                case tk of
-                    L _ ITcppDefine -> contPush
-                    L _ ITcppIf -> contPush
-                    L _ ITcppIfdef -> contPush
-                    L _ ITcppIfndef -> contPush
+                -- case tk of
+                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                    L _ (ITcppDefine s) -> do
+                        ppDefine (trace ("ppDefine:" ++ show s) s)
+                        popContext
+                        contIgnoreTok tk
+                    L _ (ITcppIf _) -> contPush
+                    L _ (ITcppIfdef s) -> do
+                        defined <- ppIsDefined s
+                        -- setAccepting defined
+                        setAccepting (trace ("ifdef:" ++ show (s, defined)) defined)
+                        contIgnoreTok tk
+                    L _ (ITcppIfndef s) -> do
+                        defined <- ppIsDefined s
+                        -- setAccepting (not defined)
+                        setAccepting (trace ("ifdef:" ++ show (s, defined)) (not defined))
+                        contIgnoreTok tk
                     L _ ITcppElse -> do
                         preprocessElse
                         contIgnoreTok tk
                     L _ ITcppEndif -> do
                         preprocessEnd
                         contIgnoreTok tk
-                    L _ tok -> do
+                    _ -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
                             CppIgnoring -> contIgnoreTok tk
-                            CppInDefine -> do
-                                ppDefine (trace ("ppDefine:" ++ show tok) (show tok))
-                                popContext
-                                contIgnoreTok tk
-                            CppInIfdef -> do
-                                defined <- ppIsDefined (show tok)
-                                setAccepting defined
-                                popContext
-                                contIgnoreTok tk
-                            CppInIfndef -> do
-                                defined <- ppIsDefined (show tok)
-                                setAccepting (not defined)
-                                popContext
-                                contIgnoreTok tk
                             _ -> contInner tk
         )
 
@@ -112,9 +110,9 @@ getCppState = do
     context <- peekContext
     accepting <- getAccepting
     case context of
-        ITcppDefine -> return CppInDefine
-        ITcppIfdef -> return CppInIfdef
-        ITcppIfndef -> return CppInIfndef
+        ITcppDefine _ -> return CppInDefine
+        ITcppIfdef _ -> return CppInIfdef
+        ITcppIfndef _ -> return CppInIfndef
         _ ->
             if accepting
                 then return CppNormal
@@ -157,13 +155,20 @@ getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 -- definitions start --------------------
 
-ppDefine :: String -> P ()
+ppDefine :: FastString -> P ()
 ppDefine def = P $ \s ->
-    POk s{pp = (pp s){pp_defines = Set.insert def (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
 
-ppIsDefined :: String -> P Bool
+ppIsDefined :: FastString -> P Bool
 ppIsDefined def = P $ \s ->
-    POk s (Set.member def (pp_defines (pp s)))
+    POk s (Set.member (cleanTokenString def) (pp_defines (pp s)))
+
+-- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
+cleanTokenString :: FastString -> String
+cleanTokenString fs = r
+  where
+    ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
+    r = init ss
 
 -- =====================================================================
 -- Emulate the parser
@@ -378,4 +383,43 @@ t2 = do
         , "x = 5"
         , "#endif"
         , ""
+        ]
+
+t3 :: IO ()
+t3 = do
+    doTest
+        [ "{-# LANGUAGE GhcCPP #-}"
+        , "module Example1 where"
+        , ""
+        , "#define FOO"
+        , ""
+        , "x ="
+        , "#ifdef FOO"
+        , "  \" hello \""
+        , "#else"
+        , "  \" bye now \""
+        , "#endif"
+        , ""
+        , "foo = putStrLn x"
+        ]
+
+t4 :: IO ()
+t4 = do
+    doTest
+        [ "/* package ghc-exactprint-1.7.0.1 */"
+        , "#ifndef VERSION_ghc_exactprint"
+        , "#define VERSION_ghc_exactprint \"1.7.0.1\""
+        , "#endif /* VERSION_ghc_exactprint */"
+        , "#ifndef MIN_VERSION_ghc_exactprint"
+        -- , "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (\\"
+        -- , "  (major1) <  1 || \\"
+        -- , "  (major1) == 1 && (major2) <  7 || \\"
+        -- , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
+        , "#endif /* MIN_VERSION_ghc_exactprint */"
+        , ""
+        , "#if VERSION_ghc_exactprint == \"1.7.0.1\""
+        , "x = \"got version\""
+        , "#else"
+        , "x = \"no version\""
+        , "#endif"
         ]
