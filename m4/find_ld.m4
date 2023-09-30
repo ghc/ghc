@@ -61,19 +61,23 @@ AC_DEFUN([FIND_LD],[
         AC_CHECK_TARGET_TOOL([LD], [ld])
     }
 
-    if test "$ghc_host_os" = "darwin" ; then
+    case "$target" in
+    *-darwin)
         dnl N.B. Don't even try to find a more efficient linker on Darwin where
         dnl broken setups (e.g. unholy mixtures of Homebrew and the native
         dnl toolchain) are far too easy to come across.
         dnl
         dnl See #21712.
         AC_CHECK_TARGET_TOOL([LD], [ld])
-    elif test "x$enable_ld_override" = "xyes"; then
-        find_ld
-    else
-        AC_CHECK_TARGET_TOOL([LD], [ld])
-    fi
-
+        ;;
+    *)
+        if test "x$enable_ld_override" = "xyes"; then
+            find_ld
+        else
+            AC_CHECK_TARGET_TOOL([LD], [ld])
+        fi
+        ;;
+    esac
     CHECK_LD_COPY_BUG([$1])
 ])
 
