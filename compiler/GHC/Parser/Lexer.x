@@ -264,7 +264,8 @@ $tab          { warnTab }
 -- are). We also rule out nested Haddock comments, if the -haddock flag is
 -- set.
 
-"{-" / { isNormalComment } { nested_comment }
+"{-" / { isNormalComment }       { nested_comment }
+"/*" / { ifExtension GhcCppBit } { nested_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -319,16 +320,16 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <bol> {
   \n                                    ;
   -- Ghc CPP symbols
-  ^"#define"        / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
-  ^"#include"       / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
-  ^"#undef"         / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppUndef) }
-  ^"#error"         / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppError) }
-  ^"#if"            / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIf) }
-  ^"#ifdef"         / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfdef) }
-  ^"#ifndef"        / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfndef) }
-  ^"#elif"          / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
-  ^"#else"          / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElse) }
-  ^"#endif"         / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppEndif) }
+  ^"#define"  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
+  ^"#include" .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
+  ^"#undef"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppUndef) }
+  ^"#error"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppError) }
+  ^"#ifdef"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfdef) }
+  ^"#ifndef"  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfndef) }
+  ^"#if"      .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIf) }
+  ^"#elif"    .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
+  ^"#else"          / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppElse) }
+  ^"#endif"         / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppEndif) }
   -- "defined"        { token (ITcppDefined) }
 
   -- ^\# "define"        / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
@@ -358,6 +359,17 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
+  ^"#define"  .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppDefine) }
+  ^"#include" .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppInclude) }
+  ^"#undef"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppUndef) }
+  ^"#error"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppError) }
+  ^"#ifdef"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIfdef) }
+  ^"#ifndef"  .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIfndef) }
+  ^"#if"      .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIf) }
+  ^"#elif"    .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppElif) }
+  ^"#else"    .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (\_ -> ITcppElse) }
+  ^"#endif"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (\_ -> ITcppEndif) }
+
   ^\# (line)?                           { begin line_prag1 }
 }
 
@@ -381,9 +393,9 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 "{-#" $whitechar* $pragmachar+ / { known_pragma linePrags }
                                 { dispatch_pragmas linePrags }
 
--- CPP pragmas
+-- CPP pragmas, retore original layout
 <cpp_prag> {
-  () { pop }
+  () { popCpp }
 }
 
 -- single-line line pragmas, of the form
@@ -1016,18 +1028,19 @@ data Token
   | ITlineComment  String      PsSpan -- ^ comment starting by "--"
   | ITblockComment String      PsSpan -- ^ comment in {- -}
 
-  -- GHC CPP extension
-  | ITcppDefine       -- ^ #define
-  | ITcppInclude      -- ^ #include
-  | ITcppUndef        -- ^ #undef
-  | ITcppError        -- ^ #error
-  | ITcppIf           -- ^ #if
-  | ITcppIfdef        -- ^ #ifdef
-  | ITcppIfndef       -- ^ #ifndef
-  | ITcppElif         -- ^ #elif
-  | ITcppElse         -- ^ #else
-  | ITcppEndif        -- ^ #endif
-  | ITcppDefined      -- ^ defined (in conditional)
+  -- GHC CPP extension. Each (bar ITcppIgnored) contains an entire
+  -- line of source code
+  | ITcppDefine   FastString      -- ^ #define
+  | ITcppInclude  FastString      -- ^ #include
+  | ITcppUndef    FastString      -- ^ #undef
+  | ITcppError    FastString      -- ^ #error
+  | ITcppIf       FastString      -- ^ #if
+  | ITcppIfdef    FastString      -- ^ #ifdef
+  | ITcppIfndef   FastString      -- ^ #ifndef
+  | ITcppElif     FastString      -- ^ #elif
+  | ITcppElse                    -- ^ #else
+  | ITcppEndif                   -- ^ #endif
+  | ITcppDefined  FastString     -- ^ defined (in conditional)
   | ITcppIgnored [Located Token] -- TODO: push into comments instead
 
 
@@ -1266,11 +1279,25 @@ pop _span _buf _len _buf2 =
      lexToken
      -- trace "pop" $ do lexToken
 
-cppToken :: Int ->  Token -> Action
-cppToken code t span _buf _len _buf2 =
-  do pushLexState code
-     return (L span t)
+cppToken :: Int -> (FastString -> Token)-> Action
+cppToken _code t span buf len _buf2 =
+  do -- pushLexState code
+     return (L span (t $! lexemeToFastString buf len))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
+cppLayoutToken :: Int ->  (FastString -> Token) -> Action
+cppLayoutToken code t span buf len _buf2 =
+  do -- _ <- popLexState
+     -- pushLexState code
+     -- ctx <- getContext
+     -- setContext (NoLayout:ctx)
+     return (L span (t $! lexemeToFastString buf len))
+     -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
+popCpp :: Action
+popCpp _span _buf _len _buf2 =
+  do _ <- popLexState
+     _ <- popContext
+     lexToken
+     -- trace "pop" $ do lexToken
 
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action
@@ -1443,6 +1470,9 @@ It holds simply because we immediately lex a literal after the minus.
 ifExtension :: ExtBits -> AlexAccPred ExtsBitmap
 ifExtension extBits bits _ _ _ = extBits `xtest` bits
 
+ifNotExtension :: ExtBits -> AlexAccPred ExtsBitmap
+ifNotExtension extBits bits _ _ _ = not (extBits `xtest` bits)
+
 alexNotPred p userState in1 len in2
   = not (p userState in1 len in2)
 
@@ -1545,23 +1575,36 @@ nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) i
           cspan = mkSrcSpanPs $ mkPsSpan (psSpanStart span) end_loc
           lcomment = L cspan comment
       endComment input lcomment
-    go commentAcc n input = case alexGetChar' input of
-      Nothing -> errBrace input (psRealSpan span)
-      Just ('-',input) -> case alexGetChar' input of
+    go commentAcc n input = ghcCppSet >>= \ghcCppSet -> case (ghcCppSet, alexGetChar' input) of
+      (_, Nothing) -> errBrace input (psRealSpan span)
+      (_, Just ('-',input)) -> case alexGetChar' input of
         Nothing  -> errBrace input (psRealSpan span)
         Just ('\125',input) -> go ('\125':'-':commentAcc) (n-1) input -- '}'
         Just (_,_)          -> go ('-':commentAcc) n input
-      Just ('\123',input) -> case alexGetChar' input of  -- '{' char
+      (_, Just ('\123',input)) -> case alexGetChar' input of  -- '{' char
         Nothing  -> errBrace input (psRealSpan span)
         Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
         Just (_,_)       -> go ('\123':commentAcc) n input
+      (True, Just ('*',input)) -> case alexGetChar' input of
+        Nothing  -> errBrace input (psRealSpan span)
+        Just ('/',input) -> go ('/':'*':commentAcc) (n-1) input -- '/'
+        Just (_,_)          -> go ('-':commentAcc) n input
+      (True, Just ('/',input)) -> case alexGetChar' input of  -- '/' char
+        Nothing  -> errBrace input (psRealSpan span)
+        Just ('*',input) -> go ('*':'/':commentAcc) (n+1) input
+        Just (_,_)       -> go ('/':commentAcc) n input
       -- See Note [Nested comment line pragmas]
-      Just ('\n',input) -> case alexGetChar' input of
+      (_, Just ('\n',input)) -> case alexGetChar' input of
         Nothing  -> errBrace input (psRealSpan span)
         Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
                            go (parsedAcc ++ '\n':commentAcc) n input
         Just (_,_)   -> go ('\n':commentAcc) n input
-      Just (c,input) -> go (c:commentAcc) n input
+      (_, Just (c,input)) -> go (c:commentAcc) n input
+
+ghcCppSet :: P Bool
+ghcCppSet = do
+  exts <- getExts
+  return $ xtest GhcCppBit exts
 
 -- See Note [Nested comment line pragmas]
 parseNestedPragma :: AlexInput -> P (String,AlexInput)
@@ -2953,6 +2996,8 @@ mkParserOpts extensionFlags diag_opts
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
       .|. GhcCppBit                   `xoptBit` LangExt.GhcCpp
+      -- .|. (trace ("GhcCppBit:" ++ show (GhcCppBit                   `xoptBit` LangExt.GhcCpp))
+      --       GhcCppBit                   `xoptBit` LangExt.GhcCpp)
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
@@ -3179,7 +3224,7 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
                 let offs = srcSpanStartCol (psRealSpan loc) in
                 let ord = case stk of
                             Layout n gen_semic : _ ->
-                              --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $
+                              -- trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $
                               (compare offs n, gen_semic)
                             _ ->
                               (GT, dontGenerateSemic)
@@ -3747,7 +3792,6 @@ commentToAnnotation :: RealLocated Token -> LEpaComment
 commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComment s)
 commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
-commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
 
