@@ -20,7 +20,7 @@ import GHC.Prelude
 import GHC.Cmm.Expr
 import GHC.Cmm.Reg (GlobalArgRegs(..))
 
-import GHC.Parser.Lexer hiding (lexToken)
+import GHC.Parser.Lexer
 import GHC.Cmm.Parser.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
