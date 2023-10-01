@@ -346,16 +346,16 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
-  ^\# \ * "define"  .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppDefine) }
-  ^\# \ * "include" .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppInclude) }
-  ^\# \ * "undef"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppUndef) }
-  ^\# \ * "error"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppError) }
-  ^\# \ * "ifdef"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIfdef) }
-  ^\# \ * "ifndef"  .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIfndef) }
-  ^\# \ * "if"      .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppIf) }
-  ^\# \ * "elif"    .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (ITcppElif) }
-  ^\# \ * "else"    .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (\_ -> ITcppElse) }
-  ^\# \ * "endif"   .* \n   / { ifExtension GhcCppBit } { cppLayoutToken cpp_prag (\_ -> ITcppEndif) }
+  ^\# \ * "define"  .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
+  ^\# \ * "include" .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
+  ^\# \ * "undef"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppUndef) }
+  ^\# \ * "error"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppError) }
+  ^\# \ * "ifdef"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfdef) }
+  ^\# \ * "ifndef"  .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfndef) }
+  ^\# \ * "if"      .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIf) }
+  ^\# \ * "elif"    .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
+  ^\# \ * "else"    .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppElse) }
+  ^\# \ * "endif"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppEndif) }
 
   ^\# (line)?                           { begin line_prag1 }
 }
@@ -380,9 +380,11 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 "{-#" $whitechar* $pragmachar+ / { known_pragma linePrags }
                                 { dispatch_pragmas linePrags }
 
--- CPP pragmas, retore original layout
+-- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
-  () { popCpp }
+  .* \\ \n                   { cppTokenCont (ITcppContinue) }
+  .* \n                      { cppTokenPop  (ITcppContinue) }
+  -- () { popCpp }
 }
 
 -- single-line line pragmas, of the form
@@ -1027,6 +1029,7 @@ data Token
   | ITcppElif     FastString     -- ^ #elif
   | ITcppElse                    -- ^ #else
   | ITcppEndif                   -- ^ #endif
+  | ITcppContinue FastString     -- ^ Continuation after a trailing backslash
 
   deriving Show
 
@@ -1264,24 +1267,32 @@ pop _span _buf _len _buf2 =
      -- trace "pop" $ do lexToken
 
 cppToken :: Int -> (FastString -> Token)-> Action
-cppToken _code t span buf len _buf2 =
-  do -- pushLexState code
-     return (L span (t $! lexemeToFastString buf len))
+cppToken code t span buf len _buf2 =
+  do 
+     let tokStr = lexemeToFastString buf len
+     -- check if the string ends with backslash and newline
+     -- NOTE: preformance likely sucks, make it work for now
+     case (reverse $ unpackFS tokStr) of
+        -- ('\n':'\\':_) -> pushLexState code
+        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code)
+        _ -> return ()
+     return (L span (t $! tokStr))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
-cppLayoutToken :: Int ->  (FastString -> Token) -> Action
-cppLayoutToken code t span buf len _buf2 =
-  do -- _ <- popLexState
-     -- pushLexState code
-     -- ctx <- getContext
-     -- setContext (NoLayout:ctx)
-     return (L span (t $! lexemeToFastString buf len))
-     -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
+
+cppTokenCont :: (FastString -> Token)-> Action
+cppTokenCont t span buf len _buf2 = return (L span (t $! lexemeToFastString buf len))
+
+cppTokenPop :: (FastString -> Token)-> Action
+cppTokenPop t span buf len _buf2 =
+  do _ <- popLexState
+     -- return (L span (t $! lexemeToFastString buf len))
+     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
+
 popCpp :: Action
 popCpp _span _buf _len _buf2 =
   do _ <- popLexState
-     _ <- popContext
-     lexToken
-     -- trace "pop" $ do lexToken
+     -- lexToken
+     trace "pop" $ do lexToken
 
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action
