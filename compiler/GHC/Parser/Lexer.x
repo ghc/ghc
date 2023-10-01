@@ -367,8 +367,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
-  .* \\ \n                   { cppTokenCont (ITcppContinue True) }
-  .* \n                      { cppTokenPop  (ITcppContinue False) }
+  .* \\ \n                   { cppTokenCont (ITcpp True) }
+  .* \n                      { cppTokenPop  (ITcpp False) }
   -- () { popCpp }
 }
 
@@ -1002,15 +1002,26 @@ data Token
   | ITlineComment  String      PsSpan -- ^ comment starting by "--"
   | ITblockComment String      PsSpan -- ^ comment in {- -}
 
-  -- GHC CPP extension. Each contains an entire line of source code,
-  -- possibly joining up ones ending in backslash
-  | ITcppStart    Bool FastString   -- ^ Start of a CPP #-prefixed line. Flag for continuation
-  | ITcppContinue Bool FastString   -- ^ Continuation after a trailing backslash. Flag for continuation
-
+  -- GHC CPP extension. See Note [GhcCPP Token]
+  | ITcpp Bool FastString   -- ^ CPP #-prefixed line, or continuation.
   deriving Show
 
 instance Outputable Token where
   ppr x = text (show x)
+
+{- Note [GhcCPP Token]
+~~~~~~~~~~~~~~~~~~~~~~
+We only invoke the Ghc CPP processing on lines beginning with a '#'
+and one of the keywords in @cppkeyword.
+
+These directives can finish on a trailing slash, which signals a
+continuation onto the next line.
+
+When lexing, we detect the start of the directive, and put the line
+into a ITcpp token, with a flag indicating if it ends with a
+continuation. Subsequent continued lines are treated the same way,
+until the final ITcpp token with the flag set False.
+-}
 
 {- Note [PsSpan in Comments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1248,21 +1259,22 @@ cppToken code span buf len _buf2 =
      let tokStr = lexemeToFastString buf len
      -- check if the string ends with backslash and newline
      -- NOTE: performance likely sucks, make it work for now
-     continue <- case (reverse $ unpackFS tokStr) of
-        -- ('\n':'\\':_) -> pushLexState code >> return True
-        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return True
-        _ -> return False
-     return (L span (ITcppStart continue $! tokStr))
+     (len0, continue) <- case (reverse $ unpackFS tokStr) of
+        -- ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
+        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return (len - 2, True)
+        ('\n':_) -> pushLexState code >> return (len - 1, False)
+        ts -> return (len, False)
+     return (L span (ITcpp continue $! lexemeToFastString buf len0))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
 cppTokenCont :: (FastString -> Token)-> Action
-cppTokenCont t span buf len _buf2 = return (L span (t $! lexemeToFastString buf len))
+cppTokenCont t span buf len _buf2 = return (L span (t $! lexemeToFastString buf (len - 2)))
 
 cppTokenPop :: (FastString -> Token)-> Action
 cppTokenPop t span buf len _buf2 =
   do _ <- popLexState
-     -- return (L span (t $! lexemeToFastString buf len))
-     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
+     -- return (L span (t $! lexemeToFastString buf (len - 1)))
+     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" (len -1))))
 
 popCpp :: Action
 popCpp _span _buf _len _buf2 =

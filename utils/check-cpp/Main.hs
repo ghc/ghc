@@ -60,7 +60,7 @@ ppLexer queueComments cont =
         ( \tk ->
             let
                 contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                contPush = pushContext (unLoc tk) >> contIgnoreTok tk
+                -- contPush = pushContext (unLoc tk) >> contIgnoreTok tk
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
@@ -69,22 +69,11 @@ ppLexer queueComments cont =
              in
                 -- case tk of
                 case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
-                    L _ (ITcppStart continuation s) -> do
+                    L _ (ITcpp continuation s) -> do
                         if continuation
-                            then do
-                                pushContinuation tk
-                                contIgnoreTok tk
-                            else do
-                                processCppToks s
-                                contIgnoreTok tk
-                    L _ (ITcppContinue continuation s) -> do
-                        if continuation
-                            then do
-                                pushContinuation tk
-                                contIgnoreTok tk
-                            else do
-                                processCppToks s
-                                contIgnoreTok tk
+                            then pushContinuation tk
+                            else processCppToks s
+                        contIgnoreTok tk
                     -- L _ (ITcppDefine s) -> do
                     --     -- ppDefine (trace ("ppDefine:" ++ show s) s)
                     --     ppDefine s
@@ -126,10 +115,8 @@ preprocessEnd = do
 
 processCppToks :: FastString -> P ()
 processCppToks fs = do
-    let str = unpackFS fs
     let
-        get (L _ (ITcppStart _ s)) = s
-        get (L _ (ITcppContinue _ s)) = s
+        get (L _ (ITcpp _ s)) = s
         get _ = error "should not"
     -- Combine any prior continuation tokens
     cs <- popContinuation
@@ -138,8 +125,10 @@ processCppToks fs = do
 
 processCpp :: [FastString] -> P ()
 processCpp fs = do
-    traceM $ "processCpp: fs=" ++ show fs
-    return ()
+    -- traceM $ "processCpp: fs=" ++ show fs
+    -- let s = cppInitial fs
+    let s = cppInitial fs
+    return (trace ("processCpp:s=" ++ show s) ())
 
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
@@ -261,10 +250,11 @@ cppToken = lexeme (PS.many1 (PS.satisfy (\c -> not (isSpace c))))
 {- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
 See Note [GhcCPP Initial Processing]
 -}
-cppInitial :: FastString -> String
+cppInitial :: [FastString] -> String
 cppInitial fs = r
   where
-    r = unpackFS fs
+    -- go fs' = reverse $ drop 2 $ reverse $ unpackFS fs'
+    r = concatMap unpackFS fs
 
 {-
 Note [GhcCPP Initial Processing]
