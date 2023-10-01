@@ -243,6 +243,9 @@ $docsym    = [\| \^ \* \$]
 -- not explicitly positive (contrast @exponent)
 @negative = \-
 
+-- recognise any of the GhcCPP keywords introduced by a leading #
+@cppkeyword = "define" | "include" | "undef" | "error" | "ifdef"
+                 | "ifndef" | "if" | "elif" | "else" | "endif"
 
 -- -----------------------------------------------------------------------------
 -- Alex "Identifier"
@@ -320,16 +323,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <bol> {
   \n                                    ;
   -- Ghc CPP symbols
-  ^\# \ * "define"  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
-  ^\# \ * "include" .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
-  ^\# \ * "undef"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppUndef) }
-  ^\# \ * "error"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppError) }
-  ^\# \ * "ifdef"   .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfdef) }
-  ^\# \ * "ifndef"  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfndef) }
-  ^\# \ * "if"      .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIf) }
-  ^\# \ * "elif"    .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
-  ^\# \ * "else"          / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppElse) }
-  ^\# \ * "endif"         / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppEndif) }
+  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
@@ -346,16 +340,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
-  ^\# \ * "define"  .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
-  ^\# \ * "include" .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
-  ^\# \ * "undef"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppUndef) }
-  ^\# \ * "error"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppError) }
-  ^\# \ * "ifdef"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfdef) }
-  ^\# \ * "ifndef"  .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIfndef) }
-  ^\# \ * "if"      .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppIf) }
-  ^\# \ * "elif"    .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
-  ^\# \ * "else"    .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppElse) }
-  ^\# \ * "endif"   .* \n   / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppEndif) }
+  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
 }
@@ -382,8 +367,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
-  .* \\ \n                   { cppTokenCont (ITcppContinue) }
-  .* \n                      { cppTokenPop  (ITcppContinue) }
+  .* \\ \n                   { cppTokenCont (ITcppContinue True) }
+  .* \n                      { cppTokenPop  (ITcppContinue False) }
   -- () { popCpp }
 }
 
@@ -1016,17 +1001,8 @@ data Token
 
   -- GHC CPP extension. Each contains an entire line of source code,
   -- possibly joining up ones ending in backslash
-  | ITcppDefine   FastString     -- ^ #define
-  | ITcppInclude  FastString     -- ^ #include
-  | ITcppUndef    FastString     -- ^ #undef
-  | ITcppError    FastString     -- ^ #error
-  | ITcppIf       FastString     -- ^ #if
-  | ITcppIfdef    FastString     -- ^ #ifdef
-  | ITcppIfndef   FastString     -- ^ #ifndef
-  | ITcppElif     FastString     -- ^ #elif
-  | ITcppElse                    -- ^ #else
-  | ITcppEndif                   -- ^ #endif
-  | ITcppContinue FastString     -- ^ Continuation after a trailing backslash
+  | ITcppStart    Bool FastString   -- ^ Start of a CPP #-prefixed line. Flag for continuation
+  | ITcppContinue Bool FastString   -- ^ Continuation after a trailing backslash. Flag for continuation
 
   deriving Show
 
@@ -1261,17 +1237,17 @@ pop _span _buf _len _buf2 =
      lexToken
      -- trace "pop" $ do lexToken
 
-cppToken :: Int -> (FastString -> Token)-> Action
-cppToken code t span buf len _buf2 =
-  do 
+cppToken :: Int -> Action
+cppToken code span buf len _buf2 =
+  do
      let tokStr = lexemeToFastString buf len
      -- check if the string ends with backslash and newline
-     -- NOTE: preformance likely sucks, make it work for now
-     case (reverse $ unpackFS tokStr) of
-        -- ('\n':'\\':_) -> pushLexState code
-        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code)
-        _ -> return ()
-     return (L span (t $! tokStr))
+     -- NOTE: performance likely sucks, make it work for now
+     continue <- case (reverse $ unpackFS tokStr) of
+        -- ('\n':'\\':_) -> pushLexState code >> return True
+        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return True
+        _ -> return False
+     return (L span (ITcppStart continue $! tokStr))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
 cppTokenCont :: (FastString -> Token)-> Action
@@ -2597,9 +2573,10 @@ data PState = PState {
         -- correctly?
 
 -- | Use for emulating (limited) CPP preprocessing in GHC.
+-- TODO: move this into PreProcess, and make a param on PState
 data PpState = PpState {
         pp_defines :: !(Set String),
-        pp_pushed_back :: !(Maybe (Located Token)),
+        pp_continuation :: ![Located Token],
         -- pp_context :: ![PpContext],
         pp_context :: ![Token], -- What preprocessor directive we are currently processing
         pp_accepting :: !Bool
@@ -2612,7 +2589,7 @@ data PpContext = PpContextIf [Located Token]
 initPpState :: PpState
 initPpState = PpState
    { pp_defines = Set.empty
-   , pp_pushed_back = Nothing
+   , pp_continuation = []
    , pp_context = []
    , pp_accepting = True
    }
