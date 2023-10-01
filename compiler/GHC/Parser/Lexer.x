@@ -330,7 +330,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^"#elif"    .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
   ^"#else"          / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppElse) }
   ^"#endif"         / { ifExtension GhcCppBit } { cppToken cpp_prag (\_ -> ITcppEndif) }
-  -- "defined"        { token (ITcppDefined) }
 
   -- ^\# "define"        / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppDefine) }
   -- ^\# "include"       / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppInclude) }
@@ -342,7 +341,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   -- ^\# "elif"          / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElif) }
   -- ^\# "else"          / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppElse) }
   -- ^\# "endif"         / { ifExtension GhcCppBit } { cppToken cpp_prag (ITcppEndif) }
-  -- -- "defined"        { token (ITcppDefined) }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
@@ -1028,21 +1026,18 @@ data Token
   | ITlineComment  String      PsSpan -- ^ comment starting by "--"
   | ITblockComment String      PsSpan -- ^ comment in {- -}
 
-  -- GHC CPP extension. Each (bar ITcppIgnored) contains an entire
-  -- line of source code
-  | ITcppDefine   FastString      -- ^ #define
-  | ITcppInclude  FastString      -- ^ #include
-  | ITcppUndef    FastString      -- ^ #undef
-  | ITcppError    FastString      -- ^ #error
-  | ITcppIf       FastString      -- ^ #if
-  | ITcppIfdef    FastString      -- ^ #ifdef
-  | ITcppIfndef   FastString      -- ^ #ifndef
-  | ITcppElif     FastString      -- ^ #elif
+  -- GHC CPP extension. Each contains an entire line of source code,
+  -- possibly joining up ones ending in backslash
+  | ITcppDefine   FastString     -- ^ #define
+  | ITcppInclude  FastString     -- ^ #include
+  | ITcppUndef    FastString     -- ^ #undef
+  | ITcppError    FastString     -- ^ #error
+  | ITcppIf       FastString     -- ^ #if
+  | ITcppIfdef    FastString     -- ^ #ifdef
+  | ITcppIfndef   FastString     -- ^ #ifndef
+  | ITcppElif     FastString     -- ^ #elif
   | ITcppElse                    -- ^ #else
   | ITcppEndif                   -- ^ #endif
-  | ITcppDefined  FastString     -- ^ defined (in conditional)
-  | ITcppIgnored [Located Token] -- TODO: push into comments instead
-
 
   deriving Show
 
