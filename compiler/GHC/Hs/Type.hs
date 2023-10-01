@@ -541,7 +541,7 @@ mkHsOpTy prom ty1 op ty2 = HsOpTy noAnn prom ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2
-  = addCLocAA t1 t2 (HsAppTy noExtField t1 (parenthesizeHsType appPrec t2))
+  = addCLocA t1 t2 (HsAppTy noExtField t1 (parenthesizeHsType appPrec t2))
 
 mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
@@ -550,7 +550,7 @@ mkHsAppTys = foldl' mkHsAppTy
 mkHsAppKindTy :: LHsType (GhcPass p) -> LHsToken "@" (GhcPass p) -> LHsType (GhcPass p)
               -> LHsType (GhcPass p)
 mkHsAppKindTy ty at k
-  = addCLocAA ty k (HsAppKindTy noExtField ty at k)
+  = addCLocA ty k (HsAppKindTy noExtField ty at k)
 
 {-
 ************************************************************************

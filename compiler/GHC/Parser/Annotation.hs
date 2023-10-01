@@ -71,13 +71,14 @@ module GHC.Parser.Annotation (
   mapLocA,
   combineLocsA,
   combineSrcSpansA,
-  addCLocA, addCLocAA,
+  addCLocA,
 
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
-  noLocA, getLocA,
+  HasAnnotation(..),
+  noLocA,
+  getLocA,
   noSrcSpanA,
-  noAnnSrcSpan,
 
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
@@ -994,15 +995,15 @@ la2na l = noAnnSrcSpan (locA l)
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
-la2la :: LocatedAn ann1 a2 -> LocatedAn ann2 a2
+la2la :: (NoAnn ann2) => LocatedAn ann1 a2 -> LocatedAn ann2 a2
 la2la (L la a) = L (noAnnSrcSpan (locA la)) a
 
 l2l :: SrcSpanAnn' a -> SrcAnn ann
-l2l l = noAnnSrcSpan (locA l)
+l2l l = SrcSpanAnn EpAnnNotUsed (locA l)
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
-na2la :: SrcSpanAnn' a -> SrcAnn ann
+na2la :: (NoAnn ann) => SrcSpanAnn' a -> SrcAnn ann
 na2la l = noAnnSrcSpan (locA l)
 
 reLoc :: LocatedAn a e -> Located e
@@ -1022,17 +1023,20 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 -- ---------------------------------------------------------------------
 
-noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+class HasAnnotation e where
+  noAnnSrcSpan :: SrcSpan -> e
+
+instance (NoAnn ann) => HasAnnotation (SrcSpanAnn' (EpAnn ann)) where
+  noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
+
+noLocA :: (HasAnnotation e) => a -> GenLocated e a
+noLocA = L (noAnnSrcSpan noSrcSpan)
 
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA = getHasLoc
 
-noSrcSpanA :: SrcAnn ann
+noSrcSpanA :: (HasAnnotation e) => e
 noSrcSpanA = noAnnSrcSpan noSrcSpan
-
-noAnnSrcSpan :: SrcSpan -> SrcAnn ann
-noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
 
 -- ---------------------------------------------------------------------
 
@@ -1163,7 +1167,7 @@ epAnnComments (EpAnn _ _ cs) = cs
 sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
 
-mapLocA :: (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
+mapLocA :: (NoAnn ann) => (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
 mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 -- AZ:TODO: move this somewhere sane
@@ -1179,11 +1183,9 @@ combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
         SrcSpanAnn (EpAnn (widenAnchorR anc (realSrcSpan l)) an cs) l
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLocA :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcAnn ann) e3
-addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
-
-addCLocAA :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3 -> GenLocated (SrcAnn ann) e3
-addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
+addCLocA :: (HasLoc a, HasLoc b, HasAnnotation l)
+         => a -> b -> c -> GenLocated l c
+addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (getHasLoc a) (getHasLoc b)) c
 
 -- ---------------------------------------------------------------------
 -- Utilities for manipulating EpAnnComments
@@ -1332,26 +1334,33 @@ instance Semigroup EpAnnComments where
   EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
 
-instance NoAnn NoEpAnns where
-  noAnn = NoEpAnns
-
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
-
-instance NoAnn AnnListItem where
-  noAnn = AnnListItem []
-
 
 instance Semigroup (AnnSortKey tag) where
   NoAnnSortKey <> x = x
   x <> NoAnnSortKey = x
   AnnSortKey ls1 <> AnnSortKey ls2 = AnnSortKey (ls1 <> ls2)
 
+instance Monoid (AnnSortKey tag) where
+  mempty = NoAnnSortKey
+
+-- ---------------------------------------------------------------------
+-- NoAnn instances
+
+instance NoAnn NoEpAnns where
+  noAnn = NoEpAnns
+
+instance NoAnn AnnListItem where
+  noAnn = AnnListItem []
+
+instance NoAnn AnnContext where
+  noAnn = AnnContext Nothing [] []
+
 instance NoAnn AnnList where
   noAnn = AnnList Nothing Nothing Nothing [] []
 
-instance Monoid (AnnSortKey tag) where
-  mempty = NoAnnSortKey
+-- ---------------------------------------------------------------------
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []

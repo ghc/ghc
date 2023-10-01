@@ -232,14 +232,14 @@ mkLamCaseMatchGroup origin lam_variant (L l matches)
   = mkMatchGroup origin (L l $ map fixCtxt matches)
   where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
 
-mkLocatedList :: Semigroup a
+mkLocatedList :: (Semigroup a, NoAnn an)
   => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
 mkLocatedList ms = case nonEmpty ms of
     Nothing -> noLocA []
     Just ms1 -> L (noAnnSrcSpan $ locA $ combineLocsA (NE.head ms1) (NE.last ms1)) ms
 
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsApp e1 e2 = addCLocAA e1 e2 (HsApp noComments e1 e2)
+mkHsApp e1 e2 = addCLocA e1 e2 (HsApp noComments e1 e2)
 
 mkHsAppWith
   :: (LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> HsExpr (GhcPass id) -> LHsExpr (GhcPass id))
@@ -250,7 +250,7 @@ mkHsAppWith mkLocated e1 e2 = mkLocated e1 e2 (HsApp noAnn e1 e2)
 
 mkHsApps
   :: LHsExpr (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
-mkHsApps = mkHsAppsWith addCLocAA
+mkHsApps = mkHsAppsWith addCLocA
 
 mkHsAppsWith
  :: (LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> HsExpr (GhcPass id) -> LHsExpr (GhcPass id))
@@ -260,7 +260,7 @@ mkHsAppsWith
 mkHsAppsWith mkLocated = foldl' (mkHsAppWith mkLocated)
 
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
-mkHsAppType e t = addCLocAA t_body e (HsAppType noExtField e noHsTok paren_wct)
+mkHsAppType e t = addCLocA t_body e (HsAppType noExtField e noHsTok paren_wct)
   where
     t_body    = hswc_body t
     paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
@@ -1832,5 +1832,3 @@ rec_field_expl_impl rec_flds (RecFieldsDotDot { .. })
           = ImplicitFieldBinders
               { implFlBndr_field   = foExt fld
               , implFlBndr_binders = collectPatBinders CollNoDictBinders rhs }
-
-
