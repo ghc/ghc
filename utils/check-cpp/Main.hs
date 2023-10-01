@@ -27,6 +27,19 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
+import qualified Text.Parsec as Parsec
+import Text.Parsec.Char as PS
+import Text.Parsec.Combinator as PS
+import Text.Parsec.Prim as PS
+
+-- import qualified Text.Parsec as Parsec
+import Text.Parsec.String (Parser)
+
+-- import Text.Parsec.Char
+-- import FunctionsAndTypesForParsing (regularParse, parseWithEof, parseWithLeftOver)
+-- import Text.Parsec.String.Combinator (many1)
+-- import Text.Parsec.Combinator (many1)
+
 -- ---------------------------------------------------------------------
 
 showAst :: (Data a) => a -> String
@@ -57,7 +70,8 @@ ppLexer queueComments cont =
                 -- case tk of
                 case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ (ITcppDefine s) -> do
-                        ppDefine (trace ("ppDefine:" ++ show s) s)
+                        -- ppDefine (trace ("ppDefine:" ++ show s) s)
+                        ppDefine s
                         popContext
                         contIgnoreTok tk
                     L _ (ITcppIf _) -> contPush
@@ -157,11 +171,13 @@ getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 ppDefine :: FastString -> P ()
 ppDefine def = P $ \s ->
-    POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
+    -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Set.insert (trace ("ppDefine:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s))}} ()
 
 ppIsDefined :: FastString -> P Bool
 ppIsDefined def = P $ \s ->
-    POk s (Set.member (cleanTokenString def) (pp_defines (pp s)))
+    -- POk s (Set.member (cleanTokenString def) (pp_defines (pp s)))
+    POk s (Set.member (trace ("ppIsDefined:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s)))
 
 -- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
 cleanTokenString :: FastString -> String
@@ -169,6 +185,60 @@ cleanTokenString fs = r
   where
     ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
     r = init ss
+
+parseDefine :: FastString -> Maybe (String, String)
+parseDefine s = r
+  where
+    r = Just (cleanTokenString s, "")
+
+-- =====================================================================
+-- Parsec parsing
+type CppParser = Parsec String ()
+
+regularParse :: Parser a -> String -> Either Parsec.ParseError a
+regularParse p = PS.parse p ""
+
+cppComment :: CppParser ()
+cppComment = do
+    _ <- PS.string "/*"
+    _ <- PS.manyTill PS.anyChar (PS.try (PS.string "*/"))
+    return ()
+
+whiteSpace :: CppParser ()
+whiteSpace = do
+    _ <- PS.many (PS.choice [cppComment, PS.space >> return ()])
+    return ()
+
+lexeme :: CppParser a -> CppParser a
+lexeme p = p <* whiteSpace
+
+cppToken :: CppParser String
+cppToken = lexeme (PS.many1 (PS.satisfy (\c -> not (isSpace c))))
+
+{- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
+See Note [GhcCPP Initial Processing]
+-}
+cppInitial :: FastString -> String
+cppInitial fs = r
+  where
+    r = unpackFS fs
+
+{-
+Note [GhcCPP Initial Processing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This processing is based on the description at
+https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
+
+It is only done for lines starting with a preprocessor
+directive.
+
+1. Broken into lines.  We rely on the GHC Lexer to do this
+2. Trigraphs are not processed
+3. Continued lines are merged into a single line
+   and is handled in the Lexer.
+4. All comments are replaced with a single space
+
+-}
 
 -- =====================================================================
 -- Emulate the parser
@@ -335,13 +405,9 @@ happyError = Lexer.srcParseFail
 -- =====================================================================
 -- ---------------------------------------------------------------------
 
-printToks :: Int -> [Located Token] -> IO ()
-printToks indent toks = mapM_ go toks
+printToks :: [Located Token] -> IO ()
+printToks toks = mapM_ go toks
   where
-    go (L _ (ITcppIgnored ts)) = do
-        putStr "ITcppIgnored ["
-        printToks (indent + 4) ts
-        putStrLn "]"
     go (L _ tk) = putStrLn (show tk)
 
 -- Testing
@@ -354,13 +420,13 @@ doTest strings = do
     let test = intercalate "\n" strings
     !tks <- parseString libdirNow test
     putStrLn "-----------------------------------------"
-    printToks 0 (reverse tks)
+    printToks (reverse tks)
 
 t0 :: IO ()
 t0 = do
     doTest
-        [ "#define FOO"
-        , "#ifdef FOO"
+        [ "# define FOO"
+        , "#  ifdef FOO"
         , "x = 1"
         , "#endif"
         , ""
@@ -391,6 +457,26 @@ t3 = do
         [ "{-# LANGUAGE GhcCPP #-}"
         , "module Example1 where"
         , ""
+        , "y = 1"
+        , ""
+        , "#define FOO"
+        , ""
+        , "x ="
+        , "#ifdef FOO"
+        , "  \" hello \""
+        , "#else"
+        , "  \" bye now \""
+        , "#endif"
+        , ""
+        , "foo = putStrLn x"
+        ]
+
+t3a :: IO ()
+t3a = do
+    doTest
+        [ "{-# LANGUAGE GhcCPP #-}"
+        , "module Example1 where"
+        , ""
         , "#define FOO"
         , ""
         , "x ="
@@ -411,15 +497,40 @@ t4 = do
         , "#define VERSION_ghc_exactprint \"1.7.0.1\""
         , "#endif /* VERSION_ghc_exactprint */"
         , "#ifndef MIN_VERSION_ghc_exactprint"
-        -- , "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (\\"
-        -- , "  (major1) <  1 || \\"
-        -- , "  (major1) == 1 && (major2) <  7 || \\"
-        -- , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
-        , "#endif /* MIN_VERSION_ghc_exactprint */"
+        , -- , "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (\\"
+          -- , "  (major1) <  1 || \\"
+          -- , "  (major1) == 1 && (major2) <  7 || \\"
+          -- , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
+          "#endif /* MIN_VERSION_ghc_exactprint */"
         , ""
-        , "#if VERSION_ghc_exactprint == \"1.7.0.1\""
+        , "#ifdef VERSION_ghc_exactprint"
         , "x = \"got version\""
         , "#else"
         , "x = \"no version\""
         , "#endif"
         ]
+
+t5 :: IO ()
+t5 = do
+    doTest
+        [ "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (\\"
+        , "  (major1) <  1 || \\"
+        , "  (major1) == 1 && (major2) <  7 || \\"
+        , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
+        , "x = x"
+        ]
+
+t6 :: IO ()
+t6 = do
+    doTest
+        [ "#define VERSION_ghc_exactprint \"1.7.0.1\""
+        , ""
+        , "#ifdef VERSION_ghc_exactprint"
+        , "x = \"got version\""
+        , "#else"
+        , "x = \"no version\""
+        , "#endif"
+        ]
+
+t7 :: Maybe (String, String)
+t7 = parseDefine (mkFastString "#define VERSION_ghc_exactprint \"1.7.0.1\"\n")
