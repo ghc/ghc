@@ -62,9 +62,6 @@ instance NoAnn AddEpAnn where
 instance NoAnn AnnKeywordId where
   noAnn = Annlarrowtail  {- gotta pick one -}
 
-instance NoAnn AnnContext where
-  noAnn = AnnContext Nothing [] []
-
 instance NoAnn EpAnnSumPat where
   noAnn = EpAnnSumPat noAnn  noAnn  noAnn
 
