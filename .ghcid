@@ -2,4 +2,4 @@
 --reload compiler
 --reload ghc
 --reload includes
---restart hadrian/
+--restart hadrian/ghci
