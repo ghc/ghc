@@ -6,7 +6,7 @@ import Data.Char
 import Data.Data hiding (Fixity)
 import Data.List
 import qualified Data.Set as Set
-import Debug.Trace (trace)
+import Debug.Trace
 import GHC
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
@@ -69,28 +69,44 @@ ppLexer queueComments cont =
              in
                 -- case tk of
                 case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
-                    L _ (ITcppDefine s) -> do
-                        -- ppDefine (trace ("ppDefine:" ++ show s) s)
-                        ppDefine s
-                        popContext
-                        contIgnoreTok tk
-                    L _ (ITcppIf _) -> contPush
-                    L _ (ITcppIfdef s) -> do
-                        defined <- ppIsDefined s
-                        -- setAccepting defined
-                        setAccepting (trace ("ifdef:" ++ show (s, defined)) defined)
-                        contIgnoreTok tk
-                    L _ (ITcppIfndef s) -> do
-                        defined <- ppIsDefined s
-                        -- setAccepting (not defined)
-                        setAccepting (trace ("ifdef:" ++ show (s, defined)) (not defined))
-                        contIgnoreTok tk
-                    L _ ITcppElse -> do
-                        preprocessElse
-                        contIgnoreTok tk
-                    L _ ITcppEndif -> do
-                        preprocessEnd
-                        contIgnoreTok tk
+                    L _ (ITcppStart continuation s) -> do
+                        if continuation
+                            then do
+                                pushContinuation tk
+                                contIgnoreTok tk
+                            else do
+                                processCppToks s
+                                contIgnoreTok tk
+                    L _ (ITcppContinue continuation s) -> do
+                        if continuation
+                            then do
+                                pushContinuation tk
+                                contIgnoreTok tk
+                            else do
+                                processCppToks s
+                                contIgnoreTok tk
+                    -- L _ (ITcppDefine s) -> do
+                    --     -- ppDefine (trace ("ppDefine:" ++ show s) s)
+                    --     ppDefine s
+                    --     popContext
+                    --     contIgnoreTok tk
+                    -- L _ (ITcppIf _) -> contPush
+                    -- L _ (ITcppIfdef s) -> do
+                    --     defined <- ppIsDefined s
+                    --     -- setAccepting defined
+                    --     setAccepting (trace ("ifdef:" ++ show (s, defined)) defined)
+                    --     contIgnoreTok tk
+                    -- L _ (ITcppIfndef s) -> do
+                    --     defined <- ppIsDefined s
+                    --     -- setAccepting (not defined)
+                    --     setAccepting (trace ("ifdef:" ++ show (s, defined)) (not defined))
+                    --     contIgnoreTok tk
+                    -- L _ ITcppElse -> do
+                    --     preprocessElse
+                    --     contIgnoreTok tk
+                    -- L _ ITcppEndif -> do
+                    --     preprocessEnd
+                    --     contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
@@ -108,6 +124,23 @@ preprocessEnd = do
     -- TODO: nested context
     setAccepting True
 
+processCppToks :: FastString -> P ()
+processCppToks fs = do
+    let str = unpackFS fs
+    let
+        get (L _ (ITcppStart _ s)) = s
+        get (L _ (ITcppContinue _ s)) = s
+        get _ = error "should not"
+    -- Combine any prior continuation tokens
+    cs <- popContinuation
+    processCpp (reverse $ fs : map get cs)
+    return ()
+
+processCpp :: [FastString] -> P ()
+processCpp fs = do
+    traceM $ "processCpp: fs=" ++ show fs
+    return ()
+
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
 
@@ -124,9 +157,9 @@ getCppState = do
     context <- peekContext
     accepting <- getAccepting
     case context of
-        ITcppDefine _ -> return CppInDefine
-        ITcppIfdef _ -> return CppInIfdef
-        ITcppIfndef _ -> return CppInIfndef
+        -- ITcppDefine _ -> return CppInDefine
+        -- ITcppIfdef _ -> return CppInIfdef
+        -- ITcppIfndef _ -> return CppInIfndef
         _ ->
             if accepting
                 then return CppNormal
@@ -164,6 +197,16 @@ setAccepting on =
 
 getAccepting :: P Bool
 getAccepting = P $ \s -> POk s (pp_accepting (pp s))
+
+-- -------------------------------------
+
+pushContinuation :: Located Token -> P ()
+pushContinuation new =
+    P $ \s -> POk s{pp = (pp s){pp_continuation = new : pp_continuation (pp s)}} ()
+
+popContinuation :: P [Located Token]
+popContinuation =
+    P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
 
 -- pp_context stack end -------------------
 
