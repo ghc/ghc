@@ -1293,6 +1293,24 @@ instance Semigroup (AnnSortKey tag) where
 instance Monoid (AnnSortKey tag) where
   mempty = NoAnnSortKey
 
+-- instance Semigroup AnnList where
+--   (AnnList a1 o1 c1 r1 t1) <> (AnnList a2 o2 c2 r2 t2)
+--     = AnnList (a1 <> a2) (c o1 o2) (c c1 c2) (r1 <> r2) (t1 <> t2)
+--     where
+--       -- Left biased combination for the open and close annotations
+--       c Nothing x = x
+--       c x Nothing = x
+--       c f _       = f
+
+-- instance Semigroup AnnContext where
+--   (AnnContext a1 o1 c1) <> (AnnContext a2 o2 c2)
+--     = AnnContext (c a1 a2)  (o1 <> o2) (c1 <> c2)
+--     where
+--       -- Left biased combination for the ac_darrow
+--       c Nothing x = x
+--       c x Nothing = x
+--       c f _       = f
+
 -- ---------------------------------------------------------------------
 -- NoAnn instances
 -- ---------------------------------------------------------------------

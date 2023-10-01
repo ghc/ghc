@@ -253,7 +253,7 @@ ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
 tokComment :: LEpaComment -> [Comment]
 tokComment t@(L lt c) =
   case c of
-    (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments lt pt dc
+    (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments (noCommentsToEpaLocation lt) pt dc
     _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
 
 hsDocStringComments :: Anchor -> RealSrcSpan -> GHC.HsDocString -> [Comment]
@@ -268,9 +268,9 @@ hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
   in
     (Comment str (spanAsAnchor lx) pt Nothing : docChunk (rs lx) (map dedentDocChunk xs))
 hsDocStringComments anc pt (NestedDocString dec@(HsDocStringNamed _) (L _ chunk))
-  = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+  = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
 hsDocStringComments anc pt (NestedDocString dec (L _ chunk))
-  = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+  = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
 
 hsDocStringComments _ _ (GeneratedDocString _) = [] -- Should not appear in user-written code
 
