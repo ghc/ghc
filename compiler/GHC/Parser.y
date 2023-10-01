@@ -763,17 +763,16 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 -- Ghc CPP
-'#define'       { L _ (ITcppDefine _) }
-'#include'      { L _ (ITcppInclude _) }
-'#undef'        { L _ (ITcppUndef _) }
-'#error'        { L _ (ITcppError _) }
-'#if'           { L _ (ITcppIf _) }
-'#ifdef'        { L _ (ITcppIfdef _) }
-'#ifndef'       { L _ (ITcppIfndef _) }
-'#elif'         { L _ (ITcppElif _) }
-'#else'         { L _ ITcppElse }
-'#endif'        { L _ ITcppEndif }
-'defined'       { L _ (ITcppDefined _)}
+-- '#define'       { L _ (ITcppDefine _) }
+-- '#include'      { L _ (ITcppInclude _) }
+-- '#undef'        { L _ (ITcppUndef _) }
+-- '#error'        { L _ (ITcppError _) }
+-- '#if'           { L _ (ITcppIf _) }
+-- '#ifdef'        { L _ (ITcppIfdef _) }
+-- '#ifndef'       { L _ (ITcppIfndef _) }
+-- '#elif'         { L _ (ITcppElif _) }
+-- '#else'         { L _ ITcppElse }
+-- '#endif'        { L _ ITcppEndif }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
