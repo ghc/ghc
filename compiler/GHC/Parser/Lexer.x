@@ -324,6 +324,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \n                                    ;
   -- Ghc CPP symbols
   ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
+  ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
@@ -341,6 +342,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
   ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
+  ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
 }
@@ -368,7 +370,9 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
   .* \\ \n                   { cppTokenCont (ITcpp True) }
-  .* \n                      { cppTokenPop  (ITcpp False) }
+  .* \\                      { cppTokenCont (ITcpp True) }
+  -- .* \n                      { cppTokenPop  (ITcpp False) }
+  .*                       { cppTokenPop  (ITcpp False) }
   -- () { popCpp }
 }
 
@@ -1262,19 +1266,28 @@ cppToken code span buf len _buf2 =
      (len0, continue) <- case (reverse $ unpackFS tokStr) of
         -- ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
         ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return (len - 2, True)
-        ('\n':_) -> pushLexState code >> return (len - 1, False)
-        ts -> return (len, False)
+        ('\n':_) -> return (len - 1, False)
+        _ -> return (len, False)
      return (L span (ITcpp continue $! lexemeToFastString buf len0))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
 cppTokenCont :: (FastString -> Token)-> Action
-cppTokenCont t span buf len _buf2 = return (L span (t $! lexemeToFastString buf (len - 2)))
+cppTokenCont code span buf len _buf2 =
+  do
+     let tokStr = lexemeToFastString buf len
+     -- check if the string ends with backslash and newline
+     -- NOTE: performance likely sucks, make it work for now
+     (len0, continue) <- case (reverse $ unpackFS tokStr) of
+        ('\n':'\\':_) -> return (len - 2, True)
+        ('\n':_) -> return (len - 1, False)
+        _ -> return (len, False)
+     return (L span (ITcpp continue $! lexemeToFastString buf len0))
 
 cppTokenPop :: (FastString -> Token)-> Action
 cppTokenPop t span buf len _buf2 =
   do _ <- popLexState
      -- return (L span (t $! lexemeToFastString buf (len - 1)))
-     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" (len -1))))
+     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
 
 popCpp :: Action
 popCpp _span _buf _len _buf2 =
@@ -2592,7 +2605,7 @@ data PState = PState {
 -- | Use for emulating (limited) CPP preprocessing in GHC.
 -- TODO: move this into PreProcess, and make a param on PState
 data PpState = PpState {
-        pp_defines :: !(Set String),
+        pp_defines :: !(Map String [String]),
         pp_continuation :: ![Located Token],
         -- pp_context :: ![PpContext],
         pp_context :: ![Token], -- What preprocessor directive we are currently processing
@@ -2605,7 +2618,7 @@ data PpContext = PpContextIf [Located Token]
 
 initPpState :: PpState
 initPpState = PpState
-   { pp_defines = Set.empty
+   { pp_defines = Map.empty
    , pp_continuation = []
    , pp_context = []
    , pp_accepting = True
