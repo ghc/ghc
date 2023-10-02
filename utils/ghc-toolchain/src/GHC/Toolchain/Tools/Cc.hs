@@ -4,6 +4,7 @@
 module GHC.Toolchain.Tools.Cc
     ( Cc(..)
     , _ccProgram
+    , findBasicCc
     , findCc
       -- * Helpful utilities
     , preprocess
@@ -33,22 +34,29 @@ _ccProgram = Lens ccProgram (\x o -> o{ccProgram=x})
 _ccFlags :: Lens Cc [String]
 _ccFlags = _ccProgram % _prgFlags
 
-findCc :: String -- ^ The llvm target to use if Cc supports --target
-       -> ProgOpt -> M Cc
-findCc llvmTarget progOpt = checking "for C compiler" $ do
+-- We use this to find a minimally-functional compiler needed to call
+-- parseTriple.
+findBasicCc :: ProgOpt -> M Cc
+findBasicCc progOpt = checking "for C compiler" $ do
     -- TODO: We keep the candidate order we had in configure, but perhaps
     -- there's a more optimal one
     ccProgram <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
+    return $ Cc{ccProgram}
 
-    cc0 <- ignoreUnusedArgs $ Cc {ccProgram}
-    cc1 <- ccSupportsTarget llvmTarget cc0
-    checking "whether Cc works" $ checkCcWorks cc1
-    cc2 <- oneOf "cc doesn't support C99" $ map checkC99Support
-        [ cc1
-        , cc1 & _ccFlags %++ "-std=gnu99"
+findCc :: ArchOS
+       -> String -- ^ The llvm target to use if Cc supports --target
+       -> ProgOpt -> M Cc
+findCc archOs llvmTarget progOpt = do
+    cc0 <- findBasicCc progOpt
+    cc1 <- ignoreUnusedArgs cc0
+    cc2 <- ccSupportsTarget archOs llvmTarget cc1
+    checking "whether Cc works" $ checkCcWorks cc2
+    cc3 <- oneOf "cc doesn't support C99" $ map checkC99Support
+        [ cc2
+        , cc2 & _ccFlags %++ "-std=gnu99"
         ]
-    checkCcSupportsExtraViaCFlags cc2
-    return cc2
+    checkCcSupportsExtraViaCFlags cc3
+    return cc3
 
 checkCcWorks :: Cc -> M ()
 checkCcWorks cc = withTempDir $ \dir -> do
@@ -75,9 +83,10 @@ ignoreUnusedArgs cc
 -- Does Cc support the --target=<triple> option? If so, we should pass it
 -- whenever possible to avoid ambiguity and potential compile-time errors (e.g.
 -- see #20162).
-ccSupportsTarget :: String -> Cc -> M Cc
-ccSupportsTarget target cc = checking "whether Cc supports --target" $
-                             supportsTarget _ccProgram checkCcWorks target cc
+ccSupportsTarget :: ArchOS -> String -> Cc -> M Cc
+ccSupportsTarget archOs target cc =
+    checking "whether Cc supports --target" $
+    supportsTarget archOs _ccProgram checkCcWorks target cc
 
 checkC99Support :: Cc -> M Cc
 checkC99Support cc = checking "for C99 support" $ withTempDir $ \dir -> do

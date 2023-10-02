@@ -380,11 +380,15 @@ mkTarget opts = do
     normalised_triple <- normaliseTriple (optTriple opts)
     -- Use Llvm target if specified, otherwise use triple as llvm target
     let tgtLlvmTarget = fromMaybe normalised_triple (optLlvmTriple opts)
-    cc0 <- findCc tgtLlvmTarget (optCc opts)
-    cxx <- findCxx tgtLlvmTarget (optCxx opts)
+
+    (archOs, tgtVendor) <- do
+      cc0 <- findBasicCc (optCc opts)
+      parseTriple cc0 normalised_triple
+
+    cc0 <- findCc archOs tgtLlvmTarget (optCc opts)
+    cxx <- findCxx archOs tgtLlvmTarget (optCxx opts)
     cpp <- findCpp (optCpp opts) cc0
     hsCpp <- findHsCpp (optHsCpp opts) cc0
-    (archOs, tgtVendor) <- parseTriple cc0 normalised_triple
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
     ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf

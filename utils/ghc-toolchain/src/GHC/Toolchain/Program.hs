@@ -30,6 +30,7 @@ import System.Directory
 import System.Exit
 import System.Process hiding (env)
 
+import GHC.Platform.ArchOS
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils
 
@@ -182,17 +183,37 @@ compile ext extraFlags lens c outPath program = do
     callProgram (view lens c) $ extraFlags ++ ["-o", outPath, srcPath]
     expectFileExists outPath "compiler produced no output"
 
+-- Note [Don't pass --target to emscripten toolchain]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Emscripten's CC wrapper is a bit wonky in that it accepts the `--target`
+-- flag when used as a linker yet rejects it as a compiler (e.g. with `-c`).
+-- This is exacerbated by the fact that Cabal currently in some cases
+-- combines (and therefore conflates) link and compilation flags.
+--
+-- Ultimately this should be fixed in Cabal but in the meantime we work around it
+-- by handling this toolchain specifically in the various
+-- "supports --target" checks in `configure` and `ghc-toolchain`.
+--
+-- Fixes #23744.
+
 -- | Does compiler program support the @--target=<triple>@ option? If so, we should
 -- pass it whenever possible to avoid ambiguity and potential compile-time
 -- errors (e.g. see #20162).
-supportsTarget :: Lens compiler Program
+supportsTarget :: ArchOS
+               -> Lens compiler Program
                -> (compiler -> M ()) -- ^ Action to check if compiler with @--target@ flag works
                -> String             -- ^ The LLVM target to use if @cc@ supports @--target@
                -> compiler           -- ^ The compiler to check @--target@ support for
                -> M compiler         -- ^ Return compiler with @--target@ flag if supported
-supportsTarget lens checkWorks llvmTarget c
--- TODO: #23603
-  | any ("--target=" `isPrefixOf`) (view (lens % _prgFlags) c) = return c
+supportsTarget archOs lens checkWorks llvmTarget c
+    -- See Note [Don't pass --target to emscripten toolchain].
+  | ArchJavaScript <- archOS_arch archOs
+  = return c
+
+    -- No reason to check if the options already contain a --target flag
+  | any ("--target=" `isPrefixOf`) (view (lens % _prgFlags) c)
+  = return c
+
   | otherwise
   = let c' = over (lens % _prgFlags) (("--target="++llvmTarget):) c
      in (c' <$ checkWorks (over (lens % _prgFlags) ("-Werror":) c')) <|> return c
