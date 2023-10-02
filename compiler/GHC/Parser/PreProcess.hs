@@ -152,15 +152,15 @@ getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 -- definitions start --------------------
 
-ppDefine :: FastString -> P ()
-ppDefine def = P $ \s ->
-    -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Set.insert (trace ("ppDefine:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s))}} ()
+-- ppDefine :: FastString -> P ()
+-- ppDefine def = P $ \s ->
+--     -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
+--     POk s{pp = (pp s){pp_defines = Set.insert (trace ("ppDefine:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s))}} ()
 
-ppIsDefined :: FastString -> P Bool
-ppIsDefined def = P $ \s ->
-    -- POk s (Set.member def (pp_defines (pp s)))
-    POk s (Set.member (trace ("ppIsDefined:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s)))
+-- ppIsDefined :: FastString -> P Bool
+-- ppIsDefined def = P $ \s ->
+--     -- POk s (Set.member def (pp_defines (pp s)))
+--     POk s (Set.member (trace ("ppIsDefined:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s)))
 
 -- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
 cleanTokenString :: FastString -> String
