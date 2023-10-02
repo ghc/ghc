@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+#! nix-shell -i bash -p moreutils lzip zip lftp gnupg
 
-set -e
+set -Eeuo pipefail
 
 # This is a script for preparing and uploading a release of GHC.
 #
@@ -30,21 +31,15 @@ set -e
 #
 # Prerequisites: moreutils
 
-if [ -z "$SIGNING_KEY" ]; then
-    SIGNING_KEY="=Benjamin Gamari <ben@well-typed.com>"
-fi
+: ${SIGNING_KEY:="=Benjamin Gamari <ben@well-typed.com>"}
 
 
 # Infer release name from directory name
-if [ -z "$rel_name" ]; then
-    rel_name="$(basename $(pwd))"
-fi
+: ${rel_name:=$(basename $(pwd))}
 
 # Infer version from tarball names
-if [ -z "$ver" ]; then
-    ver="$(ls ghc-*.tar.* | sed -ne 's/ghc-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).\+/\1/p' | head -n1)"
-    if [ -z "$ver" ]; then echo "Failed to infer \$ver"; exit 1; fi
-fi
+: ${ver:=$(ls ghc-*.tar.* | sed -ne 's/ghc-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).\+/\1/p' | head -n1)}
+if [ -z "$ver" ]; then echo "Failed to infer \$ver"; exit 1; fi
 
 host="gitlab-storage.haskell.org"
 
@@ -141,6 +136,7 @@ function upload() {
 }
 
 function purge_all() {
+    dir="$(echo $rel_name | sed s/-release//)"
     # Purge CDN cache
     curl -X PURGE http://downloads.haskell.org/ghc/
     curl -X PURGE http://downloads.haskell.org/~ghc/
@@ -196,6 +192,7 @@ function prepare_docs() {
 }
 
 function recompress() {
+    set -Eeuo pipefail
     combine <(basename -s .xz *.xz) not <(basename -s .lz *.lz) | \
         parallel 'echo "Recompressing {}.xz to {}.lz"; unxz -c {}.xz | lzip - -o {}.lz'
 
