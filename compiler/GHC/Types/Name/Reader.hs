@@ -1308,12 +1308,16 @@ childGREPriority (LookupChild { wantedParent = wanted_parent
         | isTermVarOrFieldNameSpace ns
         , isTermVarOrFieldNameSpace other_ns
         = Just 0
-        | ns == varName
+        | isValNameSpace varName
         , other_ns == tcName
-        -- When looking up children, we sometimes want to a symbolic variable
-        -- name to resolve to a type constructor, e.g. for an infix declaration
-        -- "infix +!" we want to take into account both class methods and associated
-        -- types. See test T10816.
+        -- When looking up children, we sometimes want a value name
+        -- to resolve to a type constructor.
+        -- For example, for an infix declaration "infixr 3 +!" or "infix 2 `Fun`"
+        -- inside a class declaration, we want to account for the possibility
+        -- that the identifier refers to an associated type (type constructor
+        -- NameSpace), when otherwise "+!" would be in the term-level variable
+        -- NameSpace, and "Fun" would be in the term-level data constructor
+        -- NameSpace.  See tests T10816, T23664, T24037.
         = Just 1
         | ns == tcName
         , other_ns == dataName
