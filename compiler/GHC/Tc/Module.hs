@@ -2595,6 +2595,9 @@ tcRnType :: HscEnv
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
+    unsetGOptM Opt_DeferTypeErrors $           -- Disable deferred type errors
+    unsetGOptM Opt_DeferTypedHoles $           -- We don't want them in :kind (#24024),
+    unsetGOptM Opt_DeferOutOfScopeVariables $  -- since the output is confusing
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_sig_type@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body })) }, _fvs)
                  -- we are using 'rnHsSigWcType' to bind the unbound type variables
                  -- and in combination with 'tcOuterTKBndrs' we are able to
