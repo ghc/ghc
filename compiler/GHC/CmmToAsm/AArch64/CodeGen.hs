@@ -781,12 +781,12 @@ getRegister' config plat expr
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (fromIntegral n) ->
+    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (fromIntegral n) ->
+    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
@@ -1070,13 +1070,16 @@ getRegister' config plat expr
 -- | Is a given number encodable as a bitmask immediate?
 --
 -- https://stackoverflow.com/questions/30904718/range-of-immediate-values-in-armv8-a64-assembly
-isAArch64Bitmask :: Integer -> Bool
+isAArch64Bitmask :: Width -> Integer -> Bool
 -- N.B. zero and ~0 are not encodable as bitmask immediates
-isAArch64Bitmask 0  = False
-isAArch64Bitmask n
-  | n == bit 64 - 1 = False
-isAArch64Bitmask n  =
-    check 64 || check 32 || check 16 || check 8
+isAArch64Bitmask width n =
+  assert (width `elem` [W32,W64]) $
+  case n of
+    0 -> False
+    _ | n == bit (widthInBits width) - 1
+      -> False -- 1111...1111
+      | otherwise
+      -> (width == W64 && check 64) || check 32 || check 16 || check 8
   where
     -- Check whether @n@ can be represented as a subpattern of the given
     -- width.
