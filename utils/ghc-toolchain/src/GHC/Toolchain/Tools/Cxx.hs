@@ -8,6 +8,8 @@ module GHC.Toolchain.Tools.Cxx
     ) where
 
 import System.FilePath
+
+import GHC.Platform.ArchOS
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 import GHC.Toolchain.Utils
@@ -19,18 +21,20 @@ newtype Cxx = Cxx { cxxProgram :: Program
 _cxxProgram :: Lens Cxx Program
 _cxxProgram = Lens cxxProgram (\x o -> o{cxxProgram=x})
 
-findCxx :: String -- ^ The llvm target to use if Cc supports --target
+findCxx :: ArchOS
+        -> String -- ^ The llvm target to use if Cc supports --target
         -> ProgOpt -> M Cxx
-findCxx target progOpt = checking "for C++ compiler" $ do
+findCxx archOs target progOpt = checking "for C++ compiler" $ do
     -- TODO: We use the search order in configure, but there could be a more optimal one
     cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"]
-    cxx        <- cxxSupportsTarget target Cxx{cxxProgram}
+    cxx        <- cxxSupportsTarget archOs target Cxx{cxxProgram}
     checkCxxWorks cxx
     return cxx
 
-cxxSupportsTarget :: String -> Cxx -> M Cxx
-cxxSupportsTarget target cxx = checking "whether C++ supports --target" $
-                               supportsTarget _cxxProgram checkCxxWorks target cxx
+cxxSupportsTarget :: ArchOS -> String -> Cxx -> M Cxx
+cxxSupportsTarget archOs target cxx =
+    checking "whether C++ supports --target" $
+    supportsTarget archOs _cxxProgram checkCxxWorks target cxx
 
 checkCxxWorks :: Cxx -> M ()
 checkCxxWorks cxx = withTempDir $ \dir -> do
