@@ -13,7 +13,7 @@ import Control.Exception (assert)
 import qualified Data.Set as Set
 import System.Directory
 import Settings.Program (programContext)
-import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
+import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink, targetPlatformTriple)
 import GHC.Toolchain.Program (prgFlags)
 
 cabalBuilderArgs :: Args
@@ -191,6 +191,7 @@ configureArgs cFlags' ldFlags' = do
                            ]
         ldFlags  = ldArgs <> ldFlags'
     cldFlags <- unwords <$> (cFlags <> ldFlags)
+    let predStage' s = case s of {Stage0 {} -> stage0InTree ; _ -> predStage s }
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
@@ -200,8 +201,7 @@ configureArgs cFlags' ldFlags' = do
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        -- ROMES:TODO: how is the Host set to TargetPlatformFull? That would be the target
-        , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
+        , conf "--host"                   $ arg =<< flip queryTarget targetPlatformTriple  . predStage' =<< getStage
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"
         ]
