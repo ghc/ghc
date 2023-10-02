@@ -5,7 +5,7 @@ import Control.Monad.IO.Class
 import Data.Char
 import Data.Data hiding (Fixity)
 import Data.List
-import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Debug.Trace
 import GHC
 import qualified GHC.Data.EnumSet as EnumSet
@@ -69,33 +69,12 @@ ppLexer queueComments cont =
              in
                 -- case tk of
                 case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                    L _ ITeof -> contInner tk
                     L _ (ITcpp continuation s) -> do
                         if continuation
                             then pushContinuation tk
                             else processCppToks s
                         contIgnoreTok tk
-                    -- L _ (ITcppDefine s) -> do
-                    --     -- ppDefine (trace ("ppDefine:" ++ show s) s)
-                    --     ppDefine s
-                    --     popContext
-                    --     contIgnoreTok tk
-                    -- L _ (ITcppIf _) -> contPush
-                    -- L _ (ITcppIfdef s) -> do
-                    --     defined <- ppIsDefined s
-                    --     -- setAccepting defined
-                    --     setAccepting (trace ("ifdef:" ++ show (s, defined)) defined)
-                    --     contIgnoreTok tk
-                    -- L _ (ITcppIfndef s) -> do
-                    --     defined <- ppIsDefined s
-                    --     -- setAccepting (not defined)
-                    --     setAccepting (trace ("ifdef:" ++ show (s, defined)) (not defined))
-                    --     contIgnoreTok tk
-                    -- L _ ITcppElse -> do
-                    --     preprocessElse
-                    --     contIgnoreTok tk
-                    -- L _ ITcppEndif -> do
-                    --     preprocessEnd
-                    --     contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
@@ -128,6 +107,25 @@ processCpp fs = do
     -- traceM $ "processCpp: fs=" ++ show fs
     -- let s = cppInitial fs
     let s = cppInitial fs
+    case regularParse cppDirective s of
+      Left err -> error $ show err
+      Right (CppDefine name def) -> do
+        ppDefine name def
+      Right (CppIfdef name) -> do
+        defined <- ppIsDefined name
+        setAccepting defined
+      Right (CppIfndef name) -> do
+        defined <- ppIsDefined name
+        setAccepting (not defined)
+      Right CppElse -> do
+        accepting <- getAccepting
+        setAccepting (not accepting)
+        return ()
+      Right CppEndif -> do
+        -- TODO: nested states
+        setAccepting True
+        return ()
+
     return (trace ("processCpp:s=" ++ show s) ())
 
 -- ---------------------------------------------------------------------
@@ -135,24 +133,15 @@ processCpp fs = do
 
 data CppState
     = CppIgnoring
-    | CppInDefine
-    | CppInIfdef
-    | CppInIfndef
     | CppNormal
     deriving (Show)
 
 getCppState :: P CppState
 getCppState = do
-    context <- peekContext
     accepting <- getAccepting
-    case context of
-        -- ITcppDefine _ -> return CppInDefine
-        -- ITcppIfdef _ -> return CppInIfdef
-        -- ITcppIfndef _ -> return CppInIfndef
-        _ ->
-            if accepting
-                then return CppNormal
-                else return CppIgnoring
+    if accepting
+        then return CppNormal
+        else return CppIgnoring
 
 -- pp_context stack start -----------------
 
@@ -201,15 +190,15 @@ popContinuation =
 
 -- definitions start --------------------
 
-ppDefine :: FastString -> P ()
-ppDefine def = P $ \s ->
+ppDefine :: String -> [String] -> P ()
+ppDefine name val = P $ \s ->
     -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Set.insert (trace ("ppDefine:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") name) val (pp_defines (pp s))}} ()
 
-ppIsDefined :: FastString -> P Bool
+ppIsDefined :: String -> P Bool
 ppIsDefined def = P $ \s ->
-    -- POk s (Set.member (cleanTokenString def) (pp_defines (pp s)))
-    POk s (Set.member (trace ("ppIsDefined:def=[" ++ show (cleanTokenString def) ++ "]") (cleanTokenString def)) (pp_defines (pp s)))
+    -- POk s (Map.member def (pp_defines (pp s)))
+    POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
 
 -- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
 cleanTokenString :: FastString -> String
@@ -218,10 +207,13 @@ cleanTokenString fs = r
     ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
     r = init ss
 
-parseDefine :: FastString -> Maybe (String, String)
-parseDefine s = r
+parseDefine :: FastString -> Maybe (String, [String])
+parseDefine fs = r
   where
-    r = Just (cleanTokenString s, "")
+    -- r = Just (cleanTokenString s, "")
+    r = case regularParse cppDefinition (unpackFS fs) of
+        Left _ -> Nothing
+        Right v -> Just v
 
 -- =====================================================================
 -- Parsec parsing
@@ -229,6 +221,63 @@ type CppParser = Parsec String ()
 
 regularParse :: Parser a -> String -> Either Parsec.ParseError a
 regularParse p = PS.parse p ""
+
+
+-- TODO: delete this
+cppDefinition :: CppParser (String, [String])
+cppDefinition = do
+    _ <- PS.char '#'
+    _ <- whiteSpace
+    _ <- lexeme (PS.string "define")
+    name <- cppToken
+    definition <- cppTokens
+    return (name, definition)
+
+data CppDirective
+  = CppDefine String [String]
+  | CppIfdef String
+  | CppIfndef String
+  | CppElse
+  | CppEndif
+    deriving (Show, Eq)
+
+cppDirective :: CppParser CppDirective
+cppDirective = do
+    _ <- PS.char '#'
+    _ <- whiteSpace
+    choice
+        [ cppKw "define" >> cmdDefinition
+        -- , cppKw "include" CppIncludeKw
+        -- , cppKw "undef" CppUndefKw
+        -- , cppKw "error" CppErrorKw
+        , try$ cppKw "ifdef" >> cmdIfdef
+        , cppKw "ifndef" >> cmdIfndef
+        -- , cppKw "if" CppIfKw
+        -- , cppKw "elif" CppElifKw
+        , try $ cppKw "else" >> return CppElse
+        , cppKw "endif" >> return CppEndif
+        ]
+
+cmdDefinition :: CppParser CppDirective
+cmdDefinition = do
+      name <- cppToken
+      definition <- cppTokens
+      return $ CppDefine name definition
+
+cmdIfdef :: CppParser CppDirective
+cmdIfdef = do
+      name <- cppToken
+      return $ CppIfdef name
+
+cmdIfndef :: CppParser CppDirective
+cmdIfndef = do
+      name <- cppToken
+      return $ CppIfndef name
+
+cppKw :: String -> CppParser ()
+cppKw kw = do
+    _ <- lexeme (PS.string kw)
+    return ()
 
 cppComment :: CppParser ()
 cppComment = do
@@ -246,6 +295,9 @@ lexeme p = p <* whiteSpace
 
 cppToken :: CppParser String
 cppToken = lexeme (PS.many1 (PS.satisfy (\c -> not (isSpace c))))
+
+cppTokens :: CppParser [String]
+cppTokens = PS.many cppToken
 
 {- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
 See Note [GhcCPP Initial Processing]
@@ -481,7 +533,6 @@ t2 = do
         , "#else"
         , "x = 5"
         , "#endif"
-        , ""
         ]
 
 t3 :: IO ()
@@ -563,7 +614,14 @@ t6 = do
         , "#else"
         , "x = \"no version\""
         , "#endif"
+        , ""
         ]
 
-t7 :: Maybe (String, String)
-t7 = parseDefine (mkFastString "#define VERSION_ghc_exactprint \"1.7.0.1\"\n")
+t7 :: Maybe (String, [String])
+t7 = parseDefine (mkFastString "#define VERSION_ghc_exactprint \"1.7.0.1\"")
+
+t8 :: Maybe (String, [String])
+t8 = parseDefine (mkFastString "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)")
+
+t9 :: Either Parsec.ParseError CppDirective
+t9 = regularParse cppDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
