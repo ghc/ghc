@@ -12,7 +12,8 @@ import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP )
+import qualified GHC.Parser.PreProcess as Lexer  (initParserState, PpState)
 import GHC.Parser.Lexer (ParserOpts)
 import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
@@ -50,7 +51,7 @@ isDecl pflags stmt =
         _ -> True
     Lexer.PFailed _ -> False
 
-parseThing :: Lexer.P thing -> ParserOpts -> String -> Lexer.ParseResult thing
+parseThing :: Lexer.P Lexer.PpState thing -> ParserOpts -> String -> Lexer.ParseResult Lexer.PpState thing
 parseThing parser opts stmt = do
   let buf = stringToStringBuffer stmt
       loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
