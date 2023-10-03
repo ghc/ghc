@@ -21,7 +21,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpState (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
-import qualified GHC.Parser.Lexer as Lexer
+import qualified GHC.Parser.Lexer as Lexer hiding (initParserState)
+import qualified GHC.Parser.PreProcess as Lexer  (initParserState)
 import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Error
@@ -49,7 +50,11 @@ showAst ast =
 
 -- =====================================================================
 
-ppLexer, ppLexerDbg :: Bool -> (Located Token -> P a) -> P a
+type PP = P PpState
+
+-- =====================================================================
+
+ppLexer, ppLexerDbg :: Bool -> (Located Token -> PP a) -> PP a
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
 ppLexerDbg queueComments cont = ppLexer queueComments contDbg
   where
@@ -82,17 +87,17 @@ ppLexer queueComments cont =
                             _ -> contInner tk
         )
 
-preprocessElse :: P ()
+preprocessElse :: PP ()
 preprocessElse = do
     accepting <- getAccepting
     setAccepting (not accepting)
 
-preprocessEnd :: P ()
+preprocessEnd :: PP ()
 preprocessEnd = do
     -- TODO: nested context
     setAccepting True
 
-processCppToks :: FastString -> P ()
+processCppToks :: FastString -> PP ()
 processCppToks fs = do
     let
         get (L _ (ITcpp _ s)) = s
@@ -102,7 +107,7 @@ processCppToks fs = do
     processCpp (reverse $ fs : map get cs)
     return ()
 
-processCpp :: [FastString] -> P ()
+processCpp :: [FastString] -> PP ()
 processCpp fs = do
     -- traceM $ "processCpp: fs=" ++ show fs
     -- let s = cppInitial fs
@@ -136,7 +141,7 @@ data CppState
     | CppNormal
     deriving (Show)
 
-getCppState :: P CppState
+getCppState :: PP CppState
 getCppState = do
     accepting <- getAccepting
     if accepting
@@ -145,11 +150,11 @@ getCppState = do
 
 -- pp_context stack start -----------------
 
-pushContext :: Token -> P ()
+pushContext :: Token -> PP ()
 pushContext new =
     P $ \s -> POk s{pp = (pp s){pp_context = new : pp_context (pp s)}} ()
 
-popContext :: P ()
+popContext :: PP ()
 popContext =
     P $ \s ->
         let
@@ -159,7 +164,7 @@ popContext =
          in
             POk s{pp = (pp s){pp_context = new_context}} ()
 
-peekContext :: P Token
+peekContext :: PP Token
 peekContext =
     P $ \s ->
         let
@@ -169,20 +174,20 @@ peekContext =
          in
             POk s r
 
-setAccepting :: Bool -> P ()
+setAccepting :: Bool -> PP ()
 setAccepting on =
     P $ \s -> POk s{pp = (pp s){pp_accepting = on}} ()
 
-getAccepting :: P Bool
+getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 -- -------------------------------------
 
-pushContinuation :: Located Token -> P ()
+pushContinuation :: Located Token -> PP ()
 pushContinuation new =
     P $ \s -> POk s{pp = (pp s){pp_continuation = new : pp_continuation (pp s)}} ()
 
-popContinuation :: P [Located Token]
+popContinuation :: PP [Located Token]
 popContinuation =
     P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
 
@@ -190,12 +195,12 @@ popContinuation =
 
 -- definitions start --------------------
 
-ppDefine :: String -> [String] -> P ()
+ppDefine :: String -> [String] -> PP ()
 ppDefine name val = P $ \s ->
     -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
     POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") name) val (pp_defines (pp s))}} ()
 
-ppIsDefined :: String -> P Bool
+ppIsDefined :: String -> PP Bool
 ppIsDefined def = P $ \s ->
     -- POk s (Map.member def (pp_defines (pp s)))
     POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
@@ -415,16 +420,16 @@ ghcWrapper libdir a =
 
 -- ---------------------------------------------------------------------
 
-parseModuleNoHaddock :: P [Located Token]
+parseModuleNoHaddock :: PP [Located Token]
 parseModuleNoHaddock = happySomeParser
   where
     -- happySomeParser = happyThen (happyParse 0#) (\x -> happyReturn (let {(HappyWrap35 x') = happyOut35 x} in x'))
     happySomeParser = (>>=) (happyParse 0) (\x -> return x)
 
-happyParse :: Int -> P [Located Token]
+happyParse :: Int -> PP [Located Token]
 happyParse start_state = happyNewToken start_state [] []
 
-happyNewToken :: Int -> [Int] -> [Located Token] -> P [Located Token]
+happyNewToken :: Int -> [Int] -> [Located Token] -> PP [Located Token]
 happyNewToken action sts stk =
     -- lexer
     ppLexerDbg
@@ -439,7 +444,7 @@ happyNewToken action sts stk =
                     -- _ -> happyError' (tk, [])
         )
 
-happyDoAction :: Int -> Located Token -> Int -> [Int] -> [Located Token] -> P [Located Token]
+happyDoAction :: Int -> Located Token -> Int -> [Int] -> [Located Token] -> PP [Located Token]
 -- happyDoAction num tk action sts stk = P $ \s -> POk s tk
 happyDoAction num tk action sts stk =
     case num of
@@ -455,7 +460,7 @@ happyDoAction num tk action sts stk =
 -- happyAccept j tk st sts (HappyStk ans _) =
 --         (happyTcHack j (happyTcHack st)) (happyReturn1 ans)
 
-happyAccept :: Int -> Located Token -> Int -> [Int] -> [Located Token] -> P [Located Token]
+happyAccept :: Int -> Located Token -> Int -> [Int] -> [Located Token] -> PP [Located Token]
 happyAccept _j tk _st _sts stk =
     trace ("happyAccept:" ++ show tk)
         $ return stk
@@ -463,28 +468,28 @@ happyAccept _j tk _st _sts stk =
 -- happyReturn1 :: a -> P a
 -- happyReturn1 = return
 
-happyShift :: Int -> Int -> Located Token -> Int -> [Int] -> [Located Token] -> P [Located Token]
+happyShift :: Int -> Int -> Located Token -> Int -> [Int] -> [Located Token] -> PP [Located Token]
 happyShift new_state _i tk st sts stk = do
     happyNewToken new_state (st : sts) (tk : stk)
 
 -- happyShift new_state i tk st sts stk =
 --      happyNewToken new_state (HappyCons (st) (sts)) ((happyInTok (tk))`HappyStk`stk)
 
-happyFail :: [String] -> Int -> Located Token -> p2 -> p3 -> p4 -> P a
+happyFail :: [String] -> Int -> Located Token -> p2 -> p3 -> p4 -> PP a
 happyFail explist i tk _old_st _ _stk =
     trace ("failing" ++ show explist)
         $ happyError_ explist i tk
 
-happyError_ :: [String] -> p -> Located Token -> P a
+happyError_ :: [String] -> p1 -> Located Token -> PP a
 happyError_ explist _ tk = happyError' (tk, explist)
 
 notHappyAtAll :: a
 notHappyAtAll = Prelude.error "Internal Happy error\n"
 
-happyError' :: (Located Token, [String]) -> P a
+happyError' :: (Located Token, [String]) -> PP a
 happyError' tk = (\(_tokens, _explist) -> happyError) tk
 
-happyError :: P a
+happyError :: PP a
 happyError = Lexer.srcParseFail
 
 -- =====================================================================
