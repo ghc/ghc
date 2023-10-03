@@ -135,12 +135,15 @@ BNF-style grammar for the tops of instance declarations below.
         |  ctype ',' ctxt
 
   inst_head ::= '(' inst_head ')'
-             |  prefix_cls_tycon arg_types
-             |  arg_type infix_cls_tycon arg_type
-             |  '(' arg_type infix_cls_tycon arg_type ')' arg_types
+             |  prefix_cls_tycon args
+             |  arg_type args infix_cls_tycon arg_type args
+             |  '(' arg_type args infix_cls_tycon arg_type args ')' args
 
-  arg_type ::= <empty>
-            |  arg_type arg_types
+  args ::= <empty>
+        |  arg args
+
+  arg :: '@' arg_type
+       | arg_type
 
   opt_where ::= <empty>
              |  'where'
