@@ -322,37 +322,27 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
             Just stub_h -> do
               OsPath.createDirectoryIfMissing True (OsPath.takeDirectory stub_h)
               outputForeignStubs_help (OsPath.unsafeDecodeUtf stub_h) stub_h_output_w
-                    ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
+                    "#include <HsFFI.h>\n"
 
         putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export stubs" FormatC stub_c_output_d
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
-                ("#define IN_STG_CODE 0\n" ++
-                 "#include <Rts.h>\n" ++
-                 rts_includes ++
-                 ffi_includes ++
-                 cplusplus_hdr)
-                 cplusplus_ftr
-           -- We're adding the default hc_header to the stub file, but this
-           -- isn't really HC code, so we need to define IN_STG_CODE==0 to
-           -- avoid the register variables etc. being enabled.
+                (rts_includes ++
+                 ffi_includes)
 
         return (stub_h_file_exists, if stub_c_file_exists
                                        then Just stub_c
                                        else Nothing )
- where
-   cplusplus_hdr = "#if defined(__cplusplus)\nextern \"C\" {\n#endif\n"
-   cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
 
 
 -- It is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help :: FilePath -> String -> String -> String -> IO Bool
-outputForeignStubs_help _fname ""      _header _footer = return False
-outputForeignStubs_help fname doc_str header footer
-   = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
+outputForeignStubs_help :: FilePath -> String -> String -> IO Bool
+outputForeignStubs_help _fname ""      _header = return False
+outputForeignStubs_help fname doc_str header
+   = do writeFile fname (header ++ doc_str ++ "\n")
         return True
 
 -- -----------------------------------------------------------------------------
