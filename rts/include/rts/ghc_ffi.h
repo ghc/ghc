@@ -1,5 +1,5 @@
 /*
- * <ffi.h> wrapper working around #23586.
+ * <ffi.h> wrapper working around #23568.
  *
  * (c) The University of Glasgow 2023
  *
