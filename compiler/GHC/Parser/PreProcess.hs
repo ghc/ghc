@@ -8,13 +8,19 @@ module GHC.Parser.PreProcess (
     -- ppLexerDbg,
     lexer,
     lexerDbg,
+    initPpState,
+    initParserState,
+    initPragState,
+    PpState
 ) where
 
 import Data.Char
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Debug.Trace (trace)
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
+import GHC.Data.StringBuffer
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpState (..), Token (..))
 import qualified GHC.Parser.Lexer as Lexer
@@ -23,7 +29,26 @@ import GHC.Types.SrcLoc
 
 -- ---------------------------------------------------------------------
 
-lexer, lexerDbg :: Bool -> (Located Token -> P a) -> P a
+-- | Set parser options for parsing OPTIONS pragmas
+initPragState :: Lexer.ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initPragState = Lexer.initPragState initPpState
+
+-- | Creates a parse state from a 'ParserOpts' value
+initParserState :: Lexer.ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserState = Lexer.initParserState initPpState
+
+initPpState :: PpState
+initPpState =
+    PpState
+        { pp_defines = Map.empty
+        , pp_continuation = []
+        , pp_context = []
+        , pp_accepting = True
+        }
+
+-- ---------------------------------------------------------------------
+
+lexer, lexerDbg :: Bool -> (Located Token -> P PpState a) -> P PpState a
 -- bypass for now, work in ghci
 lexer = Lexer.lexer
 lexerDbg = Lexer.lexerDbg
@@ -141,11 +166,11 @@ lexerDbg = Lexer.lexerDbg
 --          in
 --             POk s r
 
-setAccepting :: Bool -> P ()
+setAccepting :: Bool -> P PpState ()
 setAccepting on =
     P $ \s -> POk s{pp = (pp s){pp_accepting = on}} ()
 
-getAccepting :: P Bool
+getAccepting :: P PpState Bool
 getAccepting = P $ \s -> POk s (pp_accepting (pp s))
 
 -- pp_context stack end -------------------
