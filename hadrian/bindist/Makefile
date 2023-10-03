@@ -55,27 +55,26 @@ endef
 
 # QUESTION : should we use shell commands?
 
-
+.PHONY: show
 show:
 	@echo '$(VALUE)="$($(VALUE))"'
 
 
-.PHONY: install
-
+.PHONY: install_extra
 ifeq "$(EnableDistroToolchain)" "NO"
 install_extra: install_mingw
 else
 install_extra:
 endif
 
+.PHONY: install_bin
 ifeq "$(RelocatableBuild)" "YES"
 install_bin: install_bin_direct
 else
 install_bin: install_bin_libdir install_wrappers
 endif
 
-
-
+.PHONY: install
 install: install_bin install_lib install_extra
 install: install_man install_docs update_package_db
 install: install_data
@@ -146,6 +145,7 @@ lib/settings : config.mk
 
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
+.PHONY: install_bin_libdir
 install_bin_libdir:
 	@echo "Copying binaries to $(DESTDIR)$(ActualBinsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
@@ -161,11 +161,13 @@ install_bin_libdir:
 		"${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; \
 	fi
 
+.PHONY: install_bin_direct
 install_bin_direct:
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
 	$(INSTALL_PROGRAM) ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
 
+.PHONY: install_lib
 install_lib: lib/settings
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
@@ -196,6 +198,7 @@ install_lib: lib/settings
 		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \
 	fi
 
+.PHONY: install_docs
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
@@ -233,6 +236,7 @@ install_man:
 	fi
 
 export SHELL
+.PHONY: install_wrappers
 install_wrappers: install_bin_libdir
 	@echo "Installing wrapper scripts"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
@@ -241,6 +245,7 @@ install_wrappers: install_bin_libdir
 	done
 
 PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
+.PHONY: update_package_db
 update_package_db: install_bin install_lib
 	@echo "Installing C++ standard library virtual package"
 	$(INSTALL_DATA) mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/package.conf.d"
@@ -249,6 +254,7 @@ update_package_db: install_bin install_lib
 		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-[0-9.]*-[0-9a-zA-Z]*\.conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)"),$(shell echo $(notdir $p) | sed 's/.conf//g')))
 	'$(DESTDIR)$(ActualBinsDir)/$(CrossCompilePrefix)ghc-pkg' --global-package-db "$(DESTDIR)$(ActualLibsDir)/package.conf.d" recache
 
+.PHONY: install_mingw
 install_mingw:
 	@echo "Installing MingGW"
 	$(INSTALL_DIR) "$(DESTDIR)$(prefix)/mingw"
