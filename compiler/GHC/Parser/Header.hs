@@ -28,7 +28,8 @@ import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw e
 
 import GHC.Parser.Errors.Types
 import GHC.Parser           ( parseHeader )
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (initPragState, initParserState)
+import GHC.Parser.PreProcess   (initPragState, initParserState)
 
 import GHC.Hs
 import GHC.Builtin.Names
@@ -202,7 +203,7 @@ lazyGetToks popts filename handle = do
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
-  lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
+  lazyLexBuf :: Handle -> PState p -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size =
     case unP (lexer False return) state of
       POk state' t -> do
@@ -220,7 +221,7 @@ lazyGetToks popts filename handle = do
         | otherwise -> return [L (mkSrcSpanPs (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
-  getMore :: Handle -> PState -> Int -> IO [Located Token]
+  getMore :: Handle -> PState p -> Int -> IO [Located Token]
   getMore handle state size = do
      -- pprTrace "getMore" (text (show (buffer state))) (return ())
      let new_size = size * 2
