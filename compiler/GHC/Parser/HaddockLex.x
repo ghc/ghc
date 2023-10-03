@@ -131,7 +131,7 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
   Just (c, bs') -> advanceSrcLocBS (advanceSrcLoc loc c) bs'
 
 -- | Lex 'StringLiteral' for warning messages
-lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
+lexStringLiteral :: P () (LocatedN RdrName) -- ^ A precise identifier parser
                  -> Located StringLiteral
                  -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
 lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
@@ -149,7 +149,7 @@ lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
 -- | Lex identifiers from a docstring.
-lexHsDoc :: P (LocatedN RdrName)      -- ^ A precise identifier parser
+lexHsDoc :: P () (LocatedN RdrName)      -- ^ A precise identifier parser
          -> HsDocString
          -> HsDoc GhcPs
 lexHsDoc identParser doc =
@@ -169,7 +169,7 @@ lexHsDoc identParser doc =
 
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
-validateIdentWith :: P (LocatedN RdrName) -> SrcSpan -> ByteString -> Maybe (Located RdrName)
+validateIdentWith :: P () (LocatedN RdrName) -> SrcSpan -> ByteString -> Maybe (Located RdrName)
 validateIdentWith identParser mloc str0 =
   let -- These ParserFlags should be as "inclusive" as possible, allowing
       -- identifiers defined with any language extension.
@@ -182,7 +182,7 @@ validateIdentWith identParser mloc str0 =
       realSrcLc = case mloc of
         RealSrcSpan loc _ -> realSrcSpanStart loc
         UnhelpfulSpan _ -> mkRealSrcLoc nilFS 0 0
-      pstate = initParserState pflags buffer realSrcLc
+      pstate = initParserState () pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of
        RealSrcSpan _ _ -> reLoc name
