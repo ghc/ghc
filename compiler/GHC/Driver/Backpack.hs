@@ -37,7 +37,8 @@ import GHC.Driver.Errors.Types
 
 import GHC.Parser
 import GHC.Parser.Header
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (initParserState)
+import GHC.Parser.PreProcess   (initParserState)
 import GHC.Parser.Annotation
 
 import GHC.Rename.Names
