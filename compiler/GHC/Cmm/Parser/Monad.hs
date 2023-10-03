@@ -34,7 +34,7 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Types
 import GHC.Unit.Home
 
-newtype PD a = PD { unPD :: PDConfig -> HomeUnit -> PState -> ParseResult a }
+newtype PD a = PD { unPD :: PDConfig -> HomeUnit -> PState () -> ParseResult () a }
 
 instance Functor PD where
   fmap = liftM
@@ -46,7 +46,7 @@ instance Applicative PD where
 instance Monad PD where
   (>>=) = thenPD
 
-liftP :: P a -> PD a
+liftP :: P () a -> PD a
 liftP (P f) = PD $ \_ _ s -> f s
 
 failMsgPD :: (SrcSpan -> MsgEnvelope PsMessage) -> PD a
