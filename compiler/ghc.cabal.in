@@ -813,6 +813,7 @@ Library
         GHC.Types.CostCentre.State
         GHC.Types.Cpr
         GHC.Types.Demand
+        GHC.Types.DumpSpecInfo
         GHC.Types.Error
         GHC.Types.Error.Codes
         GHC.Types.FieldLabel

@@ -1,6 +1,5 @@
-
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -66,6 +65,7 @@ import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
+import GHC.Types.DumpSpecInfo
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -806,6 +806,18 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        ; dsWarnOrphanRule rule
 
+         -- Dump the specialisation if -ddump-specialisations is enabled
+       ; dumpSpecialisation @Module @Id @Type $
+           DumpSpecInfo
+             { dumpSpecInfo_module = this_mod
+             , dumpSpecInfo_fromPragma = True
+             , dumpSpecInfo_polyId = poly_id
+             , dumpSpecInfo_polyTy = idType poly_id
+             , dumpSpecInfo_specId = spec_id
+             , dumpSpecInfo_specTy = spec_ty
+             , dumpSpecInfo_dicts = map varType rule_bndrs
+             }
+
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
             --     makeCorePair overwrites the unfolding, which we have
@@ -845,7 +857,6 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                     _            -> isAlwaysActive spec_prag_act
     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
-
 
 dsWarnOrphanRule :: CoreRule -> DsM ()
 dsWarnOrphanRule rule

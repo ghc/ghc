@@ -343,6 +343,19 @@ subexpression elimination pass.
 
     Dump output of the SpecConstr specialisation pass
 
+.. ghc-flag:: -ddump-specializations
+    :shortdesc: Dump information about generated specialisations
+    :type: dynamic
+
+    Equivalent to :ghc-flag:`-ddump-specialisations`
+
+.. ghc-flag:: -ddump-specialisations
+    :shortdesc: Dump information about generated specialisations
+    :type: dynamic
+
+    Dump information about any specialisations resulting from pragmas or the
+    specialiser logic.
+
 .. ghc-flag:: -ddump-rules
     :shortdesc: Dump rewrite rules
     :type: dynamic
