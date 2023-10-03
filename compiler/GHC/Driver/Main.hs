@@ -192,7 +192,8 @@ import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
 import GHC.Parser
-import GHC.Parser.Lexer as Lexer
+import GHC.Parser.Lexer as Lexer hiding (initPpState, initParserState)
+import GHC.Parser.PreProcess (initParserState)
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
@@ -2651,11 +2652,11 @@ hscParseIdentifier hsc_env str =
     runInteractiveHsc hsc_env $ hscParseThing parseIdentifier str
 
 hscParseThing :: (Outputable thing, Data thing)
-              => Lexer.P thing -> String -> Hsc thing
+              => Lexer.P PpState thing -> String -> Hsc thing
 hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
 hscParseThingWithLocation :: (Outputable thing, Data thing) => String -> Int
-                          -> Lexer.P thing -> String -> Hsc thing
+                          -> Lexer.P PpState thing -> String -> Hsc thing
 hscParseThingWithLocation source linenumber parser str = do
     dflags <- getDynFlags
     logger <- getLogger
