@@ -1,0 +1,41 @@
+HSC2HS_C="@SettingsCCompilerFlags@"
+
+HSC2HS_L="@SettingsCCompilerLinkFlags@"
+
+tflag="--template=$libdir/template-hsc.h"
+Iflag="-I$includedir/include/"
+
+for f in ${HSC2HS_C}; do
+  cflags="${cflags} --cflag=$f"
+done
+
+for f in ${HSC2HS_L}; do
+  lflags="${lflags} --lflag=$f"
+done
+
+HSC2HS_EXTRA="$cflags $lflags"
+
+read_response() {
+    response_file=$1
+    if [ -f "$response_file" ]; then
+        while read -r arg; do
+            case "$arg" in
+                -t*)          tflag=;;
+                --template=*) tflag=;;
+                @*)           read_response "${arg#"@"}" ;;
+                --)           break;;
+            esac
+        done < "$response_file"
+    fi
+}
+
+for arg do
+    case "$arg" in
+        -t*)          tflag=;;
+        --template=*) tflag=;;
+        @*)           read_response "${arg#"@"}" ;;
+        --)           break;;
+    esac
+done
+
+exec "$executablename" ${tflag:+"$tflag"} $HSC2HS_EXTRA ${1+"$@"} "$Iflag"
