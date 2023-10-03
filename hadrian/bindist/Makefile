@@ -213,12 +213,18 @@ install_man:
 	fi
 
 export SHELL
-install_wrappers: install_bin_libdir
+.PHONY: install_wrappers
+install_wrappers: install_bin_libdir install_hsc2hs_wrapper
 	@echo "Installing wrapper scripts"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
 	for p in `cd wrappers; $(FIND) . ! -type d`; do \
 	    mk/install_script.sh "$$p" "$(DESTDIR)/$(WrapperBinsDir)/$$p" "$(WrapperBinsDir)" "$(ActualBinsDir)" "$(ActualBinsDir)/$$p" "$(ActualLibsDir)" "$(docdir)" "$(includedir)"; \
 	done
+
+.PHONY: install_hsc2hs_wrapper
+install_hsc2hs_wrapper:
+	@echo Copying hsc2hs wrapper
+	cp mk/hsc2hs wrappers/hsc2hs-ghc-$(ProjectVersion)
 
 PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 update_package_db: install_bin install_lib
