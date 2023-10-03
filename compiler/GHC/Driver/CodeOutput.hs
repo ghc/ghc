@@ -329,15 +329,8 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
-                ("#define IN_STG_CODE 0\n" ++
-                 "#include <Rts.h>\n" ++
-                 rts_includes ++
-                 ffi_includes ++
-                 cplusplus_hdr)
-                 cplusplus_ftr
-           -- We're adding the default hc_header to the stub file, but this
-           -- isn't really HC code, so we need to define IN_STG_CODE==0 to
-           -- avoid the register variables etc. being enabled.
+                (rts_includes ++
+                 ffi_includes) ""
 
         return (stub_h_file_exists, if stub_c_file_exists
                                        then Just stub_c
