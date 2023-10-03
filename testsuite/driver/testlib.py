@@ -174,6 +174,18 @@ def js_fragile( bug: IssueNumber ):
     else:
         return normal;
 
+def nonmoving_test( name, opts ):
+    """
+    Always run the given test with the nonmoving collector, in addition to
+    the usual ways.
+
+    See Note [Testing the nonmoving collector] in rts/sm/NonMoving.c.
+    """
+    ways = ['nonmoving']
+    if config.ghc_with_threaded_rts and config.target_has_smp:
+        ways += ['nonmoving_thr_sanity', 'nonmoving_thr_ghc']
+    return extra_ways(ways)(name, opts)
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the

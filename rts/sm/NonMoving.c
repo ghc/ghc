@@ -583,6 +583,25 @@ static void nonmovingBumpEpoch(void) {
  * quick.
  *
  * See #24150
+ *
+ * Note [Testing the nonmoving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The testsuite has four "ways" which test the nonmoving collector:
+ *
+ *  - nonmoving: runs tests under the nonmoving collector running in
+ *    non-concurrent mode (i.e. using the non-threaded runtime)
+ *  - nonmoving_thr: runs tests under the collector running in concurrent
+ *    mode (with the threaded runtime)
+ *  - nonmoving_thr_sanity: runs tests with concurrent collection and
+ *    sanity checking (i.e. `+RTS -DS`)
+ *  - nonmoving_thr_ghc: compiles tests with `ghc +RTS --nonmoving-gc -RTS`
+ *    as GHC itself tends to be a good smoke test of the collector.
+ *
+ * To avoid blowing up validation times, we do not run any of these ways in the
+ * default "normal" test speed. To ensure that we catch regressions in during
+ * normal validation we do run a small number of tests in these ways. These
+ * tests are identified by the `nonmoving_test` test modifier.
+ *
  */
 
 memcount nonmoving_segment_live_words = 0;

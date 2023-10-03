@@ -1,18 +1,18 @@
 # -----------------------------------------------------------------------------
 # These tests we do even for 'make fast'
 
-test('conc003', normal, compile_and_run, [''])
-test('conc006', normal, compile_and_run, [''])
-test('conc027', normal, compile_and_run, [''])
-test('conc051', normal, compile_and_run, [''])
+test('conc003', nonmoving_test, compile_and_run, [''])
+test('conc006', nonmoving_test, compile_and_run, [''])
+test('conc027', nonmoving_test, compile_and_run, [''])
+test('conc051', nonmoving_test, compile_and_run, [''])
 
 if ('threaded1' in config.run_ways):
    only_threaded_ways = only_ways(['ghci','threaded1','threaded2', 'nonmoving_thr'])
 else:
    only_threaded_ways = skip
 
-test('conc069', only_threaded_ways, compile_and_run, [''])
-test('conc069a', only_threaded_ways, compile_and_run, [''])
+test('conc069', [nonmoving_test, only_threaded_ways], compile_and_run, [''])
+test('conc069a', [nonmoving_test, only_threaded_ways], compile_and_run, [''])
 # this test gives slightly different results for non-threaded ways, so omit
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
@@ -47,8 +47,8 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
 # times out with ghci
 test('T4030', omit_ghci, compile_and_run, ['-O'])
 
-test('throwto002', js_fragile(24259), compile_and_run, [''])
-test('throwto003', normal, compile_and_run, [''])
+test('throwto002', [nonmoving_test, js_fragile(24259)], compile_and_run, [''])
+test('throwto003', nonmoving_test, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
 test('mask002', js_broken(22261), compile_and_run, [''])
@@ -81,9 +81,9 @@ test('T5611a', fragile(12751), compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
-test('readMVar1', normal, compile_and_run, [''])
-test('readMVar2', normal, compile_and_run, [''])
-test('readMVar3', normal, compile_and_run, [''])
+test('readMVar1', nonmoving_test, compile_and_run, [''])
+test('readMVar2', nonmoving_test, compile_and_run, [''])
+test('readMVar3', nonmoving_test, compile_and_run, [''])
 test('tryReadMVar1', normal, compile_and_run, [''])
 test('tryReadMVar2', normal, compile_and_run, [''])
 
@@ -121,9 +121,9 @@ test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
 
 setTestOpts(when(fast(), skip))
 
-test('conc001', normal, compile_and_run, [''])
-test('conc002', normal, compile_and_run, [''])
-test('conc004', normal, compile_and_run, [''])
+test('conc001', nonmoving_test, compile_and_run, [''])
+test('conc002', nonmoving_test, compile_and_run, [''])
+test('conc004', nonmoving_test, compile_and_run, [''])
 test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
 test('conc008', normal, compile_and_run, [''])
 test('conc009', exit_code(1), compile_and_run, [''])
@@ -218,16 +218,17 @@ test('conc039', [omit_ways(ghci_ways + threaded_ways), js_skip], compile_and_run
 test('conc040', [exit_code(1), omit_ghci, js_skip], compile_and_run, [''])
 
 # STM-related tests.
-test('conc041', normal, compile_and_run, [''])
-test('conc042', normal, compile_and_run, [''])
-test('conc043', normal, compile_and_run, [''])
-test('conc044', normal, compile_and_run, [''])
-test('conc045', normal, compile_and_run, [''])
+test('conc041', nonmoving_test, compile_and_run, [''])
+test('conc042', nonmoving_test, compile_and_run, [''])
+test('conc043', nonmoving_test, compile_and_run, [''])
+test('conc044', nonmoving_test, compile_and_run, [''])
+test('conc045', nonmoving_test, compile_and_run, [''])
 
-test('conc058', normal, compile_and_run, [''])
+test('conc058', nonmoving_test, compile_and_run, [''])
 
 test('conc059',
      [only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
+      nonmoving_test,
       pre_cmd('$MAKE -s --no-print-directory conc059_setup')],
      compile_and_run, ['conc059_c.c -no-hs-main'])
 
