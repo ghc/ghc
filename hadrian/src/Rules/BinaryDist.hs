@@ -361,6 +361,7 @@ bindistInstallFiles =
     , "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
     , "mk" -/- "system-cxx-std-lib-1.0.conf.in"
+    , "mk" -/- "hsc2hs.in"
     , "mk" -/- "install_script.sh"
     , "README", "INSTALL" ]
 
@@ -425,17 +426,8 @@ haddockWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" -l\"$libdir\" ${
 commonWrapper :: Action String
 commonWrapper = pure $ "exec \"$executablename\" ${1+\"$@\"}\n"
 
--- echo 'HSC2HS_EXTRA="$(addprefix --cflag=,$(CONF_CC_OPTS_STAGE1)) $(addprefix --lflag=,$(CONF_GCC_LINKER_OPTS_STAGE1))"' >> "$(WRAPPER)"
 hsc2hsWrapper :: Action String
-hsc2hsWrapper = do
-  ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
-  ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
-  wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
-  return $ unlines
-    ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ ldFlags) <> "\""
-    : "tflag=\"--template=$libdir/template-hsc.h\""
-    : "Iflag=\"-I$includedir/\""
-    : wrapper )
+hsc2hsWrapper = return "Copied from mk/hsc2hs"
 
 runGhcWrapper :: Action String
 runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"

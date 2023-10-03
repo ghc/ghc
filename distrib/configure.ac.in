@@ -298,6 +298,7 @@ AC_SUBST(UseLibdw)
 FP_SETTINGS
 
 AC_CONFIG_FILES([config.mk])
+AC_CONFIG_FILES([mk/hsc2hs])
 AC_OUTPUT
 
 # We get caught by
