@@ -2269,7 +2269,7 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% acsA (\cs -> sLL $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnTilde $1] cs) SrcLazy $2)) }
         | PREFIX_BANG  atype             {% acsA (\cs -> sLL $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnBang $1] cs) SrcStrict $2)) }
 
-        | '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (Just $ listAsAnchor $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
+        | '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (listAsAnchorM $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
                                                ; checkRecordSyntax decls }}
                                                         -- Constructor sigs only
         | '(' ')'                        {% acsA (\cs -> sLL $1 $> $ HsTupleTy (EpAnn (glR $1) (AnnParen AnnParens (glAA $1) (glAA $2)) cs)
@@ -2407,7 +2407,7 @@ gadt_constrlist :: { Located ([AddEpAnn]
                           ,[LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
-                                                      L (comb2 $1 $3)
+                                                      L (comb2 $1 $4)
                                                         ([mj AnnWhere $1
                                                          ,moc $2
                                                          ,mcc $4]
@@ -2588,8 +2588,9 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
                                   do { let L l (bs, csw) = adaptWhereBinds $3
                                      ; let loc = (comb3 $1 $2 (L l bs))
+                                     ; let locg = (comb2 $1 $2)
                                      ; acs (\cs ->
-                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
+                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs locg) (GrhsAnn Nothing (mj AnnEqual $1)) cs) locg $2)
                                                       bs)) } }
         | gdrhs wherebinds      {% do { let {L l (bs, csw) = adaptWhereBinds $2}
                                       ; acs (\cs -> sL (comb2 $1 (L l bs))
@@ -3324,7 +3325,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
                          acsA (\cs -> sLLAsl $1 $>
-                                         (Match { m_ext = EpAnn (listAsAnchor $1) [] cs
+                                         (Match { m_ext = EpAnn (listAsAnchor $1 $>) [] cs
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
                                                 , m_pats = $1
                                                 , m_grhss = unLoc $2 }))}
@@ -3336,7 +3337,7 @@ alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
-                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (glR $1) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 $2) $2)) }
+                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (spanAsAnchor $ comb2 $1 (reLoc $2)) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 (reLoc $2)) $2)) }
         | gdpats              { $1 >>= \gdpats ->
                                 return $ sL1 gdpats (reverse (unLoc gdpats)) }
 
@@ -4465,9 +4466,16 @@ hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAn t a] -> Anchor
-listAsAnchor [] = spanAsAnchor noSrcSpan
-listAsAnchor (L l _:_) = spanAsAnchor (locA l)
+listAsAnchor :: [LocatedAn t a] -> Located b -> Anchor
+listAsAnchor [] (L l _) = spanAsAnchor l
+listAsAnchor (h:_) s = spanAsAnchor (comb2 (reLoc h) s)
+
+listAsAnchorM :: [LocatedAn t a] -> Maybe Anchor
+listAsAnchorM [] = Nothing
+listAsAnchorM (L l _:_) =
+  case locA l of
+    RealSrcSpan ll _ -> Just $ realSpanAsAnchor ll
+    _                -> Nothing
 
 hsTok :: Located Token -> LHsToken tok GhcPs
 hsTok (L l _) = L (mkTokenLocation l) HsTok
@@ -4528,7 +4536,6 @@ addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
 -- Mostly use to add AnnComma, special case it to NOP if adding a zero-width annotation
 addTrailingCommaN :: MonadP m => LocatedN a -> SrcSpan -> m (LocatedN a)
 addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
-  -- cs <- getCommentsFor l
   let cs = emptyComments
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
