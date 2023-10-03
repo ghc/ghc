@@ -330,6 +330,7 @@ bindistRules = do
       if cross
         then need ["binary-dist-dir-cross"]
         else buildBinDistDir root normalBindist
+
     phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
     phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 
@@ -360,6 +361,10 @@ bindistRules = do
       phony (name <> "-dist-gzip") $ mk_bindist Gzip
       phony (name <> "-dist-bzip2") $ mk_bindist Bzip2
       phony (name <> "-dist-xz") $ mk_bindist Xz
+
+    -- TODO: Generate these targets as well
+    phony ("binary-dist-cross") $ buildBinDistX "binary-dist-dir-cross" "bindist" Xz
+    phony ("binary-dist-stage3") $ buildBinDistX "binary-dist-dir-stage3" "bindist" Xz
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
