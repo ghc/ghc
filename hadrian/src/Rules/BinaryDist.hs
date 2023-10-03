@@ -15,8 +15,6 @@ import Target
 import Utilities
 import qualified System.Directory.Extra as IO
 import Data.Either
-import GHC.Toolchain (ccProgram, tgtCCompiler, ccLinkProgram, tgtCCompilerLink)
-import GHC.Toolchain.Program (prgFlags)
 import qualified Data.Set as Set
 import Oracles.Flavour
 
@@ -400,6 +398,7 @@ bindistInstallFiles =
     , "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
     , "mk" -/- "system-cxx-std-lib-1.0.conf.in"
+    , "mk" -/- "hsc2hs.in"
     , "mk" -/- "install_script.sh"
     , "README", "INSTALL" ]
 
@@ -464,17 +463,8 @@ haddockWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" -l\"$libdir\" ${
 commonWrapper :: Action String
 commonWrapper = pure $ "exec \"$executablename\" ${1+\"$@\"}\n"
 
--- echo 'HSC2HS_EXTRA="$(addprefix --cflag=,$(CONF_CC_OPTS_STAGE1)) $(addprefix --lflag=,$(CONF_GCC_LINKER_OPTS_STAGE1))"' >> "$(WRAPPER)"
 hsc2hsWrapper :: Action String
-hsc2hsWrapper = do
-  ccArgs <- map ("--cflag=" <>) . prgFlags . ccProgram . tgtCCompiler <$> targetStage Stage1
-  linkFlags <- map ("--lflag=" <>) . prgFlags . ccLinkProgram . tgtCCompilerLink <$> targetStage Stage1
-  wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
-  return $ unlines
-    ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ linkFlags) <> "\""
-    : "tflag=\"--template=$libdir/template-hsc.h\""
-    : "Iflag=\"-I$includedir/\""
-    : wrapper )
+hsc2hsWrapper = return "Copied from mk/hsc2hs"
 
 runGhcWrapper :: Action String
 runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"

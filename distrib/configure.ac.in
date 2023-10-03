@@ -325,6 +325,7 @@ FP_SETTINGS
 AC_CONFIG_FILES([config.mk])
 AC_CONFIG_FILES([default.host.target])
 AC_CONFIG_FILES([default.target])
+AC_CONFIG_FILES([mk/hsc2hs])
 AC_OUTPUT
 
 # We get caught by
