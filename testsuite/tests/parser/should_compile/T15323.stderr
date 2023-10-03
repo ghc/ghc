@@ -100,7 +100,14 @@
              (EpaSpan { T15323.hs:6:17-18 }))
             (HsNormalTok))
            (L
-            (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:20-54 })
+            (SrcSpanAnn (EpAnn
+                         (Anchor
+                          { T15323.hs:6:20-25 }
+                          (UnchangedAnchor))
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])) { T15323.hs:6:20-25 })
             (HsOuterExplicit
              (EpAnn
               (Anchor
