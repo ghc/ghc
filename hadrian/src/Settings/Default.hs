@@ -158,11 +158,11 @@ stage1Packages = do
         , stm
         , unlit
         , xhtml
+	, haddock
         , if winTarget then win32 else unix
         ]
       , when (not cross)
-        [ haddock
-        , hpcBin
+        [ hpcBin
         , iserv
         , runGhc
         , ghcToolchainBin

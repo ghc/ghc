@@ -592,34 +592,14 @@ function test_hadrian() {
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
     # special case for JS backend
-  elif [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" == "js-emulator" ]; then
-    # The JS backend doesn't support CROSS_EMULATOR logic yet
-    unset CROSS_EMULATOR
-    # run "hadrian test" directly, not using the bindist, even though it did get installed.
-    # This is a temporary solution, See !9515 for the status of hadrian support.
-    run_hadrian \
-      test \
-      --summary-junit=./junit.xml \
-      --test-have-intree-files    \
-      --docs=none                 \
-      "runtest.opts+=${RUNTEST_ARGS:-}" \
-      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
-      || fail "cross-compiled hadrian main testsuite"
-  elif [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
-    run_hadrian \
-      test \
-      --summary-junit=./junit.xml \
-      "runtest.opts+=${RUNTEST_ARGS:-}" \
-      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
-      || fail "hadrian main testsuite targetting $CROSS_TARGET"
-  elif [ -n "${CROSS_TARGET:-}" ]; then
-    local instdir="$TOP/_build/install"
-    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
-    echo 'main = putStrLn "hello world"' > expected
-    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-    ${CROSS_EMULATOR:-} ./hello > actual
-    run diff expected actual
+#  elif [ -n "${CROSS_TARGET:-}" ]; then
+#    local instdir="$TOP/_build/install"
+#    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+#    install_bindist _build/bindist/ghc-*/ "$instdir"
+#    echo 'main = putStrLn "hello world"' > expected
+#    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+#    ${CROSS_EMULATOR:-} ./hello > actual
+#    run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \

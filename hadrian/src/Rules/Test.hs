@@ -228,7 +228,7 @@ testRules = do
         rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
 
         -- force stage0 program building for cross
-        when cross $ need [rel_hpc, rel_haddock, rel_runghc]
+        --when cross $ need [rel_hpc, rel_haddock, rel_runghc]
 
         prog_ghc_pkg     <- make_absolute rel_ghc_pkg
         prog_hsc2hs      <- make_absolute rel_hsc2hs
