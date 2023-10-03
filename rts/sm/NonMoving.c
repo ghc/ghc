@@ -151,9 +151,9 @@ static void nonmovingBumpEpoch(void) {
  *  3. [STW] Root collection: Here we walk over a variety of root sources
  *     and add them to the mark queue (see nonmovingCollect).
  *
- *  4. [CONC] Concurrent marking: Here we do the majority of marking concurrently
- *     with mutator execution (but with the write barrier enabled; see
- *     Note [Update remembered set]).
+ *  4. [CONC] Concurrent marking: Here we do the majority of marking
+ *     concurrently with mutator execution (but with the write barrier enabled;
+ *     see Note [Update remembered set]).
  *
  *  5. [STW] Final sync: Here we interrupt the mutators, ask them to
  *     flush their final update remembered sets, and mark any new references
@@ -218,9 +218,9 @@ static void nonmovingBumpEpoch(void) {
  *  - Note [Concurrent read barrier on deRefWeak#] (NonMovingMark.c) describes
  *    the read barrier on Weak# objects.
  *
- *  - Note [Unintentional marking in resurrectThreads] (NonMovingMark.c) describes
- *    a tricky interaction between the update remembered set flush and weak
- *    finalization.
+ *  - Note [Unintentional marking in resurrectThreads] (NonMovingMark.c)
+ *    describes a tricky interaction between the update remembered set flush and
+ *    weak finalization.
  *
  *  - Note [Origin references in the nonmoving collector] (NonMovingMark.h)
  *    describes how we implement indirection short-cutting and the selector
@@ -229,8 +229,8 @@ static void nonmovingBumpEpoch(void) {
  *  - Note [StgStack dirtiness flags and concurrent marking] (TSO.h) describes
  *    the protocol for concurrent marking of stacks.
  *
- *  - Note [Nonmoving write barrier in Perform{Put,Take}] (PrimOps.cmm) describes
- *    a tricky barrier necessary when resuming threads blocked on MVar
+ *  - Note [Nonmoving write barrier in Perform{Put,Take}] (PrimOps.cmm)
+ *    describes a tricky barrier necessary when resuming threads blocked on MVar
  *    operations.
  *
  *  - Note [Static objects under the nonmoving collector] (Storage.c) describes
@@ -240,13 +240,17 @@ static void nonmovingBumpEpoch(void) {
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
  *
- *  - Note [Weak pointer processing and the non-moving GC] (MarkWeak.c) describes
- *    how weak pointers are handled when the non-moving GC is in use.
+ *  - Note [Weak pointer processing and the non-moving GC] (MarkWeak.c)
+ *    describes how weak pointers are handled when the non-moving GC is in use.
  *
  *  - Note [Sync phase marking budget] describes how we avoid long mutator
  *    pauses during the sync phase
  *
- *  - Note [Allocator sizes] goes into detail about our choice of allocator sizes.
+ *  - Note [Allocator sizes] goes into detail about our choice of allocator
+ *    sizes.
+ *
+ *  - Note [Testing the nonmoving collector] describes how we test the
+ *    collector.
  *
  *  - Note [Segment allocation strategy] explains our segment allocation strategy.
  *
@@ -261,15 +265,15 @@ static void nonmovingBumpEpoch(void) {
  * Concurrency-control of non-moving garbage collection is a bit tricky. There
  * are a few things to keep in mind:
  *
- *  - Only one non-moving collection may be active at a time. This is enforced by the
- *    concurrent_coll_running flag, which is set when a collection is on-going. If
- *    we attempt to initiate a new collection while this is set we wait on the
- *    concurrent_coll_finished condition variable, which signals when the
- *    active collection finishes.
+ *  - Only one non-moving collection may be active at a time. This is enforced
+ *    by the concurrent_coll_running flag, which is set when a collection is
+ *    on-going. If we attempt to initiate a new collection while this is set we
+ *    wait on the concurrent_coll_finished condition variable, which signals
+ *    when the active collection finishes.
  *
- *  - In between the mark and sweep phases the non-moving collector must synchronize
- *    with mutator threads to collect and mark their final update remembered
- *    sets. This is accomplished using
+ *  - In between the mark and sweep phases the non-moving collector must
+ *    synchronize with mutator threads to collect and mark their final update
+ *    remembered sets. This is accomplished using
  *    stopAllCapabilitiesWith(SYNC_FLUSH_UPD_REM_SET). Capabilities are held
  *    the final mark has concluded.
  *
@@ -363,9 +367,9 @@ static void nonmovingBumpEpoch(void) {
  *        ╰─────────────────╯
  *                    ┆
  *
- * In this case we have a TSO blocked on a dead MVar. Because the MVAR_TSO_QUEUE on
- * which it is blocked lives in the moving heap, the TSO is necessarily on the
- * oldest generation's mut_list. As in Note [Aging under the non-moving
+ * In this case we have a TSO blocked on a dead MVar. Because the MVAR_TSO_QUEUE
+ * on which it is blocked lives in the moving heap, the TSO is necessarily on
+ * the oldest generation's mut_list. As in Note [Aging under the non-moving
  * collector], the MVAR_TSO_QUEUE will be evacuated. If MVAR_TSO_QUEUE is aged
  * (e.g. evacuated to the young generation) then the MVAR will be added to the
  * mark queue. Consequently, we will falsely conclude that the MVAR is still
@@ -389,9 +393,9 @@ static void nonmovingBumpEpoch(void) {
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * The nonmoving collector uses an approximate heuristic for reporting live
  * data quantity. Specifically, during mark we record how much live data we
- * find in nonmoving_segment_live_words. At the end of mark this is combined with nonmoving_large_words
- * and nonmoving_compact_words, and we declare this amount to
- * be how much live data we have on in the nonmoving heap (by setting
+ * find in nonmoving_segment_live_words. At the end of mark this is combined
+ * with nonmoving_large_words and nonmoving_compact_words, and we declare this
+ * amount to be how much live data we have on in the nonmoving heap (by setting
  * oldest_gen->live_estimate).
  *
  * In addition, we update oldest_gen->live_estimate every time we fill a
@@ -415,10 +419,10 @@ static void nonmovingBumpEpoch(void) {
  *  - Minor collections assume that all sparks living in the non-moving heap
  *    are reachable.
  *
- *  - Major collections prune the spark queue during the final sync. This pruning
- *    assumes that all sparks in the young generations are reachable (since the
- *    BF_EVACUATED flag won't be set on the nursery blocks) and will consequently
- *    only prune dead sparks living in the non-moving heap.
+ *  - Major collections prune the spark queue during the final sync. This
+ * pruning assumes that all sparks in the young generations are reachable (since
+ * the BF_EVACUATED flag won't be set on the nursery blocks) and will
+ * consequently only prune dead sparks living in the non-moving heap.
  *
  *
  * Note [Dirty flags in the non-moving collector]
@@ -441,8 +445,8 @@ static void nonmovingBumpEpoch(void) {
  * In the non-moving collector we use the same dirty flag to implement a
  * related optimisation on the non-moving write barrier: Specifically, the
  * snapshot invariant only requires that the non-moving write barrier applies
- * to the *first* mutation to an object after collection begins. To achieve this,
- * we impose the following invariant:
+ * to the *first* mutation to an object after collection begins. To achieve
+ * this, we impose the following invariant:
  *
  *     An object being marked as dirty implies that all of its fields are on
  *     the mark queue (or, equivalently, update remembered set).
@@ -494,8 +498,8 @@ static void nonmovingBumpEpoch(void) {
  *                        ┊
  *
  * This is bad. When we resume mutation a mutator may mutate MVAR A; since it's
- * already dirty we would fail to add Y to the update remembered set, breaking the
- * snapshot invariant and potentially losing track of the liveness of Z.
+ * already dirty we would fail to add Y to the update remembered set, breaking
+ * the snapshot invariant and potentially losing track of the liveness of Z.
  *
  * To avoid this nonmovingScavengeOne we eagerly pushes the values of the
  * fields of all objects which it fails to evacuate (e.g. MVAR A) to the update
@@ -537,8 +541,9 @@ static void nonmovingBumpEpoch(void) {
  * Note [Allocator sizes]
  * ~~~~~~~~~~~~~~~~~~~~~~
  * Our choice of allocator sizes has to balance several considerations:
- * - Allocator sizes should be available for the most commonly request block sizes,
- *   in order to avoid excessive waste from rounding up to the next size (internal fragmentation).
+ * - Allocator sizes should be available for the most commonly request block
+ *   sizes, in order to avoid excessive waste from rounding up to the next size
+ *   (internal fragmentation).
  * - It should be possible to efficiently determine which allocator services
  *   a certain block size.
  * - The amount of allocators should be kept down to avoid overheads
@@ -550,15 +555,15 @@ static void nonmovingBumpEpoch(void) {
  *   arbitrary allocator sizes, we need to do some precomputation and make
  *   use of the integer division by constants optimisation.
  *
- * We currently try to balance these considerations by adopting the following scheme.
- * We have nonmoving_alloca_dense_cnt "dense" allocators starting with size
- * NONMOVING_ALLOCA0, and incrementing by NONMOVING_ALLOCA_DENSE_INCREMENT.
+ * We currently try to balance these considerations by adopting the following
+ * scheme. We have nonmoving_alloca_dense_cnt "dense" allocators starting with
+ * size NONMOVING_ALLOCA0, and incrementing by NONMOVING_ALLOCA_DENSE_INCREMENT.
  * These service the vast majority of allocations.
  * In practice, Haskell programs tend to allocate a lot of small objects.
  *
- * Other allocations are handled by a family of "sparse" allocators, each providing
- * blocks up to a power of 2. This places an upper bound on the waste at half the
- * required block size.
+ * Other allocations are handled by a family of "sparse" allocators, each
+ * providing blocks up to a power of 2. This places an upper bound on the waste
+ * at half the required block size.
  *
  * See #23340
  *
