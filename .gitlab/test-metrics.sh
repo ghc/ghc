@@ -17,7 +17,12 @@ fail() {
 
 function pull() {
   local ref="refs/notes/$REF"
-  run git fetch -f "$NOTES_ORIGIN" "$ref:$ref"
+  # 2023-10-04: `git fetch` started failing, first on Darwin in CI and then on
+  # Linux locally, both using git version 2.40.1. See #24055. One workaround is
+  # to set a larger http.postBuffer, although this is definitely a workaround.
+  # The default should work just fine. The error could be in git, GitLab, or
+  # perhaps the networking tube (including all proxies etc) between the two.
+  run git -c http.postBuffer=2097152 fetch -f "$NOTES_ORIGIN" "$ref:$ref"
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
