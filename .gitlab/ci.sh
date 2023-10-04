@@ -490,7 +490,8 @@ function build_hadrian() {
     export XZ_OPT="${XZ_OPT:-} -T$cores"
   fi
 
-  case "${CROSS_STAGE:2}" in
+  echo "CROSS_STAGE: $CROSS_STAGE"
+  case "${CROSS_STAGE:-2}" in
     2) BINDIST_TARGET="binary-dist";;
     3) BINDIST_TARGET="binary-dist-stage3";;
     *) fail "Unknown CROSS_STAGE, must be 2 or 3";;
@@ -555,7 +556,7 @@ function install_bindist() {
       # FIXME: The bindist configure script shouldn't need to be reminded of
       # the target platform. See #21970.
       if [ -n "${CROSS_TARGET:-}" ]; then
-          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
+          args+=( "--target=$CROSS_TARGET" )
       fi
 
       run ${CONFIGURE_WRAPPER:-} ./configure \

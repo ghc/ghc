@@ -15,7 +15,7 @@ module Packages (
     ghcPackages, isGhcPackage,
 
     -- * Package information
-    crossPrefix, programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
+    crossPrefix, programBasename, programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiBuildPath,
     ensureConfigured
     ) where
@@ -185,9 +185,10 @@ programName Context {..} = do
     --      use Cabal conditionals + a 'profiling' flag
     --      to declare the executable name, and I'm not sure
     --      this is allowed (or desired for that matter).
-    return $ prefix ++ basename
-  where
-    basename
+    return $ prefix ++ programBasename way package
+
+programBasename :: Way -> Package -> String
+programBasename way package 
       | package == ghc          = "ghc"
       | package == ghciWrapper  = "ghci" -- See Note [Hadrian's ghci-wrapper package]
       | package == hpcBin       = "hpc"

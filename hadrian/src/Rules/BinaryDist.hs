@@ -19,6 +19,7 @@ import GHC.Toolchain (ccProgram, tgtCCompiler, ccLinkProgram, tgtCCompilerLink)
 import GHC.Toolchain.Program (prgFlags)
 import qualified Data.Set as Set
 import Oracles.Flavour
+import Debug.Trace
 
 {-
 Note [Binary distributions]
@@ -280,7 +281,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     need $ map (bindistFilesDir -/-)
               (["configure", "Makefile"] ++ bindistInstallFiles)
     copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
-    generateBuildMk >>= writeFile' (bindistFilesDir -/- "build.mk")
+    generateBuildMk conf >>= writeFile' (bindistFilesDir -/- "build.mk")
     copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
     copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
 
@@ -404,12 +405,16 @@ data Compressor = Gzip | Bzip2 | Xz
 
 
 -- Information from the build configuration which needs to be propagated to config.mk.in
-generateBuildMk :: Action String
-generateBuildMk = do
-  dynamicGhc <- askDynGhcPrograms Stage1
-  rtsWays <- unwords . map show . Set.toList <$> interpretInContext (vanillaContext Stage1 rts) getRtsWays
+generateBuildMk :: BindistConfig -> Action String
+generateBuildMk BindistConfig{..}  = do
+  dynamicGhc <- askDynGhcPrograms executable_stage
+  rtsWays <- unwords . map show . Set.toList <$> interpretInContext (vanillaContext library_stage rts) getRtsWays
+  cross <- crossStage executable_stage
+  traceShowM ("cross", library_stage, executable_stage, cross)
   return $ unlines [ "GhcRTSWays" =. rtsWays
-                   , "DYNAMIC_GHC_PROGRAMS" =. yesNo dynamicGhc ]
+                   -- MP: TODO just very hacky, should be one place where cross implies static (see programContext for where this is currently)
+                   , "DYNAMIC_GHC_PROGRAMS" =. yesNo (dynamicGhc && not cross)
+		   , "CrossCompiling" =. yesNo cross ]
 
 
   where

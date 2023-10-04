@@ -187,7 +187,9 @@ install_lib: lib/settings
 		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ;; \
 		esac; \
 	done; \
-	chmod ugo+rx "$$dest"/bin/*
+	if [ -d "$$dest/bin" ]; then \
+		chmod ugo+rx "$$dest"/bin/*;  \
+	fi
 	# Work around #17418 on Darwin
 	if [ -e "${XATTR}" ]; then \
 		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \

@@ -230,12 +230,6 @@ testRules = do
         -- force stage0 program building for cross
         --when cross $ need [rel_hpc, rel_haddock, rel_runghc]
 
-        prog_ghc_pkg     <- make_absolute rel_ghc_pkg
-        prog_hsc2hs      <- make_absolute rel_hsc2hs
-        prog_hp2ps       <- make_absolute rel_hp2ps
-        prog_haddock     <- make_absolute rel_haddock
-        prog_hpc         <- make_absolute rel_hpc
-        prog_runghc      <- make_absolute rel_runghc
 
         ghcPath <- getCompilerPath testCompilerArg
 
@@ -246,10 +240,27 @@ testRules = do
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history", "-fprint-error-index-links=never"
               ]
+	-- MP: TODO wrong
         ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
         ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
 
         pythonPath      <- builderPath Python
+
+        testGhc <- testCompiler <$> userSetting defaultTestArgs
+        bindir <- getBinaryDirectory testGhc
+    	cross <- getBooleanSetting TestCrossCompiling
+    	test_target_platform <- getTestSetting TestTARGETPLATFORM
+    	let cross_prefix = if cross then test_target_platform ++ "-" else ""
+
+	let exe_path :: Package -> String
+	    exe_path pkg = bindir </> (cross_prefix ++  programBasename vanilla pkg) <.> exe
+
+        prog_ghc_pkg     <- make_absolute (exe_path ghcPkg)
+        prog_hsc2hs      <- make_absolute (exe_path hsc2hs)
+        prog_hp2ps       <- make_absolute (exe_path hp2ps)
+        prog_haddock     <- make_absolute (exe_path haddock)
+        prog_hpc         <- make_absolute (exe_path hpc)
+        prog_runghc      <- make_absolute (exe_path runGhc)
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that

@@ -3,7 +3,9 @@ module Settings.Builders.RunTest (runTestBuilderArgs
                                  , runTestGhcFlags
                                  , assertSameCompilerArgs
                                  , outOfTreeCompilerArgs
-                                 , TestCompilerArgs(..) ) where
+                                 , TestCompilerArgs(..)
+				 , getBooleanSetting
+				 , getTestSetting ) where
 
 import Hadrian.Utilities
 import qualified System.FilePath
@@ -23,6 +25,7 @@ import qualified Context.Type
 import GHC.Toolchain.Target
 import Text.Read
 import GHC.Platform.ArchOS
+import Debug.Trace
 
 getTestSetting :: TestSetting -> Action String
 getTestSetting key = testSetting key
@@ -178,6 +181,8 @@ outOfTreeCompilerArgs = do
     wordsize    <- show . ((8 :: Int) *) . read <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
     let debugged = "debug" `isInfixOf` rtsWay
+
+    traceShowM (os, arch, platform)
 
     llc_cmd   <- getTestSetting TestLLC
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
@@ -338,6 +343,7 @@ getTestArgs = do
     cross <- expr $ getBooleanSetting TestCrossCompiling
     test_target <- expr $ getTestSetting TestTARGETPLATFORM
     let cross_prefix = if cross then test_target ++ "-" else ""
+    traceShowM ("cross", cross, cross_prefix, test_target)
 
     -- the testsuite driver will itself tell us if we need to generate the docs target
     -- So we always pass the haddock path if the hadrian configuration allows us to build

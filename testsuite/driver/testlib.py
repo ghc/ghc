@@ -144,6 +144,7 @@ def js_skip( name, opts ):
 
 # expect broken for the JS backend
 def js_broken( bug: IssueNumber ):
+    print ("js_broken", js_arch())
     if js_arch():
         return expect_broken(bug);
     else:
@@ -727,6 +728,7 @@ def opsys( os: str ) -> bool:
     return config.os == os
 
 def arch( arch: str ) -> bool:
+    print(arch, config.arch)
     return config.arch == arch
 
 def wordsize( ws: int ) -> bool:
