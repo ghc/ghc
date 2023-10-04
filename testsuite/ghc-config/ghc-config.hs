@@ -9,14 +9,15 @@ main = do
   info <- readProcess ghc ["+RTS", "--info"] ""
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
-  getGhcFieldOrFail fields "WORDSIZE" "Word size"
-  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
-  getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
-  getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
   getGhcFieldOrFail fields "RTSWay" "RTS way"
 
   info <- readProcess ghc ["--info"] ""
   let fields = read info :: [(String,String)]
+
+  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
+  getGhcFieldOrFail fields "WORDSIZE" "target word size"
+  getGhcFieldOrFail fields "TargetOS" "target os"
+  getGhcFieldOrFail fields "TargetARCH" "target arch"
 
   getGhcFieldOrFail fields "GhcStage" "Stage"
   getGhcFieldOrFail fields "GhcDebugAssertions" "Debug on"

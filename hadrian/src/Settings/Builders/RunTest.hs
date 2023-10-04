@@ -21,6 +21,8 @@ import Settings.Program
 import qualified Context.Type
 
 import GHC.Toolchain.Target
+import Text.Read
+import GHC.Platform.ArchOS
 
 getTestSetting :: TestSetting -> Action String
 getTestSetting key = testSetting key
@@ -167,10 +169,13 @@ outOfTreeCompilerArgs = do
 
     debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
+    let readArch :: String -> Maybe Arch
+        readArch = readMaybe
+
     os          <- getTestSetting TestHostOS
-    arch        <- getTestSetting TestTargetARCH_CPP
+    arch        <- maybe "unknown" stringEncodeArch . readArch <$> getTestSetting TestTargetARCH
     platform    <- getTestSetting TestTARGETPLATFORM
-    wordsize    <- getTestSetting TestWORDSIZE
+    wordsize    <- show . ((8 :: Int) *) . read <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
     let debugged = "debug" `isInfixOf` rtsWay
 

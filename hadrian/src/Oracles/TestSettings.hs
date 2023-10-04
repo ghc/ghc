@@ -23,8 +23,8 @@ testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
 data TestSetting = TestHostOS
                  | TestWORDSIZE
                  | TestTARGETPLATFORM
-                 | TestTargetOS_CPP
-                 | TestTargetARCH_CPP
+                 | TestTargetOS
+                 | TestTargetARCH
                  | TestRTSWay
                  | TestGhcStage
                  | TestGhcDebugAssertions
@@ -55,8 +55,8 @@ testSetting key = do
         TestHostOS                -> "HostOS"
         TestWORDSIZE              -> "WORDSIZE"
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
-        TestTargetOS_CPP          -> "TargetOS_CPP"
-        TestTargetARCH_CPP        -> "TargetARCH_CPP"
+        TestTargetOS              -> "TargetOS"
+        TestTargetARCH            -> "TargetARCH"
         TestRTSWay                -> "RTSWay"
         TestGhcStage              -> "GhcStage"
         TestGhcDebugAssertions    -> "GhcDebugAssertions"
