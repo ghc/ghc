@@ -363,7 +363,7 @@ import GHCi.RemoteTypes
 
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer hiding (initParserState)
-import GHC.Parser.PreProcess   (initParserState)
+import GHC.Parser.PreProcess   (initParserState, initPpState)
 import GHC.Parser.Annotation
 import GHC.Parser.Utils
 
