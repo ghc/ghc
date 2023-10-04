@@ -20,6 +20,7 @@ import GHC.Toolchain.Program (prgFlags)
 import qualified Data.Set as Set
 import Oracles.Flavour
 import Debug.Trace
+import qualified System.Directory.Extra as IO
 
 {-
 Note [Binary distributions]
@@ -171,6 +172,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     -- let rtsDir  = "rts"
 
     let ghcBuildDir      = root -/- stageString library_stage
+	ghcLibBinBuildDir = root -/- stageString executable_stage -/- "lib" -/- "bin"
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
@@ -181,6 +183,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     createDirectory bindistFilesDir
     createDirectory (bindistFilesDir -/- "bin")
     createDirectory (bindistFilesDir -/- "lib")
+    createDirectory (bindistFilesDir -/- "lib" -/- "bin")
     -- Also create wrappers with version suffixes (#20074)
     forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path) -> do
         let orig_filename = takeFileName prog_path
@@ -227,6 +230,9 @@ buildBinDistDir root conf@BindistConfig{..} = do
               IO.createFileLink version_prog versioned_runhaskell_path
 
     copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
+    ld <- liftIO $ IO.listDirectory ghcLibBinBuildDir
+    traceShowM ld
+    copyDirectory ghcLibBinBuildDir bindistFilesDir
     copyDirectory (rtsIncludeDir)         bindistFilesDir
     when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
 
