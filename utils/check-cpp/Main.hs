@@ -5,6 +5,7 @@ import Control.Monad.IO.Class
 import Data.Char
 import Data.Data hiding (Fixity)
 import Data.List
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Debug.Trace
 import GHC
@@ -19,21 +20,17 @@ import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), PpState (..), Token (..))
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
-import qualified GHC.Parser.Lexer as Lexer hiding (initParserState)
-import qualified GHC.Parser.PreProcess as Lexer  (initParserState)
+import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-
 import qualified Text.Parsec as Parsec
 import Text.Parsec.Char as PS
 import Text.Parsec.Combinator as PS
 import Text.Parsec.Prim as PS
-
--- import qualified Text.Parsec as Parsec
 import Text.Parsec.String (Parser)
 
 -- import Text.Parsec.Char
@@ -51,6 +48,28 @@ showAst ast =
 -- =====================================================================
 
 type PP = P PpState
+
+initPpState :: PpState
+initPpState =
+    PpState
+        { pp_defines = Map.empty
+        , pp_includes = Map.empty
+        , pp_include_stack = []
+        , pp_continuation = []
+        , pp_context = []
+        , pp_accepting = True
+        }
+
+data PpState = PpState
+    { pp_defines :: !(Map String [String])
+    , pp_includes :: !(Map String StringBuffer)
+    , pp_include_stack :: ![Lexer.AlexInput]
+    , pp_continuation :: ![Located Token]
+    , pp_context :: ![Token] -- What preprocessor directive we are currently processing
+    , pp_accepting :: !Bool
+    }
+    deriving (Show)
+-- deriving instance Show Lexer.AlexInput
 
 -- =====================================================================
 
@@ -74,7 +93,13 @@ ppLexer queueComments cont =
              in
                 -- case tk of
                 case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
-                    L _ ITeof -> contInner tk
+                    L _ ITeof -> do
+                      mInp <- popIncludeLoc
+                      case mInp of
+                        Nothing -> contInner tk
+                        Just inp -> do
+                          Lexer.setInput inp
+                          ppLexer queueComments cont
                     L _ (ITcpp continuation s) -> do
                         if continuation
                             then pushContinuation tk
@@ -82,7 +107,8 @@ ppLexer queueComments cont =
                         contIgnoreTok tk
                     _ -> do
                         state <- getCppState
-                        case (trace ("CPP state:" ++ show state) state) of
+                        -- case (trace ("CPP state:" ++ show state) state) of
+                        case state of
                             CppIgnoring -> contIgnoreTok tk
                             _ -> contInner tk
         )
@@ -113,25 +139,28 @@ processCpp fs = do
     -- let s = cppInitial fs
     let s = cppInitial fs
     case regularParse cppDirective s of
-      Left err -> error $ show err
-      Right (CppDefine name def) -> do
-        ppDefine name def
-      Right (CppIfdef name) -> do
-        defined <- ppIsDefined name
-        setAccepting defined
-      Right (CppIfndef name) -> do
-        defined <- ppIsDefined name
-        setAccepting (not defined)
-      Right CppElse -> do
-        accepting <- getAccepting
-        setAccepting (not accepting)
-        return ()
-      Right CppEndif -> do
-        -- TODO: nested states
-        setAccepting True
-        return ()
+        Left err -> error $ show err
+        Right (CppInclude filename) -> do
+            ppInclude filename
+        Right (CppDefine name def) -> do
+            ppDefine name def
+        Right (CppIfdef name) -> do
+            defined <- ppIsDefined name
+            setAccepting defined
+        Right (CppIfndef name) -> do
+            defined <- ppIsDefined name
+            setAccepting (not defined)
+        Right CppElse -> do
+            accepting <- getAccepting
+            setAccepting (not accepting)
+            return ()
+        Right CppEndif -> do
+            -- TODO: nested states
+            setAccepting True
+            return ()
 
-    return (trace ("processCpp:s=" ++ show s) ())
+    -- return (trace ("processCpp:s=" ++ show s) ())
+    return ()
 
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
@@ -193,7 +222,41 @@ popContinuation =
 
 -- pp_context stack end -------------------
 
+-- pp_include start -----------------------
+
+getInclude :: String -> PP (Maybe StringBuffer)
+getInclude filename = P $ \s -> POk s (Map.lookup filename (pp_includes (pp s)))
+
+pushIncludeLoc :: Lexer.AlexInput -> PP ()
+pushIncludeLoc pos
+  = P $ \s -> POk s {pp = (pp s){ pp_include_stack = pos: pp_include_stack (pp s)}} ()
+
+popIncludeLoc :: PP (Maybe Lexer.AlexInput)
+popIncludeLoc =
+    P $ \s ->
+          let
+            (new_st,r) = case pp_include_stack (pp s) of
+              [] ->([], Nothing)
+              (h:t) -> (t, Just h)
+          in
+            POk s{pp = (pp s){pp_include_stack = new_st }} r
+
+-- pp_include end -------------------------
+
 -- definitions start --------------------
+
+ppInclude :: String -> PP ()
+ppInclude filename = do
+    mSrc <- getInclude filename
+    case mSrc of
+      Nothing -> return ()
+      Just src -> do
+        origInput <- Lexer.getInput
+        pushIncludeLoc origInput
+        let loc =  PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
+        Lexer.setInput (Lexer.AI  loc src)
+    return $ trace ("ppInclude:mSrc=[" ++ show mSrc ++ "]") ()
+    -- return $ trace ("ppInclude:filename=[" ++ filename ++ "]") ()
 
 ppDefine :: String -> [String] -> PP ()
 ppDefine name val = P $ \s ->
@@ -227,7 +290,6 @@ type CppParser = Parsec String ()
 regularParse :: Parser a -> String -> Either Parsec.ParseError a
 regularParse p = PS.parse p ""
 
-
 -- TODO: delete this
 cppDefinition :: CppParser (String, [String])
 cppDefinition = do
@@ -239,11 +301,12 @@ cppDefinition = do
     return (name, definition)
 
 data CppDirective
-  = CppDefine String [String]
-  | CppIfdef String
-  | CppIfndef String
-  | CppElse
-  | CppEndif
+    = CppInclude String
+    | CppDefine String [String]
+    | CppIfdef String
+    | CppIfndef String
+    | CppElse
+    | CppEndif
     deriving (Show, Eq)
 
 cppDirective :: CppParser CppDirective
@@ -252,32 +315,39 @@ cppDirective = do
     _ <- whiteSpace
     choice
         [ cppKw "define" >> cmdDefinition
-        -- , cppKw "include" CppIncludeKw
-        -- , cppKw "undef" CppUndefKw
-        -- , cppKw "error" CppErrorKw
-        , try$ cppKw "ifdef" >> cmdIfdef
+        , try $ cppKw "include" >> cmdInclude
+        , try $ cppKw "ifdef" >> cmdIfdef
         , cppKw "ifndef" >> cmdIfndef
-        -- , cppKw "if" CppIfKw
-        -- , cppKw "elif" CppElifKw
         , try $ cppKw "else" >> return CppElse
         , cppKw "endif" >> return CppEndif
+        -- , cppKw "if" CppIfKw
+        -- , cppKw "elif" CppElifKw
+        -- , cppKw "undef" CppUndefKw
+        -- , cppKw "error" CppErrorKw
         ]
+
+cmdInclude :: CppParser CppDirective
+cmdInclude = do
+    _ <- string "\""
+    filename <- many1 (satisfy (\c -> not (isSpace c || c == '"')))
+    _ <- string "\""
+    return $ CppInclude filename
 
 cmdDefinition :: CppParser CppDirective
 cmdDefinition = do
-      name <- cppToken
-      definition <- cppTokens
-      return $ CppDefine name definition
+    name <- cppToken
+    definition <- cppTokens
+    return $ CppDefine name definition
 
 cmdIfdef :: CppParser CppDirective
 cmdIfdef = do
-      name <- cppToken
-      return $ CppIfdef name
+    name <- cppToken
+    return $ CppIfdef name
 
 cmdIfndef :: CppParser CppDirective
 cmdIfndef = do
-      name <- cppToken
-      return $ CppIfndef name
+    name <- cppToken
+    return $ CppIfndef name
 
 cppKw :: String -> CppParser ()
 cppKw kw = do
@@ -334,10 +404,11 @@ directive.
 -- Emulate the parser
 
 type LibDir = FilePath
+type Includes = [(String, [String])]
 
 -- parseString :: LibDir -> String -> IO (WarningMessages, Either ErrorMessages [Located Token])
-parseString :: LibDir -> String -> IO [Located Token]
-parseString libdir str = ghcWrapper libdir $ do
+parseString :: LibDir -> Includes -> String -> IO [Located Token]
+parseString libdir includes str = ghcWrapper libdir $ do
     dflags0 <- initDynFlags
     let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
     let pflags = initParserOpts dflags
@@ -345,12 +416,15 @@ parseString libdir str = ghcWrapper libdir $ do
     liftIO $ putStrLn "-- parsing ----------"
     liftIO $ putStrLn str
     liftIO $ putStrLn "---------------------"
-    return $ strGetToks pflags "fake_test_file.hs" str
+    return $ strGetToks includes pflags "fake_test_file.hs" str
 
-strGetToks :: Lexer.ParserOpts -> FilePath -> String -> [Located Token]
-strGetToks popts filename str = reverse $ lexAll pstate
+strGetToks :: Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
+-- strGetToks includes popts filename str = reverse $ lexAll pstate
+strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
   where
-    pstate = Lexer.initParserState popts buf loc
+    includeMap = Map.fromList $ map (\(k,v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
+    initState = initPpState { pp_includes = includeMap }
+    pstate = Lexer.initParserState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
     -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
@@ -387,7 +461,7 @@ strParser str dflags filename =
         loc = mkRealSrcLoc (mkFastString filename) 1 1
         buf = stringToStringBuffer str
      in
-        case unP parseModuleNoHaddock (Lexer.initParserState (initParserOpts dflags) buf loc) of
+        case unP parseModuleNoHaddock (Lexer.initParserState initPpState (initParserOpts dflags) buf loc) of
             PFailed pst ->
                 let (warns, errs) = Lexer.getPsMessages pst
                  in (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
@@ -506,9 +580,12 @@ libdirNow :: LibDir
 libdirNow = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
 
 doTest :: [String] -> IO ()
-doTest strings = do
+doTest strings = doTestWithIncludes [] strings
+
+doTestWithIncludes :: Includes -> [String] -> IO ()
+doTestWithIncludes includes strings = do
     let test = intercalate "\n" strings
-    !tks <- parseString libdirNow test
+    !tks <- parseString libdirNow includes test
     putStrLn "-----------------------------------------"
     printToks (reverse tks)
 
@@ -630,3 +707,26 @@ t8 = parseDefine (mkFastString "#define MIN_VERSION_ghc_exactprint(major1,major2
 
 t9 :: Either Parsec.ParseError CppDirective
 t9 = regularParse cppDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
+
+t10 :: IO ()
+t10 = do
+    doTestWithIncludes testIncludes
+        [ "#include \"bar.h\""
+        , ""
+        , "#ifdef FOO"
+        , "x = 1"
+        , "#else"
+        , "x = 2"
+        , "#endif"
+        ]
+
+testIncludes :: Includes
+testIncludes =
+    [
+        ( "bar.h"
+        , ["#include \"sub.h\""]
+        ),
+        ( "sub.h"
+        , ["#define FOO"]
+        )
+    ]
