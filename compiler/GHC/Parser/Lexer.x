@@ -59,7 +59,7 @@ module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg,
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
-   PpState(..), initPpState, PpContext(..),
+   -- PpState(..), initPpState, PpContext(..),
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
@@ -84,7 +84,7 @@ module GHC.Parser.Lexer (
    addPsMessage,
    -- * for integration with the preprocessor
    queueIgnoredToken,
-   getInput, setInput
+   getInput, setInput, AlexInput(..)
   ) where
 
 import GHC.Prelude
@@ -2599,28 +2599,28 @@ data PState a = PState {
         -- of the action, it is the *current* token.  Do I understand
         -- correctly?
 
--- | Use for emulating (limited) CPP preprocessing in GHC.
--- TODO: move this into PreProcess, and make a param on PState
-data PpState = PpState {
-        pp_defines :: !(Map String [String]),
-        pp_continuation :: ![Located Token],
-        -- pp_context :: ![PpContext],
-        pp_context :: ![Token], -- What preprocessor directive we are currently processing
-        pp_accepting :: !Bool
-     }
-    deriving (Show)
+-- -- | Use for emulating (limited) CPP preprocessing in GHC.
+-- -- TODO: move this into PreProcess, and make a param on PState
+-- data PpState = PpState {
+--         pp_defines :: !(Map String [String]),
+--         pp_continuation :: ![Located Token],
+--         -- pp_context :: ![PpContext],
+--         pp_context :: ![Token], -- What preprocessor directive we are currently processing
+--         pp_accepting :: !Bool
+--      }
+--     deriving (Show)
 
 data PpContext = PpContextIf [Located Token]
     deriving (Show)
 
 -- TODO: delete
-initPpState :: PpState
-initPpState = PpState
-   { pp_defines = Map.empty
-   , pp_continuation = []
-   , pp_context = []
-   , pp_accepting = True
-   }
+-- initPpState :: PpState
+-- initPpState = PpState
+--    { pp_defines = Map.empty
+--    , pp_continuation = []
+--    , pp_context = []
+--    , pp_accepting = True
+--    }
 
 data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
                               Bool{- is it a 'let' block? -}
