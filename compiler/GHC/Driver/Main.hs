@@ -195,8 +195,8 @@ import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
 import GHC.Parser
-import GHC.Parser.Lexer as Lexer hiding (initPpState, initParserState)
-import GHC.Parser.PreProcess (initParserState)
+import GHC.Parser.Lexer as Lexer hiding (initParserState)
+import GHC.Parser.PreProcess (initParserState, PpState)
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
