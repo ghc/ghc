@@ -604,6 +604,7 @@ data Rule = ReleaseOnly  -- ^ Only run this job in a release pipeline
 data ValidateRule =
             FullCI       -- ^ Run this job when the "full-ci" label is present.
           | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
+          | JSBackend    -- ^ Run this job when the "javascript" label is present
           | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
           | IpeData      -- ^ Run this job when the "IPE" label is set
@@ -648,11 +649,12 @@ validateRuleString FullCI = or_all ([ labelString "full-ci"
                                     , branchStringLike "ghc-[0-9]+\\.[0-9]+"
                                     ])
 
-validateRuleString LLVMBackend = labelString "LLVM backend"
+validateRuleString LLVMBackend  = labelString "LLVM backend"
+validateRuleString JSBackend    = labelString "javascript"
 validateRuleString FreeBSDLabel = labelString "FreeBSD"
-validateRuleString NonmovingGc = labelString "non-moving GC"
-validateRuleString IpeData = labelString "IPE"
-validateRuleString TestPrimops = labelString "test-primops"
+validateRuleString NonmovingGc  = labelString "non-moving GC"
+validateRuleString IpeData      = labelString "IPE"
+validateRuleString TestPrimops  = labelString "test-primops"
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -1010,10 +1012,9 @@ job_groups =
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
-        )
-        { bignumBackend = Native
-        }
+
+     , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11) javascriptConfig)
+
      , make_wasm_jobs wasm_build_config
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {bignumBackend = Native}
@@ -1024,6 +1025,8 @@ job_groups =
      ]
 
   where
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+                         { bignumBackend = Native }
 
     -- ghcilink002 broken due to #17869
     --
