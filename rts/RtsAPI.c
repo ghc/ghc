@@ -508,7 +508,7 @@ void rts_evalStableIOMain(/* inout */ Capability **cap,
     SchedulerStatus stat;
 
     p = (StgClosure *)deRefStablePtr(s);
-    w = rts_apply(*cap, &base_GHCziTopHandler_runMainIO_closure, p);
+    w = rts_apply(*cap, &ghczminternal_GHCziTopHandler_runMainIO_closure, p);
     tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, w);
     // async exceptions are always blocked by default in the created
     // thread.  See #1048.

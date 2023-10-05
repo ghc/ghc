@@ -390,7 +390,7 @@ function h$performMajorGC() {
 }
 
 
-function h$baseZCSystemziCPUTimeZCgetrusage() {
+function h$ghczminternalZCSystemziCPUTimeZCgetrusage() {
   return 0;
 }
 

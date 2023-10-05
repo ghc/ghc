@@ -6,7 +6,7 @@ def f( name, opts ):
   opts.only_ways = ['normal']
 
 setTestOpts(f)
-setTestOpts(normalise_version('base'))
+setTestOpts(normalise_version('ghc-internal', 'base'))
 
 test('CheckA', normal, compile, [''])
 test('CheckB', [], multimod_compile, ['CheckB', '-trust base'])

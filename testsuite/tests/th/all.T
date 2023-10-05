@@ -264,7 +264,7 @@ test('ClosedFam2TH', normal, compile, ['-v0'])
 test('T8028', [], multimod_compile, ['T8028', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_Roles1', normal, compile_fail, ['-v0'])
-test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim',
+test('TH_Roles2', normalise_version('ghc-internal', 'array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
                                     'ghc-bignum', 'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
@@ -551,7 +551,7 @@ test('T17820c', normal, compile_fail, [''])
 test('T17820d', normal, compile_fail, [''])
 test('T17820e', normal, compile_fail, [''])
 test('T20454', normal, compile_and_run, [''])
-test('T21547', [extra_files(['T21547A.hs']), normalise_version('base')], multimod_compile_fail, ['T21547', '-v0'])
+test('T21547', [extra_files(['T21547A.hs']), normalise_version('ghc-internal', 'base')], multimod_compile_fail, ['T21547', '-v0'])
 test('T20590', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T20773', only_ways(['ghci']), ghci_script, ['T20773.script'])
 test('T20884', normal, compile_fail, [''])

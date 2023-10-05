@@ -1,4 +1,4 @@
-setTestOpts(normalise_version('base','ghc-prim'))
+setTestOpts(normalise_version('ghc-internal','base','ghc-prim'))
 
 test('saks001', normal, compile, [''])
 test('saks002', normal, compile, [''])

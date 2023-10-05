@@ -5,9 +5,9 @@ RecordDotSyntaxFail11.hs:8:3: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 25 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘print’
       In a stmt of a 'do' block: print $ (.foo.bar.baz) a

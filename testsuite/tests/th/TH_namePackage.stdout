@@ -4,6 +4,6 @@
 Just "Data.Either"
 Nothing
 Just "Module"
-Just "base"
+Just "ghc-internal"
 Nothing
 Nothing

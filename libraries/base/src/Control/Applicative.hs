@@ -2,6 +2,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -52,17 +55,15 @@ import Control.Category hiding ((.), id)
 import Control.Arrow
 import Data.Maybe
 import Data.Tuple
-import Data.Eq
-import Data.Ord
-import Data.Foldable (Foldable(..), asum)
+import Data.Foldable (asum)
 import Data.Functor ((<$>))
 import Data.Functor.Const (Const(..))
+import Data.Typeable (Typeable)
+import Data.Data (Data)
 
 import GHC.Base
+import GHC.Functor.ZipList (ZipList(..))
 import GHC.Generics
-import GHC.List (repeat, zipWith)
-import GHC.Read (Read)
-import GHC.Show (Show)
 
 -- $setup
 -- >>> import Prelude
@@ -88,6 +89,10 @@ instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
 
+-- | @since 4.14.0.0
+deriving instance (Typeable (m :: Type -> Type), Typeable a, Data (m a))
+         => Data (WrappedMonad m a)
+
 newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
                            deriving ( Generic  -- ^ @since 4.7.0.0
                                     , Generic1 -- ^ @since 4.7.0.0
@@ -108,43 +113,10 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
     empty = WrapArrow zeroArrow
     WrapArrow u <|> WrapArrow v = WrapArrow (u <+> v)
 
--- | Lists, but with an 'Applicative' functor based on zipping.
-newtype ZipList a = ZipList { getZipList :: [a] }
-                  deriving ( Show     -- ^ @since 4.7.0.0
-                           , Eq       -- ^ @since 4.7.0.0
-                           , Ord      -- ^ @since 4.7.0.0
-                           , Read     -- ^ @since 4.7.0.0
-                           , Functor  -- ^ @since 2.01
-                           , Foldable -- ^ @since 4.9.0.0
-                           , Generic  -- ^ @since 4.7.0.0
-                           , Generic1 -- ^ @since 4.7.0.0
-                           )
--- See Data.Traversable for Traversable instance due to import loops
-
--- |
--- > f <$> ZipList xs1 <*> ... <*> ZipList xsN
--- >     = ZipList (zipWithN f xs1 ... xsN)
---
--- where @zipWithN@ refers to the @zipWith@ function of the appropriate arity
--- (@zipWith@, @zipWith3@, @zipWith4@, ...). For example:
---
--- > (\a b c -> stimes c [a, b]) <$> ZipList "abcd" <*> ZipList "567" <*> ZipList [1..]
--- >     = ZipList (zipWith3 (\a b c -> stimes c [a, b]) "abcd" "567" [1..])
--- >     = ZipList {getZipList = ["a5","b6b6","c7c7c7"]}
---
--- @since 2.01
-instance Applicative ZipList where
-    pure x = ZipList (repeat x)
-    liftA2 f (ZipList xs) (ZipList ys) = ZipList (zipWith f xs ys)
-
--- | @since 4.11.0.0
-instance Alternative ZipList where
-   empty = ZipList []
-   ZipList xs0 <|> ZipList ys0 = ZipList $ go xs0 ys0
-     where
-       go (x:xs) (_:ys) = x : go xs ys
-       go    []     ys  = ys
-       go    xs      _  = xs
+-- | @since 4.14.0.0
+deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
+                   Data (a b c))
+         => Data (WrappedArrow a b c)
 
 -- extra functions
 

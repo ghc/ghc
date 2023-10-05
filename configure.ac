@@ -559,8 +559,8 @@ AC_MSG_NOTICE([Creating links for in-tree file handling routines])
 ln -f utils/fs/fs.* utils/lndir/
 ln -f utils/fs/fs.* utils/unlit/
 ln -f utils/fs/fs.* rts/
-ln -f utils/fs/fs.h libraries/base/include/
-ln -f utils/fs/fs.c libraries/base/cbits/
+ln -f utils/fs/fs.h libraries/ghc-internal/include/
+ln -f utils/fs/fs.c libraries/ghc-internal/cbits/
 AC_MSG_NOTICE([Routines in place. Packages can now be build normally.])
 
 dnl ** Copy files for ghci wrapper C utilities.

@@ -40,5 +40,6 @@ class (RealFrac a, Floating a) => RealFloat a where
   	-- Defined in ‘GHC.Float’
 instance RealFloat Double -- Defined in ‘GHC.Float’
 instance RealFloat Float -- Defined in ‘GHC.Float’
-base-4.18.0.0:Data.OldList.isPrefixOf :: Eq a => [a] -> [a] -> Bool
-  	-- Defined in ‘base-4.18.0.0:Data.OldList’
+ghc-internal-0.1.0.0:Data.OldList.isPrefixOf ::
+  Eq a => [a] -> [a] -> Bool
+  	-- Defined in ‘ghc-internal-0.1.0.0:Data.OldList’

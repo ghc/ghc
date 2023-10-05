@@ -1,0 +1,51 @@
+
+LIBRARY "libHSbase-@LibVersion@-ghc@ProjectVersion@.dll"
+
+EXPORTS
+    ghczminternal_GHCziInt_I8zh_con_info
+    ghczminternal_GHCziInt_I16zh_con_info
+    ghczminternal_GHCziInt_I32zh_con_info
+    ghczminternal_GHCziInt_I64zh_con_info
+
+    ghczminternal_GHCziWord_W8zh_con_info
+    ghczminternal_GHCziWord_W16zh_con_info
+    ghczminternal_GHCziWord_W32zh_con_info
+    ghczminternal_GHCziWord_W64zh_con_info
+
+    ghczminternal_GHCziStable_StablePtr_con_info
+
+    ghczminternal_GHCziPack_unpackCString_closure
+
+    ghczminternal_GHCziTopHandler_runIO_closure
+    ghczminternal_GHCziTopHandler_runNonIO_closure
+
+    ghczminternal_GHCziIOziException_stackOverflow_closure
+    ghczminternal_GHCziIOziException_heapOverflow_closure
+
+    ghczminternal_GHCziPtr_Ptr_con_info
+    ghczminternal_GHCziPtr_FunPtr_con_info
+
+    ghczminternal_GHCziConcziIO_ensureIOManagerIsRunning_closure
+    ghczminternal_GHCziConcziIO_interruptIOManager_closure
+    ghczminternal_GHCziConcziIO_ioManagerCapabilitiesChanged_closure
+    ghczminternal_GHCziConcziSync_runSparks_closure
+    ghczminternal_GHCziEventziWindows_processRemoteCompletion_closure
+
+    ghczminternal_GHCziTopHandler_flushStdHandles_closure
+
+    ghczminternal_GHCziWeakziFinalizze_runFinalizzerBatch_closure
+    ghczminternal_GHCziPack_unpackCString_closure
+    ghczminternal_GHCziIOziException_blockedIndefinitelyOnMVar_closure
+    ghczminternal_GHCziIOziException_blockedIndefinitelyOnSTM_closure
+    ghczminternal_GHCziIOziException_allocationLimitExceeded_closure
+    ghczminternal_GHCziIOziException_stackOverflow_closure
+    ghczminternal_GHCziIOziException_cannotCompactFunction_closure
+    ghczminternal_GHCziIOziException_cannotCompactPinned_closure
+    ghczminternal_GHCziIOziException_cannotCompactMutable_closure
+    ghczminternal_GHCziIOPort_doubleReadException_closure
+    ghczminternal_ControlziExceptionziBase_nonTermination_closure
+    ghczminternal_ControlziExceptionziBase_nestedAtomically_closure
+    ghczminternal_GHCziEventziThread_blockedOnBadFD_closure
+    ghczminternal_GHCziExceptionziType_divZZeroException_closure
+    ghczminternal_GHCziExceptionziType_underflowException_closure
+    ghczminternal_GHCziExceptionziType_overflowException_closure

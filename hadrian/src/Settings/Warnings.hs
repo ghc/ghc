@@ -31,6 +31,7 @@ ghcWarningsArgs = do
                                       , "-fno-warn-unused-imports" ] ]
         , notStage0 ? mconcat
         [ libraryPackage       ? pure [ "-Wno-deprecated-flags" ]
+        , package ghcInternal  ? pure [ "-Wno-trustworthy-safe" ]
         , package base         ? pure [ "-Wno-trustworthy-safe" ]
         , package binary       ? pure [ "-Wno-deprecations" ]
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]

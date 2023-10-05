@@ -217,7 +217,7 @@ jsLinkRts logger tmpfs tmp_dir cfg unit_env inst = do
 
   -- link the RTS and its dependencies (things it uses from `base`, etc.)
   let link_spec = LinkSpec
-        { lks_unit_ids        = [rtsUnitId, baseUnitId, primUnitId]
+        { lks_unit_ids        = [rtsUnitId, ghcInternalUnitId, primUnitId]
         , lks_obj_files       = mempty
         , lks_obj_root_filter = const False
         , lks_extra_roots     = mempty
