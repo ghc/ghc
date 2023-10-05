@@ -389,6 +389,7 @@ Library
           jsbits/base.js
           jsbits/errno.js
 
+    hs-source-dirs: src
     include-dirs: include
     includes:
         HsBase.h
