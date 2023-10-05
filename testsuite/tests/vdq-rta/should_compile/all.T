@@ -1,4 +1,4 @@
-setTestOpts(normalise_version('base','ghc-prim'))
+setTestOpts(normalise_version('ghc-internal','base','ghc-prim'))
 
 test('T22326_idv', normal, compile, [''])
 test('T22326_typeRep', normal, compile, [''])

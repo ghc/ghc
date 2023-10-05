@@ -111,7 +111,7 @@ closureConstructors s = do
     checkC :: JSM JStgStat
     checkC | csAssertRts s =
       jVar $ \msg ->
-        jwhenS (var "arguments" .! 0 .!==. jString "h$baseZCGHCziJSziPrimziJSVal_con_e")
+        jwhenS (var "arguments" .! 0 .!==. jString "h$ghczminternalZCGHCziJSziPrimziJSVal_con_e")
         <$>
         (loop 1 (.<. var "arguments" .^ "length")
           (\i ->
@@ -235,7 +235,7 @@ bhLneStats _s p frameSize = jVar $ \v ->
   , ifS v
     ((sp |= sp - frameSize)
       <> ifS (v .===. var "h$blackhole")
-      (returnS $ app "h$throw" [var "h$baseZCControlziExceptionziBasezinonTermination", false_])
+      (returnS $ app "h$throw" [var "h$ghczminternalZCControlziExceptionziBasezinonTermination", false_])
       (mconcat [r1 |= v
                , sp |= sp - frameSize
                , returnStack
@@ -521,10 +521,10 @@ rts_gen s = do
                                               , returnS (var "h$ap_1_0")
                                               ]
              , closure (ClosureInfo (global "h$flushStdout_e") (CIRegs 0 []) "flushStdout" (CILayoutFixed 0 []) CIThunk mempty)
-               $ return $ mconcat [ r1 |= var "h$baseZCGHCziIOziHandlezihFlush"
-                                  , r2 |= var "h$baseZCGHCziIOziHandleziFDzistdout"
+               $ return $ mconcat [ r1 |= var "h$ghczminternalZCGHCziIOziHandlezihFlush"
+                                  , r2 |= var "h$ghczminternalZCGHCziIOziHandleziFDzistdout"
                                   , returnS (app "h$ap_1_1_fast" [])
-                                           ]
+                                  ]
              , pure $ global "h$flushStdout" ||= app "h$static_thunk" [var "h$flushStdout_e"]
              -- the scheduler pushes this frame when suspending a thread that
              -- has not called h$reschedule explicitly

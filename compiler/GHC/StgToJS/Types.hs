@@ -170,14 +170,14 @@ instance ToJExpr JSRep where
 -- in JS Land. For example, the entry function for the 'Just' constructor is a
 -- 'IdConEntry' which compiles to:
 -- @
--- function h$baseZCGHCziMaybeziJust_con_e() { return h$rs() };
+-- function h$ghczminternalZCGHCziMaybeziJust_con_e() { return h$rs() };
 -- @
 -- which just returns whatever the stack point is pointing to. Whereas the entry
 -- function to 'Just' is an 'IdEntry' and does the work. It compiles to:
 -- @
--- function h$baseZCGHCziMaybeziJust_e() {
+-- function h$ghczminternalZCGHCziMaybeziJust_e() {
 --    var h$$baseZCGHCziMaybezieta_8KXnScrCjF5 = h$r2;
---    h$r1 = h$c1(h$baseZCGHCziMaybeziJust_con_e, h$$baseZCGHCziMaybezieta_8KXnScrCjF5);
+--    h$r1 = h$c1(h$ghczminternalZCGHCziMaybeziJust_con_e, h$$baseZCGHCziMaybezieta_8KXnScrCjF5);
 --    return h$rs();
 --    };
 -- @

@@ -29,14 +29,14 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       normalise_errmsg_fun(ignoreLdOutput, normalise_errmsg),
-      normalise_version("array", "ghc-bignum", "bytestring",
+      normalise_version('ghc-internal', "array", "ghc-bignum", "bytestring",
                         "base", "deepseq", "ghc-prim"),
       normalise_fun(normalise_errmsg),
       js_broken(22349)],
      run_command, ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
 # Fail since we enable package trust
-test('ImpSafe01', normalise_version('base'), compile_fail, ['-fpackage-trust -distrust base'])
+test('ImpSafe01', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust base'])
 
 # Succeed since we don't enable package trust
 test('ImpSafe02', normal, compile, ['-distrust base'])
@@ -50,7 +50,7 @@ test('ImpSafe03',
   ], '-fpackage-trust' ])
 
 # Fail same as ImpSafe01 but testing with -XTrustworthy now
-test('ImpSafe04', normalise_version('base'), compile_fail, ['-fpackage-trust -distrust base'])
+test('ImpSafe04', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust base'])
 
 test('ImpSafeOnly01',
      [js_broken(22349),
@@ -107,7 +107,7 @@ test('ImpSafeOnly07',
       req_host_target_ghc,
       extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly07 ' + make_args),
-      normalise_version("bytestring", "base")],
+      normalise_version('ghc-internal', "bytestring", "base")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly07/local.db -trust safePkg01 -distrust bytestring'])
 test('ImpSafeOnly08',
@@ -115,7 +115,7 @@ test('ImpSafeOnly08',
       req_host_target_ghc,
       extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly08 ' + make_args),
-      normalise_version("bytestring", "base")],
+      normalise_version('ghc-internal', "bytestring", "base")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly08/local.db -trust safePkg01'])
 test('ImpSafeOnly09',

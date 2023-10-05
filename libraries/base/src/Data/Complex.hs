@@ -75,6 +75,7 @@ data Complex a
                  , Traversable -- ^ @since 4.9.0.0
                  )
 
+
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
 

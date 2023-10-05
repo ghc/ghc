@@ -6,9 +6,9 @@ data Data.ByteString.Lazy.ByteString
   	-- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Monoid Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
-instance Read Data.ByteString.Lazy.ByteString
-  -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Semigroup Data.ByteString.Lazy.ByteString
+  -- Defined in ‘Data.ByteString.Lazy.Internal’
+instance Read Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Show Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
@@ -25,9 +25,9 @@ data Data.ByteString.ByteString
   	-- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
 instance Monoid Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
-instance Read Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
 instance Semigroup Data.ByteString.ByteString
+  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+instance Read Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
 instance Show Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’

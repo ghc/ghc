@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -100,18 +101,20 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           Prelude             hiding (foldr1, Applicative(..))
-
-import GHC.Base (Semigroup(..))
-
-import           Data.Semigroup.Internal
-
-import           Control.Applicative
-import           Control.Monad.Fix
+import           GHC.Base hiding (Any)
+import           GHC.Enum
+import           GHC.Show
+import           GHC.Read
+import           GHC.Num
+import           GHC.Real
+import           Data.Functor ((<$>))
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
-import           Data.Coerce
+import           Data.Foldable
+import           Data.Traversable
+import           Data.Semigroup.Internal
+import           Control.Monad.Fix
 import           Data.Data
 import           GHC.Generics
 import qualified GHC.List as List
@@ -189,10 +192,10 @@ instance Enum a => Enum (Min a) where
   pred (Min a) = Min (pred a)
   toEnum = Min . toEnum
   fromEnum = fromEnum . getMin
-  enumFrom (Min a) = Min <$> enumFrom a
-  enumFromThen (Min a) (Min b) = Min <$> enumFromThen a b
-  enumFromTo (Min a) (Min b) = Min <$> enumFromTo a b
-  enumFromThenTo (Min a) (Min b) (Min c) = Min <$> enumFromThenTo a b c
+  enumFrom (Min a) = Min `fmap` enumFrom a
+  enumFromThen (Min a) (Min b) = Min `fmap` enumFromThen a b
+  enumFromTo (Min a) (Min b) = Min `fmap` enumFromTo a b
+  enumFromThenTo (Min a) (Min b) (Min c) = Min `fmap` enumFromThenTo a b c
 
 
 -- | @since 4.9.0.0
@@ -218,7 +221,7 @@ instance Foldable Min where
 
 -- | @since 4.9.0.0
 instance Traversable Min where
-  traverse f (Min a) = Min <$> f a
+  traverse f (Min a) = Min `fmap` f a
 
 -- | @since 4.9.0.0
 instance Applicative Min where
@@ -274,10 +277,10 @@ instance Enum a => Enum (Max a) where
   pred (Max a) = Max (pred a)
   toEnum = Max . toEnum
   fromEnum = fromEnum . getMax
-  enumFrom (Max a) = Max <$> enumFrom a
-  enumFromThen (Max a) (Max b) = Max <$> enumFromThen a b
-  enumFromTo (Max a) (Max b) = Max <$> enumFromTo a b
-  enumFromThenTo (Max a) (Max b) (Max c) = Max <$> enumFromThenTo a b c
+  enumFrom (Max a) = Max `fmap` enumFrom a
+  enumFromThen (Max a) (Max b) = Max `fmap` enumFromThen a b
+  enumFromTo (Max a) (Max b) = Max `fmap` enumFromTo a b
+  enumFromThenTo (Max a) (Max b) (Max c) = Max `fmap` enumFromThenTo a b c
 
 -- | @since 4.9.0.0
 instance Ord a => Semigroup (Max a) where
@@ -302,7 +305,7 @@ instance Foldable Max where
 
 -- | @since 4.9.0.0
 instance Traversable Max where
-  traverse f (Max a) = Max <$> f a
+  traverse f (Max a) = Max `fmap` f a
 
 -- | @since 4.9.0.0
 instance Applicative Max where
@@ -387,7 +390,7 @@ instance Foldable (Arg a) where
 
 -- | @since 4.9.0.0
 instance Traversable (Arg a) where
-  traverse f (Arg x a) = Arg x <$> f a
+  traverse f (Arg x a) = Arg x `fmap` f a
 
 -- | @since 4.9.0.0
 instance Eq a => Eq (Arg a b) where
@@ -408,12 +411,12 @@ instance Bifunctor Arg where
   bimap f g (Arg a b) = Arg (f a) (g b)
 
 -- | @since 4.10.0.0
-instance Bifoldable Arg where
-  bifoldMap f g (Arg a b) = f a <> g b
-
--- | @since 4.10.0.0
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
+
+-- | @since 4.10.0.0
+instance Bifoldable Arg where
+  bifoldMap f g (Arg a b) = f a <> g b
 
 -- |
 -- Beware that @Data.Semigroup.@'First' is different from
@@ -446,10 +449,10 @@ instance Enum a => Enum (First a) where
   pred (First a) = First (pred a)
   toEnum = First . toEnum
   fromEnum = fromEnum . getFirst
-  enumFrom (First a) = First <$> enumFrom a
-  enumFromThen (First a) (First b) = First <$> enumFromThen a b
-  enumFromTo (First a) (First b) = First <$> enumFromTo a b
-  enumFromThenTo (First a) (First b) (First c) = First <$> enumFromThenTo a b c
+  enumFrom (First a) = First `fmap` enumFrom a
+  enumFromThen (First a) (First b) = First `fmap` enumFromThen a b
+  enumFromTo (First a) (First b) = First `fmap` enumFromTo a b
+  enumFromThenTo (First a) (First b) (First c) = First `fmap` enumFromThenTo a b c
 
 -- | @since 4.9.0.0
 instance Semigroup (First a) where
@@ -466,7 +469,7 @@ instance Foldable First where
 
 -- | @since 4.9.0.0
 instance Traversable First where
-  traverse f (First a) = First <$> f a
+  traverse f (First a) = First `fmap` f a
 
 -- | @since 4.9.0.0
 instance Applicative First where
@@ -516,10 +519,10 @@ instance Enum a => Enum (Last a) where
   pred (Last a) = Last (pred a)
   toEnum = Last . toEnum
   fromEnum = fromEnum . getLast
-  enumFrom (Last a) = Last <$> enumFrom a
-  enumFromThen (Last a) (Last b) = Last <$> enumFromThen a b
-  enumFromTo (Last a) (Last b) = Last <$> enumFromTo a b
-  enumFromThenTo (Last a) (Last b) (Last c) = Last <$> enumFromThenTo a b c
+  enumFrom (Last a) = Last `fmap` enumFrom a
+  enumFromThen (Last a) (Last b) = Last `fmap` enumFromThen a b
+  enumFromTo (Last a) (Last b) = Last `fmap` enumFromTo a b
+  enumFromThenTo (Last a) (Last b) (Last c) = Last `fmap` enumFromThenTo a b c
 
 -- | @since 4.9.0.0
 instance Semigroup (Last a) where
@@ -537,7 +540,7 @@ instance Foldable Last where
 
 -- | @since 4.9.0.0
 instance Traversable Last where
-  traverse f (Last a) = Last <$> f a
+  traverse f (Last a) = Last `fmap` f a
 
 -- | @since 4.9.0.0
 instance Applicative Last where
@@ -588,11 +591,11 @@ instance Enum a => Enum (WrappedMonoid a) where
   pred (WrapMonoid a) = WrapMonoid (pred a)
   toEnum = WrapMonoid . toEnum
   fromEnum = fromEnum . unwrapMonoid
-  enumFrom (WrapMonoid a) = WrapMonoid <$> enumFrom a
-  enumFromThen (WrapMonoid a) (WrapMonoid b) = WrapMonoid <$> enumFromThen a b
-  enumFromTo (WrapMonoid a) (WrapMonoid b) = WrapMonoid <$> enumFromTo a b
+  enumFrom (WrapMonoid a) = WrapMonoid `fmap` enumFrom a
+  enumFromThen (WrapMonoid a) (WrapMonoid b) = WrapMonoid `fmap` enumFromThen a b
+  enumFromTo (WrapMonoid a) (WrapMonoid b) = WrapMonoid `fmap` enumFromTo a b
   enumFromThenTo (WrapMonoid a) (WrapMonoid b) (WrapMonoid c) =
-      WrapMonoid <$> enumFromThenTo a b c
+      WrapMonoid `fmap` enumFromThenTo a b c
 
 -- | Repeat a value @n@ times.
 --

@@ -1,4 +1,4 @@
-setTestOpts(normalise_version('base','ghc-prim'))
+setTestOpts(normalise_version('ghc-internal', 'base', 'ghc-prim'))
 
 test('ADT', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('AddAndOr1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])

@@ -210,7 +210,7 @@ void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack) {
 // IPE.
 StgClosure* createPtrClosure(Capability *cap, InfoProvEnt* ipe) {
   StgClosure *p = (StgClosure *) allocate(cap, CONSTR_sizeW(0,1));
-  SET_HDR(p, &base_GHCziPtr_Ptr_con_info, CCS_SYSTEM);
+  SET_HDR(p, &ghczminternal_GHCziPtr_Ptr_con_info, CCS_SYSTEM);
   p->payload[0] = (StgClosure*) ipe;
   return TAG_CLOSURE(1, p);
 }

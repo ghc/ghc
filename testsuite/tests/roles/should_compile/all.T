@@ -1,4 +1,4 @@
-setTestOpts(normalise_version('base','ghc-prim'))
+setTestOpts(normalise_version('base', 'ghc-internal', 'ghc-prim'))
 
 test('Roles1', only_ways(['normal']), compile, ['-ddump-tc -fprint-explicit-foralls -dsuppress-uniques'])
 test('Roles2', only_ways(['normal']), compile, ['-ddump-tc -fprint-explicit-foralls -dsuppress-uniques'])

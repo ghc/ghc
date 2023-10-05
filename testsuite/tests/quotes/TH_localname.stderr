@@ -13,11 +13,10 @@ TH_localname.hs:3:11: error: [GHC-39999]
                   Language.Haskell.TH.Syntax.Lift b) =>
                  Language.Haskell.TH.Syntax.Lift (Either a b)
           -- Defined in ‘Language.Haskell.TH.Syntax’
-        instance Language.Haskell.TH.Syntax.Lift a =>
-                 Language.Haskell.TH.Syntax.Lift (Maybe a)
+        instance Language.Haskell.TH.Syntax.Lift Integer
           -- Defined in ‘Language.Haskell.TH.Syntax’
         ...plus 15 others
-        ...plus 13 instances involving out-of-scope types
+        ...plus 14 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: Language.Haskell.TH.Syntax.lift y
       In the expression:

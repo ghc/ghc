@@ -805,31 +805,31 @@ readArObject ar_state mod ar_file = do
 -- | dependencies for the RTS, these need to be always linked
 rtsDeps :: ([UnitId], Set ExportedFun)
 rtsDeps =
-  ( [baseUnitId, primUnitId]
+  ( [ghcInternalUnitId, primUnitId]
   , S.fromList $ concat
-      [ mkBaseFuns "GHC.Conc.Sync"
+      [ mkInternalFuns "GHC.Conc.Sync"
           ["reportError"]
-      , mkBaseFuns "Control.Exception.Base"
+      , mkInternalFuns "Control.Exception.Base"
           ["nonTermination"]
-      , mkBaseFuns "GHC.Exception.Type"
+      , mkInternalFuns "GHC.Exception.Type"
           [ "SomeException"
           , "underflowException"
           , "overflowException"
           , "divZeroException"
           ]
-      , mkBaseFuns "GHC.TopHandler"
+      , mkInternalFuns "GHC.TopHandler"
           [ "runMainIO"
           , "topHandler"
           ]
-      , mkBaseFuns "GHC.Base"
+      , mkInternalFuns "GHC.Base"
           ["$fMonadIO"]
-      , mkBaseFuns "GHC.Maybe"
+      , mkInternalFuns "GHC.Maybe"
           [ "Nothing"
           , "Just"
           ]
-      , mkBaseFuns "GHC.Ptr"
+      , mkInternalFuns "GHC.Ptr"
           ["Ptr"]
-      , mkBaseFuns "GHC.JS.Prim"
+      , mkInternalFuns "GHC.JS.Prim"
           [ "JSVal"
           , "JSException"
           , "$fShowJSException"
@@ -838,7 +838,7 @@ rtsDeps =
           , "resolveIO"
           , "toIO"
           ]
-      , mkBaseFuns "GHC.JS.Prim.Internal"
+      , mkInternalFuns "GHC.JS.Prim.Internal"
           [ "wouldBlock"
           , "blockedIndefinitelyOnMVar"
           , "blockedIndefinitelyOnSTM"
@@ -865,8 +865,8 @@ rtsDeps =
   )
 
 -- | Export the functions in base
-mkBaseFuns :: FastString -> [FastString] -> [ExportedFun]
-mkBaseFuns = mkExportedFuns baseUnitId
+mkInternalFuns :: FastString -> [FastString] -> [ExportedFun]
+mkInternalFuns = mkExportedFuns ghcInternalUnitId
 
 -- | Export the Prim functions
 mkPrimFuns :: FastString -> [FastString] -> [ExportedFun]
