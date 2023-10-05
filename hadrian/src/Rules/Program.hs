@@ -38,7 +38,7 @@ buildProgramRules rs = do
     -- Rules for programs that are actually built by hadrian.
     forM_ allStages $ \stage ->
         [ root -/- stageString stage -/- "bin"     -/- "*"
-        , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
+        ] |%> \bin -> do
             programContexts <- getProgramContexts stage
             case lookupProgramContext bin programContexts of
                 Nothing  -> error $ "Unknown program " ++ show bin
@@ -97,13 +97,7 @@ buildProgram bin ctx@(Context{..}) rs = do
   -- so we use pkgRegisteredLibraryFile instead.
   registerPackages =<< contextDependencies ctx
 
-  cross <- flag CrossCompiling
-  case (cross, stage) of
-    -- MP: Why do we copy these? Seems like we should just build them again.
-    (False, s) | s > stage0InTree && (package `elem` [touchy, unlit]) -> do
-        srcDir <- stageLibPath stage0InTree <&> (-/- "bin")
-        copyFile (srcDir -/- takeFileName bin) bin
-    _ -> buildBinary rs bin ctx
+  buildBinary rs bin ctx
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do

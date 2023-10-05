@@ -206,14 +206,8 @@ programBasename way package
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Action FilePath
 programPath context@Context {..} = do
-    -- TODO: The @touchy@ utility lives in the @lib/bin@ directory instead of
-    -- @bin@, which is likely just a historical accident that should be fixed.
-    -- See: https://github.com/snowleopard/hadrian/issues/570
-    -- Likewise for @iserv@ and @unlit@.
     name <- programName context
-    path <- if package `elem` [iserv, touchy, unlit]
-              then stageLibPath stage <&> (-/- "bin")
-              else stageBinPath stage
+    path <- stageBinPath stage
     return $ path -/- name <.> exe
 
 -- TODO: Move @timeout@ to the @util@ directory and build in a more standard
