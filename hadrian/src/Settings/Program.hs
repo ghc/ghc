@@ -14,11 +14,11 @@ import Packages
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- askGhcProfiled stage
-    dynGhcProgs <- askDynGhcPrograms stage 
+    dynGhcProgs <- askDynGhcPrograms stage
     -- Have to build static if it's a cross stage as we won't distribute the libraries built for the host.
     return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
-    where wayFor prof dyn 
+    where wayFor prof dyn
             | prof && dyn                           =
                 error "programContext: profiling+dynamic not supported"
             | pkg == ghc && prof && notStage0 stage = profiling

@@ -188,7 +188,7 @@ programName Context {..} = do
     return $ prefix ++ programBasename way package
 
 programBasename :: Way -> Package -> String
-programBasename way package 
+programBasename way package
       | package == ghc          = "ghc"
       | package == ghciWrapper  = "ghci" -- See Note [Hadrian's ghci-wrapper package]
       | package == hpcBin       = "hpc"
