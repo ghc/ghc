@@ -85,8 +85,6 @@ buildProgram bin ctx@(Context{..}) rs = do
     need [template]
   -- Custom dependencies: this should be modeled better in the
   -- Cabal file somehow.
-  when (package == ghc) $ do
-    need =<< ghcBinDeps stage
   when (package == haddock) $ do
     -- Haddock has a resource folder
     need =<< haddockDeps stage

@@ -238,17 +238,12 @@ instance H.Builder Builder where
           -- changes (#18001).
           _bootGhcVersion <- setting GhcVersion
           pure []
-        Ghc _ stage -> do
+        Ghc {} -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext (Stage0 InTreeLibs) touchy)
             unlitPath  <- builderPath Unlit
 
-            -- GHC from the previous stage is used to build artifacts in the
-            -- current stage. Need the previous stage's GHC deps.
-            ghcdeps <- ghcBinDeps (predStage stage)
-
             return $ [ unlitPath ]
-                  ++ ghcdeps
                   ++ [ touchyPath          | windowsHost ]
                   ++ [ root -/- mingwStamp | windowsHost ]
                      -- proxy for the entire mingw toolchain that
