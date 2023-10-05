@@ -26,6 +26,7 @@ import Utilities
 
 import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
+import Oracles.Flavour
 
 docRoot :: FilePath
 docRoot = "doc"
@@ -268,7 +269,7 @@ buildPackageDocumentation = do
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
-        dynamicPrograms <- flip dynamicGhcPrograms (stage context)=<< flavour
+        dynamicPrograms <- askDynGhcPrograms (stage context)
         let haddockWay = if dynamicPrograms then dynamic else vanilla
 
         -- Build the dependencies of the package we are going to build documentation for
