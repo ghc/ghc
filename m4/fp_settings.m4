@@ -75,7 +75,7 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     if test "$HostOS" = "mingw32"; then
-        SettingsTouchCommand='$$topdir/bin/touchy.exe'
+        SettingsTouchCommand='$$topdir/../bin/touchy.exe'
     else
         SettingsTouchCommand='touch'
     fi
@@ -109,7 +109,7 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsArCommand])
         SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
-        SettingsTouchCommand='$$topdir/bin/touchy.exe'
+        SettingsTouchCommand='$$topdir/../bin/touchy.exe'
     fi
 
     # LLVM backend tools

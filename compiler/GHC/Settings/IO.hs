@@ -38,7 +38,7 @@ initSettings top_dir = do
   let installed :: FilePath -> FilePath
       installed file = top_dir </> file
       libexec :: FilePath -> FilePath
-      libexec file = top_dir </> "bin" </> file
+      libexec file = top_dir </> ".." </> "bin" </> file
       settingsFile = installed "settings"
 
       readFileSafe :: FilePath -> ExceptT SettingsError m String

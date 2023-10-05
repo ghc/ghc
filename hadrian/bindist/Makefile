@@ -118,7 +118,7 @@ lib/settings : config.mk
 	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
-	@echo ',("unlit command", "$$topdir/bin/$(CrossCompilePrefix)unlit")' >> $@
+	@echo ',("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
@@ -189,7 +189,6 @@ install_lib: lib/settings
 		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ;; \
 		esac; \
 	done; \
-	chmod ugo+rx "$$dest"/bin/*
 	# Work around #17418 on Darwin
 	if [ -e "${XATTR}" ]; then \
 		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \

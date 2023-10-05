@@ -125,6 +125,7 @@ installTo relocatable prefix = do
                 NotRelocatable -> []
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
+
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
@@ -188,7 +189,11 @@ bindistRules = do
             -- 2. Either make a symlink for the unversioned version or
             -- a wrapper script on platforms (windows) which don't support symlinks.
             if windowsHost
-              then createVersionWrapper pkg version_prog unversioned_install_path
+              then if pkg == unlit
+                      -- The unlit executable is a C executable already, wrapping it again causes
+                      -- paths to be double escaped, so we just copy this one as it is already small.
+                      then copyFile install_path unversioned_install_path
+                      else createVersionWrapper pkg version_prog unversioned_install_path
               else liftIO $ do
                 -- Use the IO versions rather than createFileLink because
                 -- we need to create a relative symlink.
