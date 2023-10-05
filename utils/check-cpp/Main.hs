@@ -58,8 +58,8 @@ parseString libdir includes str = ghcWrapper libdir $ do
     return $ strGetToks includes pflags "fake_test_file.hs" str
 
 strGetToks :: Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
--- strGetToks includes popts filename str = reverse $ lexAll pstate
-strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
+strGetToks includes popts filename str = reverse $ lexAll pstate
+-- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
   where
     includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
     initState = initPpState{pp_includes = includeMap}
@@ -69,7 +69,8 @@ strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ s
     -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
 
     lexAll state = case unP (ppLexerDbg True return) state of
-        POk _ t@(L _ ITeof) -> [t]
+        -- POk _ t@(L _ ITeof) -> [t]
+        POk s t@(L _ ITeof) -> trace ("lexall end:s=" ++ show (Lexer.pp s)) [t]
         POk state' t -> t : lexAll state'
         -- (trace ("lexAll: " ++ show (unLoc t)) state')
         PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)

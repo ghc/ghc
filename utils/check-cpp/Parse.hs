@@ -1,14 +1,21 @@
 module Parse where
 
 import Data.Char
+
+-- import Data.Functor.Identity
 import GHC.Parser.Errors.Ppr ()
+import Text.Parsec
 import qualified Text.Parsec as Parsec
 import Text.Parsec.Char as PS
 import Text.Parsec.Combinator as PS
-import Text.Parsec.Prim as PS
-import Text.Parsec.String (Parser)
+import Text.Parsec.Language (emptyDef)
+import Text.Parsec.Prim as PS hiding (token)
+import Text.Parsec.String
 
--- import Debug.Trace
+-- import Text.Parsec.String (Parser)
+import qualified Text.Parsec.Token as P
+
+import Debug.Trace
 
 -- ---------------------------------------------------------------------
 
@@ -22,7 +29,7 @@ cppDefinition :: CppParser (String, [String])
 cppDefinition = do
     _ <- PS.char '#'
     _ <- whiteSpace
-    _ <- lexeme (PS.string "define")
+    eToken "define"
     name <- cppToken
     definition <- cppTokens
     return (name, definition)
@@ -101,94 +108,89 @@ cppToken = lexeme (PS.many1 (PS.satisfy (\c -> not (isSpace c))))
 cppTokens :: CppParser [String]
 cppTokens = PS.many cppToken
 
+-- token :: String -> CppParser ()
+-- token str = do
+--     _ <- lexeme (PS.string str)
+--     return ()
+
 -- ---------------------------------------------------------------------
--- import GHC.S.Types
+-- Expression language
+-- NOTE: need to take care of macro expansion while parsing. Or perhaps before?
 
--- parseS :: String -> Either ParseError S
--- parseS = parse expr ""
+lexer :: P.TokenParser ()
+lexer = P.makeTokenParser exprDef
 
--- lexer :: P.TokenParser ()
--- lexer =
---     P.makeTokenParser
---         ( emptyDef
---             { P.reservedNames =
---                 [ "define"
---                 , "include"
---                 , "undef"
---                 , "error"
---                 , "ifdef"
---                 , "ifndef"
---                 , "if"
---                 , "elif"
---                 , "else"
---                 , "endif"
---                 ]
---             }
---         )
+exprDef :: P.LanguageDef st
+exprDef =emptyDef
+            { P.commentStart = "/*"
+            , P.commentEnd = "*/"
+            , P.commentLine = "//"
+            , P.nestedComments = False
+            , P.identStart = letter <|> char '_'
+            , P.identLetter = alphaNum <|> oneOf "_'"
+            , P.opStart = P.opLetter exprDef
+            , P.opLetter = oneOf ":!#$%&*+./<=>?@\\^|-~"
+            , P.reservedOpNames = []
+            , P.reservedNames = []
+            , P.caseSensitive = True
+            }
 
--- slam :: Parser S
--- slam = P.parens lexer $ do
---     P.reserved lexer "lam"
---     ident <- P.identifier lexer
---     body <- expr
---     return (SLam (Atom ident) body)
+data Expr
+    = Parens Expr
+    | Var String
+    | IntVal Int
+    | BinOp Op Expr Expr
+    deriving (Show)
 
--- slet :: Parser S
--- slet = P.parens lexer $ do
---     P.reserved lexer "let"
---     (ident, e1) <- P.parens lexer $ do
---         idnt <- P.identifier lexer
---         expr1 <- expr
---         return (idnt, expr1)
---     e2 <- expr
---     return (SLet (Atom ident) e1 e2)
+data Op
+    = Or
+    | And
+    | CmpEqual
+    | CmpGt
+    | CmpGtE
+    | CmpLt
+    | CmpLtE
+    deriving (Show)
 
--- sletrec :: Parser S
--- sletrec = P.parens lexer $ do
---     P.reserved lexer "letrec"
---     ls <- P.parens lexer $ many1 $ P.parens lexer $ do
---         idnt <- P.identifier lexer
---         expr1 <- expr
---         return (Atom idnt, expr1)
---     e2 <- expr
---     return (SLetRec ls e2)
+eExpr :: CppParser Expr
+eExpr = choice [eParens, eBinOp, eVariable]
 
--- scase :: Parser S
--- scase = P.parens lexer $ do
---     P.reserved lexer "case"
---     e <- expr
---     alt <- optionMaybe (P.identifier lexer)
---     alts <- P.parens lexer $ many1 $ P.parens lexer $ do
---         pat <- expr
---         ex <- expr
---         return (pat, ex)
---     case alt of
---         Just alt -> return (SCase (Atom alt) e alts)
---         Nothing -> return (SCase (Atom "_") e alts)
+eParens :: CppParser Expr
+eParens = P.parens lexer $ do
+    e <- eExpr
+    return $ Parens e
 
--- swild :: Parser S
--- swild = do
---     P.symbol lexer "_"
---     return SWild
+eBinOp :: CppParser Expr
+eBinOp = do
+    e1 <- eExpr
+    op <- eOp
+    -- _ <- cppToken
+    -- let op = Or
+    e2 <- eExpr
+    return $ BinOp op e1 e2
 
--- sbinop :: Parser S
--- sbinop = P.parens lexer $ do
---     e1 <- expr
---     op <- P.operator lexer
---     e2 <- expr
---     return (SBinOp (Atom op) e1 e2)
+eOp :: CppParser Op
+eOp = do
+    -- op <- P.operator lexer
+    op <- P.operator (trace "foo" lexer)
+    return $ trace ("op=" ++ show op) Or
 
--- expr :: Parser S
--- expr =
---     choice
---         [ try slam
---         , try sbinop
---         , try slet
---         , try sletrec
---         , try scase
---         , STuple <$> P.parens lexer (many expr)
---         , swild
---         , SAtom <$> (Atom <$> (P.identifier lexer))
---         , SString <$> P.stringLiteral lexer
---         , SInt <$> P.integer lexer
---         ]
+eVariable :: CppParser Expr
+eVariable = do
+    v <- P.identifier lexer
+    return $ Var v
+
+eToken :: String -> CppParser ()
+eToken str = P.reserved lexer str
+
+-- ---------------------------------------------------------------------
+
+doTest :: String -> Either Parsec.ParseError CppDirective
+doTest str =
+    regularParse cppDirective str
+
+t0 :: Either Parsec.ParseError CppDirective
+t0 = doTest "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
+
+t1 :: Either Parsec.ParseError Expr
+t1 = regularParse eExpr "(m < 1)"
