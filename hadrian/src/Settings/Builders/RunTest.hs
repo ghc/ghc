@@ -4,8 +4,8 @@ module Settings.Builders.RunTest (runTestBuilderArgs
                                  , assertSameCompilerArgs
                                  , outOfTreeCompilerArgs
                                  , TestCompilerArgs(..)
-				 , getBooleanSetting
-				 , getTestSetting ) where
+         , getBooleanSetting
+         , getTestSetting ) where
 
 import Hadrian.Utilities
 import qualified System.FilePath

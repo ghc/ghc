@@ -212,23 +212,11 @@ testRules = do
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- timeoutPath]
 
-        cross <- flag CrossCompiling
 
         -- get relative path for the given program in the given stage
-        let relative_path_stage s p = programPath =<< programContext s p
         let make_absolute rel_path = do
               abs_path <- liftIO (IO.makeAbsolute rel_path)
               fixAbsolutePathOnWindows abs_path
-
-        rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
-        rel_hsc2hs      <- relative_path_stage Stage1 hsc2hs
-        rel_hp2ps       <- relative_path_stage Stage1 hp2ps
-        rel_haddock     <- relative_path_stage (Stage0 InTreeLibs) haddock
-        rel_hpc         <- relative_path_stage (Stage0 InTreeLibs) hpc
-        rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
-
-        -- force stage0 program building for cross
-        --when cross $ need [rel_hpc, rel_haddock, rel_runghc]
 
 
         ghcPath <- getCompilerPath testCompilerArg
@@ -240,7 +228,7 @@ testRules = do
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history", "-fprint-error-index-links=never"
               ]
-	-- MP: TODO wrong
+        -- MP: TODO wrong, should use the ccPath and ccFlags from the bindist we are testing.
         ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
         ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
 
@@ -248,12 +236,12 @@ testRules = do
 
         testGhc <- testCompiler <$> userSetting defaultTestArgs
         bindir <- getBinaryDirectory testGhc
-    	cross <- getBooleanSetting TestCrossCompiling
-    	test_target_platform <- getTestSetting TestTARGETPLATFORM
-    	let cross_prefix = if cross then test_target_platform ++ "-" else ""
+        cross <- getBooleanSetting TestCrossCompiling
+        test_target_platform <- getTestSetting TestTARGETPLATFORM
+        let cross_prefix = if cross then test_target_platform ++ "-" else ""
 
-	let exe_path :: Package -> String
-	    exe_path pkg = bindir </> (cross_prefix ++  programBasename vanilla pkg) <.> exe
+        let exe_path :: Package -> String
+            exe_path pkg = bindir </> (cross_prefix ++  programBasename vanilla pkg) <.> exe
 
         prog_ghc_pkg     <- make_absolute (exe_path ghcPkg)
         prog_hsc2hs      <- make_absolute (exe_path hsc2hs)

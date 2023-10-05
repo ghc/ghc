@@ -20,7 +20,6 @@ import GHC.Toolchain.Program (prgFlags)
 import qualified Data.Set as Set
 import Oracles.Flavour
 import Debug.Trace
-import qualified System.Directory.Extra as IO
 
 {-
 Note [Binary distributions]
@@ -172,7 +171,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     -- let rtsDir  = "rts"
 
     let ghcBuildDir      = root -/- stageString library_stage
-	ghcLibBinBuildDir = root -/- stageString executable_stage -/- "lib" -/- "bin"
+        ghcLibBinBuildDir = root -/- stageString executable_stage -/- "lib" -/- "bin"
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
@@ -416,11 +415,10 @@ generateBuildMk BindistConfig{..}  = do
   dynamicGhc <- askDynGhcPrograms executable_stage
   rtsWays <- unwords . map show . Set.toList <$> interpretInContext (vanillaContext library_stage rts) getRtsWays
   cross <- crossStage executable_stage
-  traceShowM ("cross", library_stage, executable_stage, cross)
   return $ unlines [ "GhcRTSWays" =. rtsWays
                    -- MP: TODO just very hacky, should be one place where cross implies static (see programContext for where this is currently)
-                   , "DYNAMIC_GHC_PROGRAMS" =. yesNo (dynamicGhc && not cross)
-		   , "CrossCompiling" =. yesNo cross ]
+                   , "DYNAMIC_GHC_PROGRAMS" =. yesNo dynamicGhc
+                   , "CrossCompiling" =. yesNo cross ]
 
 
   where
