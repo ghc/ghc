@@ -5,7 +5,6 @@ module Settings.Program
 import Base
 import Context
 import Oracles.Flavour
-import Oracles.Setting
 import Packages
 
 -- TODO: there is duplication and inconsistency between this and
