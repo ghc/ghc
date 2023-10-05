@@ -1,0 +1,1 @@
+test('stability1', [extra_files(['FlaggedExperimental.hs'])], multimod_compile, ['stability1', ''])

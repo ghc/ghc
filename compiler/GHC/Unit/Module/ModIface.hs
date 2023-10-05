@@ -48,6 +48,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile
+import GHC.Types.Stability
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM
 
@@ -241,6 +242,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [Trust Own Package] in GHC.Rename.Names
+
+        mi_stability :: !StabilityMode,
+
         mi_complete_matches :: ![IfaceCompleteMatch],
 
         mi_docs :: !(Maybe Docs),
@@ -364,6 +368,7 @@ instance Binary ModIface where
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
+                 mi_stability = stability,
                  mi_complete_matches = complete_matches,
                  mi_docs      = docs,
                  mi_ext_fields = _ext_fields, -- Don't `put_` this in the instance so we
@@ -409,6 +414,7 @@ instance Binary ModIface where
         put_ bh hpc_info
         put_ bh trust
         put_ bh trust_pkg
+        put_ bh stability
         put_ bh complete_matches
         lazyPutMaybe bh docs
 
@@ -441,6 +447,7 @@ instance Binary ModIface where
         hpc_info    <- get bh
         trust       <- get bh
         trust_pkg   <- get bh
+        stability   <- get bh
         complete_matches <- get bh
         docs        <- lazyGetMaybe bh
         return (ModIface {
@@ -465,6 +472,7 @@ instance Binary ModIface where
                  mi_hpc         = hpc_info,
                  mi_trust       = trust,
                  mi_trust_pkg   = trust_pkg,
+                 mi_stability   = stability,
                         -- And build the cached values
                  mi_complete_matches = complete_matches,
                  mi_docs        = docs,
@@ -512,6 +520,7 @@ emptyPartialModIface mod
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False,
+               mi_stability   = StabilityDefault,
                mi_complete_matches = [],
                mi_docs        = Nothing,
                mi_final_exts  = (),

@@ -107,6 +107,7 @@ import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.ProfAuto
 import GHC.Types.SafeHaskell
+import GHC.Types.Stability
 import GHC.Types.SrcLoc
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
@@ -459,7 +460,10 @@ data DynFlags = DynFlags {
     -- 'Int' because it can be used to test uniques in decreasing order.
 
   -- | Temporary: CFG Edge weights for fast iterations
-  cfgWeights            :: Weights
+  cfgWeights            :: Weights,
+
+  -- | What level of experimental features/libraries should be allowed?
+  stabilityMode         :: StabilityMode
 }
 
 class HasDynFlags m where
@@ -710,7 +714,9 @@ defaultDynFlags mySettings =
 
         reverseErrors = False,
         maxErrors     = Nothing,
-        cfgWeights    = defaultWeights
+        cfgWeights    = defaultWeights,
+
+        stabilityMode = StabilityDefault
       }
 
 type FatalMessager = String -> IO ()

@@ -1,5 +1,6 @@
 
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006-2008
@@ -51,6 +52,7 @@ import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 import GHC.Driver.Plugins
+import GHC.Driver.Stability
 
 import GHC.Types.Id
 import GHC.Types.Fixity.Env
@@ -107,7 +109,7 @@ mkPartialIface :: HscEnv
                -> ModDetails
                -> ModSummary
                -> ModGuts
-               -> PartialModIface
+               -> IO PartialModIface
 mkPartialIface hsc_env core_prog mod_details mod_summary
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
@@ -230,7 +232,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
 
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
 
-          let partial_iface = mkIface_ hsc_env
+          partial_iface <- mkIface_ hsc_env
                    this_mod (fromMaybe [] mb_program) hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
@@ -249,7 +251,7 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Maybe Docs
          -> ModSummary
          -> ModDetails
-         -> PartialModIface
+         -> IO PartialModIface
 mkIface_ hsc_env
          this_mod core_prog hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
@@ -301,8 +303,11 @@ mkIface_ hsc_env
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = maybeGlobalRdrEnv rdr_env
+    stability <- checkStability hsc_env deps this_mod >>= \case
+                   Just  s -> return s
+                   Nothing -> panic $ "Failed stability check for " ++ (show $ ms_mod_name mod_summary)
 
-    ModIface {
+    return ModIface {
           mi_module      = this_mod,
           -- Need to record this because it depends on the -instantiated-with flag
           -- which could change
@@ -330,6 +335,7 @@ mkIface_ hsc_env
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
+          mi_stability   = stability,
           mi_complete_matches = icomplete_matches,
           mi_docs        = docs,
           mi_final_exts  = (),

@@ -253,6 +253,7 @@ import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
+import GHC.Types.Stability
 import GHC.Types.Basic ( treatZeroAsInf )
 import GHC.Data.FastString
 import GHC.Utils.TmpFs
@@ -514,6 +515,10 @@ setSafeHaskell s = updM f
                   return $ dfs { safeHaskell = safeM, trustworthyOnLoc = l }
                 -- leave safe inference on in Unsafe mode as well.
                 _ -> return $ dfs { safeHaskell = safeM }
+
+setStability :: String -> DynP ()
+setStability "experimental" = updM (\d -> return $ d { stabilityMode = StabilityExperimental })
+setStability l = addErr $ "Unknown stability level: " ++ l
 
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
@@ -1260,6 +1265,8 @@ dynamic_flags_deps = [
       (noArg (\d -> d {rtsOptsSuggestions = False}))
   , make_ord_flag defGhcFlag "dhex-word-literals"
         (NoArg (setGeneralFlag Opt_HexWordLiterals))
+
+  , make_ord_flag defGhcFlag "std"                  (HasArg setStability)
 
   , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)

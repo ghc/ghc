@@ -489,6 +489,7 @@ Library
         GHC.Driver.Plugins.External
         GHC.Driver.Ppr
         GHC.Driver.Session
+        GHC.Driver.Stability
         GHC.Hs
         GHC.Hs.Binds
         GHC.Hs.Decls
@@ -847,6 +848,7 @@ Library
         GHC.Types.SourceFile
         GHC.Types.SourceText
         GHC.Types.SrcLoc
+        GHC.Types.Stability
         GHC.Types.Target
         GHC.Types.Tickish
         GHC.Types.TypeEnv
