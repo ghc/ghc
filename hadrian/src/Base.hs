@@ -32,7 +32,7 @@ module Base (
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     stageBinPath, stageLibPath, templateHscPath,
     buildTargetFile, hostTargetFile, targetTargetFile,
-    ghcBinDeps, ghcLibDeps, haddockDeps,
+    ghcLibDeps, haddockDeps,
     relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
     systemCxxStdLibConf, systemCxxStdLibConfPath
     , PackageDbLoc(..), Inplace(..)
@@ -151,16 +151,11 @@ ghcLibDeps stage iplace = do
         , "llvm-passes"
         , "ghc-interp.js"
         , "settings"
+        , "ghc-usage.txt"
+        , "ghci-usage.txt"
         ]
     cxxStdLib <- systemCxxStdLibConfPath (PackageDbLoc stage iplace)
     return (cxxStdLib : ps)
-
--- | Files the GHC binary depends on.
-ghcBinDeps :: Stage -> Action [FilePath]
-ghcBinDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
-    [ "ghc-usage.txt"
-    , "ghci-usage.txt"
-    ]
 
 -- | Files the `haddock` binary depends on
 haddockDeps :: Stage -> Action [FilePath]
