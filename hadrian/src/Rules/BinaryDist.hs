@@ -171,7 +171,6 @@ buildBinDistDir root conf@BindistConfig{..} = do
     -- let rtsDir  = "rts"
 
     let ghcBuildDir      = root -/- stageString library_stage
-        ghcLibBinBuildDir = root -/- stageString executable_stage -/- "lib" -/- "bin"
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
@@ -229,9 +228,6 @@ buildBinDistDir root conf@BindistConfig{..} = do
               IO.createFileLink version_prog versioned_runhaskell_path
 
     copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
-    ld <- liftIO $ IO.listDirectory ghcLibBinBuildDir
-    traceShowM ld
-    copyDirectory ghcLibBinBuildDir bindistFilesDir
     copyDirectory (rtsIncludeDir)         bindistFilesDir
     when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
 
