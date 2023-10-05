@@ -480,6 +480,9 @@ function build_hadrian() {
 
   check_release_build
 
+  # Just to be sure, use the same hackage index state when building Hadrian.
+  echo "index-state: $HACKAGE_INDEX_STATE" > hadrian/cabal.project.local
+
   # We can safely enable parallel compression for x64. By the time
   # hadrian calls tar/xz to produce bindist, there's no other build
   # work taking place.
