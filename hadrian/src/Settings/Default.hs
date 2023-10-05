@@ -158,11 +158,11 @@ stage1Packages = do
         , stm
         , unlit
         , xhtml
-	, haddock
-	, hpcBin
+        , haddock
+        , hpcBin
         , if winTarget then win32 else unix
         ] ++
-	[ iserv
+        [ iserv
         , runGhc
         , ghcToolchainBin
         ]
