@@ -170,7 +170,8 @@ setPath pkg path = pkg { pkgPath = path }
 crossPrefix :: Stage -> Action String
 crossPrefix st = do
     cross <- crossStage st
-    targetPlatform <- targetPlatformTriple <$> targetStage (succStage st)
+    -- NB: If you modify this then it needs to align with CrossCompilePrefix in configure.ac
+    targetPlatform <- setting TargetPlatformFull
     return $ if cross then targetPlatform ++ "-" else ""
 
 -- | Given a 'Context', compute the name of the program that is built in it

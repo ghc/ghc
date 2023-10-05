@@ -592,15 +592,15 @@ function test_hadrian() {
   if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
-    # special case for JS backend
-#  elif [ -n "${CROSS_TARGET:-}" ]; then
-#    local instdir="$TOP/_build/install"
-#    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-#    install_bindist _build/bindist/ghc-*/ "$instdir"
-#    echo 'main = putStrLn "hello world"' > expected
-#    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-#    ${CROSS_EMULATOR:-} ./hello > actual
-#    run diff expected actual
+  # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
+  elif [ -n "${CROSS_EMULATOR:-}" ]; then
+    local instdir="$TOP/_build/install"
+    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+    install_bindist _build/bindist/ghc-*/ "$instdir"
+    echo 'main = putStrLn "hello world"' > expected
+    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+    ${CROSS_EMULATOR:-} ./hello > actual
+    run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
