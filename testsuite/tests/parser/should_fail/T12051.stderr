@@ -1,0 +1,2 @@
+
+T12051.hs:3:10: error: [GHC-25742] Not a data constructor: ‘+++’

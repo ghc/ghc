@@ -1,0 +1,10 @@
+
+T23154.hs:7:1: error: [GHC-52083]
+    The first pattern in the equation for ‘f’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.
+
+T23154.hs:7:1: error: [GHC-52083]
+    The first pattern in the equation for ‘f’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.

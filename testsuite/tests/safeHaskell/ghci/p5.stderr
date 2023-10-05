@@ -1,0 +1,16 @@
+unrecognised flag: -XNoSafe
+did you mean one of:
+  -XSafe
+
+<no location info>: Incompatible Safe Haskell flags! (Safe, Trustworthy)
+Usage: For basic information, try the `--help' option.
+unrecognised flag: -XNoTrustworthy
+did you mean one of:
+  -XTrustworthy
+
+<no location info>: Incompatible Safe Haskell flags! (Safe, Unsafe)
+Usage: For basic information, try the `--help' option.
+unrecognised flag: -XNoUnsafe
+did you mean one of:
+  -XUnsafe
+

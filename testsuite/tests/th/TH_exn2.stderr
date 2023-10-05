@@ -1,0 +1,10 @@
+
+TH_exn2.hs:1:1: error: [GHC-87897]
+    Exception when trying to run compile-time code:
+      Prelude.tail: empty list
+CallStack (from HasCallStack):
+  error, called at libraries/ghc-internal/src/GHC/List.hs:2018:3 in ghc-internal:GHC.List
+  errorEmptyList, called at libraries/ghc-internal/src/GHC/List.hs:179:28 in ghc-internal:GHC.List
+  tail, called at TH_exn2.hs:10:17 in main:TH
+    Code: (do ds <- [d| |]
+              return (tail ds))

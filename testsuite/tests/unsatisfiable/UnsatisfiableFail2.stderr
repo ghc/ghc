@@ -1,0 +1,5 @@
+
+UnsatisfiableFail2.hs:15:9: error: [GHC-22250]
+    • Input was False!
+    • In the expression: h (Proxy @False)
+      In an equation for ‘eg3’: eg3 _ = h (Proxy @False)

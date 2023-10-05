@@ -1,0 +1,5 @@
+constr a
+constr b
+hello
+destr b
+destr a

@@ -1,0 +1,10 @@
+
+T14605.hs:14:13: error: [GHC-10283]
+    • Couldn't match representation of type ‘x’ with that of ‘()’
+        arising from a use of ‘coerce’
+      ‘x’ is a rigid type variable bound by
+        the type ()
+        at T14605.hs:14:1-49
+    • In the expression: coerce @(forall x. ()) @(forall x. x)
+      In an equation for ‘duplicate’:
+          duplicate = coerce @(forall x. ()) @(forall x. x)

@@ -1,0 +1,3 @@
+:load T15743b.hs
+:set -fprint-explicit-foralls
+:k F

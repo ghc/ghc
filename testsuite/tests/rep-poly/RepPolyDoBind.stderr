@@ -1,0 +1,17 @@
+
+RepPolyDoBind.hs:26:3: error: [GHC-55287]
+    • The first argument of the rebindable syntax operator ‘(>>=)’
+        arising from a do statement
+      does not have a fixed runtime representation.
+      Its type is:
+        ma0 :: TYPE rep0
+      Cannot unify ‘rep’ with the type variable ‘rep0’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In a stmt of a 'do' block: a <- undefined
+      In the expression:
+        do a <- undefined
+           return ()
+      In an equation for ‘foo’:
+          foo _
+            = do a <- undefined
+                 return ()

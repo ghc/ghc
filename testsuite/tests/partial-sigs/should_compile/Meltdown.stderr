@@ -1,0 +1,15 @@
+TYPE SIGNATURES
+  isMeltdown :: forall param1 param2. NukeMonad param1 param2 Bool
+  unlessMeltdown ::
+    forall {param1} {param2}.
+    NukeMonad param1 param2 () -> NukeMonad param1 param2 ()
+TYPE CONSTRUCTORS
+  data type NukeMonad{3} :: * -> * -> * -> *
+    roles phantom phantom phantom
+CLASS INSTANCES
+  instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:9:10
+  instance Applicative (NukeMonad a b)
+    -- Defined at Meltdown.hs:12:10
+  instance Monad (NukeMonad a b) -- Defined at Meltdown.hs:16:10
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]

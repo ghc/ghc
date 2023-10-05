@@ -1,0 +1,10 @@
+pattern Foo :: () => (b ~ a) => a :~~: b
+  	-- Defined at <interactive>:6:1
+pattern Bar
+  :: forall {k1} {k2} {a :: k1} {b :: k2}.
+     () =>
+     (k2 ~ k1, b ~~ a) =>
+     a :~~: b
+  	-- Defined at <interactive>:12:1
+pattern Bam :: () => Ord a => a -> a -> (S a, S a)
+  	-- Defined at <interactive>:22:1

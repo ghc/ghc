@@ -1,0 +1,9 @@
+:set -fprint-redundant-promotion-ticks -XNoStarIsType
+:load T20531_defs
+:kind! L0
+:kind! L1
+:kind! L2
+:kind! Tup0
+:kind! Tup2
+:kind! S
+:kind! I

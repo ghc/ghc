@@ -1,0 +1,10 @@
+
+tcfail062.hs:34:6: error: [GHC-76037]
+    Not in scope: type variable ‘behaviouralExpression’
+    Suggested fix:
+      Perhaps use type constructor or class ‘BehaviouralExpression’ (line 25)
+
+tcfail062.hs:34:29: error: [GHC-76037]
+    Not in scope: type variable ‘behaviouralExpression’
+    Suggested fix:
+      Perhaps use type constructor or class ‘BehaviouralExpression’ (line 25)

@@ -1,0 +1,10 @@
+name: echo-plugin
+cabal-version: >=1.24
+build-type: Simple
+version: 0.1.0.0
+
+library
+  default-language: Haskell2010
+  build-depends: base, ghc
+  exposed-modules: Echo, Echo1, Echo2
+  ghc-options: -Wall

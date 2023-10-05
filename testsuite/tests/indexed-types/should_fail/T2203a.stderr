@@ -1,0 +1,5 @@
+
+T2203a.hs:13:19: error: [GHC-73138]
+    • Illegal type synonym family application ‘TheFoo a’ in instance:
+        Bar (Either a (TheFoo a))
+    • In the instance declaration for ‘Bar (Either a (TheFoo a))’

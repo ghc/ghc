@@ -1,0 +1,11 @@
+:l GHCiDRF
+:t GHCiDRF.foo
+:t GHCiDRF.bar
+:info GHCiDRF.foo
+:info GHCiDRF.bar
+:m - GHCiDRF
+:t GHCiDRF.foo
+:t GHCiDRF.bar
+:info GHCiDRF.foo
+:info GHCiDRF.bar
+GHCiDRF.bar (GHCiDRF.MkU True :: GHCiDRF.U)

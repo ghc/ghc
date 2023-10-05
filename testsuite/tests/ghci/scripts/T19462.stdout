@@ -1,0 +1,11 @@
+pattern P :: a -> b -> (a, b)
+pattern P {x, y}
+  	-- Defined at <interactive>:2:1
+pattern P :: a -> b -> (a, b)
+pattern P {x, y}
+  	-- Defined at <interactive>:2:11
+pattern P :: a -> b -> (a, b)
+pattern P {x, y}
+  	-- Defined at <interactive>:2:13
+pattern V :: () 	-- Defined at <interactive>:6:1
+pattern C :: a -> b -> (a, b) 	-- Defined at <interactive>:8:1

@@ -1,0 +1,3 @@
+
+WarnMinimalFail1.hs:5:1: error: [GHC-87866]
+    Misplaced MINIMAL pragma: {-# MINIMAL global #-}

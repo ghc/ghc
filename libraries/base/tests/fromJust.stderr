@@ -1,0 +1,4 @@
+fromJust.hs: Maybe.fromJust: Nothing
+CallStack (from HasCallStack):
+  error, called at libraries/base/Data/Maybe.hs:148:21 in base:Data.Maybe
+  fromJust, called at fromJust.hs:9:8 in main:Main

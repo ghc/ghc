@@ -1,0 +1,4 @@
+set terminal latex
+set output "piece.tex"
+set nokey
+plot [0.0:20.0] "piece.plt" with lines

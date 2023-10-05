@@ -1,0 +1,9 @@
+
+Linear7.hs:7:16: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘n’
+    • In an equation for ‘incorrectLCase’:
+          incorrectLCase n
+            = \case
+                True -> n
+                False -> 0

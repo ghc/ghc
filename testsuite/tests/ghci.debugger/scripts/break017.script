@@ -1,0 +1,17 @@
+:l QSort.hs
+:set -fbreak-on-exception
+:trace qsort ("abc" ++ undefined)
+
+-- Back up to the (filter (<=a) as) call
+:back
+:back
+
+putStrLn "Printing 1"
+:print as
+
+putStrLn "Forcing"
+:force as
+
+-- this should print the exception
+putStrLn "Printing 2"
+:print as

@@ -1,0 +1,33 @@
+
+==================== Demand signatures ====================
+UnsatFun.f: <1!P(S)><B>b
+UnsatFun.g: <1!P(S)>b
+UnsatFun.g': <MS>
+UnsatFun.g3: <A>
+UnsatFun.h: <1C(1,L)>
+UnsatFun.h2: <1L><MC(1,L)>
+UnsatFun.h3: <1C(1,A)>
+
+
+
+==================== Cpr signatures ====================
+UnsatFun.f: b
+UnsatFun.g:
+UnsatFun.g':
+UnsatFun.g3: 1
+UnsatFun.h:
+UnsatFun.h2:
+UnsatFun.h3: 1
+
+
+
+==================== Demand signatures ====================
+UnsatFun.f: <1!P(S)><B>b
+UnsatFun.g: <1!P(S)>b
+UnsatFun.g': <MS>
+UnsatFun.g3: <A>
+UnsatFun.h: <1C(1,L)>
+UnsatFun.h2: <1L><MC(1,L)>
+UnsatFun.h3: <1C(1,A)>
+
+

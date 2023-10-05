@@ -1,0 +1,28 @@
+
+Linear13.hs:6:14: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘a’
+    • In an equation for ‘incorrectLet’:
+          incorrectLet a = let x = a in ()
+
+Linear13.hs:9:27: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectLetWithSignature’:
+          incorrectLetWithSignature x
+            = let
+                y :: Bool -> Bool
+                y = x
+              in ()
+
+Linear13.hs:12:20: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectLazyMatch’:
+          incorrectLazyMatch x = let (a, b) = x in b
+
+Linear13.hs:15:24: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectCasePromotion’:
+          incorrectCasePromotion x = case x of (a, b) -> b

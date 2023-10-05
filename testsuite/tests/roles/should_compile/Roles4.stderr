@@ -1,0 +1,48 @@
+TYPE SIGNATURES
+  meth1 :: forall a. C1 a => a -> a
+  meth3 :: forall a. C3 a => a -> Syn1 a
+TYPE CONSTRUCTORS
+  class C1{1} :: * -> Constraint
+  class C3{1} :: * -> Constraint
+  type synonym Syn1{1} :: * -> *
+COERCION AXIOMS
+  axiom Roles4.N:C1 :: C1 a = a -> a
+  axiom Roles4.N:C3 :: C3 a = a -> Syn1 a
+Dependent modules: []
+Dependent packages: [base-4.17.0.0]
+
+==================== Typechecker ====================
+Roles4.$tcC3
+  = GHC.Types.TyCon
+      7508642517340826358#Word64 16938219270597865136#Word64
+      Roles4.$trModule (GHC.Types.TrNameS "C3"#) 0# $krep
+Roles4.$tc'C:C3
+  = GHC.Types.TyCon
+      3133378316178104365#Word64 15809386433947157376#Word64
+      Roles4.$trModule (GHC.Types.TrNameS "'C:C3"#) 1# $krep
+Roles4.$tcC1
+  = GHC.Types.TyCon
+      13392243382482428602#Word64 1780037961948725012#Word64
+      Roles4.$trModule (GHC.Types.TrNameS "C1"#) 0# $krep
+Roles4.$tc'C:C1
+  = GHC.Types.TyCon
+      3870707671502302648#Word64 10631907186261837450#Word64
+      Roles4.$trModule (GHC.Types.TrNameS "'C:C1"#) 1# $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp Roles4.$tcC3 ((:) $krep [])
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp Roles4.$tcC1 ((:) $krep [])
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp GHC.Types.$tcList ((:) $krep [])
+Roles4.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles4"#)
+
+

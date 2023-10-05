@@ -1,0 +1,3 @@
+T12368a: This is good!
+CallStack (from HasCallStack):
+  error, called at T12368a.hs:22:17 in main:Main

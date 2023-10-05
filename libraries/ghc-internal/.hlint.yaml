@@ -1,0 +1,29 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: {}
+- warn: {name: Unused LANGUAGE pragma}
+- warn: {name: Use fewer LANGUAGE pragmas}
+- warn: {name: Redundant return}
+- warn: {name: Redundant True guards}
+- warn: {name: Redundant do}
+- warn: {name: Redundant variable capture}
+- warn: {name: Redundant void}
+- warn: {name: Redundant as}
+- warn: {name: Use fewer imports}
+- warn: {name: Redundant as-pattern}
+- warn: {name: Redundant where}
+- warn: {name: Used otherwise as a pattern}
+
+
+## Exceptions
+# Sometimes, the hlint parser flags some functions and modules as incorrectly
+# using a language extension. Some other times, we need to make exceptions to
+# lints that we otherwise want applied elsewhere. Such exceptions are listed
+# below.
+
+- ignore: {name: Unused LANGUAGE pragma, within: [GHC.IO.Encoding.CodePage, GHC.IO.Handle.Lock.Windows, GHC.Event.KQueue, GHC.Generics]}
+- ignore: {name: Redundant do, within: [GHC.IO.Handle.Text.commitBuffer]}
+- ignore: {name: Use fewer imports, within: [GHC.Windows, GHC.Event.Control]}
+- ignore: {name: Use fewer LANGUAGE pragmas, within: [GHC.IO.Handle.Lock.LinuxOFD]}

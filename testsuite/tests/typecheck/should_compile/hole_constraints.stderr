@@ -1,0 +1,74 @@
+
+hole_constraints.hs:8:6: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 f1 :: forall a. Eq a => a
+               at hole_constraints.hs:7:1-15
+    • In an equation for ‘f1’: f1 = _
+    • Relevant bindings include
+        f1 :: a (bound at hole_constraints.hs:8:1)
+      Constraints include Eq a (from hole_constraints.hs:7:1-15)
+      Valid hole fits include f1 :: a
+
+hole_constraints.hs:12:6: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 f2 :: forall a. (Show a, Eq a) => a
+               at hole_constraints.hs:11:1-25
+    • In an equation for ‘f2’: f2 = _
+    • Relevant bindings include
+        f2 :: a (bound at hole_constraints.hs:12:1)
+      Constraints include
+        Show a (from hole_constraints.hs:11:1-25)
+        Eq a (from hole_constraints.hs:11:1-25)
+      Valid hole fits include
+        f2 :: a
+        f1 :: forall a. Eq a => a
+
+hole_constraints.hs:16:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [a]
+      Where: ‘a’ is a rigid type variable bound by
+               the instance declaration
+               at hole_constraints.hs:16:10-22
+    • In an equation for ‘f3’: f3 = _
+      In the instance declaration for ‘C [a]’
+    • Relevant bindings include
+        f3 :: [a] (bound at hole_constraints.hs:16:30)
+      Constraints include Eq a (from hole_constraints.hs:16:10-22)
+      Valid hole fits include
+        f3 :: [a]
+        f1 :: forall a. Eq a => a
+        [] :: forall a. [a]
+        mempty :: forall a. Monoid a => a
+
+hole_constraints.hs:20:19: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 castWith :: forall a b. (a :~: b) -> a -> b
+               at hole_constraints.hs:19:1-29
+    • In an equation for ‘castWith’: castWith Refl x = _
+    • Relevant bindings include
+        x :: a (bound at hole_constraints.hs:20:15)
+        castWith :: (a :~: b) -> a -> b (bound at hole_constraints.hs:20:1)
+      Constraints include b ~ a (from hole_constraints.hs:20:10-13)
+      Valid hole fits include x :: a
+
+hole_constraints.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: String
+    • In a case alternative: AnyShow x -> _
+      In the expression: case a of AnyShow x -> _
+      In an equation for ‘foo’: foo a = case a of AnyShow x -> _
+    • Relevant bindings include
+        x :: a (bound at hole_constraints.hs:27:27)
+        a :: AnyShow (bound at hole_constraints.hs:27:5)
+        foo :: AnyShow -> String (bound at hole_constraints.hs:27:1)
+      Constraints include Show a (from hole_constraints.hs:27:19-27)
+      Valid hole fits include
+        f3 :: forall a. C a => a
+        f1 :: forall a. Eq a => a
+        f2 :: forall a. (Show a, Eq a) => a
+        [] :: forall a. [a]
+        mempty :: forall a. Monoid a => a

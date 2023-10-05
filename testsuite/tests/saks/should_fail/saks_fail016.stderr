@@ -1,0 +1,3 @@
+
+saks_fail016.hs:13:27: error: [GHC-76037]
+    Not in scope: type variable ‘k’

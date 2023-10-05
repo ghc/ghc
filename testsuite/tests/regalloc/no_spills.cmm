@@ -1,0 +1,15 @@
+foo () {
+    bits32 a, b, c, d, e, f, g, h, i;
+
+    a = 5;
+    b = 6;
+    c = a + b;
+    d = c + 7;
+    e = d + 8;
+    f = e + 9;
+    g = f + 10;
+    h = g + 11;
+    i = h + 12;
+
+    return (i);
+}

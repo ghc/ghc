@@ -1,0 +1,98 @@
+-- WARNING: ghc-bin.cabal is automatically generated from ghc-bin.cabal.in by
+-- ./configure.  Make sure you are editing ghc-bin.cabal.in, not ghc-bin.cabal.
+
+Name: ghc-bin
+Version: @ProjectVersion@
+Copyright: XXX
+-- License: XXX
+-- License-File: XXX
+Author: XXX
+Maintainer: glasgow-haskell-users@haskell.org
+Homepage: http://www.haskell.org/ghc/
+Synopsis: The Glorious Glasgow Haskell Compiler.
+Description:
+    This package contains the @ghc@ executable, the user facing front-end
+    to the Glasgow Haskell Compiler.
+Category: Development
+Build-Type: Simple
+Cabal-Version: >=1.10
+
+Flag internal-interpreter
+    Description: Build with internal interpreter support.
+    Default: False
+    Manual: True
+
+Flag threaded
+    Description: Link the ghc executable against the threaded RTS
+    Default: True
+    Manual: True
+
+Executable ghc
+    Default-Language: GHC2021
+
+    Main-Is: Main.hs
+    Build-Depends: base       >= 4   && < 5,
+                   array      >= 0.1 && < 0.6,
+                   bytestring >= 0.9 && < 0.13,
+                   directory  >= 1   && < 1.4,
+                   process    >= 1   && < 1.7,
+                   filepath   >= 1   && < 1.5,
+                   containers >= 0.5 && < 0.8,
+                   transformers >= 0.5 && < 0.7,
+                   ghc-boot      == @ProjectVersionMunged@,
+                   ghc           == @ProjectVersionMunged@
+
+    if os(windows)
+        Build-Depends: Win32  >= 2.3 && < 2.14
+    else
+        Build-Depends: unix   >= 2.7 && < 2.9
+
+    GHC-Options: -Wall
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monoid-instances
+                 -rtsopts=all
+                 "-with-rtsopts=-K512M -H -I5 -T"
+
+    if flag(internal-interpreter)
+        -- NB: this is never built by the bootstrapping GHC+libraries
+        Build-depends:
+            deepseq        >= 1.4 && < 1.6,
+            ghc-prim       >= 0.5.0 && < 0.11,
+            ghci           == @ProjectVersionMunged@,
+            haskeline      == 0.8.*,
+            exceptions     == 0.10.*,
+            time           >= 1.8 && < 1.13
+        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
+        Other-Modules:
+            GHCi.Leak
+            GHCi.UI
+            GHCi.UI.Info
+            GHCi.UI.Monad
+            GHCi.UI.Exception
+            GHCi.Util
+        Other-Extensions:
+            FlexibleInstances
+            LambdaCase
+            MagicHash
+            MultiWayIf
+            OverloadedStrings
+            RankNTypes
+            RecordWildCards
+            ScopedTypeVariables
+            UnboxedTuples
+            ViewPatterns
+
+    if flag(threaded)
+      ghc-options: -threaded
+
+    Other-Extensions:
+        CPP
+        NondecreasingIndentation
+        TupleSections
+
+    -- This should match the default-extensions used in 'ghc.cabal'. This way,
+    -- GHCi can be used to load it all at once.
+    Default-Extensions:
+        NoImplicitPrelude
+      , ScopedTypeVariables
+      , BangPatterns

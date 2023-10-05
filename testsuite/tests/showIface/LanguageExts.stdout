@@ -1,0 +1,26 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+         []
+       arg docs:
+         []
+       documentation structure:
+       named chunks:
+       haddock options:
+       language:
+         Just Haskell98
+       language extensions:
+         MonomorphismRestriction
+         DeepSubsumption
+         ImplicitPrelude
+         NPlusKPatterns
+         PatternGuards
+         DatatypeContexts
+         NondecreasingIndentation
+         TraditionalRecordSyntax
+         StarIsType
+         CUSKs
+         FieldSelectors
+extensible fields:
+

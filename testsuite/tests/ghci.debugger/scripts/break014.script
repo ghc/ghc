@@ -1,0 +1,5 @@
+-- Available bindings at let(s)
+:l break014
+:break 3
+g 1
+-- stops at the breakpoint on c, a and b should be in scope

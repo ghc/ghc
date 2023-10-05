@@ -1,0 +1,22 @@
+unit h where
+    signature H where
+        data T = T1
+unit t-impl where
+    module T where
+        data T = T2
+unit p where
+    dependency h[H=<H>]
+    dependency t-impl
+    -- Known bug: GHC will not eagerly report an error here although
+    -- it could, if it more aggressively checked for type-compatibility
+    -- when a hole gets resolved
+    signature H(module H, T(..)) where
+        import T
+unit h-impl where
+    dependency t-impl
+    module H(T(..)) where
+        import T
+unit q where
+    -- Fortunately, you'll never be able to instantiate these signatures;
+    -- it's just an unsatisfiable set of constraints.
+    dependency p[H=h-impl:H]

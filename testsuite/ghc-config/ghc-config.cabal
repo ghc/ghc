@@ -1,0 +1,11 @@
+cabal-version:      2.4
+name:               ghc-config
+version:            0.1.0.0
+synopsis:           A utility used by GHC's testsuite driver to extract information from @ghc --info@.
+author:             The GHC Developers
+maintainer:         ghc-devs@haskell.org
+
+executable ghc-config
+    main-is:          ghc-config.hs
+    build-depends:    base, process
+    default-language: Haskell2010

@@ -1,0 +1,26 @@
+# "Unit tests"
+dump_simpl_opts = ' -dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques '
+test('Arity00', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity01', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity02', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity03', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity04', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity05', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity06', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity07', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity08', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity09', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity10', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity11', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity12', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity13', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity14', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity15', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('Arity16', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+
+# Regression tests
+test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
+test('T18870', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
+test('T18937', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
+test('T21755',  [ grep_errmsg(r'Arity=') ], compile, ['-fno-worker-wrapper' + dump_simpl_opts])
+test('T24296b', [ grep_errmsg(r'g f y') ], compile, ['-fpedantic-bottoms' + dump_simpl_opts])

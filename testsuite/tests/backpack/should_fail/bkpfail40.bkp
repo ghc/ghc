@@ -1,0 +1,5 @@
+unit p where
+    signature A where
+        class C a where
+            f :: a -> a
+            f x = x

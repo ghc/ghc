@@ -1,0 +1,9 @@
+
+T21605c.hs:5:13: error: [GHC-37479]
+    ‘Prelude.head’ is a term-level binding
+     and can not be used at the type level.
+    Suggested fix:
+      Perhaps use one of these:
+        type constructor or class ‘Prelude.Read’ (imported from Prelude),
+        type constructor or class ‘Prelude.Real’ (imported from Prelude),
+        type constructor or class ‘Prelude.ReadS’ (imported from Prelude)

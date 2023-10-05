@@ -1,0 +1,113 @@
+
+T8958.hs:2:31: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+TYPE CONSTRUCTORS
+  newtype Map{2} :: * -> * -> *
+    roles nominal representational
+  class Nominal{1} :: * -> Constraint
+  class Representational{1} :: * -> Constraint
+    roles representational
+COERCION AXIOMS
+  axiom T8958.N:Map :: Map k v = [(k, v)]
+DATA CONSTRUCTORS
+  MkMap :: forall k v.
+           (Nominal k, Representational v) =>
+           [(k, v)] -> Map k v
+CLASS INSTANCES
+  instance [incoherent] Representational a
+    -- Defined at T8958.hs:11:10
+  instance [incoherent] Nominal a -- Defined at T8958.hs:8:10
+Dependent modules: []
+Dependent packages: [base-4.18.0.0]
+
+==================== Typechecker ====================
+T8958.$tcMap
+  = GHC.Types.TyCon
+      16542473435673943392#Word64 5374201132143305512#Word64
+      T8958.$trModule (GHC.Types.TrNameS "Map"#) 0#
+      GHC.Types.krep$*->*->*
+T8958.$tc'MkMap
+  = GHC.Types.TyCon
+      2942839876828444488#Word64 3989137838066763457#Word64
+      T8958.$trModule (GHC.Types.TrNameS "'MkMap"#) 2# $krep
+T8958.$tcRepresentational
+  = GHC.Types.TyCon
+      12809567151893673426#Word64 12159693688248149156#Word64
+      T8958.$trModule (GHC.Types.TrNameS "Representational"#) 0# $krep
+T8958.$tc'C:Representational
+  = GHC.Types.TyCon
+      2358772282532242424#Word64 5444038897914446879#Word64
+      T8958.$trModule (GHC.Types.TrNameS "'C:Representational"#) 1# $krep
+T8958.$tcNominal
+  = GHC.Types.TyCon
+      12224997609886144634#Word64 9866011944332051160#Word64
+      T8958.$trModule (GHC.Types.TrNameS "Nominal"#) 0# $krep
+T8958.$tc'C:Nominal
+  = GHC.Types.TyCon
+      10562260635335201742#Word64 1215478186250709459#Word64
+      T8958.$trModule (GHC.Types.TrNameS "'C:Nominal"#) 1# $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Tuple.Prim.$tcTuple2
+      ((:) @GHC.Types.KindRep
+         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcMap
+      ((:) @GHC.Types.KindRep
+         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcList
+      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcRepresentational
+      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcNominal
+      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+T8958.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
+AbsBinds [a] []
+  {Exports: [T8958.$fRepresentationala <= $dRepresentational
+               wrap: <>]
+   Exported types: T8958.$fRepresentationala [InlPrag=CONLIKE]
+                     :: forall a. Representational a
+                   [LclIdX[DFunId],
+                    Unf=DFun: \ (@a) -> T8958.C:Representational TYPE: a]
+   Binds: $dRepresentational = T8958.C:Representational @a
+   Evidence: [EvBinds{}]}
+AbsBinds [a] []
+  {Exports: [T8958.$fNominala <= $dNominal
+               wrap: <>]
+   Exported types: T8958.$fNominala [InlPrag=CONLIKE]
+                     :: forall a. Nominal a
+                   [LclIdX[DFunId], Unf=DFun: \ (@a) -> T8958.C:Nominal TYPE: a]
+   Binds: $dNominal = T8958.C:Nominal @a
+   Evidence: [EvBinds{}]}
+
+
+
+T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Representational v’ matches
+        instance Representational a -- Defined at T8958.hs:11:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the definition of data constructor ‘MkMap’
+      In the newtype declaration for ‘Map’
+
+T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Nominal k’ matches
+        instance Nominal a -- Defined at T8958.hs:8:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the definition of data constructor ‘MkMap’
+      In the newtype declaration for ‘Map’

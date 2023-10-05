@@ -1,0 +1,5 @@
+
+readFail031.hs:4:3: error: [GHC-94426]
+    Invalid type signature: (:+) :: ...
+    Suggested fix:
+      A type signature should be of form <variables> :: <type>

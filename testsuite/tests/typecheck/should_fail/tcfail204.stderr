@@ -1,0 +1,9 @@
+
+tcfail204.hs:10:7: error: [GHC-18042] [-Wtype-defaults (in -Wall), Werror=type-defaults]
+    • Defaulting the type variable ‘a0’ to type ‘Double’ in the following constraints
+        (RealFrac a0)
+          arising from a use of ‘ceiling’ at tcfail204.hs:10:7-13
+        (Fractional a0)
+          arising from the literal ‘6.3’ at tcfail204.hs:10:15-17
+    • In the expression: ceiling 6.3
+      In an equation for ‘foo’: foo = ceiling 6.3

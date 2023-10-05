@@ -1,0 +1,15 @@
+Nothing
+Just ()
+Just (Just ())
+Just Nothing
+Left 'a'
+Right 'b'
+Right Nothing
+Right (Just 'c')
+Right (Right 'd')
+Right (Left 'e')
+Left 'f'
+Left Nothing
+Left (Just 'g')
+Left (Right 'h')
+Left (Right 'i')

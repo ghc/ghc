@@ -1,0 +1,2 @@
+dsrun005: dsrun005.hs:42:1-18: Non-exhaustive patterns in function f
+

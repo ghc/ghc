@@ -1,0 +1,19 @@
+foo :: Proxy a1 -> Proxy a2
+bar :: Proxy a1 -> Proxy a2
+baz :: forall {k1} (a1 :: k1) {k2} (a2 :: k2). Proxy a1 -> Proxy a2
+quux
+  :: forall {k1} {k2} (a1 :: k1) (a2 :: k2). Proxy a1 -> Proxy a2
+foo
+  :: forall {r1 :: RuntimeRep} (a1 :: TYPE r1) {r2 :: RuntimeRep}
+            (a2 :: TYPE r2).
+     Proxy @{TYPE r1} a1 -> Proxy @{TYPE r2} a2
+bar
+  :: forall {r1 :: RuntimeRep} {r2 :: RuntimeRep} (a1 :: TYPE r1)
+            (a2 :: TYPE r2).
+     Proxy @{TYPE r1} a1 -> Proxy @{TYPE r2} a2
+baz
+  :: forall {k1} (a1 :: k1) {k2} (a2 :: k2).
+     Proxy @{k1} a1 -> Proxy @{k2} a2
+quux
+  :: forall {k1} {k2} (a1 :: k1) (a2 :: k2).
+     Proxy @{k1} a1 -> Proxy @{k2} a2

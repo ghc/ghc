@@ -1,0 +1,3 @@
+T16066: exit never happens
+CallStack (from HasCallStack):
+  error, called at T16066.hs:31:3 in main:Main

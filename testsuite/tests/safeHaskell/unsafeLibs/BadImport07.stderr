@@ -1,0 +1,4 @@
+
+BadImport07.hs:6:1: error: [GHC-44360]
+    Unsafe.Coerce: Can't be safely imported!
+    The module itself isn't safe.

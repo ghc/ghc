@@ -1,0 +1,4 @@
+
+T16114.hs:4:18: error: [GHC-71492]
+    Instance head cannot contain nested ‘forall’s or contexts
+    In an instance declaration

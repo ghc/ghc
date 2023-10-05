@@ -1,0 +1,6 @@
+
+on the commandline: warning: [GHC-93741] [-Wunrecognised-warning-flags (in -Wdefault)]
+    unrecognised warning flag: -Wbar
+
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS

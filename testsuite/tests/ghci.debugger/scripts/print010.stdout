@@ -1,0 +1,6 @@
+o = O (_t1::a0)
+()
+o = O ((_t2::a0) : (_t3::[a0]))
+()
+3
+o = O [0,(_t4::Integer),(_t5::Integer),(_t6::Integer)]

@@ -1,0 +1,6 @@
+type L0 :: * -> *
+type L0 = [] :: * -> *
+  	-- Defined at <interactive>:1:1
+type L1 :: * -> *
+type L1 a = [a]
+  	-- Defined at <interactive>:4:1

@@ -1,0 +1,20 @@
+:set -fprint-explicit-foralls
+:print fmap
+:t fmap
+:t _t1
+:print show
+:t show
+:t _t2
+_t2 "foo"
+_t1 _t2 [7, 42]
+:print _t1
+:t _t3
+:print _t2
+:t _t4
+_t3 _t4 [7, 42]
+:print id
+:t id
+:t _t5
+:print print
+:t print
+:t _t6

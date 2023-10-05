@@ -1,0 +1,3 @@
+-- Declaring a custom fixity for an infix data constructor should work.
+data Infix a b = a :@: b; infixl 4 :@:
+:i (:@:)

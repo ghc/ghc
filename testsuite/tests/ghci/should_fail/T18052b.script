@@ -1,0 +1,2 @@
+:set -XMagicHash
+let (%%%) = 1#

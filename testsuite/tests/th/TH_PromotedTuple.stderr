@@ -1,0 +1,9 @@
+TH_PromotedTuple.hs:(14,31)-(16,44): Splicing type
+    do ty <- [t| '(Int, False) |]
+       reportWarning (show ty)
+       return ty
+  ======>
+    '(Int, 'False)
+
+TH_PromotedTuple.hs:14:31: warning: [GHC-39584]
+    AppT (AppT (PromotedTupleT 2) (ConT GHC.Types.Int)) (PromotedT GHC.Types.False)

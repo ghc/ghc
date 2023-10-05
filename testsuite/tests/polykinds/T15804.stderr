@@ -1,0 +1,5 @@
+
+T15804.hs:5:12: error: [GHC-25897]
+    • Expected a type, but ‘a :: k’ has kind ‘k’
+    • In the kind ‘(a :: k) -> *’
+      In the data type declaration for ‘T’

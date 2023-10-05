@@ -1,0 +1,15 @@
+
+T12709.hs:28:13: error: [GHC-55287]
+    • The argument ‘1’ of ‘(+)’
+      does not have a fixed runtime representation.
+      Its type is:
+        a0 :: TYPE rep0
+      Cannot unify ‘rep’ with the type variable ‘rep0’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the expression: 1 + 2 + 3 + 4
+      In an equation for ‘u’: u = 1 + 2 + 3 + 4
+      In the expression:
+        let
+          u :: Num (a :: TYPE rep) => a
+          u = 1 + 2 + 3 + 4
+        in BUB u u

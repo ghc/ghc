@@ -1,0 +1,8 @@
+#include "Cmm.h"
+
+// Small memcpies should unroll
+callMemcpy (W_ dst, W_ src)
+{
+  prim %memcpy(dst, src, 16, 4);
+  return ();
+}

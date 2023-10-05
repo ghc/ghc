@@ -1,0 +1,24 @@
+
+T18869.hs:10:11: error: [GHC-95909]
+    • Constructor ‘MkFoo’ does not have the required strict field(s):
+        foo :: a0
+    • In the expression: MkFoo {}
+      In an equation for ‘testFoo’: testFoo = MkFoo {}
+
+T18869.hs:16:11: error: [GHC-95909]
+    • Constructor ‘MkBar’ does not have the required strict field(s):
+        bar :: a0
+    • In the expression: MkBar {}
+      In an equation for ‘testBar’: testBar = MkBar {}
+
+T18869.hs:22:11: error: [GHC-95909]
+    • Constructor ‘MkBaz’ does not have the required strict field(s):
+        baz2 :: Bool
+    • In the expression: MkBaz {baz1 = False}
+      In an equation for ‘testBaz’: testBaz = MkBaz {baz1 = False}
+
+T18869.hs:30:12: error: [GHC-95909]
+    • Constructor ‘MkQuux’ does not have the required strict field(s):
+        quux :: TQuux Int
+    • In the expression: MkQuux {}
+      In an equation for ‘testQuux’: testQuux = MkQuux {}

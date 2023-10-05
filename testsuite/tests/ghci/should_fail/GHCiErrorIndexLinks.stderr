@@ -1,0 +1,6 @@
+
+<interactive>:1:9: error: []8;;https://errors.haskell.org/messages/GHC-39999\GHC-39999]8;;\]
+    • No instance for ‘Num String’ arising from the literal ‘1729’
+    • In the first argument of ‘(+)’, namely ‘1729’
+      In the second argument of ‘($)’, namely ‘1729 + "hello from GHCi!"’
+      In the expression: print $ 1729 + "hello from GHCi!"

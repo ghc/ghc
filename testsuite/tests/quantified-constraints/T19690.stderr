@@ -1,0 +1,16 @@
+
+T19690.hs:12:16: error: [GHC-05617]
+    • Could not deduce ‘c’
+        arising from the head of a quantified constraint
+        arising from a use of ‘go’
+      from the context: Hold c
+        bound by a quantified context at T19690.hs:12:16-17
+    • In the expression: go
+      In an equation for ‘anythingDict’:
+          anythingDict
+            = go
+            where
+                go :: (Hold c => c) => Dict c
+                go = Dict
+    • Relevant bindings include
+        anythingDict :: Dict c (bound at T19690.hs:12:1)

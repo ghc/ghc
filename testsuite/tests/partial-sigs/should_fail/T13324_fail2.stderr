@@ -1,0 +1,12 @@
+
+T13324_fail2.hs:7:1: error: [GHC-39999]
+    • No instance for ‘Eq (f (f a))’
+        arising from a 'deriving' declaration
+      Possible fix: fill in the wildcard constraint yourself
+    • When deriving the instance for (Eq (Foo f a))
+
+T13324_fail2.hs:11:1: error: [GHC-16437]
+    • Can't make a derived instance of ‘Eq (T a)’:
+        Constructor ‘MkT’ is a GADT
+    • In the stand-alone deriving instance for ‘_ => Eq (T a)’
+    Suggested fix: Fill in the wildcard constraint yourself

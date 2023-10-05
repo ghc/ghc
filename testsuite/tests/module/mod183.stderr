@@ -1,0 +1,3 @@
+
+mod183.hs:5:26: error: [GHC-05661]
+    Multiple occurrences of 'qualified'

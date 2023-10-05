@@ -1,0 +1,3 @@
+:set -XPatternSynonyms -XViewPatterns
+:m + Language.Haskell.TH
+pattern A :: ExpQ; pattern A <- (undefined -> ()) where A = undefined

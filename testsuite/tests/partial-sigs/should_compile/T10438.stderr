@@ -1,0 +1,27 @@
+
+T10438.hs:7:22: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘p3’
+      Where: ‘p3’ is a rigid type variable bound by
+               the inferred type of g :: p3 -> p3
+               at T10438.hs:(6,9)-(8,21)
+    • In the type signature: x :: _
+      In an equation for ‘g’:
+          g r
+            = x
+            where
+                x :: _
+                x = r
+      In an equation for ‘foo’:
+          foo f
+            = g
+            where
+                g r
+                  = x
+                  where
+                      x :: _
+                      x = r
+    • Relevant bindings include
+        r :: p3 (bound at T10438.hs:6:11)
+        g :: p3 -> p3 (bound at T10438.hs:6:9)
+        f :: p1 (bound at T10438.hs:5:5)
+        foo :: p1 -> p2 -> p2 (bound at T10438.hs:5:1)

@@ -1,0 +1,13 @@
+
+T9177.hs:4:13: error: [GHC-76037]
+    Not in scope: type variable ‘int’
+    Suggested fix:
+      Perhaps use type constructor or class ‘Int’ (imported from Prelude)
+
+T9177.hs:7:14: error: [GHC-76037]
+    Not in scope: type variable ‘integerr’
+    Suggested fix:
+      Perhaps use type constructor or class ‘Integer’ (imported from Prelude)
+
+T9177.hs:17:6: error: [GHC-76037]
+    Not in scope: data constructor ‘Fun’

@@ -1,0 +1,11 @@
+
+TyAppPat_Nonmatching.hs:9:6: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘Int’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall a. Maybe a -> a
+        at TyAppPat_Nonmatching.hs:8:1-19
+    • In the pattern: Just @Int x
+      In an equation for ‘foo’: foo (Just @Int x) = x
+    • Relevant bindings include
+        foo :: Maybe a -> a (bound at TyAppPat_Nonmatching.hs:9:1)

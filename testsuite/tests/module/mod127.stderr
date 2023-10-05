@@ -1,0 +1,6 @@
+
+mod127.hs:6:6: error: [GHC-76037]
+    Not in scope: type constructor or class ‘T’
+    Suggested fix:
+      Remove ‘T’ from the explicit hiding list in the import of
+      ‘Mod127_A’ (at mod127.hs:4:1-26).

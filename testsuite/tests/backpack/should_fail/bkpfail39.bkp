@@ -1,0 +1,6 @@
+unit p where
+    signature A where
+        class C a
+    module B where
+        import A
+        instance C Int where

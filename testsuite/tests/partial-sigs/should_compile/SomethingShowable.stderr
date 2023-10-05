@@ -1,0 +1,12 @@
+TYPE SIGNATURES
+  somethingShowable :: Show Bool => Bool -> String
+Dependent modules: []
+Dependent packages: [base-4.18.0.0]
+
+SomethingShowable.hs:5:1: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Show Bool’ matches
+        instance Show Bool -- Defined in ‘GHC.Show’
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • When checking the inferred type
+        somethingShowable :: Show Bool => Bool -> String

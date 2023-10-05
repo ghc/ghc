@@ -1,0 +1,14 @@
+name:                p
+version:             0.1.0.0
+license:             BSD3
+license-file:        LICENSE
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+extra-source-files:  ChangeLog.md
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     P
+  build-depends:       base, containers
+  default-language:    Haskell2010

@@ -1,0 +1,4 @@
+
+SafeFlags17.hs:5:8: error: [GHC-75165]
+    Prelude: Can't be safely imported!
+    The package (base-4.17.0.0) the module resides in isn't trusted.

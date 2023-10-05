@@ -1,0 +1,4 @@
+mapM :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t b)
+mapM :: Monad m => (a -> m b) -> [a] -> m [b]
+length :: [a] -> Int
+foo :: Double -> Double

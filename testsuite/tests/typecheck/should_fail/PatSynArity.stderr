@@ -1,0 +1,4 @@
+PatSynArity.hs:6:1: [GHC-18365]
+     Pattern synonym ‘P’ has two arguments
+        but its type signature has 1 fewer arrows
+     In the declaration for pattern synonym ‘P’

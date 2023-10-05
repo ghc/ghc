@@ -1,0 +1,32 @@
+unit a where
+    module A where
+        data T = T
+            deriving (Show)
+        x = True
+        y = False
+        mkT = T
+        class Foo a where
+            foo :: a -> a
+        instance Foo Bool where
+            foo = not
+unit bsig where
+    signature B where
+        data T
+        x :: Bool
+        mkT :: T
+        class Foo a where
+            foo :: a -> a
+        instance Foo Bool
+        instance Show T
+    module App where
+        import B
+        y = foo x
+        app = do
+            print y
+            print mkT
+            print (foo y)
+unit main where
+    dependency bsig[B=a:A]
+    module Main where
+        import App
+        main = app

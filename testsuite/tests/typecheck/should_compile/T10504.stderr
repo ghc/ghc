@@ -1,0 +1,3 @@
+
+T10504.hs:5:1: warning: [GHC-35827]
+    SPECIALISE pragma for non-overloaded function ‘myfun’

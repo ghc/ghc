@@ -1,0 +1,18 @@
+// Test conditional jumps to a proc-point/continuation
+
+// So far this can't happen, so this test is unneeded
+// and would currently fail (it won't even parse).
+// But if in future a CmmCondBranch could target
+// a proc-point/continuation, then the CPS would need
+// to be updated to account for this.
+
+foo() {
+  bits32 x, y, z;
+  x = x;
+  (x) = foreign "C--" bar() "safe";
+L:
+  y = y;
+  foreign "C--" baz() "safe";
+  if (y<3) goto L;
+  goto L;
+}

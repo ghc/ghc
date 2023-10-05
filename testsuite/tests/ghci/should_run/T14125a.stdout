@@ -1,0 +1,4 @@
+Foo Int :: *
+= Foo Int
+f :: Foo Int -> Int 	-- Defined at <interactive>:5:5
+f :: Foo Int -> Int

@@ -1,0 +1,6 @@
+
+==================== Tidy Core rules ====================
+"SPEC r_bar @Int"
+    forall ($dC :: C Int). r_bar @Int $dC = $fCInt_$sr_bar
+
+

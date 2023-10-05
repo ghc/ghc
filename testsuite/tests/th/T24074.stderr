@@ -1,0 +1,16 @@
+T24074.hs:6:2-43: Splicing declarations
+    [d| instance {-# OVERLAPS #-} A Int |]
+  ======>
+    instance {-# OVERLAPS #-} A Int
+T24074.hs:7:2-48: Splicing declarations
+    [d| instance {-# OVERLAPPABLE #-} A Bool |]
+  ======>
+    instance {-# OVERLAPPABLE #-} A Bool
+T24074.hs:8:2-45: Splicing declarations
+    [d| instance {-# OVERLAPPING #-} A () |]
+  ======>
+    instance {-# OVERLAPPING #-} A ()
+T24074.hs:9:2-46: Splicing declarations
+    [d| instance {-# INCOHERENT #-} A Char |]
+  ======>
+    instance {-# INCOHERENT #-} A Char

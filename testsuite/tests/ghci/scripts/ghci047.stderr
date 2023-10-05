@@ -1,0 +1,14 @@
+
+<interactive>:40:1: error: [GHC-18872]
+    • Couldn't match type ‘HFalse’ with ‘HTrue’
+        arising from a use of ‘f’
+    • In the first argument of ‘($)’, namely ‘f’
+      In the expression: f $ Baz 'a'
+      In an equation for ‘it’: it = f $ Baz 'a'
+
+<interactive>:41:1: error: [GHC-18872]
+    • Couldn't match type ‘HFalse’ with ‘HTrue’
+        arising from a use of ‘f’
+    • In the first argument of ‘($)’, namely ‘f’
+      In the expression: f $ Quz
+      In an equation for ‘it’: it = f $ Quz

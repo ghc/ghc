@@ -1,0 +1,16 @@
+good: Int
+good: Int#
+good: IO
+good: Maybe
+good: TYPE
+good: RuntimeRep
+good: 'IntRep
+good: FUN 'Many ('BoxedRep 'Lifted) ('BoxedRep 'Lifted)
+good: Proxy * Int
+good: Proxy (TYPE 'IntRep) Int#
+good: *
+good: Int -> Int
+good: 5
+good: "hello world"
+good: 'Just Natural 5
+good: []

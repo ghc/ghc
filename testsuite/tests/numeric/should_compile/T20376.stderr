@@ -1,0 +1,57 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 71, types: 45, coercions: 0, joins: 0/0}
+
+foo0 = \ _ -> 16##
+
+foo1 = \ _ -> 4##
+
+foo2 = \ _ -> 11##
+
+foo3 = foo0
+
+foo0' = I# 16#
+
+foo1' = I# 4#
+
+foo2' = I# 11#
+
+foo3' = foo0'
+
+foo4' = I# 31#
+
+ctz0 = \ _ -> 30##
+
+ctz1 = \ _ -> 6##
+
+ctz2 = \ _ -> 14##
+
+ctz3 = ctz0
+
+ctz0' = I# 30#
+
+ctz1' = I# 6#
+
+ctz2' = I# 14#
+
+ctz3' = ctz0'
+
+ctz4' = I# 62#
+
+clz1 = \ _ -> 5##
+
+clz2 = \ _ -> 13##
+
+clz3 = \ _ -> 29##
+
+clz1' = I# 5#
+
+clz2' = I# 13#
+
+clz3' = I# 29#
+
+clz4' = I# 61#
+
+
+

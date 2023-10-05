@@ -1,0 +1,9 @@
+
+T21871.hs:13:36: error: [GHC-25897]
+    • Couldn't match kind ‘k’ with ‘*’
+      Expected kind ‘* -> *’, but ‘m’ has kind ‘k -> *’
+      ‘k’ is a rigid type variable bound by
+        a `deriving' clause
+        at T21871.hs:(10,1)-(13,36)
+    • In the second argument of ‘ReaderT’, namely ‘m’
+      In the newtype declaration for ‘FooT’

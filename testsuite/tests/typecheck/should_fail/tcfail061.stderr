@@ -1,0 +1,12 @@
+
+tcfail061.hs:5:17: error: [GHC-76037]
+    Not in scope: type variable ‘b’
+
+tcfail061.hs:5:19: error: [GHC-76037]
+    Not in scope: type variable ‘b’
+
+tcfail061.hs:11:22: error: [GHC-76037]
+    Not in scope: type variable ‘b’
+
+tcfail061.hs:11:24: error: [GHC-76037]
+    Not in scope: type variable ‘b’

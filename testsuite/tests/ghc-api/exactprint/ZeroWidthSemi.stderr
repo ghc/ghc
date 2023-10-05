@@ -1,0 +1,154 @@
+
+==================== Parser AST ====================
+
+(L
+ { ZeroWidthSemi.hs:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { ZeroWidthSemi.hs:1:1 })
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { ZeroWidthSemi.hs:1:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { ZeroWidthSemi.hs:1:22-26 }))]
+     []
+     (Just
+      ((,)
+       { ZeroWidthSemi.hs:9:1 }
+       { ZeroWidthSemi.hs:8:1-58 })))
+    (EpaCommentsBalanced
+     [(L
+       (EpaSpan
+        { ZeroWidthSemi.hs:3:1-19 })
+       (EpaComment
+        (EpaLineComment
+         "-- leading comments")
+        { ZeroWidthSemi.hs:1:22-26 }))]
+     [(L
+       (EpaSpan
+        { ZeroWidthSemi.hs:8:1-58 })
+       (EpaComment
+        (EpaLineComment
+         "-- Trailing comment, should be in HsModule extension point")
+        { ZeroWidthSemi.hs:6:5 }))]))
+   (EpVirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { ZeroWidthSemi.hs:1:8-20 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    {ModuleName: ZeroWidthSemi}))
+  (Nothing)
+  []
+  [(L
+    (EpAnn
+     (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+     (AnnListItem
+      [])
+     (EpaComments
+      [(L
+        (EpaSpan
+         { ZeroWidthSemi.hs:5:1-19 })
+        (EpaComment
+         (EpaLineComment
+          "-- Function comment")
+         { ZeroWidthSemi.hs:3:1-19 }))]))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { ZeroWidthSemi.hs:6:1 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: a}))
+      (MG
+       (FromSource)
+       (L
+        (EpAnn
+         (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (Match
+           (EpAnn
+            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { ZeroWidthSemi.hs:6:1 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: a}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (EpAnn
+               (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { ZeroWidthSemi.hs:6:3 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { ZeroWidthSemi.hs:6:5 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsOverLit
+                 (EpAnn
+                  (EpaSpan { ZeroWidthSemi.hs:6:5 })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (OverLit
+                  (NoExtField)
+                  (HsIntegral
+                   (IL
+                    (SourceText 0)
+                    (False)
+                    (0))))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))]))
+
+

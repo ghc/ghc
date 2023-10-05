@@ -1,0 +1,55 @@
+cabal-version:  3.0
+name:           ghc-heap
+version:        @ProjectVersionMunged@
+license:        BSD-3-Clause
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
+synopsis:       Functions for walking GHC's heap
+category:       GHC
+description:
+    This package provides functions for walking the GHC heap data structures
+    and retrieving information about those data structures.
+
+build-type:     Simple
+tested-with:    GHC==7.11
+
+source-repository head
+  type:     git
+  location: https://gitlab.haskell.org/ghc/ghc.git
+  subdir:   libraries/ghc-heap
+
+library
+  default-language: Haskell2010
+
+  build-depends:    base             >= 4.9.0 && < 5.0
+                  , ghc-prim         > 0.2 && < 0.12
+                  , rts              == 1.0.*
+                  , containers       >= 0.6.2.1 && < 0.8
+
+  ghc-options:      -Wall
+  if !os(ghcjs)
+    cmm-sources:      cbits/HeapPrim.cmm
+                      cbits/Stack.cmm
+  c-sources:        cbits/Stack_c.c
+
+  default-extensions: NoImplicitPrelude
+
+  exposed-modules:  GHC.Exts.Heap
+                    GHC.Exts.Heap.Closures
+                    GHC.Exts.Heap.ClosureTypes
+                    GHC.Exts.Heap.Constants
+                    GHC.Exts.Heap.InfoTable
+                    GHC.Exts.Heap.InfoTable.Types
+                    GHC.Exts.Heap.InfoTableProf
+                    GHC.Exts.Heap.Utils
+                    GHC.Exts.Heap.FFIClosures
+                    GHC.Exts.Heap.FFIClosures_ProfilingDisabled
+                    GHC.Exts.Heap.FFIClosures_ProfilingEnabled
+                    GHC.Exts.Heap.ProfInfo.Types
+                    GHC.Exts.Heap.ProfInfo.PeekProfInfo
+                    GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
+                    GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
+                    GHC.Exts.Stack.Constants
+                    GHC.Exts.Stack
+                    GHC.Exts.Stack.Decode

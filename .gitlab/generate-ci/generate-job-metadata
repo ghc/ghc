@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+out_dir="$(git rev-parse --show-toplevel)/.gitlab"
+
+# Update job metadata for ghcup
+generate-ci metadata "$out_dir/jobs-metadata.json"
+echo "Updated $out_dir/jobs-metadata.json"

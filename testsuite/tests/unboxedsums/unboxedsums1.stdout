@@ -1,0 +1,14 @@
+Left "error"
+Right 10
+Left 10
+Right 1.2
+Left "OK"
+Right 123
+Alt0: 10
+Alt1: False
+Alt2: "ok"
+Alt3: 'a'
+Alt4: Right True
+Alt5: 123
+Alt6: 54.3
+Left "error"

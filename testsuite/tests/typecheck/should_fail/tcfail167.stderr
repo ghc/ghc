@@ -1,0 +1,12 @@
+
+tcfail167.hs:14:1: error: [GHC-53633] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘inaccessible’: inaccessible C2 = ...
+
+tcfail167.hs:14:14: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werror=inaccessible-code]
+    • Inaccessible code in
+        a pattern with constructor: C2 :: T Float,
+        in an equation for ‘inaccessible’
+      Couldn't match type ‘Char’ with ‘Float’
+    • In the pattern: C2
+      In an equation for ‘inaccessible’: inaccessible C2 = ' '

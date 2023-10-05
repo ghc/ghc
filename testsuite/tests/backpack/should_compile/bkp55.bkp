@@ -1,0 +1,11 @@
+unit p where
+    signature A where
+        p :: Int
+
+unit q where
+    dependency signature p[A=<B>]
+    signature B (module B) where
+        q :: Int
+    module M where
+        import B
+        f = p + q

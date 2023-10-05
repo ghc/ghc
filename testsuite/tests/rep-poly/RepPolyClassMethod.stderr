@@ -1,0 +1,9 @@
+
+RepPolyClassMethod.hs:10:12: error: [GHC-25897]
+    • Couldn't match kind ‘rep’ with ‘LiftedRep’
+      Expected kind ‘*’, but ‘a’ has kind ‘TYPE rep’
+      ‘rep’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at RepPolyClassMethod.hs:8:18-20
+    • In the type signature: methC :: a
+      In the class declaration for ‘C’

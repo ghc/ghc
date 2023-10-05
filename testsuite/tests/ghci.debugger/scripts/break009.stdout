@@ -1,0 +1,9 @@
+Breakpoint 0 activated at Test6.hs:5:8-11
+Stopped in Main.main, Test6.hs:5:8-11
+_result :: a = _
+*** Exception: Prelude.head: empty list
+CallStack (from HasCallStack):
+  error, called at libraries/ghc-internal/src/GHC/List.hs:2018:3 in ghc-internal:GHC.List
+  errorEmptyList, called at libraries/ghc-internal/src/GHC/List.hs:90:11 in ghc-internal:GHC.List
+  badHead, called at libraries/ghc-internal/src/GHC/List.hs:84:28 in ghc-internal:GHC.List
+  head, called at Test6.hs:1:8 in main:Main

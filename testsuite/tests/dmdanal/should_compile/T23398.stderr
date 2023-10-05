@@ -1,0 +1,109 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 76, types: 117, coercions: 4, joins: 0/0}
+
+-- RHS size: {terms: 18, types: 11, coercions: 0, joins: 0/0}
+T23398.$wfoo [InlPrag=[2]]
+  :: forall a. (Eq a, Show a) => a -> a -> String
+[GblId[StrictWorker([!, !])],
+ Arity=4,
+ Str=<SP(1C(1,C(1,L)),A)><SP(A,1C(1,L),A)><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30 60 0 0] 120 0}]
+T23398.$wfoo
+  = \ (@a) (ww :: Eq a) (ww1 :: Show a) (eta :: a) (eta1 :: a) ->
+      case == @a ww eta eta1 of {
+        False -> show @a ww1 eta1;
+        True -> show @a ww1 eta
+      }
+
+-- RHS size: {terms: 12, types: 12, coercions: 0, joins: 0/0}
+foo [InlPrag=[2]] :: forall a. PairDict a => a -> a -> String
+[GblId,
+ Arity=3,
+ Str=<S!P(SP(SC(S,C(1,L)),A),SP(A,SC(S,L),A))><L><L>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 ($d(%,%) [Occ=Once1!] :: PairDict a)
+                 (eta [Occ=Once1] :: a)
+                 (eta1 [Occ=Once1] :: a) ->
+                 case $d(%,%) of { (ww [Occ=Once1], ww1 [Occ=Once1]) ->
+                 T23398.$wfoo @a ww ww1 eta eta1
+                 }}]
+foo
+  = \ (@a) ($d(%,%) :: PairDict a) (eta :: a) (eta1 :: a) ->
+      case $d(%,%) of { (ww, ww1) -> T23398.$wfoo @a ww ww1 eta eta1 }
+
+Rec {
+-- RHS size: {terms: 21, types: 19, coercions: 3, joins: 0/0}
+T23398.$wbar [InlPrag=[2], Occ=LoopBreaker]
+  :: forall a b.
+     (a GHC.Prim.~# b, Show a) =>
+     GHC.Prim.Int# -> a -> (# b, String #)
+[GblId[StrictWorker([~, !])],
+ Arity=4,
+ Str=<L><SP(A,SC(S,L),A)><1L><L>,
+ Unf=OtherCon []]
+T23398.$wbar
+  = \ (@a)
+      (@b)
+      (ww :: a GHC.Prim.~# b)
+      ($dShow :: Show a)
+      (ww1 :: GHC.Prim.Int#)
+      (eta :: a) ->
+      case ww1 of ds {
+        __DEFAULT ->
+          T23398.$wbar
+            @a @b @~(ww :: a GHC.Prim.~# b) $dShow (GHC.Prim.-# ds 1#) eta;
+        0# -> (# eta `cast` (Sub ww :: a ~R# b), show @a $dShow eta #)
+      }
+end Rec }
+
+-- RHS size: {terms: 21, types: 32, coercions: 1, joins: 0/0}
+bar [InlPrag=[2]]
+  :: forall a b. (a ~ b, Show a) => Int -> a -> (b, String)
+[GblId,
+ Arity=4,
+ Str=<S!P(L)><SP(A,SC(S,L),A)><1!P(1L)><L>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 (@b)
+                 ($d~ [Occ=Once1!] :: a ~ b)
+                 ($dShow [Occ=Once1] :: Show a)
+                 (eta [Occ=Once1!] :: Int)
+                 (eta1 [Occ=Once1] :: a) ->
+                 case $d~ of { GHC.Types.Eq# ww ->
+                 case eta of { GHC.Types.I# ww1 [Occ=Once1] ->
+                 case T23398.$wbar @a @b @~(ww :: a GHC.Prim.~# b) $dShow ww1 eta1
+                 of
+                 { (# ww2 [Occ=Once1], ww3 [Occ=Once1] #) ->
+                 (ww2, ww3)
+                 }
+                 }
+                 }}]
+bar
+  = \ (@a)
+      (@b)
+      ($d~ :: a ~ b)
+      ($dShow :: Show a)
+      (eta :: Int)
+      (eta1 :: a) ->
+      case $d~ of { GHC.Types.Eq# ww ->
+      case eta of { GHC.Types.I# ww1 ->
+      case T23398.$wbar @a @b @~(ww :: a GHC.Prim.~# b) $dShow ww1 eta1
+      of
+      { (# ww2, ww3 #) ->
+      (ww2, ww3)
+      }
+      }
+      }
+
+
+

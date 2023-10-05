@@ -1,0 +1,11 @@
+Stopped at dynbrk005.hs:5:0-21
+_result :: (a, a, a) = _
+Stopped at dynbrk005.hs:5:14-21
+_result :: (a, a, a) = _
+x :: [a] = [_,_,_]
+Stopped at dynbrk005.hs:3:0-22
+_result :: (a, a, a) = _
+Stopped at dynbrk005.hs:3:11-22
+_result :: (a, a, a) = _
+x :: [a] = [_,_,_]
+(1,2,3)

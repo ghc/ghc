@@ -1,0 +1,5 @@
+TYPE SIGNATURES
+  f :: forall {a}. a -> (a, Integer)
+  x :: Integer
+Dependent modules: []
+Dependent packages: [base-4.17.0.0]

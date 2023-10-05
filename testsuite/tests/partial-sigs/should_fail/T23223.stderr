@@ -1,0 +1,11 @@
+
+T23223.hs:5:10: error: [GHC-39999]
+    • Could not deduce ‘Ord a’ arising from a use of ‘>’
+      from the context: Show a
+        bound by the inferred type of f :: Show a => a -> w -> Bool
+        at T23223.hs:5:1-11
+      Possible fix:
+        add (Ord a) to the context of
+          the inferred type of f :: Show a => a -> w -> Bool
+    • In the expression: x > x
+      In an equation for ‘f’: f x y = x > x

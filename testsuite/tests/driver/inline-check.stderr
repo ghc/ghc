@@ -1,0 +1,31 @@
+Considering inlining: foo
+  arg infos [ValueArg]
+  interesting continuation RhsCtxt(NonRecursive)
+  some_benefit True
+  is exp: True
+  is work-free: True
+  guidance IF_ARGS [0] 30 0
+  case depth = 0
+  depth based penalty = 0
+  discounted size = 10
+  ANSWER = YES
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Considering inlining: foo
+  arg infos []
+  interesting continuation RhsCtxt(NonRecursive)
+  some_benefit False
+  is exp: True
+  is work-free: True
+  guidance IF_ARGS [0] 30 0
+  case depth = 0
+  depth based penalty = 0
+  discounted size = 20
+  ANSWER = NO
+Inactive unfolding: foo1

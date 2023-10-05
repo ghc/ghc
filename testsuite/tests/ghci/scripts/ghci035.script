@@ -1,0 +1,4 @@
+:set -Wall
+-- In 6.12, GHCi used to warn that x was unused (trac #3813):
+x <- return True
+x

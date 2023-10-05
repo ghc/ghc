@@ -1,0 +1,3 @@
+
+ColumnPragma.hs:5:1015: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma: NONEXISTENTPRAGMA

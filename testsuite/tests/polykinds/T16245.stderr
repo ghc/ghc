@@ -1,0 +1,11 @@
+
+T16245.hs:16:36: error: [GHC-25897]
+    • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
+      ‘k2’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at T16245.hs:16:47
+      ‘k1’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at T16245.hs:15:11-46
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the class declaration for ‘C’

@@ -1,0 +1,4 @@
+
+ImpSafeOnly05.hs:5:1: error: [GHC-75165]
+    M_SafePkg5: Can't be safely imported!
+    The package (safePkg01-1.0) the module resides in isn't trusted.

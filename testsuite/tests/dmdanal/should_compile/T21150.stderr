@@ -1,0 +1,237 @@
+
+==================== Exitification transformation ====================
+Result size of Exitification transformation
+  = {terms: 242, types: 140, coercions: 0, joins: 3/9}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule = "T21150"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T21150.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T21150.$trModule = GHC.Types.Module $trModule $trModule
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 70, types: 37, coercions: 0, joins: 1/3}
+f3 :: Int -> Int -> Int -> Maybe Int
+[LclIdX,
+ Arity=3,
+ Str=<L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 0 0] 279 10}]
+f3
+  = \ (x :: Int) (y :: Int) (z :: Int) ->
+      let {
+        t3 :: Int
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 77 0}]
+        t3
+          = case x of { I# y ->
+            case ># 0# y of {
+              __DEFAULT ->
+                joinrec {
+                  $wgo3 [InlPrag=[2], Occ=LoopBreaker] :: Int# -> Int# -> Int
+                  [LclId[JoinId(2)(Nothing)],
+                   Arity=2,
+                   Str=<L><L>,
+                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                           WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 40 10}]
+                  $wgo3 (x :: Int#) (ww :: Int#)
+                    = case ==# x y of {
+                        __DEFAULT -> jump $wgo3 (+# x 1#) (+# ww x);
+                        1# -> GHC.Types.I# (+# ww x)
+                      }; } in
+                jump $wgo3 0# 0#;
+              1# -> lvl
+            }
+            } } in
+      let {
+        $wg3 [InlPrag=NOINLINE] :: Int -> Int -> (# Int #)
+        [LclId,
+         Arity=2,
+         Str=<L><L>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 20] 42 10}]
+        $wg3
+          = \ (v [OS=OneShot] :: Int) (z :: Int) ->
+              (# case v of { I# x ->
+                 case z of { I# y ->
+                 case t3 of { I# y -> GHC.Types.I# (+# (+# x y) y) }
+                 }
+                 } #) } in
+      case $wg3 x y of { (# ww #) ->
+      case $wg3 x z of { (# ww #) ->
+      GHC.Maybe.Just @Int (GHC.Num.$fNumInt_$c+ ww ww)
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 69, types: 36, coercions: 0, joins: 1/3}
+$wf2 [InlPrag=[2]] :: Int -> Int -> Maybe Int
+[LclId,
+ Arity=2,
+ Str=<L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 20] 279 10}]
+$wf2
+  = \ (x :: Int) (z :: Int) ->
+      let {
+        t2 :: Int
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 77 0}]
+        t2
+          = case x of { I# y ->
+            case ># 0# y of {
+              __DEFAULT ->
+                joinrec {
+                  $wgo3 [InlPrag=[2], Occ=LoopBreaker] :: Int# -> Int# -> Int
+                  [LclId[JoinId(2)(Nothing)],
+                   Arity=2,
+                   Str=<L><L>,
+                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                           WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 40 10}]
+                  $wgo3 (x :: Int#) (ww :: Int#)
+                    = case ==# x y of {
+                        __DEFAULT -> jump $wgo3 (+# x 1#) (+# ww x);
+                        1# -> GHC.Types.I# (+# ww x)
+                      }; } in
+                jump $wgo3 0# 0#;
+              1# -> lvl
+            }
+            } } in
+      let {
+        $wg2 [InlPrag=NOINLINE] :: Int -> (# #) -> (# Int #)
+        [LclId,
+         Arity=2,
+         Str=<L><L>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 0] 42 10}]
+        $wg2
+          = \ (v [OS=OneShot] :: Int) _ [Occ=Dead] ->
+              (# case v of { I# x ->
+                 case z of { I# y ->
+                 case t2 of { I# y -> GHC.Types.I# (+# (+# x y) y) }
+                 }
+                 } #) } in
+      case $wg2 x GHC.Prim.(##) of { (# ww #) ->
+      case $wg2 x GHC.Prim.(##) of { (# ww #) ->
+      GHC.Maybe.Just @Int (GHC.Num.$fNumInt_$c+ ww ww)
+      }
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+f2 [InlPrag=[2]] :: Int -> Int -> Int -> Maybe Int
+[LclIdX,
+ Arity=3,
+ Str=<L><A><L>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (x [Occ=Once1] :: Int)
+                 _ [Occ=Dead, Dmd=A]
+                 (z [Occ=Once1] :: Int) ->
+                 $wf2 x z}]
+f2 = \ (x :: Int) _ [Occ=Dead, Dmd=A] (z :: Int) -> $wf2 x z
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 70, types: 37, coercions: 0, joins: 1/3}
+f :: Int -> Int -> Int -> Maybe Int
+[LclIdX,
+ Arity=3,
+ Str=<L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 20 0] 279 10}]
+f = \ (x :: Int) (y :: Int) (z :: Int) ->
+      let {
+        t :: Int
+        [LclId,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
+                 WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 77 0}]
+        t = case x of { I# y ->
+            case ># 0# y of {
+              __DEFAULT ->
+                joinrec {
+                  $wgo3 [InlPrag=[2], Occ=LoopBreaker] :: Int# -> Int# -> Int
+                  [LclId[JoinId(2)(Nothing)],
+                   Arity=2,
+                   Str=<L><L>,
+                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                           WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 40 10}]
+                  $wgo3 (x :: Int#) (ww :: Int#)
+                    = case ==# x y of {
+                        __DEFAULT -> jump $wgo3 (+# x 1#) (+# ww x);
+                        1# -> GHC.Types.I# (+# ww x)
+                      }; } in
+                jump $wgo3 0# 0#;
+              1# -> lvl
+            }
+            } } in
+      let {
+        $wg [InlPrag=NOINLINE] :: Int -> (# #) -> (# Int #)
+        [LclId,
+         Arity=2,
+         Str=<L><L>,
+         Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+                 WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 0] 42 10}]
+        $wg
+          = \ (v [OS=OneShot] :: Int) _ [Occ=Dead] ->
+              (# case y of { I# x ->
+                 case v of { I# y ->
+                 case t of { I# y -> GHC.Types.I# (+# (+# x y) y) }
+                 }
+                 } #) } in
+      case $wg z GHC.Prim.(##) of { (# ww #) ->
+      case $wg y GHC.Prim.(##) of { (# ww #) ->
+      GHC.Maybe.Just @Int (GHC.Num.$fNumInt_$c+ ww ww)
+      }
+      }
+
+
+

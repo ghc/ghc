@@ -1,0 +1,31 @@
+
+T10267.hs:8:1: error: [GHC-88464]
+    • Found hole: _foo :: a -> a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 i :: forall a. a -> a
+               at T10267.hs:(8,1)-(12,14)
+      Or perhaps ‘_foo’ is mis-spelled, or not in scope
+    • In an equation for ‘i’: i = _foo
+    • Relevant bindings include i :: a -> a (bound at T10267.hs:8:1)
+      Valid hole fits include
+        i :: a -> a (bound at T10267.hs:8:1)
+        j :: forall a0. a0 -> a0
+          with j @a
+          (bound at T10267.hs:8:1)
+        id :: forall a. a -> a
+          with id @a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Base’))
+
+T10267.hs:8:1: error: [GHC-88464]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 j :: forall a. a -> a
+               at T10267.hs:(8,1)-(12,14)
+    • In an equation for ‘j’: j x = _
+    • Relevant bindings include
+        x :: a (bound at T10267.hs:8:1)
+        j :: a -> a (bound at T10267.hs:8:1)
+      Valid hole fits include x :: a (bound at T10267.hs:8:1)

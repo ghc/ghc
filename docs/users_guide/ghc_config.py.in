@@ -1,0 +1,33 @@
+import sphinx
+from utils import parse_version
+
+if parse_version(sphinx.__version__) >= parse_version("4.0.0"):
+    # N.B. see #23807 and #22690
+    extlinks = {
+        'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#%s'),
+        'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', '%s'),
+    }
+else:
+    extlinks = {
+        'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#'),
+        'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', ''),
+    }
+
+libs_base_uri = '../libraries'
+
+# N.B. If you add a package to this list be sure to also add a corresponding
+# LIBRARY_VERSION macro call to configure.ac.
+lib_versions = {
+    'base': '@LIBRARY_base_UNIT_ID@',
+    'ghc-prim': '@LIBRARY_ghc_prim_UNIT_ID@',
+    'template-haskell': '@LIBRARY_template_haskell_UNIT_ID@',
+    'ghc-compact': '@LIBRARY_ghc_compact_UNIT_ID@',
+    'ghc': '@LIBRARY_ghc_UNIT_ID@',
+    'Cabal': '@LIBRARY_Cabal_UNIT_ID@',
+    'array': '@LIBRARY_array_UNIT_ID@',
+}
+
+version = '@ProjectVersion@'
+
+llvm_version_min = '@LlvmMinVersion@'
+llvm_version_max = '@LlvmMaxVersion@'

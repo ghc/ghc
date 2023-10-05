@@ -1,0 +1,25 @@
+unit p where
+    signature A where
+        data A
+        neg :: A -> A
+    module P where
+        import A
+        f :: A -> A
+        f = neg . neg
+
+unit r where
+    module A where
+        data B = X | Y
+        type A = B
+        neg :: B -> B
+        neg X = Y
+        neg Y = X
+
+unit q where
+    dependency p[A=r:A]
+    dependency r
+    module M where
+        import P
+        import A
+        g :: B
+        g = f X

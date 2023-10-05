@@ -1,0 +1,68 @@
+7f86c4be8740: created capset 0 of type 2
+7f86c4be8740: created capset 1 of type 3
+7f86c4be8740: cap 0: initialised
+7f86c4be8740: assigned cap 0 to capset 0
+7f86c4be8740: assigned cap 0 to capset 1
+7f86c4be8740: cap 0: created thread 1[""]
+7f86c4be8740: cap 0: running thread 1[""] (ThreadRunGHC)
+7f86c4be8740: cap 0: thread 1[""] stopped (stack overflow, size 109)
+7f86c4be8740: cap 0: running thread 1[""] (ThreadRunGHC)
+7f86c4be8740: cap 0: created thread 2[""]
+7f86c4be8740: cap 0: thread 2 has label IOManager on cap 0
+7f86c4be8740: cap 0: thread 1[""] stopped (yielding)
+7f86b67fc640: cap 0: running thread 2["IOManager on cap 0"] (ThreadRunGHC)
+7f86b67fc640: cap 0: thread 2["IOManager on cap 0"] stopped (yielding)
+7f86c4be8740: cap 0: running thread 1[""] (ThreadRunGHC)
+7f86c4be8740: cap 0: created thread 3[""]
+7f86c4be8740: cap 0: thread 3 has label TimerManager
+7f86c4be8740: cap 0: thread 1[""] stopped (finished)
+7f86c4be8740: IPE: table_name table_name_009, closure_desc closure_desc_009, ty_desc ty_desc_009, label label_009, module module_009, srcloc src_file_009:src_span_009
+7f86c4be8740: IPE: table_name table_name_008, closure_desc closure_desc_008, ty_desc ty_desc_008, label label_008, module module_008, srcloc src_file_008:src_span_008
+7f86c4be8740: IPE: table_name table_name_007, closure_desc closure_desc_007, ty_desc ty_desc_007, label label_007, module module_007, srcloc src_file_007:src_span_007
+7f86c4be8740: IPE: table_name table_name_006, closure_desc closure_desc_006, ty_desc ty_desc_006, label label_006, module module_006, srcloc src_file_006:src_span_006
+7f86c4be8740: IPE: table_name table_name_005, closure_desc closure_desc_005, ty_desc ty_desc_005, label label_005, module module_005, srcloc src_file_005:src_span_005
+7f86c4be8740: IPE: table_name table_name_004, closure_desc closure_desc_004, ty_desc ty_desc_004, label label_004, module module_004, srcloc src_file_004:src_span_004
+7f86c4be8740: IPE: table_name table_name_003, closure_desc closure_desc_003, ty_desc ty_desc_003, label label_003, module module_003, srcloc src_file_003:src_span_003
+7f86c4be8740: IPE: table_name table_name_002, closure_desc closure_desc_002, ty_desc ty_desc_002, label label_002, module module_002, srcloc src_file_002:src_span_002
+7f86c4be8740: IPE: table_name table_name_001, closure_desc closure_desc_001, ty_desc ty_desc_001, label label_001, module module_001, srcloc src_file_001:src_span_001
+7f86c4be8740: IPE: table_name table_name_000, closure_desc closure_desc_000, ty_desc ty_desc_000, label label_000, module module_000, srcloc src_file_000:src_span_000
+7f86c4be8740: IPE: table_name table_name_009, closure_desc closure_desc_009, ty_desc ty_desc_009, label label_009, module module_009, srcloc src_file_009:src_span_009
+7f86c4be8740: IPE: table_name table_name_008, closure_desc closure_desc_008, ty_desc ty_desc_008, label label_008, module module_008, srcloc src_file_008:src_span_008
+7f86c4be8740: IPE: table_name table_name_007, closure_desc closure_desc_007, ty_desc ty_desc_007, label label_007, module module_007, srcloc src_file_007:src_span_007
+7f86c4be8740: IPE: table_name table_name_006, closure_desc closure_desc_006, ty_desc ty_desc_006, label label_006, module module_006, srcloc src_file_006:src_span_006
+7f86c4be8740: IPE: table_name table_name_005, closure_desc closure_desc_005, ty_desc ty_desc_005, label label_005, module module_005, srcloc src_file_005:src_span_005
+7f86c4be8740: IPE: table_name table_name_004, closure_desc closure_desc_004, ty_desc ty_desc_004, label label_004, module module_004, srcloc src_file_004:src_span_004
+7f86c4be8740: IPE: table_name table_name_003, closure_desc closure_desc_003, ty_desc ty_desc_003, label label_003, module module_003, srcloc src_file_003:src_span_003
+7f86c4be8740: IPE: table_name table_name_002, closure_desc closure_desc_002, ty_desc ty_desc_002, label label_002, module module_002, srcloc src_file_002:src_span_002
+7f86c4be8740: IPE: table_name table_name_001, closure_desc closure_desc_001, ty_desc ty_desc_001, label label_001, module module_001, srcloc src_file_001:src_span_001
+7f86c4be8740: IPE: table_name table_name_000, closure_desc closure_desc_000, ty_desc ty_desc_000, label label_000, module module_000, srcloc src_file_000:src_span_000
+7f86c4be8740: cap 0: created thread 4[""]
+7f86b67fc640: cap 0: running thread 2["IOManager on cap 0"] (ThreadRunGHC)
+7f86b67fc640: cap 0: thread 2["IOManager on cap 0"] stopped (suspended while making a foreign call)
+7f86b5ffb640: cap 0: running thread 3["TimerManager"] (ThreadRunGHC)
+7f86b5ffb640: cap 0: thread 3["TimerManager"] stopped (suspended while making a foreign call)
+7f86c4be8740: cap 0: running thread 4[""] (ThreadRunGHC)
+7f86c4be8740: cap 0: thread 4[""] stopped (yielding)
+7f86c4be8740: cap 0: running thread 4[""] (ThreadRunGHC)
+7f86c4be8740: cap 0: thread 4[""] stopped (finished)
+7f86b57fa640: cap 0: requesting sequential GC
+7f86b57fa640: cap 0: starting GC
+7f86b57fa640: cap 0: GC working
+7f86b57fa640: cap 0: GC idle
+7f86b57fa640: cap 0: GC done
+7f86b57fa640: cap 0: GC idle
+7f86b57fa640: cap 0: GC done
+7f86b57fa640: cap 0: GC idle
+7f86b57fa640: cap 0: GC done
+7f86b57fa640: cap 0: Memory Return (Current: 6) (Needed: 8) (Returned: 0)
+7f86b57fa640: cap 0: all caps stopped for GC
+7f86b57fa640: cap 0: finished GC
+7f86b5ffb640: cap 0: running thread 3["TimerManager"] (ThreadRunGHC)
+7f86b5ffb640: cap 0: thread 3["TimerManager"] stopped (finished)
+7f86b67fc640: cap 0: running thread 2["IOManager on cap 0"] (ThreadRunGHC)
+7f86b67fc640: cap 0: thread 2["IOManager on cap 0"] stopped (finished)
+7f86c4be8740: removed cap 0 from capset 0
+7f86c4be8740: removed cap 0 from capset 1
+7f86c4be8740: cap 0: shutting down
+7f86c4be8740: deleted capset 0
+7f86c4be8740: deleted capset 1

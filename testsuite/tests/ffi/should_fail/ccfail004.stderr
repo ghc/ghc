@@ -1,0 +1,35 @@
+
+ccfail004.hs:9:1: error: [GHC-72317]
+    • Unacceptable argument type in foreign declaration:
+        ‘NInt’ cannot be marshalled in a foreign call
+          because its data constructor is not in scope
+    • When checking declaration:
+        foreign import ccall safe f1 :: NInt -> IO Int
+    Suggested fix: Import the data constructor ‘NInt’ of ‘NInt’
+
+ccfail004.hs:10:1: error: [GHC-72317]
+    • Unacceptable result type in foreign declaration:
+        ‘NInt’ cannot be marshalled in a foreign call
+          because its data constructor is not in scope
+    • When checking declaration:
+        foreign import ccall safe f2 :: Int -> IO NInt
+    Suggested fix: Import the data constructor ‘NInt’ of ‘NInt’
+
+ccfail004.hs:11:1: error: [GHC-72317]
+    • Unacceptable result type in foreign declaration:
+        ‘NIO Int’ cannot be marshalled in a foreign call
+          because the data constructor for ‘NIO’ is not in scope
+    • When checking declaration:
+        foreign import ccall safe f3 :: Int -> NIO Int
+    Suggested fix: Import the data constructor ‘NIO’ of ‘NIO’
+
+ccfail004.hs:14:1: error: [GHC-89401]
+    • Unacceptable argument type in foreign declaration:
+        ‘[NT]’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe f4 :: NT -> IO ()
+
+ccfail004.hs:15:1: error: [GHC-89401]
+    • Unacceptable result type in foreign declaration:
+        ‘[NT]’ cannot be marshalled in a foreign call
+    • When checking declaration: foreign import ccall safe f5 :: IO NT

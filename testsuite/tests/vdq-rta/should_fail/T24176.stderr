@@ -1,0 +1,8 @@
+
+T24176.hs:4:7: error: [GHC-83865]
+    • Expected a constraint, but ‘forall a -> Eq a’ is a type
+    • In the type signature: f :: (forall a -> Eq a) => a
+
+T24176.hs:4:19: error: [GHC-83865]
+    • Expected a type, but ‘Eq a’ is a constraint
+    • In the type signature: f :: (forall a -> Eq a) => a

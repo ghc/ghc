@@ -1,0 +1,4 @@
+:set -XDataKinds
+import GHC.TypeLits
+:kind! CmpSymbol "a" "\0"
+compare "a" "\0"

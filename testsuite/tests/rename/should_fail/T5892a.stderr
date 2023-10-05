@@ -1,0 +1,8 @@
+
+T5892a.hs:12:8: error: [GHC-20125] [-Wmissing-fields (in -Wdefault), Werror=missing-fields]
+    • Fields of ‘Node’ not initialised:
+        subForest :: [Tree [Int]]
+    • In the expression: Node {..}
+      In the expression: let rootLabel = [] in Node {..}
+      In an equation for ‘foo’:
+          foo (Node {..}) = let rootLabel = [] in Node {..}

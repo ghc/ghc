@@ -1,0 +1,25 @@
+Note [Turtles]
+~~~~~~~~~~~~~~~
+This is note 1. See Note [Wombats are toes].
+
+/* Note [Wombats are toes]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+   This is another Note.
+ */
+
+See Note [This is a
+Note reference broken across lines].
+
+  // This is another Note [Broken
+  // across a line in a C++ comment].
+  
+  /*
+   * This is another Note [Broken
+   * across a line in a C comment].
+   */
+  
+  -- This is another Note [Broken
+  -- across a line in a Haskell comment].
+  
+  # This is another Note [Broken
+  # across a line in a Python comment].

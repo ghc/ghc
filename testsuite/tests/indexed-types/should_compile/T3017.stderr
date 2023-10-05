@@ -1,0 +1,23 @@
+TYPE SIGNATURES
+  empty :: forall c. Coll c => c
+  emptyL :: forall a. ListColl a
+  insert :: forall c. Coll c => Elem c -> c -> c
+  test2 ::
+    forall {c} {a} {b}.
+    (Elem c ~ (a, b), Coll c, Num a, Num b) =>
+    c -> c
+TYPE CONSTRUCTORS
+  class Coll{1} :: * -> Constraint
+  associated type family Elem{1} :: * -> *
+    roles nominal
+  data type ListColl{1} :: * -> *
+COERCION AXIOMS
+  axiom Foo.D:R:ElemListColl :: Elem (ListColl a) = a
+DATA CONSTRUCTORS
+  L :: forall a. [a] -> ListColl a
+CLASS INSTANCES
+  instance Coll (ListColl a) -- Defined at T3017.hs:12:11
+FAMILY INSTANCES
+  type instance Elem (ListColl a) = a -- Defined at T3017.hs:13:9
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]

@@ -1,0 +1,32 @@
+<no location info>: warning:
+    • The first argument of ‘coerce’ does not have a fixed runtime representation:
+        a :: TYPE k
+    Substitution: <InScope = {a q}
+                   IdSubst   = []
+                   TvSubst   = []
+                   CvSubst   = []>
+in coerce BAD 1
+<no location info>: warning:
+    • The first argument of ‘coerce’ does not have a fixed runtime representation:
+        ‘q’ is not concrete.
+    Substitution: <InScope = {a q}
+                   IdSubst   = []
+                   TvSubst   = []
+                   CvSubst   = []>
+in coerce BAD 2
+<no location info>: warning:
+    • The return type of the first argument of the primop ‘catch#’ does not have a fixed runtime representation:
+        a :: TYPE q
+    Substitution: <InScope = {a q}
+                   IdSubst   = []
+                   TvSubst   = []
+                   CvSubst   = []>
+in catch# BAD 1
+<no location info>: warning:
+    • The return type of the first argument of the primop ‘catch#’ does not have a fixed runtime representation:
+        ‘q’ is not concrete.
+    Substitution: <InScope = {a q}
+                   IdSubst   = []
+                   TvSubst   = []
+                   CvSubst   = []>
+in catch# BAD 2

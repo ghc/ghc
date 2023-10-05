@@ -1,0 +1,3 @@
+
+RnImplicitBindInMdoNotation.hs:6:5: error: [GHC-50730]
+    Implicit-parameter bindings illegal in an mdo expression ?x = 5

@@ -1,0 +1,8 @@
+
+T22513g.hs:5:1: warning: [GHC-54201] [-Wterm-variable-capture]
+    The type variable ‘head’ is implicitly quantified,
+    even though another variable of the same name is in scope:
+      ‘head’ imported from ‘Prelude’ at T22513g.hs:1:8-14
+             (and originally defined in ‘GHC.List’)
+    This is not compatible with the RequiredTypeArguments extension.
+    Suggested fix: Consider renaming the type variable.

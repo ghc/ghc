@@ -1,0 +1,439 @@
+
+==================== Parser AST ====================
+
+(L
+ { T17544_kw.hs:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { T17544_kw.hs:1:1 })
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
+     []
+     (Just
+      ((,)
+       { T17544_kw.hs:25:1 }
+       { T17544_kw.hs:24:18 })))
+    (EpaCommentsBalanced
+     []
+     []))
+   (EpVirtualBraces
+    (1))
+   (Nothing)
+   (Just
+    (L
+     { T17544_kw.hs:12:3-33 }
+     (WithHsDocIdentifiers
+      (MultiLineDocString
+       (HsDocStringNext)
+       (:|
+        (L
+         { T17544_kw.hs:12:7-33 }
+         (HsDocStringChunk
+          " Bad comment for the module"))
+        []))
+      []))))
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { T17544_kw.hs:13:3-11 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    {ModuleName: T17544_kw}))
+  (Nothing)
+  []
+  [(L
+    (EpAnn
+     (EpaSpan { T17544_kw.hs:(15,1)-(16,20) })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (EpAnn
+       (EpaSpan { T17544_kw.hs:(15,1)-(16,20) })
+       [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { T17544_kw.hs:15:6-8 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Foo}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (DataTypeCons
+        (False)
+        [(L
+          (EpAnn
+           (EpaSpan { T17544_kw.hs:16:9-20 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (ConDeclGADT
+           ((,)
+            (EpUniTok
+             (EpaSpan { T17544_kw.hs:16:15-16 })
+             (NormalSyntax))
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:16:9-20 })
+             []
+             (EpaComments
+              [])))
+           (:|
+            (L
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:16:9-13 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: MkFoo}))
+            [])
+           (L
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:16:18-20 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsOuterImplicit
+             (NoExtField)))
+           (Nothing)
+           (PrefixConGADT
+            (NoExtField)
+            [])
+           (L
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:16:18-20 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:16:18-20 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { T17544_kw.hs:16:18-20 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Foo}))))
+           (Just
+            (L
+             { T17544_kw.hs:15:10-35 }
+             (WithHsDocIdentifiers
+              (MultiLineDocString
+               (HsDocStringNext)
+               (:|
+                (L
+                 { T17544_kw.hs:15:14-35 }
+                 (HsDocStringChunk
+                  " Bad comment for MkFoo"))
+                []))
+              [])))))])
+       []))))
+  ,(L
+    (EpAnn
+     (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (EpAnn
+       (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
+       [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { T17544_kw.hs:18:9-11 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Bar}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (NewTypeCon
+        (L
+         (EpAnn
+          (EpaSpan { T17544_kw.hs:19:9-26 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (ConDeclGADT
+          ((,)
+           (EpUniTok
+            (EpaSpan { T17544_kw.hs:19:15-16 })
+            (NormalSyntax))
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:19:9-26 })
+            []
+            (EpaComments
+             [])))
+          (:|
+           (L
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:19:9-13 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: MkBar}))
+           [])
+          (L
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:19:18-26 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (HsOuterImplicit
+            (NoExtField)))
+          (Nothing)
+          (PrefixConGADT
+           (NoExtField)
+           [(HsScaled
+             (HsUnrestrictedArrow
+              (EpUniTok
+               (EpaSpan { T17544_kw.hs:19:21-22 })
+               (NormalSyntax)))
+             (L
+              (EpAnn
+               (EpaSpan { T17544_kw.hs:19:18-19 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTupleTy
+               (EpAnn
+                (EpaSpan { T17544_kw.hs:19:18-19 })
+                (AnnParen
+                 (AnnParens)
+                 (EpaSpan { T17544_kw.hs:19:18 })
+                 (EpaSpan { T17544_kw.hs:19:19 }))
+                (EpaComments
+                 []))
+               (HsBoxedOrConstraintTuple)
+               [])))])
+          (L
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:19:24-26 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (HsTyVar
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:19:24-26 })
+             []
+             (EpaComments
+              []))
+            (NotPromoted)
+            (L
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:19:24-26 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Bar}))))
+          (Just
+           (L
+            { T17544_kw.hs:18:13-38 }
+            (WithHsDocIdentifiers
+             (MultiLineDocString
+              (HsDocStringNext)
+              (:|
+               (L
+                { T17544_kw.hs:18:17-38 }
+                (HsDocStringChunk
+                 " Bad comment for MkBar"))
+               []))
+             []))))))
+       []))))
+  ,(L
+    (EpAnn
+     (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      ((,,)
+       (EpAnn
+        (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
+        [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
+        (EpaComments
+         []))
+       (EpVirtualBraces
+        (5))
+       (NoAnnSortKey))
+      (Nothing)
+      (L
+       (EpAnn
+        (EpaSpan { T17544_kw.hs:21:7-9 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Cls}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { T17544_kw.hs:21:11 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { T17544_kw.hs:21:11 })
+           []
+           (EpaComments
+            []))
+          (HsBndrRequired
+           (NoExtField))
+          (L
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:21:11 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      []
+      [(L
+        (EpAnn
+         (EpaSpan { T17544_kw.hs:24:5-18 })
+         (AnnListItem
+          [])
+         (EpaComments
+          []))
+        (ClassOpSig
+         (EpAnn
+          (EpaSpan { T17544_kw.hs:24:5-18 })
+          (AnnSig
+           (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
+           [])
+          (EpaComments
+           []))
+         (False)
+         [(L
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:24:5-13 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: clsmethod}))]
+         (L
+          (EpAnn
+           (EpaSpan { T17544_kw.hs:24:18 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           (L
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:24:18 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:24:18 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { T17544_kw.hs:24:18 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: a}))))))))]
+      {Bag(LocatedA (HsBind GhcPs)):
+       []}
+      []
+      []
+      [(L
+        (EpAnn
+         (EpaSpan { T17544_kw.hs:22:5-34 })
+         (AnnListItem
+          [])
+         (EpaComments
+          []))
+        (DocCommentNext
+         (L
+          { T17544_kw.hs:22:5-34 }
+          (WithHsDocIdentifiers
+           (MultiLineDocString
+            (HsDocStringNext)
+            (:|
+             (L
+              { T17544_kw.hs:22:9-34 }
+              (HsDocStringChunk
+               " Bad comment for clsmethod"))
+             []))
+           []))))])))]))
+
+

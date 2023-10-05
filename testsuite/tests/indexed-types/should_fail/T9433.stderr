@@ -1,0 +1,4 @@
+
+T9433.hs:14:6: error: [GHC-27346]
+    • The type family ‘Id’ should have 1 argument, but has been given none
+    • In the type signature: x :: Map Id [Bool]

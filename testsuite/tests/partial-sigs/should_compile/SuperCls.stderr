@@ -1,0 +1,4 @@
+
+SuperCls.hs:4:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘() :: Constraint’
+    • In the type signature: f :: (Ord a, _) => a -> Bool

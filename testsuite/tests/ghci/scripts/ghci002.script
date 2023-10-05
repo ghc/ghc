@@ -1,0 +1,4 @@
+-- bug: we used to throw away the instance accidentally here
+:m GHC.Base
+1 == (2 :: Int)
+1 == (2 :: Int)

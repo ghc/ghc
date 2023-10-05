@@ -1,0 +1,6 @@
+
+T17955.hs:6:13: error: [GHC-17440]
+    • A newtype constructor must not have a context in its type
+      T :: Coercible () T => () -> T
+    • In the definition of data constructor ‘T’
+      In the newtype declaration for ‘T’

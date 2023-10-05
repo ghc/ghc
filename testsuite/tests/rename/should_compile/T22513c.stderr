@@ -1,0 +1,7 @@
+
+T22513c.hs:6:5: warning: [GHC-54201] [-Wterm-variable-capture]
+    The type variable ‘a’ is implicitly quantified,
+    even though another variable of the same name is in scope:
+      ‘a’ defined at T22513c.hs:4:3
+    This is not compatible with the RequiredTypeArguments extension.
+    Suggested fix: Consider renaming the type variable.

@@ -1,0 +1,8 @@
+
+RepPolyRule2.hs:17:53: error: [GHC-55287]
+    • The argument ‘x’ of ‘f’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE (F rep)
+    • In the expression: f x
+      When checking the rewrite rule "f_id"

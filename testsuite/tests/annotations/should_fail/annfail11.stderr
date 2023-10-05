@@ -1,0 +1,11 @@
+
+annfail11.hs:3:9: error: [GHC-10173]
+    • No top-level binding for ‘length’ in this module
+    • In the annotation:
+        {-# ANN length "Cannot annotate other modules yet" #-}
+
+annfail11.hs:4:14: error: [GHC-10173]
+    • No top-level binding for
+        type constructor or class ‘Integer’ in this module
+    • In the annotation:
+        {-# ANN type Integer "Cannot annotate other modules yet" #-}

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+RECORDS=15
+FIELDS=20
+UPDATES_PER_RECORD=5
+echo "{-# LANGUAGE DuplicateRecordFields #-}" > RecordUpdPerf.hs
+echo "module RecordUpdPerf where" >> RecordUpdPerf.hs
+for r in $(seq -w 1 $RECORDS); do
+  echo "data R$r = MkR$r {" >> RecordUpdPerf.hs
+    for f in $(seq -w 1 $FIELDS); do
+      echo "  r$f :: Int," >> RecordUpdPerf.hs
+      echo "  s${r}_$f :: Int," >> RecordUpdPerf.hs
+    done
+    echo "  t :: Bool }" >> RecordUpdPerf.hs
+done
+
+for u in $(seq -w 1 $UPDATES_PER_RECORD); do
+  for r in $(seq -w 1 $RECORDS); do
+    echo "f${r}_$u r = r {" >> RecordUpdPerf.hs
+    for f in $(seq -w 1 $FIELDS); do
+      echo "  r$f = $u * $r * $f," >> RecordUpdPerf.hs
+    done
+    echo "  s${r}_$FIELDS = $u + $r }" >> RecordUpdPerf.hs
+  done
+done

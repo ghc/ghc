@@ -1,0 +1,4 @@
+-- testing :info on builtin identifiers
+:info []
+:info ()
+:info (,)

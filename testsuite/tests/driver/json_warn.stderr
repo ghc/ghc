@@ -1,0 +1,1 @@
+{"version":"1.0","ghcVersion":"ghc-9.9.20230817","span":{"file":"json_warn.hs","start":{"line":4,"column":3},"end":{"line":4,"column":4}},"severity":"Warning","code":40910,"message":["Defined but not used: `x'"],"hints":[]}

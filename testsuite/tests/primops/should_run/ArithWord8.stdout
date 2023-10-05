@@ -1,0 +1,8 @@
+Pass: passing Word8# on the stack
+Pass: notWord8#
+Pass: plusWord8#
+Pass: subWord8#
+Pass: timesWord8#
+Pass: remWord8#
+Pass: quotWord8#
+Pass: quotRemWord8#

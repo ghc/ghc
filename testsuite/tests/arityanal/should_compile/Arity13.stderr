@@ -1,0 +1,33 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 32, types: 16, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 31, types: 12, coercions: 0, joins: 0/0}
+f13 :: Int -> Int -> Int -> Int
+[GblId,
+ Arity=3,
+ Str=<S,1*U(U)><S,1*U(U)><S,1*U(U)>,
+ Cpr=m1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1!] :: Int) (y [Occ=Once2!] :: Int) (eta [Occ=Once1!] :: Int) ->
+                 case eta of { GHC.Types.I# x1 [Occ=Once2] ->
+                 case x of { GHC.Types.I# x2 ->
+                 case GHC.Prim.># x2 0# of {
+                   __DEFAULT -> case y of { GHC.Types.I# y1 [Occ=Once1] -> GHC.Types.I# (GHC.Prim.+# x1 y1) };
+                   1# -> case y of { GHC.Types.I# y1 [Occ=Once1] -> GHC.Types.I# (GHC.Prim.+# x1 (GHC.Prim.*# x2 y1)) }
+                 }
+                 }
+                 }}]
+f13
+  = \ (x :: Int) (y :: Int) (eta :: Int) ->
+      case eta of { GHC.Types.I# x1 ->
+      case x of { GHC.Types.I# x2 ->
+      case GHC.Prim.># x2 0# of {
+        __DEFAULT -> case y of { GHC.Types.I# y1 -> GHC.Types.I# (GHC.Prim.+# x1 y1) };
+        1# -> case y of { GHC.Types.I# y1 -> GHC.Types.I# (GHC.Prim.+# x1 (GHC.Prim.*# x2 y1)) }
+      }
+      }
+      }
+
+
+

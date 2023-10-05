@@ -1,0 +1,17 @@
+
+T11473.hs:19:1: error: [GHC-55287]
+    The first pattern in the equation for ‘hello’
+    does not have a fixed runtime representation.
+    Its type is:
+      a :: TYPE r
+
+T11473.hs:19:17: error: [GHC-55287]
+    • The argument ‘x’ of ‘boxed’
+      does not have a fixed runtime representation.
+      Its type is:
+        a0 :: TYPE lev0
+      Cannot unify ‘r’ with the type variable ‘lev0’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘boxed’, namely ‘x’
+      In the expression: boxed x
+      In an equation for ‘hello’: hello x = boxed x

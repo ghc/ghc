@@ -1,0 +1,13 @@
+unit h where
+    signature H where
+        data T
+unit p where
+    dependency h[H=<H>]
+    module B(T(..)) where
+        data T = T
+    signature H(module H, T(..)) where
+        import B(T(..))
+        f :: a -> a
+    module A(T) where
+        import H(T(T),f)
+        x = f T :: T

@@ -1,0 +1,8 @@
+
+==================== Tidy Core rules ====================
+"SPEC wimwam @(ST s)"
+    forall (@k) (@(s :: k)) ($dM :: M (ST s)).
+      wimwam @(ST s) $dM
+      = f_$swimwam @k @s
+
+

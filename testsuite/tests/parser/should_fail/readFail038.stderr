@@ -1,0 +1,4 @@
+
+readFail038.hs:5:9: [GHC-42026]
+    Unexpected parallel statement in a list comprehension
+    Suggested fix: Perhaps you intended to use ParallelListComp

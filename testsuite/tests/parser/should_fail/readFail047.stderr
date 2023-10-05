@@ -1,0 +1,3 @@
+
+readFail047.hs:6:5: error: [GHC-58481]
+    parse error (possibly incorrect indentation or mismatched brackets)

@@ -1,0 +1,5 @@
+
+T11241.hs:5:21: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘*’
+    • In the kind ‘_’
+      In the type signature: foo :: forall (a :: _). a -> a

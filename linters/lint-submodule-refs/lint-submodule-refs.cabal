@@ -1,0 +1,28 @@
+cabal-version:       3.0
+name:                lint-submodule-refs
+version:             0.1.0.0
+synopsis:            Lint submodule references
+license:             GPL-3.0-only
+author:              The GHC team
+build-type:          Simple
+
+executable lint-submodule-refs
+
+  default-language:
+    Haskell2010
+
+  build-depends:
+    base
+       >= 4.14 && < 5,
+    text
+       >= 1.2  && < 2.2,
+    linters-common
+
+  ghc-options:
+    -Wall
+
+  hs-source-dirs:
+    .
+
+  main-is:
+    Main.hs

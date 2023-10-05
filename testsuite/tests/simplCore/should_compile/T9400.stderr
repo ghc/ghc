@@ -1,0 +1,86 @@
+
+T9400.hs:13:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: [] -> ...
+
+T9400.hs:18:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: "" -> ...
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 48, types: 28, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2 :: TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T9400"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4 :: TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Types.TrNameS $trModule3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T9400.$trModule :: Module
+[GblId, Unf=OtherCon []]
+T9400.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+-- RHS size: {terms: 33, types: 21, coercions: 0, joins: 0/0}
+main :: IO ()
+[GblId]
+main
+  = >>
+      @IO
+      GHC.Base.$fMonadIO
+      @()
+      @()
+      (putStrLn (unpackCString# "c"#))
+      (>>
+         @IO
+         GHC.Base.$fMonadIO
+         @()
+         @()
+         (putStrLn (unpackCString# "x"#))
+         (>>
+            @IO
+            GHC.Base.$fMonadIO
+            @()
+            @()
+            (putStrLn (unpackCString# "z"#))
+            (>>
+               @IO
+               GHC.Base.$fMonadIO
+               @()
+               @()
+               (putStrLn (unpackCString# "efg"#))
+               (>>
+                  @IO
+                  GHC.Base.$fMonadIO
+                  @()
+                  @()
+                  (case Control.Exception.Base.patError
+                          @LiftedRep @() "T9400.hs:(17,5)-(18,29)|case"#
+                   of {})
+                  (>>
+                     @IO
+                     GHC.Base.$fMonadIO
+                     @()
+                     @()
+                     (putStrLn (unpackCStringUtf8# "abc"#))
+                     (putStrLn
+                        (unpackCStringUtf8#
+                           "a\\197\\188\\195\\179\\197\\130\\196\\135z"#)))))))
+
+
+

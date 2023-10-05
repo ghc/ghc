@@ -1,0 +1,2 @@
+signature A.B where
+import A

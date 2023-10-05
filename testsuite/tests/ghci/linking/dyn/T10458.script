@@ -1,0 +1,4 @@
+:set -fobject-code
+:load T10458
+
+callSO

@@ -1,0 +1,6 @@
+
+T13625.hs:5:11: error: [GHC-56753]
+    • Data constructor ‘Y’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘Y’
+      In the data type declaration for ‘X’

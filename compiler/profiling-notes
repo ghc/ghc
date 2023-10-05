@@ -1,0 +1,303 @@
+Profiling Implementation Notes -- June/July/Sept 1994
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Simon and Will
+
+Pre-code-generator-ish
+~~~~~~~~~~~~~~~~~~~~~~
+
+* Automagic insertion of _sccs_ on...
+
+  - If -fprof-auto-exported is specified, add _scc_ on each *exported* top-level definition. 
+    NB this includes CAFs.  Done by addAutoCostCentres (Core-to-Core pass).
+
+  - If -fprof-auto-top is specified, add _scc_ on *all* top-level definitions.
+    Done by same pass.
+
+  - If -fprof-auto is specified, add _scc_ on *all* definitions.
+
+  - Always: just before code generation of module M, onto any CAF
+    which hasn't already got an explicit cost centre attached, pin
+    "AllCAFs-M".
+
+    Done by finalStgMassageForProfiling (final STG-to-STG pass)
+
+    Only the one-off costs of evaluating the CAFs will be attributed
+    to the AllCAFs-M cost centre.  We hope that these costs will be
+    small; since the _scc_s are introduced automatically it's
+    confusing to attribute any significant costs to them.  However if
+    there *are* significant one-off costs we'd better know about it.
+
+    Why so late in the compilation process?  We aren't *absolutely*
+    sure what is and isn't a CAF until *just* before code generation.
+    So we don't want to mark them as such until then.
+
+  - Individual DICTs
+
+    We do it in the desugarer, because that's the *only* point at
+    which we *know* exactly what bindings are introduced by
+    overloading.  NB should include bindings for selected methods, eg
+
+	f d = let op = _scc_ DICT op_sel d in
+	      ...op...op...op
+
+    The DICT CC ensures that:
+    (a) [minor] that the selection cost is separately attributed
+    (b) [major] that the cost of executing op is attributed to
+	its call site, eg
+
+	...(scc "a" op)...(scc "b" op)...(scc "c" op)...
+
+* Automagic "boxing" of higher-order args:
+
+	finalStgMassageForProfiling (final STG-to-STG pass)
+
+	This (as well as CAF stuff above) is really quite separate
+	from the other business of finalStgMassageForProfiling
+	(collecting up CostCentres that need to be
+	declared/registered).
+	
+	But throwing it all into the pot together means that we don't
+	have to have Yet Another STG Syntax Walker.
+
+	Furthermore, these "boxes" are really just let-bindings that
+	many other parts of the compiler will happily substitute away!
+	Doing them at the very last instant prevents this.
+
+	A down side of doing these so late is that we get lots of
+	"let"s, which if generated earlier and not substituted away,
+	could be floated outwards.  Having them floated outwards would
+	lessen the chance of skewing profiling results (because of
+	gratuitous "let"s added by the compiler into the inner loop of
+	some program...).  The allocation itself will be attributed to
+	profiling overhead; the only thing which'll be skewed is time measurement.
+
+	So if we have, post-boxing-higher-order-args...
+
+	    _scc_ "foo" ( let f' = [f] \ [] f
+			  in
+			  map f' xs )
+
+	... we want "foo" to be put in the thunk for "f'", but we want the
+	allocation cost (heap census stuff) to be attr to OVERHEAD.
+
+	As an example of what could be improved
+		f = _scc_ "f" (g h)
+	To save dynamic allocation, we could have a static closure for h:
+		h_inf = _scc_ "f" h
+		f = _scc_ "f" (g h_inf)
+	
+
+	
+
+
+Code generator-ish
+~~~~~~~~~~~~~~~~~~
+
+(1) _Entry_ code for a closure *usually* sets CC from the closure,
+		 at the fast entry point
+
+    Exceptions:
+
+    (a) Top-level subsumed functions (i.e., w/ no _scc_ on them)
+
+	Refrain from setting CC from the closure
+
+    (b) Constructors
+
+	Again, refrain.  (This is *new*)
+	
+	Reasons: (i) The CC will be zapped very shortly by the restore
+	of the enclosing CC when we return to the eval'ing "case".
+	(ii) Any intervening updates will indirect to this existing
+	constructor (...mumble... new update mechanism... mumble...)
+
+(2) "_scc_ cc expr"
+
+    Set current CC to "cc".  
+    No later "restore" of the previous CC is reqd.
+
+(3) "case e of { ...alts... }" expression (eval)
+
+    Save CC before eval'ing scrutinee
+    Restore CC at the start of the case-alternative(s)
+
+(4) _Updates_ : updatee gets current CC
+
+    (???? not sure this is OK yet 94/07/04)
+
+    Reasons:
+
+    * Constructors : want to be insensitive to return-in-heap vs
+	return-in-regs.  For example,
+
+	f x = _scc_ "f" (x, x)
+
+	The pair (x,x) would get CC of "f" if returned-in-heap;
+	therefore, updatees should get CC of "f".
+
+    * PAPs : Example:
+
+	f x = _scc_ "f" (let g = \ y -> ... in g)
+
+	At the moment of update (updatePAP?), CC is "f", which
+	is what we want to set it to if the "updatee" is entered
+
+    	When we enter the PAP ("please put the arguments back so I can
+	use them"), we restore the setup as at the moment the
+	arg-satisfaction check failed.
+
+        Be careful!  UPDATE_PAP is called from the arg-satis check,
+	which is before the fast entry point.  So the cost centre
+	won't yet have been set from the closure which has just
+	been entered.  Solution: in UPDATE_PAP see if the cost centre inside
+	the function closure which is being entered is "SUB"; if so, use
+	the current cost centre to update the updatee; otherwise use that
+	inside the function closure.  (See the computation of cc_pap
+	in rule 16_l for lexical semantics.)
+
+
+(5) CAFs
+
+CAFs get their own cost centre.  Ie
+
+			x = e
+is transformed to
+			x = _scc_ "CAF:x" e
+
+Or sometimes we lump all the CAFs in a module together.
+(Reporting issue or code-gen issue?)
+
+
+
+Hybrid stuff
+~~~~~~~~~~~~
+
+The problem:
+
+  f = _scc_ "CAF:f" (let g = \xy -> ...
+	 	   in (g,g))
+
+Now, g has cost-centre "CAF:f", and is returned as part of
+the result.  So whenever the function embedded in the result
+is called, the costs will accumulate to "CAF:f".  This is
+particularly (de)pressing for dictionaries, which contain lots
+of functions.
+
+Solution: 
+
+  A.  Whenever in case (1) above we would otherwise "set the CC from the
+  closure", we *refrain* from doing so if 
+	(a) the closure is a function, not a thunk; and
+	(b) the cost-centre in the closure is a CAF cost centre.
+
+  B.  Whenever we enter a thunk [at least, one which might return a function]
+  we save the current cost centre in the update frame.  Then, UPDATE_PAP
+  restores the saved cost centre from the update frame iff the cost
+  centre at the point of update (cc_pap in (4) above) is a CAF cost centre.
+
+  It isn't necessary to save and possibly-restore the cost centre for
+  thunks which will certainly return a constructor, because the 
+  cost centre is about to be restored anyway by the enclosing case.
+
+Both A and B are runtime tests.  For A, consider:
+
+  f = _scc_ "CAF:f" (g 2)
+
+  h y = _scc_ "h" g (y+y)
+
+  g x = let w = \p -> ...
+	in (w,w)
+
+
+Now, in the call to g from h, the cost-centre on w will be "h", and
+indeed all calls to the result of the call should be attributed to
+"h".  
+
+  ... _scc_ "x1" (let (t,_) = h 2 in t 3) ...
+
+  Costs of executing (w 3) attributed to "h".
+
+But in the call to g from f, the cost-centre on w will be
+"CAF:f", and calls to w should be attributed to the call site.
+
+  ..._scc_ "x2" (let (t,_) = f in t 3)...
+
+  Costs of executing (w 3) attributed to "x2".
+
+
+	Remaining problem
+
+Consider
+
+	_scc_ "CAF:f" (if expensive then g 2 else g 3)
+
+where g is a function with arity 2.  In theory we should
+restore the enclosing cost centre once we've reduced to
+(g 2) or (g 3).  In practice this is pretty tiresome; and pretty rare.
+
+A quick fix: given (_scc_ "CAF" e) where e might be function-valued
+(in practice we usually know, because CAF sccs are top level), transform to
+
+	_scc_ "CAF" (let f = e in f)
+
+
+
+
+
+============
+
+scc cc x  ===>   x
+
+  UNLESS
+
+(a)  cc is a user-defined, non-dup'd cost 
+     centre (so we care about entry counts)
+
+OR
+
+(b) cc is not a CAF/DICT cost centre and x is top-level subsumed
+     function.
+	[If x is lambda/let bound it'll have a cost centre
+	 attached dynamically.]
+
+	To repeat, the transformation is OK if 
+		x is a not top-level subsumed function
+	OR	
+		cc is a CAF/DICT cost centre and x is a top-level
+		subsumed function
+
+
+
+(scc cc e) x  ===>  (scc cc e x)
+
+	OK????? IFF
+
+cc is not CAF/DICT  --- remains to be proved!!!!!!
+True for lex
+False for eval
+Can we tell which in hybrid?
+
+eg  Is this ok?
+
+	(scc "f" (scc "CAF" (\x.b))) y ==>   (scc "f" (scc "CAF" (\x.b) y))
+
+
+\x -> (scc cc e)    ===>   (scc cc \x->e)
+
+	OK IFF cc is not CAF/DICT
+
+
+scc cc1 (scc cc2 e))   ===>  scc cc2 e
+
+	IFF not interested in cc1's entry count
+	AND cc2 is not CAF/DICT
+
+(scc cc1 ... (scc cc2 e) ...)   ===>  (scc cc1 ... e ...)
+
+	IFF cc2 is CAF/DICT
+	AND e is a lambda not appearing as the RHS of a let
+	    OR
+	    e is a variable not bound to SUB
+
+

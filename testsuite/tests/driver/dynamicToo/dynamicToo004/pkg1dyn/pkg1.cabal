@@ -1,0 +1,7 @@
+Name:    pkg1
+Version: 1
+
+Library
+    Exposed-Modules: A
+    Build-Depends: base
+

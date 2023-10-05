@@ -1,0 +1,25 @@
+GHC runtime linker: fatal error: I found a duplicate definition for symbol
+   _a
+whilst processing object file
+   E:\ghc-dev\msys64\home\Tamar\ghc\testsuite\tests\rts\T11223\T11223_simple_duplicate_lib.run\libfoo_dup_lib.a
+The symbol was previously defined in
+   E:\ghc-dev\msys64\home\Tamar\ghc\testsuite\tests\rts\T11223\T11223_simple_duplicate_lib.run\bar_dup_lib.o
+This could be caused by:
+   * Loading two different object files which export the same symbol
+   * Specifying the same object file twice on the GHCi command line
+   * An incorrect `package.conf' entry, causing some object to be
+     loaded twice.
+ghc-stage2.exe: ^^ Could not load '_c', dependency unresolved. See top entry above.
+
+
+GHC.ByteCode.Linker: can't find label
+During interactive linking, GHCi couldn't find the following symbol:
+  c
+This may be due to you not asking GHCi to load extra object files,
+archives or DLLs needed by your current session.  Restart GHCi, specifying
+the missing library using the -L/path/to/object/dir and -lmissinglibname
+flags, or simply by naming the relevant files on the GHCi command line.
+Alternatively, this link failure might indicate a bug in GHCi.
+If you suspect the latter, please report this as a GHC bug:
+  https://www.haskell.org/ghc/reportabug
+

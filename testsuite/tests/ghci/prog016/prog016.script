@@ -1,0 +1,34 @@
+:load TopLevel
+
+:complete repl "lev"
+-- should list all 5 functions
+
+:complete repl "levWRONG"
+-- should list nothing
+
+:complete repl 1 "lev"
+-- should list one function
+
+:complete repl 2-4 "lev"
+-- should list three results
+
+:complete repl 4-10 "lev"
+-- should list last two results
+
+:complete repl "level1"
+-- should list two results
+
+:complete repl "level2"
+-- should list three results
+
+:complete repl "Level"
+-- should list five results
+
+:complete repl "Level.l"
+-- should list no results
+
+:complete repl "Level1.l"
+-- should list two results
+
+:complete repl "Level2.Level2"
+-- should list three results

@@ -1,0 +1,5 @@
+
+T3163.hs:9:5: error: [GHC-91510]
+    • Illegal polymorphic type: forall s. s
+    • In the definition of data constructor ‘Unreached’
+      In the data type declaration for ‘Taker’

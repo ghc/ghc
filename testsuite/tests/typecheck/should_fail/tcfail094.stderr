@@ -1,0 +1,4 @@
+
+tcfail094.hs:7:14: [GHC-68567]
+    Illegal type: ‘1’
+    Suggested fix: Perhaps you intended to use DataKinds

@@ -1,0 +1,3 @@
+
+T8448.hs:5:21: error: [GHC-53822]
+    Constructor ‘[]’ does not have field ‘r’

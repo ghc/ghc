@@ -1,0 +1,8 @@
+
+T6082-RULE.hs:5:11: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "foo1" may never fire because ‘foo1’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘foo1’
+
+T6082-RULE.hs:10:11: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "foo2" may never fire because ‘foo2’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘foo2’

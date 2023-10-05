@@ -1,0 +1,7 @@
+Stopped in Main.test.(...), dynbrk009.hs:8:22
+_result :: Int = _
+Stopped in Main.test, dynbrk009.hs:8:27-36
+_result :: Int = _
+Stopped in Main.test, dynbrk009.hs:8:31-35
+Stopped in Main.f, dynbrk009.hs:6:9
+3

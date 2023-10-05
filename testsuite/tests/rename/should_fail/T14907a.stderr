@@ -1,0 +1,6 @@
+
+T14907a.hs:3:8: error: [GHC-77878]
+    Unexpected type ‘Bool’
+    In the class declaration for ‘(,,)’
+    A class declaration should have form
+      class (,,) a b c where ...

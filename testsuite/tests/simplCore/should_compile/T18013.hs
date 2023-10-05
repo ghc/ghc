@@ -1,0 +1,18 @@
+{-# OPTIONS_GHC -ddump-rule-firings -ddump-simpl
+                -dsuppress-coercions -dsuppress-uniques #-}
+{-# LANGUAGE Arrows #-}
+
+module T18013 where
+
+import Control.Arrow
+import T18013a
+
+-- We want to ensure this generates good code. Uses of (.) should be
+-- specialized and inlined, and the rules defined on mkRule should fire.
+
+mapMaybeRule :: Rule IO a b -> Rule IO (Maybe a) (Maybe b)
+mapMaybeRule f = proc v -> case v of
+  Just x -> do
+    y <- f -< x
+    returnA -< Just y
+  Nothing -> returnA -< Nothing

@@ -1,0 +1,5 @@
+
+T15799.hs:46:62: error: [GHC-83865]
+    • Couldn't match kind ‘TypeLits.Natural’ with ‘Op Nat’
+      Expected kind ‘Op Nat’, but ‘UnOp b’ has kind ‘Nat’
+    • In the first argument of ‘(<=)’, namely ‘UnOp b’

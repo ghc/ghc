@@ -1,0 +1,42 @@
+
+T21906.hs:14:17: error: [GHC-55287]
+    • The return type of the third argument of the primop ‘keepAlive#’
+      does not have a fixed runtime representation.
+      Its type is:
+        b0 :: TYPE r1
+      Cannot unify ‘r’ with the type variable ‘r1’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the expression: keepAlive# val s f
+      In an equation for ‘test1’: test1 val s f = keepAlive# val s f
+
+T21906.hs:21:25: error: [GHC-55287]
+    • The return type of the first argument of the primop ‘catch#’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE q0
+      Cannot unify ‘r’ with the type variable ‘q1’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the expression: catch# action handle s
+      In an equation for ‘test2’:
+          test2 action handle s = catch# action handle s
+
+T21906.hs:30:17: error: [GHC-55287]
+    • The nested return type inside the second argument of the primop ‘control0#’
+      does not have a fixed runtime representation.
+      Its type is:
+        b :: TYPE r0
+      Cannot unify ‘r’ with the type variable ‘r0’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the expression: control0# tag f s
+      In an equation for ‘test3’: test3 tag f s = control0# tag f s
+
+T21906.hs:35:19: error: [GHC-55287]
+    • The return type of the first argument of the primop ‘fork#’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE q0
+      Cannot unify ‘r’ with the type variable ‘q0’
+      because the former is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘fork#’, namely ‘f’
+      In the expression: fork# f s
+      In an equation for ‘test4’: test4 f s = fork# f s

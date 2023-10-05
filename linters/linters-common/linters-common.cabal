@@ -1,0 +1,30 @@
+cabal-version:       3.0
+name:                linters-common
+version:             0.1.0.0
+synopsis:            Common library for GHC linting scripts
+license:             GPL-3.0-only
+author:              The GHC team
+build-type:          Simple
+
+library
+  default-language:
+    Haskell2010
+
+  build-depends:
+    process
+      ^>= 1.6,
+    base
+       >= 4.14 && < 5,
+    text
+       >= 1.2  && < 3,
+    deepseq
+       >= 1.1,
+
+  hs-source-dirs:
+    .
+
+  ghc-options:
+    -Wall
+
+  exposed-modules:
+    Linters.Common

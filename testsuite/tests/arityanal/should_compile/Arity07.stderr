@@ -1,0 +1,21 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 8, types: 9, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+f7f :: forall {p}. p -> p
+[GblId, Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+f7f = \ (@p) (x :: p) -> x
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f7g :: Integer -> Integer -> Integer
+[GblId, Arity=2, Str=<1L><SL>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+f7g = GHC.Num.Integer.integerAdd
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f7 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+f7 = 5
+
+
+

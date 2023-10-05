@@ -1,0 +1,22 @@
+
+T2664.hs:32:52: error: [GHC-25897]
+    • Could not deduce ‘b ~ a’ arising from a use of ‘newPChan’
+      from the context: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
+        bound by the type signature for:
+                   newPChan :: forall c.
+                               ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
+                               IO (PChan (a :*: b), PChan c)
+        at T2664.hs:24:5-12
+      ‘b’ is a rigid type variable bound by
+        the instance declaration
+        at T2664.hs:23:10-52
+      ‘a’ is a rigid type variable bound by
+        the instance declaration
+        at T2664.hs:23:10-52
+    • In the third argument of ‘pchoose’, namely ‘newPChan’
+      In the first argument of ‘E’, namely ‘(pchoose Right v newPChan)’
+      In the expression:
+        E (pchoose Right v newPChan) (pchoose Left v newPChan)
+    • Relevant bindings include
+        v :: MVar (Either (PChan a) (PChan b)) (bound at T2664.hs:25:9)
+        newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:24:5)

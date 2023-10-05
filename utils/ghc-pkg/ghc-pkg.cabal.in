@@ -1,0 +1,36 @@
+Name: ghc-pkg
+-- XXX Version number
+Version: @ProjectVersion@
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: cvs-fptools@haskell.org
+Synopsis: A utility for querying and managing the GHC package database.
+Description:
+    GHC maintains a database of known packages. This tools allows tools
+    and users to query and modify this database. See @ghc-pkg --help@ for
+    usage information.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable ghc-pkg
+    Default-Language: GHC2021
+    Main-Is: Main.hs
+    Other-Extensions: CPP
+
+    Build-Depends: base       >= 4   && < 5,
+                   directory  >= 1   && < 1.4,
+                   process    >= 1   && < 1.7,
+                   containers,
+                   filepath,
+                   Cabal,
+                   Cabal-syntax,
+                   binary,
+                   ghc-boot,
+                   bytestring
+    if !os(windows)
+        Build-Depends: unix
+    if os(windows)
+        c-sources: CRT_noglob.c

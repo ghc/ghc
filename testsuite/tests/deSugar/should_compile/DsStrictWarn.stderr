@@ -1,0 +1,4 @@
+
+DsStrictWarn.hs:7:11: warning: [GHC-62161] [-Wincomplete-uni-patterns (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a pattern binding: Patterns of type ‘String’ not matched: []

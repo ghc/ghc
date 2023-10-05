@@ -1,0 +1,23 @@
+unit p where
+    signature H where
+        data T
+        f :: T -> T
+    module A where
+        import H
+        data A = MkA T
+        ff :: A -> A
+        ff (MkA t) = MkA (f t)
+
+unit q where
+    module H where
+        data T = T Int
+        f (T i) = T (i+1)
+
+unit main where
+    dependency q
+    dependency p[H=q:H]
+    module Main where
+        import A
+        import H
+        main = case ff (MkA (T 0)) of
+                    MkA (T i) -> print i

@@ -1,0 +1,15 @@
+-- create an .o file
+:set -fobject-code
+:l T15369.hs
+:set -fbyte-code
+-- start the test
+:set +c
+:l *T15369.hs
+:all-types
+:l *T15369.hs
+:all-types
+-- Note: BSD sed doesn't allow use of -i here due to symlinks
+:! sed -e 's/Int/Double/g' T15369.hs > Temp.hs
+:! mv Temp.hs T15369.hs
+:l *T15369.hs
+:all-types

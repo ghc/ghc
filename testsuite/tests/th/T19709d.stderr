@@ -1,0 +1,16 @@
+
+T19709d.hs:6:2: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘String’ not matched:
+            []
+            (p:_) where p is not one of {'h'}
+            ['h']
+            ('h':p:_) where p is not one of {'e'}
+            ...
+
+T19709d.hs:1:1: error: [GHC-87897]
+    Exception when trying to run compile-time code:
+      T19709d.hs:6:2-46: Non-exhaustive patterns in case
+
+    Code: (case tail "hello" of "hello" -> return [])

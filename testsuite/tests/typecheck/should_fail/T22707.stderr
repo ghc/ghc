@@ -1,0 +1,46 @@
+
+T22707.hs:6:59: error: [GHC-25897]
+    • Couldn't match expected type ‘i1’
+                  with actual type ‘m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0’
+      ‘i1’ is a rigid type variable bound by
+        the type signature for:
+          t1 :: forall i2 o i1 a. Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
+        at T22707.hs:5:1-47
+    • In the expression: evalCont (t1 c) >>== \ ati1 -> return ati1 xa
+      In the second argument of ‘($)’, namely
+        ‘\ xa -> evalCont (t1 c) >>== \ ati1 -> return ati1 xa’
+      In the second argument of ‘runCont’, namely
+        ‘(ati1tti2
+            $ \ xa -> evalCont (t1 c) >>== \ ati1 -> return ati1 xa)’
+    • Relevant bindings include
+        ati1tti2 :: (a -> i1) -> i2 (bound at T22707.hs:6:16)
+        c :: Cont (i2 -> o) i1 a (bound at T22707.hs:6:4)
+        t1 :: Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
+          (bound at T22707.hs:6:1)
+
+T22707.hs:6:72: error: [GHC-25897]
+    • Couldn't match type ‘o’
+                     with ‘m0
+                             GHC.Types.LiftedRep
+                             GHC.Types.LiftedRep
+                             (m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0)’
+      Expected: Cont
+                  ((a -> i1)
+                   -> m0
+                        GHC.Types.LiftedRep
+                        GHC.Types.LiftedRep
+                        (m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0))
+                  i1
+                  a
+        Actual: Cont (i2 -> o) i1 a
+      ‘o’ is a rigid type variable bound by
+        the type signature for:
+          t1 :: forall i2 o i1 a. Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
+        at T22707.hs:5:1-47
+    • In the first argument of ‘t1’, namely ‘c’
+      In the first argument of ‘evalCont’, namely ‘(t1 c)’
+      In the first argument of ‘(>>==)’, namely ‘evalCont (t1 c)’
+    • Relevant bindings include
+        c :: Cont (i2 -> o) i1 a (bound at T22707.hs:6:4)
+        t1 :: Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
+          (bound at T22707.hs:6:1)

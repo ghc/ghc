@@ -1,0 +1,65 @@
+
+T19296.hs:6:6: warning: [GHC-30606] [-Wredundant-constraints]
+    Redundant constraint: Eq a
+    In the type signature for:
+         f :: forall a. Eq a => a -> ()
+  |
+6 | f :: Eq a => a -> ()
+  |      ^^^^
+
+T19296.hs:10:21: warning: [GHC-30606] [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+      In an expression type signature:
+           forall a1. Eq a1 => a1 -> ()
+    • In the expression: (\ x -> ()) :: Eq a => a -> ()
+      In an equation for ‘g’: g _ = (\ x -> ()) :: Eq a => a -> ()
+   |
+10 | g _ = (\x -> ()) :: Eq a => a -> ()
+   |                     ^^^^
+
+T19296.hs:13:6: warning: [GHC-30606] [-Wredundant-constraints]
+    Redundant constraint: Eq a
+    In the type signature for:
+         h :: forall a b. (Eq a, Ord b) => a -> b -> b
+   |
+13 | h :: (Eq a, Ord b) => a -> b -> b
+   |      ^^^^^^^^^^^^^
+
+T19296.hs:21:1: warning: [GHC-40548]
+    Forall'd constraint ‘Eq a’ is not bound in RULE lhs
+      Orig bndrs: [a, $dEq]
+      Orig lhs: let {
+                  $dOrd :: Ord Int
+                  [LclId]
+                  $dOrd = GHC.Classes.$fOrdInt } in
+                spec @Int @a $dOrd
+      optimised lhs: spec @Int @a $dOrd
+   |
+21 | {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+T19296.hs:21:24: warning: [GHC-30606] [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+      In the type signature for:
+           spec :: forall a. Eq a => a -> Int -> Int
+    • In the pragma: {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
+   |
+21 | {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
+   |                        ^^^^
+
+T19296.hs:31:20: warning: [GHC-30606] [-Wredundant-constraints]
+    Redundant constraint: Show a
+    In the type signature for:
+         foo :: Show a => [a]
+   |
+31 |     default foo :: Show a => [a]
+   |                    ^^^^^^
+
+T19296.hs:39:12: warning: [GHC-30606] [-Wredundant-constraints]
+    • Redundant constraints: (Eq b, Ord b)
+      In the type signature for:
+           bar :: forall b. (Eq b, Ord b) => Int -> b -> Int
+    • In the instance declaration for ‘Bar Int’
+   |
+39 |     bar :: (Eq b, Ord b) => Int -> b -> Int
+   |            ^^^^^^^^^^^^^

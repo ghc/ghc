@@ -1,0 +1,4 @@
+
+T11112.hs:3:9: error: [GHC-83865]
+    • Expected a type, but ‘Ord s’ is a constraint
+    • In the type signature: sort :: Ord s -> [s] -> [s]

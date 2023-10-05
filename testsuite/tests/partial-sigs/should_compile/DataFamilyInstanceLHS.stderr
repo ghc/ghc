@@ -1,0 +1,18 @@
+TYPE SIGNATURES
+  foo :: Sing A
+TYPE CONSTRUCTORS
+  data type MyKind{0} :: *
+  data family Sing{2} :: forall k. k -> *
+    roles nominal nominal
+COERCION AXIOMS
+  axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
+      Sing = DataFamilyInstanceLHS.R:SingMyKind_
+DATA CONSTRUCTORS
+  A :: MyKind
+  B :: MyKind
+  SingA :: Sing A
+  SingB :: Sing B
+FAMILY INSTANCES
+  data instance Sing _ -- Defined at DataFamilyInstanceLHS.hs:8:15
+Dependent modules: []
+Dependent packages: [base-4.17.0.0]

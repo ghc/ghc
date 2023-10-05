@@ -1,0 +1,1627 @@
+\documentclass[a4paper,UKenglish]{lipics}
+
+\usepackage{enumerate}
+%% \usepackage{abbrev}
+\usepackage{xspace}
+\usepackage{denot}
+\usepackage{prooftree}
+\usepackage{afterpage}
+\usepackage{float}
+%% \usepackage{pstricks}
+\usepackage{url}
+
+\usepackage{amsthm}
+
+\usepackage{latexsym} 
+%% %% less space consuming enumerates and itemizes
+\usepackage{mdwlist} 
+\usepackage{stmaryrd} 
+
+%% \usepackage{amsfonts} 
+%% \usepackage{amssymb} 
+%% % Local packages
+\usepackage{code}
+
+%% % \newcommand{\text}[1]{\mbox{#1}}
+
+%% \newcommand{\reach}[2]{\widehat{#1}(#2)}
+%% \newcommand{\ftv}[2]{ftv^{#1}(#2)}
+
+\usepackage{color} 
+%% %% \newcommand{\color}[1]{}
+
+%% % \newcommand{\scf}{\sigma^\dagger}
+%% % \newcommand{\rcf}{\rho^\dagger}
+%% % \newcommand{\tcf}{\tau^\dagger}
+
+\newcommand{\simon}[1]{{\bf SPJ:}\begin{color}{blue} #1 \end{color}}
+\newcommand{\dv}[1]{{\bf DV:}\begin{color}{red} #1 \end{color}}
+\def\fiddle#1{\hspace*{-0.8ex}\raisebox{0.1ex}{$\scriptscriptstyle#1$}}
+
+\newcommand{\highlight}[1]{\colorbox{green}{\ensuremath{#1}}}
+
+
+\def\twiddleiv{\endprooftree\qquad\prooftree}           % ~~~~
+\def\twiddlev{\endprooftree\\ \\ \prooftree}            % ~~~~~...
+\def\rulename#1{\textsc{#1}}
+\def\minusv#1{\using\text{\rulename{#1}}\justifies}     % \minusv...
+
+
+\newcommand{\OK}[2]{#1 \vdash^{\fiddle{\sf{E}}} #2}
+\newcommand{\wfe}{\vdash^{\fiddle{\sf{E}}}}
+\newcommand{\wfco}{\vdash^{\fiddle{\sf{co}}}}
+\newcommand{\wftm}{\vdash^{\fiddle{\sf{tm}}}}
+\newcommand{\wfty}{\vdash^{\fiddle{\sf{ty}}}}
+\newcommand{\unboxed}[1]{\mathop{unboxed}(#1)}
+
+\newcommand{\psim}{\mathrel{\sim_{\tiny \#}}}
+\newcommand{\static}{\textsf{$Constraint_{\#}$}}
+
+%% %% \newtheorem{theorem}{Theorem}[section]
+%% %% %% \newtheorem{proof}{Proof}[]
+%% %% \newtheorem{lemma}[theorem]{Lemma}
+%% %% \newtheorem{proposition}[theorem]{Proposition}
+%% %% \newtheorem{corollary}[theorem]{Corollary}
+
+%% %% bibliography guidelines 
+%% \usepackage{natbib}
+%% \bibpunct();A{},
+%% \let\cite=\citep
+
+\def\rulename#1{\textsc{#1}}
+\def\ruleform#1{\fbox{$#1$}}
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% % Floats
+
+%% %% \renewcommand{\textfraction}{0.1}
+%% %% \renewcommand{\topfraction}{0.95}
+%% %% \renewcommand{\dbltopfraction}{0.95}
+%% %% \renewcommand{\floatpagefraction}{0.8}
+%% %% \renewcommand{\dblfloatpagefraction}{0.8}
+
+%% %% \setlength{\floatsep}{16pt plus 4pt minus 4pt}
+%% %% \setlength{\textfloatsep}{16pt plus 4pt minus 4pt}
+
+%% % Figures should be boxed
+%% %    *** Uncomment the next two lines to box the floats *** 
+\floatstyle{boxed}
+\restylefloat{figure}
+
+%% %% % Keep footnotes on one page
+%% %% \interfootnotelinepenalty=10000 
+
+%% %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% %% % Indentation
+%% %% \setlength{\parskip}{0.35\baselineskip plus 0.2\baselineskip minus 0.1\baselineskip}
+%% %% \setlength{\parsep}{\parskip}
+%% %% \setlength{\topsep}{0cm}
+%% %% \setlength{\parindent}{0cm}
+
+%% \renewcommand{\phi}{\varphi}
+
+\newcommand{\E}{{\cal E}}
+\newcommand{\ol}[1]{\overline{#1}}
+\newcommand{\sym}[1]{\mathop{sym}\, #1}
+\newcommand{\bnd}{\mathop{bnd}}
+\newcommand{\cval}{\textsf{cv}}
+\newcommand{\nfval}{\textsf{nf}}
+\newcommand{\tval}{\textsf{tv}}
+\newcommand{\val}{\textsf{val}}
+\newcommand{\clift}[1]{\lfloor#1\rfloor}
+\newcommand{\lifting}[2]{[#1]{\uparrow}(#2)} 
+\newcommand{\erase}[2]{\{#2\}_{#1}}
+\newcommand{\nth}[2]{\mathop{nth} #1\;#2}
+\newcommand{\inst}[2]{#1@#2}
+\newcommand{\refl}[1]{\langle#1\rangle}  % Reflexivity
+
+\newcommand{\tcase}[2]{\mathbf{case}\;#1\;\mathbf{of}\;\ol{#2}}
+\newcommand{\tlet}[4]{\mathbf{let}\;#1{:}#2 = #3\;\mathbf{in}\;#4}
+\newcommand{\tcast}[2]{#1\;\triangleright\;#2}
+\newcommand{\rsa}[1]{\rightsquigarrow_{#1}}
+\newcommand{\as}{\ol{a}}
+\newcommand{\bs}{\ol{b}}
+\newcommand{\cs}{\ol{c}}
+\newcommand{\ds}{\ol{d}}
+\newcommand{\es}{\ol{e}}
+\newcommand{\fs}{\ol{f}}
+\newcommand{\gs}{\ol{g}}
+
+\newcommand{\alphas}{\ol{\alpha}}
+\newcommand{\betas}{\ol{\beta}}
+\newcommand{\gammas}{\ol{\gamma}}
+\newcommand{\deltas}{\ol{\delta}}
+\newcommand{\epsilons}{\ol{\epsilon}}
+\newcommand{\zetas}{\ol{\zeta}}
+\newcommand{\etas}{\ol{\eta}}
+
+\newcommand{\phis}{\ol{\phi}}
+
+\newcommand{\sigmas}{\ol{\sigma}}
+\newcommand{\taus}{\ol{\tau}}
+
+\newcommand{\xs}{\ol{x}}
+
+%% %% \theoremstyle{plain} 
+%% %% \newtheorem{definition}{Definition}[section]
+
+
+\title{Evidence normalization in System FC}
+
+\author{Dimitrios Vytiniotis}
+\author{Simon Peyton Jones}
+\affil{Microsoft Research, Cambridge}
+
+   %% \{\{dimitris,simonpj@microsoft.com}}
+
+\authorrunning{D. Vytiniotis and S. Peyton Jones}
+% \Copyright{TO BE PROVIDED}
+
+\subjclass{F.4.2 Grammars and Other Rewriting Systems}
+
+
+\begin{document} 
+
+
+
+%% \preprintfooter{\textbf{--- DRAFT submitted to ICFP 2011 ---}}
+
+%% \conferenceinfo{ICFP'08,} {September 22--24, 2008, Victoria, BC, Canada.}
+%% \CopyrightYear{2008}
+%% \copyrightdata{978-1-59593-919-7/08/09} 
+
+
+
+%% \category{D.3.3}{Language Constructs and Features}{Abstract data types}
+%% \category{F.3.3}{Studies of Program Constructs}{Type structure}
+
+%% \terms{Design, Languages}
+
+%% \keywords{Type equalities, Deferred type errors, System FC}
+
+
+%% Theory of computation → Rewrite systems
+%% Software and its engineering → Data types and structures
+
+
+\maketitle
+\makeatactive
+
+\begin{abstract}
+System FC is an explicitly typed language that serves as the target language for Haskell
+source programs. System FC is based on System F with the addition of erasable but explicit type equality
+proof witnesses. Equality proof witnesses are generated from type inference performed on source Haskell
+programs. Such witnesses may be very large objects, which causes performance degradation in later stages of 
+compilation, and makes it hard to debug the results of type inference and subsequent program transformations.
+In this paper we present an equality proof simplification algorithm, implemented in GHC, which greatly reduces 
+the size of the target System FC programs.
+\end{abstract}
+%% \category{D.3.3}{Language Constructs and Features}{Abstract data types}
+%% \category{F.3.3}{Studies of Program Constructs}{Type structure}
+%% \terms{Design,Languages}
+%% \keywords{Haskell, Type functions, System FC}
+
+\section{Introduction}\label{s:intro}
+
+A statically-typed intermediate language brings a lot of benefits to a compiler: it is free 
+from the design trade-offs that come with source language features; types
+can inform optimisations; and type checking
+programs in the intermediate language provides a powerful consistency check on 
+each stage of the compiler.
+
+%% Type checking the intermediate programs 
+%% that result from further program transformation and optimization passes 
+%% checks
+%% that these stages 
+%% the results of further program transformation and optimization passes. 
+%% A typed intermediate language provides a firm place for a compiler to stand, 
+%% free from the design trade-offs of a complex source language. Moreover, 
+%% type-checking the intermediate program provides a 
+%% powerful consistency check on the earlier stages of elaboration,
+%% desugaring, and optimization.
+
+The Glasgow Haskell Compiler (GHC) has just such an intermediate language,
+which has evolved from System F to System FC
+\cite{sulzmann+:fc-paper,weirich+:fc2} to accommodate the
+source-language features of
+\emph{GADTs}~\cite{cheney-hinze:phantom-types,sheard:omega,spj+:gadt}
+and \emph{type families}~\cite{Kiselyov09funwith,chak+:synonyms}.
+The key feature that allows System FC to accommodate GADTs and type
+families is its use of explicit \emph{coercions} that witness the
+equality of two syntactically-different types.  Coercions are erased
+before runtime but, like types, serve as a static consistency
+proof that the program will not ``go wrong''. 
+
+In GHC, coercions are produced by a fairly complex
+type inference (and proof inference) algorithm
+that elaborates source Haskell programs into FC programs \cite{pjv:modular}. 
+Furthermore, coercions undergo major transformations during subsequent program 
+optimization passes. As a consequence, they can become very large, 
+making the compiler bog down.  This paper describes how we fixed the problem:
+\begin{itemize*} 
+\item Our main contribution is a novel coercion simplification algorithm, expressed
+as a rewrite system, that allows the compiler to replace a coercion
+with an equivalent but much smaller one
+(Section~\ref{s:normalization}).
+     \item Coercion simplification is important in practice.
+      We encountered programs whose un-simplified 
+      coercion terms grow to many times the size of the actual executable terms, 
+      to the point where GHC choked and ran out of heap. When the simplifier
+      is enabled, coercions simplify to a small fraction of their
+      size (Section~\ref{ssect:ghc}).
+     \item To get these benefits, coercion simplification must take user-declared equality axioms 
+      into account, but the simplifier {\em must never loop} while optimizing a coercion -- no matter 
+      which axioms are declared by users. Proof normalization theorems are notoriously hard, 
+      but we present such a theorem for our coercion simplification. (Section~\ref{ssect:termination})
+   \end{itemize*}
+Equality proof normalization was first studied in the context of monoidal categories and we give 
+pointers to early work in Section~\ref{s:related} -- this work in addition addresses the simplification 
+of open coercions containing variables and arbitrary user-declared axioms.
+
+%% Coercion simplification has been studied in the context
+%% Despite its great practical importance,
+%% coercion simplification did not appear to be well-studied in the coercion 
+%% literature, but we give some connections to related work in Section~\ref{s:related}.
+
+% --------------------------------------------------------------------------
+\section{An overview of System FC} \label{s:intro-coercions}
+
+\begin{figure}\small
+\[\begin{array}{l} 
+\begin{array}{lrll}
+%% \multicolumn{3}{l}{\text{Terms}} \\
+c   &  \in & \text{Coercion variables} \\ 
+x   & \in  & \text{Term variables} \\ 
+e,u & ::= & x \mid l \mid \lambda x{:}\sigma @.@ e \mid e\;u \\ 
+    & \mid    & \Lambda a{:}\eta @.@ e \mid e\;\phi   & \text{Type polymorphism} \\
+    & \mid    & \lambda c{:}\tau @.@ e \mid e\;\gamma & \text{Coercion abstraction/application} \\
+    & \mid    & K \mid \tcase{e}{p \to u} & \text{Constructors and case expressions} \\ 
+    & \mid    & \tlet{x}{\tau}{e}{u} & \text{Let binding}    \\ 
+    & \mid    & \tcast{e}{\gamma}         &   \text{Cast} \\
+%%    & \mid    & \text{\sout{\ensuremath{\lambda c{:}\tau_1 \psim \tau_2 @.@ e}}} & \text{\sout{Coercion abstraction}} \\[2mm]
+p   & ::=     & K\;\ol{c{:}\tau}\;\ol{x{:}\tau} & \text{Patterns} \\[3mm]
+\end{array}
+\end{array}\] 
+\caption{Syntax of System FC (Terms)}\label{fig:syntax1}
+\end{figure}
+
+
+We begin by reviewing the role of an intermediate
+language.  GHC desugars a rich, complex source language (Haskell) into
+a small, simple intermediate language.  The source language, Haskell, is \emph{implicitly typed},
+and a type inference engine figures out the type of every binder and sub-expression.
+To make type inference feasible, Haskell embodies many somewhat ad-hoc design
+compromises; for example, $\lambda$-bound variables are assigned monomorphic types.
+By contrast, the intermediate language is simple, uniform, and \emph{explicitly typed}.
+It can be typechecked by a simple, linear time algorithm.  The type inference
+engine \emph{elaborates} the implicitly-typed Haskell program into an
+explicitly-typed FC program.
+
+To make this concrete, Figure~\ref{fig:syntax1} gives the syntax of
+System FC, the calculus implemented by GHC's intermediate language.
+The term language is mostly conventional, consisting of System F,
+together with let bindings, data constructors and case expressions.
+The syntax of a term encodes its typing derivation: every binder
+carries its type, and type abstractions $\Lambda a{:}\eta@.@e$ and
+type applications $e\,\phi$ are explicit. 
+
+\begin{figure}\small
+\[\begin{array}{l|l} 
+\begin{array}{lrll}
+\multicolumn{3}{l}{\text{Types}}               \\ 
+\phi,\sigma,\tau,\upsilon & ::= & a        & \text{Variables}   \\ 
+        & \mid    & H        & \text{Constants}   \\ 
+        & \mid    & F &           \text{Type functions}    \\ 
+        & \mid & \phi_1\;\phi_2      & \text{Application} \\ 
+%%        & \mid & \phi\;\kappa       & \text{Kind application} \\
+        & \mid & \forall a{:}\eta @.@ \phi  & \text{Polymorphic types} \\
+%%        & \mid & \forall\kvar @.@ \tau & \text{Kind-polymorphic types}\\[2mm]
+\multicolumn{3}{l}{\text{Type constants}}           \\ 
+H & ::= & T &           \text{Datatypes}          \\ 
+  & \mid    & (\to)   &       \text{Arrow}             \\ 
+  & \mid    & (\psim) &  \text{Coercion} \\ 
+%%  & \mid    & (\psim) &         \text{Primitive equality type} \\ 
+\multicolumn{3}{l}{\text{Kinds}} \\ 
+       \kappa,\eta & ::= & \star \mid \kappa \to \kappa \\ 
+%%            & \mid   & \forall\kvar @.@ \kappa & \text{Polymorphic kinds} \\
+           & \mid   & \static & \text{Coercion kind} \\[2mm]
+\end{array} & 
+\begin{array}{lrll}
+\multicolumn{3}{l}{\text{Coercion values}} \\ 
+\gamma,\delta & ::= & c        & \text{Variables} \\ 
+%%  & \mid    & \text{\sout{\ensuremath{c}}}             & \text{\sout{Coercion variables}} \\ 
+%%  & \mid    & C\;\ol{\kappa}\;\gammas     & \text{Axiom application} \\ 
+%%   & \mid    & \gamma_1\;\kappa         & \text{Kind application} \\ 
+  & \mid    & \refl{\phi}             & \text{Reflexivity} \\ 
+  & \mid    & \gamma_1;\gamma_2        & \text{Transitivity} \\ 
+  & \mid    & \sym{\gamma}        & \text{Symmetry} \\ 
+  & \mid    & \nth{k}{\gamma}     & \text{Injectivity} \\ 
+  & \mid    & \gamma_1\;\gamma_2       & \text{Application} \\
+  & \mid    & C\;\gammas          & \text{Type family axiom} \\ 
+  & \mid    & \forall a{:}\eta @.@ \gamma   & \text{Polym. coercion} \\
+  & \mid    & \inst{\gamma}{\phi}    & \text{Instantiation} \\ \\ \\ \\
+%%   & \mid    & \forall\kvar @.@ \gamma & \text{Kind polymorphic coercion} \\ 
+%%   & \mid    & \inst{\gamma}{\kappa}     & \text{Kind instantiation}
+\end{array} 
+\end{array}\]
+\caption{Syntax of System FC (types and coercions)}\label{fig:syntax2}
+\end{figure}
+
+The types and kinds of the language are given in Figure~\ref{fig:syntax2}. Types include variables ($a$)
+and constants $H$ (such as $@Int@$ and @Maybe@), type applications (such as $@Maybe@\;@Int@$), 
+and polymorphic types ($\forall a{:}\eta @.@ \phi$). The syntax of types also includes {\em type functions}
+(or {\em type families} in the Haskell jargon), which are used to express type level computation.
+For instance the following declaration in source Haskell:
+\begin{code}
+  type family F (a :: *) :: a
+  type instance F [a] = a
+\end{code}
+introduces a type function $F$ at the level of System FC. The accompanying @instance@ line asserts
+that any expression of type @F [a]@ can be viewed as having type @a@. We shall see in 
+Section~\ref{sec:type-funs} how this fact 
+is expressed in FC. Finally type constants include datatype 
+constructors ($T$) but also arrow ($\to$) as well as a special type constructor $\psim$ whose 
+role we explain in the following section. The kind language includes the familiar $\star$ and
+$\kappa_1 \to \kappa_2$ kinds but also a special kind called $\static$ that we explain along with
+the $\psim$ constructor.
+
+The typing rules for System FC are given in Figure~\ref{fig:wftm}. We
+urge the reader to consult \cite{sulzmann+:fc-paper,weirich+:fc2} for
+more examples and intuition. 
+
+\begin{figure}\small
+\[\begin{array}{l} 
+\begin{array}{lrll}
+\multicolumn{3}{l}{\text{Environments}} \\
+\Gamma,\Delta  & ::= & \cdot \mid \Gamma,\bnd \\
+\bnd & ::=   %% & \kvar & \text{Kind variable} \\
+             & a : \eta     & \text{Type variable} \\ 
+     & \mid  & c : \sigma \psim \phi    & \text{Coercion variable}\\ 
+     & \mid  & x : \sigma   & \text{Term variable}\\ 
+     & \mid  & T : \ol{\kappa} \to \star & \text{Data type} \\
+     & \mid  & K : \forall (\ol{a{:}\eta}) @.@ \taus \to T\;\as   & \text{Data constructor} \\
+     & \mid  & F^n : \ol{\kappa}^n \to \kappa & \text{Type families (of arity $n$)} \\
+     & \mid  & C \,\ol{(a{:}\eta)} : \sigma \psim \phi & \text{Axioms} \\
+%%     & \mid  & F_n : \kappa_1 \to \ldots \to \kappa_n \to \kappa & \text{Type family, arity $n$} \\
+%%     & \mid  & C\;\ol{\kvar}\;(\ol{a{:}\kappa}) :  \peqt{\sigma}{\phi}  & \text{Axiom} \\ 
+\multicolumn{3}{l}{\text{Notation}} \\ 
+T\;\ol{\tau} & \equiv & T\;\tau_1 \ldots \tau_n \\
+\taus \to \tau & \equiv & \tau_1 \to \ldots \to \tau_n \to \tau \\
+\taus^{1..n} & \equiv & \tau_1,\ldots,\tau_n
+                  %% &  & \text{for $\alpha$ either $\kappa$ or $\tau$}\\
+% \Gamma_0       & \equiv & \text{initial (closed) environment}  \\ 
+%          & \ni & \multicolumn{2}{l}{(\psim) : \forall\kvar @.@ \kvar \to \kvar \to \static} \\
+\end{array}
+\end{array}\] 
+\caption{Syntax of System FC (Auxiliary definitions) }\label{fig:syntax3}
+\end{figure}
+
+\begin{figure}\small
+\[\begin{array}{c}\ruleform{\Gamma \wftm e : \tau } \\ \\
+\prooftree
+   (x{:}\tau) \in \Gamma 
+   \minusv{EVar} 
+   \Gamma \wftm x : \tau 
+   \twiddleiv
+   (K{:}\sigma) \in \Gamma
+   \minusv{ECon}
+   \Gamma \wftm K : \sigma 
+   \twiddlev
+   \begin{array}{c}
+   \Gamma,(x{:}\sigma) \wftm e : \tau \quad
+   \Gamma \wfty \sigma : \star \end{array}
+   \minusv{EAbs}
+   \Gamma \wftm \lambda x{:}\sigma @.@ e : \sigma \to \tau 
+   \twiddleiv 
+   \begin{array}{c}
+   \Gamma \wftm e : \sigma \to \tau \quad \Gamma \wftm u : \sigma 
+   \end{array}
+   \minusv{EApp}
+   \Gamma \wftm e\;u : \tau 
+   \twiddlev 
+   \begin{array}{c}
+   \Gamma,(c{:}\sigma) \wftm e : \tau \\
+   \Gamma \wfty \sigma : \static{}
+   \end{array}
+   \minusv{ECAbs}
+   \Gamma \wftm \lambda c{:}\sigma @.@ e : \sigma \to \tau 
+   \twiddleiv 
+   \begin{array}{c}
+   \Gamma \wftm e : (\sigma_1 \psim \sigma_2) \to \tau \\
+   \Gamma \wfco \gamma : \sigma_1 \psim \sigma_2
+   \end{array}
+   \minusv{ECApp}
+   \Gamma \wftm e\;\gamma : \tau 
+   \twiddlev 
+   \begin{array}{c} \phantom{\Gamma} 
+%%    \Gamma \wfk \eta \\
+   \Gamma,(a{:}\eta) \wftm e : \tau
+   \end{array}
+   \minusv{ETabs}
+   \Gamma \wftm \Lambda a{:}\eta @.@ e : \forall a{:}\eta @.@ \tau 
+   \twiddleiv 
+   \begin{array}{c} 
+   \Gamma \wftm e : \forall a{:}\eta @.@ \tau \quad
+   \Gamma \wfty \phi : \eta
+   \end{array}
+   \minusv{ETApp}
+   \Gamma \wftm e\;\phi : \tau[\phi/a]
+   \twiddlev 
+   %% \begin{array}{c} \phantom{\Gamma} \\ 
+   %% \Gamma,\kvar \wftm e : \tau
+   %% \end{array}
+   %% -----------------------------------------{EKabs}
+   %% \Gamma \wftm \Lambda\kvar @.@ e : \forall\kvar @.@ \tau
+   %% \twiddleiv 
+   %% \begin{array}{c} 
+   %% \Gamma \wftm e : \forall\kvar @.@ \tau \\ 
+   %% \Gamma \wfk \kappa 
+   %% \end{array}
+   %% -----------------------------------------{EKApp}
+   %% \Gamma \wftm e\;\kappa : \tau[\kappa/\kvar]
+   %% \twiddlev
+   \begin{array}{c}
+     \Gamma,(x{:}\sigma) \wftm u : \sigma \quad
+     \Gamma,(x{:}\sigma) \wftm e : \tau 
+   \end{array}
+   \minusv{ELet}
+   \Gamma \wftm \tlet{x}{\sigma}{u}{e} : \tau
+%%   \twiddleiv 
+%%    \begin{array}{c}
+%%      \Gamma \wftm u : \sigma \\
+%%      \Gamma,(x{:}\sigma) \wftm e : \tau 
+%%    \end{array}
+%%    -------------------------------------------{ELet}
+%%    \Gamma \wftm \tlet{x}{\sigma}{u}{e} : \tau
+   \twiddleiv\hspace{-5pt}
+   \begin{array}{c}
+    \Gamma \wftm e : \tau \quad
+    \Gamma \wfco \gamma : \tau \psim \phi
+   \end{array}
+   \minusv{ECast} 
+   \Gamma \wftm \tcast{e}{\gamma} : \phi
+  \twiddlev
+   \begin{array}{l} 
+   \Gamma \wftm e : T\;\ol{\kappa}\;\sigmas \\ 
+   \text{For each branch } K\;\ol{x{:}\tau} \to u \\ 
+    \quad (K{:}\forall (\ol{a{:}\eta_a}) @.@ \ol{\sigma_1\psim\sigma_2} \to \taus \to T\;\as) \in \Gamma \\
+    \quad \phi_i = \tau_i[\sigmas/\as] \\
+    \quad \phi_{1i} = \sigma_{1i}[\sigmas/\as] \\
+    \quad \phi_{2i} = \sigma_{2i}[\sigmas/\as]
+    \quad \Gamma,\ol{c{:}\phi_1\psim\phi_2}\;\ol{x{:}\phi} \wftm u : \sigma
+   \end{array}
+   \minusv{ECase}
+   \Gamma \wftm \tcase{e}{K\;(\ol{c{:}\sigma_1\psim\sigma_2})\;(\ol{x{:}\tau}) \to u} : \sigma
+\endprooftree
+\end{array}\]\caption{Well-formed terms}\label{fig:wftm}
+\end{figure}
+
+
+
+\begin{figure}\small 
+\[\begin{array}{c}\ruleform{\Gamma \wfty \tau : \kappa } \\ \\
+\prooftree
+    (a{:}\eta) \in \Gamma 
+  \minusv{TVar}
+     \Gamma \wfty a : \eta
+  \twiddleiv 
+    (T{:}\kappa) \in \Gamma 
+  \minusv{TData}
+     \Gamma \wfty T : \kappa 
+  \twiddleiv 
+    (F{:}\kappa) \in \Gamma 
+  \minusv{TFun}
+     \Gamma \wfty F : \kappa 
+  \twiddlev 
+   \kappa_1,\kappa_2 \in \{ \static, \star \}
+  \minusv{TArr}
+   \Gamma \wfty (\to) : \kappa_1 \to \kappa_2 \to \star 
+  \twiddleiv
+   \phantom{\Gamma}
+  \minusv{TEqPred}
+   \Gamma \wfty (\psim) : \kappa \to \kappa \to \static
+  \twiddlev
+  \begin{array}{c}
+  \Gamma \wfty \phi_1 : \kappa_1 \to \kappa_2 \quad
+  \Gamma \wfty \phi_2 : \kappa_1 
+  \end{array} \vspace{2pt}
+  \minusv{TApp}
+  \Gamma \wfty \phi_1\;\phi_2 : \kappa_2
+  \twiddleiv 
+  \begin{array}{c} \phantom{\Gamma} \quad
+  \Gamma,(a{:}\eta) \wfty \tau : \star 
+  \end{array} \vspace{2pt}
+  \minusv{TAll}
+  \Gamma \wfty \forall a{:}\eta @.@ \tau : \star
+\endprooftree
+\end{array}\]\caption{Well-formed types}\label{fig:wfty}
+\end{figure}
+
+\subsection{Coercions}
+
+The unusual feature of FC is the use of coercions.
+The term $\tcast{e}{\gamma}$ is a cast, that converts a term $e$ of
+type $\tau$ to one of type $\phi$ (rule \rulename{ECast} in
+Figure~\ref{fig:wftm}). The coercion $\gamma$ is a \emph{witness}, 
+or \emph{proof}, providing
+evidence that $\tau$ and $\phi$ are equal types -- that is, $\gamma$ has
+type $\tau \psim \phi$.  
+We use the symbol ``$\psim$'' to denote type equality\footnote{The ``$\#$'' subscript
+is irrelevant for this paper; the interested reader may consult 
+\cite{deferred-type-errors} to understand the related type equality $\sim$, and
+the relationship between $\sim$ and $\psim$.}.
+The syntax of coercions $\gamma$ is given in
+Figure~\ref{fig:syntax2}, and their typing rules in Figure~\ref{fig:wfco}.  
+For uniformity we treat $\psim$ as an ordinary type constructor, with
+kind $\kappa \to \kappa \to \static$ (Figure~\ref{fig:wfty}). 
+
+To see casts in action, consider this Haskell program which uses GADTs:
+\begin{code}
+  data T a where               f :: T a -> [a]   
+     T1 :: Int -> T Int        f (T1 x) = [x+1]  
+     T2 :: a -> T a            f (T2 v) = [v]    
+
+                               main = f (T1 4)   
+\end{code}
+We regard the GADT data constructor @T1@ as having the type
+$$ @T1@ : \forall a. (a \psim @Int@) \to @Int@ \to @T@\;a $$
+So in FC, @T1@ takes three arguments: a type argument to instantiate $a$,
+a coercion witnessing the equivalence of $a$ and @Int@, and a value of type @Int@.
+Here is the FC elaboration of @main@:
+\begin{code}
+  main = f Int (T1 Int <Int> 4)
+\end{code}
+The coercion argument has kind $(@Int@\psim@Int@)$, for which the evidence
+is just $\refl{@Int@}$ (reflexivity).
+Similarly, pattern-matching on @T1@ binds two variables: 
+a coercion variable, and a term variable.  Here is the FC elaboration 
+of function @f@:
+\begin{code}
+  f = /\(a:*). \(x:T a).
+      case x of 
+        T1 (c:a ~# Int) (n:Int) -> (Cons (n+1) Nil) |> sym [c]
+        T2 (v:a)                -> Cons v Nil
+\end{code}
+The cast converts the type of the result from @[Int]@ to @[a]@.
+The coercion $\sym{[c]}$ is evidence for (or a proof of) 
+the equality of these types, using coercion @c@, of type $(@a@\psim@Int@)$.
+
+\subsection{Typing coercions} \label{sec:newtype} \label{sec:type-funs}
+
+\begin{figure*}\small
+\[\begin{array}{c}\ruleform{\Gamma \wfco \gamma : \sigma_1 \psim \sigma_2 } \\ \\
+\prooftree
+    \begin{array}{c} \phantom{G} \\ 
+    (c{:}\sigma_1 \psim \sigma_2) \in \Gamma
+    \end{array}
+    \minusv{CVar}
+    \Gamma \wfco c : \sigma_1 \psim \sigma_2 
+    \twiddleiv 
+    \begin{array}{c}
+      (C\, \ol{a{:}\eta} : \tau_1 \psim \tau_2) \in \Gamma \\ 
+    \Gamma \wfco \gamma_i : \sigma_i \psim \phi_i \vspace{1pt}
+    \end{array}
+    \minusv{CAx} 
+    \Gamma \wfco C\;\gammas : \tau_1[\sigmas/\as]{\psim}\tau_2[\phis/\as]
+    \twiddleiv 
+    \begin{array}{c} \phantom{G} \\ 
+    \Gamma \wfty \phi : \kappa
+    \end{array}
+    \minusv{CRefl}
+    \Gamma \wfco \refl{\phi} : \sigma \psim \sigma
+    \twiddlev 
+    \begin{array}{c} 
+      \Gamma \wfco \gamma_1 : \sigma_1 \psim \sigma_2 \\ 
+      \Gamma \wfco \gamma_2 : \sigma_2 \psim \sigma_3 \vspace{1pt}
+    \end{array}
+    \minusv{CTrans}
+    \Gamma \wfco \gamma_1;\gamma_2 : \sigma_1{\psim}\sigma_3
+    \twiddleiv
+    \Gamma \wfco \gamma : \sigma_1 \psim \sigma_2 
+    \minusv{CSym} 
+    \Gamma \wfco \sym{\gamma} : \sigma_2 \psim \sigma_1 
+    \twiddleiv 
+    \Gamma \wfco \gamma : H\;\sigmas \psim H\;\taus
+    \minusv{CNth} 
+    \Gamma \wfco \nth{k}{\gamma} : \sigma_k \psim \tau_k 
+    \twiddlev 
+    \Gamma,(a{:}\eta) \wfco \gamma : \sigma_1 \psim \sigma_2
+    \minusv{CAll} 
+    \Gamma \wfco \forall a{:}\eta @.@ \gamma : (\forall a{:}\eta @.@ \sigma_1) \psim (\forall a{:}\eta @.@ \sigma_2)
+    %% \twiddleiv
+    %% \Gamma \wfco \gamma_i : \tau_i \psim \sigma_i \quad i \in 1..n
+    %% \minusv{CFun} 
+    %% \Gamma \wfco F^n\;\gammas : F\;\taus \psim F\;\sigmas
+    \twiddlev
+    \begin{array}{c}
+      \Gamma \wfco \gamma_1 : \sigma_1 \psim \sigma_2  \\
+      \Gamma \wfco \gamma_2 : \phi_1 \psim \phi_2 \quad \Gamma \wfty : \sigma_1\;\phi_1 : \kappa
+    \end{array}
+    \minusv{CApp}
+    \Gamma \wfco \gamma_1\;\gamma_2 : \sigma_1\;\phi_1 \psim \sigma_2\;\phi_2
+    \twiddleiv 
+    \begin{array}{c}
+    \Gamma \wfty \phi : \eta \\
+    \Gamma \wfco \gamma : (\forall a{:}\eta @.@ \sigma_1) \psim (\forall a{:}\eta @.@ \sigma_2) \vspace{1pt}
+    \end{array}
+    \minusv{CInst} 
+    \Gamma \wfco \inst{\gamma}{\phi} : \sigma_1[\phi/a] \psim \sigma_2[\phi/a]
+\endprooftree
+\end{array}\]\caption{Well-formed coercions}\label{fig:wfco}
+\end{figure*}
+
+Figure~\ref{fig:wfco} gives the typing rules for coercions. The rules include unsurprising cases 
+for reflexivity (\rulename{CRefl}), symmetry (\rulename{CSym}), and transitivity (\rulename{CTrans}).
+Rules \rulename{CAll} and \rulename{CApp} allow us to construct coercions on more complex types from
+coercions on simpler types. Rule \rulename{CInst} instantiates a coercion between two $\forall$-types,
+to get a coercion between two instantiated types. Rule \rulename{CVar} allows us to use a coercion 
+that has been introduced to the context by a coercion abstraction $(\lambda c{:}\tau{\psim}\phi @.@ e)$, 
+or a pattern match against a GADT (as in the example above).
+
+Rule \rulename{CAx} refers to instantiations of {\em axioms}. In GHC, axioms can arise as a result of {\em newtype} or {\em type family} declarations. Consider the following code:
+\begin{code}
+  newtype N a = MkN (a -> Int)
+
+  type family F (x :: *) :: *
+  type instance F [a]  = a
+  type instance F Bool = Char
+\end{code}
+$N$ is a \emph{newtype} (part of the original Haskell 98 definition), and is desugared to 
+the following FC coercion axiom:
+\[\begin{array}{rcl}
+C_N \, a& : & N\,a \psim a \rightarrow @Int@ 
+\end{array}\] 
+which provides evidence of the equality of types $(N\,a)$ and $(a \rightarrow @Int@)$.
+
+In the above Haskell code, $F$ is a {\em type family} \cite{chak+:types, chak+:synonyms}, 
+and the two @type@ @instance@ declarations above introduce two FC coercion axioms: 
+\[\begin{array}{rcl}
+C_1 \, a & : & F\;[a] \psim a \\
+C_2 & : & F\;@Bool@ \psim @Char@
+\end{array}
+\]
+Rule \rulename{CAx} describes how these axioms may be used to create coercions. In this 
+particular example, if we have $\gamma : \tau \psim \sigma$, then we can prove that
+$ C_1\;\gamma : F\;[\tau] \psim \sigma$. Using such coercions we can get, for example, that
+$(\tcast{3}{\sym{(C_1\;\refl{@Int@})}}) : F\;[@Int@]$.
+
+Axioms always appear saturated in System FC, hence the syntax $C\,\overline{\gamma}$ in Figure~\ref{fig:syntax2}.
+
+%% Lifting and one push rule, in case we need it 
+%% \begin{figure*}\small
+%% \[\begin{array}{c}
+%% \ruleform{\lifting{a\mapsto\gamma}{\tau} = \gamma'} \\ \\
+%% \begin{array}{lcl}
+%% \lifting{a \mapsto \gamma}{a}    & = & \gamma \\
+%% \lifting{a \mapsto \gamma}{b}    & = & \refl{b} \\ 
+%% \lifting{a \mapsto \gamma}{H}    & = & \refl{H} \\
+%% \lifting{a \mapsto \gamma}{F}    & = & \refl{F} \\
+%% \lifting{a \mapsto \gamma}{\tau_1\;\tau_2} & = & 
+%%    \left\{\begin{array}{l} 
+%%            \refl{\phi_1\;\phi_2} \text{ when } \lifting{a\mapsto\gamma}{\tau_i} = \refl{\phi_i} \\
+%%            (\lifting{a \mapsto \gamma}{\tau_1})\;(\lifting{a\mapsto\gamma}{\tau_2}) \text{ otherwise }
+%%          \end{array}\right.   \\
+%% \lifting{a\mapsto\gamma}{\forall a{:}\eta @.@ \tau} & = &  
+%%    \left\{\begin{array}{l} 
+%%            \refl{\forall a{:}\eta @.@ \phi} \text{ when } \lifting{a\mapsto\gamma}{\tau} = \refl{\phi} \\
+%%            \forall a{:}\eta @.@ (\lifting{a\mapsto\gamma}{\tau}) \text{ otherwise}
+%%          \end{array}\right.
+%% \end{array} \\ \\ 
+%% \begin{array}{llcl} 
+%%         & \tcase{\tcast{K\;\taus\;\gammas\;\es}{\gamma}}{p \to u} & \rightsquigarrow & \tcase{K\;\taus'\;\gammas'\;\es'}{p \to u} \\ 
+%%                    & & & \hspace{-4pt}\begin{array}{lll} 
+%%                                   \text{when } \\ %% & \cval(K\;\taus\;\phis\;\es)  \\ 
+%%                                   & \wfco \gamma : T\;\taus \psim T\;\taus' \\ 
+%%                                   & K{:}\forall\ol{a{:}\eta} @.@ \ol{\sigma_1 \psim \sigma_2} \to \sigmas \to T\;\as \in \Gamma_0 \\ 
+%%                                   & e_i' = \tcast{e_i}{\lifting{\as \mapsto \deltas}{\sigma_i[\phis/\cs]}} \\
+%%                                   & \delta_j = \nth{j}{\gamma} \\ 
+%%                                   & \gamma_j' = \ldots 
+%%                      \end{array}
+%% \end{array}
+%% \end{array} \]
+%% \caption{Coercion pushing in simplification}\label{fig:opsem}
+%% \end{figure*}
+
+
+% --------------------------------------------------------------------------
+\section{The problem with large coercions}\label{ssect:large}
+
+System FC terms arise as the result of elaboration of source language
+terms, through type inference. Type inference typically
+relies on a \emph{constraint solver} \cite{pjv:modular}
+which produces System FC witnesses of
+equality (coercions), that in turn decorate the elaborated term. The constraint solver is
+not typically concerned with producing small or readable witnesses;
+indeed GHC's constraint solver can produce large and complex coercions.
+These complex coercions can make the
+elaborated term practically impossible to understand and debug.
+
+Moreover, GHC's optimiser transforms well-typed FC terms.
+Insofar as these transformations involve coercions, the coercions \emph{themselves}
+may need to be transformed.  If you think of the coercions as little proofs that
+fragments of the program are well-typed, then the optimiser must maintain the proofs
+as it transforms the terms.  
+
+\subsection{How big coercions arise}
+
+The trouble is that \emph{term-level optimisation tends to make
+coercions bigger}. The full details of these transformations are given in the so called {\em push}
+rules in our previous work~\cite{weirich+:fc2}, but we illustrate them here with an example.
+Consider this term:
+$$
+  (\tcast{\lambda x.e}{\gamma})\, a
+$$
+where
+$$
+\begin{array}{rcl}
+  \gamma & : & (\sigma_1 \rightarrow \tau_1) \psim (\sigma_2 \rightarrow \tau_2) \\
+  a      & : & \sigma_2
+\end{array}
+$$
+We would like to perform the beta reduction, but the cast is getting in
+the way.  No matter!  We can transform thus:
+$$\begin{array}{ll}
+  &  (\tcast{\lambda x.e}{\gamma})\, a \\
+= &  \tcast{((\lambda x.e)\, (\tcast{a}{\sym{(\nth{0}{\gamma})}}))}{\nth{1}{\gamma}}
+\end{array}
+$$
+From the coercion $\gamma$ we have derived two coercions whose syntactic form
+is larger, but whose types are smaller:
+$$
+\begin{array}{rcl}
+  \gamma & : & (\sigma_1 \rightarrow \tau_1) \psim (\sigma_2 \rightarrow \tau_2) \\
+\sym{(\nth{0}{\gamma})} & : & \sigma_2 \psim \sigma_1  \\
+\nth{1}{\gamma} & : & \tau_1 \psim \tau_2 
+\end{array}
+$$
+Here we make use of the coercion combinators $sym$, which reverses the sense of
+the proof; and $nth\,i$, which from a proof of $T\,\overline{\sigma} \psim T \, \overline{\tau}$
+gives a proof of $\sigma_i \psim \tau_i$.  Finally, we use the derived coercions to 
+cast the argument and result of the function separately.  Now the lambda is
+applied directly to an argument (without a cast in the way), so 
+$\beta$-reduction can proceed as desired.
+Since $\beta$-reduction is absolutely
+crucial to the optimiser, this ability to ``push coercions out of the way'' is
+fundamental. Without it, the optimiser is hopelessly compromised.
+
+A similar situation arises with @case@ expressions:
+$$@case@\,(\tcast{K\,e_1}{\gamma})\,@of@\,\{\ldots;\,K\,x \rightarrow e_2; \ldots \}$$
+where $K$ is a data constructor.  
+Here we want to simplify the @case@ expression, by picking the correct alternative
+$K\,x \rightarrow e_2$, and substituting $e_1$ for $x$.  Again the coercion gets in the way, but
+again it is possible to push the coercion out of way.  
+
+\subsection{How coercions can be simplified}
+
+Our plan is to simplify complicated coercion terms into simpler ones, using rewriting. 
+Here are some obvious rewrites we might think of immediately:
+$$
+\begin{array}{rcll}
+\sym{(\sym{\gamma})} & \rsa{} & \gamma \\
+\gamma ; \sym{\gamma} & \rsa{} & \refl{\tau} & \text{if}\,\gamma : \tau \psim \phi 
+\end{array}
+$$
+But there are much more complicated rewrites to consider.
+Consider these coercions, where $C_N$ is the axiom generated by the newtype coercion in 
+Section~\ref{sec:newtype}:
+$$
+\begin{array}{rcl}
+\gamma_1 & : & \tau_1 \psim \tau_2 \\
+\gamma_2 = \sym{(C_N\,\refl{\tau_1})} & : & (\tau_1 \rightarrow @Int@) \psim (N\,\tau_1) \\
+\gamma_3 = N\,\refl{\gamma_1} & : & (N\,\tau_1) \psim (N\,\tau_2) \\
+\gamma_4 = C_N\,\refl{\tau_2} & : & (N\,\tau_2) \psim (\tau_2 \rightarrow @Int@) \\
+\\
+\gamma_5 = \gamma_2 ; \gamma_3 ; \gamma_4 & : & (\tau_1 \rightarrow @Int@) \psim (\tau_2 \rightarrow @Int@)
+\end{array}
+$$
+Here $\gamma_2$ takes a function, and wraps it in the newtype; then $\gamma_3$ coerces that newtype from
+$N\,\tau_1$ to $N\,\tau_2$; and $\gamma_4$ unwraps the newtype.
+Composing the three gives a rather large, complicated 
+coercion $\gamma_2 ; \gamma_3 ; \gamma_4$.  \emph{But its type
+is pretty simple}, and indeed the coercion $\gamma_1 \to \refl{@Int@}$ is a much simpler
+witness of the same equality.  The rewrite system we present shortly will rewrite 
+the former to the latter.
+
+Finally, here is an actual example taken from a real program compiled by GHC
+(don't look at the details!):
+$$
+\begin{array}{ll}
+& @Mut@\, \refl{v}\, (\sym{(C_{StateT} \, \refl{s})})\, \refl{a} \\
+& ; \sym{(\nth{0}{(\inst{\inst{\inst{(\forall 
+    w % :*\rightarrow *
+    t % :*
+    b % : *
+.\,
+                   @Mut@\, \refl{w}\, (\sym{(C_{StateT}\, \refl{t})})\, \refl{b}
+                   \rightarrow \refl{@ST@\, t\,(w\, b)})}{v}}{s}}{a})}} \\
+\rsa{} & \refl{@Mut@\, v\,s\,a}
+\end{array}
+$$
+As you can see, the shrinkage in coercion size can be dramatic.
+
+%% \dv{Simon will update some of the examples here. Not sure if we should
+%%   include the push figure then if we can explain it with a couple of
+%%   examples.  The figure will introduce lifting etc and maybe that is a
+%%   distraction. However Simon, note that we refer to this example from
+%%   a later section and describe how exactly it was optimized, so probably 
+%%   you do not want to eliminate it entirely, but just add more examples?}
+
+
+\section{Coercion simplification}\label{s:normalization}
+\newcommand{\G}{{\cal G}}
+
+We now proceed to the details of our coercion simplification algorithm. We note that the design of the algorithm
+is guided by empirical evidence of its effectiveness on actual programs and that other choices might be possible.
+Nevertheless, we formally study the properties of this algorithm, namely we will show that it preserves validity 
+of coercions and terminates -- even when the rewrite system induced by the axioms is not strongly normalizing.
+
+\subsection{Simplification rules}\label{ssect:rules}
+
+Coercion simplification is given as a non-deterministic relation in Figure~\ref{fig:optimization1} and Figure~\ref{fig:optimization2}
+In these two figures we use some syntactic conventions: Namely, for sequences of coercions $\gammas_1$ and $\gammas_2$, 
+we write $\ol{\gamma_1;\gamma_2}$ for the sequence of pointwise transitive compositions and $\sym{\gammas_1}$ for pointwise 
+application of symmetry. We write $nontriv(\gamma)$ iff $\gamma$ {\em contains} some variable $c$ or axiom application $C\;\gammas$.
+
+\begin{figure}\small
+\[\begin{array}{l}
+\text{Coercion evaluation contexts} \quad\quad \G ::=  \Box \mid \G\;\gamma \mid \gamma\;\G \mid C\;\gammas_1\G\gammas_2 \mid  \sym{\G} \mid \forall a{:}\eta @.@ \G \mid \inst{\G}{\tau} \mid \G;\gamma \mid \gamma;\G \\ \\ 
+\prooftree
+     \begin{array}{c}
+        \gamma  \approx \G[\gamma_1] \text{ modulo associativity of } ({;}) \quad
+        \Delta \wfco \gamma_1 : \sigma \psim \phi \quad \Delta \vdash \gamma_1 \rsa{} \gamma_2 \vspace{2pt}
+     \end{array}
+     \minusv{CoEval}
+      \gamma \longrightarrow \G[\gamma_2] 
+\endprooftree \\ \\ 
+\ruleform{\Delta \vdash \gamma_1 \rsa{} \gamma_2} \\ \\ 
+\begin{array}{llcl}
+\multicolumn{4}{l}{\text{Reflexivity rules}} \\ 
+\rulename{ReflApp}    & \Delta \vdash \refl{\phi_1}\;\refl{\phi_2} & \rightsquigarrow & \refl{\phi_1\;\phi_2} \\
+\rulename{ReflAll}    & \Delta \vdash \forall a{:}\eta @.@ \refl{\phi}   & \rightsquigarrow & \refl{\forall a{:}\eta @.@ \phi} \\
+\rulename{ReflElimL}  & \Delta \vdash \refl{\phi};\gamma & \rsa{} & \gamma \\ 
+\rulename{ReflElimR}  & \Delta \vdash \gamma;\refl{\phi} & \rsa{} & \gamma \\ \phantom{\Delta}
+\end{array} \\  
+\begin{array}{llcl} 
+\multicolumn{4}{l}{\text{Eta rules}} \\ 
+\rulename{EtaAllL}  & \Delta \vdash \inst{((\forall a{:}\eta @.@ \gamma_1);\gamma_2)}{\phi} & \rsa{} & \gamma_1[\phi/a];(\inst{\gamma_2}{\phi}) \\
+\rulename{EtaAllR}  & \Delta \vdash \inst{(\gamma_1;(\forall a{:}\eta @.@ \gamma_2))}{\phi} & \rsa{} & \inst{\gamma_1}{\phi};\gamma_2[\phi/a] \\
+\rulename{EtaNthL}  & \Delta \vdash \nth{k}{(\refl{H\;\taus^{1..\ell}}\;\gammas;\gamma)}      & \rsa{} & \left\{\begin{array}{ll} \nth{k}{\gamma}     & \text{ if } k \leq \ell  \\ 
+                                                                                                            \gamma_{k-\ell};\nth{k}{\gamma} & \text{ otherwise }
+                                                                                                            
+                                                                                          \end{array}\right. \\ 
+\rulename{EtaNthR}  & \Delta \vdash \nth{k}{(\gamma;\refl{H\;\taus^{1..\ell}}\;\gammas)}      & \rsa{} & \left\{\begin{array}{ll}
+                                                                                                     \nth{k}{\gamma}        & \text{ if } k \leq \ell \\  
+                                                                                                     \nth{k}{\gamma};\gamma_{k-\ell} & \text{ otherwise }
+                                                                              \end{array}\right.
+\end{array} \\ 
+\begin{array}{llcl}
+\multicolumn{4}{l}{\text{Symmetry rules}} \\
+\rulename{SymRefl}  & \Delta \vdash \sym{\refl{\phi}} & \rightsquigarrow & \refl{\phi} \\ 
+\rulename{SymAll}   & \Delta \vdash \sym{(\forall a{:}\eta @.@ \gamma)} & \rightsquigarrow & \forall a{:}\eta @.@ \sym{\gamma} \\ 
+\rulename{SymApp}   & \Delta \vdash \sym{(\gamma_1\;\gamma_2)} & \rightsquigarrow & (\sym{\gamma_1})\;(\sym{\gamma_2}) \\ 
+\rulename{SymTrans} & \Delta \vdash \sym{(\gamma_1;\gamma_2)}  & \rightsquigarrow & (\sym{\gamma_2}){;}(\sym{\gamma_1}) \\ 
+\rulename{SymSym}   & \Delta \vdash \sym{(\sym{\gamma})} & \rightsquigarrow & \gamma 
+\end{array}  \\ \\
+\begin{array}{llcl}
+\multicolumn{4}{l}{\text{Reduction rules}} \\
+\rulename{RedNth}   & \Delta \vdash \nth{k}{(\refl{H\;\taus^{1..\ell}}\;\gammas)} & \rightsquigarrow & \left\{\begin{array}{ll} \refl{\tau_k} & \text{ if }k \leq \ell \\ 
+                                                                                                               \gamma_{k-\ell}          & \text{ otherwise } 
+                                                                                                \end{array}\right. \\ 
+\rulename{RedInstCo}  & \Delta \vdash \inst{(\forall a{:}\eta @.@ \gamma)}{\phi} & \rsa{} & \gamma[\phi/a] \\  
+\rulename{RedInstTy}  & \Delta \vdash \inst{\refl{\forall a{:}\eta @.@ \tau}}{\phi} & \rsa{} & \refl{\tau[\phi/a]}
+\end{array} \\ \\ 
+\begin{array}{llcll}
+\multicolumn{4}{l}{\text{Push transitivity rules }} \\
+\rulename{PushApp} & \Delta \vdash (\gamma_1\;\gamma_2);(\gamma_3\;\gamma_4) & \rsa{} & (\gamma_1;\gamma_3)\;(\gamma_2;\gamma_4) \\ 
+\rulename{PushAll} & \Delta \vdash (\forall a{:}\eta @.@ \gamma_1); (\forall a{:}\eta @.@ \gamma_2) & \rsa{} & \forall a{:}\eta @.@ \gamma_1;\gamma_2 \\ 
+\rulename{PushInst}& \Delta \vdash (\inst{\gamma_1}{\tau});(\inst{\gamma_2}{\tau}) & \rsa{} & \inst{(\gamma_1;\gamma_2)}{\tau}  
+                                                              & \text{ when } \Delta \wfco \gamma_1;\gamma_2 : \sigma_1 \psim \sigma_2 \\ 
+\rulename{PushNth} & \Delta \vdash (\nth{k}{\gamma_1});(\nth{k}{\gamma_2})   & \rsa{} & \nth{k}{(\gamma_1;\gamma_2)}
+                                                               & \text{ when } \Delta \wfco \gamma_1;\gamma_2 : \sigma_1 \psim \sigma_2 
+\end{array}
+\end{array}\]\caption{Coercion simplification (I)}\label{fig:optimization1}
+\end{figure}
+
+We define coercion evaluation contexts, $\G$, as coercion terms with holes inside them. The syntax of $\G$ allows us to rewrite anywhere 
+inside a coercion. The main coercion evaluation rule is \rulename{CoEval}. If we are given a coercion $\gamma$, we first decompose it to some 
+evaluation context $\G$ with $\gamma_1$ in its hole. Rule \rulename{CoEval} works up to associativity of transitive composition;
+% -- for example, the compiler may use a flat list of coercions 
+%that are transitively composed to each other instead of the binary composition operator $(;)$. 
+for example, we will 
+allow the term $(\gamma_1;\gamma_2;);\gamma_3$ to be written as $\G[\gamma_2;\gamma_3]$ where $\G = \gamma_1;\Box$. This treatment of 
+transitivity is extremely convenient, but we must be careful to ensure that our argument for termination 
+remains robust under associativity (Section~\ref{ssect:termination}). Once we
+have figured out a decomposition $\G[\gamma_1]$, \rulename{CoEval} performs 
+a single step of rewriting $\Delta \vdash \gamma_1 \rsa{} \gamma_2$ and simply return $\G[\gamma_2]$. 
+Since we are allowed to rewrite coercions under a type environment ($\forall a{:}\eta @.@ \G$ is a valid coercion 
+evaluation context), $\Delta$ (somewhat informally) enumerates the type variables bound by $\G$. For instance we
+should be allowed to rewrite $\forall a{:}\eta @.@ \gamma_1$ to $\forall a{:}\eta @.@ \gamma_2$. This can happen 
+if $(a{:}\eta) |- \gamma_1 \rsa{} \gamma_2$. The precondition $\Delta \wfco \gamma_1 : \sigma \psim \phi$ of rule
+\rulename{CoEval} ensures that this context corresponds to the decomposition of $\gamma$ into a context and $\gamma_1$.
+Moreover, the $\Delta$ is passed on to the $\rsa{}$ relation, since some of the rules of the $\rsa{}$ relation that we will present 
+later may have to consult the context $\Delta$ to establish preconditions for rewriting.
+
+The soundness property for the $\longrightarrow$ relation is given by the following theorem.
+\begin{theorem}[Coercion subject reduction]\label{thm:sr-theorem}
+If $\wfco \gamma_1 : \sigma \psim \phi$ and $\gamma_1 \longrightarrow \gamma_2$ then $\wfco \gamma_2 : \sigma \psim \phi$. 
+\end{theorem}
+The rewriting judgement $\Delta \vdash \gamma_1 \rsa{} \gamma_2$ satisfies a similar property. 
+\begin{lemma}\label{lem:sr-lemma}
+If $\Delta \wfco \gamma_1 : \sigma \psim \phi$ and $\Delta \vdash \gamma_1 \rsa{} \gamma_2$ then $\Delta \wfco \gamma_2 : \sigma \psim \phi$. 
+\end{lemma}
+
+To explain coercion simplification, we now present the reaction rules 
+for the $\rsa{}$ relation, organized in several groups.
+
+\subsubsection{Pulling reflexivity up} 
+Rules \rulename{ReflApp}, \rulename{ReflAll}, \rulename{ReflElimL}, and \rulename{ReflElimR}, deal with 
+uses of reflexivity. Rules \rulename{ReflApp} and \rulename{ReflAll} ``swallow'' constructors from the 
+coercion language (coercion application, and quantification respectively) into the type language 
+(type application, and quantification respectively). Hence they pull reflexivity as high as 
+possible in the tree structure of a coercion term. Rules \rulename{ReflElimL} and \rulename{ReflElimR} 
+simply eliminate reflexivity uses that are composed with other coercions. 
+
+\subsubsection{Pushing symmetry down} 
+Uses of symmetry, contrary to reflexivity, are pushed as close to the leaves as possible or eliminated, 
+(rules \rulename{SymRefl}, \rulename{SymAll}, \rulename{SymApp}, \rulename{SymTrans}, and \rulename{SymSym})
+only getting stuck at terms of the form 
+$\sym{x}$ and $\sym{(C\;\gammas)}$.
+The idea is that by pushing uses of symmetry towards the leaves, 
+the rest of the rules may completely ignore symmetry, except where 
+symmetry-pushing gets stuck (variables or axiom applications). 
+
+\subsubsection{Reducing coercions}
+Rules \rulename{RedNth}, \rulename{RedInstCo}, and \rulename{RedInstTy} comprise the first interesting group of rules.
+They eliminate uses of injectivity and instantiation. Rule \rulename{RedNth} is concerned with the case where 
+we wish to decompose a coercion of type $H\;\phis \psim H\;\sigmas$, where the coercion term contains $H$ in its head.
+Notice that $H$ is a type and may already be applied to some type arguments $\taus^{1..\ell}$, and hence the rule 
+has to account for selection from the first $\ell$ arguments, or a later argument. Rule \rulename{RedInstCo} deals
+with instantiation of a polymorphic coercion with a type. Notice that in rule \rulename{RedInstCo} the quantified variable
+may only appear ``protected'' under some $\refl{\sigma}$ inside $\gamma$, and hence simply substituting $\gamma[\phi/a]$ is 
+guaranteed to produce a syntactically well-formed coercion. Rule \rulename{RedInstTy} deals with the instantiation of a 
+polymorphic coercion that is {\em just} a type.
+
+\subsubsection{Eta expanding and subsequent reducing}
+Redexes of \rulename{RedNth} and \rulename{RedInstCo} or \rulename{RedInstTy} may not be directly visible. 
+Consider $\nth{k}{(\refl{H\;\taus^{1..\ell}}\;\gammas;\gamma)}$. The use of transitivity stands in our way for the 
+firing of rule \rulename{RedNth}. To the rescue, rules \rulename{EtaAllL}, \rulename{EtaAllR}, \rulename{EtaNthL}, 
+and \rulename{EtaNthR}, push decomposition or instantiation through transitivity and eliminate such redexes. 
+We call these rules ``eta'' because in effect we are $\eta$-expanding and immediately reducing one of the components of the transitive composition. 
+Here is a decomposition of \rulename{EtaAllL} in smaller steps that involve an $\eta$-expansion (of $\gamma_2$ in the second line): 
+\[\begin{array}{ll}
+        & \inst{((\forall a{:}\eta @.@ \gamma_1);\gamma_2)}{\phi} \\
+   \rsa{} & \inst{((\forall a{:}\eta @.@ \gamma_1);(\forall a{:}\eta @.@ \inst{\gamma_2}{a}))}{\phi}          \\ 
+ \rsa{} & \inst{(\forall a{:}\eta @.@ \gamma_1;\inst{\gamma_2}{a})}{\phi} \;\;\rsa{}\;\; \gamma_1[\phi/a] ; \inst{\gamma_2}{\phi} 
+\end{array}\]
+We have merged these steps in a single rule to facilitate the proof of 
+termination. In doing this, we do not lose any reactions, since all of the intermediate terms can also reduce to the final coercion.
+
+There are many design possibilities for rules that look like our $\eta$-rules. For instance one may wonder why 
+we are not always expanding terms of the form $\gamma_1;(\forall a{:}\eta @.@ \gamma_2)$ to $\forall a{:}\eta @.@ \inst{\gamma_1}{a} ; \gamma_2$, 
+whenever $\gamma_1$ is of type $\forall a{:}\eta @.@ \tau \psim \forall a{:}\eta @.@ \phi$. We experimented with several variations like this, but we found 
+that such expansions either complicated the termination argument, or did not result in smaller coercion terms. Our rules in 
+effect perform $\eta$-expansion {\em only} when there is a firing reduction directly after the expansion. 
+
+%% Finally, one may wonder if we are missing a rule that reduces $\inst{(\gamma_1;(\forall a{:}\eta @.@ \gamma_2);\gamma_3)}{\phi}$ (and similarly for $\mathrel{nth}$). 
+%% However, if $\gamma_1$ or $\gamma_3$ are $\forall$-coercions then the ``push rules'' (to be described next) will recover this reduction. If not, then 
+%% we are not gaining anything if we push the instantiation inwards to get: $\inst{\gamma_1}{\phi}; \gamma_2[\phi/a]; \inst{\gamma_3}{\phi}$. In fact, the 
+%% resulting term is bigger than the one we started with! 
+
+\subsubsection{Pushing transitivity down}
+Rules \rulename{PushApp}, \rulename{PushAll}, \rulename{PushNth}, and \rulename{PushInst} push uses of transitivity
+{\em down} the structure of a coercion term, towards the leaves. These rules aim to reveal more redexes
+at the leaves, that will be reduced by the next (and final) set of rules. Notice that rules \rulename{PushInst} and \rulename{PushNth}
+impose side conditions on the transitive composition $\gamma_1;\gamma_2$. Without these conditions, the resulting coercion may not be well-formed.
+Take $\gamma_1 = \forall a{:}\eta @.@ \refl{T\;a\;a}$ and $\gamma_2 = \forall a{:}\eta @.@ \refl{T\;a\;@Int@}$. It is 
+certainly the case that $(\inst{\gamma_1}{@Int@});(\inst{\gamma_2}{@Int@})$ is well formed. However, $\wfco \gamma_1 : \forall a{:}\eta @.@ T\;a\;a \psim \forall a{:}\eta @.@ T\;a\;a$
+and $\wfco \gamma_2 : \forall a{:}\eta @.@ T\;a\;@Int@ \psim \forall a{:}\eta @.@ T\;a\;@Int@$, and hence $\inst{(\gamma_1;\gamma_2)}{@Int@}$ is not well-formed. A similar argument 
+applies to rule \rulename{PushNth}. 
+
+\begin{figure}[t]\small
+\[\begin{array}{c}
+%% \text{Leaf rules} \\ \\ 
+\prooftree 
+   \Delta \wfco c : \tau \psim \upsilon
+  \minusv{VarSym} 
+   \Delta \vdash c ; \sym{c} \rsa{} \refl{\tau}
+  \twiddleiv
+   \Delta \wfco c : \tau \psim \upsilon
+  \minusv{SymVar} 
+   \Delta \vdash \sym{c} ; c \rsa{} \refl{\upsilon}
+  \twiddlev 
+          (C\, \ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \quad  \as \subseteq ftv(\upsilon)
+  \minusv{AxSym} 
+   \begin{array}{l} 
+   \Delta \vdash C\;\gammas_1;\sym{(C\;\gammas_2)} \rsa{} \\ 
+   \qquad\quad \lifting{\as \mapsto \ol{\gamma_1;\sym{\gamma_2}}}{\tau}
+   \end{array}
+  \twiddleiv 
+           (C\,\ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \quad \as \subseteq ftv(\tau)
+  \minusv{SymAx}
+   \begin{array}{l} 
+   \Delta \vdash \sym{(C\;\gammas_1)};C\;\gammas_2 \rsa{} \\ 
+   \qquad\quad \lifting{\as \mapsto \ol{\sym{\gamma_1};\gamma_2}}{\upsilon}
+   \end{array}
+  \twiddlev
+  \begin{array}{c} 
+      (C\,\ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \\ \as \subseteq ftv(\upsilon) \quad
+       nontriv(\delta) \\ \delta = \lifting{\as \mapsto\gammas_2}{\upsilon}
+  \end{array}
+  \minusv{AxSuckR}
+    \Delta \vdash (C\;\gammas_1) ; \delta \rsa{} C\;\ol{\gamma_1{;}\gamma_2}
+  \twiddleiv 
+  \begin{array}{c} 
+      (C \ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \\ \as \subseteq ftv(\tau) \quad
+       nontriv(\delta) \\ \delta = \lifting{\as \mapsto\gammas_1}{\tau} \vspace{2pt}
+  \end{array}
+  \minusv{AxSuckL} 
+    \Delta \vdash \delta ; (C\;\gammas_2) \rsa{} C\;\ol{\gamma_1{;}\gamma_2}
+  \twiddlev
+  \begin{array}{c} 
+      (C\, \ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \quad \as \subseteq ftv(\tau) \\
+       nontriv(\delta) \quad \delta = \lifting{\as \mapsto\gammas_2}{\tau} \vspace{2pt}
+  \end{array}
+  \minusv{SymAxSuckR} 
+    \Delta \vdash \sym{(C\;\gammas_1)} ; \delta \rsa{} \sym{(C\;\ol{\sym{\gamma_2}{;}\gamma_1})}
+  \twiddlev 
+  \begin{array}{c} 
+      (C\,\ol{(a{:}\eta)} : \tau \psim \upsilon) \in \Gamma \quad \as \subseteq ftv(\upsilon) \\
+       nontriv(\delta) \quad \delta = \lifting{\as \mapsto\gammas_1}{\upsilon}
+  \end{array}
+  \minusv{SymAxSuckL}
+    \Delta \vdash \delta ; \sym{(C\;\gammas_2)} \rsa{} \sym{(C\;\ol{\gamma_2{;}\sym{\gamma_1}})}
+\endprooftree
+\end{array}\]\caption{Coercion simplification (II)}\label{fig:optimization2}
+\end{figure}
+
+\subsubsection{Leaf reactions}
+When transitivity and symmetry have been pushed as low as possible, new redexes may appear, for which we introduce
+rules \rulename{VarSym}, \rulename{SymVar}, \rulename{AxSym}, \rulename{SymAx}, \rulename{AxSuckR}, \rulename{AxSuckL}, 
+\rulename{SymAxSuckR}, \rulename{SymAxSuckL}. (Figure~\ref{fig:optimization2})
+\begin{itemize*} 
+  \item Rules \rulename{VarSym} and \rulename{SymVar} are entirely straightforward: a coercion variable (or its symmetric coercion) meets its
+symmetric coercion (or the variable) and the result is the identity. 
+
+  \item Rules \rulename{AxSym} and \rulename{SymAx} are more involved. Assume that the axiom $(C\;(\ol{a{:}\eta}) {:} \tau \psim \upsilon) \in \Gamma$, and a 
+  well-formed coercion of the form: $C\;\gammas_1; \sym{(C\;\gammas_2)}$. Moreover $\Delta \wfco \gammas_1 : \sigmas_1 \psim \phis_1$ and $\Delta \wfco \gammas_2 : \sigmas_2 \psim \phis_2$.
+Then we know that $\Delta \wfco C\;\gammas_1; \sym{(C\;\gammas_2)} : \tau[\sigmas_1/\as] \psim \tau[\sigmas_2/\as]$. Since the composition is 
+well-formed, it must be the case that $\upsilon[\phis_1/\as] = \upsilon[\phis_2/\as]$. If $\as \subseteq ftv(\upsilon)$ then it must be $\phis_1 = \phis_2$. Hence,
+the pointwise composition $\ol{\gamma_1;\sym{\gamma_2}}$ is well-formed and of type $\sigmas_1 \psim \sigmas_2$. Consequently, we may replace the original coercion 
+with the {\em lifting} of $\tau$ over a substitution that maps $\as$ to $\ol{\gamma_1;\sym{\gamma_2}}$: $\lifting{\as \mapsto \ol{\gamma_1;\sym{\gamma_2}}}{\tau}$.
+
+What is this lifting operation, of a substitution from type variables to coercions, over a type? 
+Its result is a new coercion, and the definition of the operation is given in Figure~\ref{fig:lifting}. 
+The easiest way to understand it is by its effect on a type:
+\begin{lemma}[Lifting]
+If $\Delta,(a{:}\eta) \wfty \tau : \eta$ and
+$\Delta \wfco \gamma : \sigma \sim \phi$ such that $\Delta \wfty \sigma : \eta$ and $\Delta \wfty \phi : \eta$, 
+then $\Delta \wfco \lifting{a \mapsto \gamma}{\tau} : \tau[\sigma/a] \psim \tau[\phi/a]$
+\end{lemma}
+Notice that we have made sure that lifting pulls reflexivity as high as possible in the syntax tree -- the only 
+significance of this on-the-fly normalization was that it appeared to simplify the argument we have given for termination of 
+coercion normalization.
+
+\begin{figure}\small
+\[\begin{array}{l}
+\ruleform{\lifting{a\mapsto\gamma}{\tau} = \gamma'} \\ \\
+\begin{array}{lcl}
+\lifting{a \mapsto \gamma}{a}    & = & \gamma \\
+\lifting{a \mapsto \gamma}{b}    & = & \refl{b} \\ 
+\lifting{a \mapsto \gamma}{H}    & = & \refl{H} \\
+\lifting{a \mapsto \gamma}{F}    & = & \refl{F} \\
+\lifting{a \mapsto \gamma}{\tau_1\;\tau_2} & = & 
+   \left\{\begin{array}{l} 
+           \refl{\phi_1\;\phi_2} \text{ when } \lifting{a\mapsto\gamma}{\tau_i} = \refl{\phi_i} \\
+           (\lifting{a \mapsto \gamma}{\tau_1})\;(\lifting{a\mapsto\gamma}{\tau_2}) \text{ otherwise }
+         \end{array}\right.   \\
+\lifting{a\mapsto\gamma}{\forall b{:}\eta @.@ \tau} & = &  
+   \left\{\begin{array}{l} 
+           \refl{\forall a{:}\eta @.@ \phi} \text{ when } \lifting{a\mapsto\gamma}{\tau} = \refl{\phi} \\
+           \forall b{:}\eta @.@ (\lifting{a\mapsto\gamma}{\tau}) \text{ otherwise} \quad (b \notin ftv(\gamma), b \neq a)
+         \end{array}\right.
+\end{array}
+%% \begin{array}{llcl} 
+%%         & \tcase{\tcast{K\;\taus\;\gammas\;\es}{\gamma}}{p \to u} & \rightsquigarrow & \tcase{K\;\taus'\;\gammas'\;\es'}{p \to u} \\ 
+%%                    & & & \hspace{-4pt}\begin{array}{lll} 
+%%                                   \text{when } \\ %% & \cval(K\;\taus\;\phis\;\es)  \\ 
+%%                                   & \wfco \gamma : T\;\taus \psim T\;\taus' \\ 
+%%                                   & K{:}\forall\ol{a{:}\eta} @.@ \ol{\sigma_1 \psim \sigma_2} \to \sigmas \to T\;\as \in \Gamma \\ 
+%%                                   & e_i' = \tcast{e_i}{\lifting{\as \mapsto \deltas}{\sigma_i[\phis/\cs]}} \\
+%%                                   & \delta_j = \nth{j}{\gamma} \\ 
+%%                                   & \gamma_j' = \ldots 
+%%                      \end{array}
+%% \end{array}
+\end{array} \]
+\caption{Lifting}\label{fig:lifting}
+\end{figure}
+
+Returning to rules \rulename{AxSym} and \rulename{SymAx}, we stress that the side condition is essential for the rule to be sound. Consider the following example: 
+\[  C (a{:}\star): F\;[a] \psim  @Int@  \in \Gamma  \]
+Then $(C\;\refl{@Int@});\sym{(C\;\refl{@Bool@})}$ is well-formed and of 
+type $F\;[@Int@] \psim F\;[@Bool@]$, but $\refl{F}\;(\refl{@Int@};\sym{\refl{@Bool@}})$ is not well-formed!
+Rule \rulename{SymAx} is symmetric and has a similar soundness side condition on the free variables of $\tau$ this time. 
+
+  \item The rest of the rules deal with the case when an axiom meets a lifted type -- the reaction swallows the lifted type
+        inside the axiom application. For instance, here is rule \rulename{AxSuckR}: 
+        \[\small\prooftree
+        \begin{array}{c} 
+          (C\;(\ol{a{:}\eta}) {:} \tau \psim \upsilon) \in \Gamma \quad \as \subseteq ftv(\upsilon) \\
+          nontriv(\delta) \quad \delta = \lifting{\as \mapsto\gammas_2}{\upsilon} \vspace{2pt}
+        \end{array}
+        \minusv{AxSuckR}
+        \Delta \vdash (C\;\gammas_1) ; \delta \rsa{} C\;\ol{\gamma_1{;}\gamma_2}
+        \endprooftree\]
+        This time let us assume that $\Delta \wfco \gammas_1 : \sigmas_1 \psim \phis_1$. Consequently
+        $\Delta \wfco C\;\gammas_1 : \tau[\sigmas_1/\as] \psim \upsilon[\phis_1/\as]$. Since $\as \subseteq ftv(\upsilon)$ it 
+        must be that $\Delta \wfco \gammas_2 : \phis_1 \psim \phis_3$ for some $\phis_3$ and we can 
+        pointwise compose $\ol{\gamma_1{;}\gamma_2}$ to get coercions between $\sigmas_1 \psim \phis_3$. 
+        The resulting coercion $C\;\ol{\gamma_1{;}\gamma_2}$ is well-formed and of type $\tau[\sigmas_1/\as] \psim \upsilon[\phis_3/\as]$. 
+        Rules \rulename{AxSuckL}, \rulename{SymAxSuckL}, and \rulename{SymAxSuckR} involve a similar reasoning.
+
+        The side condition $nontriv(\delta)$ is not restrictive in any way -- it merely requires that $\delta$ contains some variable 
+        $c$ or axiom application. If not, then $\delta$ can be converted to reflexivity:
+        \begin{lemma}\label{lem:coherence} 
+        If $\wfco \delta : \sigma{\psim}\phi$ and $\lnot nontriv(\delta)$, then $\delta {\longrightarrow^{*}} \refl{\phi}$.
+        \end{lemma}
+        Reflexivity, when transitively composed with any other coercion, is eliminable via \rulename{ReflElimL/R} or and consequently the side condition is not preventing any 
+        reactions from firing. It will, however, be useful in the simplification termination proof in Section~\ref{ssect:termination}.
+\end{itemize*}
+
+The purpose of rules \rulename{AxSuckL/R} and \rulename{SymAxSuckL/R} is to eliminate intermediate coercions in a
+big transitive composition chain, to give the opportunity to an axiom to meet its symmetric version and react 
+with rules \rulename{AxSym} and \rulename{SymAx}. In fact this rule is {\em precisely} what we need for the 
+impressive simplifications from Section~\ref{ssect:large}. Consider that example again:
+\[\begin{array}{lrll}
+ \gamma_5 & = &  \gamma_2;\gamma_3;\gamma_4 \\
+          & = &  \sym{(C_N\;\refl{\tau_1})};(\refl{N}\;\gamma_1);(C_N\;\refl{\tau_2})    & (\rulename{AxSucL} \text{ with } \delta := (\refl{N}\;\gamma_1)) \\
+          & \longrightarrow & \sym{(C_N\;\refl{\tau_1})};(C_N\;(\gamma_1;\refl{\tau_2})) & (\rulename{ReflElimR} \text{ with } \gamma := \gamma_1, \phi := \tau_2) \\
+          & \longrightarrow & \sym{(C_N\;\refl{\tau_1})};(C_N\;\gamma_1)                 & (\rulename{SymAx}) \\
+          & \longrightarrow & \refl{\to}\;(\refl{\tau_1};\gamma_1)\;\refl{@Int@}        & (\rulename{ReflElimL} \text{ with } \phi := \tau_1,\gamma := \gamma_1) \\
+          & \longrightarrow & \refl{\to}\;\gamma_1\;\refl{@Int@} 
+\end{array}\] 
+
+Notably, rules \rulename{AxSuckL/R} and \rulename{SymAxSuckL/R} generate
+axiom applications of the form $C\;\gammas$ (with a coercion as argument).
+In our previous papers, the syntax of axiom applications was $C\;\taus$, with \emph{types}
+as arguments.  But we need the additional generality to allow coercions rewriting to
+proceed without getting stuck.
+
+%% which we now give in mathematical notation. The 
+%% relevant axioms are:
+%% \[\begin{array}{lll} 
+%%     C_n  : \forall a{:}\star \to \star @.@ N\;a \psim \forall xy @.@ a\;x \to a\;y  & \in & \Gamma \\ 
+%%     C_f  : F\;() \psim Maybe                                 & \in & \Gamma 
+%% \end{array}\]
+%% The coercion term is: 
+%% \[  \nth{2}{(
+%%          \inst{(\inst{(\sym{C_n\;\refl{Maybe}};\refl{N}\;(\sym{C_f});C_n\;\refl{F\;()})}{x_{a}})}{y_{a}})} \]
+
+%% Its simplification is given in Figure~\ref{fig:optimization-example}. 
+%% Notably, rules \rulename{AxSuckL/R} and \rulename{SymAxSuckL/R} rely 
+%% on axiom applications be of the form $C\;\gammas$ instead of the simpler 
+%% $C\;\taus$ found in previous FC papers.
+
+%% \begin{figure*}\small
+%% \[\begin{array}{ll}
+%%    \nth{2}{(
+%%            \inst{(\inst{(\sym{C_n\;\refl{Maybe}};\highlight{\refl{N}\;(\sym{C_f});C_n\;\refl{F\;()}})}{x_{a}})}{y_{a}})} \vspace{3pt} \\
+%% (\rulename{AxSuckL}) \rsa{} \vspace{3pt}\\
+%%    \nth{2}{(
+%%            \inst{(\inst{\highlight{(\sym{C_n\;\refl{Maybe}};C_n\;((\sym{C_f});\refl{F\;()}))}}{x_{a}})}{y_{a}})} \vspace{3pt} \\ 
+%% (\rulename{SymAx})    \rsa{} \vspace{3pt}\\ 
+%%      \nth{2}{(
+%%          \inst{(\inst{(\forall xy. (\sym{\refl{Maybe}};\sym{C_f};\refl{F\;()})\;\refl{x}\;\refl{\to}\;
+%%                             (\sym{\refl{Maybe}};\sym{C_f};\refl{F\;()})\;\refl{y})}{x_{a}})}{y_{a}})} \vspace{3pt}\\
+%% (\rulename{ReflElimL},\rulename{ReflElimR},\rulename{SymRefl}) \rsa{}^{*} \vspace{3pt}\\
+%%      \nth{2}{(
+%%          \inst{(\inst{(\forall x y @.@ (\sym{C_f})\;\refl{x}\;\refl{\to}\;
+%%                             (\sym{C_f})\;\refl{y})}{x_{a}})}{y_{a}})} \vspace{3pt}\\
+%% (\rulename{RedInstCo}) \rsa{}^{*} \quad
+%%      \nth{2}{((\sym{C_f})\;\refl{x_a}\;\refl{\to}\;(\sym{C_f})\;\refl{y_a})} \quad 
+%% (\rulename{RedNth}) \rsa{} \quad
+%%      (\sym{C_f})\;\refl{y_a} 
+%% \end{array}\]
+%% \caption{Simplification example}\label{fig:optimization-example}
+%% \end{figure*}
+
+\section{Coercion simplification in GHC}\label{ssect:ghc}
+
+To assess the usefulness of coercion simplification we added it to GHC. 
+For Haskell programs that make no use of GADTs or type families, the
+effect will be precisely zero, so we took measurements on two bodies of code.
+First, our regression suite of 151 tests for GADTs and type families; these are
+all very small programs.  Second, the @Data.Accelerate@ library that we know makes use
+of type families \cite{chakravarty+:accelerate}. This library consists
+of 18 modules, containing 8144 lines of code.
+
+We compiled each of these programs with and without coercion simplification, 
+and measured the percentage reduction in size of the coercion terms with
+simplification enabled.  This table shows the minimum, maximum, and 
+aggregate reduction, taken over the 151 tests and 18 modules respectively.
+The ``aggregate reduction'' is obtained by combining all the programs
+in the group (testsuite or @Accelerate@) into one giant ``program'', and computing
+the reduction in coercion size.
+$$
+\begin{array}{rrr}
+& \text{Testsuite} & \text{Accelerate} \\
+\text{Minimum} & -97\% & -81\%\\
+\text{Maximum} & +14\% & 0\% \\
+\text{\bf Aggregate} & {\bf -58\% } & {\bf -69\%}
+\end{array}
+$$
+There is a substantial aggregate decrease of 58\% in the testsuite
+and 69\% in @Accelerate@, with a massive 97\% decrease
+in special cases. These special cases should not be taken lightly: 
+in one program the types and coercions taken together were five times
+bigger than the term they decorated; after simplification they were ``only''
+twice as big.  The coercion simplifier makes the compiler less vulnerable to
+falling off a cliff.
+
+Only one program showed an increase in coercion size, of 14\%, which turned out to be the
+effect of this rewrite:
+$$ \sym{(C ;  D)} \quad \longrightarrow \quad (\sym{D});(\sym{C}) $$
+Smaller coercion terms make the 
+compiler faster, but the normalization algorithm itself consumes some time.
+However, the effect on compile time is barely measurable (less than 1\%), and we 
+do not present detailed figures.
+
+Of course none of this would matter if coercions were always tiny, so that they
+took very little space in the first place.  And indeed that is often the case.
+But for programs that make heavy use of type functions, un-optimised coercions 
+can dominate compile time. For example, the @Accelerate@ library makes
+heavy use of type functions.  The time and memory consumption of compiling
+all 21 modules of the library are as follows:
+$$
+\begin{array}{lrrr}
+                                     & \text{Compile time}  & \text{Memory allocated} & \text{Max residency} \\
+\text{With coercion optimisation}    & 68s           & 31\, Gbyte & 153\, Mbyte \\
+\text{Without coercion optimisation} & 291s          & 51\, Gbyte & 2,000\, Mbyte 
+\end{array}
+$$
+As you can see, the practical effects can be extreme; the cliff is very real.
+
+\section{Termination and confluence}\label{ssect:termination}
+\newcommand{\ps}{\ol{p}}
+
+We have demonstrated the effectiveness of the algorithm in practice, but we must also 
+establish termination. This is important, since it would not be acceptable
+for a compiler to loop while simplifying a coercion, no matter what axioms are declared by users.
+Since the rules fire non-deterministically, and some of the rules (such as \rulename{RedInstCo} or \rulename{AxSym})
+create potentially larger coercion trees, termination is not obvious. 
+
+\subsection{Termination}
+
+\begin{figure*}\small
+\[\begin{array}{c} 
+ \begin{array}{lcl} 
+      \multicolumn{3}{l}{\text{Axiom polynomial}} \\ 
+      p(\sym{\gamma})    & = & p(\gamma) \\ 
+      p(C\;\gammas) & = & z \cdot \Sigma p(\gamma_i) + z + 1 \\ 
+      p(c)          & = & 1 \\ 
+      p(\gamma_1;\gamma_2)     & = & p(\gamma_1) + p(\gamma_2) + p(\gamma_1)\cdot p(\gamma_2) \\ 
+      p(\refl{\phi})   & = & 0 \\ 
+      p(\nth{k}{\gamma}) & = & p(\gamma) \\ 
+      p(\inst{\gamma}{\phi}) & = & p(\gamma) \\ 
+      p(\gamma_1\;\gamma_2)    & = & p(\gamma_1) + p(\gamma_2) \\
+      p(\forall a{:}\eta @.@ \gamma) & = & p(\gamma)
+  \end{array}
+  \begin{array}{lcl} 
+      \multicolumn{3}{l}{\text{Coercion weight}} \\ 
+      w(\sym{\gamma})      & = & w(\gamma) \\ 
+      w(C\;\gammas)   & = & \Sigma w(\gamma_i) + 1 \\ 
+      w(c)            & = & 1 \\ 
+      w(\gamma_1;\gamma_2)       & = & 1 + w(\gamma_1) + w(\gamma_2) \\ 
+      w(\refl{\phi})     & = & 1 \\ 
+      w(\nth{k}{\gamma})   & = & 1 + w(\gamma) \\ 
+      w(\inst{\gamma}{\phi})  & = & 1 + w(\gamma) \\ 
+      w(\gamma_1\;\gamma_2)      & = & 1 + w(\gamma_1) + w(\gamma_2) \\ 
+      w(\forall a{:}\eta @.@ \gamma) & = & 1 + w(\gamma)
+  \end{array} \\ 
+\begin{array}{lcl} 
+      \multicolumn{3}{l}{\text{Symmetry weight}} \\ 
+      sw(\sym{\gamma})      & = & w(\gamma) + sw(\gamma) \\
+      sw(C\;\gammas)   & = & \Sigma sw(\gamma_i) \\ 
+      sw(c)            & = & 0 \\ 
+      sw(\gamma_1;\gamma_2)       & = & sw(\gamma_1) + sw(\gamma_2) \\ 
+      sw(\refl{\phi})     & = & 0 \\ 
+      sw(\nth{k}{\gamma})   & = & sw(\gamma) \\ 
+      sw(\inst{\gamma}{\phi})  & = & sw(\gamma) \\ 
+      sw(\gamma_1\;\gamma_2)      & = & sw(\gamma_1) + sw(\gamma_2) \\
+      sw(\forall a{:}\eta @.@ \gamma) & = & sw(\gamma)
+     \end{array}
+\end{array}\]\caption{Metrics on coercion terms}\label{fig:metrics}
+\end{figure*}
+
+To formalize a termination argument, we introduce several definitions in Figure~\ref{fig:metrics}. 
+The {\em axiom polynomial} of a coercion over a distinguished variable $z$, $p(\cdot)$, returns a polynomial with natural number coefficients that can be compared
+to any other polynomial over $z$. The {\em coercion weight} of a coercion is defined as the function $w(\cdot)$ and 
+the {\em symmetry weight} of a coercion is defined with the function $sw(\cdot)$ in 
+         Figure~\ref{fig:metrics}. Unlike the polynomial and coercion weights of a coercion, 
+         $sw(\cdot)$ does take symmetry into account.
+Finally, we will also use the {\em number of coercion applications and coercion $\forall$-introductions}, denoted with $intros(\cdot)$ in what follows.
+
+Our termination argument comprises of the lexicographic left-to-right ordering of:
+\[  \mu(\cdot) = \langle p(\cdot),w(\cdot),intros(\cdot),sw(\cdot)\rangle \]
+We will show that each of the $\rsa{}$ reductions reduces this tuple.
+For this to be a valid termination argument for $(\longrightarrow)$ we need two more facts about 
+{\em each} component measure, namely that (i)~$(=)$ and $(<)$ are preserved under arbitrary contexts, 
+and (ii)~each component is invariant with respect to the associativity of $(;)$.
+
+\begin{lemma} If $\Delta \wfco \gamma_1 : \tau \psim \sigma$ and $\gamma_1 \approx \gamma_2$ modulo associativity 
+of $(;)$, then $p(\gamma_1) = p(\gamma_2)$, $w(\gamma_1) = w(\gamma_2)$, $intros(\gamma_1) = intros(\gamma_2)$, and $sw(\gamma_1) = sw(\gamma_2)$.
+\end{lemma} 
+\vspace{-10pt}\begin{proof} This is a simple inductive argument, the only interesting case is the case for 
+$p(\cdot)$ where the reader can calculate that $p(\gamma_1;(\gamma_2;\gamma_3)) = p((\gamma_1;\gamma_2);\gamma_3)$ and by induction we are done. 
+\end{proof}
+
+\begin{lemma} If $\Gamma,\Delta \wfco \gamma_i : \tau \psim \sigma$ (for $i=1,2$) and $p(\gamma_1) < p(\gamma_2)$ then 
+$p(\G[\gamma_1]) < p(\G[\gamma_2])$ for any $\G$ with $\Gamma \wfco \G[\gamma_i] : \phi \psim \phi'$.
+Similarly if we replace $(<)$ with $(=)$. 
+\end{lemma}
+\vspace{-10pt}\begin{proof} By induction on the shape of $\G$. The only interesting case is the transitivity case 
+again. Let $\G = \gamma ; \G'$. Then $p(\gamma;\G'[\gamma_1]) = p(\gamma) + p(\G'[\gamma_1]) + p(\gamma)\cdot p(\G'[\gamma_1])$ whereas 
+$p(\gamma;\G'[\gamma_2]) = p(\gamma) + p(\G'[\gamma_2]) + p(\gamma)\cdot p(\G'[\gamma_2])$. Now, either $p(\gamma) = 0$, in which case we are done
+by induction hypothesis for $\G'[\gamma_1]$ and $\G'[\gamma_2]$, or $p(\gamma) \neq 0$ in which case again induction 
+hypothesis gives us the result since we are multiplying $p(\G'[\gamma_1])$ and $p(\G'[\gamma_2])$ by the same polynomial.
+The interesting ``trick'' is that the polynomial for transitivity contains both the product 
+of the components {\em and} their sum (since product alone is not preserved by contexts!).
+\end{proof}
+\begin{lemma} If $\Gamma,\Delta \wfco \gamma_i : \tau \psim \sigma$ and $w(\gamma_1) < w(\gamma_2)$ then 
+$w(\G[\gamma_1]) < w(\G[\gamma_2])$ for any $\G$ with $\Gamma \wfco \G[\gamma_i] : \phi \psim \phi'$.
+Similarly if we replace $(<)$ with $(=)$.
+\end{lemma}
+
+\begin{lemma} If $\Gamma,\Delta \wfco \gamma_i : \tau \psim \sigma$ and $intros(\gamma_1) < intros(\gamma_2)$ then 
+$intros(\G[\gamma_1]) < intros(\G[\gamma_2])$ for any $\G$ with $\Gamma \wfco \G[\gamma_i] : \phi \psim \phi'$.
+Similarly if we replace $(<)$ with $(=)$. 
+\end{lemma}
+
+
+\begin{lemma} If $\Gamma,\Delta \wfco \gamma_i : \tau \psim \sigma$, $w(\gamma_1) \leq w(\gamma_2)$, and $sw(\gamma_1) < sw(\gamma_2)$ then 
+$sw(\G[\gamma_1]) < sw(\G[\gamma_2])$ for any $\G$ with $\Gamma \wfco \G[\gamma_i] : \phi \psim \phi'$.
+\end{lemma}
+\vspace{-10pt}\begin{proof} The only interesting case is when $\G = \sym{\G'}$ and hence we have that 
+$sw(\G[\gamma_1]) = sw(\sym{\G'[\gamma_1]}) = w(\G'[\gamma_1]) + sw(\G'[\gamma_1])$. 
+Similarly $sw(\G[\gamma_2]) = w(\G'[\gamma_2]) + sw(\G'[\gamma_2])$. By the precondition for the weights and induction 
+hypothesis we are done. The precondition on the weights is not restrictive, since 
+$w(\cdot)$ has higher precedence than $sw(\cdot)$ inside $\mu(\cdot)$.
+\end{proof}
+
+The conclusion is the following theorem.
+\begin{theorem}
+If $\gamma \approx \G[\gamma_1]$ modulo associativity of $(;)$ and $\Delta \wfco \gamma_1 : \sigma \psim \phi$, and 
+$\Delta \vdash \gamma_1 \rsa{} \gamma_2$ such that $\mu(\gamma_2) < \mu(\gamma_1)$, it is the case that $\mu(\G[\gamma_2]) < \mu(\gamma)$.
+\end{theorem}
+
+\begin{corollary} 
+$(\longrightarrow)$ terminates on well-formed coercions if each of the $\rsa{}$ transitions reduces $\mu(\cdot)$. 
+\end{corollary}
+
+Note that often the term rewrite literature requires similar
+conditions (preservation under contexts and associativity), but also
+{\em stability under substitution} (e.g. see~\cite{Baader:1998:TR:280474},
+Chapter 5). In our setting, variables are essentially treated as
+constants and this is the reason that we do not rely on stability
+under substitutions. For instance the rule \rulename{ReflElimR}
+$\Delta |- \gamma;\refl{\phi} \rsa{} \gamma$ is {\em not} expressed as
+$\Delta |- c;\refl{\phi} \rsa{} c$, as would be customary in a more
+traditional term-rewrite system presentation.
+
+We finally show that indeed each of the $\rsa{}$ steps reduces $\mu(\cdot)$.
+
+\begin{theorem}[Termination]
+If $\Delta \wfco \gamma_1 : \sigma \psim \phi$ and $\Delta \vdash \gamma_1 \rsa{} \gamma_2$ then $\mu(\gamma_2) < \mu(\gamma_1)$. 
+\end{theorem}
+\vspace{-10pt}\begin{proof}
+It is easy to see that the reflexivity rules, the symmetry rules, the reduction rules, and the 
+$\eta$-rules preserve or reduce the polynomial component $p(\cdot)$. The same is true for the push rules 
+but the proof is slightly more interesting. Let us consider \rulename{PushApp}, and let us write
+$p_i$ for $p(\gamma_i)$. We have that 
+$p((\gamma_1\;\gamma_2);(\gamma_3\;\gamma_4)) = p_1 + p_2 + p_3 + p_4 + p_1p_3 + p_2p_3 + p_1p_4 + p_2p_4$. On 
+the other hand $p((\gamma_1;\gamma_3)\;(\gamma_2;\gamma_4)) = p_1 + p_3 + p_1p_3 + p_2 + p_4 + p_2p_4$ which is a smaller
+or equal polynomial than the left-hand side polynomial.
+Rule \rulename{PushAll} is easier. Rules \rulename{PushInst} and \rulename{PushNth} have exactly the same polynomials on the left-hand and 
+the right-hand side so they are ok. Rules \rulename{VarSym} and \rulename{SymVar} reduce $p(\cdot)$. 
+The interesting bit is with rules \rulename{AxSym}, \rulename{SymAx}, and \rulename{AxSuckR/L} 
+and \rulename{SymAxSuckR/L}. We will only show the cases for \rulename{AxSym} and \rulename{AxSuckR} 
+as the rest of the rules involve very similar calculations: 
+\begin{itemize*}
+  \item Case \rulename{SymAx}. We will use the notational convention $\ps_1$ for $p(\gammas_1)$ (a vector of polynomials)
+   and similarly $\ps_2$ for $p(\gammas_2)$. Then the left-hand side polynomial is:
+   \[\begin{array}{l} 
+      (z\Sigma\ps_1{+}z{+}1) + (z\Sigma\ps_2{+}z{+}1) + \\ 
+      \quad\quad\quad\quad\quad\quad (z\Sigma\ps_1{+}z{+}1)\cdot(z\Sigma\ps_2{+}z{+}1) = \\
+      (z^2{+}2z)\Sigma\ps_1 + (z^2{+}2z)\Sigma\ps_2 + z^2\Sigma\ps_1\Sigma\ps_2 + (z^2{+}4z{+}3)
+   \end{array}\] 
+  For the right-hand side polynomial we know that each $\gamma_{1i};\sym{\gamma_{2i}}$ will have polynomial
+  $p_{1i}+p_{2i}+p_{1i} p_{2i}$ and it cannot be repeated inside the lifted type more than a finite
+  number of times (bounded by the maximum number of occurrences of a type variable from $\as$ in
+  type $\tau$), call it $k$. Hence the right-hand side polynomial is smaller or equal to: 
+  \[\begin{array}{ll}
+       k\Sigma\ps_1 + k\Sigma\ps_2 + k\Sigma(p_{1i}p_{2i}) \leq 
+       k\Sigma\ps_1 + k\Sigma\ps_2 + k\Sigma\ps_1\Sigma\ps_2   
+  \end{array}\] 
+  But that polynomial is strictly smaller than the left-hand side polynomial, hence we are done.
+  \item Case \rulename{AxSuckR}. In this case the left-hand side polynomial is going to be greater
+        or equal to (because of reflexivity inside $\delta$ and because some of the $\as$ variables may 
+        appear more than once inside $\upsilon$ it is not exactly equal to) the following: 
+        \[\begin{array}{l} 
+           (z\Sigma\ps_1+z+1) + \Sigma\ps_2 + (z\Sigma\ps_1+z+1)\Sigma\ps2 = \\ 
+           \quad\quad\quad\quad\quad z\Sigma\ps_1\Sigma\ps_2 + z\Sigma\ps_1 + z\Sigma\ps_2 + 2\Sigma\ps_2 + z + 1 
+          \end{array}\]
+        On the other hand, the right-hand side polynomial is: 
+$$
+           z\Sigma(p_{1i}+p_{2i}+p_{1i}p_{2i})+z+1 \, \leq \,   
+           z\Sigma\ps_1+z\Sigma\ps_2+z\Sigma\ps_1\Sigma\ps_2+z+1
+$$
+        We observe that there is a difference of $2\Sigma\ps_2$, but we know that 
+        $\delta$ satisfies $nontriv(\delta)$, and consequently there must exist some variable or 
+        axiom application inside one of the $\gammas_2$. Therefore, $\Sigma\ps_2$ is 
+        {\em non-zero} and the case is finished.
+\end{itemize*}
+It is the arbitrary copying of coercions $\gammas_1$ and $\gammas_2$ in rules \rulename{AxSym} and \rulename{SymAx} 
+that prevents simpler measures that only involve summation of coercions for axioms or transitivity. Other reasonable 
+measures such as the height of transitivity uses from the leaves would not be preserved from contexts, 
+due to \rulename{AxSym} again.
+
+So far we've shown that all rules but the axiom rules preserve the polynomials, and the axiom rules 
+reduce them. We next show that in the remaining rules, some other component reduces, lexicographically.
+Reflexivity rules reduce $w(\cdot)$. Symmetry rules preserve $w(\cdot)$ and $intros(\cdot)$ 
+but reduce $sw(\cdot)$. Reduction rules and $\eta$-rules reduce $w(\cdot)$. 
+Rules \rulename{PushApp} and \rulename{PushAll} preserve or reduce $w(\cdot)$ but certainly 
+reduce $intros(\cdot)$. Rules \rulename{PushInst} and \rulename{PushNth} reduce $w(\cdot)$. 
+\end{proof}
+We conclude that $(\longrightarrow)$ terminates.
+
+\subsection{Confluence}
+
+Due to the arbitrary types of axioms and coercion variables in the context, we do not expect 
+confluence to be true. Here is a short example that demonstrates the lack of 
+confluence; assume we have the following in our context:
+\[\begin{array}{lcl} 
+C_1 \, (a{:}\star \to \star) : F\;a \psim a & \\ 
+C_2 \, (a{:}\star \to \star) : G\;a \psim a & 
+\end{array}\]
+Consider the coercion:
+\[      (C_1\;\refl{\sigma});\sym{(C_2\;\refl{\sigma})}  \] 
+of type $F\;\sigma \psim G\;\sigma$. In one reduction possibility, using 
+rule \rulename{AxSuckR}, we may get 
+\[ C_1\;(\sym{(C_2\;\refl{\sigma})}) \] 
+In another possibility, using \rulename{SymAxSuckL}, we 
+may get 
+\[ \sym{(C_2\;(\sym{(C_1\;\refl{\sigma})}))} \]
+Although the two normal forms are different, it is unclear if one of them is ``better'' than the other. 
+
+Despite this drawback, confluence or syntactic characterization of normal forms is, for our purposes, 
+of secondary importance (if possible at all for open coercions in such an under-constrained problem!), 
+since we never reduce coercions for the purpose of comparing their normal forms. That said, we acknowledge 
+that experimental results may vary with respect to the actual evaluation strategy, but we do not expect 
+wild variations.
+
+
+%% \begin{array}{l} 
+%% \nth{2}{(
+%%          \inst{(\inst{(\sym{N\;\refl{Maybe}};C\;\sym{TF};N\;(F\;()))}{x_{a}})}{y_{a}})} \\ 
+%% \rightsquigarrow 
+
+
+
+
+%% axiom  N a :: C a ~ forall xy. a x -> a y
+%% axiom  TF   :: F () ~ Maybe
+%%   nth 2 
+%%     (inst
+%%        (inst
+%%           (trans
+%%              (sym 
+%%                 (N Maybe)
+%%              ) 
+%%              (trans (C (sym TF()))
+%%                     (N (F ()))
+%%              ))
+%%           xabL)
+%%        yabM)
+%%   :: Maybe yabM  ~ F () yabM
+%% Here is another motivating example from GHC: \dv{Add example.}
+
+
+
+
+
+
+
+%% \section{Discussion}\label{s:discuss}
+%% \dv{Is there anything we want to write here, at all?}
+
+\section{Related and future work}\label{s:related}
+
+%% \subsection{Coercion erasure}
+%% There is a substantial volume of related work on proof erasure in the
+%% context of dependent type theory. Our method for sound, runtime, but
+%% zero-cost equality proof terms lies in the middle ground between two
+%% other general methodologies.
+
+%% \paragraph{Type-based erasure}
+%%  On the one hand, Coq~\cite{coq} uses a {\em
+%% type-based} erasure process by introducing a special universe for
+%% propositions, {\em Prop}.  Terms whose type lives in {\em
+%% Prop} are erased even when they are applications of functions
+%% (lemmas) to computational terms. This is sound since in Coq
+%% the computation language is also strongly normalizing. As we have seen,
+%% this is not sound in FC. 
+%% \paragraph{Irrelevance-based erasure}
+%% On the other hand, {\em irrelevance-based} erasure is another
+%% methodology proposed in the context of pure type systems and type
+%% theory. In the context of Epigram, \cite{DBLP:conf/types/BradyMM03} present an erasure
+%% technique where term-level indices of inductive types can be erased
+%% even when they are deconstructed inside the body of a function, since
+%% values of the indexed inductive datatype will be simultaneously
+%% deconstructed and hence the indices are irrelevant for the
+%% computation. In the Agda language~\cite{norell:thesis} there exist plans to adopt a similar 
+%% irrelevance-based erasure strategy. Other related work~\cite{mishra:erasure,abel:fossacs11} 
+%% proposes erasure in the context of PTSs guided with lightweight programmer annotations.
+
+%% Finally, our approach of separating the ``computational part'' of a 
+%% proof, which always has to run before we get to a zero-cost ``logical part''
+%% is reminiscent of the separation that A-normal forms introduce in refinement 
+%% type systems, for instance~\cite{bengtson+:f7}. It is interesting future work to determine
+%% whether our treatment of coercions is also applicable
+%% to types and hopefully paves the way towards full-spectrum dependent types. 
+%% \subsection{Coercion simplification}
+
+Traditionally, work on proof theory is concerned with proof normalization theorems, namely cut-elimination.
+Category and proof theory has studied the commutativity of diagrams in {\em monoidal
+categories}~\cite{MacLaneS:catwm}, establishing coherence theorems. In our setting Lemma~\ref{lem:coherence}
+expresses such a result: any coercion that does not include axioms or free coercion variables is equivalent
+to reflexivity. More work on proof theory is concerned with cut-elimination theorems -- in our setting 
+eliminating transitivity completely is plainly impossible due to the presence of axioms. 
+Recent work on {\em 2-dimensional type theory}~\cite{Licata:2012:CTT:2103656.2103697} provides an equivalence 
+relation on equality proofs (and terms), 
+which suffices to establish that types enjoy canonical forms. Although that work does not provide an algorithm
+for checking equivalence (this is harder to do because of actual computation embedded with isomorphisms), that
+definition shares many rules with our normalization algorithm. Finally there is a large literature in associative
+commutative rewrite systems~\cite{Dershowitz:1983:AR:1623516.1623594,Bachmair:1985:TOA:6947.6948}.
+
+To our knowledge, most programming languages literature on coercions is not concerned with coercion 
+simplification but rather with inferring the placement of coercions in 
+source-level programs. Some recent examples are~\cite{luo:coercions} and~\cite{Swamy:2009:TTC:1596550.1596598}. 
+A comprehensive study of coercions {\em and their normalization} in programming languages
+is that of~\cite{henglein:coercions}, motivated by coercion placement in a language with
+{\em type dynamic}. Henglein's coercion language differs to ours in that (i)~coercions there 
+are not symmetric, (ii)~do not involve polymorphic axiom schemes and (iii)~may have computational significance.
+Unlike us, Henglein is concerned with characterizations of minimal coercions and confluence, 
+fixes an equational theory of coercions, and presents a normalization algorithm for that equational theory. 
+In our case, in the absence of a denotational semantics for System FC and its coercions, 
+such an axiomatization would be no more ad-hoc than the algorithm and 
+hence not particularly useful: for instance we could consider adding type-directed
+equations like $\Delta \vdash \gamma \rsa{} \refl{\tau}$ when $\Delta \wfco \gamma : \tau \psim \tau$, or other equations 
+that only hold in consistent or confluent axiom sets. It is certainly an 
+interesting direction for future work to determine whether 
+there even exists a maximal syntactic axiomatization of 
+equalities between coercions with respect to some denotational semantics 
+of System FC.
+
+In the space of typed intermediate languages, {\sf xMLF}\cite{Remy-Yakobowski:xmlf} is
+a calculus with coercions that capture {\em instantiation} instead of equality, and which serves 
+as target for the {\sf MLF} language. Although the authors are not 
+directly concerned with normalization as part of an intermediate 
+language simplifier, their translation of the graph-based instantiation 
+witnesses does produce {\sf xMLF} normal proofs.
+
+Finally, another future work direction would be to 
+determine whether we can encode coercions as $\lambda$-terms, and derive coercion 
+simplification by normalization in some suitable $\lambda$-calculus.
+
+%% \dv{Related work seems a bit thin at the moment.}
+
+\paragraph*{Acknowledgments}
+Thanks to Tom Schrijvers for early discussions 
+and for contributing a first implementation.  We would particularly
+like to thank Thomas Str\"{o}der for his insightful and detailed feedback
+in the run-up to submitting the final paper.
+
+\bibliographystyle{plain}
+\bibliography{fc-normalization-rta}
+
+\end{document}

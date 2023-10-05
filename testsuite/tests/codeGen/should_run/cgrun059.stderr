@@ -1,0 +1,3 @@
+cgrun059: Error: File not found
+CallStack (from HasCallStack):
+  error, called at cgrun059.hs:12:28 in main:Main

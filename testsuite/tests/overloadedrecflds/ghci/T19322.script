@@ -1,0 +1,5 @@
+:set -XTypeApplications -XDataKinds
+import GHC.Records
+data X = X { name :: String }
+data Y = Y { name :: String }
+getField @"name" $ X "Tom"

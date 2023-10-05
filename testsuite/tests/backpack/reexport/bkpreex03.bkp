@@ -1,0 +1,7 @@
+unit p where
+    module M1 where
+        data M = M
+    module M2 where
+        data M = M
+    signature A(module A, M) where
+        import M1

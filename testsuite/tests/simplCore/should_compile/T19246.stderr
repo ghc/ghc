@@ -1,0 +1,11 @@
+
+==================== Tidy Core rules ====================
+
+
+
+==================== Tidy Core rules ====================
+"SPEC/T19246 $wf @Int" [2]
+    forall ($dOrd :: Ord Int). $wf @Int $dOrd = $s$wf
+"USPEC f @Int" [2] forall ($dOrd :: Ord Int). f @Int $dOrd = $sf
+
+

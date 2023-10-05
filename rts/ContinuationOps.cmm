@@ -1,0 +1,234 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 2022
+ *
+ * Continuation support
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/GHC/Cmm/Parser.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+import CLOSURE ghczminternal_ControlziExceptionziBase_noMatchingContinuationPrompt_closure;
+#if !defined(UnregisterisedCompiler)
+import CLOSURE ALLOC_RTS_ctr;
+import CLOSURE ALLOC_RTS_tot;
+import CLOSURE ENT_CONTINUATION_ctr;
+import CLOSURE HEAP_CHK_ctr;
+import CLOSURE RtsFlags;
+import CLOSURE SLOW_CALL_fast_pv_ctr;
+import CLOSURE SLOW_CALL_fast_v_ctr;
+import CLOSURE STK_CHK_ctr;
+import CLOSURE UNKNOWN_CALL_ctr;import CLOSURE stg_PROMPT_TAG_info;
+import CLOSURE stg_ap_pv_info;
+import CLOSURE stg_ap_v_info;
+import CLOSURE stg_maskAsyncExceptionszh_ret_info;
+import CLOSURE stg_maskUninterruptiblezh_ret_info;
+import CLOSURE stg_prompt_frame_info;
+import CLOSURE stg_unmaskAsyncExceptionszh_ret_info;
+#endif
+
+/* --------------------------------------------------------------------------
+                         Prompts and prompt tags
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_PROMPT_TAG,0,0,PRIM,"PROMPT_TAG","PROMPT_TAG")
+{ foreign "C" barf("PROMPT_TAG object (%p) entered!", R1) never returns; }
+
+stg_newPromptTagzh()
+{
+  W_ tag;
+
+  ALLOC_PRIM_(SIZEOF_StgHeader, stg_newPromptTagzh);
+  tag = Hp - SIZEOF_StgHeader + WDS(1);
+  SET_HDR(tag,stg_PROMPT_TAG_info,CCCS);
+
+  return (tag);
+}
+
+#define PROMPT_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,tag) \
+  w_ info_ptr,                                        \
+  PROF_HDR_FIELDS(w_,p1,p2)                           \
+  p_ tag
+
+INFO_TABLE_RET(stg_prompt_frame, RET_SMALL, PROMPT_FRAME_FIELDS(W_,P_, info_ptr, p1, p2, tag /* :: PromptTag# a */))
+  return (P_ ret /* :: a */)
+{
+  return (ret);
+}
+
+// see Note [Continuations overview] in Continuation.c
+stg_promptzh(P_ tag /* :: PromptTag# a */, P_ io /* :: IO a */)
+{
+  STK_CHK_GEN();
+  TICK_UNKNOWN_CALL();
+  TICK_SLOW_CALL_fast_v();
+  jump stg_ap_v_fast
+    (PROMPT_FRAME_FIELDS(,,stg_prompt_frame_info, CCCS, 0, tag))
+    (io);
+}
+
+/* --------------------------------------------------------------------------
+                          Continuation capture
+   -------------------------------------------------------------------------- */
+
+// see Note [Continuations overview] in Continuation.c
+stg_control0zh(P_ tag /* :: PromptTag# a */, P_ f /* :: (IO b -> IO a) -> IO a */)
+{
+  // We receive two arguments, so we need to use a high-level Cmm entrypoint to
+  // receive them with the platform-specific calling convention, but we just
+  // jump to `stg_control0zh_ll` immediately, since we need to be in low-level
+  // Cmm to manipulate the stack.
+  R1 = tag;
+  R2 = f;
+  jump stg_control0zh_ll [R1, R2];
+}
+
+// see Note [Continuations overview] in Continuation.c
+stg_control0zh_ll // explicit stack
+{
+  P_ tag  /* :: PromptTag# a */,
+     f    /* :: (IO b -> IO a) -> IO a */,
+     cont /* :: IO b -> IO a */;
+  tag = R1;
+  f = R2;
+
+  SAVE_THREAD_STATE();
+  (cont) = ccall captureContinuationAndAbort(MyCapability() "ptr",
+                                             CurrentTSO "ptr",
+                                             tag);
+  LOAD_THREAD_STATE();
+
+  // see Note [When capturing the continuation fails] in Continuation.c
+  if (cont == NULL) (likely: False) {
+    jump stg_raisezh(ghczminternal_ControlziExceptionziBase_noMatchingContinuationPrompt_closure);
+  }
+
+  W_ apply_mask_frame;
+  apply_mask_frame = StgContinuation_apply_mask_frame(cont);
+
+  // The stack has been updated, so it’s time to apply the input function,
+  // passing the captured continuation and a RealWorld token as arguments.
+  TICK_UNKNOWN_CALL();
+  TICK_SLOW_CALL_fast_pv();
+
+  // If `apply_mask_frame` is NULL, that means the captured continuation doesn’t
+  // make any adjustments to the async exception masking state, which means we
+  // don’t have any adjustments to undo, either. Therefore, we can just apply
+  // the function directly.
+  if (apply_mask_frame == NULL) {
+    Sp_adj(-2);
+    Sp(1) = cont;
+    R1 = f;
+    jump RET_LBL(stg_ap_pv) [R1];
+  }
+
+  // Otherwise, the continuation did adjust the masking state, so we have to
+  // undo it before resuming execution.
+  //
+  // Rather than deal with updating the state ourselves, we return to the
+  // relevant unmask frame (defined in Exception.cmm) that happens to be at the
+  // bottom of the captured continuation (see Note [Continuations and async
+  // exception masking] in Continuation.c for all the details).
+  //
+  // We start by extracting the unmask frame’s info table pointer from the chunk
+  // of captured stack.
+  P_ untagged_cont;
+  W_ cont_stack, mask_frame_offset, mask_frame;
+  untagged_cont = UNTAG(cont);
+  cont_stack = untagged_cont + SIZEOF_StgHeader + OFFSET_StgContinuation_stack;
+  mask_frame_offset = StgContinuation_mask_frame_offset(untagged_cont);
+  mask_frame = W_[cont_stack + WDS(mask_frame_offset)];
+
+  // Now we have the relevant info table to return to in `mask_frame`, so we
+  // just set up the stack to apply the function when the unmask frame returns
+  // and jump to the frame’s entry code.
+  Sp_adj(-3); // Note -3, not -2, because `mask_frame` will
+              // try to pop itself off the stack when it returns!
+  Sp(1) = stg_ap_pv_info;
+  Sp(2) = cont;
+  R1 = f;
+  jump %ENTRY_CODE(mask_frame) [R1];
+}
+
+/* --------------------------------------------------------------------------
+                           Continuation restore
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_FUN(stg_CONTINUATION,0,0,CONTINUATION,"CONTINUATION","CONTINUATION",2,ARG_P)
+  (P_ cont /* :: IO b -> IO a */, P_ io /* :: IO b */)
+{
+  // We receive two arguments, so we need to use a high-level Cmm entrypoint to
+  // receive them with the platform-specific calling convention, but we just
+  // jump to `stg_CONTINUATION_apply` immediately, since we need to be in
+  // low-level Cmm to manipulate the stack.
+  R1 = UNTAG(cont);
+  R2 = io;
+  jump stg_CONTINUATION_apply [R1, R2];
+}
+
+// see Note [Continuations overview] in Continuation.c
+stg_CONTINUATION_apply // explicit stack
+{
+  W_ _unused;
+  P_ cont, io;
+  cont = R1;
+  io = R2;
+
+  IF_DEBUG(sanity, (_unused) = ccall checkClosure(cont "ptr"));
+
+  W_ new_stack_words, apply_mask_frame, mask_frame_offset;
+  new_stack_words = StgContinuation_stack_size(cont);
+  apply_mask_frame = StgContinuation_apply_mask_frame(cont);
+  mask_frame_offset = StgContinuation_mask_frame_offset(cont);
+
+  // Make sure we have enough space to restore the stack.
+  STK_CHK_PP_LL(WDS(new_stack_words), stg_CONTINUATION_apply, cont, io);
+
+  TICK_ENT_CONTINUATION();
+  LDV_ENTER(cont);
+#if defined(PROFILING)
+  ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(cont) "ptr");
+#endif
+
+  // Restore the stack.
+  W_ p;
+  p = cont + SIZEOF_StgHeader + OFFSET_StgContinuation_stack;
+  Sp_adj(-new_stack_words);
+  prim %memcpy(Sp, p, WDS(new_stack_words), SIZEOF_W);
+
+  TICK_UNKNOWN_CALL();
+  TICK_SLOW_CALL_fast_v();
+
+  // If `apply_mask_frame` is NULL, there’s no need to adjust the async
+  // exception masking state, so just apply the argument directly.
+  if (apply_mask_frame == NULL) {
+    R1 = io;
+    jump stg_ap_v_fast [R1];
+  }
+
+  // Otherwise, we need to update the masking state, but before we do, we also
+  // need to update the unmask frame at the bottom of the restored chunk of
+  // stack so that it returns the masking state to whatever it was before the
+  // continuation was applied (see also Note [Continuations and async exception
+  // masking] in Continuation.c).
+  if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
+    Sp(mask_frame_offset) = stg_unmaskAsyncExceptionszh_ret_info;
+  } else {
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
+      Sp(mask_frame_offset) = stg_maskUninterruptiblezh_ret_info;
+    } else {
+      Sp(mask_frame_offset) = stg_maskAsyncExceptionszh_ret_info;
+    }
+  }
+
+  // Now we just set up the stack so that `apply_mask_frame` will apply `io`
+  // when it returns and jump to it.
+  Sp_adj(-2);
+  Sp(1) = stg_ap_v_info;
+  R1 = io;
+  jump %ENTRY_CODE(apply_mask_frame) [R1];
+}

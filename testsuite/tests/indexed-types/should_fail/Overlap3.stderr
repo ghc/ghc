@@ -1,0 +1,4 @@
+
+Overlap3.hs:8:1: [GHC-06207]
+    Illegal instance for closed family ‘F’
+    In the type instance declaration for ‘F’

@@ -1,0 +1,6 @@
+
+LinearRole.hs:12:7: error: [GHC-18872]
+    • Couldn't match type ‘One’ with ‘Many’
+        arising from a use of ‘coerce’
+    • In the expression: coerce x
+      In an equation for ‘f’: f x = coerce x

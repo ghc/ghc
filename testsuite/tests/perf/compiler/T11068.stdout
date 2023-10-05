@@ -1,0 +1,160 @@
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                       `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+                           `cast` (GHC.Generics.N:M1[0]
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.L1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+      ((GHC.Generics.U1 @(*) @GHC.Types.Any)
+       `cast` (Sym (GHC.Generics.N:M1[0]
+  = GHC.Generics.R1
+  = GHC.Generics.R1
+  = GHC.Generics.R1

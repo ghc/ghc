@@ -1,0 +1,11 @@
+:l T21088
+:type foo
+:type bar
+:type baz
+:type quux
+
+:set -fprint-explicit-kinds -fprint-explicit-runtime-reps -fprint-explicit-foralls
+:type foo
+:type bar
+:type baz
+:type quux

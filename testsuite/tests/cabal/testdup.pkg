@@ -1,0 +1,6 @@
+name: testdup
+version: 1.0
+id: testdup-1.0-XXX
+key: testdup-1.0-XXX
+license: BSD3
+depends: testpkg-1.2.3.4-XXX testpkg-1.2.3.4-XXX

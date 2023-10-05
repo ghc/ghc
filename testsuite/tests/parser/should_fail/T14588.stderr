@@ -1,0 +1,5 @@
+
+T14588.hs:4:19: error: [GHC-79767]
+    Illegal bang-pattern
+    !x
+    Suggested fix: Perhaps you intended to use BangPatterns

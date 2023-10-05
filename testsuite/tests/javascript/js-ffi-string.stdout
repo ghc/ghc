@@ -1,0 +1,21 @@
+Does JS `String.fromCodePoint` decode to the expected UTF-16 values? True
+abc😊
+abc😊
+
+Does `GHC.JS.fromJSString` convert the JavaScript literal string correctly? True
+abc😊
+abc😊
+
+Does `GHC.JS.toJSString` convert the Haskell-defined string correctly? True
+abc😊
+abc😊
+
+Do values survive the Haskell -> JavaScript -> Haskell round-trip? True
+abc😊
+abc😊
+
+Do values survive the JavaScript -> Haskell -> JavaScript round-trip? True
+abc😊
+abc😊
+
+Does the empty string survive the Haskell -> JavaScript -> Haskell round-trip? True

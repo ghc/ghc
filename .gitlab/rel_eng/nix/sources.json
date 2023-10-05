@@ -1,0 +1,68 @@
+{
+    "binutils-gdb": {
+        "branch": "master",
+        "repo": "https://sourceware.org/git/binutils-gdb.git",
+        "rev": "49c843e6d2d0577200e7c1d2d02855f21a3a9dde",
+        "type": "git"
+    },
+    "gdb-walkers": {
+        "branch": "master",
+        "description": "Bring mdb walkers to gdb, also add other helpful commands.",
+        "homepage": "",
+        "owner": "hardenedapple",
+        "repo": "gdb-walkers",
+        "rev": "c0701c4c87852bd09e21ca313c48dd4a649cfd0d",
+        "sha256": "1sd61a90lg8bkddl8lp15qady1wvbjmhjgm0d3lb813nwimlka9y",
+        "type": "tarball",
+        "url": "https://github.com/hardenedapple/gdb-walkers/archive/c0701c4c87852bd09e21ca313c48dd4a649cfd0d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "niv": {
+        "branch": "master",
+        "description": "Easy dependency management for Nix projects",
+        "homepage": "https://github.com/nmattia/niv",
+        "owner": "nmattia",
+        "repo": "niv",
+        "rev": "82e5cd1ad3c387863f0545d7591512e76ab0fc41",
+        "sha256": "090l219mzc0gi33i3psgph6s2pwsc8qy4lyrqjdj4qzkvmaj65a7",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/niv/archive/82e5cd1ad3c387863f0545d7591512e76ab0fc41.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "nixos-22.11",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2d10e73416ec1449ef74aeac7faf2cf8c556ff5a",
+        "sha256": "00s89np0sqr3jxxp5h9nrpqy30fy4vsrmis6mmryrrmjqh09lpfv",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/2d10e73416ec1449ef74aeac7faf2cf8c556ff5a.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "processor-trace": {
+        "branch": "master",
+        "description": "libipt - an Intel(R) Processor Trace decoder library",
+        "homepage": "",
+        "owner": "01org",
+        "repo": "processor-trace",
+        "rev": "c848a85c3104e2f5780741f85de5c9e65476ece2",
+        "sha256": "1ml8g6pm2brlcqp90yvgc780xf64d6k2km7fiqs88wvhlwsl7vzf",
+        "type": "tarball",
+        "url": "https://github.com/01org/processor-trace/archive/c848a85c3104e2f5780741f85de5c9e65476ece2.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "rr": {
+        "branch": "master",
+        "description": "Record and Replay Framework",
+        "homepage": "http://rr-project.org/",
+        "owner": "rr-debugger",
+        "repo": "rr",
+        "rev": "e77b5f8ca4b360daffd31cf72cb6b093fa9e0b62",
+        "sha256": "sha256:1gxphqcv1yw2ffmjp0d2cv0mpccr00pf9jhf44rq57jqdsvlfn2c",
+        "type": "tarball",
+        "url": "https://github.com/rr-debugger/rr/archive/3f87444659d1f063397fabc7791ed3b13b15c798.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}

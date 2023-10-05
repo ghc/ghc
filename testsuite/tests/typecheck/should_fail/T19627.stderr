@@ -1,0 +1,45 @@
+
+T19627.hs:108:3: error: [GHC-05617]
+    • Could not deduce ‘Not (p0 a b) ~ Not (p a b)’
+      from the context: Lol p
+        bound by the type signature for:
+                   apartR :: forall (p :: * -> * -> *) a b.
+                             Lol p =>
+                             Not (p a b) -> b <#- a
+        at T19627.hs:108:3-34
+      Expected: Not (p a b) -> b <#- a
+        Actual: Not (p0 a b) -> b <#- a
+        NB: ‘Not’ is a non-injective type family
+        The type variable ‘p0’ is ambiguous
+    • In the ambiguity check for ‘apartR’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the class method:
+        apartR :: forall (p :: * -> * -> *) a b.
+                  Lol p =>
+                  Not (p a b) -> b <#- a
+      In the class declaration for ‘Lol’
+
+T19627.hs:108:3: error: [GHC-05617]
+    • Could not deduce ‘Not (Not (p0 a1 b1)) ~ p0 a1 b1’
+        arising from a superclass required to satisfy ‘Prop (p0 a1 b1)’,
+        arising from the head of a quantified constraint
+        arising from a superclass required to satisfy ‘Iso p0’,
+        arising from a superclass required to satisfy ‘Lol p0’,
+        arising from a type ambiguity check for
+        the type signature for ‘apartR’
+      from the context: Lol p
+        bound by the type signature for:
+                   apartR :: forall (p :: * -> * -> *) a b.
+                             Lol p =>
+                             Not (p a b) -> b <#- a
+        at T19627.hs:108:3-34
+      or from: (Prop a1, Prop b1)
+        bound by a quantified context at T19627.hs:108:3-34
+        The type variable ‘p0’ is ambiguous
+    • In the ambiguity check for ‘apartR’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the class method:
+        apartR :: forall (p :: * -> * -> *) a b.
+                  Lol p =>
+                  Not (p a b) -> b <#- a
+      In the class declaration for ‘Lol’

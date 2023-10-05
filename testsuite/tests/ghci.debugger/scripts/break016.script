@@ -1,0 +1,11 @@
+-- conditional breakpoints
+:l break016.hs
+:break 1 7
+-- this is one way to do conditional breakpoints.  It's a bit
+-- horrible: the :undef will complain the first time it is used.
+:def cond (\expr -> return (":undef __cond\n:def __cond (\\_ -> if "++expr++" then return \"\" else return \":cont\")\n:__cond"))
+:set stop 0 :cond (i < 3)
+-- this one continues:
+f 4
+-- this one stops:
+f 1

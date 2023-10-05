@@ -1,0 +1,10 @@
+
+T17775-viewpats-b.hs:7:9: error: [GHC-39999]
+    • No instance for ‘Eq a’ arising from a use of ‘==’
+      Possible fix:
+        add (Eq a) to the context of
+          the type signature for:
+            ex2 :: forall a. a -> a -> Int -> Eq a => Bool
+    • In the expression: (==)
+      In the expression: == x
+      In the pattern: (== x) -> result

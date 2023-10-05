@@ -1,0 +1,3 @@
+signature A where
+data T
+x :: Bool

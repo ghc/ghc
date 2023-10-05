@@ -1,0 +1,5 @@
+
+T14048b.hs:7:1: error: [GHC-55233]
+    • Data family has non-TYPE
+      and non-variable return kind ‘Constraint’
+    • In the data family declaration for ‘Foo’

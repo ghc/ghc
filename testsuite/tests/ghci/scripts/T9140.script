@@ -1,0 +1,5 @@
+:set -XUnboxedTuples
+let a = (# 1 #)
+let a = (# 1, 3 #)
+
+let a = (# 1, 3 #) :: (# Integer, Integer #)

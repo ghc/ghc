@@ -1,0 +1,13 @@
+{-# LANGUAGE Haskell2010 #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+unit user where
+    signature Map where
+        class Key k
+        instance Key String
+    module User where import Map
+unit ordmap where
+    module Map(Key) where type Key = Ord
+unit main where
+    dependency user[Map=ordmap:Map] (User as User.Ord)

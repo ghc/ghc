@@ -1,0 +1,2 @@
+import GHCi.ObjLink
+lookupClosure "blah"

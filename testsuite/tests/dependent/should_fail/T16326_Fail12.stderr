@@ -1,0 +1,8 @@
+
+T16326_Fail12.hs:6:8: error: [GHC-83865]
+    • Expected a constraint, but ‘forall a -> Show a’ is a type
+    • In the class declaration for ‘C’
+
+T16326_Fail12.hs:6:20: error: [GHC-83865]
+    • Expected a type, but ‘Show a’ is a constraint
+    • In the class declaration for ‘C’

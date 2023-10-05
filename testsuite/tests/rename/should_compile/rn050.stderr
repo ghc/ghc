@@ -1,0 +1,8 @@
+
+rn050.hs:13:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘op’ (imported from Rn050_A):
+    Deprecated: "Use bop instead"
+
+rn050.hs:13:10: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘C’ (imported from Rn050_A):
+    Deprecated: "Use D instead"

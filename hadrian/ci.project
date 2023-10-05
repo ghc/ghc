@@ -1,0 +1,4 @@
+packages: ./
+
+package hadrian
+    ghc-options: -Werror

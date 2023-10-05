@@ -1,0 +1,32 @@
+{-# LANGUAGE DefaultSignatures #-}
+{-# OPTIONS_GHC -O #-}
+unit p where
+    signature A where
+        class C a where
+            f :: a -> a
+        class D a where
+            g :: a
+            default g :: a
+        class E a where
+            h :: a -> String
+            default h :: Show a => a -> String
+    module B where
+        class X a where
+            i :: String -> a
+            default i :: Read a => String -> a
+            i = read
+        instance X Int where
+unit i where
+    module A where
+        class C a where
+            f :: a -> a
+            f x = x
+        class D a where
+            g :: a
+            g = undefined
+        class E a where
+            h :: a -> String
+            default h :: Show a => a -> String
+            h = show
+unit m where
+    dependency p[A=i:A]

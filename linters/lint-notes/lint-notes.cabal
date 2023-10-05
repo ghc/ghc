@@ -1,0 +1,21 @@
+cabal-version:      2.4
+name:               lint-notes
+version:            0.1.0.0
+synopsis:           A tool for querying and checking GHC Notes
+bug-reports: https://gitlab.haskell.org/ghc/ghc
+license: BSD-3-Clause
+author:             Ben Gamari
+maintainer:         ben@smart-cactus.org
+copyright:          (c) 2022 Ben Gamari
+
+executable lint-notes
+    main-is:          Main.hs
+    other-modules:    Notes
+    build-depends:    base >= 4 && < 5 ,
+                      bytestring,
+                      containers,
+                      directory,
+                      text,
+                      process,
+                      array
+    default-language: Haskell2010

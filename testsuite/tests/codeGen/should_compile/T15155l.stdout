@@ -1,0 +1,1 @@
+@T15155_b_closure = alias i8, i8* @T15155_a_closure

@@ -1,0 +1,2 @@
+import Control.Applicative
+fmap id id ()

@@ -1,0 +1,8 @@
+      case GHC.List.$wlenAcc @a (Foo.f2 @a) 0# of v { __DEFAULT ->
+      case reverse @a xs of ys { __DEFAULT ->
+      case GHC.List.$wlenAcc @a xs 0# of ww1 { __DEFAULT ->
+      case ys of {
+        [] -> case Foo.f1 @a of { GHC.Types.I# v1 -> GHC.Prim.+# ww1 v1 };
+          case GHC.List.$wlenAcc
+                 case Foo.$wf @a xs of ww [Occ=Once1] { __DEFAULT ->
+      case Foo.$wf @a xs of ww { __DEFAULT -> GHC.Types.I# ww }

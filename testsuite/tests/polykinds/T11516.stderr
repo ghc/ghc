@@ -1,0 +1,5 @@
+
+T11516.hs:12:16: error: [GHC-83865]
+    • Expected kind ‘i -> i -> *’, but ‘()’ has kind ‘*’
+    • In the first argument of ‘Varpi’, namely ‘()’
+      In the instance declaration for ‘Varpi (->) (->) (Either f)’

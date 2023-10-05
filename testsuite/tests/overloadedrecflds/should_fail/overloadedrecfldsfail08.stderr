@@ -1,0 +1,4 @@
+
+overloadedrecfldsfail08.hs:9:9: error: [GHC-14392]
+    Invalid record update.
+    No constructor in scope has all of the following fields: ‘x’, ‘y’

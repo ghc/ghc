@@ -1,0 +1,120 @@
+% $Id: denot.sty,v 1.2 2005/05/18 08:31:50 simonpj Exp $
+%
+% denot.tex - symbols for denotational semantics
+%
+% Last updated: <mbs@cse.ogi.edu 15-Mar-2001 15:56:35>
+%
+
+% Use plain italics instead of math italics in math mode
+\DeclareSymbolFont{plainletters}{OT1}{cmr}{m}{it}
+\DeclareMathSymbol{a}{\mathalpha}{plainletters}{"61}
+\DeclareMathSymbol{b}{\mathalpha}{plainletters}{"62}
+\DeclareMathSymbol{c}{\mathalpha}{plainletters}{"63}
+\DeclareMathSymbol{d}{\mathalpha}{plainletters}{"64}
+\DeclareMathSymbol{e}{\mathalpha}{plainletters}{"65}
+\DeclareMathSymbol{f}{\mathalpha}{plainletters}{"66}
+\DeclareMathSymbol{g}{\mathalpha}{plainletters}{"67}
+\DeclareMathSymbol{h}{\mathalpha}{plainletters}{"68}
+\DeclareMathSymbol{i}{\mathalpha}{plainletters}{"69}
+\DeclareMathSymbol{j}{\mathalpha}{plainletters}{"6A}
+\DeclareMathSymbol{k}{\mathalpha}{plainletters}{"6B}
+\DeclareMathSymbol{l}{\mathalpha}{plainletters}{"6C}
+\DeclareMathSymbol{m}{\mathalpha}{plainletters}{"6D}
+\DeclareMathSymbol{n}{\mathalpha}{plainletters}{"6E}
+\DeclareMathSymbol{o}{\mathalpha}{plainletters}{"6F}
+\DeclareMathSymbol{p}{\mathalpha}{plainletters}{"70}
+\DeclareMathSymbol{q}{\mathalpha}{plainletters}{"71}
+\DeclareMathSymbol{r}{\mathalpha}{plainletters}{"72}
+\DeclareMathSymbol{s}{\mathalpha}{plainletters}{"73}
+\DeclareMathSymbol{t}{\mathalpha}{plainletters}{"74}
+\DeclareMathSymbol{u}{\mathalpha}{plainletters}{"75}
+\DeclareMathSymbol{v}{\mathalpha}{plainletters}{"76}
+\DeclareMathSymbol{w}{\mathalpha}{plainletters}{"77}
+\DeclareMathSymbol{x}{\mathalpha}{plainletters}{"78}
+\DeclareMathSymbol{y}{\mathalpha}{plainletters}{"79}
+\DeclareMathSymbol{z}{\mathalpha}{plainletters}{"7A}
+\DeclareMathSymbol{A}{\mathalpha}{plainletters}{"41}
+\DeclareMathSymbol{B}{\mathalpha}{plainletters}{"42}
+\DeclareMathSymbol{C}{\mathalpha}{plainletters}{"43}
+\DeclareMathSymbol{D}{\mathalpha}{plainletters}{"44}
+\DeclareMathSymbol{E}{\mathalpha}{plainletters}{"45}
+\DeclareMathSymbol{F}{\mathalpha}{plainletters}{"46}
+\DeclareMathSymbol{G}{\mathalpha}{plainletters}{"47}
+\DeclareMathSymbol{H}{\mathalpha}{plainletters}{"48}
+\DeclareMathSymbol{I}{\mathalpha}{plainletters}{"49}
+\DeclareMathSymbol{J}{\mathalpha}{plainletters}{"4A}
+\DeclareMathSymbol{K}{\mathalpha}{plainletters}{"4B}
+\DeclareMathSymbol{L}{\mathalpha}{plainletters}{"4C}
+\DeclareMathSymbol{M}{\mathalpha}{plainletters}{"4D}
+\DeclareMathSymbol{N}{\mathalpha}{plainletters}{"4E}
+\DeclareMathSymbol{O}{\mathalpha}{plainletters}{"4F}
+\DeclareMathSymbol{P}{\mathalpha}{plainletters}{"50}
+\DeclareMathSymbol{Q}{\mathalpha}{plainletters}{"51}
+\DeclareMathSymbol{R}{\mathalpha}{plainletters}{"52}
+\DeclareMathSymbol{S}{\mathalpha}{plainletters}{"53}
+\DeclareMathSymbol{T}{\mathalpha}{plainletters}{"54}
+\DeclareMathSymbol{U}{\mathalpha}{plainletters}{"55}
+\DeclareMathSymbol{V}{\mathalpha}{plainletters}{"56}
+\DeclareMathSymbol{W}{\mathalpha}{plainletters}{"57}
+\DeclareMathSymbol{X}{\mathalpha}{plainletters}{"58}
+\DeclareMathSymbol{Y}{\mathalpha}{plainletters}{"59}
+\DeclareMathSymbol{Z}{\mathalpha}{plainletters}{"5A}
+
+\def\@myop#1{\mathop{\mathstrut{#1}}\nolimits}
+
+% \def\pset    {\@myop{\bbold P}}
+% \def\pset    {\@myop{\wp}}
+\def\pset       {\@myop{\cal P}}
+
+\def\lquote     {[\![}
+\def\rquote     {]\!]}
+\let\approx=    \cong
+\def\lnot       {\neg\;}
+\def\land       {\mathrel{\wedge}}
+\def\lor        {\mathrel{\vee}}
+\def\lxor       {\mathrel{\oplus}}
+\let\implies=   \Rightarrow
+\let\infers=    \Leftarrow
+\let\iff=       \Leftrightarrow
+\let\biim=      \leftrightarrow
+\let\fun=       \rightarrow
+%\def\sum        {\mathbin{+}}
+%\let\prod=     \times
+%\let\cross=    \times
+\let\bottom=    \perp
+
+\def\biglub     {\@myop{\bigsqcup}}
+\def\bigglb     {\mathop{\lower.1ex\hbox{\Large$\sqcap$}}}
+\def\join       {\mathbin{\sqcup}}
+\def\meet       {\mathbin{\sqcap}}
+\def\lub        {\mathop{\sqcup}}
+\def\glb        {\mathop{\sqcap}}
+\def\union      {\mathbin{\cup}}
+\def\inter      {\mathbin{\cap}}
+\def\bigunion   {\@myop{\bigcup}}
+\def\biginter   {\@myop{\bigcap}}
+\def\bigconcat  {\mathop{\text{\bf\large +\hspace*{-0.42em}+}}}
+\def\bigbigconcat{\mathop{\text{\bf\LARGE +\hspace*{-0.38em}+}}}
+
+\def\lset       {\mathopen{\{}}
+\def\rset       {\mathclose{\}}}
+\def\biglset    {\mathopen{\Bigl\}}}
+\def\bigrset    {\mathclose{\Bigr\}}}
+\def\power      {\mathbin{\uparrow}}
+\def\relset     {\@myop{\Re}}
+\def\entails    {\mathrel{\vdash}}
+\def\comp       {\mathbin{\circ}}
+\def\ccomp      {\mathbin{\bullet}}
+\def\seq        {\mathclose{\ast}}
+    
+\def\eqdef      {\overset{\text{\tiny def}}{=}}
+\def\eqq        {\overset{?}{=}}
+
+\def\set#1{\lset #1 \rset}
+\def\denot#1{[\![ #1 ]\!]}
+% \def\state#1#2{\langle #1 \mid #2 \rangle}
+
+% eof
+
+
+

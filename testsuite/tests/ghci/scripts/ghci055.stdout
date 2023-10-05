@@ -1,0 +1,5 @@
+*** Exception: Prelude.undefined
+CallStack (from HasCallStack):
+  undefined, called at <interactive>:1:7 in interactive:Ghci1
+x :: a = _
+y :: Int = 3

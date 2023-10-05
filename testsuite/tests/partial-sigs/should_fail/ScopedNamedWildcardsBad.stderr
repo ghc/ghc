@@ -1,0 +1,11 @@
+
+ScopedNamedWildcardsBad.hs:11:15: error: [GHC-83865]
+    • Couldn't match expected type ‘Bool’ with actual type ‘Char’
+    • In the first argument of ‘g’, namely ‘'x'’
+      In the expression: g 'x'
+      In the expression:
+        let
+          v = not x
+          g :: _a -> _a
+          g x = x
+        in (g 'x')

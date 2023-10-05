@@ -1,0 +1,57 @@
+	Wed Jul  6 01:06 2022 Time and Allocation Profiling Report  (Final)
+
+	   ioprof +RTS -hc -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =     130,792 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC                 %time %alloc
+
+CAF         GHC.IO.Handle.FD <entire-module>       0.0   26.6
+CAF         GHC.IO.Exception <entire-module>       0.0    1.0
+CAF         GHC.IO.Encoding  <entire-module>       0.0    2.3
+CAF         GHC.Exception    <entire-module>       0.0    3.0
+CAF         Main             <entire-module>       0.0    1.1
+main        Main             ioprof.hs:28:1-43     0.0    6.7
+errorM.\    Main             ioprof.hs:23:22-28    0.0   57.3
+
+
+                                                                                  individual      inherited
+COST CENTRE    MODULE                SRC                       no.     entries  %time %alloc   %time %alloc
+
+MAIN           MAIN                  <built-in>                131           0    0.0    0.5     0.0  100.0
+ CAF           Main                  <entire-module>           261           0    0.0    1.1     0.0    1.1
+  <*>          Main                  ioprof.hs:20:5-14         267           1    0.0    0.0     0.0    0.0
+  fmap         Main                  ioprof.hs:16:5-16         276           1    0.0    0.0     0.0    0.0
+  liftA2       Main                  ioprof.hs:18:10-26        265           1    0.0    0.0     0.0    0.0
+  main         Main                  ioprof.hs:28:1-43         262           1    0.0    0.0     0.0    0.0
+ CAF           GHC.Conc.Signal       <entire-module>           256           0    0.0    0.5     0.0    0.5
+ CAF           GHC.Conc.Sync         <entire-module>           254           0    0.0    0.5     0.0    0.5
+ CAF           GHC.Exception         <entire-module>           252           0    0.0    3.0     0.0    3.0
+ CAF           GHC.IO.Encoding       <entire-module>           243           0    0.0    2.3     0.0    2.3
+ CAF           GHC.IO.Encoding.Iconv <entire-module>           240           0    0.0    0.2     0.0    0.2
+ CAF           GHC.IO.Exception      <entire-module>           225           0    0.0    1.0     0.0    1.0
+ CAF           GHC.IO.Handle.FD      <entire-module>           219           0    0.0   26.6     0.0   26.6
+ CAF           GHC.Stack.CCS         <entire-module>           195           0    0.0    0.2     0.0    0.2
+ CAF           GHC.Weak.Finalize     <entire-module>           184           0    0.0    0.0     0.0    0.0
+ main          Main                  ioprof.hs:28:1-43         263           0    0.0    6.7     0.0   64.2
+  bar          Main                  ioprof.hs:31:1-20         264           1    0.0    0.1     0.0    0.2
+   foo         Main                  ioprof.hs:34:1-16         282           1    0.0    0.0     0.0    0.0
+    errorM     Main                  ioprof.hs:23:1-28         283           1    0.0    0.0     0.0    0.0
+   liftA2      Main                  ioprof.hs:18:10-26        266           0    0.0    0.1     0.0    0.1
+    <*>        Main                  ioprof.hs:20:5-14         268           0    0.0    0.0     0.0    0.0
+     >>=       Main                  ioprof.hs:(11,3)-(12,50)  269           1    0.0    0.0     0.0    0.0
+    fmap       Main                  ioprof.hs:16:5-16         277           0    0.0    0.0     0.0    0.0
+     >>=       Main                  ioprof.hs:(11,3)-(12,50)  278           1    0.0    0.0     0.0    0.0
+  runM         Main                  ioprof.hs:26:1-37         270           1    0.0    0.0     0.0   57.3
+   bar         Main                  ioprof.hs:31:1-20         271           0    0.0    0.0     0.0   57.3
+    foo        Main                  ioprof.hs:34:1-16         284           0    0.0    0.0     0.0   57.3
+     errorM    Main                  ioprof.hs:23:1-28         285           0    0.0    0.0     0.0   57.3
+      errorM.\ Main                  ioprof.hs:23:22-28        286           1    0.0   57.3     0.0   57.3
+    liftA2     Main                  ioprof.hs:18:10-26        272           0    0.0    0.0     0.0    0.0
+     <*>       Main                  ioprof.hs:20:5-14         273           0    0.0    0.0     0.0    0.0
+      >>=      Main                  ioprof.hs:(11,3)-(12,50)  274           0    0.0    0.0     0.0    0.0
+       >>=.\   Main                  ioprof.hs:(11,27)-(12,50) 275           1    0.0    0.0     0.0    0.0
+     fmap      Main                  ioprof.hs:16:5-16         279           0    0.0    0.0     0.0    0.0
+      >>=      Main                  ioprof.hs:(11,3)-(12,50)  280           0    0.0    0.0     0.0    0.0
+       >>=.\   Main                  ioprof.hs:(11,27)-(12,50) 281           1    0.0    0.0     0.0    0.0

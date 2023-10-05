@@ -1,0 +1,36 @@
+SIZE=1000
+MODULE=ManyAlternatives
+
+# Generates a module with a large number of alternatives that looks
+# like this:
+#
+#   module ManyAlternatives where
+#
+#   data A1000 = A0
+#     | A0001
+#     | A0002
+#     ...
+#     | A1000
+#
+#   f :: A -> Int
+#   f A0001 = 1990001
+#   f A0002 = 1990002
+#   ...
+#   f A1000 = 1991000
+#
+# The point of this test is to check if we don't regress on #14667 reintroducing
+# some code that's quadratic in the number of alternatives.
+
+echo "module $MODULE where" > $MODULE.hs
+echo >> $MODULE.hs
+echo "data A$SIZE = A0" >> $MODULE.hs
+i=1; while test $i -lt $SIZE; do
+  printf "  | A%03d\n" $i >> $MODULE.hs
+  i=$((i+1))
+done
+echo >> $MODULE.hs
+echo "f :: A$SIZE -> Int" >> $MODULE.hs
+i=1; while test $i -lt $SIZE; do
+  printf "f A%03d = 199%03d\n" $i $i >> $MODULE.hs
+  i=$((i+1))
+done

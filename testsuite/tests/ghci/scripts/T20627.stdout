@@ -1,0 +1,13 @@
+
+Type and Constraint unqualified:
+(->) :: Type -> Type -> Type
+Functor :: (Type -> Type) -> Constraint
+
+Type qualified, Constraint unqualified:
+(->) :: GHC.Types.Type -> GHC.Types.Type -> GHC.Types.Type
+Functor :: (GHC.Types.Type -> GHC.Types.Type) -> Constraint
+
+Type and Constraint qualified:
+(->) :: GHC.Types.Type -> GHC.Types.Type -> GHC.Types.Type
+Functor :: (GHC.Types.Type -> GHC.Types.Type)
+           -> GHC.Types.Constraint

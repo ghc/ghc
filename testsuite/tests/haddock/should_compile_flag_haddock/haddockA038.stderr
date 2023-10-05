@@ -1,0 +1,13 @@
+
+==================== Parser ====================
+module UnamedConstructorStrictFields where
+data A = A
+data B = B
+data Foo
+  = MkFoo -- | Unpacked strict field
+          {-# UNPACK #-} !A B
+data Bar
+  = -- | Unpacked strict field
+    {-# UNPACK #-} !A :%% B
+
+

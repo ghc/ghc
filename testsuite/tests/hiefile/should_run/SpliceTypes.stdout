@@ -1,0 +1,9 @@
+No types at (14,18)
+At (14,21), got type: Int -> T
+No types at (14,24)
+At (14,29), got type: Int -> Code m Int
+forall t (m :: * -> *). (Lift t, Quote m) => t -> Code m t
+forall (m :: * -> *). Quote m => Int -> Code m Int
+At (14,41), got type: T
+No types at (20,19)
+No types at (20,21)

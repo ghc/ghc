@@ -1,0 +1,2 @@
+unit p where
+    signature A (T) where

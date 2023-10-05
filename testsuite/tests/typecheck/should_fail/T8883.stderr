@@ -1,0 +1,8 @@
+
+T8883.hs:21:1: error: [GHC-80003]
+    • Non type-variable argument in the constraint: Functor (PF a)
+    • When checking the inferred type
+        fold :: forall {a} {b}.
+                (Functor (PF a), Regular a) =>
+                (PF a b -> b) -> a -> b
+    Suggested fix: Perhaps you intended to use FlexibleContexts

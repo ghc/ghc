@@ -1,0 +1,20 @@
+
+T22912.hs:17:16: error: [GHC-39999]
+    • Could not deduce ‘Implies c’
+        arising from the head of a quantified constraint
+        arising from a use of ‘go’
+      from the context: Exactly (Implies c)
+        bound by a quantified context at T22912.hs:17:16-17
+      Possible fix:
+        add (Implies c) to the context of
+          the type signature for:
+            anythingDict :: forall (c :: Constraint). Dict c
+        or If the constraint looks soluble from a superclass of the instance context,
+           read 'Undecidable instances and loopy superclasses' in the user manual
+    • In the expression: go
+      In an equation for ‘anythingDict’:
+          anythingDict
+            = go
+            where
+                go :: (Exactly (Implies c) => Implies c) => Dict c
+                go = Dict

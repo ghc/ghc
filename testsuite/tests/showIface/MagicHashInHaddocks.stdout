@@ -1,0 +1,72 @@
+docs:
+  Just module header:
+         Just text:
+                -- | 'foo#' `Bar##` `*##`
+              identifiers:
+                {MagicHashInHaddocks.hs:3:7-10}
+                foo#
+                {MagicHashInHaddocks.hs:3:14-18}
+                Bar##
+       declaration docs:
+         []
+       arg docs:
+         []
+       documentation structure:
+         avails:
+           [foo#]
+         avails:
+           [Bar##{Bar##}]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         MagicHash
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
+extensible fields:
+

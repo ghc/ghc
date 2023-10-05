@@ -1,0 +1,3 @@
+[1 of 3] Compiling B                ( b/B.hs, b/B.o )[b]
+[2 of 3] Compiling B                ( b2/B.hs, b2/B.o )[b2]
+[3 of 3] Compiling P                ( package-imports/P.hs, package-imports/P.o )[p]

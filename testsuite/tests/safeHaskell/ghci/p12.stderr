@@ -1,0 +1,12 @@
+unrecognised flag: -XNoSafe
+did you mean one of:
+  -XSafe
+
+unrecognised flag: -fno-package-trust
+did you mean one of:
+  -fpackage-trust
+
+
+<no location info>: error: [GHC-75165]
+    Data.ByteString: Can't be safely imported!
+    The package (bytestring-0.11.4.0) the module resides in isn't trusted.

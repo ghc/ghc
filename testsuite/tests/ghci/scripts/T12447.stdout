@@ -1,0 +1,3 @@
+deferEither @(_ ~ _)
+  :: Deferrable (w1 ~ w2) =>
+     proxy (w1 ~ w2) -> ((w1 ~ w2) => r) -> Either String r

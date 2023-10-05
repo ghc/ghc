@@ -1,0 +1,4 @@
+:set -XTypeFamilies
+type family A a
+type instance A Int = ()
+type instance A Int = Bool

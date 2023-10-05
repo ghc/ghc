@@ -1,0 +1,10 @@
+#if !defined(__GHC_LLVM_VERSION_H__)
+#define __GHC_LLVM_VERSION_H__
+
+/* The maximum supported LLVM version number */
+#undef sUPPORTED_LLVM_VERSION_MAX
+
+/* The minimum supported LLVM version number */
+#undef sUPPORTED_LLVM_VERSION_MIN
+
+#endif /* __GHC_LLVM_VERSION_H__ */

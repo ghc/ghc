@@ -1,0 +1,2 @@
+ghc-stage2: on the commandline: cannot use `--interactive' with `--print-libdir'
+Usage: For basic information, try the `--help' option.

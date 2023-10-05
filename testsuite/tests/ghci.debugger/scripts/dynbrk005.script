@@ -1,0 +1,13 @@
+-- TH generated code does not get instrumented
+
+:set -XTemplateHaskell
+:l dynbrk005
+:st normal_fn [1,2,3]
+:st
+:st
+:st
+:st
+:st
+:st
+:st
+:st

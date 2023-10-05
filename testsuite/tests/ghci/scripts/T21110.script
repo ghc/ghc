@@ -1,0 +1,7 @@
+:set -package ghc -package template-haskell
+:l T21110.hs
+:set -Wunused-packages
+-- Warning about not using template-haskell
+:r
+-- No warning
+:l T21110A.hs

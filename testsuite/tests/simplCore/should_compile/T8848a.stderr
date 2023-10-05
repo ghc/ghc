@@ -1,0 +1,6 @@
+
+==================== Tidy Core rules ====================
+"USPEC f @[Int] @_"
+    forall (@b) ($dOrd :: Ord [Int]). f @[Int] @b $dOrd = f_$sf @b
+
+

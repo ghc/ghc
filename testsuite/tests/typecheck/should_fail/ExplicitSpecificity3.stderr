@@ -1,0 +1,3 @@
+
+ExplicitSpecificity3.hs:5:17: error: [GHC-58481]
+    parse error on input ‘}’

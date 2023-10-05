@@ -1,0 +1,2 @@
+foo :: Int -> Int -> Int 	-- Defined at T6091.hs:5:1
+infixr 4 `foo`

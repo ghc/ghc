@@ -1,0 +1,14 @@
+
+T23739_fail_case.hs:7:8: error: [GHC-01928]
+    • Illegal term-level use of the type variable ‘t’
+    • bound at T23739_fail_case.hs:6:5
+    • In the expression: t
+      In the expression:
+        case t of
+          False -> "False"
+          True -> "True"
+      In an equation for ‘bad’:
+          bad t
+            = case t of
+                False -> "False"
+                True -> "True"

@@ -1,0 +1,13 @@
+
+Simple13.hs:17:17: error:
+    • Couldn't match type: F [F a]
+                     with: F a
+      Expected: a
+        Actual: [F a]
+      NB: ‘F’ is a non-injective type family
+    • In the second argument of ‘same’, namely ‘(mkf p)’
+      In the expression: same p (mkf p)
+      In an equation for ‘foo’: foo p = same p (mkf p)
+    • Relevant bindings include
+        p :: a (bound at Simple13.hs:17:5)
+        foo :: a -> a (bound at Simple13.hs:17:1)

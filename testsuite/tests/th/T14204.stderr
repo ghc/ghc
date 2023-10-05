@@ -1,0 +1,5 @@
+
+T14204.hs:8:34: [GHC-23800] error:
+    • Illegal static expression: static "wat"
+    • In the untyped splice: $(pure (StaticE (LitE (StringL "wat"))))
+    Suggested fix: Perhaps you intended to use StaticPointers

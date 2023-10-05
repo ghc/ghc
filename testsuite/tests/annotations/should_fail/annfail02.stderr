@@ -1,0 +1,9 @@
+
+annfail02.hs:6:9: error: [GHC-10173]
+    • No top-level binding for data constructor ‘Foo’ in this module
+    • In the annotation: {-# ANN Foo (1 :: Int) #-}
+
+annfail02.hs:7:14: error: [GHC-10173]
+    • No top-level binding for
+        type constructor or class ‘Bar’ in this module
+    • In the annotation: {-# ANN type Bar (2 :: Int) #-}

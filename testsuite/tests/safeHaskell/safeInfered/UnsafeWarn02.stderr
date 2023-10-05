@@ -1,0 +1,6 @@
+
+UnsafeWarn02.hs:3:17: warning: [-Wunsafe]
+    ‘UnsafeWarn02’ has been inferred as unsafe!
+    Reason:
+        UnsafeWarn02.hs:5:14::
+            -XTemplateHaskell is not allowed in Safe Haskell

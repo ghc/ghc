@@ -1,0 +1,52 @@
+
+T17340.hs:15:4: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘f’: f x = ...
+
+T17340.hs:19:4: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘g’: g x = ...
+
+T17340.hs:23:9: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘h’: h x = ...
+
+T17340.hs:27:4: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘k’: k _ = ...
+
+T17340.hs:31:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘t’: t !() True = ...
+
+T17340.hs:36:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘q’: q !True = ...
+
+T17340.hs:41:4: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘i’: i x = ...
+
+T17340.hs:41:8: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘i’: i !x | x = ...
+
+T17340.hs:47:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘w’: w (T2 _) True = ...
+
+T17340.hs:48:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘w’: w !_ True = ...
+
+T17340.hs:53:7: warning: [GHC-38520] [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘z’: z x = ...
+
+T17340.hs:53:11: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘z’: z t2 !x | T2 _ <- t2, x = ...
+
+T17340.hs:54:11: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘z’: z t2 !x | !_ <- t2, x = ...

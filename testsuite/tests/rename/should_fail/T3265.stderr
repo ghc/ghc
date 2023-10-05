@@ -1,0 +1,8 @@
+
+T3265.hs:8:8: error: [GHC-50649]
+    Illegal declaration of a type or class operator ‘:+:’
+    Suggested fix: Perhaps you intended to use TypeOperators
+
+T3265.hs:10:9: error: [GHC-50649]
+    Illegal declaration of a type or class operator ‘:*:’
+    Suggested fix: Perhaps you intended to use TypeOperators

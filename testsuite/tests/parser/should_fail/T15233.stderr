@@ -1,0 +1,9 @@
+
+T15233.hs:4:10: error: [GHC-39716]
+    Illegal fixity signature of built-in syntax: :
+
+T15233.hs:5:16: error: [GHC-39716]
+    Illegal deprecation of built-in syntax: :
+
+T15233.hs:9:10: error: [GHC-39716]
+    Illegal fixity signature of built-in syntax: ->

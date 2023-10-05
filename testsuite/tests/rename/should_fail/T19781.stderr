@@ -1,0 +1,3 @@
+
+T19781_A.hs-boot:4:1: error: [GHC-58195]
+    Illegal binding in an hs-boot file.

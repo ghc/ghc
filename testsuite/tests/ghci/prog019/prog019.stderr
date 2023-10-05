@@ -1,0 +1,8 @@
+
+B2.hs:3:1: error: [GHC-25277]
+    Parse error: module header, import declaration
+    or top-level declaration expected.
+
+D.hs:3:1: error: [GHC-25277]
+    Parse error: module header, import declaration
+    or top-level declaration expected.

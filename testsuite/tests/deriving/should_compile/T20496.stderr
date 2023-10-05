@@ -1,0 +1,36 @@
+rnd
+  instance Functor UhOh2 where
+    fmap _ z = case z of {}
+    (<$) _ z = case z of {}
+  
+  instance Foldable UhOh2 where foldMap _ z = mempty
+  
+  instance Traversable UhOh2 where traverse _ z = pure (case z of {})
+  
+  instance Functor UhOh where
+    fmap _ z = case z of {}
+    (<$) _ z = case z of {}
+  
+  instance Foldable UhOh where foldMap _ z = mempty
+  
+  instance Traversable UhOh where traverse _ z = pure (case z of {})
+  
+  instance Functor Trixie where fmap _ = GHC.Prim.coerce
+  
+  instance Foldable Trixie where foldMap _ _ = mempty
+  
+  instance Traversable Trixie where
+    traverse _ z = pure (GHC.Prim.coerce z)
+  
+  instance Functor T where
+    fmap f (MkT a1) = MkT (f a1)
+    (<$) z (MkT a1) = MkT z
+  
+  instance Foldable T where
+    foldr f z (MkT a1) = f a1 z
+    foldMap f (MkT a1) = f a1
+    null (MkT _) = False
+  
+  instance Traversable T where
+    traverse f (MkT a1) = fmap (\ b1 -> MkT b1) (f a1)
+

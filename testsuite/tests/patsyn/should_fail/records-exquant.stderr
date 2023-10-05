@@ -1,0 +1,6 @@
+
+records-exquant.hs:8:7: error: [GHC-55876]
+    • Cannot use record selector ‘a’ as a function due to escaped type variables
+    • In the expression: a (Showable True)
+      In an equation for ‘qux’: qux = a (Showable True)
+    Suggested fix: Use pattern-matching syntax instead

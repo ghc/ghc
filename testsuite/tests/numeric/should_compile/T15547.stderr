@@ -1,0 +1,31 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 36, types: 100, coercions: 56, joins: 0/0}
+
+nat2Word#
+  = \ @n $dKnownNat _ ->
+      naturalToWord# ($dKnownNat `cast` <Co:5> :: ...)
+
+foo = \ _ -> 18##
+
+fd
+  = \ @n $dKnownNat _ ->
+      naturalToWord# ($dKnownNat `cast` <Co:13> :: ...)
+
+d = \ _ -> 3##
+
+fm
+  = \ @n $dKnownNat _ ->
+      naturalToWord# ($dKnownNat `cast` <Co:17> :: ...)
+
+m = \ _ -> 9##
+
+fp
+  = \ @n $dKnownNat _ ->
+      naturalToWord# ($dKnownNat `cast` <Co:21> :: ...)
+
+p = \ _ -> 512##
+
+
+

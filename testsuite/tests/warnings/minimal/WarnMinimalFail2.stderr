@@ -1,0 +1,3 @@
+
+WarnMinimalFail2.hs:8:15: error: [GHC-54721]
+    ‘global’ is not a (visible) method of class ‘Foo’

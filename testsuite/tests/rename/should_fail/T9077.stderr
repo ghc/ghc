@@ -1,0 +1,4 @@
+
+T9077.hs:3:12: error: [GHC-89246]
+    • Record syntax is illegal here: {}
+    • In the type signature for ‘main’

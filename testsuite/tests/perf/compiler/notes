@@ -1,0 +1,15 @@
+Notes about compiler benchmarks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This file contains informal notes about the peculiarities of
+individual benchmark programs, so that I don't keep re-inventing the
+wheel.  Just add to this file if you find something new and
+interesting.
+
+T18223
+~~~~~~
+This test is full of casts and coercions.
+
+!8600 led to a 20% decrease in compiler allocation, although the
+program was the same size after every step.  I suspect that it was the
+patch (part of !8600) that switched off eta-expansion in stable
+unfoldings; but I'm not sure.

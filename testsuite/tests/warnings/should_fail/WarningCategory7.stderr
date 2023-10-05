@@ -1,0 +1,27 @@
+
+WarningCategory1.hs:4:1: error: [GHC-15328] [-Wx-module-warning-42 (in -Wextended-warnings), -Werror=x-module-warning-42]
+    Module ‘WarningCategoryModule’: "Module-level warning"
+
+WarningCategory1.hs:7:8: error: [GHC-63394] [-Wx-dangerous (in -Wextended-warnings), -Werror=x-dangerous]
+    In the use of ‘foo’ (imported from WarningCategory1_B):
+    "foo is dangerous"
+
+WarningCategory1.hs:7:13: error: [GHC-63394] [-Wx-mostly-harmless (in -Wextended-warnings), -Werror=x-mostly-harmless]
+    In the use of ‘bar’ (imported from WarningCategory1_B):
+    "bar is mostly harmless"
+
+WarningCategory1.hs:7:18: error: [GHC-63394] [-Wx-harmless (in -Wextended-warnings), -Werror=x-harmless]
+    In the use of ‘baz’ (imported from WarningCategory1_B):
+    "baz is harmless"
+
+WarningCategory1.hs:7:23: error: [GHC-63394] [-Wdeprecations (in -Wextended-warnings), -Werror=deprecations]
+    In the use of ‘quux’ (imported from WarningCategory1_B):
+    "quux has no category"
+
+WarningCategory1.hs:7:29: error: [GHC-68441] [-Wdeprecations (in -Wextended-warnings), -Werror=deprecations]
+    In the use of ‘plugh’ (imported from WarningCategory1_B):
+    Deprecated: "plugh is deprecated"
+
+WarningCategory1.hs:7:36: error: [GHC-63394] [-Wx-module-warning-42 (in -Wextended-warnings), -Werror=x-module-warning-42]
+    In the use of ‘wurble’ (imported from WarningCategoryModule):
+    "Module-level warning"

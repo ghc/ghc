@@ -1,0 +1,78 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 65, types: 24, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoWW.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoWW.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoWW.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoWW.$trModule3 = GHC.Types.TrNameS OpaqueNoWW.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoWW.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 0}]
+OpaqueNoWW.$trModule2 = "OpaqueNoWW"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoWW.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoWW.$trModule1 = GHC.Types.TrNameS OpaqueNoWW.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoWW.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoWW.$trModule
+  = GHC.Types.Module OpaqueNoWW.$trModule3 OpaqueNoWW.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[GblId, Unf=OtherCon []]
+lvl = GHC.Types.I# 0#
+
+Rec {
+-- RHS size: {terms: 14, types: 4, coercions: 0, joins: 0/0}
+f [InlPrag=OPAQUE, Occ=LoopBreaker] :: Int -> Int
+[GblId, Arity=1, Str=<1P(1L)>, Unf=OtherCon []]
+f = / (ds :: Int) ->
+      case ds of { GHC.Types.I# ds1 ->
+      case ds1 of ds2 {
+        __DEFAULT -> f (GHC.Types.I# (GHC.Prim.+# ds2 1#));
+        0# -> lvl
+      }
+      }
+end Rec }
+
+Rec {
+-- RHS size: {terms: 32, types: 8, coercions: 0, joins: 0/0}
+g [Occ=LoopBreaker] :: Bool -> Bool -> Int -> Int
+[GblId, Arity=3, Str=<1L><1L><1L>, Unf=OtherCon []]
+g = / (ds :: Bool) (ds1 :: Bool) (p :: Int) ->
+      case ds of {
+        False ->
+          case ds1 of {
+            False -> g GHC.Types.False GHC.Types.True p;
+            True ->
+              case p of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 1#) }
+          };
+        True ->
+          case ds1 of {
+            False -> g GHC.Types.True GHC.Types.True p;
+            True -> f p
+          }
+      }
+end Rec }

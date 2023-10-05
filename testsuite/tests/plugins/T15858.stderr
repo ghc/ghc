@@ -1,0 +1,21 @@
+==ImpurePlugin.0
+Simple Plugin Passes Queried
+Got options:
+Simple Plugin Pass Run
+==ImpurePlugin.1
+Simple Plugin Passes Queried
+Got options:
+Simple Plugin Pass Run
+==PurePlugin.0
+Simple Plugin Passes Queried
+Got options:
+Simple Plugin Pass Run
+==FingerprintPlugin.0
+Simple Plugin Passes Queried
+Got options:
+Simple Plugin Pass Run
+==FingerprintPlugin.1
+==PurePlugin.1
+Simple Plugin Passes Queried
+Got options:
+Simple Plugin Pass Run

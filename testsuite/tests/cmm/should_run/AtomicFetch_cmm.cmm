@@ -1,0 +1,80 @@
+#include "Cmm.h"
+
+// This is not a test of atomic semantics,
+// just checking that GHC can parse %fetch_fooXX
+
+cmm_foo64 (P_ p)
+{
+  // p points to a ByteArray header, q points to its first element
+  P_ q;
+  q = p + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload;
+
+  I64 x;
+
+  prim %store_seqcst64(q, 42 :: I64);
+  (x) = prim %fetch_add64(q, 5 :: I64);
+  (x) = prim %fetch_sub64(q, 10 :: I64);
+  (x) = prim %fetch_and64(q, 120 :: I64);
+  (x) = prim %fetch_or64(q, 2 :: I64);
+  (x) = prim %fetch_xor64(q, 33 :: I64);
+  (x) = prim %fetch_nand64(q, 127 :: I64);
+  (x) = prim %load_seqcst64(q);
+  return (x);
+}
+
+cmm_foo32 (P_ p)
+{
+  // p points to a ByteArray header, q points to its first element
+  P_ q;
+  q = p + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload;
+
+  I32 x;
+
+  prim %store_seqcst32(q, 42);
+  (x) = prim %fetch_add32(q, 5);
+  (x) = prim %fetch_sub32(q, 10);
+  (x) = prim %fetch_and32(q, 120);
+  (x) = prim %fetch_or32(q, 2);
+  (x) = prim %fetch_xor32(q, 33);
+  (x) = prim %fetch_nand32(q, 127);
+  (x) = prim %load_seqcst32(q);
+  return (x);
+}
+
+cmm_foo16 (P_ p)
+{
+  // p points to a ByteArray header, q points to its first element
+  P_ q;
+  q = p + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload;
+
+  I16 x;
+
+  prim %store_seqcst16(q, 42);
+  (x) = prim %fetch_add16(q, 5);
+  (x) = prim %fetch_sub16(q, 10);
+  (x) = prim %fetch_and16(q, 120);
+  (x) = prim %fetch_or16(q, 2);
+  (x) = prim %fetch_xor16(q, 33);
+  (x) = prim %fetch_nand16(q, 127);
+  (x) = prim %load_seqcst16(q);
+  return (x);
+}
+
+cmm_foo8 (P_ p)
+{
+  // p points to a ByteArray header, q points to its first element
+  P_ q;
+  q = p + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload;
+
+  I8 x;
+
+  prim %store_seqcst8(q, 42);
+  (x) = prim %fetch_add8(q, 5);
+  (x) = prim %fetch_sub8(q, 10);
+  (x) = prim %fetch_and8(q, 120);
+  (x) = prim %fetch_or8(q, 2);
+  (x) = prim %fetch_xor8(q, 33);
+  (x) = prim %fetch_nand8(q, 127);
+  (x) = prim %load_seqcst8(q);
+  return (x);
+}

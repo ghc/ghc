@@ -1,0 +1,8 @@
+
+rnfail056.hs:7:7: [GHC-59155] error:
+    Illegal tuple section
+    Suggested fix: Perhaps you intended to use TupleSections
+
+rnfail056.hs:9:7: [GHC-59155] error:
+    Illegal tuple section
+    Suggested fix: Perhaps you intended to use TupleSections

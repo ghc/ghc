@@ -1,0 +1,17 @@
+:set -XNoStarIsType
+
+putStrLn "\nType and Constraint unqualified:"
+:k (->)
+:k Functor
+
+data Type
+
+putStrLn "\nType qualified, Constraint unqualified:"
+:k (->)
+:k Functor
+
+data Constraint
+
+putStrLn "\nType and Constraint qualified:"
+:k (->)
+:k Functor

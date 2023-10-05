@@ -1,0 +1,10 @@
+unit p where
+    signature A where
+        f :: Bool
+unit q where
+    dependency p[A=<A>]
+    signature A(module A) where
+        h :: Bool
+    module M where
+        import A
+        g = f && h

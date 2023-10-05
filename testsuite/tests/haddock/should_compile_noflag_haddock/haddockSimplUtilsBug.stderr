@@ -1,0 +1,4 @@
+
+haddockSimplUtilsBug.hs:28:7: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: _ -> ...

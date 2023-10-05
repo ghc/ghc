@@ -1,0 +1,15 @@
+// Basic function with a heap check
+// The GC block should only be one instruction
+// (or rather it should be after assignment optimizations)
+
+foo1 {
+  bits32 r;
+ B:
+  (r) = foreign "C--" bar() "safe";
+ L:
+  if (Hp > HpLim) {
+    (r) = foreign "C--" stg_gc_ret_p(r) "safe";
+    goto L;
+  }
+  return (r);
+}

@@ -1,0 +1,14 @@
+-- Everything is easy
+unit p where
+    signature Q where
+        f :: Int
+    module P where
+unit q where
+    module Q where
+        f = True
+unit r where
+    dependency p[Q=q:Q]
+    dependency q
+    signature H where
+    module R where
+        import P

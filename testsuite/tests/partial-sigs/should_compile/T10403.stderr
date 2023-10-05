@@ -1,0 +1,30 @@
+
+T10403.hs:16:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘Functor f’
+      Where: ‘f’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
+               at T10403.hs:18:1-41
+    • In the type signature: h1 :: _ => _
+
+T10403.hs:16:12: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘(a1 -> a2) -> f a1 -> H f’
+      Where: ‘a2’, ‘a1’, ‘f’ are rigid type variables bound by
+               the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
+               at T10403.hs:18:1-41
+    • In the type signature: h1 :: _ => _
+
+T10403.hs:20:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘(a1 -> a2) -> f a1 -> H f’
+      Where: ‘a2’, ‘a1’, ‘f’ are rigid type variables bound by
+               the inferred type of h2 :: (a1 -> a2) -> f a1 -> H f
+               at T10403.hs:23:1-41
+    • In the type signature: h2 :: _
+
+T10403.hs:23:15: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘Functor f’ arising from a use of ‘fmap’
+      Possible fix:
+        add (Functor f) to the context of
+          the inferred type of h2 :: (a1 -> a2) -> f a1 -> H f
+    • In the second argument of ‘(.)’, namely ‘fmap (const ())’
+      In the expression: (H . fmap (const ())) (fmap f b)
+      In an equation for ‘h2’: h2 f b = (H . fmap (const ())) (fmap f b)

@@ -1,0 +1,3 @@
+
+tcfail051.hs:3:10: error: [GHC-76037]
+    Not in scope: type constructor or class ‘B’

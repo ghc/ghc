@@ -1,0 +1,5 @@
+
+tc134.hs:11:2:
+    The scoped type variable `a' is bound to the type `Int'
+      You can only bind scoped type variables to type variables
+    In the definition of `g': g x :: a = x :: a

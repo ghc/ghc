@@ -1,0 +1,30 @@
+
+==================== Demand signatures ====================
+DmdAnalGADTs.diverges: b
+DmdAnalGADTs.f: <1L>
+DmdAnalGADTs.f': <1L>
+DmdAnalGADTs.g: <1L>
+DmdAnalGADTs.hasCPR:
+DmdAnalGADTs.hasStrSig: <1!P(L)>
+
+
+
+==================== Cpr signatures ====================
+DmdAnalGADTs.diverges: b
+DmdAnalGADTs.f:
+DmdAnalGADTs.f': 1
+DmdAnalGADTs.g:
+DmdAnalGADTs.hasCPR:
+DmdAnalGADTs.hasStrSig: 1
+
+
+
+==================== Demand signatures ====================
+DmdAnalGADTs.diverges: b
+DmdAnalGADTs.f: <1L>
+DmdAnalGADTs.f': <1L>
+DmdAnalGADTs.g: <1L>
+DmdAnalGADTs.hasCPR:
+DmdAnalGADTs.hasStrSig: <1!P(L)>
+
+

@@ -1,0 +1,3 @@
+
+T1595a.hs:3:20: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Tpyo’

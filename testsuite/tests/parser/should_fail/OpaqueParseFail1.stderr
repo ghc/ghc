@@ -1,0 +1,3 @@
+
+OpaqueParseFail1.hs:4:11: error: [GHC-58481]
+    parse error on input ‘[’

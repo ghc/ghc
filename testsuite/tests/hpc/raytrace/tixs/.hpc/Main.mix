@@ -1,0 +1,1 @@
+Mix "Main.hs" 2011-09-06 12:02:04 UTC 1310345646 8 [(13:29-13:40,ExpBox False),(13:20-13:40,ExpBox False),(14:32-14:34,ExpBox False),(14:22-14:35,ExpBox False),(14:13-14:35,ExpBox False),(13:8-15:11,ExpBox False),(13:1-15:11,TopLevelBox ["main"])]

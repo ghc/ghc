@@ -1,0 +1,10 @@
+
+Linear1.hs:10:14: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectDup’: incorrectDup x = (x, x)
+
+Linear1.hs:14:15: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectDrop’: incorrectDrop x = ()

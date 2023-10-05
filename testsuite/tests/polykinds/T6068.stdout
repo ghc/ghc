@@ -1,0 +1,1 @@
+exists Nothing :: Floop a mp => Existential mp

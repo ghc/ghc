@@ -1,0 +1,16 @@
+:set +m
+:set -XLambdaCase
+
+foo1 x = case x of
+           1 -> "one"
+           _ -> "not one"
+
+foo1 0
+foo1 1
+
+foo2 = \case
+          1 -> "one"
+          _ -> "not one"
+
+foo2 0
+foo2 1

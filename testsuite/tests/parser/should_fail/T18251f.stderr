@@ -1,0 +1,3 @@
+
+T18251f.hs:3:5: error: [GHC-07626]
+    Parse error in pattern: x In a function binding for the ‘!’ operator.

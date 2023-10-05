@@ -1,0 +1,1 @@
+  = case GHC.Real.$w$spowImpl1 2# 8# of v { __DEFAULT ->

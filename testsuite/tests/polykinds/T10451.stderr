@@ -1,0 +1,12 @@
+
+T10451.hs:22:12: error: [GHC-89347]
+    • Constraint tuple arity too large: 66 (max arity = 64)
+        Instead, use a nested tuple
+    • In the type ‘(Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a)’
+      In the type declaration for ‘T’

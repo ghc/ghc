@@ -1,0 +1,8 @@
+TYPE SIGNATURES
+  bar :: Int -> Foo Bool () Int
+TYPE CONSTRUCTORS
+  data type Foo{3} :: * -> * -> * -> *
+DATA CONSTRUCTORS
+  Foo :: forall x y z. x -> y -> z -> Foo x y z
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]

@@ -1,0 +1,3 @@
+
+T14000.hs:8:9: error: [GHC-88464]
+    Variable not in scope: noSuchThing

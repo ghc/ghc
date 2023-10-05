@@ -1,0 +1,20 @@
+cabal-version:      3.0
+name:               ghc-platform
+version:            0.1.0.0
+synopsis:           Platform information used by GHC and friends
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Rodrigo Mesquita
+maintainer:         ghc-devs@haskell.org
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:  GHC.Platform.ArchOS
+    build-depends:    base >=4.15.0.0 && <5
+    hs-source-dirs:   src
+    default-language: Haskell2010

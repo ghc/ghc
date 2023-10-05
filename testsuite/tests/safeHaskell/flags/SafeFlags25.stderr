@@ -1,0 +1,3 @@
+
+SafeFlags25.hs:2:17: warning: [GHC-58656] [-Wsafe]
+    ‘SafeFlags25’ has been inferred as safe!

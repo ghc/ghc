@@ -1,0 +1,1 @@
+ghc: Plugins require -fno-external-interpreter

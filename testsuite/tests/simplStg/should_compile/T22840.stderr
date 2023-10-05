@@ -1,0 +1,6 @@
+[1 of 3] Compiling T22840A          ( T22840A.hs, T22840A.o, T22840A.dyn_o )
+[2 of 3] Compiling T22840B          ( T22840B.hs, T22840B.o, T22840B.dyn_o, interpreted )
+[3 of 3] Compiling C                ( T22840.hs, T22840.o, T22840.dyn_o, interpreted )
+start
+Just
+end

@@ -1,0 +1,4 @@
+
+MissingDefaultMethodBinding.hs:5:1: error: [GHC-59794]
+    • Class ‘C’ has a generic-default signature without a binding ‘meth’
+    • In the class declaration for ‘C’

@@ -1,0 +1,5 @@
+Breakpoint 0 activated at T14628.hs:12:46-63
+Stopped in T14628.putArrayBytes.writeCount, T14628.hs:12:46-63
+_result :: StateT Int m () = _
+putLine :: [Char] -> IO () = _
+x :: [Char] = "123456789"

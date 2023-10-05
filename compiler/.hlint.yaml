@@ -1,0 +1,34 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: {}
+- warn: {name: Unused LANGUAGE pragma}
+- warn: {name: Use fewer LANGUAGE pragmas}
+- warn: {name: Redundant return}
+- warn: {name: Redundant True guards}
+- warn: {name: Redundant variable capture}
+- warn: {name: Redundant void}
+- warn: {name: Redundant as}
+- warn: {name: Use fewer imports}
+- warn: {name: Redundant as-pattern}
+- warn: {name: Redundant where}
+
+## Exceptions
+# Sometimes, the hlint parser flags some functions and modules as incorrectly
+# using a language extension. Some other times, we need to make exceptions to
+# lints that we otherwise want applied elsewhere. Such exceptions are listed
+# below.
+
+- ignore: {name: Redundant do, within: [GHC.SysTools.Terminal, GHC.Utils.Binary]}
+- ignore: {name: Use fewer imports, within: [GHC.Parser, GHC.Cmm.Parser ] }
+- ignore: {name: Redundant return, within: [GHC.Data.FastString] }
+- ignore: {within: [GHC.Parser, GHC.Parser.Lexer, GHC.Parser.HaddockLex] }
+
+
+## Restricted modules
+
+- warn: {name: Avoid restricted module}
+# see comments in affected modules
+- modules: 
+   - {name: [GHC.Driver.Backend.Internal], within: [GHC.Driver.Backend], message: "This module is for clients of the GHC API only.  Do not use it within the compiler."}

@@ -1,0 +1,13 @@
+unit p where
+    signature H where
+        data S
+    module A where
+        import H
+        data T = T S
+
+unit q where
+    dependency p[H=<H2>] (A as A2)
+    module B where
+        import A2
+        import H2
+        t = T :: S -> T

@@ -1,0 +1,34 @@
+# generate-ci
+
+This is the generator for GHC's GitLab CI infrastructure. In particular, this
+generates two outputs:
+
+ * `.gitlab/jobs.yaml`, which is a YAML (or, strictly speaking, JSON)
+   file which defines the bulk of the validation, nightly, and release jobs of
+   GHC's CI. This is committed to the GHC repository and must be updated
+   whenever `gen_ci.hs` is modified.
+
+ * `.gitlab/jobs-metadata.json`, which is a mapping between platforms and
+   produced binary distribution names used when producing `ghcup` metadata
+   for nightly pipeline artifacts (see the `.ghcup-metadata` job in
+   `/.gitlab-ci.yaml`).
+
+
+## Modifying the CI configuration (nix)
+
+The jobs are defined in `gen_ci.hs`. After modifying this you can run
+```sh
+nix run .gitlab/generate-ci#generate-jobs
+```
+from the top of the GHC repository to update the generated configuration.
+
+
+## Modifying the CI configuration (without nix)
+
+One can run `update-ci` without Nix as follows (assuming one has `jq`,
+`cabal-install`, and GHC installed):
+```sh
+$ cabal build generate-ci
+$ PATH="$(dirname $(cabal list-bin generate-ci)):$PATH"
+$ ./generate-jobs
+```

@@ -1,0 +1,4 @@
+TyfamsDisabled.hs:3:1: [GHC-39191]
+     Illegal family declaration for ‘A’
+     In the type family declaration for ‘A’
+    Suggested fix: Perhaps you intended to use TypeFamilies

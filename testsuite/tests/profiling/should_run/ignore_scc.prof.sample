@@ -1,0 +1,33 @@
+	Wed Mar 30 16:31 2022 Time and Allocation Profiling Report  (Final)
+
+	   ignore_scc +RTS -hc -p -RTS
+
+	total time  =        0.03 secs   (25 ticks @ 1000 us, 1 processor)
+	total alloc =      48,328 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC                   %time %alloc
+
+fib         Main             ignore_scc.hs:8:1-50  100.0    0.0
+MAIN        MAIN             <built-in>              0.0    1.7
+CAF         GHC.IO.Handle.FD <entire-module>         0.0   71.9
+CAF         GHC.IO.Encoding  <entire-module>         0.0    5.1
+CAF         GHC.Conc.Signal  <entire-module>         0.0    1.3
+main        Main             ignore_scc.hs:2:1-22    0.0   19.6
+
+
+                                                                            individual      inherited
+COST CENTRE  MODULE                SRC                   no.     entries  %time %alloc   %time %alloc
+
+MAIN         MAIN                  <built-in>            127           0    0.0    1.7   100.0  100.0
+ CAF         Main                  <entire-module>       253           0    0.0    0.0   100.0    0.7
+  main       Main                  ignore_scc.hs:2:1-22  254           1    0.0    0.7   100.0    0.7
+   f         Main                  ignore_scc.hs:5:1-65  256           1    0.0    0.0   100.0    0.0
+    f.\      Main                  ignore_scc.hs:5:55-64 259           1    0.0    0.0   100.0    0.0
+     fib     Main                  ignore_scc.hs:8:1-50  260     2692537  100.0    0.0   100.0    0.0
+    f.x'     Main                  ignore_scc.hs:5:34-44 257           1    0.0    0.0     0.0    0.0
+     fib     Main                  ignore_scc.hs:8:1-50  258       21891    0.0    0.0     0.0    0.0
+ CAF         GHC.Conc.Signal       <entire-module>       248           0    0.0    1.3     0.0    1.3
+ CAF         GHC.IO.Encoding       <entire-module>       239           0    0.0    5.1     0.0    5.1
+ CAF         GHC.IO.Encoding.Iconv <entire-module>       237           0    0.0    0.4     0.0    0.4
+ CAF         GHC.IO.Handle.FD      <entire-module>       229           0    0.0   71.9     0.0   71.9
+ main        Main                  ignore_scc.hs:2:1-22  255           0    0.0   19.0     0.0   19.0

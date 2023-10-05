@@ -1,0 +1,4 @@
+:load T15341.hs
+:info Foo
+:set -fprint-explicit-kinds
+:info Foo

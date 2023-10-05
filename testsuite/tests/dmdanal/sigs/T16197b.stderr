@@ -1,0 +1,29 @@
+
+==================== Demand signatures ====================
+f: <1!P(L)>
+
+
+
+==================== Cpr signatures ====================
+f: 1
+
+
+
+==================== Demand signatures ====================
+f: <1!P(1L)>
+
+
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 25, types: 23, coercions: 0, joins: 0/0}
+
+$WT = \ conrep -> case conrep of conrep { __DEFAULT -> T conrep }
+
+$wf = \ ww -> case ww of ww1 { __DEFAULT -> (# ww1 #) }
+
+f = \ ds ->
+      case ds of { T ww -> case $wf ww of { (# ww1 #) -> Box ww1 } }
+
+
+

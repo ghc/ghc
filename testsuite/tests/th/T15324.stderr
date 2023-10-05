@@ -1,0 +1,6 @@
+T15324.hs:(5,2)-(7,7): Splicing declarations
+    [d| f :: forall a. (Show a => a) -> a
+        f _ = undefined |]
+  ======>
+    f :: forall a. (Show a => a) -> a
+    f _ = undefined

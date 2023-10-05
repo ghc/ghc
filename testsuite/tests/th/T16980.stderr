@@ -1,0 +1,2 @@
+T16980.aNumber :: GHC.Num.Integer.Integer
+ConT GHC.Num.Integer.Integer

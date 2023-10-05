@@ -1,0 +1,3 @@
+T19288: No more bug!
+CallStack (from HasCallStack):
+  error, called at T19288.hs:25:27 in main:Main

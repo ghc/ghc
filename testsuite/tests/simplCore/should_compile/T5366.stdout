@@ -1,0 +1,2 @@
+                 case ds of { Bar bx [Occ=Once1] _ [Occ=Dead] -> GHC.Types.I# bx }}]
+f = \ (ds :: Bar) -> case ds of { Bar bx bx1 -> GHC.Types.I# bx }

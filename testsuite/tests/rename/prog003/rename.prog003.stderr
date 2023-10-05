@@ -1,0 +1,3 @@
+
+B.hs:4:6: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Class’

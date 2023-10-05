@@ -1,0 +1,8 @@
+
+T5515.hs:9:3: error: [GHC-53634]
+    Out of scope type variable ‘a’ in the RHS of a family instance.
+      All such variables must be bound on the LHS.
+
+T5515.hs:15:3: error: [GHC-53634]
+    Out of scope type variable ‘a’ in the RHS of a family instance.
+      All such variables must be bound on the LHS.

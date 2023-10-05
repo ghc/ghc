@@ -1,0 +1,19 @@
+:l T8639.hs
+:t it
+bit
+:t it
+   -- Gets the last thing evaluated (T8639.bit)
+:t T8639.it
+   -- Gets 'it' from T8639
+
+:m -T8639
+import T8639 as Q
+
+:t bit
+:t Q.bit
+:t H.bit
+   -- Should say "out of scope"
+:t it
+   -- Gets the last thing evaluated (T8639.bit)
+:t Q.it
+   -- Gets 'it' from T8639

@@ -1,0 +1,3 @@
+T5373A: Most RTS options are disabled. Link with -rtsopts to enable them.
+T5373C: Most RTS options are disabled. Link with -rtsopts to enable them.
+T5373D: RTS options are disabled. Link with -rtsopts to enable them.

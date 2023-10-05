@@ -1,0 +1,4 @@
+--Testing more shadowing
+data T = A | B
+data R = A | C
+:i A

@@ -1,0 +1,5 @@
+
+readFail008.hs:5:15: error: [GHC-04049]
+    • A newtype constructor must not have a strictness annotation
+    • In the definition of data constructor ‘T’
+      In the newtype declaration for ‘N’

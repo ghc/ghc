@@ -1,0 +1,5 @@
+Should fail, GADTs is not enabled
+Should work, GADTs is in force from :set
+Should fail, GADTs is now disabled
+Should fail, GADTs is only enabled at the prompt
+C :: T Int

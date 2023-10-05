@@ -1,0 +1,69 @@
+
+T10619.hs:10:14: error: [GHC-91028]
+    • Couldn't match type ‘p1’ with ‘forall a. a -> a’
+      Expected: (forall a. a -> a) -> forall b. b -> b
+        Actual: p1 -> p1
+      Cannot instantiate unification variable ‘p1’
+      with a type involving polytypes: forall a. a -> a
+    • In the expression: \ y -> y
+      In the expression:
+        if True then
+            ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+        else
+            \ y -> y
+      In an equation for ‘foo’:
+          foo _
+            = if True then
+                  ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+              else
+                  \ y -> y
+
+T10619.hs:14:15: error: [GHC-91028]
+    • Couldn't match type ‘p3’ with ‘forall a. a -> a’
+      Expected: p3 -> p3
+        Actual: (forall a. a -> a) -> forall b. b -> b
+      Cannot equate type variable ‘p3’
+      with a type involving polytypes: forall a. a -> a
+      ‘p3’ is a rigid type variable bound by
+        the inferred type of bar :: p2 -> p3 -> p3
+        at T10619.hs:(12,1)-(14,66)
+    • In the expression:
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+      In the expression:
+        if True then
+            \ y -> y
+        else
+            ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+      In an equation for ‘bar’:
+          bar _
+            = if True then
+                  \ y -> y
+              else
+                  ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+    • Relevant bindings include
+        bar :: p2 -> p3 -> p3 (bound at T10619.hs:12:1)
+
+T10619.hs:17:13: error: [GHC-91028]
+    • Couldn't match type ‘p0’ with ‘forall a. a -> a’
+      Expected: (forall a. a -> a) -> forall b. b -> b
+        Actual: p0 -> p0
+      Cannot instantiate unification variable ‘p0’
+      with a type involving polytypes: forall a. a -> a
+    • In the expression: \ y -> y
+      In an equation for ‘baz’: baz False = \ y -> y
+
+T10619.hs:20:14: error: [GHC-91028]
+    • Couldn't match type ‘p’ with ‘forall a. a -> a’
+      Expected: p -> p
+        Actual: (forall a. a -> a) -> forall b. b -> b
+      Cannot equate type variable ‘p’
+      with a type involving polytypes: forall a. a -> a
+      ‘p’ is a rigid type variable bound by
+        the inferred type of quux :: Bool -> p -> p
+        at T10619.hs:(19,1)-(20,64)
+    • In the expression:
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+      In an equation for ‘quux’:
+          quux True = (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+    • Relevant bindings include
+        quux :: Bool -> p -> p (bound at T10619.hs:19:1)

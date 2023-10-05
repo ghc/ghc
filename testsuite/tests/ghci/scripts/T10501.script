@@ -1,0 +1,3 @@
+:set -Wno-x-partial
+:cmd return $ head []
+:cmd return ('1':'2':undefined)

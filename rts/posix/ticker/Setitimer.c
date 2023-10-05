@@ -1,0 +1,80 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1995-2007
+ *
+ * Interval timer for profiling and pre-emptive scheduling.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "rts/PosixSource.h"
+#include "Rts.h"
+
+#include "Ticker.h"
+#include "Proftimer.h"
+#include "Schedule.h"
+#include "posix/Clock.h"
+#include "posix/Signals.h"
+
+#include <time.h>
+#if HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
+
+#if defined(HAVE_SIGNAL_H)
+# include <signal.h>
+#endif
+
+#include <string.h>
+
+static Time itimer_interval = DEFAULT_TICK_INTERVAL;
+
+void
+initTicker (Time interval, TickProc handle_tick)
+{
+    itimer_interval = interval;
+    install_vtalrm_handler(SIGALRM, handle_tick);
+}
+
+void
+startTicker(void)
+{
+    struct itimerval it;
+
+    it.it_value.tv_sec = TimeToSeconds(itimer_interval);
+    it.it_value.tv_usec = TimeToUS(itimer_interval) % 1000000;
+    it.it_interval = it.it_value;
+
+    if (setitimer(ITIMER_REAL, &it, NULL) != 0) {
+        sysErrorBelch("setitimer");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+
+void
+stopTicker(void)
+{
+    struct itimerval it;
+
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_usec = 0;
+    it.it_interval = it.it_value;
+
+    if (setitimer(ITIMER_REAL, &it, NULL) != 0) {
+        sysErrorBelch("setitimer");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+
+void
+exitTicker (bool wait STG_UNUSED)
+{
+    return;
+}
+
+int
+rtsTimerSignal(void)
+{
+    return SIGALRM;
+    // Using SIGALRM can leads to problems, see #850.  But we have no
+    // option if timer_create() is not available.
+}

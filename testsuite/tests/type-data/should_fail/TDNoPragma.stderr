@@ -1,0 +1,4 @@
+
+TDNoPragma.hs:4:1: [GHC-15013]
+    Illegal type-level data declaration
+    Suggested fix: Perhaps you intended to use TypeData

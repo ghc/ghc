@@ -1,0 +1,5 @@
+
+OpaqueParseFail4.hs:6:12: error: [GHC-31744]
+    Duplicate INLINE pragmas for ‘f’
+    at OpaqueParseFail4.hs:5:12
+       OpaqueParseFail4.hs:6:12

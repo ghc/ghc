@@ -1,0 +1,24 @@
+
+RecordDotSyntaxFail11.hs:8:3: error: [GHC-39999]
+    • Ambiguous type variable ‘a0’ arising from a use of ‘print’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      Potentially matching instances:
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        ...plus 25 others
+        ...plus 13 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘($)’, namely ‘print’
+      In a stmt of a 'do' block: print $ (.foo.bar.baz) a
+      In the expression:
+        do let a = ...
+           print $ (.foo.bar.baz) a
+
+RecordDotSyntaxFail11.hs:8:11: error: [GHC-39999]
+    • No instance for ‘GHC.Records.HasField "baz" Int a0’
+    • In the second argument of ‘($)’, namely ‘(.foo.bar.baz) a’
+      In a stmt of a 'do' block: print $ (.foo.bar.baz) a
+      In the expression:
+        do let a = ...
+           print $ (.foo.bar.baz) a

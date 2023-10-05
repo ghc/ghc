@@ -1,0 +1,5 @@
+
+T23573.hs:5:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘deprec’
+    (imported from T23573A, but defined in T23573B):
+    Deprecated: "deprec"

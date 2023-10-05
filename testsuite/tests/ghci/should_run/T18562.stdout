@@ -1,0 +1,3 @@
+CmpSymbol "a" "\0" :: Ordering
+= GT
+GT

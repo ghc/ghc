@@ -1,0 +1,7 @@
+:set -XPolyKinds
+data A x y
+:i A
+:kind A
+:set -XExistentialQuantification
+data T a = forall a . MkT a
+:info T

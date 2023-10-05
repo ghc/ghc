@@ -1,0 +1,6 @@
+
+T9681.hs:3:7: error: [GHC-39999]
+    • No instance for ‘Num String’ arising from the literal ‘1’
+    • In the first argument of ‘(+)’, namely ‘1’
+      In the expression: 1 + "\n"
+      In an equation for ‘foo’: foo = 1 + "\n"

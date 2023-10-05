@@ -1,0 +1,34 @@
+At (21,6), got evidence: ┌
+│ $dToJSON at T20341.hs:1:1, of type: ToJSON T
+│     is an evidence variable bound by a let, depending on: [$fToJSONT]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $fToJSONT at T20341.hs:17:19-24, of type: ToJSON T
+   │     is an evidence variable bound by an instance of class ToJSON
+   │           with scope: ModuleScope
+   │           
+   │     Defined at T20341.hs:17:19
+   └
+
+SrcSpanOneLine "T20341.hs" 17 19 25
+┌
+│ $dShow at T20341.hs:1:1, of type: Show T
+│     is an evidence variable bound by a let, depending on: [$fShowT]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $fShowT at T20341.hs:17:13-16, of type: Show T
+   │     is an evidence variable bound by an instance of class Show
+   │           with scope: ModuleScope
+   │           
+   │     Defined at T20341.hs:17:13
+   └
+
+$dShow was found in the definition of $fToJSONT

@@ -1,0 +1,7 @@
+saks027.hs:(8,2)-(10,7): Splicing declarations
+    [d| type U :: Type
+        
+        data U = MkU |]
+  ======>
+    type U :: Type
+    data U = MkU

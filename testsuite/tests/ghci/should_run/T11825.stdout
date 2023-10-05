@@ -1,0 +1,5 @@
+type X :: ★ → ★ → Constraint
+class X a b | a → b where
+  to ∷ a → b
+  {-# MINIMAL to #-}
+  	-- Defined at T11825.hs:3:1

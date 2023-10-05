@@ -1,0 +1,526 @@
+#!/bin/sh
+
+set -e
+
+show_help () {
+    cat <<EOF
+Usage: $0 [FLAGS]...
+
+Validate GHC source tree against testsuite; see
+https://gitlab.haskell.org/ghc/ghc/wikis/testing-patches for more
+information.
+
+Flags:
+  --no-clean           don't clean first, just carry on from
+                       a previous interrupted validation run
+  --testsuite-only     don't build the compiler, just run the test suite
+  --build-only         don't test the compiler, just build it
+  --hpc                build stage2 with -fhpc, and see how much of the
+                       compiler the test suite covers.
+                       2008-07-01: 63% slower than the default.
+                       HTML generated here: testsuite/hpc_output/hpc_index.html
+  --fast               Omit binary distribution. Omit certain tests.
+  --slow               Build stage2 with -DDEBUG. Run tests for all WAYS,
+                       but skip those that call compiler_stats_num_field.
+                       2008-07-01: 14% slower than the default.
+  --quiet              More pretty build log.
+                       See Note [Default build system verbosity].
+  --stack              Use Stack to build Hadrian and to provide the bootstrap
+                       compiler.
+  --ignore-perf-all    Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore all changes in performance tests
+  --ignore-perf-incrs  Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore increases in performance tests
+  --ignore-perf-decrs  Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore decreases in performance tests
+  --debug              Use inbuilt Hadrian flag to generate information for debugging
+  --help               shows this usage help.
+
+  validate runs 'hadrian/build -j\$THREADS', where by default THREADS is the
+  number of cpus your computer has +1. You can set the environment variable
+  THREADS to override this. For a sequential build you would for example use
+
+    THREADS=1 ./validate
+
+  You can set the 'config_args' environment variable to pass flags to
+  'configure'.
+
+  You can also use environment variables to pass extra options to the
+  testsuite. For example:
+
+    TEST='read001 read002' ./validate --testsuite-only --fast
+
+  Note on BINDIST variable: The BINDIST variable value indicates whether a binary
+  distribution of GHC built using Hadrian/Make is to be installed. When set
+  to "YES", it indicates that a path, previously set with the --prefix flag in
+  the configuration step (./configure), can be used as the installation location.
+  Otherwise the binary executables built are placed in sub-directories within
+  the "./_validatebuild" directory.
+
+  Note on validate vs GitLab CI setup: This script is distinct from the
+  collection of validation settings used by the GitLab Continuous Integration
+  system (details in ./.gitlab-ci.yml) and can be run locally on a user's computer
+  system. The CI scripts are stored in the ./.gitlab directory for reference.
+
+EOF
+}
+
+# Note [validate and testsuite speed]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# There are 3 different validate and testsuite speed settings:
+# fast, normal and slow.
+#
+#                              how    how   used
+#           cd tests  config.  many   many  by
+# validate  && make   speed=   tests  ways  whom
+# =============================================================================
+# --fast    fast      2        some   1+exs Travis (to stay within time limit)
+# --normal  test      1        all    1+exs Phabricator (slow takes too long?)
+# --slow    slow      0        all    all   Nightly (slow is ok)
+#
+#           accept    1        all    1
+#
+# `--fast` and `--normal` run one default way, as well as any other ways which
+# are explicitly requested by the test using extra_ways().
+#
+# `make accept` should run all tests exactly once. There is no point in
+# accepting a test for multiple ways, since it should produce the same output
+# for all ways.
+#
+# To make sure all .stderr and .stdout files in the testsuite are never
+# out-of-date, it is useful if CI runs each test at least once.
+
+# Note [Default build system verbosity]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
+#
+#   "The build system should clearly report what it's doing (and sometimes
+#   why), without being too verbose. It should emit actual command lines as
+#   much as possible, so that they can be inspected and cut & pasted."
+#
+# That should be the default. Only suppress commands, by setting V=0 and using
+# `make -s`, when user explicitly asks for it with `./validate --quiet`.
+
+no_clean=0
+testsuite_only=0
+build_only=0
+hpc=NO
+speed=NORMAL
+be_quiet=0
+# Validate uses gzip compression for the binary distribution to avoid the rather
+# heavy cost of xz, which is the typical default.
+tar_comp=gzip
+use_stack=NO
+ignore_perf_all=NO
+ignore_perf_increases=NO
+ignore_perf_decreases=NO
+hadrian_build_root=_validatebuild
+basedir="$($(dirname $hadrian_build_root) 2>&1 /dev/null && pwd)"
+debugging=0
+
+# Set config_args to empty string if not already set
+if [ "${config_args:-""}" ]; then
+    CONFIG_ARGS="$config_args"
+fi
+
+while [ $# -gt 0 ]
+do
+    case "$1" in
+    --no-clean)
+        no_clean=1
+        ;;
+    --testsuite-only)
+        testsuite_only=1
+        ;;
+    --build-only)
+        build_only=1
+        ;;
+    --hpc)
+        hpc=YES
+        ;;
+    --slow)
+        speed=SLOW
+        ;;
+    --fast)
+        speed=FAST
+        ;;
+    --normal) # for backward compat
+        speed=NORMAL
+        ;;
+    --quiet)
+        be_quiet=1
+        ;;
+    --stack)
+        use_stack=YES
+        ;;
+    --ignore-perf-all)
+        ignore_perf_all=YES
+        ;;
+    --ignore-perf-incrs)
+        ignore_perf_increases=YES
+        ;;
+    --ignore-perf-decrs)
+        ignore_perf_decreases=YES
+        ;;
+    --debug)
+        debugging=1
+        ;;
+    --help)
+        show_help
+        exit 0;;
+    *)
+        echo "$0: unrecognized argument '$1'" >&2
+        echo "Try '$0 --help' for more information." >&2
+        exit 1;;
+    esac
+    shift
+done
+
+check_packages () {
+    if [ "$bindistdir" = "" ]; then
+        ghc_pkg=$basedir/$hadrian_build_root/stage1/bin/ghc-pkg
+    else
+        ghc_pkg=$basedir/$bindistdir/bin/ghc-pkg
+    fi
+
+    if [ $be_quiet -eq 1 ]; then
+        "$ghc_pkg" check
+    else
+        echo "== Start $1 package check"
+        "$ghc_pkg" check -v
+        echo "== End $1 package check"
+    fi
+}
+
+if ! [ -d testsuite ]; then
+    echo 'Could not find the testsuite for validation' >&2
+    exit 1
+fi
+
+CPUS=$(mk/detect-cpu-count.sh)
+
+# Use CPU cores + 1 if not already set
+threads=${THREADS:-$((CPUS + 1))}
+echo "using THREADS=${threads}" >&2
+
+configure_cmd="./configure"
+
+# Figure out name of `make`, needed to install binary distributions
+make="gmake"
+if type gmake > /dev/null 2> /dev/null ; then
+    make="gmake"
+else
+    make="make"
+fi
+if [ $be_quiet -eq 1 ]; then
+    # See Note [Default build system verbosity].
+    make="$make -s"
+fi
+
+# Set up configuration, commands for building
+if [ "$use_stack" = "NO" ]; then
+    hadrian/build --help > /dev/null
+    echo "Entering ./hadrian directory..."
+    cd hadrian
+    hadrian_cmd=$(cabal new-exec -- which hadrian | grep 'hadrian$')
+else
+    if [ $no_clean -eq 0 ]; then
+        rm -rf hadrian/.stack-work
+    fi
+    hadrian/build-stack --help > /dev/null
+    echo "Entering ./hadrian directory..."
+    cd hadrian
+    hadrian_cmd=$(stack exec -- which hadrian)
+    configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
+fi
+cd ..
+echo "Back to $basedir"
+echo "Hadrian configure command: $configure_cmd"
+hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
+if [ $be_quiet -eq 0 ]; then
+    hadrian="$hadrian -V"
+fi
+
+echo "Hadrian command: $hadrian"
+
+# For details of the following flavours, refer to
+# ./hadrian/src/Settings/Flavours
+case $speed in
+SLOW)
+    flavour=slow-validate ;;
+NORMAL)
+    flavour=validate ;;
+FAST)
+    flavour=quick-validate ;;
+esac
+
+if [ $build_only -eq 1 ] ||
+    { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; }; then
+
+    if [ $no_clean -eq 0 ]; then
+        $hadrian clean && rm -rf $hadrian_build_root
+        python3 ./boot
+        $configure_cmd --enable-tarballs-autodownload $CONFIG_ARGS
+    fi
+
+    if [ $debugging -eq 1 ]; then
+        hadrian="$hadrian --debug"
+    fi
+
+    $hadrian --flavour=$flavour
+
+    check_packages post-build
+
+    # -------------------------------------------------------------------------
+    # Build a binary distribution (not --fast)
+
+    if [ $speed != "FAST" ]; then
+        # Set bindistdir only when a binary distribution is built
+        bindistdir="bindisttest/install   dir"
+        ghc="$basedir/$bindistdir/bin/ghc"
+
+        $hadrian binary-dist --docs=no-sphinx
+        cfgdir="$(dirname "$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)")"
+        cd "$cfgdir"
+        ./configure --prefix="$basedir/$bindistdir" && make install
+        cd "$basedir"
+        "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
+
+        check_packages post-install
+
+        cd "$basedir/libraries/xhtml"
+        dynamicGhc=$("$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
+        if [ "$dynamicGhc" = "NO" ]; then
+            libFlags="--disable-shared --enable-library-vanilla"
+        else
+            libFlags="--enable-shared --disable-library-vanilla"
+        fi
+        libFlags="$libFlags --disable-library-prof"
+
+        "$ghc" --make Setup
+
+        # shellcheck disable=SC2086
+        ./Setup configure \
+            --with-ghc="$ghc" \
+            --with-haddock="$basedir/$bindistdir/bin/haddock" $libFlags \
+            --global --builddir=dist-bindist \
+            --prefix="$basedir/$bindistdir"
+        ./Setup build --builddir=dist-bindist
+        ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
+        ./Setup install --builddir=dist-bindist
+        ./Setup clean --builddir=dist-bindist
+        rm -f Setup Setup.exe Setup.hi Setup.o
+        cd "$basedir"
+
+        check_packages post-xhtml
+    fi
+
+    if [ $build_only -eq 1 ]; then
+        cat <<EOF
+-------------------------------------------------------------------
+Congratulations!  This tree has compiled successfully.
+
+You can now test your new compiler using ./validate --testsuite-only.
+EOF
+    exit 0
+    fi
+fi # Done with building the compiler and packages
+
+if [ "$hpc" = YES ]; then
+    # XXX With threads we'd need to give a different tix file to each thread
+    #     and then sum them up at the end
+    threads=1
+    HPCTIXFILE=$basedir/testsuite/hpc_output/ghc.tix
+    export HPCTIXFILE
+    rm -f "$HPCTIXFILE"
+fi
+
+case "$speed" in
+SLOW)
+    MAKE_TEST_TARGET=slowtest
+    BINDIST="BINDIST=YES"
+    HADRIAN_TEST_SPEED=slow
+    ;;
+NORMAL)
+    # shellcheck disable=2209
+    MAKE_TEST_TARGET=test
+    BINDIST="BINDIST=YES"
+    HADRIAN_TEST_SPEED=normal
+    ;;
+FAST)
+    MAKE_TEST_TARGET=fasttest
+    BINDIST="BINDIST=NO"
+    HADRIAN_TEST_SPEED=fast
+    ;;
+esac
+
+if [ $be_quiet -eq 1 ] && [ -z "${VERBOSE+ }" ]; then
+    TEST_VERBOSITY="VERBOSE=1"
+fi
+
+# We need to be quite picky on Windows about which Python interpreter we use
+# (#12554, #12661). Allow the user to override it.
+if [ "z$PYTHON" == "z" ]; then
+    PYTHON="$(which python3)"
+fi
+if [ "z$PYTHON" == "z" ]; then
+    PYTHON="$(which python)"
+fi
+PYTHON_ARG="PYTHONPATH=$PYTHON"
+
+if [ "$ignore_perf_all" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=all"
+elif [ "$ignore_perf_increases" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=increases"
+elif [ "$ignore_perf_decreases" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=decreases"
+fi
+
+# Run the testsuite
+if [ $testsuite_only -eq 1 ] ||
+    { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; };  then
+
+    cd "$basedir"
+    rm -f testsuite_summary.txt testsuite_summary_stage1.txt testsuite.xml
+
+    # If the --fast flag is used, make the test ghc an in-tree compiler
+    if  [ -d  "$basedir/bindisttest/install   dir"  ] && [ $BINDIST = "BINDIST=YES" ]; then
+        testghc="$basedir/bindisttest/install   dir/bin/ghc"
+    elif [ $BINDIST = "BINDIST=NO" ]; then
+        testghc="stage2"
+    fi
+
+    hadrian_test_with_args="test --test-speed=$HADRIAN_TEST_SPEED \
+        --test-compiler=\"$testghc\" \
+        --summary=$basedir/testsuite_summary.txt \
+        --summary-junit=$basedir/testsuite.xml"
+    sh -c "$hadrian $hadrian_test_with_args \"$test_perf_args\""
+
+    # Use stage1 compiler when BINDIST=NO
+    if [ "$BINDIST" = "NO" ] && [ ! -d "bindisttest/install   dir" ]; then
+        hadrian_test_with_args_stage1="test --test-speed=$HADRIAN_TEST_SPEED \
+            --test-root-dirs=\"$basedir/testsuite/tests/stage1\" \
+            --test-compiler=\"$testghc\" \
+            --summary=$basedir/testsuite_summary_stage1.txt \
+            --summary-junit=$basedir/testsuite_stage1.xml"
+        sh -c "$hadrian $hadrian_test_with_args_stage1 \"$test_perf_args\""
+
+        echo '==== STAGE 1 TESTS (using Hadrian) ==== '
+        cat testsuite_summary_stage1.txt
+    fi
+
+    echo '==== STAGE 2 TESTS (using Hadrian) ==== '
+    cat testsuite_summary.txt
+
+    echo "Checking packages after running the testsuite..."
+    check_packages post-testsuite
+fi # Test run is complete
+
+if [ "$hpc" = YES ]
+then
+    "$basedir"/utils/hpc/hpc markup --hpcdir=. --srcdir=compiler \
+    --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
+fi
+
+if  grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+
+    no_hadrian_stage_2_failures=1
+
+    if [ "$BINDIST" = "NO" ]; then
+        grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null;
+
+            no_hadrian_stage_1_failures=1
+    fi
+
+    if [ "$BINDIST" = "NO" ]; then
+        no_hadrian_test_failures=$no_hadrian_stage_1_failures && $no_hadrian_stage_2_failures
+    else
+        no_hadrian_test_failures=$no_hadrian_stage_2_failures
+    fi
+fi
+if grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+
+    no_hadrian_perf_test_failures=1
+fi
+
+if [ $no_hadrian_test_failures ] || [ $no_make_test_failures ]; then
+    if [ $no_hadrian_perf_test_failures -eq 1 ] ||
+                                [ $no_make_perf_test_failures -eq 1 ]; then
+        if [ "$ignore_perf_all" = "YES" ] ||
+           [ "$ignore_perf_increases" = "YES" ] ||
+           [ "$ignore_perf_decreases" = "YES" ]; then
+           cat <<EOF
+--------------------------------------------------------------------
+Changes in metrics for performance tests were ignored in this test run.
+If you want to either log changes in performance test metrics on your
+commits or want to compare the metrics produced by your commits to the
+current CI performance metrics, use the instructions at
+https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/performance-tests#ci-performance-metrics
+to do so.
+--------------------------------------------------------------------
+EOF
+        else
+            cat <<EOF
+--------------------------------------------------------------------
+Performance test failures could not be detected in this test run. For
+adding new performance tests (if applicable) along with you changes,
+refer to https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/adding#performance-tests
+--------------------------------------------------------------------
+EOF
+        fi
+    fi
+    if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]; then
+        cat <<EOF
+-------------------------------------------------------------------
+Congratulations!  This tree has passed minimal testing.
+
+NOTE: If you have made changes that may cause failures not tested for by
+the minimal testing procedure, please do further testing as necessary.
+
+When you are satisfied that you haven't broken anything, go ahead and
+push/send your patches.
+EOF
+        if [ -f mk/validate.mk ] && grep -q "^[^#]" mk/validate.mk ; then
+            cat <<EOF
+
+WARNING: You seem to have things set in mk/validate.mk. Please check
+that it is OK before pushing.
+EOF
+        fi
+    else
+        cat <<EOF
+-------------------------------------------------------------------
+I didn't find any problems, but this wasn't a complete validate run,
+so be careful!
+
+NOTE: If you have made changes that may cause failures not tested for by
+the minimal testing procedure, please do further testing as necessary.
+-------------------------------------------------------------------
+EOF
+    fi
+else
+    if [ -z "${no_hadrian_perf_test_failures}" ] ||
+                    [ -z "${no_make_perf_test_failures}" ]; then
+        cat <<EOF
+--------------------------------------------------------------------
+Unexpected performance test failures occured in this run. Please
+refer to instructions at
+https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/performance-tests
+to pin-point the cause.
+--------------------------------------------------------------------
+EOF
+    fi
+    if [ $be_quiet -eq 0 ]; then
+       cat <<EOF
+-------------------------------------------------------------------
+Oops!  Looks like you have some unexpected test results or framework failures.
+Please fix them before pushing/sending patches.
+-------------------------------------------------------------------
+EOF
+    fi
+    exit 1
+fi

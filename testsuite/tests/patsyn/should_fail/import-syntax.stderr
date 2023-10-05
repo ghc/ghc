@@ -1,0 +1,4 @@
+
+import-syntax.hs:4:22: error: [GHC-81284]
+    Illegal import form, this syntax can only be used to bundle
+    pattern synonyms with types in module exports.

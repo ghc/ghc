@@ -1,0 +1,5 @@
+[1 of 3] Compiling RecordDotSyntaxA ( RecordDotSyntaxA.hs, RecordDotSyntaxA.o )
+[2 of 3] Compiling Main             ( RecordDotSyntaxFail6.hs, RecordDotSyntaxFail6.o )
+
+RecordDotSyntaxFail6.hs:10:17: error: [GHC-94863]
+    Fields cannot be qualified when OverloadedRecordUpdate is enabled

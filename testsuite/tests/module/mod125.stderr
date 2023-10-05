@@ -1,0 +1,6 @@
+
+mod125.hs:7:5: error: [GHC-88464]
+    Data constructor not in scope: T
+    Suggested fix:
+      Remove ‘T’ from the explicit hiding list in the import of
+      ‘Mod125_A’ (at mod125.hs:4:1-26).

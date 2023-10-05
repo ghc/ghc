@@ -1,0 +1,4 @@
+
+<no location info>: error: [GHC-35235]
+    Could not find module ‘NonModule’.
+    It is not a module in the current program, or in any known package.

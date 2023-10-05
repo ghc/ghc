@@ -1,0 +1,8 @@
+TYPE SIGNATURES
+  arbitCs1 :: forall a. (Show a, Enum a, Eq a) => a -> String
+  arbitCs2 :: forall a. (Show a, Enum a, Eq a) => a -> String
+  arbitCs3 :: forall a. (Show a, Enum a, Eq a) => a -> String
+  arbitCs4 :: forall a. (Eq a, Show a, Enum a) => a -> String
+  arbitCs5 :: forall a. (Eq a, Enum a, Show a) => a -> String
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]

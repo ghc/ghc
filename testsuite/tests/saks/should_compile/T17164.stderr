@@ -1,0 +1,7 @@
+T17164.hs:(12,2)-(14,7): Splicing declarations
+    [d| type T :: forall k -> k -> Type
+        
+        type family T :: forall k -> k -> Type |]
+  ======>
+    type T :: forall k -> k -> Type
+    type family T :: forall k -> k -> Type

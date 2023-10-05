@@ -1,0 +1,3 @@
+
+tcfail114.hs:11:20: error: [GHC-22385]
+    Not in scope: record field ‘foo’

@@ -1,0 +1,3 @@
+
+when making flags consistent: warning: [GHC-74335] [-Winconsistent-flags (in -Wdefault)]
+    Ignoring optimization flags since they are experimental for the byte-code interpreter. Pass -fno-unoptimized-core-for-interpreter to enable this feature.

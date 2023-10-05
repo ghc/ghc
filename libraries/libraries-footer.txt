@@ -1,0 +1,20 @@
+Implementation-specific notes:
+
+[GHC\/GHCi] Most of the time, all the packages are available without the need to
+use any additional command-line options.  The only time when this is not the
+case is when linking a program on the command line, without using the @--make@
+option: in this case you must list all the packages to link to by adding the
+@-package@ /P/ flag (where /P/ is the package name) to the command line for each
+package.  See the User's Guide (<../users_guide/index.html>) for more
+details.
+
+[Hugs] Hugs provides almost all of the modules in the above packages,
+with exceptions listed on the Hugs 98 libraries status page
+(<http://cvs.haskell.org/Hugs/pages/libstatus.html>).
+All those modules are always available.
+
+[Nhc98] Nhc98 provides many of the modules in the above packages (see the
+Nhc98 libraries page (<http://www.haskell.org/nhc98/libraries.html>) for a more
+details).  The modules of the @haskell98@ package are available without the need
+to use any additional compile-time options.  To use modules from some other
+package /P/ with Nhc98, add the compile-time option @-package@ /P/.

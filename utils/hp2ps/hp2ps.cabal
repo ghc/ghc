@@ -1,0 +1,25 @@
+cabal-version: 2.4
+Name: hp2ps
+Version: 0.1
+Copyright: XXX
+license: BSD-3-Clause
+Author: XXX
+Maintainer: XXX
+Synopsis: Heap Profile to PostScript converter
+Description: XXX
+Category: Development
+build-type: Simple
+extra-source-files: AreaBelow.h AuxFile.h Axes.h Curves.h Defines.h Deviation.h
+                    Dimensions.h Error.h HpFile.h Key.h Main.h Marks.h PsFile.h Reorder.h Scale.h
+                    Shade.h TopTwenty.h TraceElement.h Utilities.h
+
+Executable hp2ps
+    Default-Language: Haskell2010
+    Main-Is: Main.c
+    extra-libraries: m
+    C-Sources:
+       AreaBelow.c Curves.c Error.c
+       Reorder.c TopTwenty.c AuxFile.c Deviation.c
+       HpFile.c Marks.c Scale.c TraceElement.c
+       Axes.c Dimensions.c Key.c PsFile.c Shade.c
+       Utilities.c

@@ -1,0 +1,3 @@
+
+TDRecordsH98.hs:4:22: [GHC-67297]
+    Labelled fields are not allowed in type data declarations.

@@ -1,0 +1,10 @@
+
+<interactive>:3:16: [GHC-29916]
+    Multiple declarations of ‘A’
+    Declared at: <interactive>:3:12
+                 <interactive>:3:16
+
+<interactive>:5:16: [GHC-29916]
+    Multiple declarations of ‘A’
+    Declared at: <interactive>:5:12
+                 <interactive>:5:16

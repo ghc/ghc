@@ -1,0 +1,273 @@
+.. _release-9-10-1:
+
+Version 9.10.1
+==============
+
+Language
+~~~~~~~~
+
+- GHC Proposal `#281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  "Visible forall in types of terms" has been partially implemented.
+  The following code is now accepted by GHC::
+
+    {-# LANGUAGE RequiredTypeArguments #-}
+
+    vshow :: forall a -> Show a => a -> String
+    vshow t x = show (x :: t)
+
+    s1 = vshow Int    42      -- "42"
+    s2 = vshow Double 42      -- "42.0"
+
+  The use of ``forall a ->`` instead of ``forall a.`` indicates a *required* type
+  argument. A required type argument is visually indistinguishable from a value
+  argument but does not exist at runtime.
+
+  This feature is guarded behind :extension:`RequiredTypeArguments`.
+
+- The :extension:`ExplicitNamespaces` extension can now be used in conjunction
+  with :extension:`RequiredTypeArguments` to select the type namespace in a
+  required type argument::
+
+    data T = T               -- the name `T` is ambiguous
+    f :: forall a -> ...     -- `f` expects a required type argument
+
+    x1 = f T         -- refers to the /data/ constructor `T`
+    x2 = f (type T)  -- refers to the /type/ constructor `T`
+
+- With :extension:`LinearTypes`, ``let`` and ``where`` bindings can
+  now be linear. So the following now typechecks::
+
+    f :: A %1 -> B
+    g :: B %1 -> C
+
+    h :: A %1 -> C
+    h x = g y
+      where
+        y = f x
+
+- Due to an oversight, previous GHC releases (starting from 9.4) allowed the use
+  of promoted data types in kinds, even when :extension:`DataKinds` was not
+  enabled. That is, GHC would erroneously accept the following code: ::
+
+    {-# LANGUAGE NoDataKinds #-}
+
+    import Data.Kind (Type)
+    import GHC.TypeNats (Nat)
+
+    -- Nat shouldn't be allowed here without DataKinds
+    data Vec :: Nat -> Type -> Type
+
+  This oversight has now been fixed. If you wrote code that took advantage of
+  this oversight, you may need to enable :extension:`DataKinds` in your code to
+  allow it to compile with GHC 9.10.
+
+  For more information on what types are allowed in kinds, see the
+  :ref:`promotion` section.
+
+- Using ``forall`` as an identifier is now a parse error, as forewarned
+  by :ghc-flag:`-Wforall-identifier`::
+
+    forall :: (Variable a, MonadQSAT s m) => m a
+    -- parse error on input ‘forall’
+
+  Library authors are advised to use a different name for their functions,
+  such as ``forAll``, ``for_all``, or ``forall_``.
+
+- GHC Proposal `#65 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0065-type-infix.rst>`_
+  "Require namespacing fixity declarations for type names and WARNING/DEPRECATED pragmas" has been partially implemented.
+  Now, with :extension:`ExplicitNamespaces` enabled, you can specify the
+  namespace of a name that you want to warn about or deprecate: ::
+
+    {-# DEPRECATED type D "Use `()` instead" #-} -- this will deprecate type D, but will not touch pattern synonym
+    data D = MkD
+
+    {-# DEPRECATED data D "Use `MkD` instead" #-} -- this will deprecate pattern synonym only
+    pattern D = MkD
+
+  Ditto for ``{-# WARNING ... #-}`` pragmas.
+
+Compiler
+~~~~~~~~
+
+- GHC Proposal `#516
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>`_
+  has been implemented. It introduces a warning :ghc-flag:`-Wincomplete-record-selectors` which warns about when
+  an invocation of a record selector may fail due to being applied to a constructor for which it is not defined.
+
+  For example ::
+
+    data T = T1 | T2 { x :: Int }
+    f :: T -> Int
+    f a = x a + 1 -- emit a warning here, since `f T1` will fail
+
+  Unlike :ghc-flag:`-Wpartial-fields` this produces a warning about incomplete selectors at use sites instead of
+  definition sites, so it is useful in cases when the library does intend for incomplete record selectors to be
+  used but only in specific circumstances (e.g. when other cases are handled by previous pattern matches).
+
+- The :ghc-flag:`-finfo-table-map-with-stack` and
+  :ghc-flag:`-finfo-table-map-with-fallback` flags have been introduced. These
+  flags include ``STACK`` info tables and info tables with default source
+  location information in the info table map, respectively. They are implied by
+  the :ghc-flag:`-finfo-table-map` flag. The corresponding negative flags
+  (:ghc-flag:`-fno-info-table-map-with-stack`,
+  :ghc-flag:`-fno-info-table-map-with-fallback`) are useful for omitting these
+  info tables from the info table map and reducing the size of executables
+  containing info table profiling information. In a test on the `Agda codebase
+  <https://github.com/agda/agda>`_, the size of the build results was reduced by
+  about 10% when these info tables were omitted.
+
+- Fixed a bug where compiling with both :ghc-flag:`-ddump-timings` and :ghc-flag:`-ddump-to-file` did not
+  suppress printing timings to the console. See :ghc-ticket:`20316`.
+
+- Defaulting plugins can now propose solutions to entangled sets of type variables. This allows defaulting
+  of multi-parameter type classes. See :ghc-ticket:`23832`.
+
+- The flag `-funbox-small-strict-fields` will now properly recognize unboxed tuples
+  containing multiple elements as large. Constructors like `Foo (# Int64, Int64# )`
+  will no longer be considered small and therefore not unboxed by default under `-O`
+  even when used as strict field. :ghc-ticket:`22309`.
+
+- The flag `-funbox-small-strict-fields` will now always unpack things as if compiling
+  for a 64bit platform. Even when generating code for a 32bit platform.
+  This makes core optimizations more consistent between 32bit and 64bit platforms
+  at the cost of slightly worse 32bit performance in edge cases.
+
+- Type abstractions in constructor patterns that were previously admitted without enabling the :extension:`TypeAbstractions`
+  extension now trigger a warning, :ghc-flag:`-Wdeprecated-type-abstractions`.
+  This new warning is part of the :ghc-flag:`-Wcompat` warning group and will become an error in a future GHC release.
+
+- The :ghc-flag:`-Wforall-identifier` flag is now deprecated and removed from :ghc-flag:`-Wdefault`,
+  as ``forall`` is no longer parsed as an identifier.
+
+- Late plugins have been added. These are plugins which can access and/or modify
+  the core of a module after optimization and after interface creation. See :ghc-ticket:`24254`.
+
+GHCi
+~~~~
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- Internal fragmentation incurred by the non-moving GC's allocator has been reduced for small objects.
+  In one real-world application, this has reduced resident set size by about 20% and modestly improved run-time.
+  See :ghc-ticket:`23340`.
+  :rts-flag:`--nonmoving-dense-allocator-count=⟨count⟩` has been added to fine-tune this behaviour.
+
+- Add a :rts-flag:`--no-automatic-time-samples` flag which stops time profiling samples being automatically started on
+  startup. Time profiling can be controlled manually using functions in ``GHC.Profiling``.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Updated to `Unicode 15.1.0 <https://www.unicode.org/versions/Unicode15.1.0/>`_.
+
+- The functions :base-ref:`GHC.Exts.dataToTag#` and
+  :base-ref:`GHC.Base.getTag` have had their types changed to the
+  following:
+
+  ::
+
+    dataToTag#, getTag
+      :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev))
+      .  DataToTag a => a -> Int#
+
+  In particular, they are now applicable only at some (not all)
+  lifted types.  However, if ``t`` is an algebraic data type (i.e. ``t``
+  matches a ``data`` or ``data instance`` declaration) with all of its
+  constructors in scope and the levity of ``t`` is statically known,
+  then the constraint ``DataToTag t`` can always be solved.
+
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- ``dataToTag#`` has been moved from ``GHC.Prim``.  It remains
+  exported by ``GHC.Exts``, but with a different type, as described in
+  the notes for ``base`` above.
+
+- New primops for unaligned ``Addr#`` access.
+  These primops will be emulated on platforms that don't support unaligned access.
+  These primops take the form
+
+  .. code-block:: haskell
+
+     indexWord8OffAddrAs<ty> :: Addr# -> Int# -> <ty>#
+     readWord8OffAddrAs<ty> :: Addr# -> Int# -> State# s -> (# State# s, <ty># #)
+     writeWord8OffAddrAs<ty> :: Addr# -> Int# -> <ty># -> State# s -> State# s
+
+  where ``<ty>`` is one of:
+
+  - ``Word``
+  - ``Word{16,32,64}``
+  - ``Int``
+  - ``Int{16,32,64,}``
+  - ``Char``
+  - ``WideChar``
+  - ``Addr``
+  - ``Float``
+  - ``Double``
+  - ``StablePtr``
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``ghc-experimental`` is a new library for functions and data types with
+  weaker stability guarantees. Introduced per the HF Technical Proposal `#51
+  <https://github.com/haskellfoundation/tech-proposals/blob/main/proposals/accepted/051-ghc-base-libraries.rst>`_.
+
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Extend ``Pat`` with ``TypeP`` and ``Exp`` with ``TypeE``,
+  introduce functions ``typeP`` and ``typeE`` (Template Haskell support for GHC Proposal `#281
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_).
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable

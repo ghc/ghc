@@ -1,0 +1,23 @@
+unit p where
+    signature H where
+        data T
+
+unit q where
+    signature H where
+        data T = T
+
+unit pq0 where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+
+unit pq1 where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+    signature H where
+        data T = T
+
+unit pq2 where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+    signature H where
+        data T

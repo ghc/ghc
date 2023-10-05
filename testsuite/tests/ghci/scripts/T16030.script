@@ -1,0 +1,4 @@
+:load T16030
+:info Foo1 Foo2
+:set -fprint-explicit-kinds
+:info Foo1 Foo2

@@ -1,0 +1,40 @@
+Target
+{ tgtArchOs = ArchOS {archOS_arch = @HaskellTargetArch@, archOS_OS = @HaskellTargetOs@}
+, tgtVendor = @TargetVendor_CPPMaybeStr@
+, tgtLocallyExecutable = @NotCrossCompilingBool@
+, tgtSupportsGnuNonexecStack = @TargetHasGnuNonexecStackBool@
+, tgtSupportsSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbolsBool@
+, tgtSupportsIdentDirective = @TargetHasIdentDirectiveBool@
+, tgtWordSize = WS@TargetWordSize@
+, tgtEndianness = @TargetEndianness@
+, tgtSymbolsHaveLeadingUnderscore = @LeadingUnderscoreBool@
+, tgtLlvmTarget = "@LlvmTarget@"
+, tgtUnregisterised = @UnregisterisedBool@
+, tgtTablesNextToCode = @TablesNextToCodeBool@
+, tgtUseLibffiForAdjustors = @UseLibffiForAdjustorsBool@
+, tgtCCompiler = Cc {ccProgram = Program {prgPath = "@CC@", prgFlags = @CONF_CC_OPTS_STAGE2List@}}
+, tgtCxxCompiler = Cxx {cxxProgram = Program {prgPath = "@CXX@", prgFlags = @CONF_CXX_OPTS_STAGE2List@}}
+, tgtCPreprocessor = Cpp {cppProgram = Program {prgPath = "@CPPCmd@", prgFlags = @CONF_CPP_OPTS_STAGE2List@}}
+, tgtHsCPreprocessor = HsCpp {hsCppProgram = Program {prgPath = "@HaskellCPPCmd@", prgFlags = @HaskellCPPArgsList@}}
+, tgtCCompilerLink = CcLink
+{ ccLinkProgram = Program {prgPath = "@CC@", prgFlags = @CONF_GCC_LINKER_OPTS_STAGE2List@}
+, ccLinkSupportsNoPie = @CONF_GCC_SUPPORTS_NO_PIEBool@
+, ccLinkSupportsCompactUnwind = @LdHasNoCompactUnwindBool@
+, ccLinkSupportsFilelist = @LdHasFilelistBool@
+, ccLinkSupportsSingleModule = @LdHasSingleModuleBool@
+, ccLinkIsGnu = @LdIsGNULdBool@
+}
+
+, tgtAr = Ar
+{ arMkArchive = Program {prgPath = "@ArCmd@", prgFlags = @ArArgsList@}
+, arIsGnu = @ArIsGNUArBool@
+, arSupportsAtFile = @ArSupportsAtFileBool@
+, arSupportsDashL = @ArSupportsDashLBool@
+, arNeedsRanlib = @ArNeedsRanLibBool@
+}
+
+, tgtRanlib = Just (Ranlib {ranlibProgram = Program {prgPath = "@RanlibCmd@", prgFlags = []}})
+, tgtNm = Nm {nmProgram = Program {prgPath = "@NmCmd@", prgFlags = []}}
+, tgtMergeObjs = @MergeObjsCmdMaybe@
+, tgtWindres = @WindresCmdMaybeProg@
+}

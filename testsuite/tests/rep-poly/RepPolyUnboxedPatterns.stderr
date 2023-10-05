@@ -1,0 +1,12 @@
+
+RepPolyUnboxedPatterns.hs:8:1: error: [GHC-55287]
+    The first pattern in the equation for ‘foo’
+    does not have a fixed runtime representation.
+    Its type is:
+      (# a, b #) :: TYPE (TupleRep [rep1, rep2])
+
+RepPolyUnboxedPatterns.hs:11:1: error: [GHC-55287]
+    The first pattern in the equations for ‘bar’
+    does not have a fixed runtime representation.
+    Its type is:
+      (# a | b #) :: TYPE (SumRep [rep1, rep2])

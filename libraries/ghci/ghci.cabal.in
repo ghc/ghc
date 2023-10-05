@@ -1,0 +1,91 @@
+-- WARNING: ghci.cabal is automatically generated from ghci.cabal.in by
+-- ../../configure.  Make sure you are editing ghci.cabal.in, not ghci.cabal.
+
+name:           ghci
+version:        @ProjectVersionMunged@
+license:        BSD3
+license-file:   LICENSE
+category:       GHC
+maintainer:     ghc-devs@haskell.org
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
+synopsis:       The library supporting GHC's interactive interpreter
+description:
+            This library offers interfaces which mediate interactions between the
+            @ghci@ interactive shell and @iserv@, GHC's out-of-process interpreter
+            backend.
+cabal-version:  >=1.10
+build-type:     Simple
+extra-source-files: changelog.md
+
+Flag internal-interpreter
+    Description: Build with internal interpreter support.
+    Default: False
+    Manual: True
+
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc.git
+    subdir:   libraries/ghci
+
+library
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude
+    other-extensions:
+        BangPatterns
+        CPP
+        DeriveGeneric
+        ExistentialQuantification
+        FlexibleInstances
+        GADTs
+        GeneralizedNewtypeDeriving
+        InstanceSigs
+        MagicHash
+        MultiParamTypeClasses
+        RecordWildCards
+        ScopedTypeVariables
+        StandaloneDeriving
+        TupleSections
+        UnboxedTuples
+
+    if flag(internal-interpreter)
+        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
+        exposed-modules:
+            GHCi.Run
+            GHCi.CreateBCO
+            GHCi.ObjLink
+            GHCi.Signals
+            GHCi.StaticPtrTable
+            GHCi.TH
+            GHCi.Server
+
+        if !arch(javascript)
+          exposed-modules:
+            GHCi.InfoTable
+
+    exposed-modules:
+        GHCi.BreakArray
+        GHCi.BinaryArray
+        GHCi.Message
+        GHCi.ResolvedBCO
+        GHCi.RemoteTypes
+        GHCi.FFI
+        GHCi.TH.Binary
+        GHCi.Utils
+
+    Build-Depends:
+        rts,
+        array            == 0.5.*,
+        base             >= 4.8 && < 4.20,
+        ghc-prim         >= 0.5.0 && < 0.12,
+        binary           == 0.8.*,
+        bytestring       >= 0.10 && < 0.13,
+        containers       >= 0.5 && < 0.8,
+        deepseq          >= 1.4 && < 1.6,
+        filepath         == 1.4.*,
+        ghc-boot         == @ProjectVersionMunged@,
+        ghc-heap         == @ProjectVersionMunged@,
+        template-haskell == 2.21.*,
+        transformers     >= 0.5 && < 0.7
+
+    if !os(windows)
+        Build-Depends: unix >= 2.7 && < 2.9

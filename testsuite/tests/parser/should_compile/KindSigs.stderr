@@ -1,0 +1,1969 @@
+
+==================== Parser AST ====================
+
+(L
+ { KindSigs.hs:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { KindSigs.hs:1:1 })
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
+     []
+     (Just
+      ((,)
+       { KindSigs.hs:36:1 }
+       { KindSigs.hs:35:8-11 })))
+    (EpaCommentsBalanced
+     []
+     []))
+   (EpVirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:6:8-15 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    {ModuleName: KindSigs}))
+  (Nothing)
+  [(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:8:1-16 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnn
+       (EpaSpan { KindSigs.hs:8:1-16 })
+       (EpAnnImportDecl
+        (EpaSpan { KindSigs.hs:8:1-6 })
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing))
+       (EpaComments
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (EpAnn
+       (EpaSpan { KindSigs.hs:8:8-16 })
+       (AnnListItem
+        [])
+       (EpaComments
+        []))
+      {ModuleName: Data.Kind})
+     (NoRawPkgQual)
+     (NotBoot)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Nothing)))]
+  [(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:(11,1)-(12,21) })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (FamDecl
+      (NoExtField)
+      (FamilyDecl
+       (EpAnn
+        (EpaSpan { KindSigs.hs:(11,1)-(12,21) })
+        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:11:1-4 }))
+        ,(AddEpAnn AnnFamily (EpaSpan { KindSigs.hs:11:6-11 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:11:19-23 }))]
+        (EpaComments
+         []))
+       (ClosedTypeFamily
+        (Just
+         [(L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:12:3-21 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (FamEqn
+            (EpAnn
+             (EpaSpan { KindSigs.hs:12:3-21 })
+             [(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:12:9 }))]
+             (EpaComments
+              []))
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:12:3-5 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Foo}))
+            (HsOuterImplicit
+             (NoExtField))
+            [(HsValArg
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { KindSigs.hs:12:7 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:12:7 })
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:12:7 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: a})))))]
+            (Prefix)
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:12:11-21 })
+              (AnnListItem
+               [])
+              (EpaComments
+               []))
+             (HsKindSig
+              (EpAnn
+               (EpaSpan { KindSigs.hs:12:11-21 })
+               [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:12:15-16 }))]
+               (EpaComments
+                []))
+              (L
+               (EpAnn
+                (EpaSpan { KindSigs.hs:12:11-13 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:12:11-13 })
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:12:11-13 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: Int}))))
+              (L
+               (EpAnn
+                (EpaSpan { KindSigs.hs:12:18-21 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:12:18-21 })
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:12:18-21 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: Type}))))))))]))
+       (TopLevel)
+       (L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:11:13-15 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          []))
+        (Unqual
+         {OccName: Foo}))
+       (HsQTvs
+        (NoExtField)
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:11:17 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (UserTyVar
+           (EpAnn
+            (EpaSpan { KindSigs.hs:11:17 })
+            []
+            (EpaComments
+             []))
+           (HsBndrRequired
+            (NoExtField))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:11:17 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a}))))])
+       (Prefix)
+       (L
+        (EpAnn
+         (EpaSpan { <no location info> })
+         (NoEpAnns)
+         (EpaComments
+          []))
+        (NoSig
+         (NoExtField)))
+       (Nothing)))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:15:1-51 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:15:1-51 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:15:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:15:12 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:15:6-8 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Bar}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:15:10 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { KindSigs.hs:15:10 })
+           []
+           (EpaComments
+            []))
+          (HsBndrRequired
+           (NoExtField))
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:15:10 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:15:14-51 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsTupleTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:15:14-51 })
+         (AnnParen
+          (AnnParens)
+          (EpaSpan { KindSigs.hs:15:14 })
+          (EpaSpan { KindSigs.hs:15:51 }))
+         (EpaComments
+          []))
+        (HsBoxedOrConstraintTuple)
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:15:16-26 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:15:27 }))])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:15:16-26 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:15:20-21 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:15:16-18 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:15:16-18 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:15:16-18 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Int}))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:15:23-26 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:15:23-26 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:15:23-26 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type}))))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:15:29-32 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:15:33 }))])
+           (EpaComments
+            []))
+          (HsTyVar
+           (EpAnn
+            (EpaSpan { KindSigs.hs:15:29-32 })
+            []
+            (EpaComments
+             []))
+           (NotPromoted)
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:15:29-32 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: Bool}))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:15:35-49 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:15:35-49 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:15:43-44 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:15:35-41 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsAppTy
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:15:35-39 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:15:35-39 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:15:35-39 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Maybe}))))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:15:41 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:15:41 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:15:41 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: a}))))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:15:46-49 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:15:46-49 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:15:46-49 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type}))))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:16:1-54 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:16:1-54 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:16:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:16:13 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:16:6-9 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Bar'}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:16:11 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { KindSigs.hs:16:11 })
+           []
+           (EpaComments
+            []))
+          (HsBndrRequired
+           (NoExtField))
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:16:11 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:16:15-54 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsTupleTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:16:15-54 })
+         (AnnParen
+          (AnnParensHash)
+          (EpaSpan { KindSigs.hs:16:15-16 })
+          (EpaSpan { KindSigs.hs:16:53-54 }))
+         (EpaComments
+          []))
+        (HsUnboxedTuple)
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:16:18-28 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:16:29 }))])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:16:18-28 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:16:22-23 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:16:18-20 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:16:18-20 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:16:18-20 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Int}))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:16:25-28 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:16:25-28 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:16:25-28 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type}))))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:16:31-34 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:16:35 }))])
+           (EpaComments
+            []))
+          (HsTyVar
+           (EpAnn
+            (EpaSpan { KindSigs.hs:16:31-34 })
+            []
+            (EpaComments
+             []))
+           (NotPromoted)
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:16:31-34 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: Bool}))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:16:37-51 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:16:37-51 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:16:45-46 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:16:37-43 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsAppTy
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:16:37-41 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:16:37-41 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:16:37-41 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Maybe}))))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:16:43 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:16:43 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:16:43 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: a}))))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:16:48-51 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:16:48-51 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:16:48-51 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type}))))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:19:1-26 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:19:1-26 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:19:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:19:10 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:19:6-8 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Baz}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:19:12-26 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsListTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:19:12-26 })
+         (AnnParen
+          (AnnParensSquare)
+          (EpaSpan { KindSigs.hs:19:12 })
+          (EpaSpan { KindSigs.hs:19:26 }))
+         (EpaComments
+          []))
+        (L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:19:14-24 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (HsKindSig
+          (EpAnn
+           (EpaSpan { KindSigs.hs:19:14-24 })
+           [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:19:18-19 }))]
+           (EpaComments
+            []))
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:19:14-16 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (HsTyVar
+            (EpAnn
+             (EpaSpan { KindSigs.hs:19:14-16 })
+             []
+             (EpaComments
+              []))
+            (NotPromoted)
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:19:14-16 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Int}))))
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:19:21-24 })
+            (AnnListItem
+             [])
+            (EpaComments
+             []))
+           (HsTyVar
+            (EpAnn
+             (EpaSpan { KindSigs.hs:19:21-24 })
+             []
+             (EpaComments
+              []))
+            (NotPromoted)
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:19:21-24 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Type})))))))))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:22:1-44 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (EpAnn
+       (EpaSpan { KindSigs.hs:22:1-44 })
+       (AnnSig
+        (AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:5-6 }))
+        [])
+       (EpaComments
+        []))
+      [(L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:22:1-3 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          []))
+        (Unqual
+         {OccName: qux}))]
+      (HsWC
+       (NoExtField)
+       (L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:22:8-44 })
+         (AnnListItem
+          [])
+         (EpaComments
+          []))
+        (HsSig
+         (NoExtField)
+         (HsOuterImplicit
+          (NoExtField))
+         (L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:22:8-44 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsFunTy
+           (EpAnn
+            (EpaSpan { KindSigs.hs:22:8-44 })
+            (NoEpAnns)
+            (EpaComments
+             []))
+           (HsUnrestrictedArrow
+            (EpUniTok
+             (EpaSpan { KindSigs.hs:22:22-23 })
+             (NormalSyntax)))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:22:8-20 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsParTy
+             (EpAnn
+              (EpaSpan { KindSigs.hs:22:8-20 })
+              (AnnParen
+               (AnnParens)
+               (EpaSpan { KindSigs.hs:22:8 })
+               (EpaSpan { KindSigs.hs:22:20 }))
+              (EpaComments
+               []))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:22:9-19 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsKindSig
+               (EpAnn
+                (EpaSpan { KindSigs.hs:22:9-19 })
+                [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:13-14 }))]
+                (EpaComments
+                 []))
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:22:9-11 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsTyVar
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:22:9-11 })
+                  []
+                  (EpaComments
+                   []))
+                 (NotPromoted)
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:22:9-11 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: Int}))))
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:22:16-19 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsTyVar
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:22:16-19 })
+                  []
+                  (EpaComments
+                   []))
+                 (NotPromoted)
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:22:16-19 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: Type}))))))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:22:25-44 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsFunTy
+             (EpAnn
+              (EpaSpan { KindSigs.hs:22:25-44 })
+              (NoEpAnns)
+              (EpaComments
+               []))
+             (HsUnrestrictedArrow
+              (EpUniTok
+               (EpaSpan { KindSigs.hs:22:30-31 })
+               (NormalSyntax)))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:22:25-28 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:22:25-28 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:22:25-28 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Bool}))))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:22:33-44 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsParTy
+               (EpAnn
+                (EpaSpan { KindSigs.hs:22:33-44 })
+                (AnnParen
+                 (AnnParens)
+                 (EpaSpan { KindSigs.hs:22:33 })
+                 (EpaSpan { KindSigs.hs:22:44 }))
+                (EpaComments
+                 []))
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:22:34-43 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsKindSig
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:22:34-43 })
+                  [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:37-38 }))]
+                  (EpaComments
+                   []))
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:22:34-35 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTupleTy
+                   (EpAnn
+                    (EpaSpan { KindSigs.hs:22:34-35 })
+                    (AnnParen
+                     (AnnParens)
+                     (EpaSpan { KindSigs.hs:22:34 })
+                     (EpaSpan { KindSigs.hs:22:35 }))
+                    (EpaComments
+                     []))
+                   (HsBoxedOrConstraintTuple)
+                   []))
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:22:40-43 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (EpAnn
+                    (EpaSpan { KindSigs.hs:22:40-43 })
+                    []
+                    (EpaComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { KindSigs.hs:22:40-43 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Type}))))))))))))))))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:23:1-12 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:23:1-3 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: qux}))
+      (MG
+       (FromSource)
+       (L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:23:1-12 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:23:1-12 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (Match
+           (EpAnn
+            (EpaSpan { KindSigs.hs:23:1-12 })
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:23:1-3 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: qux}))
+            (Prefix)
+            (NoSrcStrict))
+           [(L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:23:5 })
+              (AnnListItem
+               [])
+              (EpaComments
+               []))
+             (WildPat
+              (NoExtField)))
+           ,(L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:23:7 })
+              (AnnListItem
+               [])
+              (EpaComments
+               []))
+             (WildPat
+              (NoExtField)))]
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:23:9-12 })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { KindSigs.hs:23:9-12 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:23:9 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:23:11-12 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:23:11-12 })
+                   (NameAnnOnly
+                    (NameParens)
+                    (EpaSpan { KindSigs.hs:23:11 })
+                    (EpaSpan { KindSigs.hs:23:12 })
+                    [])
+                   (EpaComments
+                    []))
+                  (Exact
+                   {Name: ()}))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:26:1-29 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:26:1-29 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:26:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:26:11 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:26:6-9 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Quux}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:26:13-29 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsExplicitListTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:26:13-29 })
+         [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:26:13 }))
+         ,(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:26:14 }))
+         ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:26:29 }))]
+         (EpaComments
+          []))
+        (IsPromoted)
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:26:16-27 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:26:16-27 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:26:21-22 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:26:16-19 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:26:16-19 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:26:16-19 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: True}))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:26:24-27 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:26:24-27 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:26:24-27 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Bool}))))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:27:1-45 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:27:1-45 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:27:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:27:12 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:27:6-10 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Quux'}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:27:14-45 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsExplicitListTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:27:14-45 })
+         [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:27:14 }))
+         ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:27:45 }))]
+         (EpaComments
+          []))
+        (NotPromoted)
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:27:16-27 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:27:28 }))])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:27:16-27 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:27:21-22 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:27:16-19 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:27:16-19 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:27:16-19 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: True}))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:27:24-27 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:27:24-27 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:27:24-27 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Bool}))))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:27:30-42 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:27:30-42 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:27:36-37 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:27:30-34 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:27:30-34 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:27:30-34 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: False}))))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:27:39-42 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             (EpAnn
+              (EpaSpan { KindSigs.hs:27:39-42 })
+              []
+              (EpaComments
+               []))
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:27:39-42 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Bool}))))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:28:1-44 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:28:1-44 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:28:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:28:14 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:28:6-10 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Quuux}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:28:12 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { KindSigs.hs:28:12 })
+           []
+           (EpaComments
+            []))
+          (HsBndrRequired
+           (NoExtField))
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:28:12 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: b}))))])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:28:16-44 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsExplicitTupleTy
+        (EpAnn
+         (EpaSpan { KindSigs.hs:28:16-44 })
+         [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:28:16 }))
+         ,(AddEpAnn AnnOpenP (EpaSpan { KindSigs.hs:28:17 }))
+         ,(AddEpAnn AnnCloseP (EpaSpan { KindSigs.hs:28:44 }))]
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:28:19-39 })
+           (AnnListItem
+            [(AddCommaAnn
+              (EpaSpan { KindSigs.hs:28:40 }))])
+           (EpaComments
+            []))
+          (HsKindSig
+           (EpAnn
+            (EpaSpan { KindSigs.hs:28:19-39 })
+            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:28:31-32 }))]
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:28:19-29 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsExplicitListTy
+             (EpAnn
+              (EpaSpan { KindSigs.hs:28:19-29 })
+              [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:28:19 }))
+              ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:28:29 }))]
+              (EpaComments
+               []))
+             (NotPromoted)
+             [(L
+               (EpAnn
+                (EpaSpan { KindSigs.hs:28:20-22 })
+                (AnnListItem
+                 [(AddCommaAnn
+                   (EpaSpan { KindSigs.hs:28:23 }))])
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:28:20-22 })
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:28:20-22 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: Int}))))
+             ,(L
+               (EpAnn
+                (EpaSpan { KindSigs.hs:28:25-28 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 []))
+               (HsTyVar
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:28:25-28 })
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (EpAnn
+                  (EpaSpan { KindSigs.hs:28:25-28 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 (Unqual
+                  {OccName: Bool}))))]))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:28:34-39 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsListTy
+             (EpAnn
+              (EpaSpan { KindSigs.hs:28:34-39 })
+              (AnnParen
+               (AnnParensSquare)
+               (EpaSpan { KindSigs.hs:28:34 })
+               (EpaSpan { KindSigs.hs:28:39 }))
+              (EpaComments
+               []))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:28:35-38 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:28:35-38 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:28:35-38 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Type}))))))))
+        ,(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:28:42 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsTyVar
+           (EpAnn
+            (EpaSpan { KindSigs.hs:28:42 })
+            []
+            (EpaComments
+             []))
+           (NotPromoted)
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:28:42 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: b}))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:31:1-31 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (TyClD
+     (NoExtField)
+     (SynDecl
+      (EpAnn
+       (EpaSpan { KindSigs.hs:31:1-31 })
+       [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:31:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:31:19 }))]
+       (EpaComments
+        []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:31:6-17 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: Sarsaparilla}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:31:21-31 })
+        (AnnListItem
+         [])
+        (EpaComments
+         []))
+       (HsKindSig
+        (EpAnn
+         (EpaSpan { KindSigs.hs:31:21-31 })
+         [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:31:25-26 }))]
+         (EpaComments
+          []))
+        (L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:31:21-23 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (HsTyVar
+          (EpAnn
+           (EpaSpan { KindSigs.hs:31:21-23 })
+           []
+           (EpaComments
+            []))
+          (NotPromoted)
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:31:21-23 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: Int}))))
+        (L
+         (EpAnn
+          (EpaSpan { KindSigs.hs:31:28-31 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (HsTyVar
+          (EpAnn
+           (EpaSpan { KindSigs.hs:31:28-31 })
+           []
+           (EpaComments
+            []))
+          (NotPromoted)
+          (L
+           (EpAnn
+            (EpaSpan { KindSigs.hs:31:28-31 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           (Unqual
+            {OccName: Type})))))))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:34:1-22 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (EpAnn
+       (EpaSpan { KindSigs.hs:34:1-22 })
+       (AnnSig
+        (AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:34:6-7 }))
+        [])
+       (EpaComments
+        []))
+      [(L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:34:1-4 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          []))
+        (Unqual
+         {OccName: true}))]
+      (HsWC
+       (NoExtField)
+       (L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:34:9-22 })
+         (AnnListItem
+          [])
+         (EpaComments
+          []))
+        (HsSig
+         (NoExtField)
+         (HsOuterImplicit
+          (NoExtField))
+         (L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:34:9-22 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (HsParTy
+           (EpAnn
+            (EpaSpan { KindSigs.hs:34:9-22 })
+            (AnnParen
+             (AnnParens)
+             (EpaSpan { KindSigs.hs:34:9 })
+             (EpaSpan { KindSigs.hs:34:22 }))
+            (EpaComments
+             []))
+           (L
+            (EpAnn
+             (EpaSpan { KindSigs.hs:34:10-21 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsKindSig
+             (EpAnn
+              (EpaSpan { KindSigs.hs:34:10-21 })
+              [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:34:15-16 }))]
+              (EpaComments
+               []))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:34:10-13 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:34:10-13 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:34:10-13 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Bool}))))
+             (L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:34:18-21 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpAnn
+                (EpaSpan { KindSigs.hs:34:18-21 })
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:34:18-21 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (Unqual
+                 {OccName: Type}))))))))))))))
+  ,(L
+    (EpAnn
+     (EpaSpan { KindSigs.hs:35:1-11 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:35:1-4 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: true}))
+      (MG
+       (FromSource)
+       (L
+        (EpAnn
+         (EpaSpan { KindSigs.hs:35:1-11 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { KindSigs.hs:35:1-11 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (Match
+           (EpAnn
+            (EpaSpan { KindSigs.hs:35:1-11 })
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { KindSigs.hs:35:1-4 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: true}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:35:6-11 })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { KindSigs.hs:35:6-11 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:35:6 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { KindSigs.hs:35:8-11 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { KindSigs.hs:35:8-11 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: True}))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))]))
+
+

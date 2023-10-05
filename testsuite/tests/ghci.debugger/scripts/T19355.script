@@ -1,0 +1,6 @@
+:print fmap
+:set -fprint-explicit-foralls
+:print fmap
+:print (<*>)
+:set -fno-print-explicit-foralls
+:print (<*>)

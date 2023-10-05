@@ -1,0 +1,54 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 26, types: 13, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoAbsentArgWW.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoAbsentArgWW.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoAbsentArgWW.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoAbsentArgWW.$trModule3
+  = GHC.Types.TrNameS OpaqueNoAbsentArgWW.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoAbsentArgWW.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 60 0}]
+OpaqueNoAbsentArgWW.$trModule2 = "OpaqueNoAbsentArgWW"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoAbsentArgWW.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoAbsentArgWW.$trModule1
+  = GHC.Types.TrNameS OpaqueNoAbsentArgWW.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoAbsentArgWW.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoAbsentArgWW.$trModule
+  = GHC.Types.Module
+      OpaqueNoAbsentArgWW.$trModule3 OpaqueNoAbsentArgWW.$trModule1
+
+-- RHS size: {terms: 11, types: 5, coercions: 0, joins: 0/0}
+f [InlPrag=OPAQUE] :: Int -> Int -> Bool
+[GblId, Arity=2, Str=<A><1P(1L)>, Unf=OtherCon []]
+f = / _ [Occ=Dead] (i :: Int) ->
+      case i of { GHC.Types.I# x ->
+      case x of {
+        __DEFAULT -> GHC.Types.False;
+        0# -> GHC.Types.True
+      }
+      }

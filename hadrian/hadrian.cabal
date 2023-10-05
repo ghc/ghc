@@ -1,0 +1,192 @@
+cabal-version:       1.18
+name:                hadrian
+version:             0.1.0.0
+synopsis:            GHC build system
+license:             BSD3
+license-file:        LICENSE
+author:              Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+maintainer:          Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+copyright:           Andrey Mokhov 2014-2017
+category:            Development
+build-type:          Simple
+extra-doc-files:     README.md
+
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc
+
+-- To accommodate #16873
+flag threaded
+    manual:              True
+    default:             True
+    description:         Build with the threaded runtime for improved
+                         performance. Users with bootstrap compilers
+                         which don't support the threaded runtime should
+                         disable this flag.
+
+-- See also #21913
+flag selftest
+     manual:             True
+     default:            True
+     description:        Enables the hadrian selftest rules which require
+                         QuickCheck. Disabling it thus saves on a few dependencies
+                         which can be problematic when bootstrapping.
+
+executable hadrian
+    main-is:             Main.hs
+    hs-source-dirs:      .
+                       , src
+    other-modules:       Base
+                       , Builder
+                       , CommandLine
+                       , Context
+                       , Context.Path
+                       , Context.Type
+                       , Environment
+                       , Expression
+                       , Expression.Type
+                       , Flavour
+                       , Flavour.Type
+                       , Hadrian.Builder
+                       , Hadrian.Builder.Ar
+                       , Hadrian.Builder.Sphinx
+                       , Hadrian.Builder.Tar
+                       , Hadrian.Builder.Git
+                       , Hadrian.BuildPath
+                       , Hadrian.Expression
+                       , Hadrian.Haskell.Cabal
+                       , Hadrian.Haskell.Hash
+                       , Hadrian.Haskell.Cabal.Type
+                       , Hadrian.Haskell.Cabal.Parse
+                       , Hadrian.Oracles.ArgsHash
+                       , Hadrian.Oracles.Cabal
+                       , Hadrian.Oracles.Cabal.Rules
+                       , Hadrian.Oracles.Cabal.Type
+                       , Hadrian.Oracles.DirectoryContents
+                       , Hadrian.Oracles.Path
+                       , Hadrian.Oracles.TextFile
+                       , Hadrian.Package
+                       , Hadrian.Target
+                       , Hadrian.Utilities
+                       , Oracles.Flag
+                       , Oracles.Flavour
+                       , Oracles.Setting
+                       , Oracles.ModuleFiles
+                       , Oracles.TestSettings
+                       , Packages
+                       , Rules
+                       , Rules.BinaryDist
+                       , Rules.CabalReinstall
+                       , Rules.Clean
+                       , Rules.Codes
+                       , Rules.Compile
+                       , Rules.Dependencies
+                       , Rules.Docspec
+                       , Rules.Documentation
+                       , Rules.Generate
+                       , Rules.Gmp
+                       , Rules.Libffi
+                       , Rules.Library
+                       , Rules.Lint
+                       , Rules.Nofib
+                       , Rules.Program
+                       , Rules.Register
+                       , Rules.Rts
+                       , Rules.SimpleTargets
+                       , Rules.SourceDist
+                       , Rules.Test
+                       , Rules.ToolArgs
+                       , Settings
+                       , Settings.Builders.Alex
+                       , Settings.Builders.Cabal
+                       , Settings.Builders.Common
+                       , Settings.Builders.Cc
+                       , Settings.Builders.Configure
+                       , Settings.Builders.DeriveConstants
+                       , Settings.Builders.GenApply
+                       , Settings.Builders.GenPrimopCode
+                       , Settings.Builders.Ghc
+                       , Settings.Builders.GhcPkg
+                       , Settings.Builders.Haddock
+                       , Settings.Builders.Happy
+                       , Settings.Builders.Hsc2Hs
+                       , Settings.Builders.HsCpp
+                       , Settings.Builders.Ar
+                       , Settings.Builders.Ld
+                       , Settings.Builders.Make
+                       , Settings.Builders.MergeObjects
+                       , Settings.Builders.SplitSections
+                       , Settings.Builders.RunTest
+                       , Settings.Builders.Win32Tarballs
+                       , Settings.Builders.Xelatex
+                       , Settings.Default
+                       , Settings.Flavours.Benchmark
+                       , Settings.Flavours.Development
+                       , Settings.Flavours.GhcInGhci
+                       , Settings.Flavours.Performance
+                       , Settings.Flavours.Quick
+                       , Settings.Flavours.QuickCross
+                       , Settings.Flavours.Quickest
+                       , Settings.Flavours.Validate
+                       , Settings.Flavours.Release
+                       , Settings.Packages
+                       , Settings.Parser
+                       , Settings.Program
+                       , Settings.Warnings
+                       , Stage
+                       , Target
+                       , UserSettings
+                       , Utilities
+                       , Way
+                       , Way.Type
+    default-language:    Haskell2010
+    default-extensions:  DeriveFunctor
+                       , DeriveGeneric
+                       , FlexibleInstances
+                       , GeneralizedNewtypeDeriving
+                       , LambdaCase
+                       , RecordWildCards
+                       , ScopedTypeVariables
+                       , TupleSections
+                       , BangPatterns
+                       , TypeOperators
+    other-extensions:    MultiParamTypeClasses
+                       , TypeFamilies
+    build-depends:       Cabal                >= 3.10    && < 3.11
+                       , base                 >= 4.11    && < 5
+                       , bytestring           >= 0.10    && < 0.13
+                       , containers           >= 0.5     && < 0.7
+                       , directory            >= 1.3.1.0 && < 1.4
+                       , extra                >= 1.4.7
+                       , filepath
+                       , time
+                       , mtl                  >= 2.2     && < 2.4
+                       , parsec               >= 3.1     && < 3.2
+                       , shake                >= 0.18.3  && < 0.20
+                       , transformers         >= 0.4     && < 0.7
+                       , unordered-containers >= 0.2.1   && < 0.3
+                       , text                 >= 1.2     && < 3
+                       , cryptohash-sha256    >= 0.11    && < 0.12
+                       , base16-bytestring    >= 0.1.1 && < 1.1.0.0
+                       , ghc-platform
+                       , ghc-toolchain
+    ghc-options:       -Wall
+                       -Wincomplete-record-updates
+                       -Wredundant-constraints
+                       -fno-warn-name-shadowing
+                       -rtsopts
+                       -fno-ignore-asserts
+
+    if flag(threaded)
+      ghc-options:
+                       -- * -I0: Disable idle GC to avoid redundant GCs while
+                       --        waiting for external processes
+                       -- * -qg: Don't use parallel GC as the synchronization
+                       --        time tends to eat any benefit.
+                       "-with-rtsopts=-I0 -qg"
+                       -threaded
+
+    if flag(selftest)
+      other-modules:   Rules.Selftest
+      cpp-options:     -DHADRIAN_ENABLE_SELFTEST
+      build-depends:   QuickCheck           >= 2.6     && < 2.15

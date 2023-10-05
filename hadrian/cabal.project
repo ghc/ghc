@@ -1,0 +1,12 @@
+packages: ./
+          ../utils/ghc-toolchain/
+          ../libraries/ghc-platform/
+
+-- This essentially freezes the build plan for hadrian
+-- It would be wise to keep this up to date with the state set in ci.sh
+index-state: 2023-10-05T11:38:51Z
+
+-- N.B. Compile with -O0 since this is not a performance-critical executable
+-- and the Cabal takes nearly twice as long to build with -O1. See #16817.
+package Cabal
+  optimization: False

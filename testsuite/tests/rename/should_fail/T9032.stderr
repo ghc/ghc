@@ -1,0 +1,3 @@
+
+T9032.hs:6:1: [GHC-43281]
+    A module cannot import itself: T9032

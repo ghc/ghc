@@ -1,0 +1,7 @@
+
+T22785.hs:8:5: [GHC-83865]
+     Couldn't match type ‘Int’ with ‘MkSolo Int’
+      Expected: Proxy (MkSolo Int)
+        Actual: Proxy Int
+     In the expression: Proxy :: Proxy Int
+      In an equation for ‘p’: p = Proxy :: Proxy Int

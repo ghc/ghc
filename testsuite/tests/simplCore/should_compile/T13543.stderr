@@ -1,0 +1,21 @@
+
+==================== Demand signatures ====================
+Foo.$trModule:
+Foo.f: <1!P(1L)><1!P(L)><1!P(L)>
+Foo.g: <1!P(1!P(L),1!P(L))>
+
+
+
+==================== Cpr signatures ====================
+Foo.$trModule:
+Foo.f: 1
+Foo.g: 1
+
+
+
+==================== Demand signatures ====================
+Foo.$trModule:
+Foo.f: <1!P(1L)><1!P(L)><1!P(L)>
+Foo.g: <1!P(1!P(L),1!P(L))>
+
+

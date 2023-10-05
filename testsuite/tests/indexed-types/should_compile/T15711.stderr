@@ -1,0 +1,6 @@
+TYPE CONSTRUCTORS
+  class C{1} :: * -> Constraint
+  associated type family F{2} :: forall a. Maybe a -> *
+    roles nominal nominal
+Dependent modules: []
+Dependent packages: [base-4.17.0.0]

@@ -1,0 +1,5 @@
+
+readFail035.hs:6:1: [GHC-32478]
+    ‘Foo’ has no constructors
+    In the data declaration for ‘Foo’
+    Suggested fix: Perhaps you intended to use EmptyDataDecls

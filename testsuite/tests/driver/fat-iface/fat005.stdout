@@ -1,0 +1,46 @@
+
+==================== Proto-BCOs ====================
+ProtoBCO Fat.$trModule#0 []:
+   CCS_DONT_CARE GHC.Types.Module! [$trModule2_rvj $trModule4_rvl]
+   bitmap:  0 []
+   PUSH_G   $trModule4_rvl
+   PUSH_G   $trModule2_rvj
+   PACK     GHC.Types.Module 2
+   ENTER
+ 
+ProtoBCO $trModule4_rvl#0 []:
+   CCS_DONT_CARE GHC.Types.TrNameS! [$trModule3_rvk]
+   bitmap:  0 []
+   PUSH_UBX (1) 7045152##
+   PACK     GHC.Types.TrNameS 1
+   ENTER
+ 
+ProtoBCO $trModule2_rvj#0 []:
+   CCS_DONT_CARE GHC.Types.TrNameS! [$trModule1_rvi]
+   bitmap:  0 []
+   PUSH_UBX (1) 140403554651664##
+   PACK     GHC.Types.TrNameS 1
+   ENTER
+ 
+ProtoBCO Fat.t#0 []:
+   CCS_DONT_CARE GHC.Types.C#! ['t'#]
+   bitmap:  0 []
+   PUSH_UBX (1) 't'#
+   PACK     GHC.Types.C# 1
+   ENTER
+ 
+ProtoBCO Fat.a#0 []:
+   CCS_DONT_CARE GHC.Types.C#! ['a'#]
+   bitmap:  0 []
+   PUSH_UBX (1) 'a'#
+   PACK     GHC.Types.C# 1
+   ENTER
+ 
+ProtoBCO Fat.f#0 []:
+   CCS_DONT_CARE GHC.Types.C#! ['f'#]
+   bitmap:  0 []
+   PUSH_UBX (1) 'f'#
+   PACK     GHC.Types.C# 1
+   ENTER
+
+

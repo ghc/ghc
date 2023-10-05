@@ -1,0 +1,16 @@
+
+RepPolyTuple4.hs:8:7: error: [GHC-55287]
+    • • The first component of the unboxed tuple
+        does not have a fixed runtime representation.
+        Its type is:
+          a1 :: TYPE k0
+        Cannot unify ‘r’ with the type variable ‘w1’
+        because the former is not a concrete ‘RuntimeRep’.
+      • The second component of the unboxed tuple
+        does not have a fixed runtime representation.
+        Its type is:
+          b :: TYPE k1
+        Cannot unify ‘r’ with the type variable ‘w0’
+        because the former is not a concrete ‘RuntimeRep’.
+    • In the expression: (#,#) @_ @_
+      In an equation for ‘bar’: bar = (#,#) @_ @_

@@ -1,0 +1,7 @@
+:m GHC.Types
+:i (->)
+:i Constraint
+:set -XStarIsType
+:i Type
+:set -XNoStarIsType
+:i Type

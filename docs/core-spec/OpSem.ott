@@ -1,0 +1,115 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Dynamic semantics  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% The definitions in this file do *not* strictly correspond to any specific
+% code in GHC. They are here to provide a reasonable operational semantic
+% interpretation to the typing rules presented in the other ott files. Thus,
+% your mileage may vary. In particular, there has been *no* attempt to
+% write any formal proofs over these semantics.
+%
+% With that disclaimer disclaimed, these rules are a reasonable jumping-off
+% point for an analysis of FC's operational semantics. If you don't want to
+% worry about mutual recursion (and who does?), you can even drop the
+% environment S.
+%
+% Join points are ignored here because operationally they work exactly the same
+% as regular bindings. Simply read "join" as "let" and "jump" as application to
+% see how a (well-typed!) program should run.
+
+grammar
+
+defns
+OpSem :: '' ::=
+
+defn e --> e'  ::  :: step :: 'S_' {{ com Single step semantics }}
+{{ tex \begin{array}{l} [[e]] [[-->]] [[e']] \end{array} }}
+by
+
+e1 --> e1'
+------------------- :: App
+e1 e2 --> e1' e2
+
+----------------------------- :: Beta
+(\n.e1) e2 --> e1[n |-> e2]
+
+% g : (t1 -> t2) ~Rep# (t3 -> t4)
+% e2 : t3
+% g0 : t3 ~Rep# t1
+% g1 : t2 ~Rep# t4
+g0 = sym (nth Rep 2 g)
+g1 = nth Rep 3 g
+not e2 is_a_type
+not e2 is_a_coercion
+----------------------------------------------- :: Push
+((\n.e1) |> g) e2 --> (\n.e1 |> g1) (e2 |> g0)
+
+% g : (forall (a : k1). t1) ~Rep# (forall (a : k2). t2)
+% t : k2
+% g' : k2 ~# k1
+% t' : k1
+g' = sym (nth Nom 0 g)
+t' = t |> g'
+-------------------------------------------------------- :: TPush
+((\n.e) |> g) t --> ((\n.e) t') |> (g @ (sym <t> Nom MCo g'))
+
+% g : ((t1 ~rho# t2) -> t3) ~Rep# ((t4 ~rho# t5) -> t6)
+% g2 : t3 ~Rep# t6
+% g' : t4 ~rho# t5
+% g0 : t1 ~rho# t4
+% g1 : t5 ~rho# t2
+% recall that (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> Type
+% and that (~#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+% so pulling out the first visible argument for both is argument 2,
+% and the second visible argument for both is argument 3
+R = coercionRole g'
+g0 = nth R 2 (nth Rep 2 g)
+g1 = sym (nth R 3 (nth Rep 2 g))
+g2 = nth Rep 3 g
+------------------------------- :: CPush
+((\n.e) |> g) g' --> (\n.e |> g2) (g0 ; g' ; g1)
+
+--------------------------------------- :: Trans
+(e |> g1) |> g2 --> e |> (g1 ; g2)
+
+e --> e'
+------------------------ :: Cast
+e |> g --> e' |> g
+
+e --> e'
+------------------------------ :: Tick
+e { tick } --> e' { tick }
+
+e --> e'
+--------------------------------------- :: Case
+case e as n return t of </ alti // i /> --> case e' as n return t of </ alti // i />
+
+altj = K </ alphabb_kbb // bb /> </ xcc_tcc // cc /> -> u
+e = K </ t'aa // aa /> </ sbb // bb /> </ ecc // cc />
+u' = u[n |-> e] </ [alphabb_kbb |-> sbb] // bb /> </ [xcc_tcc |-> ecc] // cc />
+-------------------------------------------------------------- :: MatchData
+case e as n return t of </ alti // i /> --> u'
+
+altj = lit -> u
+---------------------------------------------------------------- :: MatchLit
+case lit as n return t of </ alti // i /> --> u[n |-> lit]
+
+altj = _ -> u
+no other case matches
+------------------------------------------------------------ :: MatchDefault
+case e as n return t of </ alti // i /> --> u[n |-> e]
+
+T </ taa // aa /> k'~Rep# k T </ t'aa // aa /> = coercionKind g
+</ Raa // aa /> = tyConRoles T
+forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> $ -> T </ alphaaa_kaa // aa /> = dataConRepType K
+</ e'cc = ecc |> (t1cc $ </ [alphaaa_kaa |-> nth Raa aa g] // aa /> </ [betabb_k'bb |-> <sbb>] // bb />) // cc />
+--------------------------- :: CasePush
+case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> \\ case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
+
+----------------- :: LetNonRec
+let n = e1 in e2 --> e2[n |-> e1]
+
+------------------------------------ :: LetRec
+let rec </ ni = ei // i /> in u --> u </ [ni |-> let rec </ ni = ei // i /> in ei ] // i />
+

@@ -1,0 +1,38 @@
+This is the INSTALL instructions for a binary distribution of GHC. For
+more details on what on earth this package is up to, please consult
+the accompanying README file.
+
+This distribution can be installed in a location of your choosing.
+
+To set the ball rolling, run the configure script (as usual, run the
+script with --help to see what options it supports).  eg. to set up
+the package for installing in directory <my-dir>, use
+
+	./configure --prefix=<my-dir>
+
+The default installation directory is /usr/local.
+
+The configure script will figure out what platform you're running on,
+and a couple of other interesting pieces of trivia, which it will then
+fill in the Makefile.in template to give you a real Makefile.  If
+you're of a paranoid persuasion, you might want to take a look at this
+Makefile to see if the information is correct.
+
+Now run:
+
+	make install 
+
+For more information, full GHC documentation is available from the
+main GHC site:
+
+  https://www.haskell.org/ghc/
+
+Bug reports/suggestions for improvement to the installation
+procedure/setup (as well as other GHC related troubles you're
+experiencing, of course), gratefully received.  Bug reporting
+instructions are here:
+
+  https://gitlab.haskell.org/ghc/ghc/-/wikis/report-a-bug
+
+Enjoy,
+-- The GHC Team.

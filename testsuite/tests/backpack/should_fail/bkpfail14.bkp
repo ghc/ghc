@@ -1,0 +1,18 @@
+-- Q by a different name, differently
+unit p where
+    signature Q where
+        f :: Int
+    signature Q2 where
+    module P where
+unit q where
+    module QMe where
+        f = True
+    module Q where
+        g = 23
+    module Q2 where
+unit r where
+    dependency p[Q=q:QMe, Q2=q:Q2]
+    dependency q
+    signature H where
+    module R where
+        import P

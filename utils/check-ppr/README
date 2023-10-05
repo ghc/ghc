@@ -1,0 +1,26 @@
+
+This programme is intended to be used by any GHC developers working on the AST
+and/or pretty printer by providing a way to check that the same AST is generated
+from the pretty printed AST as from the original source.
+
+i.e., it checks whether
+
+    parse (ppr (parse s)) === parse s
+
+
+This utility is also intended to be used in tests, so that when new features are
+added the ability to round-trip the AST via ppr is tested.
+
+Usage
+
+In a test Makefile
+
+  $(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" FileToParse.hs
+
+See examples in (REPO_HOME)/testsuite/tests/printer/Makefile
+
+The utility generates the following files for ToBeTested.hs
+
+  - ToBeTested.ppr.hs      : the ppr result
+  - ToBeTested.hs.ast      : the AST of the original source
+  - ToBeTested.hs.ast.new  : the AST of the re-parsed ppr source

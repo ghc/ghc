@@ -1,0 +1,84 @@
+# Confused about what this is? See
+# https://gitlab.haskell.org/help/user/project/code_owners
+
+# Catch-all
+* @bgamari
+
+[Build system]
+/hadrian/                         @snowleopard @alp @DavidEichmann @angerman
+/configure.ac                    @angerman @hvr
+/aclocal.m4                      @angerman @hvr
+/config.sub                      @angerman @hvr
+
+[RTS-like things]
+/rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
+/rts/linker/                      @angerman @Phyx @simonmar
+/rts/include/                     @bgamari @simonmar @osa1
+/rts/wasm/                        @TerrorJack
+
+[RTS heap profiling]
+/docs/users_guide/profiling.rst   @DanielG
+/rts/include/rts/ProfHeap.h        @DanielG
+/rts/include/rts/TraverseHeap.h    @DanielG
+/rts/include/rts/storage/ClosureMacros.h @DanielG
+/rts/LdvProfile*                  @DanielG
+/rts/ProfHeap*                    @DanielG
+/rts/Retainer*                    @DanielG
+/rts/TraverseHeap*                @DanielG
+/rts/sm/GC.c                      @DanielG
+/rts/sm/Storage*                  @DanielG
+/testsuite/tests/profiling/should_run/TraverseHeap* @DanielG
+
+[The compiler]
+/compiler/parser/                  @int-index
+/compiler/GHC/Hs/                  @simonpj @rae
+/compiler/GHC/Tc/                  @simonpj @rae
+/compiler/GHC/Rename/              @simonpj @rae
+/compiler/GHC/Types/               @simonpj @rae
+/compiler/GHC/HsToCore/            @simonpj @rae
+/compiler/GHC/HsToCore/Pmc*        @sgraf
+/compiler/GHC/Tc/Deriv/            @RyanGlScott
+/compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
+/compiler/GHC/CmmToAsm/Wasm/       @TerrorJack
+/compiler/GHC/CmmToLlvm/           @angerman
+/compiler/GHC/StgToCmm/            @simonmar @osa1
+/compiler/GHC/Cmm/                 @simonmar @osa1
+/compiler/ghci/                    @simonmar
+/compiler/GHC/Core/Opt/CallArity.hs @nomeata
+/compiler/GHC/Core/Opt/Exitify.hs   @nomeata
+/compiler/GHC/Stg/CSE.hs           @nomeata
+/compiler/GHC/Stg/Lift*            @sgraf
+/compiler/GHC/Cmm/Switch.hs        @nomeata
+/compiler/GHC/Core/Opt/            @simonpj @sgraf
+/compiler/GHC/ThToHs.hs            @rae
+/compiler/GHC/Wasm/                @nrnrnr
+
+[Core libraries]
+/libraries/base/                  @hvr
+/libraries/ghci/                  @simonmar
+/libraries/template-haskell/      @rae
+
+[Internal utilities and libraries]
+/utils/iserv-proxy/               @angerman @simonmar
+/utils/iserv/                     @angerman @simonmar
+/utils/fs/                        @Phyx
+
+[WinIO related code]
+/libraries/base/GHC/Event/Windows/                   @Phyx
+/libraries/base/GHC/IO/Windows/                      @Phyx
+/rts/win32/                                          @Phyx
+/libraries/base/GHC/IO/Handle/Lock/Windows.hsc       @Phyx
+/libraries/base/GHC/Event/Windows.hsc                @Phyx
+/libraries/base/GHC/Conc/WinIO.hs                    @Phyx
+/libraries/base/GHC/Conc/Windows.hs                  @Phyx
+/libraries/base/GHC/IO/Handle/Windows.hs             @Phyx
+/libraries/base/GHC/IO/StdHandles.hs                 @Phyx
+/libraries/base/GHC/Windows.hs                       @Phyx
+/libraries/base/cbits/IOutils.c                      @Phyx
+/libraries/base/cbits/Win32Utils.c                   @Phyx
+/libraries/base/cbits/consUtils.c                    @Phyx
+/libraries/base/include/winio_structs.h              @Phyx
+
+[CI]
+/.gitlab/                         @chreekat @bgamari @mpickering
+/.gitlab-ci.yml                   @chreekat @bgamari @mpickering

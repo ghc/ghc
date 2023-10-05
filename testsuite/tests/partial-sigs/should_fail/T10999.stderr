@@ -1,0 +1,31 @@
+
+T10999.hs:5:6: error: [GHC-88464]
+    • Found extra-constraints wildcard standing for ‘Ord a’
+      Where: ‘a’ is a rigid type variable bound by
+               the inferred type of f :: Ord a => () -> Set.Set a
+               at T10999.hs:6:1-28
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: f :: _ => () -> _
+
+T10999.hs:5:17: error: [GHC-88464]
+    • Found type wildcard ‘_’ standing for ‘Set.Set a’
+      Where: ‘a’ is a rigid type variable bound by
+               the inferred type of f :: Ord a => () -> Set.Set a
+               at T10999.hs:6:1-28
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: f :: _ => () -> _
+
+T10999.hs:8:28: error: [GHC-39999]
+    • Ambiguous type variable ‘b1’ arising from a use of ‘f’
+      prevents the constraint ‘(Ord b1)’ from being solved.
+      Relevant bindings include g :: [b1] (bound at T10999.hs:8:1)
+      Probable fix: use a type annotation to specify what ‘b1’ should be.
+      Potentially matching instances:
+        instance Ord a => Ord (Set.Set a) -- Defined in ‘Data.Set.Internal’
+        instance Ord Ordering -- Defined in ‘GHC.Classes’
+        ...plus 24 others
+        ...plus three instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘($)’, namely ‘f ()’
+      In the second argument of ‘($)’, namely ‘Set.toList $ f ()’
+      In the expression: map fst $ Set.toList $ f ()

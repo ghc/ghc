@@ -1,0 +1,189 @@
+
+==================== Output Cmm ====================
+[M.foo_entry() { //  [R2]
+         { info_tbls: [(cCU,
+                        label: block_cCU_info
+                        rep: StackRep []
+                        srt: Nothing),
+                       (cD2,
+                        label: M.foo_info
+                        rep: HeapRep static { Fun {arity: 1 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cD2: // global
+           if ((Sp + -8) < SpLim) (likely: False) goto cD3; else goto cD4;   // CmmCondBranch
+       cD3: // global
+           R1 = M.foo_closure;   // CmmAssign
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cD4: // global
+           I64[Sp - 8] = cCU;   // CmmStore
+           R1 = R2;   // CmmAssign
+           Sp = Sp - 8;   // CmmAssign
+           if (R1 & 7 != 0) goto cCU; else goto cCV;   // CmmCondBranch
+       cCV: // global
+           call (I64[R1])(R1) returns to cCU, args: 8, res: 8, upd: 8;   // CmmCall
+       cCU: // global
+           _cD1::P64 = R1 & 7;   // CmmAssign
+           if (_cD1::P64 != 1) goto uDf; else goto cCZ;   // CmmCondBranch
+       uDf: // global
+           if (_cD1::P64 != 2) goto cCY; else goto cD0;   // CmmCondBranch
+       cCY: // global
+           // dataToTagSmall#
+           R1 = R1 & 7 - 1;   // CmmAssign
+           Sp = Sp + 8;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cD0: // global
+           R1 = 42;   // CmmAssign
+           Sp = Sp + 8;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cCZ: // global
+           R1 = 2;   // CmmAssign
+           Sp = Sp + 8;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ },
+ section ""data" . M.foo_closure" {
+     M.foo_closure:
+         const M.foo_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""data" . M.A_closure" {
+     M.A_closure:
+         const M.A_con_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""data" . M.B_closure" {
+     M.B_closure:
+         const M.B_con_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""data" . M.C_closure" {
+     M.C_closure:
+         const M.C_con_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""data" . M.D_closure" {
+     M.D_closure:
+         const M.D_con_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""data" . M.E_closure" {
+     M.E_closure:
+         const M.E_con_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[section ""relreadonly" . M.E_closure_tbl" {
+     M.E_closure_tbl:
+         const M.A_closure+1;
+         const M.B_closure+2;
+         const M.C_closure+3;
+         const M.D_closure+4;
+         const M.E_closure+5;
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.A_con_entry() { //  []
+         { info_tbls: [(cDt,
+                        label: M.A_con_info
+                        rep: HeapRep 1 nonptrs { Con {tag: 0 descr:"main:M.A"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cDt: // global
+           R1 = R1 + 1;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.B_con_entry() { //  []
+         { info_tbls: [(cDy,
+                        label: M.B_con_info
+                        rep: HeapRep 1 nonptrs { Con {tag: 1 descr:"main:M.B"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cDy: // global
+           R1 = R1 + 2;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.C_con_entry() { //  []
+         { info_tbls: [(cDD,
+                        label: M.C_con_info
+                        rep: HeapRep 1 nonptrs { Con {tag: 2 descr:"main:M.C"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cDD: // global
+           R1 = R1 + 3;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.D_con_entry() { //  []
+         { info_tbls: [(cDI,
+                        label: M.D_con_info
+                        rep: HeapRep 1 nonptrs { Con {tag: 3 descr:"main:M.D"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cDI: // global
+           R1 = R1 + 4;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.E_con_entry() { //  []
+         { info_tbls: [(cDN,
+                        label: M.E_con_info
+                        rep: HeapRep 1 nonptrs { Con {tag: 4 descr:"main:M.E"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cDN: // global
+           R1 = R1 + 5;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+

@@ -1,0 +1,16 @@
+
+T21589.hs:1:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma: LANGUGE
+    Suggested fix: Perhaps you meant ‘LANGUAGE’
+
+T21589.hs:2:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma: OPTION_HUGS
+    Suggested fix: Perhaps you meant ‘OPTIONS_HUGS’
+
+T21589.hs:3:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma: LIE
+    Suggested fix: Perhaps you meant ‘LINE’
+
+T21589.hs:8:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma: INLNE
+    Suggested fix: Perhaps you meant ‘INLINE’

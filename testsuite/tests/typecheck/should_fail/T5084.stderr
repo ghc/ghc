@@ -1,0 +1,3 @@
+
+T5084.hs:6:5: error: [GHC-28587]
+    The INLINE pragma for default method ‘bar’ lacks an accompanying binding

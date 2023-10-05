@@ -1,0 +1,43 @@
+Run 1
+a :: Int -> Int
+168
+Run 2
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 3
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 4
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 5
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 6
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 7
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 8
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 9
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 10
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0
+Run 11
+(A.a,B.b,C.c,D.d)
+  :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+28.0

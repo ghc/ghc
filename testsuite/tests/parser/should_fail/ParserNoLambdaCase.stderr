@@ -1,0 +1,4 @@
+
+ParserNoLambdaCase.hs:3:6: error: [GHC-51179]
+    Illegal \case
+    Suggested fix: Perhaps you intended to use LambdaCase

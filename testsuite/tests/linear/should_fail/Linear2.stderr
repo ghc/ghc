@@ -1,0 +1,16 @@
+
+Linear2.hs:9:15: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectApp1’: incorrectApp1 x = dup (x, 0)
+
+Linear2.hs:12:17: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘incorrectApp2’: incorrectApp2 f x = f x
+
+Linear2.hs:15:15: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘n’
+    • In an equation for ‘incorrectIf’:
+          incorrectIf x n = if x then n else 0

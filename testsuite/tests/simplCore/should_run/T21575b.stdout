@@ -1,0 +1,12 @@
+Normal:
+    withDict: Object (fromList [("Foo",String "Bar")])
+unsafeCoerce: Object (fromList [("Foo",String "Bar")])
+    expected: Object (fromList [("Foo",String "Bar")])
+
+
+ViaShow:
+    withDict: Object (fromList [("Foo",String "SHOWBAR")])
+unsafeCoerce: Object (fromList [("Foo",String "SHOWBAR")])
+    expected: Object (fromList [("Foo",String "SHOWBAR")])
+
+

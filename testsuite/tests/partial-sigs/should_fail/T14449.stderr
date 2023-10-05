@@ -1,0 +1,4 @@
+
+T14449.hs:6:1: error: [GHC-88793]
+    Couldn't match ‘a’ with ‘b’
+      both bound by the partial type signature: f :: a -> b -> _

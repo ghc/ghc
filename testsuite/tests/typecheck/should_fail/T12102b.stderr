@@ -1,0 +1,6 @@
+
+T12102b.hs:21:25: error: [GHC-83865]
+    • Couldn't match expected kind ‘True’
+                  with actual kind ‘IsTypeLit a’
+    • In the first argument of ‘Show’, namely ‘(T a)’
+      In the stand-alone deriving instance for ‘Show (T a)’

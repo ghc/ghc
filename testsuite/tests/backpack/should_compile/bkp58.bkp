@@ -1,0 +1,35 @@
+-- no default method, hs-boot
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+unit common where
+  module Class where
+    class Show (T x) => C x where
+      type T x
+      --type T x = ()
+      def :: T x
+unit consumer-impl where
+  dependency common
+  module {-# SOURCE #-} Impl where
+    import Class
+    data I = I Int
+    instance C I where
+      --type T I = ()
+  module Downstream where
+    import Class
+    import {-# SOURCE #-} Impl
+    asdf :: C I => String
+    asdf = show $ def @I
+  module Impl where
+    import Class
+    data I = I Int
+    instance C I where
+      type T I = ()
+      def = ()
+unit tie where
+  dependency consumer-impl
+  module Tie where
+    import Downstream
+    import Impl
+    main = print asdf

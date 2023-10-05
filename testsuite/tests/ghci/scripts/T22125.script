@@ -1,0 +1,6 @@
+:seti -XTypeFamilies -XDuplicateRecordFields -XDerivingStrategies
+data family D a
+data instance D Int  = MkD0 | MkDInt { x :: Int, y :: Bool } deriving Show
+data instance D Bool = MkDBool { x :: Int }
+f r = r { y = True, x = 14 }
+f (MkDInt 3 False)

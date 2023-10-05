@@ -1,0 +1,28 @@
+unit p where
+    signature A where
+        data A
+    signature B(module B, A) where
+        import A
+    module P where
+        import A
+        import B
+        type ZZ = A
+
+unit r where
+    module Impl where
+        data A = A
+
+unit q where
+    dependency p[A=<A>,B=<B>]
+    dependency r
+    signature A(module A, A) where
+        import Impl(A)
+    signature B(module B, A) where
+        import Impl(A)
+    module M where
+        import A
+        import B
+        import P
+        type AA = A
+        f :: ZZ -> AA
+        f x = x

@@ -1,0 +1,22 @@
+[1 of 1] Processing unit
+  Instantiating unit
+  [1 of 1] Compiling A                ( unit\A.hs, T20396.out\unit\A.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 17, types: 8, coercions: 0, joins: 0/0}
+
+f = \ x -> x
+
+$trModule1 = "unit"#
+
+$trModule2 = TrNameS $trModule1
+
+$trModule3 = "A"#
+
+$trModule4 = TrNameS $trModule3
+
+$trModule = Module $trModule2 $trModule4
+
+
+

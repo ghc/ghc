@@ -1,0 +1,6 @@
+Proxy @($(pure $ UInfixT intT '(:::) stringT))
+  :: Proxy (Int '::: String)
+Proxy @($(pure $ (intT `promUInf` stringT) `promUInf` boolT))
+  :: Proxy (Int '::: (String '::: Bool))
+Proxy @($(pure $ (intT `promInf` stringT) `promInf` boolT))
+  :: Proxy ((Int '::: String) '::: Bool)

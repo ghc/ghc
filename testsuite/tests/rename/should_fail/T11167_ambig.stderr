@@ -1,0 +1,16 @@
+
+T11167_ambig.hs:10:13: error: [GHC-87543]
+    Ambiguous occurrence ‘runContT’.
+    It could refer to
+       either the field ‘runContT’ of record ‘ContT’,
+              defined at T11167_ambig.hs:6:30,
+           or the field ‘runContT’ of record ‘ContT'’,
+              defined at T11167_ambig.hs:7:32.
+
+T11167_ambig.hs:17:9: error: [GHC-87543]
+    Ambiguous occurrence ‘runContT’.
+    It could refer to
+       either the field ‘runContT’ of record ‘ContT’,
+              defined at T11167_ambig.hs:6:30,
+           or the field ‘runContT’ of record ‘ContT'’,
+              defined at T11167_ambig.hs:7:32.

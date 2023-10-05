@@ -1,0 +1,4 @@
+:set -XTypeApplications -XPolyKinds -XDataKinds
+:t id @Maybe
+type Id (a :: k) = a
+:k Id @Maybe

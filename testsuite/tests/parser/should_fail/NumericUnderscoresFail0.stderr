@@ -1,0 +1,42 @@
+
+NumericUnderscoresFail0.hs:9:5: error: [GHC-39999]
+    • Ambiguous type variable ‘a0’ arising from a use of ‘print’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      Potentially matching instances:
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        ...plus 26 others
+        ...plus 28 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In a stmt of a 'do' block: print [1000000 _, _1000000]
+      In the expression: do print [1000000 _, _1000000]
+      In an equation for ‘main’: main = do print [1000000 _, ....]
+
+NumericUnderscoresFail0.hs:11:13: error: [GHC-39999]
+    • No instance for ‘Num (t0 -> a0)’
+        arising from the literal ‘1000000’
+        (maybe you haven't applied a function to enough arguments?)
+    • In the expression: 1000000 _
+      In the first argument of ‘print’, namely ‘[1000000 _, _1000000]’
+      In a stmt of a 'do' block: print [1000000 _, _1000000]
+
+NumericUnderscoresFail0.hs:11:20: error: [GHC-88464]
+    • Found hole: _ :: t0
+      Where: ‘t0’ is an ambiguous type variable
+    • In the first argument of ‘1000000’, namely ‘_’
+      In the expression: 1000000 _
+      In the first argument of ‘print’, namely ‘[1000000 _, _1000000]’
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail0.hs:8:1)
+
+NumericUnderscoresFail0.hs:12:13: error: [GHC-88464]
+    • Found hole: _1000000 :: a0
+      Where: ‘a0’ is an ambiguous type variable
+      Or perhaps ‘_1000000’ is mis-spelled, or not in scope
+    • In the first argument of ‘print’, namely ‘[1000000 _, _1000000]’
+      In a stmt of a 'do' block: print [1000000 _, _1000000]
+      In the expression: do print [1000000 _, _1000000]
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail0.hs:8:1)

@@ -1,0 +1,7 @@
+-- defined locally
+type T :: *
+data T = ...
+MkT :: Int -> T
+foo :: T -> Int
+type T :: *
+data T = MkT {foo :: Int}

@@ -1,0 +1,9 @@
+TH_typed3.hs:9:12-53: Splicing expression
+    typedSpliceE $ typedBracketE [| 'z' |] ======> $$[|| 'z' ||]
+TH_typed3.hs:10:12-69: Splicing expression
+    typedSpliceE $ appE [| id |] (typedBracketE [| 'z' |])
+  ======>
+    $$(id [|| 'z' ||])
+TH_typed3.hs:9:12-53: Splicing expression [|| 'z' ||] ======> 'z'
+TH_typed3.hs:10:12-69: Splicing expression
+    id [|| 'z' ||] ======> 'z'

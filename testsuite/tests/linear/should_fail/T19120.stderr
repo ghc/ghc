@@ -1,0 +1,5 @@
+
+T19120.hs:9:3: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘z’: z x | notL x = True

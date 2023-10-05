@@ -1,0 +1,97 @@
+#!/bin/sh
+
+set -e
+
+USAGE="Usage: $0 [--intree] [--verbose] [--help]"
+INTREE=
+VERBOSE=
+
+HADDOCK_ARGS=
+
+while [ "$#" -ne "0" ]
+do
+    case "$1" in
+    --intree)
+        # We're in a GHC build tree
+        INTREE=yes
+        ;;
+    --verbose)
+        VERBOSE=yes
+        ;;
+    --help)
+        echo "$USAGE"
+        exit 0
+        ;;
+    esac
+
+    shift
+done
+
+if [ -n "$INTREE" ]
+then
+    [ -d dist-haddock ] || mkdir dist-haddock
+    cd dist-haddock
+
+    if [ -e ../../inplace/bin/haddock ]
+    then
+      # Make #17527
+      HADDOCK=../../inplace/bin/haddock
+    elif [ -e ../../../../../bin/haddock ]
+    then
+      # Hadrian
+      HADDOCK=../../../../../bin/haddock
+    else
+      echo "Haddock not found"
+      exit 1
+    fi
+    # Exclude Cabal package-tests, which may run haddock
+    HADDOCK_FILES=`find ../ -name *.haddock | grep -v 'PackageTests' | sort`
+    HADDOCK_ARGS="-p ../prologue.txt"
+    for HADDOCK_FILE in $HADDOCK_FILES
+    do
+                LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
+                NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
+                # It's easier to portably remove tabs with tr than to try to get
+                # sed to do what we want
+                VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
+                HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
+                HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+    done
+else
+    HADDOCK=../../../../../bin/haddock
+    # We don't want the GHC API to swamp the index
+    HADDOCK_FILES=`ls -1 */*.haddock | grep -v '/ghc\.haddock' | sort`
+    HADDOCK_ARGS="-p prologue.txt"
+    for HADDOCK_FILE in $HADDOCK_FILES
+    do
+        NAME_VERSION=`echo "$HADDOCK_FILE" | sed 's#/.*##'`
+        HADDOCK_ARG="--read-interface=${NAME_VERSION},$HADDOCK_FILE"
+        HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+    done
+fi
+
+# Now create the combined contents and index pages
+if [ -n "$VERBOSE" ]
+then
+    echo $HADDOCK --gen-index --gen-contents -o . \
+             -t "Haskell Hierarchical Libraries" \
+             $HADDOCK_ARGS
+fi
+$HADDOCK --gen-index --gen-contents -o . \
+         -t "Haskell Hierarchical Libraries" \
+         $HADDOCK_ARGS
+
+# Unhandled Windows help stuff?:
+
+#libraries.HxS : libraries.txt
+#	 haddock ...
+#		-k libraries
+#		--html-help=mshelp2
+#	( cd $(HTML_DIR) && if Hxcomp -p libraries.HxC -o ../$@ ; then false ; else true ; fi ) || true
+#
+#libraries.chm : libraries.txt
+#	haddock ...
+#		-k libraries \
+#		--html-help=mshelp \
+#	( cd $(HTML_DIR) && if hhc libraries.hhp ; then false ; else true ; fi && mv libraries.chm .. ) || true
+

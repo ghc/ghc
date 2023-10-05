@@ -1,0 +1,15 @@
+$wg
+  = \ ww ->
+      case ww of wild {
+        __DEFAULT ->
+          case $wg (-# wild 1#) of ww1 { __DEFAULT -> *# wild ww1 };
+        0# -> 1#
+      }
+--
+g = \ ds ->
+      case ds of { I# ww -> case $wg ww of ww1 { __DEFAULT -> I# ww1 } }
+
+
+------ Local rules for imported ids --------
+"SPEC/T5298B fac @Int" forall $dEq $dNum. fac $dEq $dNum = g
+

@@ -1,0 +1,10 @@
+:set -XTemplateHaskell
+import Language.Haskell.TH
+let seeType n = do VarI _ t _ <- reify n; runIO $ putStrLn $ show t; [| return True |]
+let f :: Int -> Int; f = undefined
+let g :: [Int]     ; g = undefined
+let h :: (Int, Int); h = undefined
+$(seeType (mkName "f"))
+$(seeType (mkName "g"))
+$(seeType (mkName "h"))
+

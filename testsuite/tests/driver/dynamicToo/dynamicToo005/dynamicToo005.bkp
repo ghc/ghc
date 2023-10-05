@@ -1,0 +1,6 @@
+unit sig where
+    signature A005 where
+        data Maybe a = Nothing | Just a
+
+unit inst where
+    dependency sig[A005=base:Prelude]

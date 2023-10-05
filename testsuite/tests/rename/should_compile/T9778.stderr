@@ -1,0 +1,8 @@
+
+T9778.hs:12:10: warning: [GHC-49957] [-Wunticked-promoted-constructors]
+    Unticked promoted constructor: A.
+    Suggested fix: Use 'A instead of A.
+
+T9778.hs:16:14: warning: [GHC-49957] [-Wunticked-promoted-constructors]
+    Unticked promoted constructor: `MkD`.
+    Suggested fix: Use '`MkD` instead of `MkD`.

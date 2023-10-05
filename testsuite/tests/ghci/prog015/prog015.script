@@ -1,0 +1,25 @@
+:load TopLevel
+
+:complete repl "import Le"
+-- should list Level1 and Level2.Levele2
+
+:complete repl 1 "import Le"
+-- should list Level1
+
+:complete repl 2-3 "import Le"
+-- should list Level2.Level2
+
+:complete repl "import Level."
+-- should list nothing
+
+:complete repl "import Level2"
+-- should list Level2.Levele2
+
+:complete repl "import Level2."
+-- same output
+
+:complete repl "import Level2.W"
+-- should list nothing
+
+:complete repl "import Level2.L"
+-- should list Level2.Level2

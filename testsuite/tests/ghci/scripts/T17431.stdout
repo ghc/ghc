@@ -1,0 +1,11 @@
+Breakpoint 0 activated at T17431.hs:5:15-32
+Stopped in T17431.sort, T17431.hs:5:15-32
+_result :: [a] = _
+x :: a = _
+xs :: [a] = [_,_]
+*** Ignoring breakpoint [T17431.hs:5:15-32]
+*** Ignoring breakpoint [T17431.hs:5:15-32]
+*** Ignoring breakpoint [T17431.hs:5:15-32]
+x = 3
+xs = [2,1]
+_result = [1,2,3]

@@ -1,0 +1,4 @@
+Just (InfoProv {ipName = "sat_s11p_info", ipDesc = "15", ipTyDesc = "Any", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "10:23-39"})
+Just (InfoProv {ipName = "sat_s11F_info", ipDesc = "15", ipTyDesc = "Any", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "11:23-42"})
+Just (InfoProv {ipName = "sat_s11V_info", ipDesc = "15", ipTyDesc = "Any", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "12:23-46"})
+Just (InfoProv {ipName = "sat_s12b_info", ipDesc = "15", ipTyDesc = "Any", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "13:23-44"})

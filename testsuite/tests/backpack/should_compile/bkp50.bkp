@@ -1,0 +1,8 @@
+{-# LANGUAGE TypeFamilies #-}
+unit p where
+    signature A where
+        type family F a where
+            F a = Int
+unit q where
+    dependency p[A=<A>]
+    signature A(F) where

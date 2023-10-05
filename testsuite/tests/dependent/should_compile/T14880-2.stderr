@@ -1,0 +1,12 @@
+
+T14880-2.hs:13:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Proxy (Foo arg)’
+      Where: ‘arg’ is a rigid type variable bound by
+               the type signature for:
+                 quux :: forall arg. Proxy (Foo arg) -> ()
+               at T14880-2.hs:12:1-41
+    • In a pattern type signature: _
+      In the pattern: _ :: _
+      In an equation for ‘quux’: quux (_ :: _) = ()
+    • Relevant bindings include
+        quux :: Proxy (Foo arg) -> () (bound at T14880-2.hs:13:1)

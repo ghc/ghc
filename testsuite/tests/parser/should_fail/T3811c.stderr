@@ -1,0 +1,7 @@
+
+T3811c.hs:6:10: error: [GHC-53946]
+    • Illegal head of an instance declaration: ‘!Show D’.
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class.
+    • In an instance declaration

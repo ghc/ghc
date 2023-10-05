@@ -1,0 +1,143 @@
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE BangPatterns, NoImplicitPrelude, RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
+module GHC.Event.IntTable
+    (
+      IntTable
+    , new
+    , lookup
+    , insertWith
+    , reset
+    , delete
+    , updateWith
+    ) where
+
+import Data.Bits ((.&.), shiftL, shiftR)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Maybe (Maybe(..), isJust)
+import GHC.Base (Monad(..), (=<<), ($), ($!), const, liftM, otherwise, when)
+import GHC.Classes (Eq(..), Ord(..))
+import GHC.Event.Arr (Arr)
+import GHC.Event.IntVar
+import GHC.Num (Num(..))
+import GHC.Prim (seq)
+import GHC.Types (Bool(..), IO(..), Int(..))
+import qualified GHC.Event.Arr as Arr
+
+-- A very simple chained integer-keyed mutable hash table. We use
+-- power-of-two sizing, grow at a load factor of 0.75, and never
+-- shrink. The "hash function" is the identity function.
+
+newtype IntTable a = IntTable (IORef (IT a))
+
+data IT a = IT {
+      tabArr  :: {-# UNPACK #-} !(Arr (Bucket a))
+    , tabSize :: {-# UNPACK #-} !IntVar
+    }
+
+data Bucket a = Empty
+              | Bucket {
+      bucketKey   :: {-# UNPACK #-} !Int
+    , bucketValue :: a
+    , bucketNext  :: Bucket a
+    }
+
+lookup :: Int -> IntTable a -> IO (Maybe a)
+lookup k (IntTable ref) = do
+  let go Bucket{..}
+        | bucketKey == k = Just bucketValue
+        | otherwise      = go bucketNext
+      go _ = Nothing
+  it@IT{..} <- readIORef ref
+  bkt <- Arr.read tabArr (indexOf k it)
+  return $! go bkt
+
+new :: Int -> IO (IntTable a)
+new capacity = IntTable `liftM` (newIORef =<< new_ capacity)
+
+new_ :: Int -> IO (IT a)
+new_ capacity = do
+  arr <- Arr.new Empty capacity
+  size <- newIntVar 0
+  return IT { tabArr = arr
+            , tabSize = size
+            }
+
+grow :: IT a -> IORef (IT a) -> Int -> IO ()
+grow oldit ref size = do
+  newit <- new_ (Arr.size (tabArr oldit) `shiftL` 1)
+  let copySlot n !i
+        | n == size = return ()
+        | otherwise = do
+          let copyBucket !m Empty          = copySlot m (i+1)
+              copyBucket  m bkt@Bucket{..} = do
+                let idx = indexOf bucketKey newit
+                next <- Arr.read (tabArr newit) idx
+                Arr.write (tabArr newit) idx bkt { bucketNext = next }
+                copyBucket (m+1) bucketNext
+          copyBucket n =<< Arr.read (tabArr oldit) i
+  copySlot 0 0
+  writeIntVar (tabSize newit) size
+  writeIORef ref newit
+
+-- | @insertWith f k v table@ inserts @k@ into @table@ with value @v@.
+-- If @k@ already appears in @table@ with value @v0@, the value is updated
+-- to @f v0 v@ and @Just v0@ is returned.
+insertWith :: (a -> a -> a) -> Int -> a -> IntTable a -> IO (Maybe a)
+insertWith f k v inttable@(IntTable ref) = do
+  it@IT{..} <- readIORef ref
+  let idx = indexOf k it
+      go seen bkt@Bucket{..}
+        | bucketKey == k = do
+          let !v' = f v bucketValue
+              !next = seen <> bucketNext
+              Empty        <> bs = bs
+              b@Bucket{..} <> bs = b { bucketNext = bucketNext <> bs }
+          Arr.write tabArr idx (Bucket k v' next)
+          return (Just bucketValue)
+        | otherwise = go bkt { bucketNext = seen } bucketNext
+      go seen _ = do
+        size <- readIntVar tabSize
+        if size + 1 >= Arr.size tabArr - (Arr.size tabArr `shiftR` 2)
+          then grow it ref size >> insertWith f k v inttable
+          else do
+            v `seq` Arr.write tabArr idx (Bucket k v seen)
+            writeIntVar tabSize (size + 1)
+            return Nothing
+  go Empty =<< Arr.read tabArr idx
+{-# INLINABLE insertWith #-}
+
+-- | Used to undo the effect of a prior insertWith.
+reset :: Int -> Maybe a -> IntTable a -> IO ()
+reset k (Just v) tbl = insertWith const k v tbl >> return ()
+reset k Nothing  tbl = delete k tbl >> return ()
+
+indexOf :: Int -> IT a -> Int
+indexOf k IT{..} = k .&. (Arr.size tabArr - 1)
+
+-- | Remove the given key from the table and return its associated value.
+delete :: Int -> IntTable a -> IO (Maybe a)
+delete k t = updateWith (const Nothing) k t
+
+updateWith :: (a -> Maybe a) -> Int -> IntTable a -> IO (Maybe a)
+updateWith f k (IntTable ref) = do
+  it@IT{..} <- readIORef ref
+  let idx = indexOf k it
+      go bkt@Bucket{..}
+        | bucketKey == k = case f bucketValue of
+            Just val -> let !nb = bkt { bucketValue = val }
+                        in (False, Just bucketValue, nb)
+            Nothing  -> (True, Just bucketValue, bucketNext)
+        | otherwise = case go bucketNext of
+                        (fbv, ov, nb) -> (fbv, ov, bkt { bucketNext = nb })
+      go e = (False, Nothing, e)
+  (del, oldVal, newBucket) <- go `liftM` Arr.read tabArr idx
+  when (isJust oldVal) $ do
+    Arr.write tabArr idx newBucket
+    when del $ do
+      size <- readIntVar tabSize
+      writeIntVar tabSize (size - 1)
+  return oldVal
+

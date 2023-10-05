@@ -1,0 +1,2 @@
+:l T7388
+withCString "I am a working CApi FFI call\n" $ \str -> printfb str 0

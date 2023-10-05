@@ -1,0 +1,12 @@
+TYPE CONSTRUCTORS
+  data family DF{3} :: forall k. * -> k -> *
+    roles nominal nominal nominal
+COERCION AXIOMS
+  axiom T15852.D:R:DFProxyProxy0 ::
+    forall k1 k2 (j :: k1) (c :: k2).
+      DF (Proxy c) = T15852.R:DFProxyProxy k1 k2 j c
+FAMILY INSTANCES
+  data instance forall {k1} {k2} {j :: k1} {c :: k2}.
+                  DF (Proxy c) -- Defined at T15852.hs:10:15
+Dependent modules: []
+Dependent packages: [base-4.19.0.0, ghc-internal-0.1.0.0]

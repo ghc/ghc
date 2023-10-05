@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Generate $DEPTH layers of modules with $WIDTH modules on each layer
+# Every module on layer N imports all the modules on layer N-1
+# MultiLayerModulesPrep.hs imports all the modules from the last layer, is used to
+# prepare all dependencies.
+# MultiLayerModules.hs imports all the modules from the last layer, and has NDEFS*WIDTH
+# top-level splices which stress some inefficient parts of link dependency calculation.
+# Lastly there is a splice which contains an error so that we don't benchmark code
+# generation as well.
+
+DEPTH=10
+WIDTH=30
+NDEFS=10
+for i in $(seq -w 1 $WIDTH); do
+  echo "module DummyLevel0M$i where" > DummyLevel0M$i.hs;
+done
+for l in $(seq 1 $DEPTH); do
+  for i in $(seq -w 1 $WIDTH); do
+    echo "module DummyLevel${l}M$i where" > DummyLevel${l}M$i.hs;
+    for j in $(seq -w 1 $WIDTH); do
+      echo "import DummyLevel$((l-1))M$j" >> DummyLevel${l}M$i.hs;
+    done
+    echo "def_${l}_${i} :: Int" >> DummyLevel${l}M$i.hs;
+    echo "def_${l}_${i} = ${l} * ${i}" >> DummyLevel${l}M${i}.hs;
+  done
+done
+# Gen the prep module, which can be compiled without running and TH splices
+# but forces the rest of the project to be built.
+echo "module MultiLayerModulesPrep where" > MultiLayerModulesPrep.hs
+for j in $(seq -w 1 $WIDTH); do
+  echo "import DummyLevel${DEPTH}M$j" >> MultiLayerModulesPrep.hs;
+done
+
+echo "{-# LANGUAGE TemplateHaskell #-}" > MultiLayerModules.hs
+echo "module MultiLayerModules where" >> MultiLayerModules.hs
+echo "import Language.Haskell.TH.Syntax" >> MultiLayerModules.hs
+for j in $(seq -w 1 $WIDTH); do
+  echo "import DummyLevel${DEPTH}M$j" >> MultiLayerModules.hs;
+done
+for j in $(seq -w 1 $WIDTH); do
+  for i in $(seq -w 1 $NDEFS); do
+  echo "defth_${j}_${i} = \$(lift def_${DEPTH}_${j})"  >> MultiLayerModules.hs;
+  done
+done
+# Finally, a splice with an error so we stop before doing code generation
+# This
+echo "last = \$(error \"deliberate error\")" >> MultiLayerModules.hs

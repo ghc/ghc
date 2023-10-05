@@ -1,0 +1,6 @@
+
+==================== Tidy Core rules ====================
+"SPEC myShow_impl @Int"
+    forall ($dMyShow :: MyShow Int). myShow_impl @Int $dMyShow = foo
+
+

@@ -1,0 +1,9 @@
+
+T2534.hs:3:19: error: [GHC-83865]
+    • Couldn't match expected type: a -> a -> b
+                  with actual type: [a0]
+    • In the second argument of ‘foldr’, namely ‘[]’
+      In the expression: foldr (>>=) [] []
+      In an equation for ‘foo’: foo = foldr (>>=) [] []
+    • Relevant bindings include
+        foo :: a -> a -> b (bound at T2534.hs:3:1)

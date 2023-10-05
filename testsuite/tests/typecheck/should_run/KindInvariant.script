@@ -1,0 +1,12 @@
+:set -XDataKinds -XKindSignatures -XMagicHash  -XPolyKinds
+:m + Data.Kind GHC.Exts
+
+data T (a :: k -> k')
+:kind T State#
+
+data T (a :: Type -> k')
+:kind T State#
+
+-- this should fail
+data T (a :: Type -> Type)
+:kind T State#

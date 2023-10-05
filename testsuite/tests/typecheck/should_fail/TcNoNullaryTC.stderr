@@ -1,0 +1,5 @@
+
+TcNoNullaryTC.hs:4:1: error: [GHC-28349]
+    • No parameters for class ‘A’
+    • In the class declaration for ‘A’
+    Suggested fix: Perhaps you intended to use MultiParamTypeClasses

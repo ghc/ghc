@@ -1,0 +1,12 @@
+TYPE SIGNATURES
+  f :: forall b c. (T (Int, Int) b c -> Bool) -> (b, c)
+  h :: forall {c}. (Int, c)
+TYPE CONSTRUCTORS
+  data type T{4} :: forall {k}. * -> k -> * -> *
+    roles nominal nominal phantom nominal
+DATA CONSTRUCTORS
+  MkT :: forall {k} c y x (b :: k).
+         (x ~ y, c ~ [x], Ord x) =>
+         x -> y -> T (x, y) b c
+Dependent modules: []
+Dependent packages: [base-4.19.0.0]

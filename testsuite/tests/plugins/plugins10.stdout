@@ -1,0 +1,20 @@
+parsePlugin()
+interfacePlugin: Prelude
+interfacePlugin: Language.Haskell.TH
+interfacePlugin: Language.Haskell.TH.Quote
+interfacePlugin: GHC.Base
+interfacePlugin: GHC.Float
+interfacePlugin: GHC.Prim.Ext
+interfacePlugin: Language.Haskell.TH.Syntax
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)
+interfacePlugin: GHC.Num.BigNat
+parsePlugin(a)
+typeCheckPlugin (rn)
+interfacePlugin: Language.Haskell.TH.Lib.Internal
+metaPlugin: (return [])
+metaPlugin: quoteExp stringify "x"
+interfacePlugin: GHC.CString
+typeCheckPlugin (rn)
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)

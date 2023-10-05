@@ -1,0 +1,239 @@
+TYPE SIGNATURES
+  (!!) :: forall {a}. [a] -> Int -> a
+  ($) :: forall {a} {b}. (a -> b) -> a -> b
+  ($!) :: forall {a} {b}. (a -> b) -> a -> b
+  (&&) :: Bool -> Bool -> Bool
+  (*) :: forall {a}. Num a => a -> a -> a
+  (**) :: forall {a}. Floating a => a -> a -> a
+  (+) :: forall {a}. Num a => a -> a -> a
+  (++) :: forall {a}. [a] -> [a] -> [a]
+  (-) :: forall {a}. Num a => a -> a -> a
+  (.) :: forall {b} {c} {a}. (b -> c) -> (a -> b) -> a -> c
+  (/) :: forall {a}. Fractional a => a -> a -> a
+  (/=) :: forall {a}. Eq a => a -> a -> Bool
+  (<) :: forall {a}. Ord a => a -> a -> Bool
+  (<=) :: forall {a}. Ord a => a -> a -> Bool
+  (=<<) ::
+    forall {m :: * -> *} {a} {b}. Monad m => (a -> m b) -> m a -> m b
+  (==) :: forall {a}. Eq a => a -> a -> Bool
+  (>) :: forall {a}. Ord a => a -> a -> Bool
+  (>=) :: forall {a}. Ord a => a -> a -> Bool
+  (>>) :: forall {m :: * -> *} {a} {b}. Monad m => m a -> m b -> m b
+  (>>=) ::
+    forall {m :: * -> *} {a} {b}. Monad m => m a -> (a -> m b) -> m b
+  (^) :: forall {b} {a}. (Integral b, Num a) => a -> b -> a
+  (^^) :: forall {a} {b}. (Fractional a, Integral b) => a -> b -> a
+  abs :: forall {a}. Num a => a -> a
+  acos :: forall {a}. Floating a => a -> a
+  acosh :: forall {a}. Floating a => a -> a
+  all ::
+    forall {t :: * -> *} {a}.
+    P.Foldable t =>
+    (a -> Bool) -> t a -> Bool
+  and :: forall {t :: * -> *}. P.Foldable t => t Bool -> Bool
+  any ::
+    forall {t :: * -> *} {a}.
+    P.Foldable t =>
+    (a -> Bool) -> t a -> Bool
+  appendFile :: FilePath -> String -> IO ()
+  asTypeOf :: forall {a}. a -> a -> a
+  asin :: forall {a}. Floating a => a -> a
+  asinh :: forall {a}. Floating a => a -> a
+  atan :: forall {a}. Floating a => a -> a
+  atan2 :: forall {a}. RealFloat a => a -> a -> a
+  atanh :: forall {a}. Floating a => a -> a
+  break :: forall {a}. (a -> Bool) -> [a] -> ([a], [a])
+  ceiling :: forall {a} {b}. (RealFrac a, Integral b) => a -> b
+  compare :: forall {a}. Ord a => a -> a -> Ordering
+  concat :: forall {t :: * -> *} {a}. P.Foldable t => t [a] -> [a]
+  concatMap ::
+    forall {t :: * -> *} {a} {b}.
+    P.Foldable t =>
+    (a -> [b]) -> t a -> [b]
+  const :: forall {a} {b}. a -> b -> a
+  cos :: forall {a}. Floating a => a -> a
+  cosh :: forall {a}. Floating a => a -> a
+  curry :: forall {a} {b} {c}. ((a, b) -> c) -> a -> b -> c
+  cycle :: forall {a}. [a] -> [a]
+  decodeFloat :: forall {a}. RealFloat a => a -> (Integer, Int)
+  div :: forall {a}. Integral a => a -> a -> a
+  divMod :: forall {a}. Integral a => a -> a -> (a, a)
+  drop :: forall {a}. Int -> [a] -> [a]
+  dropWhile :: forall {a}. (a -> Bool) -> [a] -> [a]
+  either ::
+    forall {a} {c} {b}. (a -> c) -> (b -> c) -> Either a b -> c
+  elem ::
+    forall {t :: * -> *} {a}. (P.Foldable t, Eq a) => a -> t a -> Bool
+  encodeFloat :: forall {a}. RealFloat a => Integer -> Int -> a
+  enumFrom :: forall {a}. Enum a => a -> [a]
+  enumFromThen :: forall {a}. Enum a => a -> a -> [a]
+  enumFromThenTo :: forall {a}. Enum a => a -> a -> a -> [a]
+  enumFromTo :: forall {a}. Enum a => a -> a -> [a]
+  error :: forall {a}. [Char] -> a
+  even :: forall {a}. Integral a => a -> Bool
+  exp :: forall {a}. Floating a => a -> a
+  exponent :: forall {a}. RealFloat a => a -> Int
+  fail :: forall {m :: * -> *} {a}. P.MonadFail m => String -> m a
+  filter :: forall {a}. (a -> Bool) -> [a] -> [a]
+  flip :: forall {a} {b} {c}. (a -> b -> c) -> b -> a -> c
+  floatDigits :: forall {a}. RealFloat a => a -> Int
+  floatRadix :: forall {a}. RealFloat a => a -> Integer
+  floatRange :: forall {a}. RealFloat a => a -> (Int, Int)
+  floor :: forall {a} {b}. (RealFrac a, Integral b) => a -> b
+  fmap ::
+    forall {f :: * -> *} {a} {b}. Functor f => (a -> b) -> f a -> f b
+  foldl ::
+    forall {t :: * -> *} {b} {a}.
+    P.Foldable t =>
+    (b -> a -> b) -> b -> t a -> b
+  foldl1 ::
+    forall {t :: * -> *} {a}. P.Foldable t => (a -> a -> a) -> t a -> a
+  foldr ::
+    forall {t :: * -> *} {a} {b}.
+    P.Foldable t =>
+    (a -> b -> b) -> b -> t a -> b
+  foldr1 ::
+    forall {t :: * -> *} {a}. P.Foldable t => (a -> a -> a) -> t a -> a
+  fromEnum :: forall {a}. Enum a => a -> Int
+  fromInteger :: forall {a}. Num a => Integer -> a
+  fromIntegral :: forall {a} {b}. (Integral a, Num b) => a -> b
+  fromRational :: forall {a}. Fractional a => Rational -> a
+  fst :: forall {a} {b}. (a, b) -> a
+  gcd :: forall {a}. Integral a => a -> a -> a
+  getChar :: IO Char
+  getContents :: IO String
+  getLine :: IO String
+  head :: forall {a}. [a] -> a
+  id :: forall {a}. a -> a
+  init :: forall {a}. [a] -> [a]
+  interact :: (String -> String) -> IO ()
+  ioError :: forall {a}. IOError -> IO a
+  isDenormalized :: forall {a}. RealFloat a => a -> Bool
+  isIEEE :: forall {a}. RealFloat a => a -> Bool
+  isInfinite :: forall {a}. RealFloat a => a -> Bool
+  isNaN :: forall {a}. RealFloat a => a -> Bool
+  isNegativeZero :: forall {a}. RealFloat a => a -> Bool
+  iterate :: forall {a}. (a -> a) -> a -> [a]
+  last :: forall {a}. [a] -> a
+  lcm :: forall {a}. Integral a => a -> a -> a
+  length :: forall {t :: * -> *} {a}. P.Foldable t => t a -> Int
+  lex :: ReadS String
+  lines :: String -> [String]
+  log :: forall {a}. Floating a => a -> a
+  logBase :: forall {a}. Floating a => a -> a -> a
+  lookup :: forall {a} {b}. Eq a => a -> [(a, b)] -> Maybe b
+  map :: forall {a} {b}. (a -> b) -> [a] -> [b]
+  mapM ::
+    forall {t :: * -> *} {m :: * -> *} {a} {b}.
+    (P.Traversable t, Monad m) =>
+    (a -> m b) -> t a -> m (t b)
+  mapM_ ::
+    forall {t :: * -> *} {m :: * -> *} {a} {b}.
+    (P.Foldable t, Monad m) =>
+    (a -> m b) -> t a -> m ()
+  max :: forall {a}. Ord a => a -> a -> a
+  maxBound :: forall {w}. Bounded w => w
+  maximum ::
+    forall {t :: * -> *} {a}. (P.Foldable t, Ord a) => t a -> a
+  maybe :: forall {b} {a}. b -> (a -> b) -> Maybe a -> b
+  min :: forall {a}. Ord a => a -> a -> a
+  minBound :: forall {w}. Bounded w => w
+  minimum ::
+    forall {t :: * -> *} {a}. (P.Foldable t, Ord a) => t a -> a
+  mod :: forall {a}. Integral a => a -> a -> a
+  negate :: forall {a}. Num a => a -> a
+  not :: Bool -> Bool
+  notElem ::
+    forall {t :: * -> *} {a}. (P.Foldable t, Eq a) => a -> t a -> Bool
+  null :: forall {t :: * -> *} {a}. P.Foldable t => t a -> Bool
+  odd :: forall {a}. Integral a => a -> Bool
+  or :: forall {t :: * -> *}. P.Foldable t => t Bool -> Bool
+  otherwise :: Bool
+  pi :: forall {w}. Floating w => w
+  pred :: forall {a}. Enum a => a -> a
+  print :: forall {a}. Show a => a -> IO ()
+  product ::
+    forall {t :: * -> *} {a}. (P.Foldable t, Num a) => t a -> a
+  properFraction ::
+    forall {a} {b}. (RealFrac a, Integral b) => a -> (b, a)
+  putChar :: Char -> IO ()
+  putStr :: String -> IO ()
+  putStrLn :: String -> IO ()
+  quot :: forall {a}. Integral a => a -> a -> a
+  quotRem :: forall {a}. Integral a => a -> a -> (a, a)
+  read :: forall {a}. Read a => String -> a
+  readFile :: FilePath -> IO String
+  readIO :: forall {a}. Read a => String -> IO a
+  readList :: forall {a}. Read a => ReadS [a]
+  readLn :: forall {a}. Read a => IO a
+  readParen :: forall {a}. Bool -> ReadS a -> ReadS a
+  reads :: forall {a}. Read a => ReadS a
+  readsPrec :: forall {a}. Read a => Int -> ReadS a
+  realToFrac :: forall {a} {b}. (Real a, Fractional b) => a -> b
+  recip :: forall {a}. Fractional a => a -> a
+  rem :: forall {a}. Integral a => a -> a -> a
+  repeat :: forall {a}. a -> [a]
+  replicate :: forall {a}. Int -> a -> [a]
+  return :: forall {m :: * -> *} {a}. Monad m => a -> m a
+  reverse :: forall {a}. [a] -> [a]
+  round :: forall {a} {b}. (RealFrac a, Integral b) => a -> b
+  scaleFloat :: forall {a}. RealFloat a => Int -> a -> a
+  scanl :: forall {b} {a}. (b -> a -> b) -> b -> [a] -> [b]
+  scanl1 :: forall {a}. (a -> a -> a) -> [a] -> [a]
+  scanr :: forall {a} {b}. (a -> b -> b) -> b -> [a] -> [b]
+  scanr1 :: forall {a}. (a -> a -> a) -> [a] -> [a]
+  seq :: forall {a} {b}. a -> b -> b
+  sequence ::
+    forall {t :: * -> *} {m :: * -> *} {a}.
+    (P.Traversable t, Monad m) =>
+    t (m a) -> m (t a)
+  sequence_ ::
+    forall {t :: * -> *} {m :: * -> *} {a}.
+    (P.Foldable t, Monad m) =>
+    t (m a) -> m ()
+  show :: forall {a}. Show a => a -> String
+  showChar :: Char -> ShowS
+  showList :: forall {a}. Show a => [a] -> ShowS
+  showParen :: Bool -> ShowS -> ShowS
+  showString :: String -> ShowS
+  shows :: forall {a}. Show a => a -> ShowS
+  showsPrec :: forall {a}. Show a => Int -> a -> ShowS
+  significand :: forall {a}. RealFloat a => a -> a
+  signum :: forall {a}. Num a => a -> a
+  sin :: forall {a}. Floating a => a -> a
+  sinh :: forall {a}. Floating a => a -> a
+  snd :: forall {a} {b}. (a, b) -> b
+  span :: forall {a}. (a -> Bool) -> [a] -> ([a], [a])
+  splitAt :: forall {a}. Int -> [a] -> ([a], [a])
+  sqrt :: forall {a}. Floating a => a -> a
+  subtract :: forall {a}. Num a => a -> a -> a
+  succ :: forall {a}. Enum a => a -> a
+  sum :: forall {t :: * -> *} {a}. (P.Foldable t, Num a) => t a -> a
+  tail :: forall {a}. [a] -> [a]
+  take :: forall {a}. Int -> [a] -> [a]
+  takeWhile :: forall {a}. (a -> Bool) -> [a] -> [a]
+  tan :: forall {a}. Floating a => a -> a
+  tanh :: forall {a}. Floating a => a -> a
+  toEnum :: forall {a}. Enum a => Int -> a
+  toInteger :: forall {a}. Integral a => a -> Integer
+  toRational :: forall {a}. Real a => a -> Rational
+  truncate :: forall {a} {b}. (RealFrac a, Integral b) => a -> b
+  uncurry :: forall {a} {b} {c}. (a -> b -> c) -> (a, b) -> c
+  undefined :: forall {w}. w
+  unlines :: [String] -> String
+  until :: forall {a}. (a -> Bool) -> (a -> a) -> a -> a
+  unwords :: [String] -> String
+  unzip :: forall {a} {b}. [(a, b)] -> ([a], [b])
+  unzip3 :: forall {a} {b} {c}. [(a, b, c)] -> ([a], [b], [c])
+  userError :: String -> IOError
+  words :: String -> [String]
+  writeFile :: FilePath -> String -> IO ()
+  zip :: forall {a} {b}. [a] -> [b] -> [(a, b)]
+  zip3 :: forall {a} {b} {c}. [a] -> [b] -> [c] -> [(a, b, c)]
+  zipWith :: forall {a} {b} {c}. (a -> b -> c) -> [a] -> [b] -> [c]
+  zipWith3 ::
+    forall {a} {b} {c} {d}.
+    (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+  (||) :: Bool -> Bool -> Bool
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]

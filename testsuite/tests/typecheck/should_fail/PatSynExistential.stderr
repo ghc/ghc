@@ -1,0 +1,4 @@
+PatSynExistential.hs:6:1: [GHC-33973]
+     The result type of the signature for ‘P’, namely ‘x -> Maybe x’
+        mentions existential type variable ‘x’
+     In the declaration for pattern synonym ‘P’

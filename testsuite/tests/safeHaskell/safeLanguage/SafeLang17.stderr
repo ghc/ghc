@@ -1,0 +1,17 @@
+[1 of 4] Compiling SafeLang17_A     ( SafeLang17_A.hs, SafeLang17_A.o )
+[2 of 4] Compiling SafeLang17_B     ( SafeLang17_B.hs, SafeLang17_B.o )
+[3 of 4] Compiling Main             ( SafeLang17.hs, SafeLang17.o )
+
+SafeLang17.hs:9:13: error: [GHC-36705]
+    • Unsafe overlapping instances for Pos [Int]
+        arising from a use of ‘res’
+      The matching instance is:
+        instance [incoherent] [safe] Pos [Int]
+          -- Defined at SafeLang17_B.hs:15:10
+      It is compiled in a Safe module and as such can only
+      overlap instances from the same module, however it
+      overlaps the following instances from different modules:
+        instance Pos [a] -- Defined at SafeLang17_A.hs:14:10
+    • In the expression: res [(1 :: Int)]
+      In an equation for ‘r’: r = res [(1 :: Int)]
+      In a stmt of a 'do' block: let r = res [(1 :: Int)]

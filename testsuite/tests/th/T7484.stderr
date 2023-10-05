@@ -1,0 +1,4 @@
+
+T7484.hs:7:2: error: [GHC-55017]
+    Illegal variable name: ‘a ’
+    When splicing a TH declaration: a  = 5

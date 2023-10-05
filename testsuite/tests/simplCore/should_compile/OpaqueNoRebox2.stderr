@@ -1,0 +1,66 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 42, types: 25, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 5, types: 4, coercions: 0, joins: 0/0}
+f [InlPrag=OPAQUE] :: Int -> Int -> (Int, Int)
+[GblId, Arity=2, Str=<L><L>, Unf=OtherCon []]
+f = / (x :: Int) (y :: Int) -> (x, y)
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[GblId, Unf=OtherCon []]
+lvl = GHC.Types.I# 2#
+
+Rec {
+-- RHS size: {terms: 18, types: 5, coercions: 0, joins: 0/0}
+g [Occ=LoopBreaker] :: Bool -> Int -> (Int, Int)
+[GblId, Arity=2, Str=<1L><L>, Unf=OtherCon []]
+g = / (ds :: Bool) (a :: Int) ->
+      case ds of {
+        False ->
+          g GHC.Types.True
+            (case a of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 1#) });
+        True -> f lvl a
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox2.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoRebox2.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox2.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox2.$trModule3
+  = GHC.Types.TrNameS OpaqueNoRebox2.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox2.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 0}]
+OpaqueNoRebox2.$trModule2 = "OpaqueNoRebox2"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox2.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox2.$trModule1
+  = GHC.Types.TrNameS OpaqueNoRebox2.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox2.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox2.$trModule
+  = GHC.Types.Module
+      OpaqueNoRebox2.$trModule3 OpaqueNoRebox2.$trModule1

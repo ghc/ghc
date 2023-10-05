@@ -1,0 +1,10 @@
+[1 of 3] Processing common
+  Instantiating common
+  [1 of 1] Compiling Class            ( common/Class.hs, bkp56.out/common/Class.o )
+[2 of 3] Processing consumer-abs
+  [1 of 1] Compiling Instance[sig]    ( consumer-abs/Instance.hsig, nothing )
+[3 of 3] Processing consumer-impl
+  Instantiating consumer-impl
+  [1 of 1] Including common
+  [1 of 2] Compiling Impl[boot]       ( consumer-impl/Impl.hs-boot, bkp56.out/consumer-impl/Impl.o-boot )
+  [2 of 2] Compiling Impl             ( consumer-impl/Impl.hs, bkp56.out/consumer-impl/Impl.o )

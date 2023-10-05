@@ -1,0 +1,3 @@
+
+TyAppPat_MisplacedApplication.hs:9:6: error: [GHC-07626]
+    Parse error in pattern: MkT x

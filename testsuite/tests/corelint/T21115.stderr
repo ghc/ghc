@@ -1,0 +1,12 @@
+
+T21115.hs:10:5: error: [GHC-76595]
+    Illegal unboxed floating point literal in pattern:
+    0.0##
+
+T21115.hs:11:5: error: [GHC-76595]
+    Illegal unboxed floating point literal in pattern:
+    2.0##
+
+T21115.hs:12:5: error: [GHC-76595]
+    Illegal unboxed floating point literal in pattern:
+    -0.0##

@@ -1,0 +1,12 @@
+  :: Int %1 -> Int %1 -> T
+         Tmpl= \ (conrep [Occ=Once1!] :: Int)
+                 (conrep1 [Occ=Once1!] :: Int) ->
+  = \ (conrep [Occ=Once1!] :: Int) (conrep1 [Occ=Once1!] :: Int) ->
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
+  = \ (ww :: GHC.Prim.Int#) ->
+g2 [InlPrag=[2]] :: T -> Int -> Int
+         Tmpl= \ (ds [Occ=Once1!] :: T) (ds1 [Occ=Once1!] :: Int) ->
+  = \ (ds :: T) (ds1 :: Int) ->
+g1 [InlPrag=[2]] :: S -> Int -> Int
+         Tmpl= \ (ds [Occ=Once1!] :: S) (ds1 [Occ=Once1!] :: Int) ->
+  = \ (ds :: S) (ds1 :: Int) ->

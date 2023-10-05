@@ -1,0 +1,6 @@
+l = (_t1::[Maybe Integer])
+Just 1
+r = GHC.IORef.IORef (GHC.STRef.STRef
+                       (GHC.Prim.MutVar# (Just 1 : (_t2::[Maybe Integer]))))
+r = GHC.IORef.IORef (GHC.STRef.STRef
+                       (GHC.Prim.MutVar# (Just 1 : _)))

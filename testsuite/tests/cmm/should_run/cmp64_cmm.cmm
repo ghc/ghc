@@ -1,0 +1,31 @@
+#include "Cmm.h"
+
+#define TEST(name, op)                            \
+    name (bits64 x, bits64 y) {             \
+        if(x `op` y) {                          \
+            return (1);                           \
+        } else {                                  \
+            return (0);                           \
+        }                                         \
+    }
+
+cmm_func_test(bits64 foo, bits64 bar) {
+    return (1);
+}
+
+TEST(test_lt, lt)
+TEST(test_gt, gt)
+
+TEST(test_ne, ne)
+TEST(test_eq, eq)
+
+TEST(test_ge, ge)
+TEST(test_le, le)
+
+TEST(test_geu, geu)
+TEST(test_leu, leu)
+
+TEST(test_ltu, ltu)
+TEST(test_gtu, gtu)
+
+

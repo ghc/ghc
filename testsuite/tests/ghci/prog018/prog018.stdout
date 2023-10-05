@@ -1,0 +1,25 @@
+[1 of 3] Compiling A                ( A.hs, interpreted )
+[2 of 3] Compiling B                ( B.hs, interpreted )
+[3 of 3] Compiling C                ( C.hs, interpreted )
+
+A.hs:5:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘incompletePattern’:
+        Patterns of type ‘Int’ not matched: p where p is not one of {0}
+
+A.hs:8:15: warning: [GHC-40910] [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘x’
+
+B.hs:7:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The import of ‘Data.Tuple’ is redundant
+      except perhaps to import instances from ‘Data.Tuple’
+    To import instances alone, use: import Data.Tuple()
+
+C.hs:6:7: error: [GHC-88464]
+    Variable not in scope: variableNotInScope :: ()
+Failed, two modules loaded.
+[3 of 3] Compiling C                ( C.hs, interpreted )
+
+C.hs:6:7: error: [GHC-88464]
+    Variable not in scope: variableNotInScope :: ()
+Failed, two modules loaded.

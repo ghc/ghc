@@ -1,0 +1,5 @@
+
+records-mixing-fields.hs:10:14: error: [GHC-14392]
+    Invalid record update.
+    No constructor in scope has all of the following fields:
+      ‘f1’, ‘qux’

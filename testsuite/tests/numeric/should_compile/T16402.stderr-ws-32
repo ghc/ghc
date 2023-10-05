@@ -1,0 +1,133 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 124, types: 172, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule3 = TrNameS $trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule2 = "T16402"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule1 = TrNameS $trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$trModule = Module $trModule3 $trModule1
+
+-- RHS size: {terms: 18, types: 25, coercions: 0, joins: 0/0}
+smallWord_bar
+  = \ x ->
+      case x of { W64# x# ->
+      case {__pkg_ccall ghc-prim Word64#
+                      -> State# RealWorld -> (# State# RealWorld, Word# #)}
+             x# realWorld#
+      of
+      { (# ds1, ds2 #) ->
+      case {__pkg_ccall ghc-prim Word#
+                      -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             (and# ds2 0xffff##) realWorld#
+      of
+      { (# ds4, ds5 #) ->
+      W64# ds5
+      }
+      }
+      }
+
+-- RHS size: {terms: 24, types: 36, coercions: 0, joins: 0/0}
+smallWord_foo
+  = \ x ->
+      case x of { W64# x# ->
+      case {__pkg_ccall ghc-prim Word64#
+                      -> Word64# -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             x# 0xffff#Word64 realWorld#
+      of
+      { (# ds2, ds3 #) ->
+      case {__pkg_ccall ghc-prim Word64#
+                      -> State# RealWorld -> (# State# RealWorld, Word# #)}
+             ds3 realWorld#
+      of
+      { (# ds1, ds4 #) ->
+      case {__pkg_ccall ghc-prim Word#
+                      -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             (and# ds4 0xffff##) realWorld#
+      of
+      { (# ds5, ds6 #) ->
+      W64# ds6
+      }
+      }
+      }
+      }
+
+-- RHS size: {terms: 18, types: 25, coercions: 0, joins: 0/0}
+smallInt_bar
+  = \ x ->
+      case x of { I64# x# ->
+      case {__pkg_ccall ghc-prim Int64#
+                      -> State# RealWorld -> (# State# RealWorld, Int# #)}
+             x# realWorld#
+      of
+      { (# ds1, ds2 #) ->
+      case {__pkg_ccall ghc-prim Int#
+                      -> State# RealWorld -> (# State# RealWorld, Int64# #)}
+             (int16ToInt# (intToInt16# ds2)) realWorld#
+      of
+      { (# ds4, ds5 #) ->
+      I64# ds5
+      }
+      }
+      }
+
+-- RHS size: {terms: 35, types: 67, coercions: 0, joins: 0/0}
+$wsmallInt_foo
+  = \ ww ->
+      case {__pkg_ccall ghc-prim Int64#
+                      -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             1245183#Int64 realWorld#
+      of
+      { (# ds2, ds3 #) ->
+      case {__pkg_ccall ghc-prim Int64#
+                      -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             ww realWorld#
+      of
+      { (# ds4, ds5 #) ->
+      case {__pkg_ccall ghc-prim Word64#
+                      -> Word64# -> State# RealWorld -> (# State# RealWorld, Word64# #)}
+             ds5 ds3 realWorld#
+      of
+      { (# ds6, ds7 #) ->
+      case {__pkg_ccall ghc-prim Word64#
+                      -> State# RealWorld -> (# State# RealWorld, Int64# #)}
+             ds7 realWorld#
+      of
+      { (# ds8, ds9 #) ->
+      case {__pkg_ccall ghc-prim Int64#
+                      -> State# RealWorld -> (# State# RealWorld, Int# #)}
+             ds9 realWorld#
+      of
+      { (# ds1, ds11 #) ->
+      case {__pkg_ccall ghc-prim Int#
+                      -> State# RealWorld -> (# State# RealWorld, Int64# #)}
+             (int16ToInt# (intToInt16# ds11)) realWorld#
+      of
+      { (# ds12, ds13 #) ->
+      ds13
+      }
+      }
+      }
+      }
+      }
+      }
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+smallInt_foo
+  = \ w ->
+      case w of { I64# ww1 ->
+      case $wsmallInt_foo ww1 of ww2 { __DEFAULT -> I64# ww2 }
+      }
+
+
+

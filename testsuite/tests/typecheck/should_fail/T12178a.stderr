@@ -1,0 +1,5 @@
+
+T12178a.hs:7:12: error: [GHC-44432]
+    The INLINE pragma for ‘C’ lacks an accompanying binding
+    Suggested fix:
+      Move the INLINE pragma to the declaration site of ‘C’.

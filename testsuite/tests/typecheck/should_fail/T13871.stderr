@@ -1,0 +1,7 @@
+
+T13871.hs:16:18: error: [GHC-28374]
+    • Data constructor ‘MkFoo’ cannot be used here
+        (it has an unpromotable context ‘(a ~ Int, b ~ Char)’)
+    • In the first argument of ‘SFoo’, namely ‘MkFoo’
+      In the type ‘SFoo MkFoo’
+      In the definition of data constructor ‘SMkFoo’

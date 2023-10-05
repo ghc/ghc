@@ -1,0 +1,52 @@
+
+T14350.hs:49:10: error: [GHC-71451]
+    • Cannot generalise type; skolem ‘a’ would escape its scope
+      if I tried to quantify (x0 :: a) in this type:
+        forall a (b1 :: a ~> *)
+               (c :: forall (x :: a). Proxy @{a} x ~> ((@@) @{*} @{a} b1 x ~> *))
+               (f :: forall (x :: a) (y :: (@@) @{*} @{a} b1 x).
+                     Proxy @{a} x
+                     ~> (Proxy @{Apply @a @(*) b1 x} y
+                         ~> (@@)
+                              @{*}
+                              @{Apply @a @(*) b1 x}
+                              ((@@)
+                                 @{Apply @a @(*) b1 x ~> *} @{Proxy @{a} x} (c @x) ('Proxy @{a} @x))
+                              y))
+               (g :: forall (x :: a). Proxy @{a} x ~> (@@) @{*} @{a} b1 x)
+               (x :: a).
+        Sing
+          @(Proxy @{a} x0
+            ~> (Proxy @{Apply @a @(*) b1 x0} y0
+                ~> Apply
+                     @(Apply @a @(*) b1 x0)
+                     @(*)
+                     (Apply
+                        @(Proxy @{a} x0)
+                        @(Apply @a @(*) b1 x0 ~> *)
+                        (c @x0)
+                        ('Proxy @{a} @x0))
+                     y0))
+          (f @x0 @y0)
+        -> Sing @(Proxy @{a} x1 ~> Apply @a @(*) b1 x1) (g @x1)
+        -> Sing @a x
+        -> (@@)
+             @{*}
+             @{Apply @a @(*) b1 x}
+             ((@@)
+                @{Apply @a @(*) b1 x ~> *} @{Proxy @{a} x} (c @x) ('Proxy @{a} @x))
+             ((@@)
+                @{Apply @a @(*) b1 x} @{Proxy @{a} x} (g @x) ('Proxy @{a} @x))
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature:
+        dcomp :: forall (a :: Type)
+                        (b :: a ~> Type)
+                        (c :: forall (x :: a). Proxy x ~> b @@ x ~> Type)
+                        (f :: forall (x :: a) (y :: b @@ x).
+                              Proxy x ~> Proxy y ~> c @@ ('Proxy :: Proxy x) @@ y)
+                        (g :: forall (x :: a). Proxy x ~> b @@ x)
+                        (x :: a).
+                 Sing f
+                 -> Sing g
+                    -> Sing x -> c @@ ('Proxy :: Proxy x) @@ (g @@ ('Proxy :: Proxy x))

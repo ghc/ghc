@@ -1,0 +1,4 @@
+
+<no location info>: error: [GHC-95379]
+    Output was redirected with -o, but no output will be generated.
+    There is no module named ‘Main’.

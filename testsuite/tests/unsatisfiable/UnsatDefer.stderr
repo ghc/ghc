@@ -1,0 +1,5 @@
+UnsatDefer.exe: UnsatDefer.hs:20:7: error: [GHC-22250]
+    • Equality is not reflexive on Double
+    • In the expression: reflexiveEq 0 (0 :: Double)
+      In an equation for ‘foo’: foo = reflexiveEq 0 (0 :: Double)
+(deferred type error)

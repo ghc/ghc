@@ -1,0 +1,57 @@
+
+T21826.hs:3:29: error: [GHC-56449]
+    In the import of ‘Data.Type.Equality’:
+      an item called ‘(~)’ is exported, but it is a type.
+    Suggested fix:
+      Add the ‘type’ keyword to the import statement:
+        import Data.Type.Equality ( type (~) )
+
+T21826.hs:4:21: error: [GHC-35373]
+    In the import of ‘Data.Maybe’:
+      an item called ‘Just’
+      is exported, but it is a data constructor of
+      ‘Maybe’.
+    Suggested fix:
+      Use
+        import Data.Maybe ( Maybe( Just ) )
+      or
+        import Data.Maybe ( Maybe(..) )
+      or
+        import Data.Maybe ( pattern Just )
+
+T21826.hs:5:21: error: [GHC-61689]
+    Module ‘Data.Maybe’ does not export ‘Some’.
+
+T21826.hs:6:21: error: [GHC-10237]
+    In the import of ‘Data.Maybe’:
+      an item called ‘Maybe’ is exported, but it does not export any children
+      (constructors, class methods or field names) called ‘Some’.
+
+T21826.hs:7:21: error: [GHC-10237]
+    In the import of ‘Data.Maybe’:
+      an item called ‘Maybe’ is exported, but it does not export any children
+      (constructors, class methods or field names) called ‘Some’, ‘Mk’.
+
+T21826.hs:8:20: error: [GHC-12112]
+    In the import of ‘Data.List’:
+      an item called ‘(!!)’ is exported, but it is not a type.
+    Suggested fix:
+      Remove the ‘type’ keyword from the import statement:
+        import Data.List ( (!!) )
+
+T21826.hs:10:29: error: [GHC-56449]
+    In the import of ‘Data.Type.Equality’:
+      an item called ‘(:~:)’ is exported, but it is a type.
+    Suggested fix:
+      Add the ‘type’ keyword to the import statement:
+        import Data.Type.Equality ( type (:~:) )
+
+T21826.hs:12:21: error: [GHC-61689]
+    Module ‘Data.Maybe’ does not export ‘pattern Some’.
+
+T21826.hs:13:21: error: [GHC-56449]
+    In the import of ‘Data.Maybe’:
+      an item called ‘Maybe’ is exported, but it is a type.
+    Suggested fix:
+      Add the ‘type’ keyword to the import statement:
+        import Data.Maybe ( type Maybe )

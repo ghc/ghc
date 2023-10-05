@@ -1,0 +1,7 @@
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+key: testpkg-1.2.3.4-XXX
+exposed: True
+library-dirs: "${pkgroot}"
+extra-libraries: foo

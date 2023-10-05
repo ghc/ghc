@@ -1,0 +1,4 @@
+
+T22326_fail_ext1.hs:12:16: error: [GHC-47007]
+    Illegal keyword 'type'
+    Suggested fix: Perhaps you intended to use ExplicitNamespaces

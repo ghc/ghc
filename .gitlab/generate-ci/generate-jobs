@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -e
+
+out_dir="$(git rev-parse --show-toplevel)/.gitlab"
+
+tmp="$(mktemp)"
+generate-ci gitlab "$tmp"
+rm -f "$out_dir/jobs.yaml"
+echo "### THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY" > "$out_dir/jobs.yaml"
+cat "$tmp" | jq >> "$out_dir/jobs.yaml"
+rm "$tmp"
+echo "Updated $out_dir/jobs.yaml"
+

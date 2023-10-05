@@ -1,0 +1,4 @@
+test(bits64 buffer) {
+    return (%sx64((~(bits32[buffer])) >> (31::bits64)));
+}
+

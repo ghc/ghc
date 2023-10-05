@@ -1,0 +1,6 @@
+test('arrowfail002', normal, compile_fail, [''])
+test('arrowfail003', normal, compile_fail, [''])
+test('arrowfail004', normal, compile_fail, [''])
+test('T2111', normal, compile_fail, [''])
+test('T5380', normal, compile_fail, [''])
+test('T20768_arrow_fail', normal, compile_fail, [''])

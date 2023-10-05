@@ -1,0 +1,59 @@
+
+NumericUnderscoresFail1.hs:11:14: error: [GHC-88464]
+    • Found hole: _ :: t4
+      Where: ‘t4’ is an ambiguous type variable
+    • In the first argument of ‘0’, namely ‘_’
+      In the first argument of ‘(.)’, namely ‘0 _’
+      In the expression: 0 _ . 0001
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail1.hs:8:1)
+
+NumericUnderscoresFail1.hs:13:19: error: [GHC-88464]
+    • Found hole: _ :: t3
+      Where: ‘t3’ is an ambiguous type variable
+    • In the first argument of ‘0.0001’, namely ‘_’
+      In the expression: 0.0001 _
+      In the first argument of ‘print’, namely
+        ‘[0 _ . 0001, _0.0001, 0.0001 _, 0 . _0001, ....]’
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail1.hs:8:1)
+
+NumericUnderscoresFail1.hs:14:15: error: [GHC-88464]
+    • Found hole: _0001 :: a0 -> b1
+      Where: ‘a0’ is an ambiguous type variable
+             ‘b1’ is an ambiguous type variable
+      Or perhaps ‘_0001’ is mis-spelled, or not in scope
+    • In the second argument of ‘(.)’, namely ‘_0001’
+      In the expression: 0 . _0001
+      In the first argument of ‘print’, namely
+        ‘[0 _ . 0001, _0.0001, 0.0001 _, 0 . _0001, ....]’
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail1.hs:8:1)
+
+NumericUnderscoresFail1.hs:17:14: error: [GHC-88464]
+    Variable not in scope: e_
+
+NumericUnderscoresFail1.hs:18:18: error: [GHC-88464]
+    • Found hole: _ :: t1
+      Where: ‘t1’ is an ambiguous type variable
+    • In the first argument of ‘1e+23’, namely ‘_’
+      In the expression: 1e+23 _
+      In the first argument of ‘print’, namely
+        ‘[0 _ . 0001, _0.0001, 0.0001 _, 0 . _0001, ....]’
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail1.hs:8:1)
+
+NumericUnderscoresFail1.hs:19:14: error: [GHC-88464]
+    Variable not in scope: e
+
+NumericUnderscoresFail1.hs:19:16: error: [GHC-88464]
+    • Found hole: _23 :: a0 -> c0
+      Where: ‘a0’ is an ambiguous type variable
+             ‘c0’ is an ambiguous type variable
+      Or perhaps ‘_23’ is mis-spelled, or not in scope
+    • In the second argument of ‘(+)’, namely ‘_23’
+      In the expression: 1 e + _23
+      In the first argument of ‘print’, namely
+        ‘[0 _ . 0001, _0.0001, 0.0001 _, 0 . _0001, ....]’
+    • Relevant bindings include
+        main :: IO () (bound at NumericUnderscoresFail1.hs:8:1)

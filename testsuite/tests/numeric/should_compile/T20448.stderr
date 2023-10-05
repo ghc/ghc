@@ -1,0 +1,27 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 30, types: 30, coercions: 0, joins: 0/0}
+
+w8 = \ x -> x
+
+w16 = \ x -> x
+
+w32 = \ x -> x
+
+w64 = \ x -> x
+
+w = \ x -> x
+
+i8 = \ x -> x
+
+i16 = \ x -> x
+
+i32 = \ x -> x
+
+i64 = \ x -> x
+
+i = \ x -> x
+
+
+

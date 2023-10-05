@@ -1,0 +1,6 @@
+#include "Cmm.h"
+
+f(P_ a, P_ b, P_ c) {
+  I64[c + SIZEOF_StgArrBytes + 8] = 770000;
+  return (b, a, c);
+}

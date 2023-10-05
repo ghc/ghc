@@ -1,0 +1,5 @@
+
+proposal-229c.hs:6:3: error: [GHC-79767]
+    Illegal bang-pattern
+    !x
+    Suggested fix: Perhaps you intended to use BangPatterns

@@ -1,0 +1,32 @@
+ToDo:
+
+* inert_funeqs, inert_eqs: keep only the CtEvidence.
+   They are all CFunEqCans, CTyEqCans
+
+* Consider individual data types for CFunEqCan etc
+
+* Collapse CNonCanonical and CIrredCan
+  * RAE: I think it would be better to split off CNonCanonical into its own
+    type, and remove it completely from Ct. Then, we would keep CIrredCan
+
+The coercion solver
+~~~~~~~~~~~~~~~~~~~~
+Our hope. In GHC currently drawn from {G,W,D}, but with the coercion
+solver the flavours become pairs
+    { (k,l) | k <- {G,W,D}, l <- {Nom,Rep} }
+
+But can
+      a -(G,R)-> Int
+rewrite
+      b -(G,R)-> T a
+?
+
+Well, it depends on the roles at which T uses its arguments :-(.
+So it may not be enough just to look at (flavour,role) pairs?
+
+RAE: This is true, but it is taken care of by being careful in the
+flattening algorithm. Flattening (T a) looks at the roles of
+T's parameters, and chooses the role for flattening `a` appropriately.
+This is why there must be the [Role] parameter to flattenMany.
+Of course, this non-uniform rewriting may gum up the proof works.
+

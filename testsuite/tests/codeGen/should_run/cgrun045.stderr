@@ -1,0 +1,3 @@
+cgrun045: hello world!
+CallStack (from ImplicitParams):
+  error, called at cgrun045.hs:6:13 in main:Main

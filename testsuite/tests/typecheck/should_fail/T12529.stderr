@@ -1,0 +1,2 @@
+
+T12529.hs:5:5: error: [GHC-88464] Variable not in scope: p

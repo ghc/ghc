@@ -1,0 +1,2 @@
+-- This should print 'forall j k.', not 'forall k j.'
+F :: forall j k. j -> k

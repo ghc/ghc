@@ -1,0 +1,14 @@
+
+T22570.hs:11:10: error: [GHC-53946]
+    • Illegal instance for type synonym ‘SomeClassUnit’.
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class.
+    • In the instance declaration for ‘SomeClassUnit’
+
+T22570.hs:15:10: error: [GHC-53946]
+    • Illegal instance for type synonym ‘SomeClassSyn’.
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class.
+    • In the instance declaration for ‘SomeClassSyn ()’

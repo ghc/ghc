@@ -1,0 +1,17 @@
+TYPE CONSTRUCTORS
+  data type MyKind{0} :: *
+  data family Sing{2} :: forall k. k -> *
+    roles nominal nominal
+COERCION AXIOMS
+  axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
+      Sing = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
+DATA CONSTRUCTORS
+  A :: MyKind
+  B :: MyKind
+  SingA :: Sing A
+  SingB :: Sing B
+FAMILY INSTANCES
+  data instance Sing _a
+                  -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
+Dependent modules: []
+Dependent packages: [base-4.17.0.0]

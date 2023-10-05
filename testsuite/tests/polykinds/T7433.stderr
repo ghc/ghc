@@ -1,0 +1,4 @@
+
+T7433.hs:2:10: error: [GHC-68567]
+    Illegal type: ‘'Z’
+    Suggested fix: Perhaps you intended to use DataKinds

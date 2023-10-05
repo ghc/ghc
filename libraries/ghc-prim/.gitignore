@@ -1,0 +1,5 @@
+/dist/
+/dist-install/
+/ghc.mk
+/ghc-prim.buildinfo
+/GNUmakefile

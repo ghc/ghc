@@ -1,0 +1,11 @@
+:set -v1
+System.IO.writeFile "T8042B.hs" "{-# OPTIONS_GHC -fobject-code #-} module T8042B where { type I = Int; }"
+System.IO.writeFile "T8042C.hs" "module T8042C where { type B = Bool; }"
+System.IO.writeFile "T8042A.hs" "module T8042A where { import T8042B; import T8042C }"
+-- no `*` prefix so should compile object-code for B only
+:load T8042A
+System.IO.writeFile "T8042A.hs" "{-# OPTIONS_GHC -fobject-code #-} module T8042A where { import T8042B; import T8042C }"
+-- should compile object-code for A now
+:reload
+-- with `*` prefix should compile byte-code for A
+:load *T8042A

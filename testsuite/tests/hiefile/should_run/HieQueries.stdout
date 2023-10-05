@@ -1,0 +1,99 @@
+==========================
+At point (17,9), we found:
+==========================
+┌
+│ $dC at HieQueries.hs:17:1-13, of type: C [a]
+│     is an evidence variable bound by a let, depending on: [$fCList,
+│                                                            $dC]
+│           with scope: LocalScope HieQueries.hs:17:1-13
+│           bound at: HieQueries.hs:17:1-13
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ $fCList at HieQueries.hs:13:10-21, of type: forall a. C a => C [a]
+|  │     is an evidence variable bound by an instance of class C
+|  │           with scope: ModuleScope
+|  │           
+|  │     Defined at HieQueries.hs:13:10
+|  └
+|
+`- ┌
+   │ $dC at HieQueries.hs:17:1-13, of type: C a
+   │     is an evidence variable bound by a HsWrapper
+   │           with scope: LocalScope HieQueries.hs:17:1-13
+   │           bound at: HieQueries.hs:17:1-13
+   │     Defined at <no location info>
+   └
+
+==========================
+At point (23,9), we found:
+==========================
+┌
+│ $dShow at HieQueries.hs:23:1-22, of type: Show [(Integer, x, A)]
+│     is an evidence variable bound by a let, depending on: [$fShowList,
+│                                                            $dShow]
+│           with scope: LocalScope HieQueries.hs:23:1-22
+│           bound at: HieQueries.hs:23:1-22
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ $fShowList at HieQueries.hs:23:1-22, of type: forall a. Show a => Show [a]
+|  │     is a usage of an external evidence variable
+|  │     Defined in `GHC.Show'
+|  └
+|
+`- ┌
+   │ $dShow at HieQueries.hs:23:1-22, of type: Show (Integer, x, A)
+   │     is an evidence variable bound by a let, depending on: [$fShowTuple3,
+   │                                                            $dShow, $dShow, $dShow]
+   │           with scope: LocalScope HieQueries.hs:23:1-22
+   │           bound at: HieQueries.hs:23:1-22
+   │     Defined at <no location info>
+   └
+   |
+   +- ┌
+   |  │ $fShowTuple3 at HieQueries.hs:23:1-22, of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
+   |  │     is a usage of an external evidence variable
+   |  │     Defined in `GHC.Show'
+   |  └
+   |
+   +- ┌
+   |  │ $dShow at HieQueries.hs:23:1-22, of type: Show Integer
+   |  │     is an evidence variable bound by a let, depending on: [$fShowInteger]
+   |  │           with scope: LocalScope HieQueries.hs:23:1-22
+   |  │           bound at: HieQueries.hs:23:1-22
+   |  │     Defined at <no location info>
+   |  └
+   |  |
+   |  `- ┌
+   |     │ $fShowInteger at HieQueries.hs:23:1-22, of type: Show Integer
+   |     │     is a usage of an external evidence variable
+   |     │     Defined in `GHC.Show'
+   |     └
+   |
+   +- ┌
+   |  │ $dShow at HieQueries.hs:23:1-22, of type: Show x
+   |  │     is an evidence variable bound by a HsWrapper
+   |  │           with scope: LocalScope HieQueries.hs:23:1-22
+   |  │           bound at: HieQueries.hs:23:1-22
+   |  │     Defined at <no location info>
+   |  └
+   |
+   `- ┌
+      │ $dShow at HieQueries.hs:23:1-22, of type: Show A
+      │     is an evidence variable bound by a let, depending on: [$fShowA]
+      │           with scope: LocalScope HieQueries.hs:23:1-22
+      │           bound at: HieQueries.hs:23:1-22
+      │     Defined at <no location info>
+      └
+      |
+      `- ┌
+         │ $fShowA at HieQueries.hs:28:21-24, of type: Show A
+         │     is an evidence variable bound by an instance of class Show
+         │           with scope: ModuleScope
+         │           
+         │     Defined at HieQueries.hs:28:21
+         └
+

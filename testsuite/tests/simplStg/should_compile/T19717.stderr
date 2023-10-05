@@ -1,0 +1,19 @@
+
+==================== Final STG: ====================
+Foo.f :: forall {a}. a -> [GHC.Maybe.Maybe a]
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []] =
+    {} \r [x]
+        case x of x1 {
+        __DEFAULT ->
+        let {
+          sat [Occ=Once1] :: GHC.Maybe.Maybe a
+          [LclId] =
+              GHC.Maybe.Just! [x1]; } in
+        let {
+          sat [Occ=Once1] :: [GHC.Maybe.Maybe a]
+          [LclId] =
+              :! [sat GHC.Types.[]];
+        } in  : [sat sat];
+        };
+
+

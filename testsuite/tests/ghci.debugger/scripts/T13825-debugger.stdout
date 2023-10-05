@@ -1,0 +1,8 @@
+Packed1 12.34# 56.78# 42# 99.99#
+packed1 = Packed1 12.34 56.78 42 99.99
+Packed2 12.34 56.78 42 99.99
+packed2 = Packed2 12.34 56.78 42 99.99
+Packed3 1 2 3 4 5 6 7.8 9.0
+packed3 = Packed3
+            (GHC.Word.W8# 1) (GHC.Int.I8# 2) (GHC.Int.I64# 3) (GHC.Word.W16# 4)
+            (GHC.Word.W64# 5) (GHC.Word.W32# 6) 7.8 9.0

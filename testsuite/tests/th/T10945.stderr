@@ -1,0 +1,29 @@
+
+T10945.hs:7:11: error: [GHC-83865]
+    • Couldn't match type: [Dec]
+                     with: Q [Dec]
+      Expected: DecsQ
+        Actual: [Dec]
+    • In the first argument of ‘return’, namely
+        ‘[SigD
+            (mkName "m")
+            (ForallT
+               [PlainTV (mkName "a") SpecifiedSpec] []
+               (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
+          FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]]’
+      In the expression:
+        return
+          [SigD
+             (mkName "m")
+             (ForallT
+                [PlainTV (mkName "a") SpecifiedSpec] []
+                (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
+           FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]]
+      In the Template Haskell splice
+        $$(return
+             [SigD
+                (mkName "m")
+                (ForallT
+                   [PlainTV (mkName "a") SpecifiedSpec] []
+                   (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
+              FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]])

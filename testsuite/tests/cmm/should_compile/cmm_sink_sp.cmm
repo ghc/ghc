@@ -1,0 +1,24 @@
+#include "Cmm.h"
+
+stg_sink_things ( P_ x1 )
+{
+    W_ res;
+    W_ x2, x3, x4, x5, x6;
+
+    // Should produce a series of loads that are sunk into
+    // stores to Sp like this:
+    //    I64[Sp - 64] = I64[R1 + 1];   // CmmStore
+    //    I64[Sp - 56] = I64[R1 + 2];   // CmmStore
+    x2 = W_[x1+4];
+    x3 = W_[x1+8];
+    x4 = W_[x1+12];
+    x5 = W_[x1+16];
+    x6 = W_[x1+20];
+    W_[Sp - 8] = x2;
+    W_[Sp - 16] = x3;
+    W_[Sp - 24] = x4;
+    W_[Sp - 32] = x5;
+    W_[Sp - 40] = x6;
+
+    return (x1);
+}

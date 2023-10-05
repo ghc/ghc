@@ -1,0 +1,537 @@
+%%
+%% CoreSyn.ott
+%%
+%% defines formal version of core syntax
+%%
+%% See accompanying README file
+
+embed {{ tex-preamble
+  \newcommand{\coderef}[2]{\ghcfile{#1}:\texttt{#2}%
+}
+  \newcommand{\keyword}[1]{\textbf{#1} }
+  \newcommand{\labeledjudge}[1]{\vdash_{\!\!\mathsf{#1} } }
+  \newcommand{\ctor}[1]{\texttt{#1}%
+}
+}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Metavariables  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+metavar x, c ::=   {{ com Term-level variable names }}
+metavar p ::=    {{ com Labels }}
+metavar alpha {{ tex \alpha }}, beta {{ tex \beta }} ::=
+  {{ com Type-level variable names }}
+metavar N ::=   {{ com Type-level constructor names }}
+metavar M ::=   {{ com Axiom rule names }}
+
+indexvar i, j, kk {{ tex k }}, aa {{ tex a }}, bb {{ tex b }}, cc {{ tex c }} ::= {{ com Indices to be used in lists }}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Syntax  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grammar
+
+lit {{ tex \textsf{lit} }} :: 'Literal_' ::=
+  {{ com Literals, \coderef{GHC/Types/Literal.hs}{Literal} }}
+
+z :: 'Name_' ::= {{ com Term or type name }}
+  | alpha           ::   :: Type    {{ com Type-level name }}
+  | x               ::   :: Term    {{ com Term-level name }}
+
+n, m, aname {{ tex \alpha }}, xname {{ tex x }} :: 'Var_' ::= {{ com Variable names, \coderef{GHC/Types/Var.hs}{Var} }}
+  | z _ t           ::   :: IdOrTyVar   {{ com Name, labeled with type/kind }}
+    {{ tex {[[z]]}^{[[t]]} }}
+  | z $             :: M :: NoSupScript {{ com Name without an explicit type/kind }}
+  | K               :: M :: DataCon     {{ com Data constructor }}
+
+l :: 'Label_' ::= {{ com Labels for join points, also \coderef{GHC/Types/Var.hs}{Var} }}
+  | p / I _ t     ::   :: Label   {{ com Label with join arity and type }}
+    {{ tex  {[[p]]}_{[[I]]}^{[[t]]} }}
+
+vars :: 'Vars_' ::= {{ com List of variables }}
+  | </ ni // , // i />       ::   :: List
+  | fv ( e )                 :: M :: fv_e
+    {{ tex \textit{fv}([[e]]) }}
+  | fv ( types )             :: M :: fv_types
+    {{ tex \textit{fv}([[types]]) }}
+  | empty                    :: M :: empty
+  | vars1 \inter vars2       :: M :: intersection
+    {{ tex [[vars1]] \cap [[vars2]] }}
+
+labels :: 'Labels_' ::= {{ com List of labels }}
+  | </ li // , // i />       ::   :: List
+  | empty                    :: M :: empty
+
+e, u :: 'Expr_' ::= {{ com Expressions, \coderef{GHC/Core.hs}{Expr} }}
+  | n                                            ::   :: Var  {{ com \ctor{Var}: Variable }}
+  | lit                                          ::   :: Lit  {{ com \ctor{Lit}: Literal }}
+  | e1 e2                                        ::   :: App  {{ com \ctor{App}: Application }}
+  | jump l </ ui // i />                         ::   :: Jump {{ com \ctor{App}: Jump }}
+  | \ n . e                                      ::   :: Lam  {{ com \ctor{Lam}: Abstraction }}
+  | let binding in e                             ::   :: Let  {{ com \ctor{Let}: Variable binding }}
+  | join jbinding in e                           ::   :: Join {{ com \ctor{Let}: Join binding }}
+  | case e as n return t of </ alti // | // i /> ::   :: Case {{ com \ctor{Case}: Pattern match }}
+  | e |> g                                       ::   :: Cast {{ com \ctor{Cast}: Cast }}
+  | e { tick }                                   ::   :: Tick {{ com \ctor{Tick}: Internal note }}
+    {{ tex {[[e]]}_{\{[[tick]]\} } }}
+  | t                                            ::   :: Type {{ com \ctor{Type}: Type }}
+  | g                                            ::   :: Coercion {{ com \ctor{Coercion}: Coercion }}
+  | e subst                                      :: M :: Subst {{ com Substitution }}
+  | ( e )                                        :: M :: Parens {{ com Parenthesized expression }}
+  | e </ ui // i />                              :: M :: Apps {{ com Nested application }}
+  | S ( n )                                      :: M :: Lookup {{ com Lookup in the runtime store }}
+  | \\ e                                         :: M :: Newline
+    {{ tex \qquad \\ \multicolumn{1}{r}{[[e]]} }}
+
+binding :: 'Bind_' ::= {{ com Let-bindings, \coderef{GHC/Core.hs}{Bind} }}
+  | n = e                         ::   :: NonRec  {{ com \ctor{NonRec}: Non-recursive binding }}
+  | rec </ ni = ei // ;; // i /> ::   :: Rec     {{ com \ctor{Rec}: Recursive binding }}
+
+jbinding :: 'JoinBind_' ::= {{ com Join bindings, also \coderef{GHC/Core.hs}{Bind} }}
+  | l </ ni // i /> = e     ::   :: NonRec {{ com \ctor{NonRec}: Non-recursive binding }}
+  | rec </ li </ nij // j /> = ei // i /> :: :: Rec {{ com \ctor{Rec}: Recursive binding }}
+
+alt :: 'Alt_' ::= {{ com Case alternative, \coderef{GHC/Core.hs}{Alt} }}
+  | Kp </ ni // i /> -> e    ::   :: Alt  {{ com Constructor applied to fresh names }}
+
+tick :: 'Tickish_' ::= {{ com Internal notes, \coderef{GHC/Core.hs}{Tickish} }}
+
+Kp {{ tex \mathbb{K} }} :: 'AltCon_' ::= {{ com Constructors used in patterns, \coderef{GHC/Core.hs}{AltCon} }}
+  | K        ::   :: DataAlt         {{ com \ctor{DataAlt}: Data constructor }}
+  | lit      ::   :: LitAlt          {{ com \ctor{LitAlt}: Literal (such as an integer or character) }}
+  | _        ::   :: DEFAULT         {{ com \ctor{DEFAULT}: Wildcard }}
+
+program :: 'CoreProgram_' ::= {{ com A System FC program, \coderef{GHC/Core.hs}{CoreProgram} }}
+  | </ bindingi // i />  ::   :: CoreProgram  {{ com List of bindings }}
+
+%% TYPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
+  :: 'Type_' ::= {{ com Types/kinds, \coderef{GHC/Core/TyCo/Rep.hs}{Type} }}
+  | n                       ::   :: TyVarTy       {{ com \ctor{TyVarTy}: Variable }}
+  | t1 t2                   ::   :: AppTy         {{ com \ctor{AppTy}: Application }}
+  | T </ ti // i />         ::   :: TyConApp      {{ com \ctor{TyConApp}: Application of type constructor }}
+  | t1 -> t2                ::   :: FunTy         {{ com \ctor{FunTy}: Function }}
+  | forall n . t            ::   :: ForAllTy      {{ com \ctor{ForAllTy}: Type and coercion polymorphism }}
+  | lit                     ::   :: LitTy         {{ com \ctor{LitTy}: Type-level literal }}
+  | t |> g                  ::   :: CastTy        {{ com \ctor{CastTy}: Kind cast }}
+  | g                       ::   :: CoercionTy    {{ com \ctor{CoercionTy}: Coercion used in type }}
+  | tyConKind T             :: M :: tyConKind     {{ com \coderef{GHC/Core/TyCon.hs}{tyConKind} }}
+  | t1 k1 ~# k2 t2          :: M :: unliftedEq    {{ com Metanotation for coercion types }}
+    {{ tex [[t1]] \mathop{ {}^{[[k1]]}\!\! \sim_{\#}^{[[k2]]} } [[t2]] }}
+  | t1 k1 ~Rep# k2 t2         :: M :: unliftedREq   {{ com Metanotation for coercion types }}
+    {{ tex [[t1]] \mathop{ {}^{[[k1]]}\!\! \sim_{\mathsf{R}\#}^{[[k2]]} } [[t2]] }}
+  | literalType lit         :: M :: literalType   {{ com \coderef{GHC/Types/Literal.hs}{literalType} }}
+  | ( t )                   :: M :: parens        {{ com Parentheses }}
+  | { t }                   :: M :: IParens       {{ com Invisible parentheses }}
+    {{ tex [[t]] }}
+  | t [ n |-> s ]           :: M :: TySubst       {{ com Type substitution }}
+  | subst ( k )             :: M :: TySubstList   {{ com Type substitution list }}
+  | t subst                 :: M :: TySubstListPost {{ com Type substitution list }}
+  | dataConRepType K        :: M :: dataConRepType {{ com Type of DataCon }}
+  | forall </ ni // , // i /> . t
+                            :: M :: ForAllTys     {{ com Nested polymorphism }}
+  | </ ti // i /> $ -> t'   :: M :: FunTys        {{ com Nested arrows }}
+
+%% COERCIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coderef{GHC/Core/TyCo/Rep.hs}{Coercion} }}
+  | < t >                   ::   :: Refl          {{ com \ctor{Refl}: Nominal Reflexivity }}
+    {{ tex {\langle [[t]] \rangle} }}
+  | < t > R mg              ::   :: GRefl         {{ com \ctor{GRefl}: Generalized Reflexivity }}
+    {{ tex {\langle [[t]] \rangle}^{[[mg]]}_{[[R]]} }}
+  | T RA </ gi // i />      ::   :: TyConAppCo    {{ com \ctor{TyConAppCo}: Type constructor application }}
+  | g1 -> RA g2             ::   :: FunCo         {{ com \ctor{FunCo}: Functions }}
+  | g1 g2                   ::   :: AppCo         {{ com \ctor{AppCo}: Application }}
+  | forall z : h . g        ::   :: ForAllCo      {{ com \ctor{ForAllCo}: Polymorphism }}
+    {{ tex [[forall]] [[z]]{:}[[h]].[[g]] }}
+  | n                       ::   :: CoVarCo       {{ com \ctor{CoVarCo}: Variable }}
+  | C ind </ gi // i />     ::   :: AxiomInstCo   {{ com \ctor{AxiomInstCo}: Axiom application }}
+  | prov < t1 , t2 > _ R ^ ( h ) ::  :: UnivCo    {{ com \ctor{UnivCo}: Universal coercion }}
+    {{ tex {}_{[[prov]]}{\langle [[t1]], [[t2]] \rangle}_{[[R]]}^{[[h]]} }}
+  | sym g                   ::   :: SymCo         {{ com \ctor{SymCo}: Symmetry }}
+  | g1 ; g2                 ::   :: TransCo       {{ com \ctor{TransCo}: Transitivity }}
+  | mu </ ti // i /> $ </ gj // j />
+                            ::   :: AxiomRuleCo   {{ com \ctor{AxiomRuleCo}: Axiom-rule application (for type-nats) }}
+  | nth R I g               ::   :: NthCo         {{ com \ctor{NthCo}: Projection (0-indexed) }}
+    {{ tex \textsf{nth}^{[[I]]}_{[[R]]}\,[[g]] }}
+  | LorR g                  ::   :: LRCo          {{ com \ctor{LRCo}: Left/right projection }}
+  | g @ h                   ::   :: InstCo        {{ com \ctor{InstCo}: Instantiation }}
+  | kind g                  ::   :: KindCo        {{ com \ctor{KindCo}: Kind extraction }}
+  | sub g                   ::   :: SubCo         {{ com \ctor{SubCo}: Sub-role --- convert nominal to representational }}
+  | ( g )                   :: M :: Parens        {{ com Parentheses }}
+  | t $ liftingsubst        :: M :: Lifted        {{ com Type lifted to coercion }}
+  | downgradeRole R g       :: M :: downgradeRole {{ com \textsf{downgradeRole} }}
+
+prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{GHC/Core/TyCo/Rep.hs}{UnivCoProvenance} }}
+  | UnsafeCoerceProv   ::   :: UnsafeCoerceProv  {{ com From \texttt{unsafeCoerce\#} }}
+    {{ tex \mathsf{unsafe} }}
+  | PhantomProv        ::   :: PhantomProv       {{ com From the need for a phantom coercion }}
+    {{ tex \mathsf{phant} }}
+  | ProofIrrelProv     ::   :: ProofIrrelProv    {{ com From proof irrelevance }}
+    {{ tex \mathsf{irrel} }}
+
+mg {{ tex m }} :: 'MCoercion_' ::= {{ com A possibly reflexive coercion , \coderef{GHC/Core/TyCo/Rep.hs}{MCoercion} }}
+  | MRefl            ::   :: MRefl                {{ com \ctor{MRefl}: A trivial reflexive coercion }}
+  | MCo g            ::   :: MCo                  {{ com \ctor{MCo}: Other coercions }}
+    {{ tex [[g]] }}
+
+LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{GHC/Core/TyCo/Rep.hs}{LeftOrRight} }}
+  | Left             ::   :: CLeft                {{ com \ctor{CLeft}: Left projection }}
+  | Right            ::   :: CRight               {{ com \ctor{CRight}: Right projection }}
+
+C :: 'CoAxiom_' ::= {{ com Axioms, \coderef{GHC/Core/TyCon.hs}{CoAxiom} }}
+  | T RA </ axBranchi // ; // i />     ::   :: CoAxiom  {{ com \ctor{CoAxiom}: Axiom }}
+  | ( C )                              :: M :: Parens   {{ com Parentheses }}
+
+R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{GHC/Core/Coercion/Axiom.hs}{Role} }}
+  | Nom              ::   :: Nominal              {{ com Nominal }}
+    {{ tex \mathsf{N} }}
+  | Rep              ::   :: Representational     {{ com Representational }}
+    {{ tex \mathsf{R} }}
+  | Ph               ::   :: Phantom              {{ com Phantom }}
+    {{ tex \mathsf{P} }}
+  | role_list [ i ]  :: M :: RoleListIndex        {{ com Look up in list }}
+
+axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{GHC/Core/TyCon.hs}{CoAxBranch} }}
+  | forall </ ni RAi // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com \ctor{CoAxBranch}: Axiom branch }}
+  | ( </ axBranchi // i /> ) [ ind ]                   :: M :: lookup      {{ com List lookup }}
+
+mu {{ tex \mu }} :: 'CoAxiomRule_' ::= {{ com CoAxiomRules, \coderef{GHC/Core/Coercion/Axiom.hs}{CoAxiomRule} }}
+  | M ( I , role_list , R' )   ::  :: CoAxiomRule  {{ com Named rule, with parameter info }}
+    {{ tex {[[M]]}_{([[I]], [[ role_list ]], [[R']])} }}
+
+%% TYCONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+T :: 'TyCon_' ::= {{ com Type constructors, \coderef{GHC/Core/TyCon.hs}{TyCon} }}
+  | ( -> )       ::   :: FunTyCon          {{ com \ctor{FunTyCon}: Arrow }}
+
+  % the following also includes TupleTyCon, SynTyCon
+  | N _ k        ::   :: AlgTyCon          {{ com \ctor{AlgTyCon}, \ctor{TupleTyCon}, \ctor{SynTyCon}: algebraic, tuples, families, and synonyms }}
+    {{ tex {[[N]]}^{[[k]]} }}
+  | H            ::   :: PrimTyCon         {{ com \ctor{PrimTyCon}: Primitive tycon }}
+  | ' K          ::   :: PromotedDataCon   {{ com \ctor{PromotedDataCon}: Promoted data constructor }}
+  | dataConTyCon K :: M :: dataConTyCon    {{ com TyCon extracted from DataCon }}
+
+H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{GHC.Builtin.Types.Prim}{} }}
+  | Int#         ::   :: intPrimTyCon           {{ com Unboxed Int (\texttt{intPrimTyCon}) }}
+  | ( ~# )       ::   :: eqPrimTyCon            {{ com Unboxed equality (\texttt{eqPrimTyCon}) }}
+  | ( ~Rep# )      ::   :: eqReprPrimTyCon        {{ com Unboxed representational equality (\texttt{eqReprPrimTyCon}) }}
+  | *            ::   :: liftedTypeKindTyCon    {{ com Kind of lifted types (\texttt{liftedTypeKindTyCon}) }}
+  | #            ::   :: unliftedTypeKindTyCon  {{ com Kind of unlifted types (\texttt{unliftedTypeKindTyCon}) }}
+  | OpenKind     ::   :: openTypeKindTyCon      {{ com Either $*$ or $\#$ (\texttt{openTypeKindTyCon}) }}
+  | Constraint   ::   :: constraintTyCon        {{ com Constraint (\texttt{constraintTyCon}) }}
+  | TYPE         ::   :: TYPE                   {{ com TYPE (\texttt{tYPETyCon}) }}
+  | Levity       ::   :: Levity                 {{ com Levity (\texttt{LevityTyCon}) }}
+
+K :: 'DataCon_' ::= {{ com Data constructors, \coderef{GHC/Core/DataCon.hs}{DataCon} }}
+  | Lifted       ::   :: Lifted       {{ com \ctor{Lifted}, a lifted type }}
+  | Unlifted     ::   :: Unlifted     {{ com \ctor{Unlifted}, an unlifted type }}
+
+%% CONTEXTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+G {{ tex \Gamma }} :: 'LintM_Bindings_' ::= {{ com List of bindings, \coderef{GHC/Core/Lint.hs}{LintM} }}
+  | n                        ::   :: Binding   {{ com Single binding }}
+  | </ Gi // , // i />       ::   :: Concat    {{ com Context concatenation }}
+  | vars_of binding          :: M :: VarsOf    {{ com \coderef{GHC/Core.hs}{bindersOf} }}
+
+D {{ tex \Delta }} :: 'LintM_JoinBindings_' ::= {{ com List of join bindings, \coderef{GHC/Core/Lint.hs}{LintM} }}
+  | l                        ::   :: Binding   {{ com Single binding }}
+  | </ Di // , // i />       ::   :: Concat    {{ com Context concatenation }}
+  | empty                    :: M :: Empty     {{ com Empty context }}
+  | labels_of binding        :: M :: LabelsOf  {{ com \coderef{GHC/Core.hs}{bindersOf} }}
+
+O {{ tex \Omega }} :: 'VarEnv_Role_' ::= {{ com Mapping from type variables to roles }}
+  | </ ni : Ri // i />       ::   :: List      {{ com List of bindings }}
+  | O1 , O2                  :: M :: Concat    {{ com Concatenate two lists }}
+
+S {{ tex \Sigma }} :: 'St_' ::= {{ com Runtime store }}
+  | [ n |-> e ]            ::   :: Binding  {{ com Single binding }}
+  | </ Si // , // i />     ::   :: Concat   {{ com Store concatentation }}
+
+%% UTILITY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+B {{ tex \mathbb{B} }} :: 'Bool_' ::= {{ com Booleans in metatheory }}
+  | false        ::   :: False
+  | true         ::   :: True
+
+kinded_types {{ tex \overline{(\sigma_i : \kappa_i)}^i }} :: 'Kinded_Types_' ::= {{ com List of types with kinds }}
+  | </ ( si : ki ) // , // i />    ::   :: List
+  | empty                          :: M :: empty
+
+subst :: 'Subst_' ::= {{ com List of substitutions }}
+  | [ n |-> t ]        ::   :: TyMapping
+  | [ n |-> e ]        ::   :: TmMapping
+  | [ z |-> t ]        ::   :: TyMapping_Raw
+  | </ substi // i />  ::   :: List
+  | empty              :: M :: Empty
+
+liftingsubst :: 'LiftSubst_' ::= {{ com List of lifting substitutions }}
+  | [ n |-> g ]               ::   :: Mapping
+  | </ liftingsubsti // i />  ::   :: List
+
+ind, I {{ tex i }} :: 'Ind_' ::= {{ com Indices, numbers }}
+  | i                           ::   :: index
+  | length </ ti // i />        :: M :: length_t
+  | length </ gi // i />        :: M :: length_g
+  | length </ axBranchi // i /> :: M :: length_axBranch
+  | tyConArity T                :: M :: tyConArity
+  | ind - 1                     :: M :: decrement
+  | -1                          :: M :: minusOne
+  | 0                           :: M :: zero
+  | 1                           :: M :: one
+  | 2                           :: M :: two
+  | 3                           :: M :: three
+
+terms :: 'Terms_' ::= {{ com List of terms }}
+  | </ ei // i />      ::   :: List
+
+types :: 'Types_' ::= {{ com List of types }}
+  | </ ti // i />      ::   :: List
+
+names {{ tex \overline{n_i}^i }} :: 'Names_' ::= {{ com List of names }}
+  | </ ni // , // i />      ::   :: List
+  | empty                   :: M :: Empty
+  | names , n               :: M :: Snoc
+
+namesroles {{ tex \overline{n_i \!\! {}_{\rho_i} }^i }} :: 'NamesRoles_' ::= {{ com List of names, annotated with roles }}
+  | </ ni RAi // , // i />    ::   :: List
+  | empty                     :: M :: Empty
+  | namesroles , n RA         :: M :: Snoc
+
+gs {{ tex \overline{\gamma} }} :: 'Cos_' ::= {{ com List of coercions }}
+  | </ gi // , // i />     ::   :: List
+  | empty                  :: M :: Empty
+  | gs , g                 :: M :: Snoc
+
+RA {{ tex {\!\!{}_{\rho} } }} :: 'RoleAnnot_' ::= {{ com Role annotation }}
+  | _ R                    :: M :: annotation
+  {{ tex {\!\!{}_{[[R]]} } }}
+  | _ ^^ R                 :: M :: spaced_annotation
+  {{ tex {}_{[[R]]} }}
+
+role_list {{ tex {\overline{\rho_j} }^j }} :: 'RoleList_' ::= {{ com List of roles }}
+  | </ Ri // , // i />       ::   :: List
+  | tyConRolesX R T          :: M :: tyConRolesX
+  | tyConRoles T             :: M :: tyConRoles
+  | ( role_list )            :: M :: Parens
+  | { role_list }            :: M :: Braces
+  | take ( ind , role_list ) :: M :: Take
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Terminals  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+terminals :: 'terminals_' ::=
+  | \            ::   :: lambda           {{ tex \lambda }}
+  | let          ::   :: let              {{ tex \keyword{let} }}
+  | join         ::   :: join             {{ tex \keyword{join} }}
+  | in           ::   :: key_in           {{ tex \keyword{in} }}
+  | rec          ::   :: rec              {{ tex \keyword{rec} }}
+  | and          ::   :: key_and          {{ tex \keyword{and} }}
+  | jump         ::   :: jump             {{ tex \keyword{jump} }}
+  | case         ::   :: case             {{ tex \keyword{case} }}
+  | of           ::   :: of               {{ tex \keyword{of} }}
+  | ->           ::   :: arrow            {{ tex \to }}
+  | |>           ::   :: cast             {{ tex \triangleright }}
+  | forall       ::   :: forall           {{ tex {\forall}\! }}
+  | ==>!         ::   :: unsafe
+    {{ tex \twoheadrightarrow\!\!\!\!\!\! \raisebox{-.3ex}{!} \,\,\,\,\, }}
+  | sym          ::   :: sym              {{ tex \textsf{sym} }}
+  | ;            ::   :: trans            {{ tex \fatsemi }}
+  | ;;           ::   :: semi             {{ tex ; }}
+  | Left         ::   :: Left             {{ tex \textsf{left} }}
+  | Right        ::   :: Right            {{ tex \textsf{right} }}
+  | _            ::   :: wildcard         {{ tex \text{\textvisiblespace} }}
+  | Int#         ::   :: int_hash         {{ tex {\textsf{Int} }_{\#} }}
+  | ~#           ::   :: eq_hash          {{ tex \mathop{ {\sim}_{\#} } }}
+  | ~Rep#        ::   :: eq_repr_hash     {{ tex \mathop{ {\sim}_{\mathsf{R}\#} } }}
+  | OpenKind     ::   :: OpenKind         {{ tex \textsf{OpenKind} }}
+  | ok           ::   :: ok               {{ tex \textsf{ ok} }}
+  | no_duplicates ::  :: no_duplicates    {{ tex \textsf{no\_duplicates } }}
+  | vars_of      ::   :: vars_of          {{ tex \textsf{vars\_of } }}
+  | split        ::   :: split            {{ tex \mathop{\textsf{split} } }}
+  | not          ::   :: not              {{ tex \neg }}
+  | isUnLiftedTyCon :: :: isUnLiftedTyCon {{ tex \textsf{isUnLiftedTyCon} }}
+  | compatibleUnBoxedTys :: :: compatibleUnBoxedTys {{ tex \textsf{compatibleUnBoxedTys} }}
+  | false        ::   :: false            {{ tex \textsf{false} }}
+  | true         ::   :: true             {{ tex \textsf{true} }}
+  | \/           ::   :: or               {{ tex \vee }}
+  | /\           ::   :: and              {{ tex \mathop{\wedge} }}
+  | elt          ::   :: elt              {{ tex \in }}
+  | /=           ::   :: neq              {{ tex \neq }}
+  | literalType  ::   :: literalType      {{ tex \textsf{literalType} }}
+  | |->          ::   :: mapsto           {{ tex \mapsto }}
+  | <-           ::   :: assignment       {{ tex \leftarrow }}
+  | $            ::   :: marker           {{ tex  }}
+  | inits        ::   :: inits            {{ tex \textsf{inits} }}
+  | ~>           ::   :: squigarrow       {{ tex \rightsquigarrow }}
+  | tyConKind    ::   :: tyConKind        {{ tex \mathop{\textsf{tyConKind} } }}
+  | empty        ::   :: empty            {{ tex \cdot }}
+  | length       ::   :: length           {{ tex \mathsf{length} }}
+  | ~            ::   :: eq               {{ tex \sim }}
+  | tyConArity   ::   :: tyConArity       {{ tex \textsf{tyConArity} }}
+  | dataConTyCon ::   :: dataConTyCon     {{ tex \textsf{dataConTyCon} }}
+  | dataConRepType :: :: dataConRepType   {{ tex \textsf{dataConRepType} }}
+  | isNewTyCon   ::   :: isNewTyCon       {{ tex \textsf{isNewTyCon} }}
+  | isOpenTypeFamilyTyCon :: :: isOpenTypeFamilyTyCon {{ tex \textsf{isOpenTypeFamilyTyCon} }}
+  | isClosedTypeFamilyTyCon :: :: isClosedTypeFamilyTyCon {{ tex \textsf{isClosedTypeFamilyTyCon} }}
+  | isDataFamilyTyCon :: :: isDataFamilyTyCon {{ tex \textsf{isDataFamilyTyCon} }}
+  | isTyFamFree  ::   :: isTyFamFree      {{ tex \textsf{isTyFamFree} }}
+  | Constraint   ::   :: Constraint       {{ tex \textsf{Constraint} }}
+  | TYPE         ::   :: TYPE             {{ tex \textsf{TYPE} }}
+  | RuntimeRep   ::   :: RuntimeRep       {{ tex \textsf{RuntimeRep} }}
+  | LiftedRep    ::   :: LiftedRep        {{ tex \textsf{LiftedRep} }}
+  | UnliftedRep  ::   :: UnliftedRep      {{ tex \textsf{UnliftedRep} }}
+  | no_conflict  ::   :: no_conflict      {{ tex \textsf{no\_conflict} }}
+  | apart        ::   :: apart            {{ tex \textsf{apart} }}
+  | kind         ::   :: kind             {{ tex \textsf{kind} }}
+  | kapp         ::   :: kapp             {{ tex \textsf{kapp} }}
+  | sub          ::   :: sub              {{ tex \textsf{sub} }}
+  | #            ::   :: free             {{ tex \mathop{ \# } }}
+  | BOX          ::   :: BOX              {{ tex \square }}
+  | *            ::   :: star             {{ tex \star }}
+  | unify        ::   :: unify            {{ tex \textsf{unify} }}
+  | tyConRolesX  ::   :: tyConRolesX      {{ tex \textsf{tyConRolesX} }}
+  | tyConRoles   ::   :: tyConRoles       {{ tex \textsf{tyConRoles} }}
+  | tyConDataCons ::  :: tyConDataCons    {{ tex \textsf{tyConDataCons} }}
+  | validRoles   ::   :: validRoles       {{ tex \textsf{validRoles} }}
+  | validDcRoles ::   :: validDcRoles     {{ tex \textsf{validDcRoles} }}
+  | -->          ::   :: steps            {{ tex \longrightarrow }}
+  | coercionKind ::   :: coercionKind     {{ tex \textsf{coercionKind} }}
+  | coercionRole ::   :: coercionRole     {{ tex \textsf{coercionRole} }}
+  | downgradeRole ::  :: downgradeRole    {{ tex \textsf{downgradeRole} }}
+  | take         ::   :: take             {{ tex \textsf{take}\! }}
+  | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
+  | almostDevoid ::   :: almostDevoid     {{ tex \textsf{almostDevoid} }}
+  | Just         ::   :: Just             {{ tex \textsf{Just} }}
+  | \\           ::   :: newline          {{ tex \\ }}
+  | classifiesTypeWithValues :: :: ctwv   {{ tex \textsf{classifiesTypeWithValues} }}
+  | 0            ::   :: zero             {{ tex 0 }}
+  | +1           ::   :: succ             {{ tex +1 }}
+  | MRefl        ::   :: mrefl            {{ tex \cdot }}
+  | MCo          ::   :: mco
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+formula :: 'formula_' ::=
+  | judgement                          ::   :: judgement
+  | formula1 ... formulai              ::   :: dots
+  | G1 = G2                            ::   :: context_rewrite
+  | D1 = D2                            ::   :: join_context_rewrite
+  | t1 = t2                            ::   :: type_rewrite
+  | t1 /= t2                           ::   :: type_inequality
+  | e1 /=e e2                          ::   :: expr_inequality
+    {{ tex [[e1]] \neq [[e2]] }}
+  | 0 <= ind1 < ind2                   ::   :: in_bounds
+    {{ tex 0 \leq [[ind1]] < [[ind2]] }}
+  | g1 = g2                            ::   :: co_rewrite
+  | no_duplicates </ zi // i />        ::   :: no_duplicates_name
+  | no_duplicates </ bindingi // i />  ::   :: no_duplicates_binding
+  | no_duplicates </ li // i />        ::   :: no_duplicates_label
+  | not formula                        ::   :: not
+  | isUnLiftedTyCon T                  ::   :: isUnLiftedTyCon
+  | compatibleUnBoxedTys t1 t2         ::   :: compatibleUnBoxedTys
+  | formula1 /\ formula2               ::   :: and
+  | formula1 \/ formula2               ::   :: or
+  | ( formula1 ) \\/ ( formula2 )      ::   :: newline
+    {{ tex \begin{array}{@{}l@{}%
+}[[formula1]] \vee \\ \multicolumn{1}{@{}r@{}%
+}{\quad [[formula2]]} \end{array} }}
+  | ( formula )                        ::   :: parens
+  | n elt G                            ::   :: context_inclusion
+  | l elt D                            ::   :: join_context_inclusion
+  | vars1 = vars2                      ::   :: vars_rewrite
+  | </ Gi $ // i /> = inits ( </ nj // j /> ) :: :: context_folding
+  | </ substi $ // i /> = inits ( </ [ nj |-> tj ] // j /> ) :: :: subst_folding
+  | ind1 = ind2                        ::   :: eq_ind
+  | ind1 < ind2                        ::   :: lt
+  | G |- tylit lit : k                 ::   :: lintTyLit
+    {{ tex [[G]] \labeledjudge{tylit} [[lit]] : [[k]] }}
+  | isNewTyCon T                       ::   :: isNewTyCon
+  | isOpenTypeFamilyTyCon T            ::   :: isOpenTypeFamilyTyCon
+  | isClosedTypeFamilyTyCon T          ::   :: isClosedTypeFamilyTyCon
+  | isDataFamilyTyCon T                ::   :: isDataFamilyTyCon
+  | isTyFamFree t                      ::   :: isTyFamFree
+  | k1 elt { </ ki // , // i /> }      ::   :: kind_elt
+  | e is_a_type                        ::   :: is_a_type
+    {{ tex \exists \tau \text{ s.t.~} [[e]] = \tau }}
+  | t is_a_coercion_type               ::   :: is_a_coercion_type
+    {{ tex \exists \tau_1, \tau_2, \kappa_1, \kappa_2 \text{ s.t.~} [[t]] =
+           \tau_1 \mathop{ {}^{\kappa_1} {\sim}_{\#}^{\kappa_2} } \tau_2 }}
+  | e is_a_coercion                    ::   :: is_a_coercion
+    {{ tex \exists \gamma \text{ s.t.~} [[e]] = \gamma }}
+  | t is_a_prop                        ::   :: is_a_prop
+    {{ tex \exists \tau_1, \tau_2, \kappa \text{ s.t.~} [[t]] =
+           \tau_1 \mathop{ {\sim}_{\#}^{\kappa} } \tau_2 }}
+  | axBranch1 = axBranch2              ::   :: branch_rewrite
+  | C1 = C2                            ::   :: axiom_rewrite
+  | apart ( </ ti // i /> , </ sj // j /> ) :: :: apart
+  | unify ( </ ti // i /> , </ sj // j /> ) = subst :: :: unify
+  | role_list1 = role_list2            ::   :: eq_role_list
+  | R1 /= R2                           ::   :: role_neq
+  | R1 = R2                            ::   :: eq_role
+  | R1 <= R2                           ::   :: lte_role
+    {{ tex [[R1]] \leq [[R2]] }}
+  | </ Ki // i /> = tyConDataCons T    ::   :: tyConDataCons
+  | O ( n ) = R                        ::   :: role_lookup
+  | R elt role_list                    ::   :: role_elt
+  | formula1 => formula2               ::   :: implication
+    {{ tex [[formula1]] \implies [[formula2]] }}
+  | alt1 = alt2                        ::   :: alt_rewrite
+  | e1 = e2                            ::   :: e_rewrite
+  | no other case matches              ::   :: no_other_case
+    {{ tex \text{no other case matches} }}
+  | t = coercionKind g                 ::   :: coercionKind
+  | R = coercionRole g                 ::   :: coercionRole
+  | Just ( t1 , t2 ) = coaxrProves mu </ si // i /> </ ( s'j , s''j ) // j />
+                                       ::   :: coaxrProves
+  | mu1 = mu2                          ::   :: mu_rewrite
+  | classifiesTypeWithValues k         ::   :: classifies_type_with_values
+  | z elt vars                         ::   :: in_vars
+  | split _ I s = types                ::   :: split_type
+    {{ tex \mathop{\textsf{split} }_{[[I]]} [[s]] = [[types]] }}
+  | almostDevoid x g                   ::   :: almostDevoid
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+parsing
+
+TyCon_FunTyCon right Type_AppTy
+TyCon_PrimTyCon right Type_AppTy
+TyCon_AlgTyCon right Type_AppTy
+TyCon_PromotedDataCon right Type_AppTy
+
+TyCon_FunTyCon right Coercion_AppCo
+TyCon_PrimTyCon right Coercion_AppCo
+TyCon_AlgTyCon right Coercion_AppCo
+TyCon_PromotedDataCon right Coercion_AppCo
+
+Subst_TyMapping <= Type_TySubstList
+Subst_TmMapping <= Type_TySubstList
+Subst_List <= Type_TySubstList
+
+Subst_TyMapping <= Type_TySubstListPost
+Subst_TmMapping <= Type_TySubstListPost
+
+Expr_Type <= formula_e_rewrite
+Expr_Jump <= Expr_Apps
+
+Coercion_TyConAppCo <= Coercion_AppCo
+
+Coercion_TyConAppCo <= Type_CoercionTy
+Coercion_CoVarCo <= Type_CoercionTy
+
+Type_unliftedEq left Var_IdOrTyVar
+
+Expr_Coercion <= Subst_TmMapping
+
+Type_CastTy <= Var_IdOrTyVar
+
+Expr_Type <= Vars_fv_e

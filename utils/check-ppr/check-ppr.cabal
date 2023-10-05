@@ -1,0 +1,30 @@
+Name: check-ppr
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: A utilities for checking the consistency of GHC's pretty printer
+Description:
+    This utility is used to check the consistency of the GHC pretty printer, by
+    parsing a file, pretty printing it, and then re-parsing the pretty printed
+    version. See @utils/check-ppr/README@ in GHC's source distribution for
+    details.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable check-ppr
+    Default-Language: Haskell2010
+
+    Main-Is: Main.hs
+
+    Ghc-Options: -Wall
+
+    Build-Depends: base       >= 4   && < 5,
+                   bytestring,
+                   containers,
+                   directory,
+                   filepath,
+                   ghc

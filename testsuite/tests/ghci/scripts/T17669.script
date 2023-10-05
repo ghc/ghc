@@ -1,0 +1,7 @@
+:set -v1
+System.IO.writeFile "T17669.hs" "module T17669 where main :: IO ();main = putStrLn \"this\""
+:load T17669.hs
+:main
+System.IO.writeFile "T17669.hs" "module T17669 where main :: IO ();main = putStrLn \"that\""
+:reload
+:main

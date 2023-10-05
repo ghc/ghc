@@ -1,0 +1,8 @@
+
+WarningCategory1.hs:7:23: error: [GHC-63394] [-Wdeprecations (in -Wextended-warnings), -Werror=deprecations]
+    In the use of ‘quux’ (imported from WarningCategory1_B):
+    "quux has no category"
+
+WarningCategory1.hs:7:29: error: [GHC-68441] [-Wdeprecations (in -Wextended-warnings), -Werror=deprecations]
+    In the use of ‘plugh’ (imported from WarningCategory1_B):
+    Deprecated: "plugh is deprecated"

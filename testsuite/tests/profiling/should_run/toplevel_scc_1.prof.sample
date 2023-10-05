@@ -1,0 +1,33 @@
+	Tue Dec 20 14:22 2016 Time and Allocation Profiling Report  (Final)
+
+	   toplevel_scc_1 +RTS -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =      75,880 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC              %time %alloc
+
+MAIN        MAIN             <built-in>         0.0   24.0
+CAF         GHC.Read         <entire-module>    0.0    1.2
+CAF         GHC.IO.Handle.FD <entire-module>    0.0   68.3
+CAF         GHC.IO.Encoding  <entire-module>    0.0    3.6
+
+
+                                                                               individual      inherited
+COST CENTRE  MODULE                SRC                      no.     entries  %time %alloc   %time %alloc
+
+MAIN         MAIN                  <built-in>               105          0    0.0   24.0     0.0  100.0
+ CAF         Main                  <entire-module>          209          0    0.0    0.3     0.0    0.5
+  Main.f1    Main                  toplevel_scc_1.hs:4:1-2  214          1    0.0    0.0     0.0    0.0
+  Main.foo   Main                  toplevel_scc_1.hs:7:1-2  210          1    0.0    0.2     0.0    0.2
+   Main.bar  Main                  toplevel_scc_1.hs:10:5-6 212          1    0.0    0.0     0.0    0.0
+ CAF         GHC.Conc.Signal       <entire-module>          203          0    0.0    0.8     0.0    0.8
+ CAF         GHC.IO.Encoding       <entire-module>          193          0    0.0    3.6     0.0    3.6
+ CAF         GHC.IO.Encoding.Iconv <entire-module>          191          0    0.0    0.3     0.0    0.3
+ CAF         GHC.IO.Handle.FD      <entire-module>          183          0    0.0   68.3     0.0   68.3
+ CAF         GHC.IO.Handle.Text    <entire-module>          181          0    0.0    0.1     0.0    0.1
+ CAF         GHC.Read              <entire-module>          171          0    0.0    1.2     0.0    1.2
+ CAF         Text.Read.Lex         <entire-module>          154          0    0.0    0.9     0.0    0.9
+ Main.f1     Main                  toplevel_scc_1.hs:4:1-2  215          0    0.0    0.0     0.0    0.0
+ Main.foo    Main                  toplevel_scc_1.hs:7:1-2  211          0    0.0    0.1     0.0    0.1
+  Main.bar   Main                  toplevel_scc_1.hs:10:5-6 213          0    0.0    0.1     0.0    0.1

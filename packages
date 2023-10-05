@@ -1,0 +1,70 @@
+# Despite the name "packages", this file contains the master list of
+# the *repositories* that make up GHC. It is parsed by
+# * boot
+# * rules/foreachLibrary.mk
+#
+# Some of this information is duplicated elsewhere in the build system:
+#    See #3896
+# In particular when adding libraries to this file, you also need to add
+# the library to the SUBDIRS variable in libraries/Makefile so that they
+# actually get built
+#
+# The repos are of several kinds:
+#    - The main GHC source repo
+#    - Each boot package lives in a repo
+#    - Haddock and hsc2hs are applications, built on top of GHC,
+#        and in turn needed to bootstrap GHC
+#    - ghc-tarballs is need to build GHC
+#    - nofib is an optional helpers
+#
+# The format of the lines in this file is:
+#   localpath  tag  remotepath  upstreamurl
+# where
+#   * 'localpath' is where to put the repository in a checked out tree.
+#   * 'remotepath' is where the repository is in the central repository.
+#     It is - for submodules.
+#   * 'upstreamurl' is the upstream Git repo location for packages
+#     maintained outside of GHC HQ. Repositories which are hosted on
+#     GitHub and GHC developers are granted push-rights for are denoted by
+#     being specified with the `ssh://` scheme. Thus, `https://`
+#     repo urls denote read-only access.
+#   * 'tag', in combination with the variable BUILD_EXTRA_PKGS,
+#     determines which packages are build by default.
+#
+# Lines that start with a '#' are comments.
+#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# localpath                  tag         remotepath                      upstreamurl
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ghc-tarballs                 windows     ghc-tarballs.git                -
+libffi-tarballs              -           -                               -
+utils/hsc2hs                 -           -                               ssh://git@github.com/haskell/hsc2hs.git
+utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
+libraries/array              -           -                               -
+libraries/binary             -           -                               https://github.com/kolmodin/binary.git
+libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
+libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
+libraries/ghc-compact        -           -                               -
+libraries/ghc-heap           -           -                               -
+libraries/containers         -           -                               https://github.com/haskell/containers.git
+libraries/deepseq            -           -                               ssh://git@github.com/haskell/deepseq.git
+libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
+libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
+libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
+libraries/hpc                -           -                               -
+libraries/mtl                -           -                               https://github.com/haskell/mtl.git
+libraries/parsec             -           -                               https://github.com/haskell/parsec.git
+libraries/pretty             -           -                               https://github.com/haskell/pretty.git
+libraries/process            -           -                               ssh://git@github.com/haskell/process.git
+libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
+libraries/text               -           -                               https://github.com/haskell/text.git
+libraries/time               -           -                               https://github.com/haskell/time.git
+libraries/transformers       -           -                               https://git.haskell.org/darcs-mirrors/transformers.git
+libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git
+libraries/Win32              -           -                               https://github.com/haskell/win32.git
+libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
+libraries/exceptions         -           -                               https://github.com/ekmett/exceptions.git
+nofib                        nofib       -                               -
+libraries/semaphore-compat   -           -                               -
+libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
+.                            -           ghc.git                         -

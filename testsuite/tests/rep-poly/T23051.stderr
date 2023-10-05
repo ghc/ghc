@@ -1,0 +1,10 @@
+
+T23051.hs:9:7: error: [GHC-18872]
+    • Couldn't match kind ‘IntRep’ with ‘f0 g0’
+      When matching types
+        a :: TYPE (f0 g0)
+        Int# :: TYPE IntRep
+    • In the first argument of ‘i’, namely ‘0#’
+      In the expression: i 0#
+      In an equation for ‘x’: x = i 0#
+    • Relevant bindings include x :: a (bound at T23051.hs:9:1)

@@ -1,0 +1,6 @@
+[1 of 3] Compiling C                ( C.hs, C.o )
+[2 of 3] Compiling B                ( B.hs, B.o )
+[3 of 3] Compiling A                ( A.hs, A.o )
+[1 of 4] Compiling C[boot]          ( C.hs-boot, C.o-boot )
+[3 of 4] Compiling B                ( B.hs, B.o )
+[4 of 4] Compiling A                ( A.hs, A.o ) [B changed]

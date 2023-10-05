@@ -1,0 +1,23 @@
+--Testing type families and their shadowing
+--(But type families no longer shadow, after #7102)
+:set -XTypeFamilies
+data HTrue
+data HFalse
+type family AND a b
+type instance AND HTrue  HTrue  = HTrue
+type instance AND HTrue  HFalse = HFalse
+type instance AND HFalse HTrue  = HFalse
+type instance AND HFalse HFalse = HFalse
+type family OR a b
+type instance OR HTrue  HTrue  = HTrue
+type instance OR HTrue  HFalse = HTrue
+type instance OR HFalse HTrue  = HTrue
+type instance OR HFalse HFalse = HFalse
+:kind! AND HTrue HTrue
+:kind! AND (OR HFalse HTrue) (OR HTrue HFalse)
+let t = undefined :: AND HTrue HTrue
+let f = undefined :: AND HTrue HFalse
+type instance AND HTrue  HTrue  = HFalse
+:t t
+let t = undefined :: AND HTrue HTrue
+:t t

@@ -1,0 +1,3 @@
+
+TDPattern.hs:7:3: [GHC-76037]
+    Not in scope: data constructor ‘Zero’

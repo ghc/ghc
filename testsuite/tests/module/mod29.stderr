@@ -1,0 +1,6 @@
+
+mod29.hs:6:12: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Char’
+    Suggested fix:
+      Add ‘Char’ to the import list in the import of ‘Prelude’
+      (at mod29.hs:5:1-19).

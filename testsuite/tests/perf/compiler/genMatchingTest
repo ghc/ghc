@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Generate a module with N data types and instances
+DEFS=10000
+MATCHES=500
+MODE=$1
+echo "module Defs where" > Defs.hs;
+for i in $(seq -w 1 $DEFS); do
+  echo "data T$i a = T$i a deriving Show" >> Defs.hs;
+done
+
+echo "{-# LANGUAGE TypeFamilies #-}" > Match.hs
+echo "{-# LANGUAGE StandaloneDeriving #-}" >> Match.hs
+echo "{-# LANGUAGE EmptyDataDecls #-}" >> Match.hs
+echo "module Match where" >> Match.hs
+echo "import Defs" >> Match.hs
+
+if [ $MODE -eq 0 ]; then
+  for i in $(seq -w 1 $MATCHES); do
+    echo "type family F$i a where" >> Match.hs;
+  done
+  echo "data T a = T" >> Match.hs
+  for i in $(seq -w 1 $MATCHES); do
+    echo "       (F$i a)" >> Match.hs;
+  done
+  echo "deriving instance Show (T a)" >> Match.hs;
+fi
+#elif [ $MODE -eq 1 ]; then
+#  echo "data T " >> Match.hs
+#    for i in $(seq -w 1 $MATCHES); do
+#      echo "       a$i" >> Match.hs;
+#    done
+#    echo "       = T " >> Match.hs
+#    for i in $(seq -w 1 $MATCHES); do
+#      echo "       a$i" >> Match.hs;
+#    done
+#    echo "deriving instance Show (T" >> Match.hs
+#    for i in $(seq -w 1 $MATCHES); do
+#      echo "       a$i" >> Match.hs;
+#    done
+#    echo "    )" >> Match.hs;
+#else
+#  for i in $(seq -w 1 $MATCHES); do
+#    echo "data F$i a" >> Match.hs;
+#  done
+#  echo "data T a = T" >> Match.hs
+#  for i in $(seq -w 1 $MATCHES); do
+#    echo "       (F$i a)" >> Match.hs;
+#  done
+#  echo "deriving instance Show (T a)" >> Match.hs;
+#
+#fi
+

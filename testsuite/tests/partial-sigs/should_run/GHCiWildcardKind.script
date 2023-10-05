@@ -1,0 +1,4 @@
+:set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+:kind _
+:kind Maybe _
+

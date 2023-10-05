@@ -1,0 +1,17 @@
+unit q where
+    module B where
+        f = 2 :: Int
+unit p2 where
+    dependency q
+    signature A(f) where
+        import B
+unit p where
+    dependency q
+    dependency p2[A=<A>]
+    signature A(module A, module Prelude) where
+        import Prelude
+        f :: Int
+    module M where
+        import B
+        import A
+        g = f

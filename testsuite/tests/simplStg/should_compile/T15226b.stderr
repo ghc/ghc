@@ -1,0 +1,48 @@
+
+==================== Final STG: ====================
+T15226b.$WMkStrictPair [InlPrag=INLINE[final] CONLIKE]
+  :: forall a b. a %1 -> b %1 -> T15226b.StrictPair a b
+[GblId[DataConWrapper], Arity=2, Str=<SL><SL>, Unf=OtherCon []] =
+    {} \r [conrep conrep1]
+        case conrep of conrep2 {
+        __DEFAULT ->
+        case conrep1 of conrep3 {
+        __DEFAULT -> T15226b.MkStrictPair [conrep2 conrep3];
+        };
+        };
+
+T15226b.testFun1
+  :: forall a b.
+     a
+     -> b
+     -> GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, T15226b.StrictPair a b #)
+[GblId, Arity=3, Str=<L><ML><L>, Unf=OtherCon []] =
+    {} \r [x y void]
+        case seq# [x GHC.Prim.void#] of ds1 {
+        Solo# ipv1 [Occ=Once1] ->
+        let {
+          sat [Occ=Once1] :: T15226b.StrictPair a b
+          [LclId] =
+              {ipv1, y} \u []
+                  case y of conrep {
+                  __DEFAULT -> T15226b.MkStrictPair [ipv1 conrep];
+                  };
+        } in  seq# [sat GHC.Prim.void#];
+        };
+
+T15226b.testFun
+  :: forall a b. a -> b -> GHC.Types.IO (T15226b.StrictPair a b)
+[GblId, Arity=3, Str=<L><ML><L>, Unf=OtherCon []] =
+    {} \r [eta eta void] T15226b.testFun1 eta eta GHC.Prim.void#;
+
+T15226b.MkStrictPair [InlPrag=CONLIKE]
+  :: forall {a} {b}. a %1 -> b %1 -> T15226b.StrictPair a b
+[GblId[DataCon], Arity=2, Caf=NoCafRefs, Unf=OtherCon []] =
+    {} \r [eta eta]
+        case eta of eta {
+        __DEFAULT ->
+        case eta of eta { __DEFAULT -> T15226b.MkStrictPair [eta eta]; };
+        };
+
+

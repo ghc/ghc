@@ -1,0 +1,11 @@
+
+mod90.hs:3:16: error: [GHC-35373]
+    In the import of ‘Prelude’:
+      an item called ‘Left’
+      is exported, but it is a data constructor of
+      ‘Either’.
+    Suggested fix:
+      Use
+        import Prelude ( Either( Left ) )
+      or
+        import Prelude ( Either(..) )

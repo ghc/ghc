@@ -1,0 +1,77 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 43, types: 16, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T4930.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T4930.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T4930.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T4930.$trModule3 = GHC.Types.TrNameS T4930.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T4930.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T4930.$trModule2 = "T4930"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T4930.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T4930.$trModule1 = GHC.Types.TrNameS T4930.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T4930.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T4930.$trModule
+  = GHC.Types.Module T4930.$trModule3 T4930.$trModule1
+
+Rec {
+-- RHS size: {terms: 17, types: 3, coercions: 0, joins: 0/0}
+T4930.$wfoo [InlPrag=[2], Occ=LoopBreaker]
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=1, Str=<L>, Unf=OtherCon []]
+T4930.$wfoo
+  = \ (ww :: GHC.Prim.Int#) ->
+      case GHC.Prim.<# ww 5# of {
+        __DEFAULT -> GHC.Prim.+# ww 5#;
+        1# -> case T4930.$wfoo ww of { __DEFAULT -> GHC.Prim.+# ww 5# }
+      }
+end Rec }
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+foo [InlPrag=[2]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n [Occ=Once1!] :: Int) ->
+                 case n of { GHC.Types.I# ww [Occ=Once1] ->
+                 case T4930.$wfoo ww of ww1 [Occ=Once1] { __DEFAULT ->
+                 GHC.Types.I# ww1
+                 }
+                 }}]
+foo
+  = \ (n :: Int) ->
+      case n of { GHC.Types.I# ww ->
+      case T4930.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+      }
+
+
+

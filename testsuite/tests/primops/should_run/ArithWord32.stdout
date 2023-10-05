@@ -1,0 +1,8 @@
+Pass: passing Word32# on the stack
+Pass: notWord32#
+Pass: plusWord32#
+Pass: subWord32#
+Pass: timesWord32#
+Pass: remWord32#
+Pass: quotWord32#
+Pass: quotRemWord32#

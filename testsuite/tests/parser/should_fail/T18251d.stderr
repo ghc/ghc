@@ -1,0 +1,4 @@
+
+T18251d.hs:6:1: error: [GHC-07626]
+    Parse error in pattern: f @a
+                              Type applications in patterns are only allowed on data constructors.

@@ -1,0 +1,9 @@
+
+WarningGroups.hs:4:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: unused :: ()
+
+WarningGroups.hs:4:1: error: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds), Werror=unused-top-binds]
+    Defined but not used: ‘unused’
+
+WarningGroups.hs:4:14: error: [GHC-40910] [-Wunused-local-binds (in -Wextra, -Wunused-binds), Werror=unused-local-binds]
+    Defined but not used: ‘useless’

@@ -1,0 +1,13 @@
+Dump of assembler code for function stg_catch_frame_info:
+ 0x0000000000000010 <+0>:	add $0x18,%rbp
+ 0x0000000000000014 <+4>:	jmpq *0x0(%rbp)
+End of assembler dump.
+Contents of the .debug_frame section:
+00000000 0000000000000014 ffffffff CIE "" cf=1 df=-8 ra=16
+ LOC CFA rbp rsp ra 
+0000000000000000 rbp+0 v+0 s c+0 
+00000018 000000000000002c 00000000 FDE cie=00000000 pc=000000000000000f..0000000000000017
+ LOC CFA rbp rsp ra 
+000000000000000f rbp+0 v+0 s c+0 
+000000000000000f rbp+24 v+0 s c+0 
+0000000000000014 rbp+0 v+0 s c+0 

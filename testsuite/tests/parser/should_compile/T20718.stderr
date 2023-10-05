@@ -1,0 +1,176 @@
+
+==================== Parser AST ====================
+
+(L
+ { T20718.hs:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { T20718.hs:1:1 })
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { T20718.hs:3:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T20718.hs:3:15-19 }))]
+     []
+     (Just
+      ((,)
+       { T20718.hs:12:1 }
+       { T20718.hs:11:1-8 })))
+    (EpaCommentsBalanced
+     [(L
+       (EpaSpan
+        { T20718.hs:1:1-16 })
+       (EpaComment
+        (EpaLineComment
+         "-- top of file 1")
+        { T20718.hs:1:1 }))
+     ,(L
+       (EpaSpan
+        { T20718.hs:2:1-16 })
+       (EpaComment
+        (EpaLineComment
+         "-- top of file 2")
+        { T20718.hs:1:1-16 }))
+     ,(L
+       (EpaSpan
+        { T20718.hs:5:1-11 })
+       (EpaComment
+        (EpaLineComment
+         "-- before 1")
+        { T20718.hs:3:15-19 }))
+     ,(L
+       (EpaSpan
+        { T20718.hs:6:1-11 })
+       (EpaComment
+        (EpaLineComment
+         "-- before 2")
+        { T20718.hs:5:1-11 }))]
+     [(L
+       (EpaSpan
+        { T20718.hs:10:1-8 })
+       (EpaComment
+        (EpaLineComment
+         "-- end 1")
+        { T20718.hs:8:5 }))
+     ,(L
+       (EpaSpan
+        { T20718.hs:11:1-8 })
+       (EpaComment
+        (EpaLineComment
+         "-- end 2")
+        { T20718.hs:10:1-8 }))]))
+   (EpVirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { T20718.hs:3:8-13 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    {ModuleName: T20718}))
+  (Nothing)
+  []
+  [(L
+    (EpAnn
+     (EpaSpan { T20718.hs:8:1-5 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { T20718.hs:8:1 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: x}))
+      (MG
+       (FromSource)
+       (L
+        (EpAnn
+         (EpaSpan { T20718.hs:8:1-5 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { T20718.hs:8:1-5 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
+          (Match
+           (EpAnn
+            (EpaSpan { T20718.hs:8:1-5 })
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { T20718.hs:8:1 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: x}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (EpAnn
+               (EpaSpan { T20718.hs:8:3-5 })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { T20718.hs:8:3-5 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { T20718.hs:8:3 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { T20718.hs:8:5 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsOverLit
+                 (EpAnn
+                  (EpaSpan { T20718.hs:8:5 })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (OverLit
+                  (NoExtField)
+                  (HsIntegral
+                   (IL
+                    (SourceText 1)
+                    (False)
+                    (1))))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))]))
+
+

@@ -1,0 +1,3 @@
+
+T12406.hs:20:28: error: [GHC-88464]
+    Variable not in scope: join :: m0 (f0 ()) -> IO ()

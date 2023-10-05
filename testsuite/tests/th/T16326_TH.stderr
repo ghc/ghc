@@ -1,0 +1,22 @@
+type family T16326_TH.Foo2 :: forall (a_0 :: *) -> a_0 -> * where
+    T16326_TH.Foo2 = T16326_TH.Foo
+data Nested_0 :: forall a_1 .
+                 forall b_2 ->
+                 forall c_3 .
+                 forall d_4 ->
+                 forall e_5 .
+                 Data.Proxy.Proxy ('(:) a_1
+                                        ('(:) b_2 ('(:) c_3 ('(:) d_4 ('(:) e_5 '[]))))) ->
+                 *
+T16326_TH.hs:(17,2)-(24,14): Splicing declarations
+    do info <- reify ''Foo2
+       liftIO $ hPutStrLn stderr $ pprint info
+       dec <- [d| data Nested :: forall a.
+                                 forall b ->
+                                 forall c. forall d -> forall e. Proxy '[a, b, c, d, e] -> Type |]
+       liftIO $ hPutStrLn stderr $ pprint dec
+       pure dec
+  ======>
+    data Nested :: forall a.
+                   forall b ->
+                   forall c. forall d -> forall e. Proxy '[a, b, c, d, e] -> Type

@@ -1,0 +1,5 @@
+"Hi"
+equivalent_to_id test-throw 1
+equivalent_to_id test-throw caught 20
+"88.0"
+"Bye"

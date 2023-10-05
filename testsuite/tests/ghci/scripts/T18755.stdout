@@ -1,0 +1,4 @@
+($)
+  :: forall (repa :: GHC.Types.RuntimeRep)
+            (repb :: GHC.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb).
+     (a -> b) -> a -> b

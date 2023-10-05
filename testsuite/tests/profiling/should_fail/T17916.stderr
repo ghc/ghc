@@ -1,0 +1,3 @@
+
+T17916.hs:6:13: error: [GHC-58481]
+    parse error on input ‘CapitalCase’

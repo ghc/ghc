@@ -1,0 +1,38 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 103, types: 55, coercions: 0, joins: 0/0}
+
+b = \ x -> case x of { I# x1 -> I# (quotInt# x1 200#) }
+
+c = \ x -> case x of { W# x# -> W# (quotWord# x# 200##) }
+
+d = \ x -> case x of { W8# x# -> W8# (quotWord8# x# 200#Word8) }
+
+e = \ x ->
+      case x of { W16# x# -> W16# (quotWord16# x# 200#Word16) }
+
+f = \ x ->
+      case x of { W32# x# -> W32# (quotWord32# x# 200#Word32) }
+
+g = \ x ->
+      case x of { W64# x# -> W64# (quotWord64# x# 200#Word64) }
+
+h = \ x ->
+      case x of { I8# x# ->
+      I8# (quotInt8# (quotInt8# x# 10#Int8) 20#Int8)
+      }
+
+i = \ x -> case x of { I16# x# -> I16# (quotInt16# x# 200#Int16) }
+
+j = \ x -> case x of { I32# x# -> I32# (quotInt32# x# 200#Int32) }
+
+a = \ x ->
+      case x of { I32# x# ->
+      I32# (quotInt32# (quotInt32# x# 2147483647#Int32) 2147483647#Int32)
+      }
+
+k = \ x -> case x of { I64# x# -> I64# (quotInt64# x# 200#Int64) }
+
+
+

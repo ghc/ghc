@@ -1,0 +1,4 @@
+:load T22817
+:info BoolKind
+:info FalseType
+:info TrueType

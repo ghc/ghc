@@ -1,0 +1,18 @@
+($) :: (a -> b) -> a -> b
+(($)) :: (a -> b) -> a -> b
+($) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base’
+infixr 0 $
+($)
+  :: forall (repa :: GHC.Types.RuntimeRep)
+            (repb :: GHC.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb).
+     (a -> b) -> a -> b
+(($))
+  :: forall (repa :: GHC.Types.RuntimeRep)
+            (repb :: GHC.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb).
+     (a -> b) -> a -> b
+($) ::
+  forall (repa :: GHC.Types.RuntimeRep)
+         (repb :: GHC.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb).
+  (a -> b) -> a -> b
+  	-- Defined in ‘GHC.Base’
+infixr 0 $

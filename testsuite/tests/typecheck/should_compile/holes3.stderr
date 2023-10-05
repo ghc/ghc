@@ -1,0 +1,201 @@
+
+holes3.hs:3:5: error: [GHC-88464]
+    • Found hole: _ :: p
+      Where: ‘p’ is a rigid type variable bound by
+               the inferred type of f :: p
+               at holes3.hs:3:1-5
+    • In an equation for ‘f’: f = _
+    • Relevant bindings include f :: p (bound at holes3.hs:3:1)
+      Valid hole fits include f :: forall {p}. p
+
+holes3.hs:6:7: error: [GHC-88464]
+    • Found hole: _gr :: Char
+      Or perhaps ‘_gr’ is mis-spelled, or not in scope
+    • In an equation for ‘g’: g x = _gr
+    • Relevant bindings include
+        x :: Int (bound at holes3.hs:6:3)
+        g :: Int -> Char (bound at holes3.hs:6:1)
+      Valid hole fits include
+        f :: forall {p}. p
+        maxBound :: forall a. Bounded a => a
+        minBound :: forall a. Bounded a => a
+
+holes3.hs:8:5: error: [GHC-88464]
+    • Found hole: _aa :: [Char]
+      Or perhaps ‘_aa’ is mis-spelled, or not in scope
+    • In the first argument of ‘(++)’, namely ‘_aa’
+      In the expression: _aa ++ "a"
+      In an equation for ‘h’: h = _aa ++ "a"
+    • Relevant bindings include h :: [Char] (bound at holes3.hs:8:1)
+      Valid hole fits include
+        h :: [Char]
+        f :: forall {p}. p
+        [] :: forall a. [a]
+        mempty :: forall a. Monoid a => a
+
+holes3.hs:11:15: error: [GHC-88464]
+    • Found hole: _x :: b0
+      Where: ‘b0’ is an ambiguous type variable
+      Or perhaps ‘_x’ is mis-spelled, or not in scope
+    • In the second argument of ‘const’, namely ‘_x’
+      In the expression: const y _x
+      In an equation for ‘z’: z y = const y _x
+    • Relevant bindings include
+        y :: [a] (bound at holes3.hs:11:3)
+        z :: [a] -> [a] (bound at holes3.hs:11:1)
+      Valid hole fits include
+        y :: [a]
+        z :: [a] -> [a]
+        g :: Int -> Char
+        h :: [Char]
+        f :: forall {p}. p
+        otherwise :: Bool
+        False :: Bool
+        True :: Bool
+        LT :: Ordering
+        EQ :: Ordering
+        GT :: Ordering
+        () :: ()
+        lines :: String -> [String]
+        unlines :: [String] -> String
+        unwords :: [String] -> String
+        words :: String -> [String]
+        userError :: String -> IOError
+        lex :: ReadS String
+        showChar :: Char -> ShowS
+        showParen :: Bool -> ShowS -> ShowS
+        showString :: String -> ShowS
+        appendFile :: FilePath -> String -> IO ()
+        getChar :: IO Char
+        getContents :: IO String
+        getLine :: IO String
+        interact :: (String -> String) -> IO ()
+        putChar :: Char -> IO ()
+        putStr :: String -> IO ()
+        putStrLn :: String -> IO ()
+        readFile :: FilePath -> IO String
+        writeFile :: FilePath -> String -> IO ()
+        (&&) :: Bool -> Bool -> Bool
+        not :: Bool -> Bool
+        (||) :: Bool -> Bool -> Bool
+        (++) :: forall a. [a] -> [a] -> [a]
+        filter :: forall a. (a -> Bool) -> [a] -> [a]
+        fromInteger :: forall a. Num a => Integer -> a
+        (-) :: forall a. Num a => a -> a -> a
+        fromRational :: forall a. Fractional a => Rational -> a
+        negate :: forall a. Num a => a -> a
+        fromIntegral :: forall a b. (Integral a, Num b) => a -> b
+        toInteger :: forall a. Integral a => a -> Integer
+        toRational :: forall a. Real a => a -> Rational
+        (:) :: forall a. a -> [a] -> [a]
+        Nothing :: forall a. Maybe a
+        Just :: forall a. a -> Maybe a
+        [] :: forall a. [a]
+        MkSolo :: forall a. a -> Solo a
+        asTypeOf :: forall a. a -> a -> a
+        id :: forall a. a -> a
+        until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
+        ioError :: forall a. IOError -> IO a
+        (!!) :: forall a. GHC.Stack.Types.HasCallStack => [a] -> Int -> a
+        break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
+        cycle :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        drop :: forall a. Int -> [a] -> [a]
+        dropWhile :: forall a. (a -> Bool) -> [a] -> [a]
+        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        init :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        iterate :: forall a. (a -> a) -> a -> [a]
+        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        repeat :: forall a. a -> [a]
+        replicate :: forall a. Int -> a -> [a]
+        reverse :: forall a. [a] -> [a]
+        scanl1 :: forall a. (a -> a -> a) -> [a] -> [a]
+        scanr1 :: forall a. (a -> a -> a) -> [a] -> [a]
+        span :: forall a. (a -> Bool) -> [a] -> ([a], [a])
+        splitAt :: forall a. Int -> [a] -> ([a], [a])
+        tail :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        take :: forall a. Int -> [a] -> [a]
+        takeWhile :: forall a. (a -> Bool) -> [a] -> [a]
+        subtract :: forall a. Num a => a -> a -> a
+        readParen :: forall a. Bool -> ReadS a -> ReadS a
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+        even :: forall a. Integral a => a -> Bool
+        gcd :: forall a. Integral a => a -> a -> a
+        lcm :: forall a. Integral a => a -> a -> a
+        odd :: forall a. Integral a => a -> Bool
+        (**) :: forall a. Floating a => a -> a -> a
+        acos :: forall a. Floating a => a -> a
+        acosh :: forall a. Floating a => a -> a
+        asin :: forall a. Floating a => a -> a
+        asinh :: forall a. Floating a => a -> a
+        atan :: forall a. Floating a => a -> a
+        atanh :: forall a. Floating a => a -> a
+        cos :: forall a. Floating a => a -> a
+        cosh :: forall a. Floating a => a -> a
+        exp :: forall a. Floating a => a -> a
+        log :: forall a. Floating a => a -> a
+        logBase :: forall a. Floating a => a -> a -> a
+        pi :: forall a. Floating a => a
+        sin :: forall a. Floating a => a -> a
+        sinh :: forall a. Floating a => a -> a
+        sqrt :: forall a. Floating a => a -> a
+        tan :: forall a. Floating a => a -> a
+        tanh :: forall a. Floating a => a -> a
+        atan2 :: forall a. RealFloat a => a -> a -> a
+        decodeFloat :: forall a. RealFloat a => a -> (Integer, Int)
+        encodeFloat :: forall a. RealFloat a => Integer -> Int -> a
+        exponent :: forall a. RealFloat a => a -> Int
+        floatDigits :: forall a. RealFloat a => a -> Int
+        floatRadix :: forall a. RealFloat a => a -> Integer
+        floatRange :: forall a. RealFloat a => a -> (Int, Int)
+        isDenormalized :: forall a. RealFloat a => a -> Bool
+        isIEEE :: forall a. RealFloat a => a -> Bool
+        isInfinite :: forall a. RealFloat a => a -> Bool
+        isNaN :: forall a. RealFloat a => a -> Bool
+        isNegativeZero :: forall a. RealFloat a => a -> Bool
+        scaleFloat :: forall a. RealFloat a => Int -> a -> a
+        significand :: forall a. RealFloat a => a -> a
+        (*) :: forall a. Num a => a -> a -> a
+        (+) :: forall a. Num a => a -> a -> a
+        abs :: forall a. Num a => a -> a
+        signum :: forall a. Num a => a -> a
+        (/) :: forall a. Fractional a => a -> a -> a
+        recip :: forall a. Fractional a => a -> a
+        div :: forall a. Integral a => a -> a -> a
+        divMod :: forall a. Integral a => a -> a -> (a, a)
+        mod :: forall a. Integral a => a -> a -> a
+        quot :: forall a. Integral a => a -> a -> a
+        quotRem :: forall a. Integral a => a -> a -> (a, a)
+        rem :: forall a. Integral a => a -> a -> a
+        zip :: forall a b. [a] -> [b] -> [(a, b)]
+        map :: forall a b. (a -> b) -> [a] -> [b]
+        realToFrac :: forall a b. (Real a, Fractional b) => a -> b
+        Left :: forall a b. a -> Either a b
+        Right :: forall a b. b -> Either a b
+        maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
+        fst :: forall a b. (a, b) -> a
+        snd :: forall a b. (a, b) -> b
+        const :: forall a b. a -> b -> a
+        scanl :: forall b a. (b -> a -> b) -> b -> [a] -> [b]
+        scanr :: forall a b. (a -> b -> b) -> b -> [a] -> [b]
+        unzip :: forall a b. [(a, b)] -> ([a], [b])
+        (^^) :: forall a b. (Fractional a, Integral b) => a -> b -> a
+        ceiling :: forall a b. (RealFrac a, Integral b) => a -> b
+        floor :: forall a b. (RealFrac a, Integral b) => a -> b
+        properFraction :: forall a b.
+                          (RealFrac a, Integral b) =>
+                          a -> (b, a)
+        round :: forall a b. (RealFrac a, Integral b) => a -> b
+        truncate :: forall a b. (RealFrac a, Integral b) => a -> b
+        seq :: forall a b. a -> b -> b
+        either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
+        curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
+        uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
+        ($!) :: forall a b. (a -> b) -> a -> b
+        (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
+        flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+        unzip3 :: forall a b c. [(a, b, c)] -> ([a], [b], [c])
+        zip3 :: forall a b c. [a] -> [b] -> [c] -> [(a, b, c)]
+        zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+        ($) :: forall a b. (a -> b) -> a -> b
+        zipWith3 :: forall a b c d.
+                    (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]

@@ -1,0 +1,8 @@
+# FP_CHECK_SIZEOF_AND_ALIGNMENT(TYPE)
+# ------------------------------------------------------------------
+# Combines AC_CHECK_SIZEOF and FP_CHECK_ALIGNMENT.
+AC_DEFUN([FP_CHECK_SIZEOF_AND_ALIGNMENT],
+[AC_CHECK_SIZEOF([$1])
+FP_CHECK_ALIGNMENT([$1])
+])# FP_CHECK_SIZEOF_AND_ALIGNMENT
+

@@ -1,0 +1,17 @@
+[1 of 3] Processing indef
+  [1 of 2] Compiling Abstract[sig]    ( indef/Abstract.hsig, nothing )
+  [2 of 2] Compiling Util             ( indef/Util.hs, nothing )
+
+T15379-DataToTag.bkp:23:34: error: [GHC-43085]
+    • Overlapping instances for DataToTag DataType
+        arising from a use of ‘dataToTag#’
+      Matching instance:
+        instance [safe] DataToTag DataType
+          -- Defined at T15379-DataToTag.bkp:15:15
+      There exists a (perhaps superclass) match:
+      (To pick the first instance above, use IncoherentInstances
+       when compiling the other instance declarations)
+    • In the first argument of ‘I#’, namely ‘(dataToTag# v)’
+      In the expression: I# (dataToTag# v)
+      In the first argument of ‘print’, namely
+        ‘[I# (dataToTag# v) | v <- sampleVals]’

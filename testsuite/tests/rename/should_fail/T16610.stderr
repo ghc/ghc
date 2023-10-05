@@ -1,0 +1,3 @@
+
+T16610.hs:6:3: error: [GHC-54721]
+    ‘wrong’ is not a (visible) method of class ‘Eq’

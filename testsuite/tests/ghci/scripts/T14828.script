@@ -1,0 +1,23 @@
+:t foldl
+:print foldl
+
+:t fmap
+:print fmap
+
+:t return
+:print return
+
+:t pure
+:print pure
+
+:m + Data.Monoid
+:p mempty
+:p mappend
+
+:set -Wno-compat-unqualified-imports
+:m + Data.List
+:p foldl'
+
+:set -XRankNTypes
+f :: (forall a. a -> a) -> b -> b; f g x = g x
+:p f

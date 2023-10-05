@@ -1,0 +1,8 @@
+Pass: passing Word16# on the stack
+Pass: notWord16#
+Pass: plusWord16#
+Pass: subWord16#
+Pass: timesWord16#
+Pass: remWord16#
+Pass: quotWord16#
+Pass: quotRemWord16#

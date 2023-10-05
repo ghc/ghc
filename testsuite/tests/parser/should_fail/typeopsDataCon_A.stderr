@@ -1,0 +1,4 @@
+
+typeopsDataCon_A.hs:1:10: error: [GHC-30670]
+    Cannot parse an infix data constructor in a data/newtype declaration:
+      Int :+ Int :+ Int
