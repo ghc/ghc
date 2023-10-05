@@ -26,7 +26,6 @@ import Hadrian.Utilities
 import Base
 import Context
 import Oracles.Setting
-import GHC.Toolchain.Target (targetPlatformTriple)
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
