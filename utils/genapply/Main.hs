@@ -442,7 +442,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
               adj_reg_locs = [ (reg, off - adj + 1) |
                                (reg,off) <- extra_reg_locs ]
               adj = case extra_reg_locs of
-                      (reg, fst_off):_ -> fst_off
+                      (_, fst_off):_ -> fst_off
                       [] -> error "Impossible: genapply.hs : No extra register locations"
               size = snd (last adj_reg_locs) + 1
 
