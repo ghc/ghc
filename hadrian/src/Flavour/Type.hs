@@ -18,20 +18,23 @@ data Flavour = Flavour {
     -- This can't depend on the result of configuring a package (ie, using readContextData)
     extraArgs :: Args,
     -- | Build these packages.
-    packages :: Stage -> Action [Package],
+    packages :: Stage -- ^ stage of the /built/ compiler
+             -> Action [Package],
     -- | Bignum backend: 'native', 'gmp', 'ffi', etc.
     bignumBackend :: String,
     -- | Check selected bignum backend against native backend
     bignumCheck :: Bool,
     -- | Build the @text@ package with @simdutf@ support. Disabled by
     -- default due to packaging difficulties described in #20724.
-    textWithSIMDUTF :: Bool,
+    textWithSIMDUTF :: Stage -- ^ stage of the /built/ compiler
+                    -> Action Bool,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
     rtsWays :: Ways,
     -- | Build dynamic GHC programs.
-    dynamicGhcPrograms :: Action Bool,
+    dynamicGhcPrograms :: Stage -- ^ stage of the /built/ compiler
+                       -> Action Bool,
     -- | Build profiled GHC.
     ghcProfiled :: Stage -- ^ stage of the /built/ compiler
                 -> Bool,
@@ -54,7 +57,8 @@ data Flavour = Flavour {
     hashUnitIds :: Bool,
 
     -- | Whether to generate .hie files
-    ghcHieFiles :: Stage -> Bool
+    ghcHieFiles :: Stage -- ^ stage of the /built/ compiler
+                -> Bool
 
     }
 

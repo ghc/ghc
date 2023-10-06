@@ -1,5 +1,6 @@
 module Settings.Packages (packageArgs) where
 
+import Data.Version.Extra
 import Expression
 import Flavour
 import Oracles.Setting
@@ -7,12 +8,11 @@ import Oracles.Flag
 import Packages
 import Settings
 import Settings.Builders.Common (wayCcArgs)
+import Settings.Program (ghcWithInterpreter)
 
 import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
-import Data.Version.Extra
-import Settings.Program (ghcWithInterpreter)
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -25,7 +25,7 @@ packageArgs = do
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
-        haveCurses = any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
+        haveCurses = any (/= "") <$> traverse (flip buildSetting stage) [ CursesIncludeDir, CursesLibDir ]
 
         -- Check if the bootstrap compiler has the same version as the one we
         -- are building. This is used to build cross-compilers
@@ -33,12 +33,12 @@ packageArgs = do
 
         compilerStageOption f = buildingCompilerStage' . f =<< expr flavour
 
-    cursesIncludeDir <- getSetting CursesIncludeDir
-    cursesLibraryDir <- getSetting CursesLibDir
-    ffiIncludeDir  <- getSetting FfiIncludeDir
-    ffiLibraryDir  <- getSetting FfiLibDir
-    libzstdIncludeDir <- getSetting LibZstdIncludeDir
-    libzstdLibraryDir <- getSetting LibZstdLibDir
+    cursesIncludeDir <- staged (buildSetting CursesIncludeDir)
+    cursesLibraryDir <- staged (buildSetting CursesLibDir)
+    ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
+    ffiLibraryDir  <- staged (buildSetting FfiLibDir)
+    libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
+    libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
     stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
     mconcat
@@ -53,7 +53,7 @@ packageArgs = do
         -- for Stage0 only so we can link ghc-pkg against it, so there is little
         -- reason to spend the effort to optimise it.
         , package cabal ?
-          andM [stage0, notCross] ? builder Ghc ? arg "-O0"
+          andM [stage0, expr(notM cross)] ? builder Ghc ? arg "-O0"
 
         ------------------------------- compiler -------------------------------
         , package compiler ? mconcat
@@ -71,11 +71,11 @@ packageArgs = do
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
-            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? andM [stage0, notCross] ?
+            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? andM [stage0, expr(notM cross)] ?
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
-            [ anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
+            [ anyTargetOs stage [OSOpenBSD] ? arg "--ld-options=-E"
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force"
             , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
             ]
@@ -92,16 +92,16 @@ packageArgs = do
             --    load target code, otherwise enable for stage1 since
             --    that runs on the target and can use target's own
             --    ghci object linker
-            [ andM [expr (ghcWithInterpreter stage), orM [notCross, stage1]] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
-            , flag UseLibzstd `cabalFlag` "with-libzstd"
+            , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
             -- not being fixed to `ghc`, when building stage0, we must set
             -- -this-unit-id to `ghc` because the boot compiler expects that.
             -- We do it through a cabal flag in ghc.cabal
             , stageVersion < makeVersion [9,8,1] ? arg "+hadrian-stage0"
-            , flag StaticLibzstd `cabalFlag` "static-libzstd"
+            , staged (buildFlag StaticLibzstd) `cabalFlag` "static-libzstd"
             , stage0 `cabalFlag` "bootstrap"
             ]
 
@@ -187,7 +187,7 @@ packageArgs = do
 
         ---------------------------------- text --------------------------------
         , package text ?
-            ifM (textWithSIMDUTF <$> expr flavour)
+            ifM (staged =<< expr (textWithSIMDUTF <$> flavour))
               (builder (Cabal Flags) ? arg "+simdutf")
               (builder (Cabal Flags) ? arg "-simdutf")
 
@@ -235,11 +235,11 @@ packageArgs = do
 ghcInternalArgs :: Args
 ghcInternalArgs = package ghcInternal ? do
     -- These are only used for non-in-tree builds.
-    librariesGmp <- getSetting GmpLibDir
-    includesGmp <- getSetting GmpIncludeDir
+    librariesGmp <- staged (buildSetting GmpLibDir)
+    includesGmp <- staged (buildSetting GmpIncludeDir)
 
     backend <- getBignumBackend
-    check   <- getBignumCheck
+    check <- getBignumCheck
 
     mconcat
           [ -- select bignum backend
@@ -259,20 +259,20 @@ ghcInternalArgs = package ghcInternal ? do
 
                        -- enable in-tree support: don't depend on external "gmp"
                        -- library
-                     , flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+                     , staged (buildFlag GmpInTree) ? arg "--configure-option=--with-intree-gmp"
 
                        -- prefer framework over library (on Darwin)
-                     , flag GmpFrameworkPref ?
+                     , staged (buildFlag GmpFrameworkPref) ?
                        arg "--configure-option=--with-gmp-framework-preferred"
 
                        -- Ensure that the ghc-internal package registration includes
                        -- knowledge of the system gmp's library and include directories.
-                     , notM (flag GmpInTree) ? cabalExtraDirs includesGmp librariesGmp
+                     , notM (staged (buildFlag GmpInTree)) ? cabalExtraDirs includesGmp librariesGmp
                      ]
                   ]
                _ -> mempty
 
-          , builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
+          , builder (Cabal Flags) ? staged (buildFlag NeedLibatomic) `cabalFlag` "need-atomic"
 
           ]
 
@@ -292,21 +292,28 @@ libffiPackageArgs = package libffi ? do
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
-    ghcUnreg       <- queryTarget tgtUnregisterised
-    ghcEnableTNC   <- queryTarget tgtTablesNextToCode
+    stage          <- getStage
+    ghcUnreg       <- queryTarget stage tgtUnregisterised
+    ghcEnableTNC   <- queryTarget stage tgtTablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory
-    useSystemFfi   <- getFlag UseSystemFfi
-    libdwIncludeDir   <- queryTarget (Lib.includePath <=< tgtRTSWithLibdw)
-    libdwLibraryDir   <- queryTarget (Lib.libraryPath <=< tgtRTSWithLibdw)
-    libnumaIncludeDir <- getSetting LibnumaIncludeDir
-    libnumaLibraryDir <- getSetting LibnumaLibDir
-    libzstdIncludeDir <- getSetting LibZstdIncludeDir
-    libzstdLibraryDir <- getSetting LibZstdLibDir
+    useSystemFfi   <- succStaged (buildFlag UseSystemFfi)
+    libdwIncludeDir   <- staged (\s -> queryTargetTarget s (Lib.includePath <=< tgtRTSWithLibdw))
+    libdwLibraryDir   <- staged (\s -> queryTargetTarget s (Lib.libraryPath <=< tgtRTSWithLibdw))
+    libnumaIncludeDir <- staged (buildSetting LibnumaIncludeDir)
+    libnumaLibraryDir <- staged (buildSetting LibnumaLibDir)
+    libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
+    libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
 
-    x86 <- queryTarget (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
+    cross <- expr $ crossStage stage
+    let stage' = if cross then
+                  predStage stage
+                 else
+                  stage
+    -- Figure out if the host (the arch where GHC is running on) is x86
+    x86Host <- queryTarget stage' (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -316,17 +323,17 @@ rtsPackageArgs = package rts ? do
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
+          , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
             -- In particular, we **do not** pass -mavx when compiling
             -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
-          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
 
-          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
           ]
 
     let cArgs = mconcat
@@ -344,7 +351,7 @@ rtsPackageArgs = package rts ? do
           , arg "-Irts"
           , arg $ "-I" ++ path
 
-          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , notM (targetSupportsSMP stage)          ? arg "-DNOSMP"
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
@@ -371,11 +378,11 @@ rtsPackageArgs = package rts ? do
           , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
-          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86Host ]
 
-          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86Host ]
 
           -- inlining warnings happen in Compact
           , inputs ["**/Compact.c"] ? arg "-Wno-inline"
@@ -388,41 +395,41 @@ rtsPackageArgs = package rts ? do
           -- any warnings in the module. See:
           -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-          , (not <$> flag CcLlvmBackend) ?
+          , (not <$> buildFlag CcLlvmBackend stage) ?
             inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-          , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
+          , input "**/RetainerProfile.c" ? buildFlag CcLlvmBackend stage ?
             arg "-Wno-incompatible-pointer-types"
 
-          , input "**/prim/atomic.c"  ? (not <$> flag CcLlvmBackend) ?
+          , input "**/prim/atomic.c"  ? (not <$> buildFlag CcLlvmBackend stage) ?
             arg "-Wno-sync-nand"
           ]
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
-          [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
-          , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
-          , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
-          , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
-          , flag UseLibm                    `cabalFlag` "libm"
-          , flag UseLibrt                   `cabalFlag` "librt"
-          , flag UseLibdl                   `cabalFlag` "libdl"
-          , useSystemFfi                    `cabalFlag` "use-system-libffi"
-          , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
-          , flag UseLibpthread              `cabalFlag` "need-pthread"
-          , flag UseLibbfd                  `cabalFlag` "libbfd"
-          , flag NeedLibatomic              `cabalFlag` "need-atomic"
-          , useLibdw                        `cabalFlag` "libdw"
-          , flag UseLibnuma                 `cabalFlag` "libnuma"
-          , flag UseLibzstd                 `cabalFlag` "libzstd"
-          , flag StaticLibzstd              `cabalFlag` "static-libzstd"
-          , queryTargetTarget tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
-          , ghcUnreg                        `cabalFlag` "unregisterised"
-          , ghcEnableTNC                    `cabalFlag` "tables-next-to-code"
-          , Debug `wayUnit` way             `cabalFlag` "find-ptr"
+          [ any (wayUnit Profiling) rtsWays   `cabalFlag` "profiling"
+          , any (wayUnit Debug) rtsWays       `cabalFlag` "debug"
+          , any (wayUnit Dynamic) rtsWays     `cabalFlag` "dynamic"
+          , any (wayUnit Threaded) rtsWays    `cabalFlag` "threaded"
+          , buildFlag UseLibm stage           `cabalFlag` "libm"
+          , buildFlag UseLibrt stage          `cabalFlag` "librt"
+          , buildFlag UseLibdl stage          `cabalFlag` "libdl"
+          , useSystemFfi                      `cabalFlag` "use-system-libffi"
+          , targetUseLibffiForAdjustors stage `cabalFlag` "libffi-adjustors"
+          , buildFlag UseLibpthread stage     `cabalFlag` "need-pthread"
+          , buildFlag UseLibbfd stage         `cabalFlag` "libbfd"
+          , buildFlag NeedLibatomic stage     `cabalFlag` "need-atomic"
+          , useLibdw stage                    `cabalFlag` "libdw"
+          , buildFlag UseLibnuma stage        `cabalFlag` "libnuma"
+          , buildFlag UseLibzstd stage        `cabalFlag` "libzstd"
+          , buildFlag StaticLibzstd stage     `cabalFlag` "static-libzstd"
+          , queryTargetTarget stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
+          , ghcUnreg                          `cabalFlag` "unregisterised"
+          , ghcEnableTNC                      `cabalFlag` "tables-next-to-code"
+          , Debug `wayUnit` way               `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
-              [ useLibdw ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
+              [ useLibdw stage ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
               , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
               ]
@@ -436,7 +443,7 @@ rtsPackageArgs = package rts ? do
         , builder HsCpp ? pure
           [ "-DTOP="             ++ show top ]
 
-        , builder HsCpp ? useLibdw ? arg "-DUSE_LIBDW" ]
+        , builder HsCpp ? useLibdw stage ? arg "-DUSE_LIBDW" ]
 
 -- See @rts/ghc.mk@.
 rtsWarnings :: Args

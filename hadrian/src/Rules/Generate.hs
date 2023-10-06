@@ -5,15 +5,14 @@ module Rules.Generate (
     ) where
 
 import Development.Shake.FilePath
-import Data.Char (isSpace)
-import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (lookupSystemConfig, getTargetTarget)
+import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
+import Settings.Program (ghcWithInterpreter)
 import Hadrian.Haskell.Cabal.Type (PackageData(version))
 import Hadrian.Haskell.Cabal
 import Hadrian.Oracles.Cabal (readPackageData)
@@ -21,10 +20,12 @@ import Packages
 import Settings
 import Target
 import Utilities
+import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
-import Settings.Program (ghcWithInterpreter)
+import qualified Data.Set as Set
+import UserSettings (finalStage)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -55,7 +56,7 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
-    jsTarget <- expr isJsTarget
+    jsTarget <- expr (isJsTarget stage)
 
     let -- headers common to native and JS RTS
         common_headers =
@@ -150,7 +151,7 @@ generatePackageCode context@(Context stage pkg _ _) = do
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
             need $ [primopsSource]
-            build $ target context HsCpp [primopsSource] [file]
+            build $ target context (HsCpp stage) [primopsSource] [file]
 
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file -> do
@@ -257,9 +258,15 @@ generateRules = do
 
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
-            go gen file = generate file (semiEmptyTarget (succStage stage)) gen
+            -- For the finalStage, we generate settings for that stage. For
+            -- others we look at the next stage. Why? Because cross-compilers
+            -- require libs from the successor stage, otherwise they are
+            -- compiled for the host and not the target.
+            stage' = if stage /= finalStage then succStage stage else stage
+            go gen file = generate file (semiEmptyTarget stage') gen
         (prefix -/- "settings") %> \out -> go (generateSettings out) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr getTargetTarget) out
+        -- The compiler in `_build/stage1/` is the stage2 compiler, thus we have to query for "stage from path" + 1
+        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
@@ -299,7 +306,7 @@ runInterpolations (Interpolations mk_substs) input = do
     return (subst input)
 
 -- | Interpolate the given variable with the value of the given 'Setting'.
-interpolateSetting :: String -> Setting -> Interpolations
+interpolateSetting :: String -> ProjectSetting -> Interpolations
 interpolateSetting name settng = interpolateVar name $ setting settng
 
 -- | Interpolate the @ProjectVersion@, @ProjectVersionMunged@, and @ProjectVersionForLib@ variables.
@@ -421,21 +428,26 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
+    , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupStageBuildConfig "settings-use-distro-mingw"))
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ yesNo <$> getTarget tgtHasLibm
+    , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
+    , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
+    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ yesNo <$> getTarget (isJust . tgtRTSWithLibdw)
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
+    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
+    , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
+    , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
+    , interpolateVar "HostPlatformFull"  (setting HostPlatformFull)
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
-    getTarget = interp . queryTarget
+    getTarget = interp . queryTarget Stage2
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
@@ -465,7 +477,9 @@ generateSettings settingsFile = do
       case stage of
         Stage0 {} -> error "Unable to generate settings for stage0"
         Stage1 -> get_pkg_db Stage1
-        Stage2 -> get_pkg_db Stage1
+        Stage2 -> do
+          cfg <- implicitBindistConfig
+          get_pkg_db (library_stage cfg)
         Stage3 -> get_pkg_db Stage2
 
     -- The unit-id of the base package which is always linked against (#25382)
@@ -479,9 +493,14 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+    -- ROMES:TODO: WHERE HAS CROSS COMPILING GONE?
+    -- ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
+        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+        -- Hard-coded as Cabal queries these to determine way support and we
+        -- need to always advertise all ways when bootstrapping.
+        -- The settings file is generated at install time when installing a bindist.
+        , ("RTS ways",  unwords . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
         ]
@@ -502,8 +521,10 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    let queryTarget f = f <$> expr (targetStage stage)
+    -- Not right for stage3
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
-    hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
+    hostPlatform <- queryTarget targetPlatformTriple
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
@@ -605,7 +626,7 @@ generatePlatformHostHs = do
     stage <- getStage
     let chooseHostQuery = case stage of
             Stage0 {} -> queryHost
-            _         -> queryTarget
+            _         -> queryTarget stage
     cHostPlatformArch <- chooseHostQuery (archOS_arch . tgtArchOs)
     cHostPlatformOS   <- chooseHostQuery (archOS_OS . tgtArchOs)
     return $ unlines
@@ -622,19 +643,3 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
-
--- | Just like 'GHC.ResponseFile.escapeArgs', but use spaces instead of newlines
--- for splitting elements.
-escapeArgs :: [String] -> String
-escapeArgs = unwords . map escapeArg
-
-escapeArg :: String -> String
-escapeArg = reverse . foldl' escape []
-
-escape :: String -> Char -> String
-escape cs c
-  |    isSpace c
-    || '\\' == c
-    || '\'' == c
-    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
-  | otherwise    = c:cs

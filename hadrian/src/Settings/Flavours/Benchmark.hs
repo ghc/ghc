@@ -12,7 +12,7 @@ benchmarkFlavour = defaultFlavour
     { name = "bench"
     , extraArgs = benchmarkArgs <> defaultHaddockExtraArgs
     , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = Set.fromList <$> mconcat [pure [vanilla], targetSupportsThreadedRts ? pure [threaded]] }
+    , rtsWays = getStage >>= \stage -> Set.fromList <$> mconcat [pure [vanilla], targetSupportsThreadedRts stage ? pure [threaded]] }
 
 benchmarkArgs :: Args
 benchmarkArgs = sourceArgs SourceArgs

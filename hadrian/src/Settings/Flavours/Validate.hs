@@ -1,7 +1,6 @@
 module Settings.Flavours.Validate (validateFlavour, slowValidateFlavour,
                                     quickValidateFlavour) where
 
-
 import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default

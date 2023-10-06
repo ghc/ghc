@@ -19,15 +19,15 @@ quickFlavour = defaultFlavour
     , libraryWays = Set.fromList <$>
                     mconcat
                     [ pure [vanilla]
-                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
+                    , notStage0 ? staged targetSupportsSharedLibs ? pure [dynamic] ]
     , rtsWays     = Set.fromList <$>
                     mconcat
                     [ pure
                       [ vanilla, debug ]
-                    , targetSupportsThreadedRts ? pure [ threaded, threadedDebug ]
-                    , notStage0 ? platformSupportsSharedLibs ? pure
+                    , staged targetSupportsThreadedRts ? pure [ threaded, threadedDebug ]
+                    , notStage0 ? staged targetSupportsSharedLibs ? pure
                       [ dynamic, debugDynamic ]
-                    , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure [
+                    , notStage0 ? staged targetSupportsSharedLibs ? staged targetSupportsThreadedRts ? pure [
                       threadedDynamic, threadedDebugDynamic
                     ]
                     ] }

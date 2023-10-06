@@ -52,8 +52,8 @@ import Settings.Builders.Win32Tarballs
 defaultPackages :: Stage -> Action [Package]
 defaultPackages (Stage0 GlobalLibs) = stageBootPackages
 defaultPackages (Stage0 InTreeLibs) = stage0Packages
-defaultPackages Stage1 = stage1Packages
-defaultPackages Stage2 = stage2Packages
+defaultPackages Stage1 = stagedPackages Stage1
+defaultPackages Stage2 = stagedPackages Stage2
 defaultPackages Stage3 = return []
 
 -- | Default bignum backend.
@@ -70,9 +70,9 @@ stageBootPackages = return
   , hsc2hs
   , compareSizes
   , deriveConstants
-  , genapply
   , genprimopcode
   , unlit
+  , genapply
   ]
 
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
@@ -125,8 +125,8 @@ stage0Packages = do
           ++ [ timeout  | windowsHost                                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
-stage1Packages :: Action [Package]
-stage1Packages = do
+stagedPackages :: Stage -> Action [Package]
+stagedPackages stage = do
     let good_stage0_package p
           -- we only keep libraries for some reason
           | not (isLibrary p) = False
@@ -140,10 +140,10 @@ stage1Packages = do
 
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
-    winTarget  <- isWinTarget
-    jsTarget   <- isJsTarget
-    haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
-    useSystemFfi <- flag UseSystemFfi
+    winTarget  <- isWinTarget stage
+    jsTarget   <- isJsTarget stage
+    haveCurses <- any (/= "") <$> traverse (flip buildSetting stage) [ CursesIncludeDir, CursesLibDir ]
+    useSystemFfi <- buildFlag UseSystemFfi stage
 
     let when c xs = if c then xs else mempty
 
@@ -181,10 +181,8 @@ stage1Packages = do
         , transformers
         , unlit
         , xhtml
+        , hpcBin
         , if winTarget then win32 else unix
-        ]
-      , when (not cross)
-        [ hpcBin
         , runGhc
         , ghcToolchainBin
         ]
@@ -202,10 +200,6 @@ stage1Packages = do
         ]
       ]
 
--- | Packages built in 'Stage2' by default. You can change this in "UserSettings".
-stage2Packages :: Action [Package]
-stage2Packages = stage1Packages
-
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
 testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact, countDeps, lintCodes, ghcConfig, dumpDecls ])
@@ -215,30 +209,34 @@ testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact,
 -- * We build 'profiling' way when stage > Stage0.
 -- * We build 'dynamic' way when stage > Stage0 and the platform supports it.
 defaultLibraryWays :: Ways
-defaultLibraryWays = Set.fromList <$>
-    mconcat
-    [ pure [vanilla]
-    , notStage0 ? pure [profiling]
-    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic, profilingDynamic]
-    ]
+defaultLibraryWays = do
+    stage <- getStage
+    Set.fromList <$>
+      mconcat
+      [ pure [vanilla]
+      , notStage0 ? pure [profiling]
+      , notStage0 ? targetSupportsSharedLibs stage ? pure [profilingDynamic, dynamic]
+      ]
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
-defaultRtsWays = Set.fromList <$>
-  mconcat
-  [ pure [vanilla]
-  , notStage0 ? pure
-      [ profiling, debugProfiling
-      , debug
-      ]
-  , notStage0 ? targetSupportsThreadedRts ? pure [threaded, threadedProfiling, threadedDebugProfiling, threadedDebug]
-  , notStage0 ? platformSupportsSharedLibs ? pure
-      [ dynamic, profilingDynamic, debugDynamic, debugProfilingDynamic
-      ]
-  , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure
-      [ threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic
-      ]
-  ]
+defaultRtsWays = do
+  stage <- getStage
+  Set.fromList <$>
+     mconcat
+     [ pure [vanilla]
+     , notStage0 ? pure
+         [ profiling, debugProfiling
+         , debug
+         ]
+     , notStage0 ? targetSupportsThreadedRts stage ? pure [threaded, threadedProfiling, threadedDebugProfiling, threadedDebug]
+     , notStage0 ? targetSupportsSharedLibs stage ? pure
+         [ dynamic, profilingDynamic, debugDynamic, debugProfilingDynamic
+         ]
+     , notStage0 ? targetSupportsSharedLibs stage ? targetSupportsThreadedRts stage ? pure
+        [ threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic
+        ]
+     ]
 
 -- TODO: Move C source arguments here
 -- | Default and package-specific source arguments.
@@ -289,7 +287,7 @@ defaultFlavour = Flavour
     , packages           = defaultPackages
     , bignumBackend      = defaultBignumBackend
     , bignumCheck        = False
-    , textWithSIMDUTF    = False
+    , textWithSIMDUTF    = const (return False)
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
@@ -298,8 +296,9 @@ defaultFlavour = Flavour
     , ghcThreaded        = const True
     , ghcDebugAssertions = const False
     , ghcSplitSections   = False
-    , ghcDocs            = cmdDocsArgs
-    , ghcHieFiles        = defaultDocsTargets }
+    , ghcDocs            = defaultDocsTargets
+    , ghcHieFiles        = const False
+    , hashUnitIds        = False }
 
 defaultDocsTargets :: Action DocTargets
 defaultDocsTargets = do
@@ -317,9 +316,9 @@ defaultDocsTargets = do
 --
 --   It corresponds to the DYNAMIC_GHC_PROGRAMS logic implemented
 --   in @mk/config.mk.in@.
-defaultDynamicGhcPrograms :: Action Bool
-defaultDynamicGhcPrograms = do
-  supportsShared <- platformSupportsSharedLibs
+defaultDynamicGhcPrograms :: Stage -> Action Bool
+defaultDynamicGhcPrograms stage = do
+  supportsShared <- targetSupportsSharedLibs stage
   return (not windowsHost && supportsShared)
 
 -- | All 'Builder'-dependent command line arguments.
