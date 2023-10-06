@@ -321,26 +321,17 @@ rtsDebugMsgFn(const char *s, va_list ap)
 }
 
 
-// Used in stg_badAlignment_entry defined in StgStartup.cmm.
-void rtsBadAlignmentBarf(void) STG_NORETURN;
-
 void
 rtsBadAlignmentBarf(void)
 {
     barf("Encountered incorrectly aligned pointer. This can't be good.");
 }
 
-// Used by code generator
-void rtsOutOfBoundsAccess(void) STG_NORETURN;
-
 void
 rtsOutOfBoundsAccess(void)
 {
     barf("Encountered out of bounds array access.");
 }
-
-// Used by code generator
-void rtsMemcpyRangeOverlap(void) STG_NORETURN;
 
 void
 rtsMemcpyRangeOverlap(void)

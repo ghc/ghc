@@ -78,7 +78,6 @@ void debugBelch(const char *s, ...)
 
 int vdebugBelch(const char *s, va_list ap);
 
-
 /* Hooks for redirecting message generation: */
 
 typedef void RtsMsgFunction(const char *, va_list);
@@ -94,3 +93,8 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunctionRetLen rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
+
+/* Used by code generator */
+void rtsBadAlignmentBarf(void) STG_NORETURN;
+void rtsOutOfBoundsAccess(void) STG_NORETURN;
+void rtsMemcpyRangeOverlap(void) STG_NORETURN;

@@ -947,6 +947,9 @@ extern char **environ;
       SymI_HasProto(arenaAlloc)                                         \
       SymI_HasProto(arenaFree)                                          \
       SymI_HasProto(setKeepCAFs)                                        \
+      SymI_HasProto(rtsBadAlignmentBarf)                                \
+      SymI_HasProto(rtsOutOfBoundsAccess)                               \
+      SymI_HasProto(rtsMemcpyRangeOverlap)                              \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
