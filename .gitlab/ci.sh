@@ -554,7 +554,7 @@ function install_bindist() {
 
       run ${CONFIGURE_WRAPPER:-} ./configure \
           --prefix="$instdir" \
-          "${args[@]+"${args[@]}"}"
+          "${args[@]+"${args[@]}"}" || fail "bindist configure failed"
       make_install_destdir "$TOP"/destdir "$instdir"
       ;;
   esac
