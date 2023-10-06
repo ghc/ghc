@@ -1,3 +1,6 @@
+-- This progam makes the coercion optimiser dominate compile time:
+-- see #8095.
+
 {-# OPTIONS_GHC -freduction-depth=1000 #-}
 {-# LANGUAGE TypeOperators,DataKinds,KindSignatures,TypeFamilies,PolyKinds,UndecidableInstances #-}
 -- Subject to Note [Sensitivity to unique increment] in T12545.hs with spread of 1.7%

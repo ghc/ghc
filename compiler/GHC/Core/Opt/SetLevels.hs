@@ -632,7 +632,13 @@ lvlMFE env _strict_ctxt ann_expr
   |  float_is_new_lam || exprIsTopLevelBindable expr expr_ty
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
-  = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
+  = -- pprTrace "setlevel" (vcat
+    --               [ text "expr" <+> ppr expr
+    --               , text "ctxt, dest" <+> ppr (le_ctxt_lvl env) <+> ppr dest_lvl
+    --               , text "saves_work" <+> ppr saves_work
+    --               , text "saves_alloc" <+> ppr saves_alloc
+    --               , text "send" <+> ppr (send_rhs_to_top ann_expr) ]) $
+    do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
                               is_bot_lam NotJoinPoint ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 NotJoinPoint is_mk_static
@@ -707,12 +713,20 @@ lvlMFE env _strict_ctxt ann_expr
                  && not float_is_new_lam  -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
+{-
+    -- Look down the application chain to find the function at the head
+    -- Always send value lambdas to the top; gets them out of the way
+    -- Likewise DFun applications (see Note [Specialising on dictionaries]
+    -- in GHC.Core.Opt.SpecConstr).  Otherwise send to top iff floatConsts
+    -- is on.
     send_rhs_to_top (_, AnnCast e _) = send_rhs_to_top e
     send_rhs_to_top (_, AnnApp f _)  = send_rhs_to_top f
-    send_rhs_to_top (_, AnnLam {})   = True
+    send_rhs_to_top (_, AnnLam b e)  | isTyVar b = send_rhs_to_top e
+                                     | otherwise = True
     send_rhs_to_top (_, AnnVar v)    = case idDetails v of
                                          DFunId {} -> True
                                          _         -> floatConsts env
+-}
     send_rhs_to_top _ = floatConsts env
 
     -- See Note [Saving allocation] and Note [Floating to the top]
