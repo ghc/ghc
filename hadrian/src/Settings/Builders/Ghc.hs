@@ -44,6 +44,7 @@ toolArgs = do
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     ways <- getLibraryWays
+    stage <- getStage
     useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
@@ -55,7 +56,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
               -- #18672.
               arg "-fdiagnostics-color=never"
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
-              platformSupportsSharedLibs ? way vanilla ?
+              targetSupportsSharedLibs stage ? way vanilla ?
               arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
@@ -118,8 +119,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libffiName' <- libffiName
     debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
 
-    osxTarget <- expr isOsxTarget
-    winTarget <- expr isWinTarget
+    osxTarget <- expr (isOsxTarget st)
+    winTarget <- expr (isWinTarget st)
 
     let
         dynamic = Dynamic `wayUnit` way

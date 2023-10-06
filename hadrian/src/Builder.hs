@@ -166,7 +166,7 @@ data Builder = Alex
              | Cc CcMode Stage
              | Configure FilePath
              | DeriveConstants
-             | GenApply
+             | GenApply Stage
              | GenPrimopCode
              | Ghc GhcMode Stage
              | GhcPkg GhcPkgMode Stage
@@ -174,17 +174,17 @@ data Builder = Alex
              | Happy
              | Hp2Ps
              | Hpc
-             | HsCpp
+             | HsCpp Stage
              | Hsc2Hs Stage
              | Ld Stage --- ^ linker
              | Make FilePath
              | Makeinfo
              | MergeObjects Stage -- ^ linker to be used to merge object files.
-             | Nm
+             | Nm Stage
              | Objdump
              | Patch
              | Python
-             | Ranlib
+             | Ranlib Stage
              | Testsuite TestMode
              | Sphinx SphinxMode
              | Tar TarMode
@@ -205,7 +205,7 @@ instance NFData   Builder
 builderProvenance :: Builder -> Maybe Context
 builderProvenance = \case
     DeriveConstants  -> context stage0Boot deriveConstants
-    GenApply         -> context stage0Boot genapply
+    GenApply stage   -> context (predStage stage) genapply
     GenPrimopCode    -> context stage0Boot genprimopcode
     Ghc _ (Stage0 {})-> Nothing
     Ghc _ stage      -> context (predStage stage) ghc
@@ -330,7 +330,7 @@ instance H.Builder Builder where
                     let env = AddEnv "CONFIG_SHELL" bash
                     cmd' env [Cwd dir] ["sh", path] buildOptions buildArgs
 
-                GenApply -> captureStdout
+                GenApply {} -> captureStdout
 
                 GenPrimopCode -> do
                     need [input]
@@ -355,7 +355,7 @@ instance H.Builder Builder where
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
-                HsCpp    -> captureStdout
+                HsCpp {}    -> captureStdout
 
                 Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
 
@@ -411,7 +411,7 @@ isOptional target = \case
     Happy    -> True
     Alex     -> True
     -- Most ar implemententions no longer need ranlib, but some still do
-    Ranlib   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
+    Ranlib {} -> not $ Toolchain.arNeedsRanlib (tgtAr target)
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
@@ -426,8 +426,8 @@ systemBuilderPath builder = case builder of
     Ghc _  (Stage0 {})   -> fromKey "system-ghc"
     GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
-    HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
-    Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
+    HsCpp stage     -> fromStageTC stage "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
+    Ld stage        -> fromStageTC stage "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
     -- MergeObjects Stage0 is a special case in case of
     -- cross-compiling. We're building stage1, e.g. code which will be
     -- executed on the host and hence we need to use host's merge
@@ -439,11 +439,11 @@ systemBuilderPath builder = case builder of
     MergeObjects st -> fromStageTC st "merge-objects" (maybeProg Toolchain.mergeObjsProgram . tgtMergeObjs)
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
-    Nm              -> fromTargetTC "nm" (Toolchain.nmProgram . tgtNm)
+    Nm stage        -> fromStageTC stage "nm" (Toolchain.nmProgram . tgtNm)
     Objdump         -> fromKey "objdump"
     Patch           -> fromKey "patch"
     Python          -> fromKey "python"
-    Ranlib          -> fromTargetTC "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
+    Ranlib stage    -> fromStageTC stage "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
     Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
@@ -464,11 +464,6 @@ systemBuilderPath builder = case builder of
     -- Get program from a certain stage's target configuration
     fromStageTC stage keyname key = do
         path <- prgPath . key <$> targetStage stage
-        validate keyname path
-
-    -- Get program from the target's target configuration
-    fromTargetTC keyname key = do
-        path <- queryTargetTarget (prgPath . key)
         validate keyname path
 
     validate keyname path = do

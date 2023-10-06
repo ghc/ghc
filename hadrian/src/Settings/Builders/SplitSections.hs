@@ -12,7 +12,8 @@ import Oracles.Setting
 splitSectionsArgs :: Args
 splitSectionsArgs = do
   pkg <- getPackage
-  osx <- expr isOsxTarget
+  stage <- getStage
+  osx <- expr (isOsxTarget stage)
   notSt0 <- notStage0
   flav <- expr flavour
   if ( ghcSplitSections flav
@@ -29,7 +30,7 @@ splitSectionsArgs = do
     ) then
     ( mconcat
         [ builder (Ghc CompileHs) ? arg "-fsplit-sections"
-        , builder MergeObjects ? ifM (expr isWinTarget)
+        , builder MergeObjects ? ifM (expr (isWinTarget stage))
             (pure ["-T", "driver/utils/merge_sections_pe.ld"])
             (pure ["-T", "driver/utils/merge_sections.ld"])
         ]

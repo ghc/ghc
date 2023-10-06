@@ -169,7 +169,7 @@ install_bin_direct:
 install_lib: lib/settings
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
-	
+
 	@dest="$(DESTDIR)$(ActualLibsDir)"; \
 	cd lib; \
 	for i in `$(FIND) . -type f`; do \
