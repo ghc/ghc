@@ -135,13 +135,8 @@ bigNatIsTwo# ba =
 bigNatIsPowerOf2# :: BigNat# -> (# (# #) | Word# #)
 bigNatIsPowerOf2# a
    | bigNatIsZero a                      = (# (# #) | #)
-   | True = case wordIsPowerOf2# msw of
-               (# (# #) | #) -> (# (# #) | #)
-               (# | c  #) -> case checkAllZeroes (imax -# 1#) of
-                  0# -> (# (# #) | #)
-                  _  -> (# | c `plusWord#`
-                              (int2Word# imax `uncheckedShiftL#` WORD_SIZE_BITS_SHIFT#) #)
-   where
+   | True =
+    let
       msw  = bigNatIndex# a imax
       sz   = bigNatSize# a
       imax = sz -# 1#
@@ -150,6 +145,12 @@ bigNatIsPowerOf2# a
          | True = case bigNatIndex# a i of
                      0## -> checkAllZeroes (i -# 1#)
                      _   -> 0#
+    in case wordIsPowerOf2# msw of
+               (# (# #) | #) -> (# (# #) | #)
+               (# | c  #) -> case checkAllZeroes (imax -# 1#) of
+                  0# -> (# (# #) | #)
+                  _  -> (# | c `plusWord#`
+                              (int2Word# imax `uncheckedShiftL#` WORD_SIZE_BITS_SHIFT#) #)
 
 -- | Return the Word# at the given index
 bigNatIndex# :: BigNat# -> Int# -> Word#
