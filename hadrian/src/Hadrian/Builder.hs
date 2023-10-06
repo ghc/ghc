@@ -14,7 +14,7 @@
 module Hadrian.Builder (
     Builder (..), BuildInfo (..), needBuilders, runBuilder,
     runBuilderWithCmdOptions, build, buildWithResources, buildWithCmdOptions,
-    getBuilderPath, builderEnvironment, askWithResources
+    getBuilderPath, builderEnvironment, remBuilderEnvironment, askWithResources
     ) where
 
 import Data.List
@@ -162,3 +162,7 @@ builderEnvironment variable builder = do
     needBuilders [builder]
     path <- builderPath builder
     return $ AddEnv variable path
+
+remBuilderEnvironment :: String -> Action CmdOption
+remBuilderEnvironment variable = do
+    return $ RemEnv variable

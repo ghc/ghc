@@ -46,7 +46,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
               -- #18672.
               arg "-fdiagnostics-color=never"
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
-              platformSupportsSharedLibs ? way vanilla ?
+              targetSupportsSharedLibs stage ? way vanilla ?
               arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
@@ -100,19 +100,20 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libDirs <- getContextData extraLibDirs
     fmwks   <- getContextData frameworks
     way     <- getWay
+    st      <- getStage
 
     -- Relative path from the output (rpath $ORIGIN).
     originPath <- dropFileName <$> getOutput
     context <- getContext
     distPath <- expr (Context.distDynDir context)
 
-    useSystemFfi <- expr (flag UseSystemFfi)
+    useSystemFfi <- succStaged (buildFlag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
     debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
 
-    osxTarget <- expr isOsxTarget
-    winTarget <- expr isWinTarget
+    osxTarget <- expr (isOsxTarget st)
+    winTarget <- expr (isWinTarget st)
 
     let
         dynamic = Dynamic `wayUnit` way
@@ -150,7 +151,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , notStage0 ? targetSupportsRPaths ? mconcat
+                , notStage0 ? staged targetSupportsRPaths ? mconcat
                       [ arg ("-optl-Wl,-rpath," ++ rpath)
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
                       -- The darwin and Windows linkers don't support/require the -zorigin option

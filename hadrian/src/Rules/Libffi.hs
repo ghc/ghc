@@ -69,7 +69,7 @@ dynLibManifest = dynLibManifest' buildRoot
 -- | Need the (locally built) libffi library.
 needLibffi :: Stage -> Action ()
 needLibffi stage = do
-    jsTarget <- isJsTarget
+    jsTarget <- isJsTarget stage
     unless jsTarget $ do
         manifest <- dynLibManifest stage
         need [manifest]
@@ -87,7 +87,7 @@ libffiContext stage = do
 -- | The name of the library
 libffiName :: Expr String
 libffiName = do
-    useSystemFfi <- expr (flag UseSystemFfi)
+    useSystemFfi <- succStaged (buildFlag UseSystemFfi)
     if useSystemFfi
       then pure "ffi"
       else libffiLocalName Nothing
@@ -96,7 +96,8 @@ libffiName = do
 libffiLocalName :: Maybe Bool -> Expr String
 libffiLocalName force_dynamic = do
   way <- getWay
-  winTarget <- expr isWinTarget
+  stage <- getStage
+  winTarget <- expr (isWinTarget stage)
   let dynamic = fromMaybe (Dynamic `wayUnit` way) force_dynamic
   pure $ mconcat
       [ if dynamic   then ""      else "C"
@@ -117,8 +118,8 @@ libffiHeaderDir stage = do
     path <- libffiBuildPath stage
     return $ path -/- "inst/include"
 
-libffiSystemHeaderDir :: Action FilePath
-libffiSystemHeaderDir = setting FfiIncludeDir
+libffiSystemHeaderDir :: Stage -> Action FilePath
+libffiSystemHeaderDir = buildSetting FfiIncludeDir
 
 fixLibffiMakefile :: FilePath -> String -> String
 fixLibffiMakefile top =
@@ -131,13 +132,18 @@ configureEnvironment :: Stage -> Action [CmdOption]
 configureEnvironment stage = do
     context <- libffiContext stage
     cFlags  <- interpretInContext context getStagedCCFlags
-    sequence [ builderEnvironment "CC" $ Cc CompileC stage
+    isCross <- flag CrossCompiling
+    sequence $ [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
              , builderEnvironment "AR" $ Ar Unpack stage
-             , builderEnvironment "NM" Nm
-             , builderEnvironment "RANLIB" Ranlib
+             , builderEnvironment "NM" $ Nm stage
+             , builderEnvironment "RANLIB" $ Ranlib stage
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-             , return . AddEnv "LDFLAGS" $ "-w" ]
+             , return . AddEnv "LDFLAGS" $ "-w" ] ++
+             -- When we're building a cross-compiler, we have to be careful
+             -- which environment variables are propagated for the non-target
+             -- stages.
+             (if isHostStage stage && isCross then [remBuilderEnvironment "LD"] else [])
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
 -- See [Libffi indicating inputs].
@@ -155,7 +161,7 @@ libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
                          -> do
-                              jsTarget <- isJsTarget
+                              jsTarget <- isJsTarget stage
                               if jsTarget
                                 then return []
                                 else readFileLines =<< dynLibManifest stage
@@ -183,8 +189,8 @@ libffiRules = do
                  <$> liftIO (getDirectoryFilesIO "." [libffiPath -/- "inst//*"])
 
         -- Find dynamic libraries.
-        osxTarget <- isOsxTarget
-        winTarget <- isWinTarget
+        osxTarget <- isOsxTarget stage
+        winTarget <- isWinTarget stage
 
         dynLibFiles <- do
             let libfilesDir = libffiPath -/-

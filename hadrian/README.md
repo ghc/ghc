@@ -327,6 +327,16 @@ workflow, for now.
 
 Note: On windows you need to use the `reloc-binary-dist` target.
 
+#### Cross Compiling
+
+If you are cross compiling then all the settings specified to ./configure are
+for the target system. For example, if you specify `--with-ffi-includes` then
+this is specifically for the target.
+
+If your host system needs additional configuration in order to build a stage1 compiler,
+then at the moment you need to manually edit the "cfg/system.config.host.in" file to
+specify these options in the right place.
+
 #### Relocatable Binary Distribution
 
 If you require a relocatable binary distribution (for example on Windows), then you
