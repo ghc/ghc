@@ -67,6 +67,7 @@ class ToPredicate p c b where
 
 infixr 3 ?
 
+
 -- | Apply a predicate to an expression.
 (?) :: (Monoid a, ToPredicate p c b) => p -> Expr c b a -> Expr c b a
 p ? e = do

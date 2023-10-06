@@ -2,12 +2,13 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag,
-    platformSupportsSharedLibs,
-    platformSupportsGhciObjects,
     targetRTSLinkerOnlySupportsSharedLibs,
+    targetSupportsSharedLibs,
+    targetSupportsGhciObjects,
     targetSupportsThreadedRts,
     targetSupportsSMP,
-    useLibffiForAdjustors, useLibdw,
+    useLibdw,
+    targetUseLibffiForAdjustors,
     arSupportsDashL,
     arSupportsAtFile
     ) where
@@ -71,17 +72,17 @@ flag f = do
 getFlag :: Flag -> Expr c b Bool
 getFlag = expr . flag
 
--- | Does the platform support object merging (and therefore we can build GHCi objects
+-- | Does the target platform support object merging (and therefore we can build GHCi objects
 -- when appropriate).
-platformSupportsGhciObjects :: Action Bool
--- FIXME: The name of the function is not entirely clear about which platform, it would be better named targetSupportsGhciObjects
-platformSupportsGhciObjects = do
-    has_merge_objs <- isJust <$> queryTargetTarget tgtMergeObjs
-    only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs
-    pure $ has_merge_objs && not only_shared_libs
+targetSupportsGhciObjects :: Stage -> Action Bool
+targetSupportsGhciObjects stage = do
+  has_merge_objs <- isJust <$> queryTargetTarget stage tgtMergeObjs
+  only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs stage
+  pure $ has_merge_objs && not only_shared_libs
 
-targetRTSLinkerOnlySupportsSharedLibs :: Action Bool
-targetRTSLinkerOnlySupportsSharedLibs = queryTargetTarget Toolchain.tgtRTSLinkerOnlySupportsSharedLibs
+targetRTSLinkerOnlySupportsSharedLibs :: Stage -> Action Bool
+targetRTSLinkerOnlySupportsSharedLibs s =
+  queryTargetTarget s Toolchain.tgtRTSLinkerOnlySupportsSharedLibs
 
 arSupportsDashL :: Stage -> Action Bool
 arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
@@ -89,27 +90,26 @@ arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
 arSupportsAtFile :: Stage -> Action Bool
 arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stage
 
-platformSupportsSharedLibs :: Action Bool
--- FIXME: This is querying about the target but is named "platformXXX", targetSupportsSharedLibs would be better
-platformSupportsSharedLibs = do
-    windows       <- isWinTarget
-    ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
-    solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
-    javascript    <- anyTargetArch     [ ArchJavaScript ]
+targetSupportsSharedLibs :: Stage -> Action Bool
+targetSupportsSharedLibs stage = do
+    windows       <- isWinTarget stage
+    ppc_linux     <- (&&) <$> anyTargetArch stage [ ArchPPC ] <*> anyTargetOs stage [ OSLinux ]
+    solaris       <- (&&) <$> anyTargetArch stage [ ArchX86 ] <*> anyTargetOs stage [ OSSolaris2 ]
+    javascript    <- anyTargetArch stage [ ArchJavaScript ]
     return $ not (windows || javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
-targetSupportsThreadedRts :: Action Bool
-targetSupportsThreadedRts = do
-    bad_arch <- anyTargetArch [ ArchWasm32, ArchJavaScript ]
+targetSupportsThreadedRts :: Stage -> Action Bool
+targetSupportsThreadedRts stage = do
+    bad_arch <- anyTargetArch stage [ ArchWasm32, ArchJavaScript ]
     return $ not bad_arch
 
 -- | Does the target support the -N RTS flag?
-targetSupportsSMP :: Action Bool
-targetSupportsSMP = queryTargetTarget Toolchain.tgtSupportsSMP
+targetSupportsSMP :: Stage -> Action Bool
+targetSupportsSMP stage = queryTargetTarget stage Toolchain.tgtSupportsSMP
 
-useLibffiForAdjustors :: Action Bool
-useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors
+useLibdw :: Stage -> Action Bool
+useLibdw stage = queryTargetTarget stage (isJust . tgtRTSWithLibdw)
 
-useLibdw :: Action Bool
-useLibdw = queryTargetTarget (isJust . tgtRTSWithLibdw)
+targetUseLibffiForAdjustors :: Stage -> Action Bool
+targetUseLibffiForAdjustors stage = queryTargetTarget stage tgtUseLibffiForAdjustors

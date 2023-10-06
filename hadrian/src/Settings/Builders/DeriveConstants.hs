@@ -13,10 +13,12 @@ deriveConstantsPairs =
   , ("DerivedConstants.h", "--gen-header")
   ]
 
+-- MP: Why is Stage1 hard-coded here, looks wrong
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
     outs   <- getOutputs
+    stage <- getStage
     let (outputFile, mode, tempDir) = case outs of
             [ofile, mode, tmpdir] -> (ofile,mode,tmpdir)
             [ofile, tmpdir]
@@ -29,12 +31,12 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         [ arg mode
         , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
-        , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)
+        , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC stage)
         , pure $ concatMap (\a -> ["--gcc-flag", a]) cFlags
-        , arg "--nm-program", arg =<< getBuilderPath Nm
+        , arg "--nm-program", arg =<< getBuilderPath (Nm stage)
         , isSpecified Objdump ? mconcat [ arg "--objdump-program"
                                         , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", arg =<< queryTarget queryOS ]
+        , arg "--target-os", arg =<< queryTarget stage queryOS ]
 
 includeCcArgs :: Args
 includeCcArgs = do
@@ -42,10 +44,10 @@ includeCcArgs = do
     rtsPath <- expr $ rtsBuildPath stage
     mconcat [ cArgs
             , cWarnings
-            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage Stage1)
-            , queryTargetTarget tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage stage)
+            , queryTargetTarget stage tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"
-            , notM targetSupportsSMP ? arg "-DNOSMP"
+            , notM (targetSupportsSMP stage) ? arg "-DNOSMP"
             , arg "-fcommon" ]

@@ -53,7 +53,6 @@ FPTOOLS_SET_PLATFORMS_VARS
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
-# ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
 if test "$target" != "$host" ; then

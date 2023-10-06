@@ -12,7 +12,6 @@ import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
 import Data.Version.Extra
-import Settings.Program (ghcWithInterpreter)
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -25,7 +24,7 @@ packageArgs = do
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
-        haveCurses = any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
+        haveCurses = any (/= "") <$> traverse (flip buildSetting stage) [ CursesIncludeDir, CursesLibDir ]
 
         -- Check if the bootstrap compiler has the same version as the one we
         -- are building. This is used to build cross-compilers
@@ -76,7 +75,7 @@ packageArgs = do
 
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
-            , anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
+            , anyTargetOs stage [OSOpenBSD] ? arg "--ld-options=-E"
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force"
             , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
             ]
@@ -90,9 +89,9 @@ packageArgs = do
             -- (#14335) and completely untested in CI for cross
             -- backends at the moment, so we might as well disable it
             -- for cross GHC.
-            [ andM [expr (ghcWithInterpreter stage), notCross] `cabalFlag` "internal-interpreter"
+            -- TODO: MP
+            [ andM [expr (ghcWithInterpreter stage)] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
-            , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
             -- not being fixed to `ghc`, when building stage0, we must set
@@ -184,8 +183,8 @@ packageArgs = do
         -- The Solaris linker does not support --export-dynamic option. It also
         -- does not need it since it exports all dynamic symbols by default
         , package iserv
-          ? expr isElfTarget
-          ? notM (expr $ anyTargetOs [OSFreeBSD, OSSolaris2])? mconcat
+          ? expr (isElfTarget stage)
+          ? notM (expr $ anyTargetOs stage [OSFreeBSD, OSSolaris2])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
         -------------------------------- haddock -------------------------------
@@ -292,8 +291,9 @@ ghcInternalArgs = package ghcInternal ? do
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
-    ghcUnreg       <- queryTarget tgtUnregisterised
-    ghcEnableTNC   <- queryTarget tgtTablesNextToCode
+    stage <- getStage
+    ghcUnreg       <- queryTarget stage tgtUnregisterised
+    ghcEnableTNC   <- queryTarget stage tgtTablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -308,18 +308,17 @@ rtsPackageArgs = package rts ? do
     libzstdIncludeDir <- getSetting LibZstdIncludeDir
     libzstdLibraryDir <- getSetting LibZstdLibDir
 
-    x86 <- queryTarget (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
+    x86 <- queryTarget stage (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
+          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
           , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
-
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
             -- In particular, we **do not** pass -mavx when compiling
@@ -329,6 +328,7 @@ rtsPackageArgs = package rts ? do
 
           , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
           , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
           ]
 
     let cArgs = mconcat
@@ -346,7 +346,7 @@ rtsPackageArgs = package rts ? do
           , arg "-Irts"
           , arg $ "-I" ++ path
 
-          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
@@ -372,13 +372,13 @@ rtsPackageArgs = package rts ? do
 
           , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
-          , speedHack ?
+          , speedHack stage ?
             inputs [ "**/Evac.c", "**/Evac_thr.c"
                    , "**/Scav.c", "**/Scav_thr.c"
                    , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
           -- @-static@ is necessary for these bits, as otherwise the NCG
           -- generates dynamic references.
-          , speedHack ?
+          , speedHack stage ?
             inputs [ "**/Updates.c", "**/StgMiscClosures.c"
                    , "**/Jumps_D.c", "**/Jumps_V16.c", "**/Jumps_V32.c", "**/Jumps_V64.c"
                    , "**/PrimOps.c", "**/Apply.c"
@@ -422,7 +422,7 @@ rtsPackageArgs = package rts ? do
           , flag UseLibrt                   `cabalFlag` "librt"
           , flag UseLibdl                   `cabalFlag` "libdl"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
-          , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
+          , targetUseLibffiForAdjustors stage     `cabalFlag` "libffi-adjustors"
           , flag UseLibpthread              `cabalFlag` "need-pthread"
           , flag UseLibbfd                  `cabalFlag` "libbfd"
           , flag NeedLibatomic              `cabalFlag` "need-atomic"
@@ -430,13 +430,13 @@ rtsPackageArgs = package rts ? do
           , flag UseLibnuma                 `cabalFlag` "libnuma"
           , flag UseLibzstd                 `cabalFlag` "libzstd"
           , flag StaticLibzstd              `cabalFlag` "static-libzstd"
-          , queryTargetTarget tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
+          , queryTargetTarget stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
           , ghcUnreg                        `cabalFlag` "unregisterised"
           , ghcEnableTNC                    `cabalFlag` "tables-next-to-code"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
-              [ useLibdw ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
+              [ useLibdw stage ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
               , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
               , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
@@ -482,10 +482,10 @@ rtsPackageArgs = package rts ? do
 --   ...
 -- ld: fatal: relocations remain against allocatable but non-writable sections
 -- collect2: ld returned 1 exit status
-speedHack :: Action Bool
-speedHack = do
-    i386   <- anyTargetArch [ArchX86]
-    goodOS <- not <$> anyTargetOs [OSSolaris2]
+speedHack :: Stage -> Action Bool
+speedHack stage = do
+    i386   <- anyTargetArch stage [ArchX86]
+    goodOS <- not <$> anyTargetOs stage [OSSolaris2]
     return $ i386 && goodOS
 
 -- See @rts/ghc.mk@.

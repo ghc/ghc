@@ -136,6 +136,7 @@ executable hadrian
                        , Settings.Warnings
                        , Stage
                        , Target
+                       , BindistConfig
                        , UserSettings
                        , Utilities
                        , Way
