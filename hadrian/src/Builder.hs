@@ -173,17 +173,17 @@ data Builder = Alex
              | Happy
              | Hp2Ps
              | Hpc
-             | HsCpp
-             | JsCpp
+             | HsCpp Stage
+             | JsCpp Stage
              | Hsc2Hs Stage
              | Ld Stage --- ^ linker
              | Make FilePath
              | Makeinfo
              | MergeObjects Stage -- ^ linker to be used to merge object files.
-             | Nm
+             | Nm Stage
              | Objdump
              | Python
-             | Ranlib
+             | Ranlib Stage
              | Testsuite TestMode
              | Sphinx SphinxMode
              | Tar TarMode
@@ -241,7 +241,8 @@ instance H.Builder Builder where
             root <- buildRoot
             unlitPath  <- builderPath Unlit
             distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
-            libffi_adjustors <- useLibffiForAdjustors
+            -- TODO: Check this is the right stage
+            libffi_adjustors <- targetUseLibffiForAdjustors st
             use_system_ffi <- flag UseSystemFfi
 
             return $ [ unlitPath ]
@@ -362,7 +363,7 @@ instance H.Builder Builder where
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
-                HsCpp    -> captureStdout
+                HsCpp {}    -> captureStdout
 
                 Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
 
@@ -418,8 +419,9 @@ isOptional target = \case
     Happy    -> True
     Alex     -> True
     -- Most ar implemententions no longer need ranlib, but some still do
-    Ranlib   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
-    JsCpp    -> not $ (archOS_arch . tgtArchOs) target == ArchJavaScript -- ArchWasm32 too?
+    Ranlib {}   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
+    -- TODO: Use stage argument
+    JsCpp  {}    -> not $ (archOS_arch . tgtArchOs) target == ArchJavaScript -- ArchWasm32 too?
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
@@ -434,9 +436,9 @@ systemBuilderPath builder = case builder of
     Ghc _  (Stage0 {})   -> fromKey "system-ghc"
     GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
-    HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
-    JsCpp           -> fromTargetTC "js-cpp" (maybeProg Toolchain.jsCppProgram . tgtJsCPreprocessor)
-    Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
+    JsCpp stage     -> fromStageTC stage "js-cpp" (maybeProg Toolchain.jsCppProgram . tgtJsCPreprocessor)
+    HsCpp stage     -> fromStageTC stage "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
+    Ld stage        -> fromStageTC stage "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
     -- MergeObjects Stage0 is a special case in case of
     -- cross-compiling. We're building stage1, e.g. code which will be
     -- executed on the host and hence we need to use host's merge
@@ -448,10 +450,10 @@ systemBuilderPath builder = case builder of
     MergeObjects st -> fromStageTC st "merge-objects" (maybeProg Toolchain.mergeObjsProgram . tgtMergeObjs)
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
-    Nm              -> fromTargetTC "nm" (Toolchain.nmProgram . tgtNm)
+    Nm stage        -> fromStageTC stage "nm" (Toolchain.nmProgram . tgtNm)
     Objdump         -> fromKey "objdump"
     Python          -> fromKey "python"
-    Ranlib          -> fromTargetTC "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
+    Ranlib stage    -> fromStageTC stage "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
     Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
@@ -472,11 +474,6 @@ systemBuilderPath builder = case builder of
     -- Get program from a certain stage's target configuration
     fromStageTC stage keyname key = do
         path <- prgPath . key <$> targetStage stage
-        validate keyname path
-
-    -- Get program from the target's target configuration
-    fromTargetTC keyname key = do
-        path <- queryTargetTarget (prgPath . key)
         validate keyname path
 
     validate keyname path = do

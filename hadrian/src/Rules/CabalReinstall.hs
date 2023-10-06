@@ -11,6 +11,7 @@ import qualified System.Directory.Extra as IO
 import Data.Either
 import Rules.BinaryDist
 import Oracles.Setting
+import BindistConfig
 
 {-
 Note [Testing reinstallable GHC]
@@ -47,10 +48,10 @@ cabalBuildRules = do
     priority 2.0 $ root -/- "stage-cabal" -/- "bin" -/- ".stamp" %> \stamp -> do
         -- We 'need' all binaries and libraries
         all_pkgs <- stagePackages Stage1
-        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
+        (lib_targets, bin_targets) <- partitionEithers <$> mapM (pkgTarget normalBindist) all_pkgs
         cross <- flag CrossCompiling
         iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+        need (map snd (lib_targets ++ bin_targets ++ iserv_targets))
 
         distDir        <- Context.distDir (vanillaContext Stage1 rts)
         let rtsIncludeDir    = distDir -/- "include"
@@ -75,7 +76,7 @@ cabalBuildRules = do
                   | pkg == hpcBin = "hpc"
                   | otherwise     = pkgName pkg
             let cabal_bin_out = work_dir -/- "cabal-bin" -/- (pgmName bin_pkg)
-            needed_wrappers <- pkgToWrappers bin_pkg
+            needed_wrappers <- pkgToWrappers Stage2 bin_pkg
             forM_ needed_wrappers $ \wrapper_name -> do
               let wrapper_prefix = unlines
                     ["#!/usr/bin/env sh"

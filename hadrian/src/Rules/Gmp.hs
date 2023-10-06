@@ -127,7 +127,7 @@ gmpRules = do
                      [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
                      , return . AddEnv "CFLAGS" $ unwords cFlags
                      , builderEnvironment "AR" (Ar Unpack (stage ctx))
-                     , builderEnvironment "NM" Nm
+                     , builderEnvironment "NM" (Nm (stage ctx))
                      ]
             need [mk <.> "in"]
             buildWithCmdOptions env $

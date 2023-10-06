@@ -3,7 +3,7 @@ module Context (
     Context (..), vanillaContext, stageContext,
 
     -- * Expressions
-    getStage, getPackage, getWay, getBuildPath, getPackageDbLoc, getStagedTarget,
+    getStage, staged, getPackage, getWay, getBuildPath, getPackageDbLoc, getStagedTarget,
 
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,
@@ -28,6 +28,9 @@ import Hadrian.Haskell.Cabal.Type
 -- | Get the 'Stage' of the current 'Context'.
 getStage :: Expr Context b Stage
 getStage = stage <$> getContext
+
+staged :: (Stage -> Action a) -> Expr Context b a
+staged f = getStage >>= \stage -> expr (f stage)
 
 getInplace :: Expr Context b Inplace
 getInplace = iplace <$> getContext

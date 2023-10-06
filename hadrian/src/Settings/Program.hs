@@ -13,14 +13,15 @@ import Packages
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- askGhcProfiled stage
-    dynGhcProgs <- askDynGhcPrograms --dynamicGhcPrograms =<< flavour
+    dynGhcProgs <- askDynGhcPrograms stage
+    -- Have to build static if it's a cross stage as we won't distribute the libraries built for the host.
     return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
     where wayFor prof dyn
             | prof && dyn                          = profilingDynamic
             | pkg == ghc && prof && notStage0 stage = profiling
             | dyn && notStage0 stage                = dynamic
-            | otherwise                            = vanilla
+            | otherwise                             = vanilla
 
           notStage0 (Stage0 {}) = False
           notStage0 _ = True

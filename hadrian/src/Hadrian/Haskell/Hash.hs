@@ -128,13 +128,13 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey (stag, pkg)) -> do
   flav <- flavour
   let flavourArgs = extraArgs flav
 
-  targetOs       <- queryTargetTarget queryOS
+  targetOs       <- queryTargetTarget stag queryOS
   projectVersion <- setting ProjectVersion
   let pkgHashCompilerId = "ghc-" ++ projectVersion
       pkgHashPlatform = targetOs
 
   libWays <- interpretInContext vanilla_ctx (libraryWays flav)
-  dyn_ghc <- dynamicGhcPrograms flav
+  dyn_ghc <- dynamicGhcPrograms flav stag
   flags <-  interpret (target vanilla_ctx (Cabal Flags stag) [] []) getArgs
   let pkgHashFlagAssignment = flags
       pkgHashVanillaLib = vanilla `Set.member` libWays

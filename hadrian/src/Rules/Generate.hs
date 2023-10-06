@@ -23,6 +23,7 @@ import Rules.Libffi
 import Settings
 import Target
 import Utilities
+import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Toolchain.Program
@@ -57,7 +58,7 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
-    jsTarget <- expr isJsTarget
+    jsTarget <- expr (isJsTarget stage)
     useSystemFfi <- expr (flag UseSystemFfi)
 
     let -- headers common to native and JS RTS
@@ -154,7 +155,7 @@ generatePackageCode context@(Context stage pkg _ _) = do
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
             need $ [primopsSource]
-            build $ target context HsCpp [primopsSource] [file]
+            build $ target context (HsCpp stage) [primopsSource] [file]
 
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file -> do
@@ -430,11 +431,11 @@ bindistRules = do
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
+    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
-    getTarget = interp . queryTarget
+    getTarget = interp . queryTarget Stage2
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
@@ -464,66 +465,68 @@ generateSettings settingsFile = do
       case stage of
         Stage0 {} -> error "Unable to generate settings for stage0"
         Stage1 -> get_pkg_db Stage1
-        Stage2 -> get_pkg_db Stage1
+        Stage2 -> do
+          cfg <- implicitBindistConfig
+          get_pkg_db (library_stage cfg)
         Stage3 -> get_pkg_db Stage2
 
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("C compiler command",   queryTarget ccPath)
-        , ("C compiler flags",     queryTarget ccFlags)
-        , ("C++ compiler command", queryTarget cxxPath)
-        , ("C++ compiler flags",   queryTarget cxxFlags)
-        , ("C compiler link flags",       queryTarget clinkFlags)
-        , ("C compiler supports -no-pie", queryTarget linkSupportsNoPie)
-        , ("CPP command",         queryTarget cppPath)
-        , ("CPP flags",           queryTarget cppFlags)
-        , ("Haskell CPP command", queryTarget hsCppPath)
-        , ("Haskell CPP flags",   queryTarget hsCppFlags)
-        , ("JavaScript CPP command", queryTarget jsCppPath)
-        , ("JavaScript CPP flags", queryTarget jsCppFlags)
-        , ("C-- CPP command", queryTarget cmmCppPath)
-        , ("C-- CPP flags",   queryTarget cmmCppFlags)
-        , ("C-- CPP supports -g0", queryTarget cmmCppSupportsG0')
-        , ("ld supports compact unwind", queryTarget linkSupportsCompactUnwind)
-        , ("ld supports filelist",       queryTarget linkSupportsFilelist)
-        , ("ld supports single module",       queryTarget linkSupportsSingleModule)
-        , ("ld is GNU ld",               queryTarget linkIsGnu)
-        , ("Merge objects command", queryTarget mergeObjsPath)
-        , ("Merge objects flags", queryTarget mergeObjsFlags)
-        , ("Merge objects supports response files", queryTarget mergeObjsSupportsResponseFiles')
-        , ("ar command",          queryTarget arPath)
-        , ("ar flags",            queryTarget arFlags)
-        , ("ar supports at file", queryTarget arSupportsAtFile')
-        , ("ar supports -L",      queryTarget arSupportsDashL')
-        , ("ranlib command", queryTarget ranlibPath)
+        [ ("C compiler command",   queryTarget stage ccPath)
+        , ("C compiler flags",     queryTarget stage ccFlags)
+        , ("C++ compiler command", queryTarget stage cxxPath)
+        , ("C++ compiler flags",   queryTarget stage cxxFlags)
+        , ("C compiler link flags",       queryTarget stage clinkFlags)
+        , ("C compiler supports -no-pie", queryTarget stage linkSupportsNoPie)
+        , ("JavaScript CPP command", queryTarget stage jsCppPath)
+        , ("JavaScript CPP flags", queryTarget stage jsCppFlags)
+        , ("C-- CPP command", queryTarget stage cmmCppPath)
+        , ("C-- CPP flags",   queryTarget stage cmmCppFlags)
+        , ("C-- CPP supports -g0", queryTarget stage cmmCppSupportsG0')
+        , ("CPP command",         queryTarget stage cppPath)
+        , ("CPP flags",           queryTarget stage cppFlags)
+        , ("Haskell CPP command", queryTarget stage hsCppPath)
+        , ("Haskell CPP flags",   queryTarget stage hsCppFlags)
+        , ("ld supports compact unwind", queryTarget stage linkSupportsCompactUnwind)
+        , ("ld supports filelist",       queryTarget stage linkSupportsFilelist)
+        , ("ld supports single module",  queryTarget stage linkSupportsSingleModule)
+        , ("ld is GNU ld",               queryTarget stage linkIsGnu)
+        , ("Merge objects command", queryTarget stage mergeObjsPath)
+        , ("Merge objects flags", queryTarget stage mergeObjsFlags)
+        , ("Merge objects supports response files", queryTarget stage mergeObjsSupportsResponseFiles')
+        , ("ar command",          queryTarget stage arPath)
+        , ("ar flags",            queryTarget stage arFlags)
+        , ("ar supports at file", queryTarget stage arSupportsAtFile')
+        , ("ar supports -L",      queryTarget stage arSupportsDashL')
+        , ("ranlib command", queryTarget stage ranlibPath)
         , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
         , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
-        , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
-        , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
-        , ("target platform string", queryTarget targetPlatformTriple)
-        , ("target os",        queryTarget (show . archOS_OS . tgtArchOs))
-        , ("target arch",      queryTarget (show . archOS_arch . tgtArchOs))
-        , ("target word size", queryTarget wordSize)
-        , ("target word big endian",       queryTarget isBigEndian)
-        , ("target has GNU nonexec stack", queryTarget (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
-        , ("target has .ident directive",  queryTarget (yesNo . Toolchain.tgtSupportsIdentDirective))
-        , ("target has subsections via symbols", queryTarget (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
+        , ("windres command", queryTarget stage (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
+        , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
+        , ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
+        , ("target platform string", queryTarget stage targetPlatformTriple)
+        , ("target os",        queryTarget stage (show . archOS_OS . tgtArchOs))
+        , ("target arch",      queryTarget stage (show . archOS_arch . tgtArchOs))
+        , ("target word size", queryTarget stage wordSize)
+        , ("target word big endian",       queryTarget stage isBigEndian)
+        , ("target has GNU nonexec stack", queryTarget stage (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
+        , ("target has .ident directive",  queryTarget stage (yesNo . Toolchain.tgtSupportsIdentDirective))
+        , ("target has subsections via symbols", queryTarget stage (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
-        , ("Unregisterised", queryTarget (yesNo . tgtUnregisterised))
-        , ("LLVM target", queryTarget tgtLlvmTarget)
+        , ("Unregisterised", queryTarget stage (yesNo . tgtUnregisterised))
+        , ("LLVM target", queryTarget stage tgtLlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
         , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
-        , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
+        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter stage)
+        , ("Support SMP", expr $ yesNo <$> targetSupportsSMP stage)
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
-        , ("Tables next to code", queryTarget (yesNo . tgtTablesNextToCode))
-        , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
-        , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
+        , ("Tables next to code", queryTarget stage (yesNo . tgtTablesNextToCode))
+        , ("Leading underscore",  queryTarget stage (yesNo . tgtSymbolsHaveLeadingUnderscore))
+        , ("Use LibFFI", expr $ yesNo <$> targetUseLibffiForAdjustors stage)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
         , ("Relative Global Package DB", pure rel_pkg_db)
         ]
@@ -572,8 +575,10 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    let queryTarget f = f <$> expr (targetStage stage)
+    -- Not right for stage3
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
-    hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
+    hostPlatform <- queryTarget targetPlatformTriple
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion

@@ -166,7 +166,7 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc f =
-    (addArgs (orM [stage1, cross] ? mconcat
+    (addArgs (stage1 ? mconcat
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
       ]) f) { ghcThreaded = (< Stage2) }
@@ -269,14 +269,14 @@ enableProfiledGhc flavour =
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
-disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
+disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = const (pure False) }
 
 -- | Don't build libraries in dynamic 'Way's.
 disableDynamicLibs :: Flavour -> Flavour
 disableDynamicLibs flavour =
   flavour { libraryWays = prune $ libraryWays flavour,
             rtsWays = prune $ rtsWays flavour,
-            dynamicGhcPrograms = pure False
+            dynamicGhcPrograms = const (pure False)
           }
   where
     prune :: Ways -> Ways

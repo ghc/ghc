@@ -9,7 +9,6 @@ import Expression
 import Flavour
 import Hadrian.Haskell.Cabal.Type (packageDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
-import Hadrian.Oracles.Path (fixAbsolutePathOnWindows)
 import Oracles.Setting
 import Oracles.TestSettings
 import Oracles.Flag
@@ -190,44 +189,35 @@ testRules = do
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- timeoutPath]
 
-        cross <- flag CrossCompiling
 
-        -- get relative path for the given program in the given stage
-        let relative_path_stage s p = programPath =<< programContext s p
-        let make_absolute rel_path = do
-              abs_path <- liftIO (IO.makeAbsolute rel_path)
-              fixAbsolutePathOnWindows abs_path
 
-        rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
-        rel_hsc2hs      <- relative_path_stage Stage1 hsc2hs
-        rel_hp2ps       <- relative_path_stage Stage1 hp2ps
-        rel_haddock     <- relative_path_stage (Stage0 InTreeLibs) haddock
-        rel_hpc         <- relative_path_stage (Stage0 InTreeLibs) hpc
-        rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
-
-        -- force stage0 program building for cross
-        when cross $ need [rel_hpc, rel_haddock, rel_runghc]
-
-        prog_ghc_pkg     <- make_absolute rel_ghc_pkg
-        prog_hsc2hs      <- make_absolute rel_hsc2hs
-        prog_hp2ps       <- make_absolute rel_hp2ps
-        prog_haddock     <- make_absolute rel_haddock
-        prog_hpc         <- make_absolute rel_hpc
-        prog_runghc      <- make_absolute rel_runghc
 
         ghcPath <- getCompilerPath testCompilerArg
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
-        ghcFlags        <- runTestGhcFlags
+        ghcFlags        <- runTestGhcFlags stg
         let ghciFlags = ghcFlags ++ unwords
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history", "-fprint-error-index-links=never"
               ]
-        ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-        ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+        -- MP: TODO wrong, should use the ccPath and ccFlags from the bindist we are testing.
+        ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+        ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
 
         pythonPath      <- builderPath Python
+
+        testGhc <- testCompiler <$> userSetting defaultTestArgs
+
+        -- Are we testing a cross compiler
+        cross <- getTestCross testGhc
+
+        prog_ghc_pkg     <- getTestExePath testGhc ghcPkg
+        prog_hsc2hs      <- getTestExePath testGhc hsc2hs
+        prog_hp2ps       <- getTestExePath testGhc hp2ps
+        prog_haddock     <- getTestExePath testGhc haddock
+        prog_hpc         <- getTestExePath testGhc hpc
+        prog_runghc      <- getTestExePath testGhc runGhc
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
