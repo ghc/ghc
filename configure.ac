@@ -997,6 +997,8 @@ FIND_GHC_TOOLCHAIN([hadrian/cfg])
 
 AC_CONFIG_FILES(
 [ hadrian/cfg/system.config
+  hadrian/cfg/system.config.host
+  hadrian/cfg/system.config.target
   hadrian/ghci-cabal
   hadrian/ghci-multi-cabal
   hadrian/ghci-stack

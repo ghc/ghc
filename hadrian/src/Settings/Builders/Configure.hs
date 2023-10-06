@@ -9,8 +9,8 @@ configureBuilderArgs = do
     stage      <- getStage
     gmpPath    <- expr (gmpBuildPath stage)
     builder (Configure gmpPath) ? do
-                targetArch <- queryTarget queryArch
-                targetPlatform <- queryTarget targetPlatformTriple
+                targetArch <- queryTarget stage queryArch
+                targetPlatform <- queryTarget stage targetPlatformTriple
                 buildPlatform <- queryBuild targetPlatformTriple
                 pure $ [ "--enable-shared=no"
                      , "--host=" ++ targetPlatform    -- GMP's host is our target

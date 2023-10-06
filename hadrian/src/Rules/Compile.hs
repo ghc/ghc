@@ -8,7 +8,7 @@ import Hadrian.Oracles.TextFile
 import Base
 import Context as C
 import Expression
-import Oracles.Flag (platformSupportsSharedLibs)
+import Oracles.Flag (targetSupportsSharedLibs)
 import Rules.Generate
 import Settings
 import Target
@@ -61,7 +61,10 @@ compilePackage rs = do
       -- compiling to build the dynamic files alongside the static files
       ( root -/- "**/build/**/*.dyn_o" :& root -/- "**/build/**/*.dyn_hi" :& Nil )
         &%> \ ( dyn_o :& _dyn_hi :& _ ) -> do
-          p <- platformSupportsSharedLibs
+
+          (BuildPath _root stage _path _o)
+            <- parsePath (parseBuildObject root) "<object file path parser>" dyn_o
+          p <- targetSupportsSharedLibs stage
           if p
             then do
                -- We `need` ".o/.hi" because GHC is called with `-dynamic-too`

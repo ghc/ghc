@@ -12,7 +12,8 @@ import Flavour.Type
 splitSectionsArgs :: Args
 splitSectionsArgs = do
   pkg <- getPackage
-  osx <- expr isOsxTarget
+  stage <- getStage
+  osx <- expr (isOsxTarget stage)
   cross <- expr $ flag CrossCompiling
   notSt0 <- notStage0
   flav <- expr flavour
