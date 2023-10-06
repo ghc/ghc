@@ -9,7 +9,7 @@ quickCrossFlavour :: Flavour
 quickCrossFlavour = disableProfiledLibs $ defaultFlavour
     { name        = "quick-cross"
     , extraArgs        = quickCrossArgs
-    , dynamicGhcPrograms = pure False
+    , dynamicGhcPrograms = const $ pure False
     }
 
 quickCrossArgs :: Args

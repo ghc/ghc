@@ -15,7 +15,7 @@ ghcInGhciFlavour = disableProfiledLibs $ defaultFlavour
         Set.fromList
             <$> mconcat
                 [ pure [vanilla]
-                , platformSupportsSharedLibs ? pure [dynamic]
+                , staged targetSupportsThreadedRts ? pure [dynamic]
                 ]
     }
 
