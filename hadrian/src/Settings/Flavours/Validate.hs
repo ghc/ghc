@@ -35,6 +35,7 @@ validateArgs = sourceArgs SourceArgs
                              -- See #11487
                            , notStage0 ? arg "-fllvm-fill-undef-with-garbage"
                            , notStage0 ? arg "-dno-debug-output"
+                           , notStage0 ? arg "-fcheck-prim-bounds"
                            ]
     , hsLibrary  = pure ["-O"]
     , hsCompiler = mconcat [ stage0 ? pure ["-O2"]
