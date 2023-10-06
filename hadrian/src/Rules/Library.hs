@@ -140,7 +140,7 @@ files etc.
 
 buildPackage :: FilePath -> FilePath -> Action ()
 buildPackage root fp = do
-  l@(BuildPath _ _ _ (PkgStamp _ _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
+  l@(BuildPath _ stage _ (PkgStamp _ _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
   let ctx = stampContext l
   srcs <- hsSources ctx
   gens <- interpretInContext ctx generatedDependencies
@@ -156,7 +156,7 @@ buildPackage root fp = do
   ways <- interpretInContext ctx getLibraryWays
   let hasVanilla = elem vanilla ways
       hasDynamic = elem dynamic ways
-  support <- platformSupportsSharedLibs
+  support <- targetSupportsGhciObjects stage
   when ((hasVanilla && hasDynamic) &&
         support && way == vanilla) $ do
     stamp <- (pkgStampFile (ctx { way = dynamic }))

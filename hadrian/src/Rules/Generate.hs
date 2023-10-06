@@ -22,6 +22,7 @@ import Rules.Libffi
 import Settings
 import Target
 import Utilities
+import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
@@ -56,7 +57,7 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
-    jsTarget <- expr isJsTarget
+    jsTarget <- expr (isJsTarget stage)
     useSystemFfi <- expr (flag UseSystemFfi)
 
     let -- headers common to native and JS RTS
@@ -153,7 +154,7 @@ generatePackageCode context@(Context stage pkg _ _) = do
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
             need $ [primopsSource]
-            build $ target context HsCpp [primopsSource] [file]
+            build $ target context (HsCpp stage) [primopsSource] [file]
 
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file -> do
@@ -434,12 +435,12 @@ bindistRules = do
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ yesNo <$> getTarget (isJust . tgtRTSWithLibdw)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
+    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
-    getTarget = interp . queryTarget
+    getTarget = interp . queryTarget Stage2
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
@@ -469,7 +470,9 @@ generateSettings settingsFile = do
       case stage of
         Stage0 {} -> error "Unable to generate settings for stage0"
         Stage1 -> get_pkg_db Stage1
-        Stage2 -> get_pkg_db Stage1
+        Stage2 -> do
+          cfg <- implicitBindistConfig
+          get_pkg_db (library_stage cfg)
         Stage3 -> get_pkg_db Stage2
 
     -- The unit-id of the base package which is always linked against (#25382)
@@ -483,8 +486,10 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
+    -- ROMES:TODO: WHERE HAS CROSS COMPILING GONE?
+    -- ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
+        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
+        , ("Use interpreter", expr $ yesNo <$> Oracles.Setting.ghcWithInterpreter stage)
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
@@ -506,8 +511,10 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    let queryTarget f = f <$> expr (targetStage stage)
+    -- Not right for stage3
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
-    hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
+    hostPlatform <- queryTarget targetPlatformTriple
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
@@ -622,19 +629,3 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
-
--- | Just like 'GHC.ResponseFile.escapeArgs', but use spaces instead of newlines
--- for splitting elements.
-escapeArgs :: [String] -> String
-escapeArgs = unwords . map escapeArg
-
-escapeArg :: String -> String
-escapeArg = reverse . foldl' escape []
-
-escape :: String -> Char -> String
-escape cs c
-  |    isSpace c
-    || '\\' == c
-    || '\'' == c
-    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
-  | otherwise    = c:cs
