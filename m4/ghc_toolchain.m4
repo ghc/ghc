@@ -136,8 +136,10 @@ dnl         and that we must compile ghc-toolchain before invoking it
 AC_DEFUN([FIND_GHC_TOOLCHAIN_BIN],[
     case "$1" in
         YES)
-            # We're configuring the bindist, and the binary is already available
-            GHC_TOOLCHAIN_BIN="bin/ghc-toolchain-bin"
+            # We're configuring the bindist, and the binary is already available.
+            # For cross-compilation bindists, Hadrian names the binary with the
+            # cross-compile prefix (e.g. riscv64-linux-gnu-ghc-toolchain-bin).
+            GHC_TOOLCHAIN_BIN="bin/${CrossCompilePrefix}ghc-toolchain-bin"
             ;;
         NO)
             # We're in the source tree, so compile ghc-toolchain

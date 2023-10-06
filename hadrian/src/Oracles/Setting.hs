@@ -69,6 +69,8 @@ data Setting = CursesIncludeDir
              | ProjectPatchLevel2
              | SystemGhc
              | TargetPlatformFull
+             | BuildPlatformFull
+             | HostPlatformFull
              | BourneShell
              | EmsdkVersion
 
@@ -107,6 +109,8 @@ setting key = lookupSystemConfig $ case key of
     ProjectPatchLevel2 -> "project-patch-level2"
     SystemGhc          -> "system-ghc"
     TargetPlatformFull -> "target-platform-full"
+    BuildPlatformFull  -> "build-platform-full"
+    HostPlatformFull   -> "host-platform-full"
     BourneShell        -> "bourne-shell"
     EmsdkVersion       -> "emsdk-version"
 

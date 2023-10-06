@@ -122,7 +122,11 @@ stage0Packages = do
           -- for upper stages. As we only use stage0 to build upper stages,
           -- this should be fine.
           ++ [ terminfo | not windowsHost, not cross ]
-          ++ [ timeout  | windowsHost                                ]
+          ++ [ timeout  | windowsHost ]
+          -- Due to some weird logic, we need ghcToolchainBin in Stage0 and
+          -- Stage1 packages if we're cross compiling. "Stage2 cross-compilers"
+          -- will solve this.
+          ++ [ ghcToolchainBin | cross ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
@@ -181,12 +185,12 @@ stage1Packages = do
         , transformers
         , unlit
         , xhtml
+        , ghcToolchainBin
         , if winTarget then win32 else unix
         ]
       , when (not cross)
         [ hpcBin
         , runGhc
-        , ghcToolchainBin
         ]
       , when (winTarget && not cross)
         [ -- See Note [Hadrian's ghci-wrapper package]
