@@ -15,7 +15,20 @@ dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
+build_alias=@BuildPlatformFull@
+host_alias=@HostPlatformFull@
+target_alias=@TargetPlatformFull@
+
+dnl this makes sure `./configure --target=<cross-compile-target>`
+dnl works as expected, since we're slightly modifying how Autoconf
+dnl interprets build/host/target and how this interacts with $CC tests
+test -n "$target_alias" && ac_tool_prefix=$target_alias-
+
+
+
 dnl Various things from the source distribution configure
+bootstrap_build=@BuildPlatform@
+bootstrap_host=@HostPlatform@
 bootstrap_target=@TargetPlatform@
 
 bootstrap_llvm_target=@LlvmTarget@
