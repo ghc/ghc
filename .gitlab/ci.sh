@@ -552,12 +552,6 @@ function install_bindist() {
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
 
-      # FIXME: The bindist configure script shouldn't need to be reminded of
-      # the target platform. See #21970.
-      if [ -n "${CROSS_TARGET:-}" ]; then
-          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
-      fi
-
       run ${CONFIGURE_WRAPPER:-} ./configure \
           --prefix="$instdir" \
           "${args[@]+"${args[@]}"}" || fail "bindist configure failed"
@@ -664,11 +658,18 @@ function test_hadrian() {
       rm proftest.hs
     fi
 
+    # The check-exact check-ppr programs etc can not be built when testing a cross compiler.
+    if [ -z "${CROSS_TARGET:-}" ]; then
+      TEST_HAVE_INTREE="--test-have-intree-files"
+    else
+      TEST_HAVE_INTREE=""
+    fi
+
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
-      --test-have-intree-files \
       --test-compiler="${test_compiler}" \
+      $TEST_HAVE_INTREE \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian main testsuite"
