@@ -7,7 +7,6 @@ import Expression
 import Flavour
 import Hadrian.Haskell.Cabal.Type (packageDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
-import Hadrian.Oracles.Path (fixAbsolutePathOnWindows)
 import Oracles.Setting
 import Oracles.TestSettings
 import Oracles.Flag
@@ -21,6 +20,7 @@ import qualified System.Directory as IO
 
 import GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program as Toolchain
+import Hadrian.Oracles.Path
 
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
@@ -188,23 +188,27 @@ testRules = do
         when cross $ mapM (relativePathStage (Stage0 InTreeLibs)) [hpc, haddock, runGhc] >>= need
 
         -- Set environment variables for test's Makefile.
-        env <- testEnv
+        env <- testEnv stg
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
         withVerbosity Diagnostic $ buildWithCmdOptions [AddEnv k v | (k,v) <- env] $ test_target RunTest
 
-testEnv :: Action [(String, String)]
-testEnv = do
-    cross           <- flag CrossCompiling
+testEnv :: Stage -> Action [(String, String)]
+testEnv stg = do
+
+    testGhc <- testCompiler <$> userSetting defaultTestArgs
+
+    cross <- getTestCross testGhc
+
+    prog_ghc_pkg     <- getTestExePath testGhc ghcPkg
+    prog_hsc2hs      <- getTestExePath testGhc hsc2hs
+    prog_hp2ps       <- getTestExePath testGhc hp2ps
+    prog_haddock     <- getTestExePath testGhc haddock
+    prog_hpc         <- getTestExePath testGhc hpc
+    prog_runghc      <- getTestExePath testGhc runGhc
     makePath        <- builderPath $ Make ""
-    prog_ghc_pkg    <- absolutePathStage Stage1 ghcPkg
-    prog_hsc2hs     <- absolutePathStage Stage1 hsc2hs
-    prog_hp2ps      <- absolutePathStage Stage1 hp2ps
-    prog_haddock    <- absolutePathStage (Stage0 InTreeLibs) haddock
-    prog_hpc        <- absolutePathStage (Stage0 InTreeLibs) hpc
-    prog_runghc     <- absolutePathStage (Stage0 InTreeLibs) runGhc
 
     root <- buildRoot
     args <- userSetting defaultTestArgs
@@ -213,9 +217,9 @@ testEnv = do
 
     top             <- topDirectory
     pythonPath      <- builderPath Python
-    ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-    ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-    ghcFlags        <- runTestGhcFlags
+    ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    ghcFlags        <- runTestGhcFlags stg
     let ghciFlags = ghcFlags ++ unwords
           [ "--interactive", "-v0", "-ignore-dot-ghci"
           , "-fno-ghci-history", "-fprint-error-index-links=never"
@@ -311,8 +315,10 @@ timeoutProgBuilder = do
 needTestsuitePackages :: Stage -> Action ()
 needTestsuitePackages stg = do
   allpkgs <- packages <$> flavour
-  -- We need the libraries of the successor stage
-  libpkgs <- map (Stage1,) . filter isLibrary <$> allpkgs (succStage stg)
+  isCross <- crossStage stg
+  -- In cross case, the libraries are one stage ahead
+  let libraryStage = if isCross then succStage stg else stg
+  libpkgs <- map (libraryStage,) . filter isLibrary <$> allpkgs libraryStage
   -- And the executables of the current stage
   exepkgs <- map (stg,) . filter isProgram <$> allpkgs stg
   -- Don't require lib:ghc or lib:cabal when testing the stage1 compiler
@@ -321,7 +327,19 @@ needTestsuitePackages stg = do
   -- Unfortunately, we still need the liba
   let pkgs = filter (\(_,p) -> not $ (pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg)
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
+
   need =<< mapM (uncurry pkgFile) pkgs
+  when isCross $ do
+    jsTarget <- isJsTarget (succStage stg)
+    wasmTarget <- isWasmTarget (succStage stg)
+    libPath <- stageLibPath stg
+    let jsDeps
+          | jsTarget  = ["ghc-interp.js"]
+          | otherwise = []
+        wasmDeps
+          | wasmTarget = ["dyld.mjs", "post-link.mjs", "prelude.mjs"]
+          | otherwise  = []
+    need $ map (libPath -/-) (jsDeps ++ wasmDeps)
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc

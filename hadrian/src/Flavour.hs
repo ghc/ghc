@@ -45,6 +45,7 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
+import BindistConfig
 
 
 flavourTransformers :: Map String (Flavour -> Flavour)
@@ -181,7 +182,7 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc f =
-    (addArgs (orM [stage1, cross] ? mconcat
+    (addArgs (stage1 ? mconcat
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
       ]) f) { ghcThreaded = (< Stage2) }
@@ -281,8 +282,8 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
 -- manually specified via
 -- @export LD_LIBRARY_PATH=$(dirname $(clang -print-libgcc-file-name -rtlib=compiler-rt))@
 -- for @ld.so@ to find it at runtime.
-needSharedLibSAN :: Action Bool
-needSharedLibSAN = flag CcLlvmBackend
+needSharedLibSAN :: Stage -> Action Bool
+needSharedLibSAN = buildFlag CcLlvmBackend
 
 -- | Build all stage1+ C/C++ code with UndefinedBehaviorSanitizer
 -- support:
@@ -295,21 +296,21 @@ enableUBSan =
         [ package rts
             ? builder (Cabal Flags)
             ? arg "+ubsan"
-            <> (needSharedLibSAN ? arg "+shared-libsan"),
+            <> (staged needSharedLibSAN ? arg "+shared-libsan"),
           builder (Ghc CompileHs) ? arg "-optc-fsanitize=undefined",
           builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=undefined",
           builder (Ghc CompileCppWithGhc) ? arg "-optcxx-fsanitize=undefined",
           builder (Ghc LinkHs)
             ? arg "-optc-fsanitize=undefined"
             <> arg "-optl-fsanitize=undefined"
-            <> (needSharedLibSAN ? arg "-optl-shared-libsan"),
+            <> (staged needSharedLibSAN ? arg "-optl-shared-libsan"),
           builder (Cc CompileC) ? arg "-fsanitize=undefined",
           builder Testsuite ? arg "--config=have_ubsan=True"
         ]
 
--- | Use the LLVM backend in stages 1 and later.
+-- | Use the LLVM backend in target stages
 viaLlvmBackend :: Flavour -> Flavour
-viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
+viaLlvmBackend = addArgs $ staged buildingForTarget ? builder Ghc ? arg "-fllvm"
 
 -- | Build the GHC executable with profiling enabled in stages 2 and
 -- later.
@@ -319,14 +320,14 @@ enableProfiledGhc flavour =
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
-disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
+disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = const (pure False) }
 
 -- | Don't build libraries in dynamic 'Way's.
 disableDynamicLibs :: Flavour -> Flavour
 disableDynamicLibs flavour =
   flavour { libraryWays = prune $ libraryWays flavour,
             rtsWays = prune $ rtsWays flavour,
-            dynamicGhcPrograms = pure False
+            dynamicGhcPrograms = const (pure False)
           }
   where
     prune :: Ways -> Ways
@@ -365,7 +366,7 @@ useNativeBignum flavour =
 -- | Enable building the @text@ package with @simdutf@ support.
 enableTextWithSIMDUTF :: Flavour -> Flavour
 enableTextWithSIMDUTF flavour = flavour {
-  textWithSIMDUTF = True
+  textWithSIMDUTF = buildingForTarget
 }
 
 enableHashUnitIds :: Flavour -> Flavour
@@ -452,17 +453,35 @@ fullyStatic flavour =
 -- libraries.
 hostFullyStatic :: Flavour -> Flavour
 hostFullyStatic flavour =
-    addArgs staticExec $ disableDynamicGhcPrograms flavour
+    addArgs staticExec . noDynamicRts $ disableDynamicGhcPrograms flavour
   where
     -- Unlike 'fullyStatic', we need to ensure these flags are only
     -- applied to host code.
     staticExec :: Args
-    staticExec = stage0 ? mconcat
+    staticExec = stage1 ? mconcat
         [
           builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
         , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
         , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
         ]
+    noDynamicRts :: Flavour -> Flavour
+    noDynamicRts f =
+       f
+         { rtsWays = do
+             ws <- rtsWays f
+             mconcat
+               [ notM stage1 ? pure ws,
+                 stage1
+                   ? pure (ws `Set.difference` Set.fromList [dynamic, profilingDynamic, threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic, debugDynamic, debugProfilingDynamic])
+               ]
+         , libraryWays = do
+             ws <- libraryWays f
+             mconcat
+               [ notM stage1 ? pure ws,
+                 stage1
+                   ? pure (ws `Set.difference` Set.fromList [dynamic, profilingDynamic, threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic, debugDynamic, debugProfilingDynamic ])
+               ]
+         }
 
 -- | Build stage2 dependencies with options to enable collection of compiler
 -- stats.

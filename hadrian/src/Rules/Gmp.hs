@@ -17,7 +17,7 @@ import Settings.Builders.Common (getStagedCCFlags)
 -- their paths.
 gmpObjects :: Stage -> Action [FilePath]
 gmpObjects s = do
-  isInTree <- flag GmpInTree
+  isInTree <- buildFlag GmpInTree s
   if not isInTree
     then return []
     else do
@@ -65,8 +65,9 @@ gmpRules = do
             packageP   = takeDirectory buildP
             librariesP = takeDirectory packageP
             stageP     = takeDirectory librariesP
+        stage <- parsePath parseStage "<stage>" (takeFileName stageP)
 
-        isInTree <- flag GmpInTree
+        isInTree <- buildFlag GmpInTree stage
 
         if isInTree
         then do
@@ -141,7 +142,7 @@ gmpRules = do
                      [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
                      , return . AddEnv "CFLAGS" $ unwords cFlags
                      , builderEnvironment "AR" (Ar Unpack (stage ctx))
-                     , builderEnvironment "NM" Nm
+                     , builderEnvironment "NM" (Nm (stage ctx))
                      ]
             need [mk <.> "in"]
             buildWithCmdOptions env $
