@@ -77,9 +77,9 @@ dnl fi
 # compiler's target platform.
 AC_DEFUN([FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP],
 [
-    if test "$bootstrap_target" != ""
+    if test "$bootstrap_$1" != ""
     then
-        $1=$bootstrap_target
+        $1=$bootstrap_$1
         echo "$1 platform inferred as: [$]$1"
     else
         echo "Can't work out $1 platform"
