@@ -130,7 +130,6 @@ INSTALL_DIR     = $(INSTALL) -m 755 -d
 #-----------------------------------------------------------------------------
 # Build configuration
 
-CrossCompiling        = @CrossCompiling@
 CrossCompilePrefix    = @CrossCompilePrefix@
 GhcUnregisterised     = @Unregisterised@
 EnableDistroToolchain = @SettingsUseDistroMINGW@

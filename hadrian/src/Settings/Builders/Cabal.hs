@@ -12,7 +12,7 @@ import qualified Settings.Builders.Common as S
 import Control.Exception (assert)
 import qualified Data.Set as Set
 import Settings.Program (programContext)
-import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
+import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink, targetPlatformTriple)
 import GHC.Toolchain.Program (prgFlags)
 
 cabalBuilderArgs :: Args
@@ -91,6 +91,7 @@ commonCabalArgs stage = do
             -- we might have issues with stripping on Windows, as I can't see a
             -- consumer of 'stripCmdPath'.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
+            -- TODO: MP should check per-stage rather than a global CrossCompiling, but not going to cause bugs
               flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
             -- We don't want to strip the debug RTS
@@ -138,9 +139,9 @@ libraryArgs = do
     contextWay  <- getWay
     package     <- getPackage
     stage       <- getStage
-    withGhci    <- expr $ ghcWithInterpreter stage
-    dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
-    ghciObjsSupported <- expr platformSupportsGhciObjects
+    withGhci    <- expr (ghcWithInterpreter stage)
+    dynPrograms <- expr (flavour >>= flip dynamicGhcPrograms stage)
+    ghciObjsSupported <- expr (targetSupportsGhciObjects stage)
     let ways = Set.insert contextWay flavourWays
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways
@@ -197,6 +198,7 @@ configureArgs cFlags' ldFlags' = do
                            , cFlags'
                            ]
         ldFlags  = ldArgs <> ldFlags'
+    let predStage' s = case s of {Stage0 {} -> stage0InTree ; _ -> predStage s }
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
@@ -205,8 +207,7 @@ configureArgs cFlags' ldFlags' = do
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        -- ROMES:TODO: how is the Host set to TargetPlatformFull? That would be the target
-        , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
+        , conf "--host"                   $ arg =<< flip queryTarget targetPlatformTriple  . predStage' =<< getStage
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , ghcVersionH
         ]

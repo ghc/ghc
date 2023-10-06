@@ -6,7 +6,8 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath, targetStage,
+    libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
+    ghcWithInterpreter,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -160,17 +161,17 @@ bashPath = setting BourneShell
 isWinHost :: Action Bool
 isWinHost = anyHostOs [OSMinGW32]
 
-isWinTarget :: Action Bool
-isWinTarget = anyTargetOs [OSMinGW32]
+isWinTarget :: Stage -> Action Bool
+isWinTarget stage = anyTargetOs stage [OSMinGW32]
 
-isJsTarget :: Action Bool
-isJsTarget = anyTargetArch [ArchJavaScript]
+isJsTarget :: Stage -> Action Bool
+isJsTarget stage = anyTargetArch stage [ArchJavaScript]
 
-isOsxTarget :: Action Bool
-isOsxTarget = anyTargetOs [OSDarwin]
+isOsxTarget :: Stage -> Action Bool
+isOsxTarget stage = anyTargetOs stage [OSDarwin]
 
-isArmTarget :: Action Bool
-isArmTarget = queryTargetTarget (isARM . archOS_arch . tgtArchOs)
+isArmTarget :: Stage -> Action Bool
+isArmTarget stage = queryTargetTarget stage (isARM . archOS_arch . tgtArchOs)
 
 -- | Check whether the host OS setting matches one of the given strings.
 anyHostOs :: [OS] -> Action Bool
@@ -178,16 +179,16 @@ anyHostOs oss = (`elem` oss) <$> queryHostTarget (archOS_OS . tgtArchOs)
 
 -- | Check whether the target architecture setting matches one of the given
 -- strings.
-anyTargetArch :: [Arch] -> Action Bool
-anyTargetArch archs = (`elem` archs) <$> queryTargetTarget (archOS_arch . tgtArchOs)
+anyTargetArch :: Stage -> [Arch] -> Action Bool
+anyTargetArch stage archs = (`elem` archs) <$> queryTargetTarget stage (archOS_arch . tgtArchOs)
 
 -- | Check whether the target OS setting matches one of the given strings.
-anyTargetOs :: [OS] -> Action Bool
-anyTargetOs oss = (`elem` oss) <$> queryTargetTarget (archOS_OS . tgtArchOs)
+anyTargetOs :: Stage -> [OS] -> Action Bool
+anyTargetOs stage oss = (`elem` oss) <$> queryTargetTarget stage (archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS uses the ELF object format.
-isElfTarget :: Action Bool
-isElfTarget = queryTargetTarget (osElfTarget . archOS_OS . tgtArchOs)
+isElfTarget :: Stage -> Action Bool
+isElfTarget stage = queryTargetTarget stage (osElfTarget . archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS supports the @-rpath@ linker option when
 -- using dynamic linking.
@@ -196,15 +197,32 @@ isElfTarget = queryTargetTarget (osElfTarget . archOS_OS . tgtArchOs)
 --
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
-targetSupportsRPaths :: Action Bool
-targetSupportsRPaths = queryTargetTarget (\t -> let os = archOS_OS (tgtArchOs t)
-                                             in osElfTarget os || osMachOTarget os)
+targetSupportsRPaths :: Stage -> Action Bool
+targetSupportsRPaths stage = queryTargetTarget stage
+                                (\t -> let os = archOS_OS (tgtArchOs t)
+                                       in osElfTarget os || osMachOTarget os)
+
+-- | Check whether the target supports GHCi.
+ghcWithInterpreter :: Stage -> Action Bool
+ghcWithInterpreter stage = do
+    goodOs <- anyTargetOs stage [ OSMinGW32, OSLinux, OSSolaris2 -- TODO "cygwin32"?,
+                          , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
+                          , OSDarwin, OSKFreeBSD
+                          , OSWasi ]
+    goodArch <- (||) <$>
+                anyTargetArch stage [ ArchX86, ArchX86_64, ArchPPC
+                              , ArchAArch64, ArchS390X
+                              , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
+                              , ArchRISCV64, ArchLoongArch64
+                              , ArchWasm32 ]
+                              <*> isArmTarget stage
+    return $ goodOs && goodArch && (stage >= Stage1)
 
 -- | Which variant of the ARM architecture is the target (or 'Nothing' if not
 -- ARM)?
-targetArmVersion :: Action (Maybe ArmISA)
-targetArmVersion = runMaybeT $ do
-    ArchARM isa _ _ <- lift $ queryTargetTarget (archOS_arch . tgtArchOs)
+targetArmVersion :: Stage -> Action (Maybe ArmISA)
+targetArmVersion stage = runMaybeT $ do
+    ArchARM isa _ _ <- lift $ queryTargetTarget stage (archOS_arch . tgtArchOs)
     return isa
 
 -- | Canonicalised GHC version number, used for integer version comparisons. We
@@ -247,12 +265,24 @@ libsuf st way
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
 
+-- Build libraries for this stage targetting this Target
+-- For example, we want to build RTS with stage1 for the host target as we produce a host executable with stage1  (which cross-compiles to stage2)
 targetStage :: Stage -> Action Target
--- TODO(#19174):
--- We currently only support cross-compiling a stage1 compiler,
--- but the cross compiler should really be stage2 (#19174).
--- When we get there, we'll need to change the definition here.
 targetStage (Stage0 {}) = getHostTarget
-targetStage (Stage1 {}) = getTargetTarget
-targetStage (Stage2 {}) = getTargetTarget -- the last two only make sense if the target can be executed locally
+targetStage (Stage1 {}) = getHostTarget
+targetStage (Stage2 {}) = getTargetTarget
 targetStage (Stage3 {}) = getTargetTarget
+
+queryTarget :: Stage -> (Target -> a) -> (Expr c b a)
+queryTarget s f = expr (f <$> targetStage s)
+
+queryTargetTarget :: Stage -> (Target -> a) -> Action a
+queryTargetTarget s f = f <$> targetStage s
+
+-- | A 'Stage' is a cross-stage if the produced compiler is a cross-compiler.
+crossStage :: Stage -> Action Bool
+crossStage st = do
+  st_target <- targetStage (succStage st)
+  st_host   <- targetStage st
+  return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
+

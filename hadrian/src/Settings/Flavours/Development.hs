@@ -14,8 +14,8 @@ developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ stageString ghcStage
     , extraArgs = developmentArgs ghcStage <> defaultHaddockExtraArgs
     , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
-    , dynamicGhcPrograms = return False
+    , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], staged targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
+    , dynamicGhcPrograms = const (return False)
     , ghcDebugAssertions = (== ghcStage) }
     where
       stageString Stage2 = "2"

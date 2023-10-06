@@ -2,13 +2,12 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag,
-    platformSupportsSharedLibs,
-    platformSupportsGhciObjects,
     targetRTSLinkerOnlySupportsSharedLibs,
+    targetSupportsSharedLibs,
+    targetSupportsGhciObjects,
     targetSupportsThreadedRts,
     targetSupportsSMP,
-    ghcWithInterpreter,
-    useLibffiForAdjustors,
+    targetUseLibffiForAdjustors,
     arSupportsDashL,
     arSupportsAtFile
     ) where
@@ -74,15 +73,6 @@ flag f = do
 getFlag :: Flag -> Expr c b Bool
 getFlag = expr . flag
 
--- | Does the platform support object merging (and therefore we can build GHCi objects
--- when appropriate).
-platformSupportsGhciObjects :: Action Bool
--- FIXME: The name of the function is not entirely clear about which platform, it would be better named targetSupportsGhciObjects
-platformSupportsGhciObjects = do
-    has_merge_objs <- isJust <$> queryTargetTarget tgtMergeObjs
-    only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs
-    pure $ has_merge_objs && not only_shared_libs
-
 -- | Does the target RTS linker only support loading shared libraries?
 -- If true, this has several implications:
 -- 1. The GHC driver must not do loadArchive/loadObj etc and must
@@ -98,8 +88,16 @@ platformSupportsGhciObjects = do
 --    when host GHC is static.
 -- 6. TH/ghci doesn't work if stage1 is built without shared libraries
 --    (e.g. quickest/fully_static).
-targetRTSLinkerOnlySupportsSharedLibs :: Action Bool
-targetRTSLinkerOnlySupportsSharedLibs = anyTargetArch [ ArchWasm32 ]
+targetRTSLinkerOnlySupportsSharedLibs :: Stage -> Action Bool
+targetRTSLinkerOnlySupportsSharedLibs stage = anyTargetArch stage [ ArchWasm32 ]
+
+-- | Does the target platform support object merging (and therefore we can build GHCi objects
+-- when appropriate).
+targetSupportsGhciObjects :: Stage -> Action Bool
+targetSupportsGhciObjects stage = do
+  has_merge_objs <- isJust <$> queryTargetTarget stage tgtMergeObjs
+  only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs stage
+  pure $ has_merge_objs && not only_shared_libs
 
 arSupportsDashL :: Stage -> Action Bool
 arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
@@ -107,28 +105,27 @@ arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
 arSupportsAtFile :: Stage -> Action Bool
 arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stage
 
-platformSupportsSharedLibs :: Action Bool
--- FIXME: This is querying about the target but is named "platformXXX", targetSupportsSharedLibs would be better
-platformSupportsSharedLibs = do
-    windows       <- isWinTarget
-    ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
-    solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
-    javascript    <- anyTargetArch     [ ArchJavaScript ]
+targetSupportsSharedLibs :: Stage -> Action Bool
+targetSupportsSharedLibs stage = do
+    windows       <- isWinTarget stage
+    ppc_linux     <- (&&) <$> anyTargetArch stage [ ArchPPC ] <*> anyTargetOs stage [ OSLinux ]
+    solaris       <- (&&) <$> anyTargetArch stage [ ArchX86 ] <*> anyTargetOs stage [ OSSolaris2 ]
+    javascript    <- anyTargetArch stage [ ArchJavaScript ]
     return $ not (windows || javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
-targetSupportsThreadedRts :: Action Bool
-targetSupportsThreadedRts = do
-    bad_arch <- anyTargetArch [ ArchWasm32, ArchJavaScript ]
+targetSupportsThreadedRts :: Stage -> Action Bool
+targetSupportsThreadedRts stage = do
+    bad_arch <- anyTargetArch stage [ ArchWasm32, ArchJavaScript ]
     return $ not bad_arch
 
 -- | Does the target support the -N RTS flag?
-targetSupportsSMP :: Action Bool
-targetSupportsSMP = do
-  unreg <- queryTargetTarget tgtUnregisterised
-  armVer <- targetArmVersion
+targetSupportsSMP :: Stage -> Action Bool
+targetSupportsSMP stage = do
+  unreg <- queryTargetTarget stage tgtUnregisterised
+  armVer <- targetArmVersion stage
   goodArch <- (||) <$>
-              anyTargetArch [ ArchX86
+              anyTargetArch stage [ ArchX86
                             , ArchX86_64
                             , ArchPPC
                             , ArchPPC_64 ELF_V1
@@ -136,7 +133,7 @@ targetSupportsSMP = do
                             , ArchAArch64
                             , ArchS390X
                             , ArchRISCV64
-                            , ArchLoongArch64 ] <*> isArmTarget
+                            , ArchLoongArch64 ] <*> isArmTarget stage
   if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
        -- Unregisterised mode doesn't allow that.
      | unreg                -> return False
@@ -146,7 +143,7 @@ targetSupportsSMP = do
      | goodArch             -> return True
      | otherwise            -> return False
 
-
+{-
 -- | When cross compiling, enable for stage0 to get ghci
 -- support. But when not cross compiling, disable for
 -- stage0, otherwise we introduce extra dependencies
@@ -171,6 +168,7 @@ ghcWithInterpreter stage = do
     -- Maybe this should just be false for cross compilers. But for now
     -- I've kept the old behaviour where it will say yes. (See #25939)
     return $ goodOs && goodArch && (stage >= Stage1 || is_cross)
+    -}
 
-useLibffiForAdjustors :: Action Bool
-useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors
+targetUseLibffiForAdjustors :: Stage -> Action Bool
+targetUseLibffiForAdjustors stage = queryTargetTarget stage tgtUseLibffiForAdjustors

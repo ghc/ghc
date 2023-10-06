@@ -128,13 +128,13 @@ gmpRules = do
                 mconcat
                     [ cArgs
                     , getStagedCCFlags
-                    , anyTargetArch [ArchWasm32] ? arg "-fvisibility=default"
+                    , staged (\stg -> anyTargetArch stg [ArchWasm32]) ? arg "-fvisibility=default"
                     ]
             env <- sequence
                      [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
                      , return . AddEnv "CFLAGS" $ unwords cFlags
                      , builderEnvironment "AR" (Ar Unpack (stage ctx))
-                     , builderEnvironment "NM" Nm
+                     , builderEnvironment "NM" (Nm (stage ctx))
                      ]
             need [mk <.> "in"]
             buildWithCmdOptions env $

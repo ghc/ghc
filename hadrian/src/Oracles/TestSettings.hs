@@ -3,16 +3,18 @@
 -- | required for testsuite e.g. WORDSIZE, HOSTOS etc.
 
 module Oracles.TestSettings
-  ( TestSetting (..), testSetting, testRTSSettings
+  ( TestSetting (..), getTestSetting, getBooleanSetting, testRTSSettings
   , getCompilerPath, getBinaryDirectory, isInTreeCompiler
-  , stageOfTestCompiler
+  , stageOfTestCompiler, getTestExePath, getTestCross
   ) where
 
 import Base
 import Hadrian.Oracles.TextFile
-import Oracles.Setting (topDirectory, setting, Setting(..))
+import Oracles.Setting (topDirectory, setting, Setting(..), crossStage)
 import Packages
 import Settings.Program (programContext)
+import Hadrian.Oracles.Path
+--import System.Directory (makeAbsolute)
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -21,8 +23,8 @@ testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
 data TestSetting = TestHostOS
                  | TestWORDSIZE
                  | TestTARGETPLATFORM
-                 | TestTargetOS_CPP
-                 | TestTargetARCH_CPP
+                 | TestTargetOS
+                 | TestTargetARCH
                  | TestRTSWay
                  | TestGhcStage
                  | TestGhcDebugAssertions
@@ -43,19 +45,20 @@ data TestSetting = TestHostOS
                  | TestLeadingUnderscore
                  | TestGhcPackageDb
                  | TestGhcLibDir
+                 | TestCrossCompiling
                  deriving (Show)
 
 -- | Lookup a test setting in @ghcconfig@ file.
 -- | To obtain RTS ways supported in @ghcconfig@ file, use 'testRTSSettings'.
-testSetting :: TestSetting -> Action String
-testSetting key = do
+getTestSetting :: TestSetting -> Action String
+getTestSetting key = do
     file <- testConfigFile
     lookupValueOrError Nothing file $ case key of
         TestHostOS                -> "HostOS"
         TestWORDSIZE              -> "WORDSIZE"
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
-        TestTargetOS_CPP          -> "TargetOS_CPP"
-        TestTargetARCH_CPP        -> "TargetARCH_CPP"
+        TestTargetOS              -> "TargetOS"
+        TestTargetARCH            -> "TargetARCH"
         TestRTSWay                -> "RTSWay"
         TestGhcStage              -> "GhcStage"
         TestGhcDebugAssertions    -> "GhcDebugAssertions"
@@ -76,6 +79,15 @@ testSetting key = do
         TestLeadingUnderscore     -> "LeadingUnderscore"
         TestGhcPackageDb          -> "GhcGlobalPackageDb"
         TestGhcLibDir             -> "GhcLibdir"
+        TestCrossCompiling        -> "CrossCompiling"
+
+-- | Parse the value of a Boolean test setting or report an error.
+getBooleanSetting :: TestSetting -> Action Bool
+getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting key
+  where
+    msg = "Cannot parse test setting " ++ quote (show key)
+
+
 
 -- | Get the RTS ways of the test compiler
 testRTSSettings :: Action [String]
@@ -123,3 +135,30 @@ stageOfTestCompiler "stage1" = Just stage0InTree
 stageOfTestCompiler "stage2" = Just Stage1
 stageOfTestCompiler "stage3" = Just Stage2
 stageOfTestCompiler _ = Nothing
+
+-- | Are we testing a cross compiler
+getTestCross :: String -> Action Bool
+getTestCross testGhc =
+  case stageOfTestCompiler testGhc of
+    Just stg -> crossStage stg
+    Nothing -> getBooleanSetting TestCrossCompiling
+
+
+-- Given the testGhc string, either a stage0..stage1..stage2 etc or a path to
+-- a compiler. Compute the absolute path to the relevant executable provided by
+-- the package in the second argument.
+getTestExePath :: String -> Package -> Action FilePath
+getTestExePath testGhc pkg = do
+  case stageOfTestCompiler testGhc of
+    Just stg -> (-/-) <$> topDirectory <*> fullPath stg pkg
+    Nothing -> do
+     bindir <- getBinaryDirectory testGhc
+     compiler_path <- getCompilerPath testGhc
+     cross <- getBooleanSetting TestCrossCompiling
+     let cross_prefix = if cross then dropWhileEnd ((/=) '-') (takeFileName compiler_path) else ""
+     -- get relative path for the given program in the given stage
+     let make_absolute rel_path = do
+           abs_path <- liftIO (makeAbsolute rel_path)
+           fixAbsolutePathOnWindows abs_path
+     make_absolute (bindir </> (cross_prefix ++ programBasename vanilla pkg) <.> exe)
+    -- get relative path for the given program in the given stage

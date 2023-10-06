@@ -8,7 +8,6 @@ import Hadrian.Haskell.Cabal.Type
 import Base
 import Context
 import Expression hiding (stage, way)
-import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting (topDirectory)
 import Packages
@@ -99,13 +98,7 @@ buildProgram bin ctx@(Context{..}) rs = do
   -- so we use pkgRegisteredLibraryFile instead.
   registerPackages =<< contextDependencies ctx
 
-  cross <- flag CrossCompiling
-  -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
-  case (cross, stage) of
-    (True, s) | s > stage0InTree -> do
-        srcDir <- buildRoot <&> (-/- (stageString stage0InTree -/- "bin"))
-        copyFile (srcDir -/- takeFileName bin) bin
-    _ -> buildBinary rs bin ctx
+  buildBinary rs bin ctx
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do

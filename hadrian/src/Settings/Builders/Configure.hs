@@ -10,8 +10,8 @@ configureBuilderArgs = do
     gmpPath    <- expr (gmpBuildPath stage)
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
-                targetArch <- queryTarget queryArch
-                targetPlatform <- queryTarget targetPlatformTriple
+                targetArch <- queryTarget stage queryArch
+                targetPlatform <- queryTarget stage targetPlatformTriple
                 buildPlatform <- queryBuild targetPlatformTriple
                 pure $ [ "--enable-shared=no"
                      , "--host=" ++ targetPlatform    -- GMP's host is our target
@@ -31,7 +31,7 @@ configureBuilderArgs = do
 
             , builder (Configure libffiPath) ? do
                 top            <- expr topDirectory
-                targetPlatform <- queryTarget targetPlatformTriple
+                targetPlatform <- queryTarget stage targetPlatformTriple
                 way            <- getWay
                 pure [ "--prefix=" ++ top -/- libffiPath -/- "inst"
                      , "--libdir=" ++ top -/- libffiPath -/- "inst/lib"

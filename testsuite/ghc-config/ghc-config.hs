@@ -41,6 +41,7 @@ main = do
   getGhcFieldOrFail fields "GhcLibdir" "LibDir"
   getGhcFieldOrFail fields "GhcGlobalPackageDb" "Global Package DB"
   getGhcFieldOrDefault fields "TargetRTSLinkerOnlySupportsSharedLibs" "target RTS linker only supports shared libraries" "NO"
+  getGhcFieldOrFail fields "CrossCompiling" "cross compiling"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
   getGhcFieldOrDefault fields "LeadingUnderscore" "Leading underscore" "NO"

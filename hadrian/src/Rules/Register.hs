@@ -12,7 +12,7 @@ import Oracles.Setting
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
-import Oracles.Flag (platformSupportsGhciObjects)
+import Oracles.Flag (targetSupportsGhciObjects)
 import Packages
 import Rules.Rts
 import Settings
@@ -153,7 +153,7 @@ buildConfFinal rs context@Context {..} _conf = do
 
     -- Special package cases (these should ideally be rolled into Cabal).
     when (package == rts) $ do
-        jsTarget <- isJsTarget
+        jsTarget <- isJsTarget stage
 
         -- If Cabal knew about "generated-headers", we could read them from the
         -- 'configuredCabal' information, and just "need" them here.
@@ -304,7 +304,7 @@ libraryTargets :: Bool -> Context -> Action [FilePath]
 libraryTargets includeGhciLib context@Context {..} = do
     libFile  <- pkgLibraryFile     context
     ghciLib  <- pkgGhciLibraryFile context
-    ghciObjsSupported <- platformSupportsGhciObjects
+    ghciObjsSupported <- targetSupportsGhciObjects stage
     ghci     <- if ghciObjsSupported && includeGhciLib && not (wayUnit Dynamic way)
                 then interpretInContext context $ getContextData buildGhciLib
                 else return False
