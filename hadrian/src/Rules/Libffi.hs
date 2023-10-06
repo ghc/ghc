@@ -69,7 +69,7 @@ dynLibManifest = dynLibManifest' buildRoot
 -- | Need the (locally built) libffi library.
 needLibffi :: Stage -> Action ()
 needLibffi stage = do
-    jsTarget <- isJsTarget
+    jsTarget <- isJsTarget stage
     unless jsTarget $ do
         manifest <- dynLibManifest stage
         need [manifest]
@@ -96,7 +96,8 @@ libffiName = do
 libffiLocalName :: Maybe Bool -> Expr String
 libffiLocalName force_dynamic = do
   way <- getWay
-  winTarget <- expr isWinTarget
+  stage <- getStage
+  winTarget <- expr (isWinTarget stage)
   let dynamic = fromMaybe (Dynamic `wayUnit` way) force_dynamic
   pure $ mconcat
       [ if dynamic   then ""      else "C"
@@ -137,8 +138,8 @@ configureEnvironment stage = do
     sequence [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
              , builderEnvironment "AR" (Ar Unpack stage)
-             , builderEnvironment "NM" Nm
-             , builderEnvironment "RANLIB" Ranlib
+             , builderEnvironment "NM" (Nm stage)
+             , builderEnvironment "RANLIB" (Ranlib stage)
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
 
@@ -158,7 +159,7 @@ libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
                          -> do
-                              jsTarget <- isJsTarget
+                              jsTarget <- isJsTarget stage
                               if jsTarget
                                 then return []
                                 else readFileLines =<< dynLibManifest stage
@@ -186,8 +187,8 @@ libffiRules = do
                  <$> liftIO (getDirectoryFilesIO "." [libffiPath -/- "inst//*"])
 
         -- Find dynamic libraries.
-        osxTarget <- isOsxTarget
-        winTarget <- isWinTarget
+        osxTarget <- isOsxTarget stage
+        winTarget <- isWinTarget stage
 
         dynLibFiles <- do
             let libfilesDir = libffiPath -/-

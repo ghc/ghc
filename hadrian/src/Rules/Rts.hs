@@ -130,7 +130,7 @@ needRtsLibffiTargets :: Stage -> Action [FilePath]
 needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage
     useSystemFfi <- flag UseSystemFfi
-    jsTarget     <- isJsTarget
+    jsTarget     <- isJsTarget stage
 
     -- Header files (in the rts build dir).
     let headers = fmap ((rtsPath -/- "include") -/-) libffiHeaderFiles

@@ -15,7 +15,7 @@ module Packages (
     ghcPackages, isGhcPackage,
 
     -- * Package information
-    crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
+    crossPrefix, programBasename, programName, nonHsMainPackage, programPath, timeoutPath,
     ) where
 
 import Hadrian.Package
@@ -23,7 +23,6 @@ import Hadrian.Utilities
 
 import Base
 import Context.Type
-import Oracles.Flag
 import Oracles.Setting
 
 -- | These are all GHC packages we know about. Build rules will be generated for
@@ -165,10 +164,13 @@ linter name = program name ("linters" -/- name)
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
 
+
+
 -- | Target prefix to prepend to executable names.
-crossPrefix :: Action String
-crossPrefix = do
-    cross <- flag CrossCompiling
+crossPrefix :: Stage -> Action String
+crossPrefix st = do
+    cross <- crossStage st
+    -- NB: If you modify this then it needs to align with CrossCompilePrefix in configure.ac
     targetPlatform <- setting TargetPlatformFull
     return $ if cross then targetPlatform ++ "-" else ""
 
@@ -178,15 +180,16 @@ crossPrefix = do
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do
-    prefix <- crossPrefix
+    prefix <- crossPrefix stage
     -- TODO: Can we extract this information from Cabal files?
     -- Alp: We could, but then the iserv package would have to
     --      use Cabal conditionals + a 'profiling' flag
     --      to declare the executable name, and I'm not sure
     --      this is allowed (or desired for that matter).
-    return $ prefix ++ basename
-  where
-    basename
+    return $ prefix ++ programBasename way package
+
+programBasename :: Way -> Package -> String
+programBasename way package
       | package == ghc          = "ghc"
       | package == ghciWrapper  = "ghci" -- See Note [Hadrian's ghci-wrapper package]
       | package == hpcBin       = "hpc"
