@@ -1,4 +1,4 @@
-dnl == autoconf source for the Glasgow FP tools ==
+  dnl == autoconf source for the Glasgow FP tools ==
 dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
 dnl  (or some such) to see the outline of this file)
 dnl
@@ -267,6 +267,7 @@ if test "${WithGhc}" != ""
 then
         bootstrap_host=`"${WithGhc}" --info | grep '^ ,("Host platform"' | sed -e 's/.*,"//' -e 's/")//' | tr -d '\r'`
         bootstrap_target=`"${WithGhc}" --info | grep '^ ,("Target platform"' | sed -e 's/.*,"//' -e 's/")//' | tr -d '\r'`
+	      bootstrap_build="$bootstrap_host"
         if test "$bootstrap_host" != "$bootstrap_target"
         then
                 echo "Bootstrapping GHC is a cross compiler. This probably isn't going to work"
@@ -398,8 +399,33 @@ then
 else
   TargetPlatformFull="${target_alias}"
 fi
+
+if test -z "${build_alias}"
+then
+  # --target wasn't given; use result from AC_CANONICAL_TARGET
+  BuildPlatformFull="${build}"
+else
+  BuildPlatformFull="${build_alias}"
+fi
+if test -z "${host_alias}"
+then
+  # --target wasn't given; use result from AC_CANONICAL_TARGET
+  HostPlatformFull="${host}"
+else
+  HostPlatformFull="${host_alias}"
+fi
+if test "$CrossCompiling" = "YES"
+then
+  # Use value passed by user from --target=
+  CrossCompilePrefix="${TargetPlatformFull}-"
+else
+  CrossCompilePrefix=""
+fi
+
 AC_SUBST(CrossCompiling)
 AC_SUBST(TargetPlatformFull)
+AC_SUBST(BuildPlatformFull)
+AC_SUBST(HostPlatformFull)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
