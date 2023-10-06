@@ -1,6 +1,6 @@
 cabal-version:        3.0
 name:                 haddock-api
-version:              2.28.0
+version:              2.30.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -43,7 +43,7 @@ library
   default-language: Haskell2010
 
   -- this package typically supports only single major versions
-  build-depends: base            ^>= 4.16.0
+  build-depends: base             >= 4.16 && < 4.20
                , ghc             ^>= 9.9
                , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.11

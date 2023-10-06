@@ -1,6 +1,6 @@
 cabal-version:        3.0
 name:                 haddock
-version:              2.28.0
+version:              2.30.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -148,7 +148,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.28.0
+    build-depends:  haddock-api == 2.30.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0
