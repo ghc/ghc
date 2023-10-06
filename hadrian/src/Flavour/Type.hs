@@ -31,7 +31,7 @@ data Flavour = Flavour {
     -- | Build RTS these ways.
     rtsWays :: Ways,
     -- | Build dynamic GHC programs.
-    dynamicGhcPrograms :: Action Bool,
+    dynamicGhcPrograms :: Stage -> Action Bool,
     -- | Build profiled GHC.
     ghcProfiled :: Stage -- ^ stage of the /built/ compiler
                 -> Bool,

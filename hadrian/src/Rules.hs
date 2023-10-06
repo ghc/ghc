@@ -33,43 +33,17 @@ import Settings.Program (programContext)
 import Target
 import UserSettings
 
--- | This rule calls 'need' on all top-level build targets that Hadrian builds
--- by default, respecting the 'finalStage' flag.
+-- | This rule defines what the default build configuration is when no targets
+-- are selected.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
-    verbosity <- getVerbosity
-    forM_ [ Stage1, Stage2, Stage3] $ \stage -> do
-      when (verbosity >= Verbose) $ do
-        (libraries, programs) <- partition isLibrary <$> stagePackages stage
-        libNames <- mapM (name stage) libraries
-        pgmNames <- mapM (name stage) programs
-        let stageHeader t ps =
-              "| Building " ++ show stage ++ " "
-                            ++ t ++ ": " ++ intercalate ", " ps
-        putInfo . unlines $
-            [ stageHeader "libraries" libNames
-            , stageHeader "programs" pgmNames ]
-    let buildStages = [ s | s <- allStages, s < finalStage ]
-    targets <- concatForM buildStages $ \stage -> do
-        packages <- stagePackages stage
-        mapM (path stage) packages
+    let targets = ["binary-dist-dir"]
 
     -- Why we need wrappers: https://gitlab.haskell.org/ghc/ghc/issues/16534.
     root <- buildRoot
     let wrappers = [ root -/- ("ghc-" ++ stageString s) | s <- [Stage1, Stage2, Stage3]
                                                         , s < finalStage ]
     need (targets ++ wrappers)
-  where
-    -- either the package database config file for libraries or
-    -- the programPath for programs. However this still does
-    -- not support multiple targets, where a cabal package has
-    -- a library /and/ a program.
-    path :: Stage -> Package -> Action FilePath
-    path stage pkg | isLibrary pkg = pkgConfFile (vanillaContext stage pkg)
-                   | otherwise     = programPath =<< programContext stage pkg
-    name :: Stage -> Package -> Action String
-    name stage pkg | isLibrary pkg = return (pkgName pkg)
-                   | otherwise     = programName (vanillaContext stage pkg)
 
 -- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.

@@ -13,8 +13,8 @@ quickestFlavour = defaultFlavour
     { name        = "quickest"
     , extraArgs        = quickestArgs
     , libraryWays = pure (Set.fromList [vanilla])
-    , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded]))
-    , dynamicGhcPrograms = return False }
+    , rtsWays     = pure (Set.fromList [vanilla]) <> (staged targetSupportsThreadedRts ? pure (Set.fromList [threaded]))
+    , dynamicGhcPrograms = const (return False) }
 
 quickestArgs :: Args
 quickestArgs = sourceArgs SourceArgs
