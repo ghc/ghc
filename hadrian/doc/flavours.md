@@ -157,7 +157,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <th>validate</td>
     <td></td>
     <td>-O0<br>-H64m</td>
-    <td>-fllvm-fill-undef-with-garbage</td>
+    <td>-fllvm-fill-undef-with-garbage<br>-fcheck-prim-bounds</td>
     <td></td>
     <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
     <td>-O2<br>-DDEBUG</td>
