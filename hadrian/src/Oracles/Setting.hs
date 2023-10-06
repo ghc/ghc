@@ -1,11 +1,13 @@
 module Oracles.Setting (
     configFile,
     -- * Settings
-    Setting (..), setting, getSetting,
+    ProjectSetting (..), setting, getSetting,
+    BuildSetting(..), buildSetting,
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath, targetStage,
+    libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
+    isHostStage,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -38,26 +40,14 @@ import GHC.Platform.ArchOS
 -- tracking the result in the Shake database.
 --
 -- * ROMES:TODO: How to handle target-platform-full?
-data Setting = CursesIncludeDir
-             | CursesLibDir
-             | DynamicExtension
-             | FfiIncludeDir
-             | FfiLibDir
-             | GhcMajorVersion
+data ProjectSetting =
+               GhcMajorVersion
              | GhcMinorVersion
              | GhcPatchLevel
              | GhcVersion
              | GhcSourcePath
              | LlvmMinVersion
              | LlvmMaxVersion
-             | GmpIncludeDir
-             | GmpLibDir
-             | IconvIncludeDir
-             | IconvLibDir
-             | LibnumaIncludeDir
-             | LibnumaLibDir
-             | LibZstdIncludeDir
-             | LibZstdLibDir
              | ProjectGitCommitId
              | ProjectName
              | ProjectVersion
@@ -69,18 +59,31 @@ data Setting = CursesIncludeDir
              | ProjectPatchLevel2
              | SystemGhc
              | TargetPlatformFull
+             | BuildPlatformFull
+             | HostPlatformFull
              | BourneShell
              | EmsdkVersion
 
+-- Things which configure how a specific stage is built
+data BuildSetting =
+               CursesIncludeDir
+             | CursesLibDir
+             | DynamicExtension
+             | FfiIncludeDir
+             | FfiLibDir
+             | GmpIncludeDir
+             | GmpLibDir
+             | IconvIncludeDir
+             | IconvLibDir
+             | LibnumaIncludeDir
+             | LibnumaLibDir
+             | LibZstdIncludeDir
+             | LibZstdLibDir
+
 -- | Look up the value of a 'Setting' in @cfg/system.config@, tracking the
 -- result.
-setting :: Setting -> Action String
+setting :: ProjectSetting -> Action String
 setting key = lookupSystemConfig $ case key of
-    CursesIncludeDir   -> "curses-include-dir"
-    CursesLibDir       -> "curses-lib-dir"
-    DynamicExtension   -> "dynamic-extension"
-    FfiIncludeDir      -> "ffi-include-dir"
-    FfiLibDir          -> "ffi-lib-dir"
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
     GhcPatchLevel      -> "ghc-patch-level"
@@ -88,14 +91,6 @@ setting key = lookupSystemConfig $ case key of
     GhcSourcePath      -> "ghc-source-path"
     LlvmMinVersion     -> "llvm-min-version"
     LlvmMaxVersion     -> "llvm-max-version"
-    GmpIncludeDir      -> "gmp-include-dir"
-    GmpLibDir          -> "gmp-lib-dir"
-    IconvIncludeDir    -> "iconv-include-dir"
-    IconvLibDir        -> "iconv-lib-dir"
-    LibnumaIncludeDir  -> "libnuma-include-dir"
-    LibnumaLibDir      -> "libnuma-lib-dir"
-    LibZstdIncludeDir  -> "libzstd-include-dir"
-    LibZstdLibDir      -> "libzstd-lib-dir"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
@@ -107,12 +102,35 @@ setting key = lookupSystemConfig $ case key of
     ProjectPatchLevel2 -> "project-patch-level2"
     SystemGhc          -> "system-ghc"
     TargetPlatformFull -> "target-platform-full"
+    BuildPlatformFull  -> "build-platform-full"
+    HostPlatformFull   -> "host-platform-full"
     BourneShell        -> "bourne-shell"
     EmsdkVersion       -> "emsdk-version"
 
+buildSetting :: BuildSetting -> Stage -> Action String
+buildSetting key stage = tgtConfig stage $ case key of
+    CursesIncludeDir   -> "curses-include-dir"
+    CursesLibDir       -> "curses-lib-dir"
+    DynamicExtension   -> "dynamic-extension"
+    FfiIncludeDir      -> "ffi-include-dir"
+    FfiLibDir          -> "ffi-lib-dir"
+    GmpIncludeDir      -> "gmp-include-dir"
+    GmpLibDir          -> "gmp-lib-dir"
+    IconvIncludeDir    -> "iconv-include-dir"
+    IconvLibDir        -> "iconv-lib-dir"
+    LibnumaIncludeDir  -> "libnuma-include-dir"
+    LibnumaLibDir      -> "libnuma-lib-dir"
+    LibZstdIncludeDir  -> "libzstd-include-dir"
+    LibZstdLibDir      -> "libzstd-lib-dir"
+  where
+    tgtConfig Stage0 {} = lookupHostBuildConfig
+    tgtConfig Stage1 = lookupHostBuildConfig
+    tgtConfig Stage2 = lookupTargetBuildConfig
+    tgtConfig Stage3 = lookupTargetBuildConfig
+
 -- | An expression that looks up the value of a 'Setting' in @cfg/system.config@,
 -- tracking the result.
-getSetting :: Setting -> Expr c b String
+getSetting :: ProjectSetting -> Expr c b String
 getSetting = expr . setting
 
 -- | The path to a Bourne shell interpreter.
@@ -122,17 +140,17 @@ bashPath = setting BourneShell
 isWinHost :: Action Bool
 isWinHost = anyHostOs [OSMinGW32]
 
-isWinTarget :: Action Bool
-isWinTarget = anyTargetOs [OSMinGW32]
+isWinTarget :: Stage -> Action Bool
+isWinTarget stage = anyTargetOs stage [OSMinGW32]
 
-isJsTarget :: Action Bool
-isJsTarget = anyTargetArch [ArchJavaScript]
+isJsTarget :: Stage -> Action Bool
+isJsTarget stage = anyTargetArch stage [ArchJavaScript]
 
-isOsxTarget :: Action Bool
-isOsxTarget = anyTargetOs [OSDarwin]
+isOsxTarget :: Stage -> Action Bool
+isOsxTarget stage = anyTargetOs stage [OSDarwin]
 
-isArmTarget :: Action Bool
-isArmTarget = queryTargetTarget (isARM . archOS_arch . tgtArchOs)
+isArmTarget :: Stage -> Action Bool
+isArmTarget stage = queryTargetTarget stage (isARM . archOS_arch . tgtArchOs)
 
 -- | Check whether the host OS setting matches one of the given strings.
 anyHostOs :: [OS] -> Action Bool
@@ -140,16 +158,16 @@ anyHostOs oss = (`elem` oss) <$> queryHostTarget (archOS_OS . tgtArchOs)
 
 -- | Check whether the target architecture setting matches one of the given
 -- strings.
-anyTargetArch :: [Arch] -> Action Bool
-anyTargetArch archs = (`elem` archs) <$> queryTargetTarget (archOS_arch . tgtArchOs)
+anyTargetArch :: Stage -> [Arch] -> Action Bool
+anyTargetArch stage archs = (`elem` archs) <$> queryTargetTarget stage (archOS_arch . tgtArchOs)
 
 -- | Check whether the target OS setting matches one of the given strings.
-anyTargetOs :: [OS] -> Action Bool
-anyTargetOs oss = (`elem` oss) <$> queryTargetTarget (archOS_OS . tgtArchOs)
+anyTargetOs :: Stage -> [OS] -> Action Bool
+anyTargetOs stage oss = (`elem` oss) <$> queryTargetTarget stage (archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS uses the ELF object format.
-isElfTarget :: Action Bool
-isElfTarget = queryTargetTarget (osElfTarget . archOS_OS . tgtArchOs)
+isElfTarget :: Stage -> Action Bool
+isElfTarget stage = queryTargetTarget stage (osElfTarget . archOS_OS . tgtArchOs)
 
 -- | Check whether the target OS supports the @-rpath@ linker option when
 -- using dynamic linking.
@@ -158,15 +176,16 @@ isElfTarget = queryTargetTarget (osElfTarget . archOS_OS . tgtArchOs)
 --
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
-targetSupportsRPaths :: Action Bool
-targetSupportsRPaths = queryTargetTarget (\t -> let os = archOS_OS (tgtArchOs t)
-                                             in osElfTarget os || osMachOTarget os)
+targetSupportsRPaths :: Stage -> Action Bool
+targetSupportsRPaths stage = queryTargetTarget stage
+                                (\t -> let os = archOS_OS (tgtArchOs t)
+                                       in osElfTarget os || osMachOTarget os)
 
 -- | Which variant of the ARM architecture is the target (or 'Nothing' if not
 -- ARM)?
-targetArmVersion :: Action (Maybe ArmISA)
-targetArmVersion = runMaybeT $ do
-    ArchARM isa _ _ <- lift $ queryTargetTarget (archOS_arch . tgtArchOs)
+targetArmVersion :: Stage -> Action (Maybe ArmISA)
+targetArmVersion stage = runMaybeT $ do
+    ArchARM isa _ _ <- lift $ queryTargetTarget stage (archOS_arch . tgtArchOs)
     return isa
 
 -- | Canonicalised GHC version number, used for integer version comparisons. We
@@ -204,17 +223,32 @@ libsuf :: Stage -> Way -> Action String
 libsuf st way
     | not (wayUnit Dynamic way) = return (waySuffix way ++ ".a") -- e.g., _p.a
     | otherwise = do
-        extension <- setting DynamicExtension -- e.g., .dll or .so
+        extension <- buildSetting DynamicExtension st-- e.g., .dll or .so
         version   <- ghcVersionStage st -- e.g. 8.4.4 or 8.9.xxxx
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
 
+-- | Build libraries for this `Stage` targetting this `Target`
+--
+-- For example, we want to build RTS with stage1 for the host target as we
+-- produce a host executable with stage1 (which cross-compiles to stage2).
 targetStage :: Stage -> Action Target
--- TODO(#19174):
--- We currently only support cross-compiling a stage1 compiler,
--- but the cross compiler should really be stage2 (#19174).
--- When we get there, we'll need to change the definition here.
-targetStage (Stage0 {}) = getHostTarget
-targetStage (Stage1 {}) = getTargetTarget
-targetStage (Stage2 {}) = getTargetTarget -- the last two only make sense if the target can be executed locally
-targetStage (Stage3 {}) = getTargetTarget
+targetStage stage | isHostStage stage = getHostTarget
+targetStage _ = getTargetTarget
+
+isHostStage :: Stage -> Bool
+isHostStage stage | stage <= Stage1 = True
+isHostStage _ = False
+
+queryTarget :: Stage -> (Target -> a) -> (Expr c b a)
+queryTarget s f = expr (f <$> targetStage s)
+
+queryTargetTarget :: Stage -> (Target -> a) -> Action a
+queryTargetTarget s f = f <$> targetStage s
+
+-- | A 'Stage' is a cross-stage if the produced compiler is a cross-compiler.
+crossStage :: Stage -> Action Bool
+crossStage st = do
+  st_target <- targetStage (succStage st)
+  st_host   <- targetStage st
+  return (targetPlatformTriple st_target /= targetPlatformTriple st_host)

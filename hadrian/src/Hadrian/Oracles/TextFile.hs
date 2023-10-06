@@ -13,10 +13,12 @@
 -- to read configuration or package metadata files and cache the parsing.
 -----------------------------------------------------------------------------
 module Hadrian.Oracles.TextFile (
-    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig, lookupValues,
+    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig,
+    lookupHostBuildConfig, lookupTargetBuildConfig, lookupStageBuildConfig,
+    lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, textFileOracle,
     getBuildTarget, getHostTarget, getTargetTarget,
-    queryBuildTarget, queryHostTarget, queryTargetTarget
+    queryBuildTarget, queryHostTarget
     ) where
 
 import Control.Monad
@@ -51,6 +53,29 @@ lookupSystemConfig :: String -> Action String
 lookupSystemConfig = lookupValueOrError (Just configError) configFile
   where
     configError = "Perhaps you need to rerun ./configure"
+
+lookupHostBuildConfig :: String -> Action String
+lookupHostBuildConfig key = do
+  cross <- (== "YES") <$> lookupSystemConfig "cross-compiling"
+  -- If we are not cross compiling, then build the host compiler like the target.
+  let cfgFile = if cross then buildConfigFileHost else buildConfigFileTarget
+  lookupValueOrError (Just configError) cfgFile key
+  where
+    configError = "Perhaps you need to rerun ./configure"
+
+lookupTargetBuildConfig :: String -> Action String
+lookupTargetBuildConfig key =
+  lookupValueOrError (Just configError) buildConfigFileTarget key
+  where
+    configError = "Perhaps you need to rerun ./configure"
+
+lookupStageBuildConfig :: String -> Stage -> Action String
+lookupStageBuildConfig key st = tgtConfig st key
+  where
+    tgtConfig Stage0 {} = lookupHostBuildConfig
+    tgtConfig Stage1 = lookupHostBuildConfig
+    tgtConfig Stage2 = lookupTargetBuildConfig
+    tgtConfig Stage3 = lookupTargetBuildConfig
 
 -- | Lookup a list of values in a text file, tracking the result. Each line of
 -- the file is expected to have @key value1 value2 ...@ format.
@@ -100,7 +125,16 @@ getBuildTarget = getTargetConfig buildTargetFile
 
 -- | Get the host target configuration through 'getTargetConfig'
 getHostTarget :: Action Toolchain.Target
-getHostTarget = getTargetConfig hostTargetFile
+getHostTarget = do
+  -- MP: If we are not cross compiling then we should use the target file in order to
+  -- build things for the host, in particular we want to use the configured values for the
+  -- target for building the RTS (ie are we using Libffi for adjustors, and the wordsize)
+  -- TODO: Use "flag CrossCompiling"
+  ht <- getTargetConfig hostTargetFile
+  tt <- getTargetConfig targetTargetFile
+  if (Toolchain.targetPlatformTriple ht) == (Toolchain.targetPlatformTriple tt)
+    then return tt
+    else return ht
   -- where
   --   msg = "The host's target configuration file " ++ quote hostTargetFile ++ " does not exist! ghc-toolchain might have failed to generate it."
 
@@ -114,8 +148,6 @@ queryBuildTarget f = f <$> getBuildTarget
 queryHostTarget :: (Toolchain.Target -> a) -> Action a
 queryHostTarget f = f <$> getHostTarget
 
-queryTargetTarget :: (Toolchain.Target -> a) -> Action a
-queryTargetTarget f = f <$> getTargetTarget
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show)

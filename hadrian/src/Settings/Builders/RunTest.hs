@@ -3,7 +3,9 @@ module Settings.Builders.RunTest (runTestBuilderArgs
                                  , runTestGhcFlags
                                  , assertSameCompilerArgs
                                  , outOfTreeCompilerArgs
-                                 , TestCompilerArgs(..) ) where
+                                 , TestCompilerArgs(..)
+         , getBooleanSetting
+         , getTestSetting ) where
 
 import Hadrian.Utilities
 import qualified System.FilePath
@@ -13,27 +15,21 @@ import CommandLine
 import Oracles.TestSettings
 import Packages
 import Settings.Builders.Common
+import Settings.Program (ghcWithInterpreter)
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
-import Settings.Program
+import Settings.Program (programContext)
 import qualified Context.Type
 
 import GHC.Toolchain.Target
+import Debug.Trace
 
-getTestSetting :: TestSetting -> Action String
-getTestSetting key = testSetting key
-
--- | Parse the value of a Boolean test setting or report an error.
-getBooleanSetting :: TestSetting -> Action Bool
-getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting key
-  where
-    msg = "Cannot parse test setting " ++ quote (show key)
 
 -- | Extra flags to send to the Haskell compiler to run tests.
-runTestGhcFlags :: Action String
-runTestGhcFlags = do
-    unregisterised <- queryTargetTarget tgtUnregisterised
+runTestGhcFlags :: Stage -> Action String
+runTestGhcFlags stage = do
+    unregisterised <- queryTargetTarget stage tgtUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt
@@ -110,49 +106,42 @@ allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 --
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
-
+    cross <- crossStage stg
+    let ghcStage = succStage stg
+        pkgCacheStage = if cross then ghcStage else stg
     (hasDynamicRts, hasThreadedRts) <- do
-      ways <- interpretInContext (vanillaContext stg rts) getRtsWays
+      ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
-    -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
-    -- should be able to built a static stage2?
     hasDynamic          <- (wayUnit Dynamic) . Context.Type.way <$> (programContext stg ghc)
-    -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
-    -- have different values? Currently not possible to express.
-    leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
-    cross               <- flag CrossCompiling
-    withInterpreter     <- ghcWithInterpreter stg
-    interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs
-    unregisterised      <- queryTargetTarget tgtUnregisterised
-    tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP
+    leadingUnderscore   <- queryTargetTarget ghcStage tgtSymbolsHaveLeadingUnderscore
+    withInterpreter     <- ghcWithInterpreter ghcStage
+    unregisterised      <- queryTargetTarget ghcStage tgtUnregisterised
+    tables_next_to_code <- queryTargetTarget ghcStage tgtTablesNextToCode
+    targetWithSMP       <- targetSupportsSMP ghcStage
+    interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs ghcStage
 
-
-    let ghcStage
-          | cross, Stage1 <- stg = Stage1
-          | otherwise = succStage stg
     debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
     debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- queryHostTarget queryOS
-    arch        <- queryTargetTarget queryArch
+    arch        <- queryTargetTarget ghcStage queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64", "loongarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- queryTargetTarget targetPlatformTriple
-    wordsize    <- show @Int . (*8) <$> queryTargetTarget (wordSize2Bytes . tgtWordSize)
+    platform    <- queryTargetTarget ghcStage targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- queryTargetTarget tgtLlc
-    llvm_as_cmd <- queryTargetTarget tgtLlvmAs
+    llc_cmd   <- queryTargetTarget ghcStage tgtLlc
+    llvm_as_cmd <- queryTargetTarget ghcStage tgtLlvmAs
     let have_llvm = allowHaveLLVM arch && all isJust [llc_cmd, llvm_as_cmd]
 
     top         <- topDirectory
 
     pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
-                    <$> (packageDbPath (PackageDbLoc stg Final) <&> (-/- "package.cache"))
+                    <$> (packageDbPath (PackageDbLoc pkgCacheStage Final) <&> (-/- "package.cache"))
     libdir           <- System.FilePath.normalise . (top -/-)
                     <$> stageLibPath stg
 
@@ -183,15 +172,17 @@ outOfTreeCompilerArgs = do
     interpForceDyn      <- getBooleanSetting TestRTSLinkerForceDyn
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP
+    targetWithSMP       <- getBooleanSetting TestGhcWithSMP
     debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
     os          <- getTestSetting TestHostOS
-    arch        <- getTestSetting TestTargetARCH_CPP
+    arch        <- getTestSetting TestTargetARCH
     platform    <- getTestSetting TestTARGETPLATFORM
-    wordsize    <- getTestSetting TestWORDSIZE
+    wordsize    <- show . read @Int <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
     let debugged = "debug" `isInfixOf` rtsWay
+
+    traceShowM (os, arch, platform)
 
     llc_cmd   <- getTestSetting TestLLC
     have_llvm <- (allowHaveLLVM arch &&) <$> liftIO (isJust <$> findExecutable llc_cmd)
@@ -225,6 +216,7 @@ assertSameCompilerArgs stg = do
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder Testsuite ? do
     ctx <- getContext
+    stage <- getStage
     pkgs     <- expr $ stagePackages (C.stage ctx)
     libTests <- expr $ filterM doesDirectoryExist $ concat
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
@@ -254,7 +246,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
     threads     <- shakeThreads <$> expr getShakeOptions
     top         <- expr $ topDirectory
-    ghcFlags    <- expr runTestGhcFlags
+    ghcFlags    <- expr (runTestGhcFlags stage)
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
     let defaultRootdirs = ("testsuite" -/- "tests") : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs
@@ -345,10 +337,17 @@ getTestArgs = do
     -- targets specified in the TEST env var
     testEnvTargets <- maybe [] words <$> expr (liftIO $ lookupEnv "TEST")
     args            <- expr $ userSetting defaultTestArgs
-    bindir          <- expr $ getBinaryDirectory (testCompiler args)
     compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
-    cross_prefix    <- expr crossPrefix
+
+    testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
+
+    ghc_pkg_path <- expr $ getTestExePath testGhc ghcPkg
+    haddock_path <- expr $ getTestExePath testGhc haddock
+    hp2ps_path <- expr $ getTestExePath testGhc hp2ps
+    hpc_path <- expr $ getTestExePath testGhc hpc
+
+
     -- the testsuite driver will itself tell us if we need to generate the docs target
     -- So we always pass the haddock path if the hadrian configuration allows us to build
     -- docs
@@ -387,13 +386,13 @@ getTestArgs = do
                            Nothing -> Just $ "--verbose=" ++ globalTestVerbosity
                            Just verbosity -> Just $ "--verbose=" ++ verbosity
         wayArgs      = map ("--way=" ++) (testWays args)
-        compilerArg  = ["--config", "compiler=" ++ show (compiler)]
-        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- (cross_prefix <> "ghc-pkg") <.> exe)]
+        compilerArg  = ["--config", "compiler=" ++ show compiler]
+        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show ghc_pkg_path]
         haddockArg   = if haveDocs
-          then [ "--config", "haddock=" ++ show (bindir -/- (cross_prefix <> "haddock") <.> exe) ]
+          then [ "--config", "haddock=" ++ show haddock_path ]
           else [ "--config", "haddock=" ]
-        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- (cross_prefix <> "hp2ps") <.> exe)]
-        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- (cross_prefix <> "hpc") <.> exe)]
+        hp2psArg     = ["--config", "hp2ps=" ++ show hp2ps_path ]
+        hpcArg       = ["--config", "hpc=" ++ show hpc_path ]
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
           show (isInTreeCompiler (testCompiler args) || testHasInTreeFiles args) ]
 
