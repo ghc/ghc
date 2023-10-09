@@ -695,7 +695,7 @@ data WarningFlag =
    | Opt_WarnIncompleteRecordSelectors               -- Since 9.10
    | Opt_WarnBadlyStagedTypes                        -- Since 9.10
    | Opt_WarnInconsistentFlags                       -- Since 9.8
-   deriving (Eq, Ord, Show, Enum)
+   deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
 --
