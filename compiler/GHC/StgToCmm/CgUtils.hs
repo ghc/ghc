@@ -173,15 +173,18 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
                         BaseReg -> baseAddr
                         _other  -> CmmLoad baseAddr (globalRegType platform reg) NaturallyAligned
 
-        CmmRegOff (CmmGlobal reg) offset ->
+        CmmRegOff greg@(CmmGlobal reg) offset ->
             -- RegOf leaves are just a shorthand form. If the reg maps
             -- to a real reg, we keep the shorthand, otherwise, we just
             -- expand it and defer to the above code.
+            -- NB: to ensure type correctness we need to ensure the Add
+            --     as well as the Int need to be of the same size as the
+            --     register.
             case reg `elem` activeStgRegs platform of
                 True  -> expr
-                False -> CmmMachOp (MO_Add (wordWidth platform)) [
-                                    fixExpr (CmmReg (CmmGlobal reg)),
+                False -> CmmMachOp (MO_Add (cmmRegWidth platform greg)) [
+                                    fixExpr (CmmReg greg),
                                     CmmLit (CmmInt (fromIntegral offset)
-                                                   (wordWidth platform))]
+                                                   (cmmRegWidth platform greg))]
 
         other_expr -> other_expr
