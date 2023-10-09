@@ -68,7 +68,7 @@ more directories, under which the testsuite driver will be looking for
 
 By default, the `test` rule tries to run all the tests available (the ones
 under `testsuite/tests/` as well as all the tests of the boot libraries
-or programs (`base`, `haddock`, etc).
+or programs (`base`, `haddock`, etc)).
 
 To restrict the testsuite driver to only run a specific directory of tests,
 e.g `testsuite/tests/th`, you can simply do:

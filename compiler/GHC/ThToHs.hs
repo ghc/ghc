@@ -328,10 +328,10 @@ cvtDec (InstanceD o ctxt ty decs)
   where
   overlap pragma =
     case pragma of
-      TH.Overlaps      -> Hs.Overlaps     (SourceText $ fsLit "OVERLAPS")
-      TH.Overlappable  -> Hs.Overlappable (SourceText $ fsLit "OVERLAPPABLE")
-      TH.Overlapping   -> Hs.Overlapping  (SourceText $ fsLit "OVERLAPPING")
-      TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "INCOHERENT")
+      TH.Overlaps      -> Hs.Overlaps     (SourceText $ fsLit "{-# OVERLAPS")
+      TH.Overlappable  -> Hs.Overlappable (SourceText $ fsLit "{-# OVERLAPPABLE")
+      TH.Overlapping   -> Hs.Overlapping  (SourceText $ fsLit "{-# OVERLAPPING")
+      TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "{-# INCOHERENT")
 
 
 

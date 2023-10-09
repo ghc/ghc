@@ -158,6 +158,7 @@ test('TH_tf1', normal, compile, ['-v0'])
 test('TH_tf3', normal, compile, ['-v0'])
 
 test('TH_pragma', normal, compile, ['-v0 -dsuppress-uniques'])
+test('T24074', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T3177', normal, compile, ['-v0'])
 test('T3177a', normal, compile_fail, ['-v0'])
 
