@@ -140,6 +140,9 @@ Runtime system
   See :ghc-ticket:`23340`.
   :rts-flag:`--nonmoving-dense-allocator-count=⟨count⟩` has been added to fine-tune this behaviour.
 
+- Add a :rts-flag:`--no-automatic-time-samples` flag which stops time profiling samples being automatically started on
+  startup. Time profiling can be controlled manually using functions in ``GHC.Profiling``.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

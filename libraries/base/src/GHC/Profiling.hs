@@ -20,7 +20,7 @@ import GHC.Base
 foreign import ccall stopProfTimer :: IO ()
 
 -- | Start attributing ticks to cost centres. This is called by the RTS on
--- startup.
+-- startup but can be disabled using the rts flag @--no-automatic-time-samples@.
 --
 -- @since 4.7.0.0
 foreign import ccall startProfTimer :: IO ()

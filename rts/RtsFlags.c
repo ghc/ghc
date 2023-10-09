@@ -216,6 +216,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = false;
     RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
     RtsFlags.ProfFlags.startHeapProfileAtStartup = true;
+    RtsFlags.ProfFlags.startTimeProfileAtStartup = true;
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.showCCSOnException = false;
@@ -1152,6 +1153,12 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
                       RtsFlags.ProfFlags.startHeapProfileAtStartup = false;
+                      break;
+                  }
+                  else if (strequal("no-automatic-time-samples",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.ProfFlags.startTimeProfileAtStartup = false;
                       break;
                   }
                   else {

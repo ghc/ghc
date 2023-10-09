@@ -1009,6 +1009,13 @@ There are three more options which relate to heap profiling:
     option is enabled, it's expected that the user will manually start heap
     profiling or request specific samples using functions from ``GHC.Profiling``.
 
+.. rts-flag:: --no-automatic-time-samples
+
+    :since: 9.10.1
+
+    Don't start time profiling from the start of program execution. If this
+    option is enabled, it's expected that the user will manually start time
+    profiling or request specific samples using functions from ``GHC.Profiling``.
 
 .. rts-flag:: --null-eventlog-writer
 

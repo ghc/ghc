@@ -296,8 +296,10 @@ void
 initTimeProfiling(void)
 {
     traceProfBegin();
-    /* Start ticking */
-    startProfTimer();
+    if (RtsFlags.ProfFlags.startTimeProfileAtStartup) {
+        /* Start ticking */
+        startProfTimer();
+    }
 };
 
 void
