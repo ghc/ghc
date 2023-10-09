@@ -689,7 +689,7 @@ data WarningFlag =
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
    | Opt_WarnIncompleteExportWarnings                -- Since 9.8
    | Opt_WarnInconsistentFlags                       -- Since 9.8
-   deriving (Eq, Ord, Show, Enum)
+   deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
 --
