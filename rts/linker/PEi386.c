@@ -1772,9 +1772,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
               targetSection = NULL;
               break;
             default:
-              targetSection = &oc->sections[targetSecNumber-1];
+              // targetSecNumber is a uint32_t, and the 0 case should be caught by PE_SECTION_UNDEFINED.
+              // The compiler should be smart enough to eliminate the guard, we'll keep it in as fail
+              // safe nontheless.
+              targetSection = targetSecNumber > 0 ? &oc->sections[targetSecNumber-1] : NULL;
           }
-          addr = (SymbolAddr*) ((size_t) targetSection->start + getSymValue(info, targetSym));
+          if(NULL != targetSection)
+              addr = (SymbolAddr*) ((size_t) targetSection->start + getSymValue(info, targetSym));
       }
       else if (  secNumber == IMAGE_SYM_UNDEFINED && symValue > 0) {
          /* This symbol isn't in any section at all, ie, global bss.
