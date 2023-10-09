@@ -667,7 +667,7 @@ data WarningFlag =
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
    | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
-   deriving (Eq, Ord, Show, Enum)
+   deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
 --
