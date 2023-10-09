@@ -517,7 +517,17 @@ setSafeHaskell s = updM f
                 _ -> return $ dfs { safeHaskell = safeM }
 
 setStability :: String -> DynP ()
-setStability "experimental" = updM (\d -> return $ d { stabilityMode = StabilityExperimental })
+
+setStability "experimental" = updM setExperimental
+  where
+    setExperimental d = case stabilityMode d of
+      StabilityRestricted StabilityExperimental
+        -> panic "Cannot set -std=experimental with -std=-experimental"
+      _
+        -> return d { stabilityMode = StabilityNonstable StabilityExperimental}
+
+setStability "-experimental" = updM (\d -> return $ d { stabilityMode = StabilityRestricted StabilityExperimental })
+
 setStability l = addErr $ "Unknown stability level: " ++ l
 
 -- | Are all direct imports required to be safe for this Safe Haskell mode?

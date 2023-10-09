@@ -108,9 +108,10 @@ mkPartialIface :: HscEnv
                -> CoreProgram
                -> ModDetails
                -> ModSummary
+               -> StabilityMode
                -> ModGuts
-               -> IO PartialModIface
-mkPartialIface hsc_env core_prog mod_details mod_summary
+               -> PartialModIface
+mkPartialIface hsc_env core_prog mod_details mod_summary stability_mode
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -125,7 +126,7 @@ mkPartialIface hsc_env core_prog mod_details mod_summary
          , mg_docs         = docs
          }
   = mkIface_ hsc_env this_mod core_prog hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages docs mod_summary mod_details
+             safe_mode stability_mode usages docs mod_summary mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
@@ -232,12 +233,14 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
 
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
 
-          partial_iface <- mkIface_ hsc_env
+          stability_mode <- checkStability_ hsc_env deps this_mod
+
+          let partial_iface = mkIface_ hsc_env
                    this_mod (fromMaybe [] mb_program) hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
-                   (imp_trust_own_pkg imports) safe_mode usages
-                   docs mod_summary
+                   (imp_trust_own_pkg imports) safe_mode stability_mode
+                   usages docs mod_summary
                    mod_details
 
           mkFullIface hsc_env partial_iface Nothing Nothing
@@ -247,14 +250,15 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> NameEnv FixItem -> Warnings GhcRn -> HpcInfo
          -> Bool
          -> SafeHaskellMode
+         -> StabilityMode
          -> [Usage]
          -> Maybe Docs
          -> ModSummary
          -> ModDetails
-         -> IO PartialModIface
+         -> PartialModIface
 mkIface_ hsc_env
          this_mod core_prog hsc_src used_th deps rdr_env fix_env src_warns
-         hpc_info pkg_trust_req safe_mode usages
+         hpc_info pkg_trust_req safe_mode stability_mode usages
          docs mod_summary
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
@@ -303,11 +307,8 @@ mkIface_ hsc_env
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = maybeGlobalRdrEnv rdr_env
-    stability <- checkStability hsc_env deps this_mod >>= \case
-                   Just  s -> return s
-                   Nothing -> panic $ "Failed stability check for " ++ (show $ ms_mod_name mod_summary)
 
-    return ModIface {
+    ModIface {
           mi_module      = this_mod,
           -- Need to record this because it depends on the -instantiated-with flag
           -- which could change
@@ -335,7 +336,7 @@ mkIface_ hsc_env
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          mi_stability   = stability,
+          mi_stability   = stability_mode,
           mi_complete_matches = icomplete_matches,
           mi_docs        = docs,
           mi_final_exts  = (),

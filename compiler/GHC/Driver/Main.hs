@@ -137,6 +137,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
 import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub, lookupEstimatedTicks)
+import GHC.Driver.Stability
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter
@@ -1098,12 +1099,14 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           (cg_guts, details) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
-          !partial_iface <-
+          stability <- checkStability_ hsc_env (mg_deps simplified_guts) (mg_module simplified_guts)
+
+          let !partial_iface =
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                liftIO $ force <$> 
-                  mkPartialIface hsc_env (cg_binds cg_guts) details summary simplified_guts
+                force $
+                  mkPartialIface hsc_env (cg_binds cg_guts) details summary stability simplified_guts
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,

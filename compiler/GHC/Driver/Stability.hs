@@ -1,6 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
+
 module GHC.Driver.Stability (
 
-  checkStability,
+  checkStability, checkStability_,
 
   module GHC.Types.Stability
 
@@ -9,6 +11,7 @@ module GHC.Driver.Stability (
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.LanguageExtensions
+import GHC.Tc.Module
 import GHC.Types.Stability
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Env
@@ -20,26 +23,42 @@ import GHC.Unit.Types
 
 import GHC.Data.EnumSet as EnumSet
 import GHC.IORef
+import GHC.Utils.Panic
 
 import qualified Data.Set as Set
 import Data.List (singleton)
 import Data.Maybe
+
+import Control.Monad.IO.Class
 
 import GHC.Prelude
 
 extensionStability :: Extension -> StabilityMode
 extensionStability _ = StabilityDefault
 
+checkStability_ :: MonadIO m => HscEnv -> Dependencies -> Module -> m StabilityMode
+checkStability_ hsc_env deps m = liftIO (checkStability hsc_env deps m) >>= \case
+  Just  s -> return s
+  Nothing -> panic $ "Failed stability check for " ++ (show $ moduleName m)
+
 checkStability :: HscEnv -> Dependencies -> Module -> IO (Maybe StabilityMode)
 checkStability hsc_env deps m = do
-  external_graph <- hscEPS hsc_env
-  let
-    home_graph = hsc_HUG hsc_env
-    hu_deps = hptSomeThingsBelowUs (singleton . mi_stability . hm_iface)
-                True hsc_env (moduleUnitId m) (GWIB (moduleName m) NotBoot)
+  ifaceMs <- mapM (getModuleInterface hsc_env) dep_mods
+  let ifaces = catMaybes $ map snd ifaceMs
 
-  return $ checkStability' flagMode exts (hu_deps ++ [])
+  -- external_graph <- hscEPS hsc_env
+  -- let
+  --   home_graph = hsc_HUG hsc_env
+  --   hu_deps = hptSomeThingsBelowUs (singleton . mi_stability . hm_iface)
+  --               True hsc_env (moduleUnitId m) (GWIB (moduleName m) IsBoot)
+
+  return $ checkStability' flagMode exts (map mi_stability ifaces)
   where
+    dep_mods = catMaybes
+             . map toModule
+             $ Set.toList (dep_direct_mods deps)
+    toModule (_  , GWIB _ IsBoot ) = Nothing
+    toModule (uid, GWIB m NotBoot) = Just $ Module (RealUnit $ Definite uid) m
     dflags = hsc_dflags hsc_env
     flagMode = stabilityMode dflags
     exts = EnumSet.toList $ extensionFlags dflags
