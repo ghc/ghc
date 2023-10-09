@@ -8,6 +8,7 @@
   * Fix `fdIsNonBlocking` to always be `0` for regular files and block devices on unix, regardless of `O_NONBLOCK`
   * Always use `safe` call to `read` for regular files and block devices on unix if the RTS is multi-threaded, regardless of `O_NONBLOCK`.
     ([CLC proposal #166](https://github.com/haskell/core-libraries-committee/issues/166))
+  * Export List from Data.List ([CLC proposal #182](https://github.com/haskell/core-libraries-committee/issues/182)).
 
 ## 4.19.0.0 *TBA*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.

@@ -1252,6 +1252,8 @@ module Data.List where
   (!!) :: forall a. GHC.Stack.Types.HasCallStack => [a] -> GHC.Types.Int -> a
   (!?) :: forall a. [a] -> GHC.Types.Int -> GHC.Maybe.Maybe a
   (++) :: forall a. [a] -> [a] -> [a]
+  type List :: * -> *
+  data List a = ...
   (\\) :: forall a. GHC.Classes.Eq a => [a] -> [a] -> [a]
   all :: forall (t :: * -> *) a. Data.Foldable.Foldable t => (a -> GHC.Types.Bool) -> t a -> GHC.Types.Bool
   and :: forall (t :: * -> *). Data.Foldable.Foldable t => t GHC.Types.Bool -> GHC.Types.Bool
