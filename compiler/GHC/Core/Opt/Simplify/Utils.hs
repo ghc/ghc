@@ -1487,8 +1487,14 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     one_occ OneOcc{ occ_n_br = 1, occ_in_lam = in_lam, occ_int_cxt = int_cxt }
        | is_value_lam rhs, IsInteresting <- int_cxt
        = True
-       | NotInsideLam <- in_lam    -- Once things are flattened to top level, don't
-       , not (isTopLevel top_lvl)  -- re-inline them.  See Note [Floating to the top]
+       | NotInsideLam <- in_lam
+       , not (isTopLevel top_lvl) || not (exprIsExpandable rhs)
+         -- Inline used-once things; except expandable things at top level
+         -- These may arise from user code e.g.
+         --     x = [1,2,3]
+         --     y = length x    -- Want this to fuse
+         -- Real world example: the [1..] in 'preparse' in nofibl/real/cacheprof
+         -- See Note [Floating to the top]
        = True
        | otherwise
        = False
