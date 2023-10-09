@@ -1500,7 +1500,6 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
 
 {-
     one_occ OneOcc{ occ_n_br   = 1
-
                   , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam

@@ -233,7 +233,7 @@ typeOneShot ty
 -- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 idStateHackOneShotInfo :: Id -> OneShotInfo
 idStateHackOneShotInfo id
-  = case idOneShotInfo id of
+  = case idOneShotInfo id of  -- Test idOneShotInfo first because it is fast
        OneShotLam                                  -> OneShotLam
        NoOneShotInfo | isStateHackType (idType id) -> OneShotLam
                      | otherwise                   -> NoOneShotInfo
