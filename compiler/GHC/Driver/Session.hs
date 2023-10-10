@@ -1548,9 +1548,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dlint"
         (NoArg enableDLint)
   , make_ord_flag defGhcFlag "dcore-lint"
-        (NoArg (setGeneralFlag Opt_DoCoreLinting))
+        (NoArg $ return ())
   , make_ord_flag defGhcFlag "dlinear-core-lint"
-        (NoArg (setGeneralFlag Opt_DoLinearCoreLinting))
+        (NoArg $ return ())
   , make_ord_flag defGhcFlag "dstg-lint"
         (NoArg (setGeneralFlag Opt_DoStgLinting))
   , make_ord_flag defGhcFlag "dcmm-lint"
@@ -2869,8 +2869,7 @@ enableDLint = do
   where
     dLintFlags :: [GeneralFlag]
     dLintFlags =
-        [ Opt_DoCoreLinting
-        , Opt_DoStgLinting
+        [ Opt_DoStgLinting
         , Opt_DoCmmLinting
         , Opt_DoAsmLinting
         , Opt_CatchNonexhaustiveCases
