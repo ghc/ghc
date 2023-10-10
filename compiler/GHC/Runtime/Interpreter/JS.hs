@@ -186,6 +186,18 @@ spawnJSInterp cfg = do
         , instExtra             = extra
         }
 
+  -- TODO: to support incremental linking of wasm modules (e.g. produced from C
+  -- sources), we should:
+  --
+  -- 1. link the emcc rts without trimming dead code as we don't know what might
+  -- be needed later by the Wasm modules we will dynamically load (cf
+  -- -sMAIN_MODULE).
+  -- 2. make the RUN_SERVER command wait for the emcc rts to be loaded.
+  -- 3. link wasm modules with -sSIDE_MODULE
+  -- 4. add a new command to load side modules with Emscripten's dlopen
+  --
+  -- cf https://emscripten.org/docs/compiling/Dynamic-Linking.html
+
   -- link rts and its deps
   jsLinkRts logger tmpfs tmp_dir codegen_cfg unit_env inst
 
@@ -213,22 +225,26 @@ jsLinkRts logger tmpfs tmp_dir cfg unit_env inst = do
         , lcForeignRefs     = False -- we don't need foreign references
         , lcNoJSExecutables = True  -- we don't need executables
         , lcNoHsMain        = True  -- nor HsMain
+        , lcForceEmccRts    = False -- nor the emcc rts
+        , lcLinkCsources    = False -- we know that there are no C sources to load for the RTS
         }
 
   -- link the RTS and its dependencies (things it uses from `base`, etc.)
   let link_spec = LinkSpec
         { lks_unit_ids        = [rtsUnitId, ghcInternalUnitId, primUnitId]
-        , lks_obj_files       = mempty
         , lks_obj_root_filter = const False
         , lks_extra_roots     = mempty
-        , lks_extra_js        = mempty
+        , lks_objs_hs         = mempty
+        , lks_objs_js         = mempty
+        , lks_objs_cc         = mempty
         }
 
   let finder_opts  = instFinderOpts (instExtra inst)
       finder_cache = instFinderCache (instExtra inst)
 
-  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache
-  jsLinkPlan logger tmpfs tmp_dir link_cfg cfg inst link_plan
+  ar_cache <- newArchiveCache
+  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
+  jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan
 
 -- | Link JS interpreter
 jsLinkInterp :: Logger -> TmpFs -> TempDir -> StgToJSConfig -> UnitEnv -> ExtInterpInstance JSInterpExtra -> IO ()
@@ -241,6 +257,8 @@ jsLinkInterp logger tmpfs tmp_dir cfg unit_env inst = do
         , lcForeignRefs     = False -- we don't need foreign references
         , lcNoJSExecutables = True  -- we don't need executables
         , lcNoHsMain        = True  -- nor HsMain
+        , lcForceEmccRts    = False -- nor the emcc rts
+        , lcLinkCsources    = True  -- enable C sources, if any
         }
 
   let is_root _ = True -- FIXME: we shouldn't consider every function as a root
@@ -258,18 +276,19 @@ jsLinkInterp logger tmpfs tmp_dir cfg unit_env inst = do
   -- link the interpreter and its dependencies
   let link_spec = LinkSpec
         { lks_unit_ids        = units
-        , lks_obj_files       = mempty
         , lks_obj_root_filter = is_root
         , lks_extra_roots     = root_deps
-        , lks_extra_js        = mempty
+        , lks_objs_hs         = mempty
+        , lks_objs_js         = mempty
+        , lks_objs_cc         = mempty
         }
 
   let finder_cache = instFinderCache (instExtra inst)
       finder_opts  = instFinderOpts (instExtra inst)
 
-  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache
-
-  jsLinkPlan logger tmpfs tmp_dir link_cfg cfg inst link_plan
+  ar_cache <- newArchiveCache
+  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
+  jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan
 
 
 -- | Link object files
@@ -282,6 +301,8 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
         , lcForeignRefs     = False -- we don't need foreign references
         , lcNoJSExecutables = True  -- we don't need executables
         , lcNoHsMain        = True  -- nor HsMain
+        , lcForceEmccRts    = False -- nor the emcc rts
+        , lcLinkCsources    = True  -- enable C sources, if any
         }
 
   let units = preloadUnits (ue_units unit_env)
@@ -290,19 +311,19 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
   -- compute dependencies
   let link_spec = LinkSpec
         { lks_unit_ids        = units
-        , lks_obj_files       = fmap ObjFile objs
         , lks_obj_root_filter = is_root
         , lks_extra_roots     = mempty
-        , lks_extra_js        = mempty
+        , lks_objs_hs         = objs
+        , lks_objs_js         = mempty
+        , lks_objs_cc         = mempty
         }
 
   let finder_opts  = instFinderOpts (instExtra inst)
       finder_cache = instFinderCache (instExtra inst)
 
-  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache
-
-  -- link
-  jsLinkPlan logger tmpfs tmp_dir link_cfg cfg inst link_plan
+  ar_cache <- newArchiveCache
+  link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
+  jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan
 
 
 
@@ -317,8 +338,8 @@ jsLinkObject logger tmpfs tmp_dir cfg unit_env inst obj roots = do
 -- | Link the given link plan
 --
 -- Perform incremental linking by removing what is already linked from the plan
-jsLinkPlan :: Logger -> TmpFs -> TempDir -> JSLinkConfig -> StgToJSConfig -> ExtInterpInstance JSInterpExtra -> LinkPlan -> IO ()
-jsLinkPlan logger tmpfs tmp_dir link_cfg cfg inst link_plan = do
+jsLinkPlan :: Logger -> TmpFs -> TempDir -> ArchiveCache -> JSLinkConfig -> StgToJSConfig -> ExtInterpInstance JSInterpExtra -> LinkPlan -> IO ()
+jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan = do
   ----------------------------------------------------------------
   -- Get already linked stuff and compute incremental plan
   ----------------------------------------------------------------
@@ -333,7 +354,7 @@ jsLinkPlan logger tmpfs tmp_dir link_cfg cfg inst link_plan = do
   ----------------------------------------------------------------
 
   tmp_out <- newTempSubDir logger tmpfs tmp_dir
-  void $ jsLink link_cfg cfg logger tmp_out diff_plan
+  void $ jsLink link_cfg cfg logger tmpfs ar_cache tmp_out diff_plan
 
   -- Code has been linked into the following files:
   --  - generated rts from tmp_out/rts.js (depends on link options)

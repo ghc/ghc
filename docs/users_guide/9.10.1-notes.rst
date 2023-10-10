@@ -148,6 +148,16 @@ Compiler
   This means that if you are using ``-fllvm`` you now need ``llc``, ``opt`` and ``clang``
   available.
 
+JavaScript backend
+~~~~~~~~~~~~~~~~~~
+
+- The JavaScript backend now supports linking with C sources. It uses Emscripten
+  to compile them to WebAssembly. The resulting JS file embeds and loads these
+  WebAssembly files. Important note: JavaScript wrappers are required to call
+  into C functions and pragmas have been added to indicate which C functions are
+  exported (see the users guide).
+
+
 GHCi
 ~~~~
 

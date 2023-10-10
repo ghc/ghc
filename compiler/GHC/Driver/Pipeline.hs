@@ -76,7 +76,6 @@ import GHC.Linker.Static.Utils
 import GHC.Linker.Types
 
 import GHC.StgToJS.Linker.Linker
-import GHC.StgToJS.Linker.Types (defaultJSLinkConfig)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -440,7 +439,7 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
         -- Don't showPass in Batch mode; doLink will do that for us.
         case ghcLink dflags of
           LinkBinary
-            | backendUseJSLinker (backend dflags) -> linkJSBinary logger fc dflags unit_env obj_files pkg_deps
+            | backendUseJSLinker (backend dflags) -> linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps
             | otherwise -> linkBinary logger tmpfs dflags unit_env obj_files pkg_deps
           LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
           LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
@@ -457,14 +456,13 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
         return Succeeded
 
 
-linkJSBinary :: Logger -> FinderCache -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkJSBinary logger fc dflags unit_env obj_files pkg_deps = do
+linkJSBinary :: Logger -> TmpFs -> FinderCache -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps = do
   -- we use the default configuration for now. In the future we may expose
   -- settings to the user via DynFlags.
-  let lc_cfg   = defaultJSLinkConfig
+  let lc_cfg   = initJSLinkConfig dflags
   let cfg      = initStgToJSConfig dflags
-  let extra_js = mempty
-  jsLinkBinary fc lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
+  jsLinkBinary fc lc_cfg cfg logger tmpfs dflags unit_env obj_files pkg_deps
 
 linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
 linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
@@ -582,7 +580,7 @@ doLink hsc_env o_files = do
     NoLink        -> return ()
     LinkBinary
       | backendUseJSLinker (backend dflags)
-                  -> linkJSBinary logger fc dflags unit_env o_files []
+                  -> linkJSBinary logger tmpfs fc dflags unit_env o_files []
       | otherwise -> linkBinary logger tmpfs dflags unit_env o_files []
     LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
     LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []

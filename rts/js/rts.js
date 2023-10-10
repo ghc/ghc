@@ -111,24 +111,53 @@ function h$rts_toString(x) {
 
 function h$rts_mkPtr(x) {
   var buf, off = 0;
-  if(typeof x == 'string') {
-    // string: UTF-8 encode
+  // null pointer
+  if(x === null) {
+    buf = null;
+    off = 0;
+  }
+  // Haskell pointer
+  else if(typeof x == 'object' &&
+     typeof x.offset == 'number' &&
+     typeof x.array !== 'undefined') {
+    buf = x.array;
+    off = x.offset;
+  }
+  // JS string: UTF-8 encode
+  else if(typeof x == 'string') {
     buf = h$encodeUtf8(x);
     off = 0;
-  } else if(typeof x == 'object' &&
+  }
+  // Haskell ByteArray
+  else if(typeof x == 'object' &&
      typeof x.len == 'number' &&
      x.buf instanceof ArrayBuffer) {
-    // already a Haskell ByteArray
     buf = x;
     off = 0;
-  } else if(x.isView) {
-    // ArrayBufferView: make ByteArray with the same byteOffset
+  }
+  // Offset in the Emscripten heap
+  else if (typeof x == 'number' && h$HEAP !== null) {
+    if (x == 0) {
+      buf = null;
+      off = 0;
+    }
+    else {
+      buf = h$HEAP;
+      off = x;
+    }
+  }
+  // ArrayBufferView: make ByteArray with the same byteOffset
+  else if(x.isView) {
     buf = h$wrapBuffer(x.buffer, true, 0, x.buffer.byteLength);
     off = x.byteOffset;
-  } else {
-    // plain ArrayBuffer
+  }
+  // plain ArrayBuffer
+  else if (x instanceof ArrayBuffer) {
     buf = h$wrapBuffer(x, true, 0, x.byteLength);
     off = 0;
+  }
+  else {
+    throw new Error ("h$rts_mkPtr: invalid argument: " + x);
   }
   return MK_PTR(buf, off);
 }

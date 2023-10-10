@@ -421,3 +421,116 @@ hand-written JavaScript come from functions with data that stays as JavaScript
 primitive types for a long time, especially strings. For this, ``JSVal`` allows
 values to be passed between ``Haskell`` and ``JavaScript`` without a marshalling
 penalty.
+
+
+Linking with C sources
+----------------------
+
+GHC supports compiling C sources into JavaScript (using Emscripten) and linking
+them with the rest of the JavaScript code (generated from Haskell codes and from
+the RTS).
+
+C functions compiled with Emscripten get a "_" prepended to their name in
+JavaScript. For example, C "malloc" becomes "_malloc" in JavaScript.
+
+EMCC pragmas
+~~~~~~~~~~~~
+
+By default the EMCC linker drops code considered dead and it has no way to know
+which code is alive due to some call from Haskell or from a JavaScript wrapper.
+As such, you must explicitly add some pragmas at the top of one of your `.js`
+files to indicate which functions are alive:
+
+```
+//#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=foo,bar
+```
+
+Enable methods `foo` and `bar` from the Emscripten runtime system. This is used
+for methods such as `ccall`, `cwrap`, `addFunction`, `removeFunction`... that
+are described in Emscripten documentation.
+
+```
+//#OPTIONS:EMCC:EXPORTED_FUNCTIONS=_foo,_bar
+```
+
+Enable C functions `foo` and `bar` to be exported respectively as `_foo` and
+`_bar` (`_` prepended). This is used for C library functions (e.g. `_malloc`,
+`_free`, etc.) and for the C code compiled with your project (e.g.
+`_sqlite3_open` and others for the `sqlite` C library).
+
+You can use both pragmas as many times as you want. Ultimately all the entries
+end up in sets of functions passed to the Emscripten linker via
+`-sEXPORTED_RUNTIME_METHODS` and `-sEXPORTED_FUNCTIONS` (which can only be
+passed once; the latter argument overrides the former ones).
+
+
+```
+//#OPTIONS:EMCC:EXTRA=-foo,-bar
+```
+
+This pragma allows additional options to be passed to Emscripten if need be. We
+already pass:
+- `-sSINGLE_FILE=1`: required to create a single `.js` file as artefact
+  (otherwise `.wasm` files corresponding to C codes need to be present in the
+  current working directory when invoking the resulting `.js` file).
+- `-sALLOW_TABLE_GROWTH`: required to support `addFunction`
+- `-sEXPORTED_RUNTIME_METHODS` and `-sEXPORTED_FUNCTIONS`: see above.
+
+Be careful because some extra arguments may break the build in unsuspected ways.
+
+Wrappers
+~~~~~~~~
+
+The JavaScript backend doesn't generate wrappers for foreign imports to call
+directly into the compiled C code. I.e. given the following foreign import:
+
+```haskell
+foreign import ccall "foo" foo :: ...
+```
+
+The JavaScript backend will replace calls to `foo` with calls to the JavaScript
+function `h$foo`. It's still up to the programmer to call `_foo` or not from `h$foo`
+on a case by case basis. If `h$foo` calls the generated from C function
+`_foo`, then we say that `h$foo` is a wrapper function. These wrapper functions
+are used to marshal arguments and returned values between the JS heap and the
+Emscripten heap.
+
+On one hand, GHC's JavaScript backend creates a different array of bytes per
+allocation (in order to make use of the garbage collector of the JavaScript
+engine). On the other hand, Emscripten's C heap consists in a single array of
+bytes. To call C functions converted to JavaScript that have pointer arguments,
+wrapper functions have to:
+
+1. allocate some buffer in the Emscripten heap (using `_malloc`) to get a valid
+   Emscripten pointer
+2. copy the bytes from the JS object to the buffer in the Emscripten heap
+3. use the Emscripten pointer to make the call to the C function
+4. optionally copy back the bytes from the Emscripten heap if the call may have
+   changed the contents of the buffer
+5. free the Emscripten buffer (with `_free`)
+
+GHC's JavaScript rts provides helper functions for this in `rts/js/mem.js`. See
+`h$copyFromHeap`, `h$copyToHeap`, `h$initHeapBuffer`, etc.
+
+Callbacks
+~~~~~~~~~
+
+Some C functions take function pointers as arguments (e.g. callbacks). This is
+supported by the JavaScript backend but requires some work from the wrapper
+functions.
+
+1. On the Haskell side it is possible to create a pointer to an Haskell function
+   (a `FunPtr`) by using a "wrapper" foreign import. See the documentation of
+   `base:Foreign.Ptr.FunPtr`.
+2. This `FunPtr` can be passed to a JavaScript wrapper function. However it's
+   implemented as a `StablePtr` and needs to be converted into a function
+   pointer that Emscripten understands. This can be done with
+   `h$registerFunPtrOnHeap`.
+3. When a callback is no longer needed, it can be freed with
+   `h$unregisterFunPtrFromHeap`.
+
+Note that in some circumstances you may not want to register an Haskell function
+directly as a callback. It is perfectly possible to register/free regular JavaScript
+function as Emscripten functions using `Module.addFunction` and `Module.removeFunction`.
+That's what the helper functions mentioned above do.
+

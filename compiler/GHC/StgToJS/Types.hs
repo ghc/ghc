@@ -30,6 +30,7 @@ import GHC.JS.Ppr ()
 
 import GHC.Stg.Syntax
 import GHC.Core.TyCon
+import GHC.Linker.Config
 
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -94,6 +95,7 @@ data StgToJSConfig = StgToJSConfig
   , csRuntimeAssert   :: !Bool -- ^ Enable runtime assertions
   -- settings
   , csContext         :: !SDocContext
+  , csLinkerConfig    :: !LinkerConfig -- ^ Emscripten linker
   }
 
 -- | Information relevenat to code generation for closures.

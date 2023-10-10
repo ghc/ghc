@@ -785,6 +785,14 @@ JavaScript code generator
 
    Include human-readable spacing and indentation when generating JavaScript.
 
+.. ghc-flag:: -ddisable-js-c-sources
+   :shortdesc: Disable the link with C sources compiled to JavaScript
+   :type: dynamic
+
+   For debugging it can be useful to avoid linking with C sources compiled to
+   JavaScript with Emscripten. This also avoids linking with Emcscripten's RTS.
+   Note that code that calls into this C code or that uses Emscripten's
+   primitives will fail at runtime (e.g. undefined function errors).
 
 Miscellaneous backend dumps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1904,6 +1904,7 @@ dynamic_flags_deps = [
 
      ------ JavaScript flags -----------------------------------------------
  ++ [ make_ord_flag defFlag "ddisable-js-minifier" (NoArg (setGeneralFlag Opt_DisableJsMinifier))
+    , make_ord_flag defFlag "ddisable-js-c-sources" (NoArg (setGeneralFlag Opt_DisableJsCsources))
     ]
 
      ------ Language flags -------------------------------------------------

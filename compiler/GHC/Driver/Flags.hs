@@ -328,6 +328,7 @@ data GeneralFlag
 
    -- JavaScript opts
    | Opt_DisableJsMinifier -- ^ render JavaScript pretty-printed instead of minified (compacted)
+   | Opt_DisableJsCsources -- ^ don't link C sources (compiled to JS) with Haskell code (compiled to JS)
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs

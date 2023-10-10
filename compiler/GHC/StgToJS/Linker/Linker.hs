@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE BlockArguments    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,10 +33,12 @@ module GHC.StgToJS.Linker.Linker
   , LinkPlan (..)
   , emptyLinkPlan
   , incrementLinkPlan
+  , ArchiveCache
+  , newArchiveCache
   )
 where
 
-import Prelude
+import GHC.Prelude
 
 import GHC.Platform.Host (hostPlatformArchOS)
 
@@ -54,6 +57,7 @@ import GHC.SysTools
 
 import GHC.Linker.Static.Utils (exeFileName)
 import GHC.Linker.Types (Unlinked(..), linkableUnlinked)
+import GHC.Linker.External
 
 import GHC.StgToJS.Linker.Types
 import GHC.StgToJS.Linker.Utils
@@ -78,7 +82,6 @@ import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
 import qualified GHC.Utils.Ppr as Ppr
-import GHC.Utils.Monad
 import GHC.Utils.TmpFs
 
 import GHC.Types.Unique.Set
@@ -105,6 +108,7 @@ import Data.Maybe
 import Data.Set                 (Set)
 import qualified Data.Set                 as S
 import Data.Word
+import Data.Monoid
 
 import System.IO
 import System.FilePath ((<.>), (</>), dropExtension, takeDirectory)
@@ -125,10 +129,10 @@ data LinkerStats = LinkerStats
   , packedMetaDataSize :: !Word64              -- ^ number of bytes for metadata
   }
 
-newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
+newtype ArchiveCache = ArchiveCache { loadedArchives :: IORef (Map FilePath Ar.Archive) }
 
-emptyArchiveState :: IO ArchiveState
-emptyArchiveState = ArchiveState <$> newIORef M.empty
+newArchiveCache :: IO ArchiveCache
+newArchiveCache = ArchiveCache <$> newIORef M.empty
 
 defaultJsContext :: SDocContext
 defaultJsContext = defaultSDocContext{sdocStyle = PprCode}
@@ -137,52 +141,70 @@ jsLinkBinary
   :: FinderCache
   -> JSLinkConfig
   -> StgToJSConfig
-  -> [FilePath]
   -> Logger
+  -> TmpFs
   -> DynFlags
   -> UnitEnv
   -> [FilePath]
   -> [UnitId]
   -> IO ()
-jsLinkBinary finder_cache lc_cfg cfg js_srcs logger dflags unit_env objs dep_units
+jsLinkBinary finder_cache lc_cfg cfg logger tmpfs dflags unit_env hs_objs dep_units
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
+
     -- additional objects to link are passed as FileOption ldInputs...
     let cmdline_objs = [ f | FileOption _ f <- ldInputs dflags ]
-    -- discriminate JavaScript sources from real object files.
-    (cmdline_js_srcs, cmdline_js_objs) <- partitionM isJsFile cmdline_objs
+
+    -- cmdline objects: discriminate between the 3 kinds of objects we have
+    let disc hss jss ccs = \case
+          []     -> pure (hss, jss, ccs)
+          (o:os) -> getObjectKind o >>= \case
+            Just ObjHs -> disc (o:hss) jss ccs os
+            Just ObjJs -> disc hss (o:jss) ccs os
+            Just ObjCc -> disc hss jss (o:ccs) os
+            Nothing    -> do
+              logInfo logger (vcat [text "Ignoring unexpected command-line object: ", text o])
+              disc hss jss ccs os
+    (cmdline_hs_objs, cmdline_js_objs, cmdline_cc_objs) <- disc [] [] [] cmdline_objs
+
     let
-        objs'    = map ObjFile (objs ++ cmdline_js_objs)
-        js_srcs' = js_srcs ++ cmdline_js_srcs
-        is_root _ = True -- FIXME: we shouldn't consider every function as a root,
-                         -- but only the program entry point (main), either the
-                         -- generated one or coming from an object
-        exe      = jsExeFileName dflags
+        exe         = jsExeFileName dflags
+        all_hs_objs = hs_objs ++ cmdline_hs_objs
+        all_js_objs = cmdline_js_objs
+        all_cc_objs = cmdline_cc_objs
+        is_root _   = True
+                      -- FIXME: we shouldn't consider every function as a root,
+                      -- but only the program entry point (main), either the
+                      -- generated one or coming from an object
 
     -- compute dependencies
     let link_spec = LinkSpec
           { lks_unit_ids        = dep_units
-          , lks_obj_files       = objs'
           , lks_obj_root_filter = is_root
           , lks_extra_roots     = mempty
-          , lks_extra_js        = js_srcs'
+          , lks_objs_hs         = all_hs_objs
+          , lks_objs_js         = all_js_objs
+          , lks_objs_cc         = all_cc_objs
           }
 
     let finder_opts = initFinderOpts dflags
+    ar_cache <- newArchiveCache
 
-    link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache
+    link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
 
-    void $ jsLink lc_cfg cfg logger exe link_plan
+    void $ jsLink lc_cfg cfg logger tmpfs ar_cache exe link_plan
 
 -- | link and write result to disk (jsexe directory)
 jsLink
      :: JSLinkConfig
      -> StgToJSConfig
      -> Logger
+     -> TmpFs
+     -> ArchiveCache
      -> FilePath               -- ^ output file/directory
      -> LinkPlan
      -> IO ()
-jsLink lc_cfg cfg logger out link_plan = do
+jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
 
       -- create output directory
       createDirectoryIfMissing False out
@@ -194,11 +216,11 @@ jsLink lc_cfg cfg logger out link_plan = do
       -- link all Haskell code (program + dependencies) into out.js
 
       -- retrieve code for Haskell dependencies
-      mods <- collectModuleCodes link_plan
+      mods <- collectModuleCodes ar_cache link_plan
 
       -- LTO + rendering of JS code
       link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h ->
-        renderLinker h (csPrettyRender cfg) mods (lkp_extra_js link_plan)
+        renderModules h (csPrettyRender cfg) mods
 
       -------------------------------------------------------------
 
@@ -224,49 +246,128 @@ jsLink lc_cfg cfg logger out link_plan = do
           void $
             hPutJS (csPrettyRender cfg) h (jsOptimize $ runJSM jsm $ jStgStatToJS <$> rts cfg)
 
-      -- link dependencies' JS files into lib.js
-      withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
-        forM_ (lkp_archives link_plan) $ \archive_file -> do
-          Ar.Archive entries <- Ar.loadAr archive_file
-          forM_ entries $ \entry -> do
-            case getJsArchiveEntry entry of
-              Nothing -> return ()
-              Just bs -> do
-                B.hPut   h bs
+      -- link user-provided JS files into lib.js
+      (emcc_opts,lib_cc_objs) <- withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
+
+        let
+            tmp_dir = linkerTempDir (csLinkerConfig cfg)
+
+            -- JS objects from dependencies' archives (.a)
+            go_archives emcc_opts cc_objs = \case
+              []     -> pure (emcc_opts, cc_objs)
+              (a:as) -> do
+                Ar.Archive entries <- loadArchive ar_cache a
+                (emcc_opts', cc_objs') <- go_entries emcc_opts cc_objs entries
+                go_archives emcc_opts' cc_objs' as
+
+            -- archive's entries
+            go_entries emcc_opts cc_objs = \case
+              []     -> pure (emcc_opts, cc_objs)
+              (e:es) -> case getObjectKindBS (Ar.filedata e) of
+                Just ObjHs -> do
+                  -- Nothing to do. HS objects are collected in
+                  -- collectModuleCodes
+                  go_entries emcc_opts cc_objs es
+                Just ObjCc -> do
+                  -- extract the object file from the archive in a temporary
+                  -- file and return its path
+                  cc_obj_fn <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "o"
+                  B.writeFile cc_obj_fn (Ar.filedata e)
+                  let cc_objs' = cc_obj_fn:cc_objs
+                  go_entries emcc_opts cc_objs' es
+                Just ObjJs -> do
+                  -- extract the JS code and append it to the `lib.js` file
+                  (opts,bs) <- parseJSObjectBS (Ar.filedata e)
+                  B.hPut   h bs
+                  hPutChar h '\n'
+                  let emcc_opts' = emcc_opts <> opts
+                  go_entries emcc_opts' cc_objs es
+                Nothing -> do
+                  logInfo logger (vcat [text "Ignoring unexpected archive entry: ", text (Ar.filename e)])
+                  go_entries emcc_opts cc_objs es
+
+            -- additional JS objects (e.g. from the command-line)
+            go_extra emcc_opts = \case
+              []     -> pure emcc_opts
+              (e:es) -> do
+                (opts,bs) <- readJSObject e
+                B.hPut h bs
                 hPutChar h '\n'
+                let emcc_opts' = emcc_opts <> opts
+                go_extra emcc_opts' es
+
+        -- archives
+        (emcc_opts0, cc_objs) <- go_archives defaultJSOptions [] (S.toList (lkp_archives link_plan))
+        -- extra object files
+        emcc_opts1            <- go_extra emcc_opts0 (S.toList (lkp_objs_js link_plan))
+        pure (emcc_opts1,cc_objs)
+
+
+      -- Link Cc objects using emcc's linker
+      --
+      -- Cc objects have been extracted from archives (see above) and are listed
+      -- in lib_cc_objs.
+      --
+      -- We don't link C sources if there are none (obviously) or if asked
+      -- explicitly by the user with -ddisable-js-c-sources (mostly used for
+      -- debugging purpose).
+      let emcc_objs     = lib_cc_objs ++ S.toList (lkp_objs_cc link_plan)
+      let has_emcc_objs = not (null emcc_objs)
+      let link_c_sources = lcLinkCsources lc_cfg && has_emcc_objs
+
+      when link_c_sources $ do
+
+        runLink logger tmpfs (csLinkerConfig cfg) $
+          [ Option "-o"
+          , FileOption "" (out </> "clibs.js")
+          -- Embed wasm files into a single .js file
+          , Option "-sSINGLE_FILE=1"
+          -- Enable support for addFunction (callbacks)
+          , Option "-sALLOW_TABLE_GROWTH"
+          -- keep some RTS methods and functions (otherwise removed as dead
+          -- code)
+          , Option ("-sEXPORTED_RUNTIME_METHODS=" ++ concat (intersperse "," (emccExportedRuntimeMethods emcc_opts)))
+          , Option ("-sEXPORTED_FUNCTIONS=" ++ concat (intersperse "," (emccExportedFunctions emcc_opts)))
+          ]
+          -- pass extra options from JS files' pragmas
+          ++ map Option (emccExtraOptions emcc_opts)
+          -- link objects
+          ++ map (FileOption "") emcc_objs
+
+      -- Don't enable the Emcc rts when not needed (i.e. no Wasm module to link
+      -- with) and not forced by the caller (e.g. in the future iserv may require
+      -- incremental linking of Wasm modules, hence the emcc rts even building
+      -- iserv itself doesn't require the emcc rts)
+      let use_emcc_rts = UseEmccRts $ link_c_sources || lcForceEmccRts lc_cfg
+
 
       -- link everything together into a runnable all.js
       -- only if we link a complete application,
       --   no incremental linking and no skipped parts
       when (lcCombineAll lc_cfg && not (lcNoRts lc_cfg)) $ do
-        _ <- combineFiles lc_cfg out
+        writeRunMain out use_emcc_rts
+        _ <- combineFiles lc_cfg link_c_sources out
         writeHtml    out
-        writeRunMain out
         writeRunner lc_cfg out
         writeExterns out
 
 data LinkSpec = LinkSpec
   { lks_unit_ids        :: [UnitId]
-
-  , lks_obj_files       :: [LinkedObj]
-
-  , lks_obj_root_filter :: ExportedFun -> Bool
-      -- ^ Predicate for exported functions in objects to declare as root
-
-  , lks_extra_roots     :: Set ExportedFun
-      -- ^ Extra root functions from loaded units
-
-  , lks_extra_js        :: [FilePath]
-      -- ^ Extra JS files to link
+  , lks_obj_root_filter :: ExportedFun -> Bool -- ^ Predicate for exported functions in objects to declare as root
+  , lks_extra_roots     :: Set ExportedFun -- ^ Extra root functions from loaded units
+  , lks_objs_hs         :: [FilePath]      -- ^ HS objects to link
+  , lks_objs_js         :: [FilePath]      -- ^ JS objects to link
+  , lks_objs_cc         :: [FilePath]      -- ^ Cc objects to link
   }
 
 instance Outputable LinkSpec where
   ppr s = hang (text "LinkSpec") 2 $ vcat
             [ hcat [text "Unit ids: ", ppr (lks_unit_ids s)]
-            , hcat [text "Object files:", ppr (lks_obj_files s)]
+            , hcat [text "HS objects:", vcat (fmap text (lks_objs_hs s))]
+            , hang (text "JS objects::") 2 (vcat (fmap text (lks_objs_js s)))
+            , hang (text "Cc objects::") 2 (vcat (fmap text (lks_objs_cc s)))
             , text "Object root filter: <function>"
             , hcat [text "Extra roots: ", ppr (lks_extra_roots s)]
-            , hang (text "Extra JS:") 2 (vcat (fmap text (lks_extra_js s)))
             ]
 
 emptyLinkPlan :: LinkPlan
@@ -274,7 +375,8 @@ emptyLinkPlan = LinkPlan
   { lkp_block_info = mempty
   , lkp_dep_blocks = mempty
   , lkp_archives   = mempty
-  , lkp_extra_js   = mempty
+  , lkp_objs_js    = mempty
+  , lkp_objs_cc    = mempty
   }
 
 -- | Given a `base` link plan (assumed to be already linked) and a `new` link
@@ -289,13 +391,15 @@ incrementLinkPlan base new = (diff,total)
       { lkp_block_info = M.union (lkp_block_info base) (lkp_block_info new)
       , lkp_dep_blocks = S.union (lkp_dep_blocks base) (lkp_dep_blocks new)
       , lkp_archives   = S.union (lkp_archives base) (lkp_archives new)
-      , lkp_extra_js   = S.union (lkp_extra_js base) (lkp_extra_js new)
+      , lkp_objs_js    = S.union (lkp_objs_js base) (lkp_objs_js new)
+      , lkp_objs_cc    = S.union (lkp_objs_cc base) (lkp_objs_cc new)
       }
     diff = LinkPlan
       { lkp_block_info = lkp_block_info new -- block info from "new" contains all we need to load new blocks
       , lkp_dep_blocks = S.difference (lkp_dep_blocks new) (lkp_dep_blocks base)
       , lkp_archives   = S.difference (lkp_archives new)   (lkp_archives base)
-      , lkp_extra_js   = S.difference (lkp_extra_js new)   (lkp_extra_js base)
+      , lkp_objs_js    = S.difference (lkp_objs_js new)    (lkp_objs_js base)
+      , lkp_objs_cc    = S.difference (lkp_objs_cc new)    (lkp_objs_cc base)
       }
 
 
@@ -305,11 +409,14 @@ computeLinkDependencies
   -> LinkSpec
   -> FinderOpts
   -> FinderCache
+  -> ArchiveCache
   -> IO LinkPlan
-computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
+computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache = do
 
   let units       = lks_unit_ids        link_spec
-  let obj_files   = lks_obj_files       link_spec
+  let hs_objs     = lks_objs_hs         link_spec
+  let js_objs     = lks_objs_js         link_spec
+  let cc_objs     = lks_objs_cc         link_spec
   let extra_roots = lks_extra_roots     link_spec
   let obj_is_root = lks_obj_root_filter link_spec
 
@@ -323,7 +430,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
   -- find/load linkable on-demand when a module is missing.
 
 
-  (objs_block_info, objs_required_blocks) <- loadObjBlockInfo obj_files
+  (objs_block_info, objs_required_blocks) <- loadObjBlockInfo hs_objs
 
   let obj_roots = S.fromList . filter obj_is_root $ concatMap (M.keys . bi_exports . lbi_info) (M.elems objs_block_info)
       obj_units = map moduleUnitId $ nub (M.keys objs_block_info)
@@ -343,7 +450,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
   let all_units = fmap unitId all_units_infos
 
   dep_archives <- getPackageArchives cfg unit_env all_units
-  (archives_block_info, archives_required_blocks) <- loadArchiveBlockInfo dep_archives
+  (archives_block_info, archives_required_blocks) <- loadArchiveBlockInfo ar_cache dep_archives
 
   -- compute dependencies
   let block_info      = objs_block_info `M.union` archives_block_info
@@ -378,7 +485,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
 
         case linkableUnlinked linkable of
               [DotO p] -> do
-                  (bis, req_b) <- loadObjBlockInfo [ObjFile p]
+                  (bis, req_b) <- loadObjBlockInfo [p]
                   -- Store new required blocks in IORef
                   modifyIORef new_required_blocks_var ((++) req_b)
                   case M.lookup mod bis of
@@ -405,7 +512,8 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
         { lkp_block_info = updated_block_info
         , lkp_dep_blocks = all_deps
         , lkp_archives   = S.fromList dep_archives
-        , lkp_extra_js   = S.fromList (lks_extra_js link_spec)
+        , lkp_objs_js    = S.fromList js_objs
+        , lkp_objs_cc    = S.fromList cc_objs
         }
 
   return plan
@@ -450,19 +558,17 @@ hPutJS render_pretty h = \case
     pure $! (after - before)
 
 -- | Link modules and pretty-print them into the given Handle
-renderLinker
+renderModules
   :: Handle
   -> Bool         -- ^ should we render readable JS for debugging?
   -> [ModuleCode] -- ^ linked code per module
-  -> Set FilePath -- ^ additional JS files
   -> IO LinkerStats
-renderLinker h render_pretty mods js_files = do
+renderModules h render_pretty mods = do
 
   -- link modules
   let (compacted_mods, meta) = linkModules mods
 
   let
-    putBS   = B.hPut h
     putJS   = hPutJS render_pretty h
 
   ---------------------------------------------------------
@@ -482,13 +588,10 @@ renderLinker h render_pretty mods js_files = do
   !meta_length <- fromIntegral <$> putJS (jsOptimize meta)
 
   -- module exports
-  mapM_ (putBS . cmc_exports) compacted_mods
-
-  -- explicit additional JS files
-  mapM_ (\i -> B.readFile i >>= putBS) (S.toList js_files)
+  mapM_ (B.hPut h . cmc_exports) compacted_mods
 
   -- stats
-  let link_stats = LinkerStats
+  let !link_stats = LinkerStats
         { bytesPerModule     = M.fromList mod_sizes
         , packedMetaDataSize = meta_length
         }
@@ -547,15 +650,20 @@ getPackageArchives cfg unit_env units =
 -- | Combine rts.js, lib.js, out.js to all.js that can be run
 -- directly with node.js or SpiderMonkey jsshell
 combineFiles :: JSLinkConfig
+             -> Bool -- has clibs.js
              -> FilePath
              -> IO ()
-combineFiles cfg fp = do
-  let files = map (fp </>) ["rts.js", "lib.js", "out.js"]
-  withBinaryFile (fp </> "all.js") WriteMode $ \h -> do
-    let cpy i = B.readFile i >>= B.hPut h
-    mapM_ cpy files
-    unless (lcNoHsMain cfg) $ do
-      B.hPut h runMainJS
+combineFiles cfg has_clibs fp = do
+  let files = map (fp </>) $ catMaybes
+        [ Just "rts.js"
+        , Just "lib.js"
+        , Just "out.js"
+        , if has_clibs      then Just "clibs.js" else Nothing
+        , if lcNoHsMain cfg then Nothing else Just "runmain.js"
+        ]
+  withBinaryFile (fp </> "all.js") WriteMode $ \h ->
+    forM_ files $ \i ->
+      B.readFile i >>= B.hPut h
 
 -- | write the index.html file that loads the program if it does not exit
 writeHtml
@@ -583,15 +691,21 @@ templateHtml =
 -- index.html is loaded
 writeRunMain
   :: FilePath -- ^ output directory
+  -> UseEmccRts
   -> IO ()
-writeRunMain out = do
+writeRunMain out use_emcc_rts = do
   let runMainFile = out </> "runmain.js"
-  e <- doesFileExist runMainFile
-  unless e $
-    B.writeFile runMainFile runMainJS
+  B.writeFile runMainFile (runMainJS use_emcc_rts)
 
-runMainJS :: B.ByteString
-runMainJS = "h$main(h$mainZCZCMainzimain);\n"
+newtype UseEmccRts = UseEmccRts Bool
+
+runMainJS :: UseEmccRts -> B.ByteString
+runMainJS (UseEmccRts use_emcc_rts) = if use_emcc_rts
+  then "Module['onRuntimeInitialized'] = function() {\n\
+       \h$initEmscriptenHeap();\n\
+       \h$main(h$mainZCZCMainzimain);\n\
+       \}\n"
+  else "h$main(h$mainZCZCMainzimain);\n"
 
 writeRunner :: JSLinkConfig -- ^ Settings
             -> FilePath     -- ^ Output directory
@@ -711,8 +825,8 @@ getDeps init_infos load_info root_funs root_blocks = traverse_funs init_infos S.
       in  open `S.union` S.fromList (filter (not . alreadyLinked) new_blocks)
 
 -- | collect dependencies for a set of roots
-collectModuleCodes :: LinkPlan -> IO [ModuleCode]
-collectModuleCodes link_plan = do
+collectModuleCodes :: ArchiveCache -> LinkPlan -> IO [ModuleCode]
+collectModuleCodes ar_cache link_plan = do
 
   let block_info = lkp_block_info link_plan
   let blocks     = lkp_dep_blocks link_plan
@@ -738,13 +852,12 @@ collectModuleCodes link_plan = do
       sorted_module_blocks = sortBy cmp (M.toList module_blocks)
 
   -- load blocks
-  ar_state <- emptyArchiveState
   forM sorted_module_blocks $ \(mod,bids) -> do
     case M.lookup mod block_info of
       Nothing  -> pprPanic "collectModuleCodes: couldn't find block info for module" (ppr mod)
-      Just lbi -> extractBlocks ar_state lbi bids
+      Just lbi -> extractBlocks ar_cache lbi bids
 
-extractBlocks :: ArchiveState -> LocatedBlockInfo -> BlockIds -> IO ModuleCode
+extractBlocks :: ArchiveCache -> LocatedBlockInfo -> BlockIds -> IO ModuleCode
 extractBlocks ar_state lbi blocks = do
   case lbi_loc lbi of
     ObjectFile fp -> do
@@ -771,15 +884,21 @@ extractBlocks ar_state lbi blocks = do
                       , mc_frefs    = concatMap oiFImports l
                       }
 
-readArObject :: ArchiveState -> Module -> FilePath -> IO Object
-readArObject ar_state mod ar_file = do
-  loaded_ars <- readIORef (loadedArchives ar_state)
-  (Ar.Archive entries) <- case M.lookup ar_file loaded_ars of
+-- | Load an archive in memory and store it in the cache for future loads.
+loadArchive :: ArchiveCache -> FilePath -> IO Ar.Archive
+loadArchive ar_cache ar_file = do
+  loaded_ars <- readIORef (loadedArchives ar_cache)
+  case M.lookup ar_file loaded_ars of
     Just a -> pure a
     Nothing -> do
       a <- Ar.loadAr ar_file
-      modifyIORef (loadedArchives ar_state) (M.insert ar_file a)
+      modifyIORef (loadedArchives ar_cache) (M.insert ar_file a)
       pure a
+
+
+readArObject :: ArchiveCache -> Module -> FilePath -> IO Object
+readArObject ar_cache mod ar_file = do
+  Ar.Archive entries <- loadArchive ar_cache ar_file
 
   -- look for the right object in archive
   let go_entries = \case
@@ -888,15 +1007,16 @@ mkExportedModFuns mod symbols = map mk_fun symbols
     mk_fun sym = ExportedFun mod (LexicalFastString sym)
 
 -- | read all dependency data from the to-be-linked files
-loadObjBlockInfo :: [LinkedObj] -- ^ object files to link
-            -> IO (Map Module LocatedBlockInfo, [BlockRef])
+loadObjBlockInfo
+  :: [FilePath] -- ^ object files to link
+  -> IO (Map Module LocatedBlockInfo, [BlockRef])
 loadObjBlockInfo objs = (prepareLoadedDeps . catMaybes) <$> mapM readBlockInfoFromObj objs
 
 -- | Load dependencies for the Linker from Ar
-loadArchiveBlockInfo :: [FilePath] -> IO (Map Module LocatedBlockInfo, [BlockRef])
-loadArchiveBlockInfo archives = do
+loadArchiveBlockInfo :: ArchiveCache -> [FilePath] -> IO (Map Module LocatedBlockInfo, [BlockRef])
+loadArchiveBlockInfo ar_cache archives = do
   archDeps <- forM archives $ \file -> do
-    (Ar.Archive entries) <- Ar.loadAr file
+    (Ar.Archive entries) <- loadArchive ar_cache file
     catMaybes <$> mapM (readEntry file) entries
   return (prepareLoadedDeps $ concat archDeps)
     where
@@ -910,34 +1030,6 @@ loadArchiveBlockInfo archives = do
               obj <- getObjectBody bh mod_name
               let !info = objBlockInfo obj
               pure $ Just (LocatedBlockInfo (ArchiveFile ar_file) info)
-
--- | Predicate to check that an entry in Ar is a JS source
--- and to return it without its header
-getJsArchiveEntry :: Ar.ArchiveEntry -> Maybe B.ByteString
-getJsArchiveEntry entry = getJsBS (Ar.filedata entry)
-
--- | Predicate to check that a file is a JS source
-isJsFile :: FilePath -> IO Bool
-isJsFile fp = withBinaryFile fp ReadMode $ \h -> do
-  bs <- B.hGet h jsHeaderLength
-  pure (isJsBS bs)
-
-isJsBS :: B.ByteString -> Bool
-isJsBS bs = isJust (getJsBS bs)
-
--- | Get JS source with its header (if it's one)
-getJsBS :: B.ByteString -> Maybe B.ByteString
-getJsBS bs = B.stripPrefix jsHeader bs
-
--- Header added to JS sources to discriminate them from other object files.
--- They all have .o extension but JS sources have this header.
-jsHeader :: B.ByteString
-jsHeader = "//JavaScript"
-
-jsHeaderLength :: Int
-jsHeaderLength = B.length jsHeader
-
-
 
 prepareLoadedDeps :: [LocatedBlockInfo]
                   -> (Map Module LocatedBlockInfo, [BlockRef])
@@ -956,25 +1048,21 @@ requiredBlocks d = map mk_block_ref (IS.toList $ bi_must_link d)
 
 -- | read block info from an object that might have already been into memory
 -- pulls in all Deps from an archive
-readBlockInfoFromObj :: LinkedObj -> IO (Maybe LocatedBlockInfo)
-readBlockInfoFromObj = \case
-  ObjLoaded name obj -> do
-    let !info = objBlockInfo obj
-    pure $ Just (LocatedBlockInfo (InMemory name obj) info)
-  ObjFile file -> do
-    readObjectBlockInfo file >>= \case
-      Nothing   -> pure Nothing
-      Just info -> pure $ Just (LocatedBlockInfo (ObjectFile file) info)
+readBlockInfoFromObj :: FilePath -> IO (Maybe LocatedBlockInfo)
+readBlockInfoFromObj file = do
+  readObjectBlockInfo file >>= \case
+    Nothing   -> pure Nothing
+    Just info -> pure $ Just (LocatedBlockInfo (ObjectFile file) info)
 
 
--- | Embed a JS file into a .o file
---
--- The JS file is merely copied into a .o file with an additional header
--- ("//Javascript") in order to be recognized later on.
+-- | Embed a JS file into a JS object .o file
 --
 -- JS files may contain option pragmas of the form: //#OPTIONS:
--- For now, only the CPP option is supported. If the CPP option is set, we
--- append some common CPP definitions to the file and call cpp on it.
+-- One of those is //#OPTIONS:CPP. When it is set, we append some common CPP
+-- definitions to the file and call cpp on it.
+--
+-- Other options (e.g. EMCC additional flags for link time) are stored in the
+-- JS object header. See JSOptions.
 embedJsFile :: Logger -> DynFlags -> TmpFs -> UnitEnv -> FilePath -> FilePath -> IO ()
 embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
   let profiling  = False -- FIXME: add support for profiling way
@@ -984,12 +1072,14 @@ embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
   -- the header lets the linker recognize processed JavaScript files
   -- But don't add JavaScript header to object files!
 
-  -- header appended to JS files stored as .o to recognize them.
-  let header = "//JavaScript\n"
-  jsFileNeedsCpp input_fn >>= \case
-    False -> copyWithHeader header input_fn output_fn
-    True  -> do
+  -- read pragmas from JS file
+  -- we need to store them explicitly as they can be removed by CPP.
+  opts <- getOptionsFromJsFile input_fn
 
+  -- run CPP if needed
+  cpp_fn <- case enableCPP opts of
+    False -> pure input_fn
+    True  -> do
       -- append common CPP definitions to the .js file.
       -- They define macros that avoid directly wiring zencoded names
       -- in RTS JS files
@@ -1011,13 +1101,11 @@ embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
               cpp_opts
               pp_fn
               js_fn
-      -- add header to recognize the object as a JS file
-      copyWithHeader header js_fn output_fn
+      pure js_fn
 
-jsFileNeedsCpp :: FilePath -> IO Bool
-jsFileNeedsCpp fn = do
-  opts <- getOptionsFromJsFile fn
-  pure (CPP `elem` opts)
+  -- write JS object
+  cpp_bs <- B.readFile cpp_fn
+  writeJSObject opts cpp_bs output_fn
 
 -- | Link module codes.
 --

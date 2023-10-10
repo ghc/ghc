@@ -1,4 +1,5 @@
-//#OPTIONS: CPP
+//#OPTIONS:CPP
+//#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=addFunction,removeFunction,getEmptyTableSlot
 
 // #define GHCJS_TRACE_META 1
 
@@ -995,6 +996,15 @@ function h$roundUpToMultipleOf(n,m) {
 function h$newByteArray(len) {
   var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
   var buf = new ArrayBuffer(len0);
+  return h$wrapByteArray(buf,len);
+}
+
+// Create a ByteArray from a given ArrayBuffer
+//
+// This is useful to wrap pre-existing ArrayBuffer such as Emscripten heap
+// (Module.HEAP8). However don't rely on the ByteArray length ("len" field) too
+// much in this case because it isn't updated when the heap grows.
+function h$wrapByteArray(buf,len) {
   return { buf: buf
          , len: len
          , i3: new Int32Array(buf)
@@ -1088,10 +1098,11 @@ function h$compareByteArrays(a1,o1,a2,o2,n) {
 */
 function h$wrapBuffer(buf, unalignedOk, offset, length) {
   if(!unalignedOk && offset && offset % 8 !== 0) {
-    throw ("h$wrapBuffer: offset not aligned:" + offset);
+    throw new Error("h$wrapBuffer: offset not aligned:" + offset);
   }
-  if(!buf || !(buf instanceof ArrayBuffer))
-    throw "h$wrapBuffer: not an ArrayBuffer"
+  if(!buf || !(buf instanceof ArrayBuffer)) {
+    throw new Error("h$wrapBuffer: not an ArrayBuffer: " + buf)
+  }
   if(!offset) { offset = 0; }
   if(!length || length < 0) { length = buf.byteLength - offset; }
   return { buf: buf
@@ -1482,4 +1493,169 @@ function h$checkOverlapByteArray(a1, o1, a2, o2, n) {
   if (o1 < o2)   return o2 - o1 >= n;
   if (o1 > o2)   return o1 - o2 >= n;
   return true;
+}
+
+
+/////////////////////////////////////////
+// Interface with Emscripten's HEAP
+/////////////////////////////////////////
+
+// The Emscripten Heap is an ArrayBuffer that we wrap as if it was a ByteArray.
+// It allows pointers into Emscripten Heap to be representable as our usual
+// pointers (ByteArray, Offset).
+var h$HEAP = null;
+
+// Initialize the global h$HEAP variable. This must only be called when linking
+// with Emscripten.
+function h$initEmscriptenHeap() {
+  h$HEAP = h$wrapByteArray(Module.HEAP8.buffer, Module.HEAP8.buffer.byteLength);
+}
+
+// Create a pointer in Emscripten's HEAP
+function h$mkHeapPtr(offset) {
+  if (!h$HEAP) {
+    throw new Error("h$mkHeapPtr: Emscripten h$HEAP not initialized");
+  }
+  return {'array':h$HEAP, 'offset': offset};
+}
+
+// Copy len bytes from the given buffer to the heap
+function h$copyToHeap(buf_d, buf_o, tgt, len) {
+    if(len === 0) return;
+    var u8 = buf_d.u8;
+    for(var i=0;i<len;i++) {
+        Module.HEAPU8[tgt+i] = u8[buf_o+i];
+    }
+}
+
+// Copy len bytes from the heap to the given buffer
+function h$copyFromHeap(src, buf_d, buf_o, len) {
+    var u8 = buf_d.u8;
+    for(var i=0;i<len;i++) {
+        u8[buf_o+i] = Module.HEAPU8[src+i];
+    }
+}
+
+// malloc and initialize a buffer on the HEAP
+function h$initHeapBufferLen(buf_d, buf_o, len) {
+  var buf_ptr = _malloc(len);
+  h$copyToHeap(buf_d, buf_o, buf_ptr, len);
+  return buf_ptr;
+}
+
+// Allocate and copy a JS buffer on the heap
+function h$initHeapBuffer(str_d, str_o) {
+  if(str_d === null) return null;
+  return ptr = h$initHeapBufferLen(str_d, str_o, str_d.len);
+}
+
+
+
+// temporarily malloc and initialize a buffer on the HEAP, pass it to the
+// continuation, then release the buffer
+function h$withOutBufferOnHeap(ptr_d, ptr_o, len, cont) {
+  var ptr = _malloc(len);
+  h$copyToHeap(ptr_d, ptr_o, ptr, len);
+  var ret = cont(ptr);
+  h$copyFromHeap(ptr, ptr_d, ptr_o, len);
+  _free(ptr);
+  return ret;
+}
+
+// Temporarily allocate and initialize a buffer on the heap and pass it to the
+// continuation. The buffer is freed from the heap when the continuation
+// returns.
+function h$withCBufferOnHeap(str_d, str_o, len, cont) {
+    var str = _malloc(len);
+    if(str_d !== null) h$copyToHeap(str_d, str_o, str, len);
+    var ret = cont(str);
+    _free(str);
+    return ret;
+}
+
+// Temporarily allocate a CString on the heap and pass it to the continuation.
+// The string is freed from the heap when the continuation returns.
+function h$withCStringOnHeap(str_d, str_o, cont) {
+  return h$withCBufferOnHeap(str_d, str_o, str_d === null ? 0 : h$strlen(str_d,str_o), cont);
+}
+
+// Dereference a heap pointer to a heap pointer (a 32-bit offset in the heap)
+function h$derefHeapPtr_addr(offset) {
+  var ptr = h$newByteArray(4);
+  ptr.u8.set(Module.HEAPU8.subarray(offset, offset+4));
+  return ptr.i3[0];
+}
+
+// Write a heap pointer (h$HEAP,offset) at the given JS pointer
+function h$putHeapAddr(a,o,offset) {
+  if (offset == 0) {
+    // null pointer in HEAP must become null pointer in JS land
+    PUT_ADDR(a,o,null,0);
+  } else {
+    PUT_ADDR(a,o,h$HEAP,offset);
+  }
+}
+
+// get a C string (null-terminated) from HEAP
+// Convert HEAP null (i.e. 0) into JS null
+function h$copyCStringFromHeap(offset) {
+  if(offset == 0) return null;
+  var len = 0;
+  while(HEAPU8[offset+len] !== 0){ len++; };
+  var str = h$newByteArray(len+1);
+  str.u8.set(HEAPU8.subarray(offset,offset+len+1));
+  return str;
+}
+
+// get an array of n pointers from HEAP
+function h$copyPtrArrayFromHeap(offset,n) {
+  var ptr = h$newByteArray(4*n);
+  ptr.u8.set(HEAPU8.subarray(offset, offset+4*n));
+  return ptr;
+}
+
+// Given a FunPtr, allocate a function wrapper with Emscripten and register it
+// in the HEAP. Return the heap pointer to it.
+//
+// If `ask_ptr` is true, `mkfn` get passed both the function and the heap
+// pointer. This is useful in callbacks which should cleanup themselves from the
+// Emscripten heap during their execution. Call h$unregisterFunPtrFromHeap on the
+// heap pointer to clean it.
+//
+// Since Emscripten uses WebAssembly, function types must be known precisely.
+// The `ty` serves this purpose. See Emscripten's `addFunction` documentation
+// for the syntax.
+function h$registerFunPtrOnHeap(funptr_d, funptr_o, ask_ptr, ty, mkfn) {
+  // TODO: assert funptr_d is the StablePtr array
+  if (funptr_o == 0) return 0;
+
+  var fun = h$deRefStablePtr(funptr_o);
+
+  // In destroy callbacks we want to call removeFunction on the running
+  // callback. But it hasn't been registered yet so we don't have its pointer!
+  //
+  // So we call getEmptyTableSlot to get the next function slot in advance.
+  // But this has the side-effect of reserving the next empty slot... so we have
+  // to release it just after. The following call to addFunction will get the
+  // same slot. Warning: this hack doesn't work if addFunction is called in
+  // mkfn, but we check this with an assertion.
+  if (ask_ptr) {
+    var cb_ptr = getEmptyTableSlot();
+    Module.removeFunction(cb_ptr);
+
+    var cb  = mkfn(fun,cb_ptr);
+    var ptr = Module.addFunction(cb,ty);
+
+    assert(cb_ptr === ptr, "h$registerJSFunPtrOnHeap: got different pointer offsets: " + cb_ptr + " and " + ptr);
+    return ptr;
+  }
+  else {
+    var cb  = mkfn(fun);
+    return Module.addFunction(cb,ty);
+  }
+}
+
+// Unregister a function previously registered on the heap with h$registerFunPtrOnHeap
+function h$unregisterFunPtrFromHeap(p) {
+  return Module.removeFunction(p);
 }

@@ -47,6 +47,8 @@ module GHC.Utils.Binary
    -- * For writing instances
    putByte,
    getByte,
+   putByteString,
+   getByteString,
 
    -- * Variable length encodings
    putULEB128,
@@ -1226,6 +1228,19 @@ getFS :: BinHandle -> IO FastString
 getFS bh = do
   l  <- get bh :: IO Int
   getPrim bh l (\src -> pure $! mkFastStringBytes src l )
+
+-- | Put a ByteString without its length (can't be read back without knowing the
+-- length!)
+putByteString :: BinHandle -> ByteString -> IO ()
+putByteString bh bs =
+  BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
+    putPrim bh l (\op -> copyBytes op (castPtr ptr) l)
+
+-- | Get a ByteString whose length is known
+getByteString :: BinHandle -> Int -> IO ByteString
+getByteString bh l =
+  BS.create l $ \dest -> do
+    getPrim bh l (\src -> copyBytes dest src l)
 
 putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =

@@ -1,11 +1,15 @@
 module GHC.Driver.Config.StgToJS
   ( initStgToJSConfig
+  , initJSLinkConfig
   )
 where
 
 import GHC.StgToJS.Types
+import GHC.StgToJS.Linker.Types
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Config.Linker
+
 import GHC.Platform.Ways
 import GHC.Utils.Outputable
 
@@ -30,4 +34,19 @@ initStgToJSConfig dflags = StgToJSConfig
   , csRuntimeAssert   = False
   -- settings
   , csContext         = initSDocContext dflags defaultDumpStyle
+  , csLinkerConfig    = initLinkerConfig dflags
   }
+
+-- | Default linker configuration
+initJSLinkConfig :: DynFlags -> JSLinkConfig
+initJSLinkConfig dflags = JSLinkConfig
+  { lcNoJSExecutables = False
+  , lcNoHsMain        = False
+  , lcNoRts           = False
+  , lcNoStats         = False
+  , lcCombineAll      = True
+  , lcForeignRefs     = True
+  , lcForceEmccRts    = False
+  , lcLinkCsources    = not (gopt Opt_DisableJsCsources dflags)
+  }
+

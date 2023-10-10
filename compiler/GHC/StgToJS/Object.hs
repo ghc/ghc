@@ -4,6 +4,8 @@
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE MultiWayIf                 #-}
 
 -- only for DB.Binary instances on Module
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -21,28 +23,23 @@
 -- Stability   :  experimental
 --
 --  Serialization/deserialization of binary .o files for the JavaScript backend
---  The .o files contain dependency information and generated code.
---  All strings are mapped to a central string table, which helps reduce
---  file size and gives us efficient hash consing on read
---
---  Binary intermediate JavaScript object files:
---   serialized [Text] -> ([ClosureInfo], JStat) blocks
---
---  file layout:
---   - magic "GHCJSOBJ"
---   - compiler version tag
---   - module name
---   - offsets of string table
---   - dependencies
---   - offset of the index
---   - unit infos
---   - index
---   - string table
 --
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Object
-  ( putObject
+  ( ObjectKind(..)
+  , getObjectKind
+  , getObjectKindBS
+  -- * JS object
+  , JSOptions(..)
+  , defaultJSOptions
+  , getOptionsFromJsFile
+  , writeJSObject
+  , readJSObject
+  , parseJSObject
+  , parseJSObjectBS
+  -- * HS object
+  , putObject
   , getObjectHeader
   , getObjectBody
   , getObject
@@ -51,7 +48,6 @@ module GHC.StgToJS.Object
   , readObjectBlocks
   , readObjectBlockInfo
   , isGlobalBlock
-  , isJsObjectFile
   , Object(..)
   , IndexEntry(..)
   , LocatedBlockInfo (..)
@@ -74,12 +70,14 @@ import           Data.Int
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import           Data.List (sortOn)
+import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Word
-import           Data.Char
-import Foreign.Storable
-import Foreign.Marshal.Array
+import           Data.Semigroup
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Unsafe   as B
+import Data.Char (isSpace)
 import System.IO
 
 import GHC.Settings.Constants (hiVersion)
@@ -97,8 +95,76 @@ import GHC.Types.Unique.Map
 import GHC.Utils.Binary hiding (SymbolTable)
 import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text, hsep)
 import GHC.Utils.Monad (mapMaybeM)
+import GHC.Utils.Panic
+import GHC.Utils.Misc (dropWhileEndLE)
+import System.IO.Unsafe
+import qualified Control.Exception as Exception
 
--- | An object file
+----------------------------------------------
+-- The JS backend supports 3 kinds of objects:
+--   1. HS objects: produced from Haskell sources
+--   2. JS objects: produced from JS sources
+--   3. Cc objects: produced by emcc (e.g. from C sources)
+--
+-- They all have a different header that allows them to be distinguished.
+-- See ObjectKind type.
+----------------------------------------------
+
+-- | Different kinds of object (.o) supported by the JS backend
+data ObjectKind
+  = ObjJs -- ^ JavaScript source embedded in a .o
+  | ObjHs -- ^ JS backend object for Haskell code
+  | ObjCc -- ^ Wasm module object as produced by emcc
+  deriving (Show,Eq,Ord)
+
+-- | Get the kind of a file object, if any
+getObjectKind :: FilePath -> IO (Maybe ObjectKind)
+getObjectKind fp = withBinaryFile fp ReadMode $ \h -> do
+  let !max_header_length = max (B.length jsHeader)
+                           $ max (B.length wasmHeader)
+                                 (B.length hsHeader)
+
+  bs <- B.hGet h max_header_length
+  pure $! getObjectKindBS bs
+
+-- | Get the kind of an object stored in a bytestring, if any
+getObjectKindBS :: B.ByteString -> Maybe ObjectKind
+getObjectKindBS bs
+  | jsHeader   `B.isPrefixOf` bs = Just ObjJs
+  | hsHeader   `B.isPrefixOf` bs = Just ObjHs
+  | wasmHeader `B.isPrefixOf` bs = Just ObjCc
+  | otherwise                    = Nothing
+
+-- Header added to JS sources to discriminate them from other object files.
+-- They all have .o extension but JS sources have this header.
+jsHeader :: B.ByteString
+jsHeader = unsafePerformIO $ B.unsafePackAddressLen 8 "GHCJS_JS"#
+
+hsHeader :: B.ByteString
+hsHeader = unsafePerformIO $ B.unsafePackAddressLen 8 "GHCJS_HS"#
+
+wasmHeader :: B.ByteString
+wasmHeader = unsafePerformIO $ B.unsafePackAddressLen 4 "\0asm"#
+
+
+
+------------------------------------------------
+-- HS objects
+--
+--  file layout:
+--   - magic "GHCJS_HS"
+--   - compiler version tag
+--   - module name
+--   - offsets of string table
+--   - dependencies
+--   - offset of the index
+--   - unit infos
+--   - index
+--   - string table
+--
+------------------------------------------------
+
+-- | A HS object file
 data Object = Object
   { objModuleName    :: !ModuleName
     -- ^ name of the module
@@ -217,11 +283,6 @@ getObjBlock syms bh = do
       }
 
 
--- | A tag that determines the kind of payload in the .o file. See
--- @StgToJS.Linker.Arhive.magic@ for another kind of magic
-magic :: String
-magic = "GHCJSOBJ"
-
 -- | Serialized block indexes and their exported symbols
 -- (the first block is module-global)
 type Index = [IndexEntry]
@@ -244,7 +305,7 @@ putObject
   -> [ObjBlock] -- ^ linkable units and their symbols
   -> IO ()
 putObject bh mod_name deps os = do
-  forM_ magic (putByte bh . fromIntegral . ord)
+  putByteString bh hsHeader
   put_ bh (show hiVersion)
 
   -- we store the module name as a String because we don't want to have to
@@ -267,37 +328,12 @@ putObject bh mod_name deps os = do
         pure (oiSymbols o,p)
       pure idx
 
--- | Test if the object file is a JS object
-isJsObjectFile :: FilePath -> IO Bool
-isJsObjectFile fp = do
-  let !n = length magic
-  withBinaryFile fp ReadMode $ \hdl -> do
-    allocaArray n $ \ptr -> do
-      n' <- hGetBuf hdl ptr n
-      if (n' /= n)
-        then pure False
-        else checkMagic (peekElemOff ptr)
-
--- | Check magic
-checkMagic :: (Int -> IO Word8) -> IO Bool
-checkMagic get_byte = do
-  let go_magic !i = \case
-        []     -> pure True
-        (e:es) -> get_byte i >>= \case
-          c | fromIntegral (ord e) == c -> go_magic (i+1) es
-            | otherwise                 -> pure False
-  go_magic 0 magic
-
--- | Parse object magic
-getCheckMagic :: BinHandle -> IO Bool
-getCheckMagic bh = checkMagic (const (getByte bh))
-
 -- | Parse object header
 getObjectHeader :: BinHandle -> IO (Either String ModuleName)
 getObjectHeader bh = do
-  is_magic <- getCheckMagic bh
-  case is_magic of
-    False -> pure (Left "invalid magic header")
+  magic <- getByteString bh (B.length hsHeader)
+  case magic == hsHeader of
+    False -> pure (Left "invalid magic header for HS object")
     True  -> do
       is_correct_version <- ((== hiVersion) . read) <$> get bh
       case is_correct_version of
@@ -630,3 +666,134 @@ instance Binary StaticLit where
     6 -> BinLit    <$> get bh
     7 -> LabelLit  <$> get bh <*> get bh
     n -> error ("Binary get bh StaticLit: invalid tag " ++ show n)
+
+
+------------------------------------------------
+-- JS objects
+------------------------------------------------
+
+-- | Options obtained from pragmas in JS files
+data JSOptions = JSOptions
+  { enableCPP                  :: !Bool     -- ^ Enable CPP on the JS file
+  , emccExtraOptions           :: ![String] -- ^ Pass additional options to emcc at link time
+  , emccExportedFunctions      :: ![String] -- ^ Arguments for `-sEXPORTED_FUNCTIONS`
+  , emccExportedRuntimeMethods :: ![String] -- ^ Arguments for `-sEXPORTED_RUNTIME_METHODS`
+  }
+  deriving (Eq, Ord)
+
+
+instance Binary JSOptions where
+  put_ bh (JSOptions a b c d) = do
+    put_ bh a
+    put_ bh b
+    put_ bh c
+    put_ bh d
+  get bh = JSOptions <$> get bh <*> get bh <*> get bh <*> get bh
+
+instance Semigroup JSOptions where
+  a <> b = JSOptions
+    { enableCPP                  = enableCPP a || enableCPP b
+    , emccExtraOptions           = emccExtraOptions a ++ emccExtraOptions b
+    , emccExportedFunctions      = List.nub (List.sort (emccExportedFunctions a ++ emccExportedFunctions b))
+    , emccExportedRuntimeMethods = List.nub (List.sort (emccExportedRuntimeMethods a ++ emccExportedRuntimeMethods b))
+    }
+
+defaultJSOptions :: JSOptions
+defaultJSOptions = JSOptions
+  { enableCPP                  = False
+  , emccExtraOptions           = []
+  , emccExportedRuntimeMethods = []
+  , emccExportedFunctions      = []
+  }
+
+-- mimics `lines` implementation
+splitOnComma :: String -> [String]
+splitOnComma s = cons $ case break (== ',') s of
+                                   (l, s') -> (l, case s' of
+                                                    []      -> []
+                                                    _:s''   -> splitOnComma s'')
+  where
+    cons ~(h, t)        =  h : t
+
+
+
+-- | Get the JS option pragmas from .js files
+getJsOptions :: Handle -> IO JSOptions
+getJsOptions handle = do
+  hSetEncoding handle utf8
+  let trim = dropWhileEndLE isSpace . dropWhile isSpace
+  let go opts = do
+        hIsEOF handle >>= \case
+          True -> pure opts
+          False -> do
+            xs <- hGetLine handle
+            if not ("//#OPTIONS:" `List.isPrefixOf` xs)
+              then pure opts
+              else do
+                -- drop prefix and spaces
+                let ys = trim (drop 11 xs)
+                let opts' = if
+                      | ys == "CPP"
+                      -> opts {enableCPP = True}
+
+                      | Just s <- List.stripPrefix "EMCC:EXPORTED_FUNCTIONS=" ys
+                      , fns <- fmap trim (splitOnComma s)
+                      -> opts { emccExportedFunctions = emccExportedFunctions opts ++ fns }
+
+                      | Just s <- List.stripPrefix "EMCC:EXPORTED_RUNTIME_METHODS=" ys
+                      , fns <- fmap trim (splitOnComma s)
+                      -> opts { emccExportedRuntimeMethods = emccExportedRuntimeMethods opts ++ fns }
+
+                      | Just s <- List.stripPrefix "EMCC:EXTRA=" ys
+                      -> opts { emccExtraOptions = emccExtraOptions opts ++ [s] }
+
+                      | otherwise
+                      -> panic ("Unrecognized JS pragma: " ++ ys)
+
+                go opts'
+  go defaultJSOptions
+
+-- | Parse option pragma in JS file
+getOptionsFromJsFile :: FilePath     -- ^ Input file
+                     -> IO JSOptions -- ^ Parsed options.
+getOptionsFromJsFile filename
+    = Exception.bracket
+              (openBinaryFile filename ReadMode)
+              hClose
+              getJsOptions
+
+
+-- | Write a JS object (embed some handwritten JS code)
+writeJSObject :: JSOptions -> B.ByteString -> FilePath -> IO ()
+writeJSObject opts contents output_fn = do
+  bh <- openBinMem (B.length contents + 1000)
+
+  putByteString bh jsHeader
+  put_ bh opts
+  put_ bh contents
+
+  writeBinMem bh output_fn
+
+
+-- | Read a JS object from BinHandle
+parseJSObject :: BinHandle -> IO (JSOptions, B.ByteString)
+parseJSObject bh = do
+  magic <- getByteString bh (B.length jsHeader)
+  case magic == jsHeader of
+    False -> panic "invalid magic header for JS object"
+    True  -> do
+      opts     <- get bh
+      contents <- get bh
+      pure (opts,contents)
+
+-- | Read a JS object from ByteString
+parseJSObjectBS :: B.ByteString -> IO (JSOptions, B.ByteString)
+parseJSObjectBS bs = do
+  bh <- unsafeUnpackBinBuffer bs
+  parseJSObject bh
+
+-- | Read a JS object from file
+readJSObject :: FilePath -> IO (JSOptions, B.ByteString)
+readJSObject input_fn = do
+  bh <- readBinMem input_fn
+  parseJSObject bh

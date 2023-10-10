@@ -17,9 +17,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Utils
-  ( getOptionsFromJsFile
-  , JSOption(..)
-  , jsExeFileName
+  ( jsExeFileName
   , getInstalledPackageLibDirs
   , getInstalledPackageHsLibs
   , commonCppDefs
@@ -41,11 +39,7 @@ import          GHC.StgToJS.Types
 
 import           Prelude
 import GHC.Platform
-import GHC.Utils.Misc
 import Data.List (isPrefixOf)
-import System.IO
-import Data.Char (isSpace)
-import qualified Control.Exception as Exception
 
 import GHC.Builtin.Types
 import Language.Haskell.Syntax.Basic
@@ -253,6 +247,10 @@ genCommonCppDefs profiling = mconcat
   , "#define RETURN_UBX_TUP9(x1,x2,x3,x4,x5,x6,x7,x8,x9) { h$ret1 = (x2); h$ret2 = (x3); h$ret3 = (x4); h$ret4 = (x5); h$ret5 = (x6); h$ret6 = (x7); h$ret7 = (x8); h$ret8 = (x9); return (x1); }\n"
   , "#define RETURN_UBX_TUP10(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { h$ret1 = (x2); h$ret2 = (x3); h$ret3 = (x4); h$ret4 = (x5); h$ret5 = (x6); h$ret6 = (x7); h$ret7 = (x8); h$ret8 = (x9); h$ret9 = (x10); return (x1); }\n"
 
+  , "#define RETURN_INT64(h,l) RETURN_UBX_TUP2((h)|0,(l)>>>0)\n"
+  , "#define RETURN_WORD64(h,l) RETURN_UBX_TUP2((h)>>>0,(l)>>>0)\n"
+  , "#define RETURN_ADDR(a,o) RETURN_UBX_TUP2(a,o)\n"
+
   , "#define CALL_UBX_TUP2(r1,r2,c) { (r1) = (c); (r2) = h$ret1; }\n"
   , "#define CALL_UBX_TUP3(r1,r2,r3,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; }\n"
   , "#define CALL_UBX_TUP4(r1,r2,r3,r4,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; (r4) = h$ret3; }\n"
@@ -282,38 +280,3 @@ jsExeFileName dflags
     dropPrefix prefix xs
       | prefix `isPrefixOf` xs = drop (length prefix) xs
       | otherwise              = xs
-
-
--- | Parse option pragma in JS file
-getOptionsFromJsFile :: FilePath      -- ^ Input file
-                     -> IO [JSOption] -- ^ Parsed options, if any.
-getOptionsFromJsFile filename
-    = Exception.bracket
-              (openBinaryFile filename ReadMode)
-              hClose
-              getJsOptions
-
-data JSOption = CPP deriving (Eq, Ord)
-
-getJsOptions :: Handle -> IO [JSOption]
-getJsOptions handle = do
-  hSetEncoding handle utf8
-  prefix' <- B.hGet handle prefixLen
-  if prefix == prefix'
-  then parseJsOptions <$> hGetLine handle
-  else pure []
- where
-  prefix :: B.ByteString
-  prefix = "//#OPTIONS:"
-  prefixLen = B.length prefix
-
-parseJsOptions :: String -> [JSOption]
-parseJsOptions xs = go xs
-  where
-    trim = dropWhileEndLE isSpace . dropWhile isSpace
-    go [] = []
-    go xs = let (tok, rest) = break (== ',') xs
-                tok' = trim tok
-                rest' = drop 1 rest
-            in  if | tok' == "CPP" -> CPP : go rest'
-                   | otherwise     -> go rest'

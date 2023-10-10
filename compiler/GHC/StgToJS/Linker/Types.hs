@@ -18,8 +18,6 @@
 
 module GHC.StgToJS.Linker.Types
   ( JSLinkConfig (..)
-  , defaultJSLinkConfig
-  , LinkedObj (..)
   , LinkPlan (..)
   )
 where
@@ -27,7 +25,7 @@ where
 import GHC.StgToJS.Object
 
 import GHC.Unit.Types
-import GHC.Utils.Outputable (hsep,Outputable(..),text,ppr, hang, IsDoc (vcat), IsLine (hcat))
+import GHC.Utils.Outputable (Outputable(..),text,ppr, hang, IsDoc (vcat), IsLine (hcat))
 
 import Data.Map.Strict      (Map)
 import Data.Set             (Set)
@@ -42,23 +40,18 @@ import Prelude
 --------------------------------------------------------------------------------
 
 data JSLinkConfig = JSLinkConfig
-  { lcNoJSExecutables    :: !Bool -- ^ Dont' build JS executables
-  , lcNoHsMain           :: !Bool -- ^ Don't generate Haskell main entry
-  , lcNoRts              :: !Bool -- ^ Don't dump the generated RTS
-  , lcNoStats            :: !Bool -- ^ Disable .stats file generation
-  , lcForeignRefs        :: !Bool -- ^ Dump .frefs (foreign references) files
-  , lcCombineAll         :: !Bool -- ^ Generate all.js (combined js) + wrappers
-  }
-
--- | Default linker configuration
-defaultJSLinkConfig :: JSLinkConfig
-defaultJSLinkConfig = JSLinkConfig
-  { lcNoJSExecutables = False
-  , lcNoHsMain        = False
-  , lcNoRts           = False
-  , lcNoStats         = False
-  , lcCombineAll      = True
-  , lcForeignRefs     = True
+  { lcNoJSExecutables :: !Bool         -- ^ Dont' build JS executables
+  , lcNoHsMain        :: !Bool         -- ^ Don't generate Haskell main entry
+  , lcNoRts           :: !Bool         -- ^ Don't dump the generated RTS
+  , lcNoStats         :: !Bool         -- ^ Disable .stats file generation
+  , lcForeignRefs     :: !Bool         -- ^ Dump .frefs (foreign references) files
+  , lcCombineAll      :: !Bool         -- ^ Generate all.js (combined js) + wrappers
+  , lcForceEmccRts    :: !Bool
+      -- ^ Force the link with the emcc rts. Use this if you plan to dynamically
+      -- load wasm modules made from C files (e.g. in iserv).
+  , lcLinkCsources    :: !Bool
+      -- ^ Link C sources (compiled to JS/Wasm) with Haskell code compiled to
+      -- JS. This implies the use of the Emscripten RTS to load this code.
   }
 
 data LinkPlan = LinkPlan
@@ -68,11 +61,15 @@ data LinkPlan = LinkPlan
   , lkp_dep_blocks :: Set BlockRef
       -- ^ Blocks to link
 
-  , lkp_archives   :: Set FilePath
-      -- ^ Archives to load JS sources from
+  , lkp_archives   :: !(Set FilePath)
+      -- ^ Archives to load JS and Cc sources from (JS code corresponding to
+      -- Haskell code is handled with blocks above)
 
-  , lkp_extra_js   :: Set FilePath
-      -- ^ Extra JS files to link
+  , lkp_objs_js   :: !(Set FilePath)
+      -- ^ JS objects to link
+
+  , lkp_objs_cc   :: !(Set FilePath)
+      -- ^ Cc objects to link
   }
 
 instance Outputable LinkPlan where
@@ -81,20 +78,7 @@ instance Outputable LinkPlan where
             -- plan, just meta info used to retrieve actual block contents
             -- [ hcat [ text "Block info: ", ppr (lkp_block_info s)]
             [ hcat [ text "Blocks: ", ppr (S.size (lkp_dep_blocks s))]
-            , hang (text "JS files from archives:") 2 (vcat (fmap text (S.toList (lkp_archives s))))
-            , hang (text "Extra JS:") 2 (vcat (fmap text (S.toList (lkp_extra_js s))))
+            , hang (text "Archives:") 2 (vcat (fmap text (S.toList (lkp_archives s))))
+            , hang (text "Extra JS objects:") 2 (vcat (fmap text (S.toList (lkp_objs_js s))))
+            , hang (text "Extra Cc objects:") 2 (vcat (fmap text (S.toList (lkp_objs_cc s))))
             ]
-
---------------------------------------------------------------------------------
--- Linker Environment
---------------------------------------------------------------------------------
-
--- | An object file that's either already in memory (with name) or on disk
-data LinkedObj
-  = ObjFile   FilePath      -- ^ load from this file
-  | ObjLoaded String Object -- ^ already loaded: description and payload
-
-instance Outputable LinkedObj where
-  ppr = \case
-    ObjFile fp    -> hsep [text "ObjFile", text fp]
-    ObjLoaded s o -> hsep [text "ObjLoaded", text s, ppr (objModuleName o)]
