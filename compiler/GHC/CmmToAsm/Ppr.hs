@@ -243,9 +243,10 @@ pprGNUSectionHeader config t suffix =
         panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags = case t of
       Text
-        | OSMinGW32 <- platformOS platform
+        | OSMinGW32 <- platformOS platform, splitSections
                     -> text ",\"xr\""
-        | otherwise -> text ",\"ax\"," <> sectionType platform "progbits"
+        | splitSections
+                    -> text ",\"ax\"," <> sectionType platform "progbits"
       CString
         | OSMinGW32 <- platformOS platform
                     -> empty
