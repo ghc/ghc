@@ -110,6 +110,7 @@ pos2delta (refl,refc) (l,c) = deltaPos lo co
     lo = l - refl
     co = if lo == 0 then c - refc
                     else c
+                    -- else c - 1
 
 -- | Apply the delta to the current position, taking into account the
 -- current column offset if advancing to a new line
@@ -166,6 +167,12 @@ badRealSrcSpan = mkRealSrcSpan bad bad
 spanLength :: RealSrcSpan -> Int
 spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol
 
+
+-- | Useful for debug dumps
+eloc2str :: EpaLocation -> String
+eloc2str (EpaSpan r _) = "EpaSpan " ++ show (rs2range r)
+eloc2str epaLoc = show epaLoc
+
 -- ---------------------------------------------------------------------
 -- | Checks whether a SrcSpan has zero length.
 isPointSrcSpan :: RealSrcSpan -> Bool
@@ -174,22 +181,23 @@ isPointSrcSpan ss = spanLength ss == 0
 
 -- ---------------------------------------------------------------------
 
-origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
-origDelta pos pp = op
+-- | A GHC comment includes the span of the preceding token.  Take an
+-- original comment, and convert the 'Anchor to have a have a
+-- `MovedAnchor` operation based on the original location, only if it
+-- does not already have one.
+commentOrigDelta :: LEpaComment -> LEpaComment
+commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
+  = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
+                  `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
   where
-    (r,c) = ss2posEnd pp
+        (r,c) = ss2posEnd pp
 
-    op = if r == 0
-           then (             ss2delta (r,c+1) pos)
-           else (tweakDelta $ ss2delta (r,c  ) pos)
+        op = if r == 0
+               then MovedAnchor (ss2delta (r,c+1) la) []
+               else MovedAnchor (ss2delta (r,c)   la) []
 
--- ---------------------------------------------------------------------
-
--- | For comment-related deltas starting on a new line we have an
--- off-by-one problem. Adjust
-tweakDelta :: DeltaPos  -> DeltaPos
-tweakDelta (SameLine d) = SameLine d
-tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
+origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
+origDelta pos pp = ss2delta (ss2posEnd pp) pos
 
 -- ---------------------------------------------------------------------
 
@@ -222,9 +230,16 @@ insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
 insertCppComments (L l p) cs = L l p'
   where
     an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
-      (EpAnn a an ocs) -> EpAnn a an (EpaComments cs')
+      (EpAnn a an ocs) -> EpAnn a an cs'
         where
-          cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
+          pc = priorComments ocs
+          fc = getFollowingComments ocs
+          cs' = case fc of
+            [] -> EpaComments $ sortEpaComments $ pc ++ fc ++ cs
+            (L ac _:_) -> EpaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
+                                              (sortEpaComments $ fc ++ cs_after)
+                   where
+                     (cs_before,cs_after) = break (\(L l0 _) ->   (ss2pos $ anchor l0) < (ss2pos $ anchor ac) ) cs
       unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
@@ -235,7 +250,6 @@ ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDoc
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> [Comment]
 tokComment t@(L lt c) =
@@ -289,7 +303,6 @@ comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
 mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
-mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
 mkComment :: String -> Anchor -> RealSrcSpan -> Comment
@@ -319,8 +332,8 @@ sortEpaComments cs = sortBy cmp cs
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
 mkKWComment kw (EpaSpan ss _)
   = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
-mkKWComment kw (EpaDelta dp _)
-  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaDelta dp cs)
+  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp cs)) placeholderRealSpan (Just kw)
 
 -- | Detects a comment which originates from a specific keyword.
 isKWComment :: Comment -> Bool
@@ -366,48 +379,11 @@ name2String = showPprUnsafe
 
 -- ---------------------------------------------------------------------
 
--- occAttributes :: OccName.OccName -> String
--- occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
---   where
---     -- ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
---     ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
---     vo = if isVarOcc     o then "Var "     else ""
---     tv = if isTvOcc      o then "Tv "      else ""
---     tc = if isTcOcc      o then "Tc "      else ""
---     d  = if isDataOcc    o then "Data "    else ""
---     ds = if isDataSymOcc o then "DataSym " else ""
---     s  = if isSymOcc     o then "Sym "     else ""
---     v  = if isValOcc     o then "Val "     else ""
-
- -- ---------------------------------------------------------------------
-
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
 locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
-
-setAnchorAn :: (NoAnn an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
-setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc noAnn cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-
-setAnchorEpa :: (NoAnn an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
-setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
-
-setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
-setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
-
-setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
-setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
-  where
-    anc' = anc { anchor_op = UnchangedAnchor }
-    an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
 
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
@@ -421,11 +397,15 @@ trailingAnnLoc :: TrailingAnn -> EpaLocation
 trailingAnnLoc (AddSemiAnn ss)    = ss
 trailingAnnLoc (AddCommaAnn ss)   = ss
 trailingAnnLoc (AddVbarAnn ss)    = ss
+trailingAnnLoc (AddDarrowAnn ss)  = ss
+trailingAnnLoc (AddDarrowUAnn ss) = ss
 
 setTrailingAnnLoc :: TrailingAnn -> EpaLocation -> TrailingAnn
 setTrailingAnnLoc (AddSemiAnn _)    ss = (AddSemiAnn ss)
 setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
 setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
+setTrailingAnnLoc (AddDarrowAnn _)  ss = (AddDarrowAnn ss)
+setTrailingAnnLoc (AddDarrowUAnn _) ss = (AddDarrowUAnn ss)
 
 addEpAnnLoc :: AddEpAnn -> EpaLocation
 addEpAnnLoc (AddEpAnn _ l) = l
@@ -435,7 +415,7 @@ addEpAnnLoc (AddEpAnn _ l) = l
 -- TODO: move this to GHC
 anchorToEpaLocation :: Anchor -> EpaLocation
 anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r Strict.Nothing
-anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
+anchorToEpaLocation (Anchor _ (MovedAnchor dp cs)) = EpaDelta dp cs
 
 -- ---------------------------------------------------------------------
 -- Horrible hack for dealing with some things still having a SrcSpan,
@@ -467,13 +447,13 @@ hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : Unhelpful
 hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
 hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
   = if s <= 0 && e <= 0
-    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+    then Anchor r (MovedAnchor (deltaPos (-s) (-e)) [])
       `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
     else Anchor r UnchangedAnchor
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
 hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
-hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
+hackAnchorToSrcSpan (Anchor r (MovedAnchor dp _cs))
   = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
       `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
   where

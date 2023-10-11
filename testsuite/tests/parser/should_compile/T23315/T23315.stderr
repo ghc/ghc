@@ -12,7 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnSignature (EpaSpan { T23315.hsig:1:1-9 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T23315.hsig:1:18-22 }))]
-      []
+     []
      (Nothing))
     (EpaComments
      []))
@@ -57,7 +57,7 @@
      (TypeSig
       (EpAnn
        (Anchor
-        { T23315.hsig:3:1 }
+        { T23315.hsig:3:1-7 }
         (UnchangedAnchor))
        (AnnSig
         (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
@@ -81,7 +81,7 @@
           (HsTupleTy
            (EpAnn
             (Anchor
-             { T23315.hsig:3:6 }
+             { T23315.hsig:3:6-7 }
              (UnchangedAnchor))
             (AnnParen
              (AnnParens)
