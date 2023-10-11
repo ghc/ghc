@@ -17,7 +17,7 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 library
-  exposed-modules: QLib
+  exposed-modules: QLib PLib
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4 && <5

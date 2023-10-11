@@ -44,7 +44,7 @@
      (FixSig
       (EpAnn
        (Anchor
-        { T20846.hs:3:1-6 }
+        { T20846.hs:3:1-11 }
         (UnchangedAnchor))
        [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
        (EpaComments
@@ -145,3 +145,5 @@
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

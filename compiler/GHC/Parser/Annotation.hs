@@ -46,6 +46,7 @@ module GHC.Parser.Annotation (
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -65,6 +66,7 @@ module GHC.Parser.Annotation (
   epAnnAnns, epAnnAnnsL,
   annParen2AddEpAnn,
   epAnnComments,
+  s_comments, s_entry,
 
   -- ** Working with locations of annotations
   sortLocatedA,
@@ -83,8 +85,9 @@ module GHC.Parser.Annotation (
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
   addCommentsToEpAnn, setCommentsEpAnn,
-  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA, commentsOnlyA,
-  removeCommentsA,
+  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA,
+  transferPriorCommentsA, transferFollowingA,
+  commentsOnlyA, removeCommentsA,
 
   placeholderRealSpan,
   ) where
@@ -371,13 +374,6 @@ data EpaCommentTok =
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}
-  | EpaEofComment                 -- ^ empty comment, capturing
-                                  -- location of EOF
-
-  -- See #19697 for a discussion of EpaEofComment's use and how it
-  -- should be removed in favour of capturing it in the location for
-  -- 'Located HsModule' in the parser.
-
     deriving (Eq, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
@@ -409,7 +405,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- sort the relative order.
 data EpaLocation = EpaSpan !RealSrcSpan !(Strict.Maybe BufSpan)
                  | EpaDelta !DeltaPos ![LEpaComment]
-               deriving (Data,Eq)
+               deriving (Data,Eq,Show)
 
 -- | Tokens embedded in the AST have an EpaLocation, unless they come from
 -- generated code (e.g. by TH).
@@ -539,7 +535,7 @@ data Anchor = Anchor        { anchor :: RealSrcSpan
 -- anchor to be freely moved, without worrying about recalculating the
 -- appropriate anchor span.
 data AnchorOperation = UnchangedAnchor
-                     | MovedAnchor DeltaPos
+                     | MovedAnchor !DeltaPos ![LEpaComment]
         deriving (Data, Eq, Show)
 
 
@@ -647,15 +643,19 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn EpaLocation    -- ^ Trailing ';'
-  | AddCommaAnn EpaLocation   -- ^ Trailing ','
-  | AddVbarAnn EpaLocation    -- ^ Trailing '|'
+  = AddSemiAnn    { ta_location :: EpaLocation }  -- ^ Trailing ';'
+  | AddCommaAnn   { ta_location :: EpaLocation }  -- ^ Trailing ','
+  | AddVbarAnn    { ta_location :: EpaLocation }  -- ^ Trailing '|'
+  | AddDarrowAnn  { ta_location :: EpaLocation }  -- ^ Trailing '=>'
+  | AddDarrowUAnn { ta_location :: EpaLocation }  -- ^ Trailing  "⇒"
   deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
   ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
   ppr (AddCommaAnn ss)   = text "AddCommaAnn"   <+> ppr ss
   ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
+  ppr (AddDarrowAnn ss)  = text "AddDarrowAnn"  <+> ppr ss
+  ppr (AddDarrowUAnn ss) = text "AddDarrowUAnn" <+> ppr ss
 
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.
@@ -925,6 +925,8 @@ trailingAnnToAddEpAnn :: TrailingAnn -> AddEpAnn
 trailingAnnToAddEpAnn (AddSemiAnn ss)    = AddEpAnn AnnSemi ss
 trailingAnnToAddEpAnn (AddCommaAnn ss)   = AddEpAnn AnnComma ss
 trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
+trailingAnnToAddEpAnn (AddDarrowUAnn ss) = AddEpAnn AnnDarrowU ss
+trailingAnnToAddEpAnn (AddDarrowAnn ss)  = AddEpAnn AnnDarrow ss
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
@@ -960,6 +962,11 @@ addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
     addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn l]}
+
+noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
+noTrailingN (SrcSpanAnn EpAnnNotUsed l) = SrcSpanAnn EpAnnNotUsed l
+noTrailingN (SrcSpanAnn s l)
+    = SrcSpanAnn (s { anns = (anns s) { nann_trailing = [] } }) l
 
 {-
 Note [list append in addTrailing*]
@@ -1165,6 +1172,13 @@ epAnnComments :: EpAnn an -> EpAnnComments
 epAnnComments EpAnnNotUsed = EpaComments []
 epAnnComments (EpAnn _ _ cs) = cs
 
+-- Forward compatibility
+s_comments :: SrcAnn ann -> EpAnnComments
+s_comments (SrcSpanAnn an _) = epAnnComments an
+
+s_entry :: SrcAnn ann -> EpaLocation
+s_entry = epaLocationFromSrcAnn
+
 -- ---------------------------------------------------------------------
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]
 sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
@@ -1274,6 +1288,26 @@ transferAnnsA (SrcSpanAnn (EpAnn a an cs) l) to
       (SrcSpanAnn (EpAnn a an' cs') loc)
         -> SrcSpanAnn (EpAnn a (an' <> an) (cs' <> cs)) loc
 
+-- | Transfer trailing items but not comments from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+  = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
+transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+  = (SrcSpanAnn (EpAnn a1 noAnn cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) an1 cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setPriorComments emptyComments pc
+    cs2' = setFollowingComments emptyComments fc
+transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+  = (SrcSpanAnn (EpAnn a1 noAnn cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setPriorComments emptyComments pc
+    cs2' = setFollowingComments cs2 fc
+
 -- | Transfer trailing items from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
 transferAnnsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
@@ -1293,6 +1327,27 @@ transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l'
   = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') noAnn cs) l')
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
   = (SrcSpanAnn (EpAnn a an emptyComments) l, SrcSpanAnn (EpAnn a' an' (cs <> cs')) l')
+
+-- | Transfer prior comments only from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+  = (SrcSpanAnn EpAnnNotUsed l1,  SrcSpanAnn ann2 l2)
+transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn (spanAsAnchor l2) noAnn cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setFollowingComments emptyComments fc
+    cs2' = setPriorComments emptyComments pc
+transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn a2 an2 cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setFollowingComments emptyComments fc
+    cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
+
 
 -- | Remove the exact print annotations payload, leaving only the
 -- anchor and comments.
@@ -1379,8 +1434,8 @@ instance Outputable Anchor where
   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
 
 instance Outputable AnchorOperation where
-  ppr UnchangedAnchor   = text "UnchangedAnchor"
-  ppr (MovedAnchor d)   = text "MovedAnchor" <+> ppr d
+  ppr UnchangedAnchor    = text "UnchangedAnchor"
+  ppr (MovedAnchor d cs) = text "MovedAnchor" <+> ppr d <+> ppr cs
 
 instance Outputable DeltaPos where
   ppr (SameLine c) = text "SameLine" <+> ppr c
