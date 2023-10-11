@@ -788,7 +788,15 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
   if backendGeneratesCode (backend (hsc_dflags hsc_env)) then
     do
       res <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
-      when (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env)) $ do
+      -- Only run dynamic-too if the backend generates object files
+      -- See Note [Writing interface files]
+      -- If we are writing a simple interface (not . backendWritesFiles), then
+      -- hscMaybeWriteIface in the regular pipeline will write both the hi and
+      -- dyn_hi files. This way we can avoid running the pipeline twice and
+      -- generating a duplicate linkable.
+      -- We must not run the backend a second time with `dynamicNow` enable because
+      -- all the work has already been done in the first pipeline.
+      when (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env) && backendWritesFiles (backend (hsc_dflags hsc_env)) ) $ do
           let dflags' = setDynamicNow (hsc_dflags hsc_env) -- set "dynamicNow"
           () <$ hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
       return res
