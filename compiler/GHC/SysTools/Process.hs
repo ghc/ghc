@@ -10,14 +10,14 @@ module GHC.SysTools.Process where
 
 import GHC.Prelude
 
-import GHC.Driver.DynFlags
-
 import GHC.Utils.Exception
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
+import GHC.Utils.CliOption
 
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
 import GHC.Data.FastString
@@ -32,7 +32,6 @@ import System.IO
 import System.IO.Error as IO
 import System.Process
 
-import GHC.Utils.TmpFs
 
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
 -- @process >= 1.6.9.0@).
@@ -153,14 +152,14 @@ runSomething logger phase_name pgm args =
 runSomethingResponseFile
   :: Logger
   -> TmpFs
-  -> DynFlags
+  -> TempDir
   -> (String->String)
   -> String
   -> String
   -> [Option]
   -> Maybe [(String,String)]
   -> IO ()
-runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_env =
+runSomethingResponseFile logger tmpfs tmp_dir filter_fn phase_name pgm args mb_env =
     runSomethingWith logger phase_name pgm args $ \real_args -> do
         fp <- getResponseFile real_args
         let args = ['@':fp]
@@ -168,7 +167,7 @@ runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_en
         return (r,())
   where
     getResponseFile args = do
-      fp <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "rsp"
+      fp <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "rsp"
       withFile fp WriteMode $ \h -> do
           hSetEncoding h utf8
           hPutStr h $ unlines $ map escape args

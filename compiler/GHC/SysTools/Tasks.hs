@@ -117,7 +117,7 @@ runCpp logger tmpfs dflags args = traceSystoolCommand logger "cpp" $ do
       userOpts_c = map Option $ getOpts dflags opt_c
       args2 = args0 ++ args ++ userOpts_c
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs dflags cc_filter "C pre-processor" p
+  runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter "C pre-processor" p
                            args2 mb_env
 
 -- | Run the Haskell C preprocessor.
@@ -148,7 +148,7 @@ runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs dflags cc_filter dbgstring prog args2
+  runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter dbgstring prog args2
                            mb_env
  where
   -- force the C compiler to interpret this file as C when
@@ -275,7 +275,7 @@ runLink logger tmpfs dflags args = traceSystoolCommand logger "linker" $ do
       optl_args = map Option (getOpts dflags opt_l)
       args2     = args0 ++ args ++ optl_args
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs dflags ld_filter "Linker" p args2 mb_env
+  runSomethingResponseFile logger tmpfs (tmpDir dflags) ld_filter "Linker" p args2 mb_env
   where
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
@@ -339,7 +339,7 @@ runMergeObjects logger tmpfs dflags args =
     if toolSettings_mergeObjsSupportsResponseFiles (toolSettings dflags)
       then do
         mb_env <- getGccEnv args2
-        runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
+        runSomethingResponseFile logger tmpfs (tmpDir dflags) id "Merge objects" p args2 mb_env
       else do
         runSomething logger "Merge objects" p args2
 
