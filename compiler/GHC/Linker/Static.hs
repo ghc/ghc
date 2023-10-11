@@ -26,6 +26,7 @@ import GHC.Linker.MacOS
 import GHC.Linker.Unit
 import GHC.Linker.Dynamic
 import GHC.Linker.ExtraObj
+import GHC.Linker.External
 import GHC.Linker.Windows
 import GHC.Linker.Static.Utils
 
@@ -181,14 +182,12 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
       OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger tmpfs dflags output_fn
       _                                       -> return []
 
-    let link dflags args | platformOS platform == OSDarwin
-                            = do
-                                 GHC.SysTools.runLink logger tmpfs dflags args
-                                 -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
-                                 when (gopt Opt_RPath dflags) $
-                                   GHC.Linker.MacOS.runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
-                         | otherwise
-                            = GHC.SysTools.runLink logger tmpfs dflags args
+    let linker_config = initLinkerConfig dflags
+    let link dflags args = do
+          runLink logger tmpfs linker_config args
+          -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
+          when (platformOS platform == OSDarwin && gopt Opt_RPath dflags) $
+            GHC.Linker.MacOS.runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
 
     link dflags (
                        map GHC.SysTools.Option verbFlags
