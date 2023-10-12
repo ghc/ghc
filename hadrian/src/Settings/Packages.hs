@@ -301,8 +301,7 @@ rtsPackageArgs = package rts ? do
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
-                                                    , "-optc-DNOSMP" ]
+          , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
           ]
 
     let cArgs = mconcat
@@ -319,6 +318,8 @@ rtsPackageArgs = package rts ? do
 
           , arg "-Irts"
           , arg $ "-I" ++ path
+
+          , notM targetSupportsSMP           ? arg "-DNOSMP"
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
