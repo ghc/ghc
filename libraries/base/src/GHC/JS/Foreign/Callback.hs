@@ -145,5 +145,5 @@ foreign import javascript unsafe "(($1, $2) => { return h$makeCallbackApply($1, 
 foreign import javascript unsafe "(($1, $2) => { return h$makeCallbackApply($1, h$runSyncReturn, [false], $2); })"
   js_syncCallbackApplyReturn :: Int -> Exts.Any -> IO (Callback b)
 
-foreign import javascript unsafe "(($1) => { return h$release($1); })"
+foreign import javascript unsafe "h$release"
   js_release :: Callback a -> IO ()

@@ -43,14 +43,14 @@ foreign import javascript unsafe
   js_setCurrentThreadResultWouldBlock :: IO ()
 
 foreign import javascript unsafe
-  "(($1) => { return h$setCurrentThreadResultJSException($1); })"
+  "h$setCurrentThreadResultJSException"
   js_setCurrentThreadResultJSException :: JSVal -> IO ()
 
 foreign import javascript unsafe
-  "(($1) => { return h$setCurrentThreadResultHaskellException($1); })"
+  "h$setCurrentThreadResultHaskellException"
   js_setCurrentThreadResultHaskellException :: JSVal -> IO ()
 
 foreign import javascript unsafe
-  "(($1) => { return h$setCurrentThreadResultValue($1); })"
+  "h$setCurrentThreadResultValue"
   js_setCurrentThreadResultValue :: JSVal -> IO ()
 

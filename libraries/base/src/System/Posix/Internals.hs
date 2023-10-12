@@ -504,7 +504,7 @@ foreign import ccall unsafe "HsBase.h __hscore_lstat"
 
 #if defined(javascript_HOST_ARCH)
 
-foreign import javascript unsafe "(() => { return rts_isThreaded; })" rtsIsThreaded_ :: Int
+foreign import javascript unsafe "h$rts_isThreaded" rtsIsThreaded_ :: Int
 foreign import javascript interruptible "h$base_access"
     c_access :: CString -> CInt -> IO CInt
 foreign import javascript interruptible "h$base_chmod"

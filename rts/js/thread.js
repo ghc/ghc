@@ -1460,5 +1460,3 @@ function h$makeMVarListener(mv, stopProp, stopImmProp, preventDefault) {
 function h$rs() {
   return h$stack[h$sp];
 }
-
-const rts_isThreaded = 0;

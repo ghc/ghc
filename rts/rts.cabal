@@ -99,6 +99,7 @@ library
       c-sources: version.c
 
       js-sources:
+        js/config.js
         js/structs.js
         js/arith.js
         js/compact.js

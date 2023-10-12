@@ -259,16 +259,16 @@ seqList xs = go xs `seq` xs
   where go (y:ys) = y `seq` go ys
         go []     = ()
 
-foreign import javascript unsafe "(($1) => { return h$toHsString($1); })"
+foreign import javascript unsafe "h$toHsString"
   js_fromJSString :: JSVal -> Exts.Any
 
-foreign import javascript unsafe "(($1) => { return h$fromHsString($1); })"
+foreign import javascript unsafe "h$fromHsString"
   js_toJSString :: Exts.Any -> JSVal
 
-foreign import javascript unsafe "(($1) => { return h$toHsListJSVal($1); })"
+foreign import javascript unsafe "h$toHsListJSVal"
   js_fromJSArray :: JSVal -> IO Exts.Any
 
-foreign import javascript unsafe "(($1) => { return h$fromHsListJSVal($1); })"
+foreign import javascript unsafe "h$fromHsListJSVal"
   js_toJSArray :: Exts.Any -> IO JSVal
 
 foreign import javascript unsafe "(($1) => { return ($1 === null); })"
