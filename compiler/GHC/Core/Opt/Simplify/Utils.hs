@@ -46,7 +46,7 @@ import GHC.Prelude hiding (head, init, last, tail)
 import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
-import GHC.Types.Literal ( isLitRubbish )
+import GHC.Core.Predicate( isDictId )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
@@ -66,6 +66,7 @@ import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
 
+import GHC.Types.Literal ( isLitRubbish )
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -1488,7 +1489,8 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
        | is_value_lam rhs, IsInteresting <- int_cxt
        = True
        | NotInsideLam <- in_lam
-       , not (isTopLevel top_lvl) || not (exprIsExpandable rhs)
+       , not (isDictId bndr)  -- Solely for SpecConstr
+--       , not (isTopLevel top_lvl) || not (exprIsExpandable rhs)
          -- Inline used-once things; except expandable things at top level
          -- These may arise from user code e.g.
          --     x = [1,2,3]
