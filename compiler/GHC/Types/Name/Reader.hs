@@ -76,6 +76,7 @@ module GHC.Types.Name.Reader (
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrEltX(..), GlobalRdrElt, IfGlobalRdrElt, FieldGlobalRdrElt,
         greName, greNameSpace, greParent, greInfo,
+        plusGRE, insertGRE,
         forceGlobalRdrEnv, hydrateGlobalRdrEnv,
         isLocalGRE, isImportedGRE, isRecFldGRE,
         fieldGREInfo,
@@ -1165,6 +1166,17 @@ data WhichGREs info where
        }
     -> WhichGREs GREInfo
 
+instance Outputable (WhichGREs info) where
+  ppr SameNameSpace = text "SameNameSpace"
+  ppr (RelevantGREs { includeFieldSelectors = sel
+                    , lookupVariablesForFields = vars
+                    , lookupTyConsAsWell = tcs_too })
+    = braces $ hsep
+       [ text "RelevantGREs"
+       , text (show sel)
+       , if vars then text "[vars]" else empty
+       , if tcs_too then text "[tcs]" else empty ]
+
 -- | Look up as many possibly relevant 'GlobalRdrElt's as possible.
 pattern AllRelevantGREs :: WhichGREs GREInfo
 pattern AllRelevantGREs =
@@ -1198,6 +1210,17 @@ data LookupChild
     --
     -- See Note [childGREPriority].
   }
+
+instance Outputable LookupChild where
+  ppr (LookupChild { wantedParent = par
+                   , lookupDataConFirst = dc
+                   , prioritiseParent = prio_parent })
+    = braces $ hsep
+        [ text "LookupChild"
+        , braces (text "parent:" <+> ppr par)
+        , if dc then text "[dc_first]" else empty
+        , if prio_parent then text "[prio_parent]" else empty
+        ]
 
 -- | After looking up something with the given 'NameSpace', is the resulting
 -- 'GlobalRdrElt' we have obtained relevant, according to the 'RelevantGREs'

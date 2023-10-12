@@ -175,7 +175,7 @@ filterAvail keep ie rest =
 -- 'avails' may have several items with the same availName
 -- E.g  import Ix( Ix(..), index )
 -- will give Ix(Ix,index,range) and Ix(index)
--- We want to combine these; addAvail does that
+-- We want to combine these; plusAvail does that
 nubAvails :: [AvailInfo] -> [AvailInfo]
 nubAvails avails = eltsDNameEnv (foldl' add emptyDNameEnv avails)
   where
