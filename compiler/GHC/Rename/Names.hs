@@ -1068,13 +1068,17 @@ Notice that T appears *twice*, once as a child and once as a parent. From
 these two exports, respectively, during construction of the imp_occ_env, we begin
 by associating the following two elements with the key T:
 
-  T -> ImpOccItem { imp_item = T, imp_bundled = [C,T]     , imp_is_parent = False }
-  T -> ImpOccItem { imp_item = T, imp_bundled = [T1,T2,T3], imp_is_parent = True  }
+  T -> ImpOccItem { imp_item = gre1, imp_bundled = [C,T]     , imp_is_parent = False }
+  T -> ImpOccItem { imp_item = gre2, imp_bundled = [T1,T2,T3], imp_is_parent = True  }
 
-We combine these (in function 'combine' in 'mkImportOccEnv') by simply discarding
-the first item, to get:
+where `gre1`, `gre2` are two GlobalRdrElts with greName T.
+We combine these (in function 'combine' in 'mkImportOccEnv') by discarding the
+non-parent item, thusly:
 
-  T -> IE_ITem { imp_item = T, imp_bundled = [T1,T2,T3], imp_is_parent = True }
+  T -> IE_ITem { imp_item = gre1 `plusGRE` gre2, imp_bundled = [T1,T2,T3], imp_is_parent = True }
+
+Note the `plusGRE`: this ensures we don't drop parent information;
+see Note [Preserve parent information when combining import OccEnvs].
 
 So the overall imp_occ_env is:
 
@@ -1133,6 +1137,31 @@ Whereas in case (B) we reach the lookup_ie case for IEThingWith,
 which looks up 'S' and then finds the unique 'foo' amongst its children.
 
 See T16745 for a test of this.
+
+Note [Preserve parent information when combining import OccEnvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When discarding one ImpOccItem in favour of another, as described in
+Note [Dealing with imports], we must make sure to combine the GREs so that
+we don't lose information.
+
+Consider for example #24084:
+
+  module M1 where { class C a where { type T a } }
+  module M2 ( module M1 ) where { import M1 }
+  module M3 where { import M2 ( C, T ); instance C () where T () = () }
+
+When processing the import list of `M3`, we will have two `Avail`s attached
+to `T`, namely `C(C, T)` and `T(T)`. We combine them in the `combine` function
+of `mkImportOccEnv`; as described in Note [Dealing with imports] we discard
+`C(C, T)` in favour of `T(T)`. However, in doing so, we **must not**
+discard the information want that `C` is the parent of `T`. Indeed,
+losing track of this information can cause errors when importing,
+as we could get an error of the form
+
+  ‘T’ is not a (visible) associated type of class ‘C’
+
+This explains why we use `plusGRE` when combining the two ImpOccItems, even
+though we are discarding one in favour of the other.
 -}
 
 -- | All the 'GlobalRdrElt's associated with an 'AvailInfo'.
@@ -1439,6 +1468,14 @@ data ImpOccItem
         -- ^ Is the import item a parent? See Note [Dealing with imports].
       }
 
+instance Outputable ImpOccItem where
+  ppr (ImpOccItem { imp_item = item, imp_bundled = bundled, imp_is_parent = is_par })
+    = braces $ hsep
+       [ text "ImpOccItem"
+       , if is_par then text "[is_par]" else empty
+       , ppr (greName item) <+> ppr (greParent item)
+       , braces $ text "bundled:" <+> ppr (map greName bundled) ]
+
 -- | Make an 'OccEnv' of all the imports.
 --
 -- Complicated by the fact that associated data types and pattern synonyms
@@ -1465,9 +1502,9 @@ mkImportOccEnv hsc_env decl_spec all_avails =
 
     -- See Note [Dealing with imports]
     -- 'combine' may be called for associated data types which appear
-    -- twice in the all_avails. In the example, we combine
-    --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
-    -- NB: the AvailTC can have fields as well as data constructors (#12127)
+    -- twice in the all_avails. In the example, we have two Avails for T,
+    -- namely T(T,T1,T2,T3) and C(C,T), and we combine them by dropping the
+    -- latter, in which T is not the parent.
     combine :: ImpOccItem -> ImpOccItem -> ImpOccItem
     combine item1@(ImpOccItem { imp_item = gre1, imp_is_parent = is_parent1 })
             item2@(ImpOccItem { imp_item = gre2, imp_is_parent = is_parent2 })
@@ -1475,11 +1512,13 @@ mkImportOccEnv hsc_env decl_spec all_avails =
       , not (isRecFldGRE gre1 || isRecFldGRE gre2) -- NB: does not force GREInfo.
       , let name1 = greName gre1
             name2 = greName gre2
+            gre = gre1 `plusGRE` gre2
+              -- See Note [Preserve parent information when combining import OccEnvs]
       = assertPpr (name1 == name2)
                   (ppr name1 <+> ppr name2) $
         if is_parent1
-        then item1
-        else item2
+        then item1 { imp_item = gre }
+        else item2 { imp_item = gre }
       -- Discard C(C,T) in favour of T(T, T1, T2, T3).
 
     -- 'combine' may also be called for pattern synonyms which appear both

@@ -695,13 +695,14 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
   | otherwise = do
   gre_env <- getGlobalRdrEnv
   let original_gres = lookupGRE gre_env (LookupChildren (rdrNameOcc rdr_name) how_lkup)
-  -- The remaining GREs are things that we *could* export here, note that
-  -- this includes things which have `NoParent`. Those are sorted in
-  -- `checkPatSynParent`.
+      picked_gres = pick_gres original_gres
+  -- The remaining GREs are things that we *could* export here.
+  -- Note that this includes things which have `NoParent`;
+  -- those are sorted in `checkPatSynParent`.
   traceRn "parent" (ppr parent)
   traceRn "lookupExportChild original_gres:" (ppr original_gres)
-  traceRn "lookupExportChild picked_gres:" (ppr (picked_gres original_gres) $$ ppr must_have_parent)
-  case picked_gres original_gres of
+  traceRn "lookupExportChild picked_gres:" (ppr picked_gres $$ ppr must_have_parent)
+  case picked_gres of
     NoOccurrence ->
       noMatchingParentErr original_gres
     UniqueOccurrence g ->
@@ -748,34 +749,36 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
           addNameClashErrRn rdr_name gres
           return (FoundChild (NE.head gres))
 
-        picked_gres :: [GlobalRdrElt] -> DisambigInfo
+        pick_gres :: [GlobalRdrElt] -> DisambigInfo
         -- For Unqual, find GREs that are in scope qualified or unqualified
         -- For Qual,   find GREs that are in scope with that qualification
-        picked_gres gres
+        pick_gres gres
           | isUnqual rdr_name
           = mconcat (map right_parent gres)
           | otherwise
           = mconcat (map right_parent (pickGREs rdr_name gres))
 
         right_parent :: GlobalRdrElt -> DisambigInfo
-        right_parent p
-          = case greParent p of
+        right_parent gre
+          = case greParent gre of
               ParentIs cur_parent
-                 | parent == cur_parent -> DisambiguatedOccurrence p
+                 | parent == cur_parent -> DisambiguatedOccurrence gre
                  | otherwise            -> NoOccurrence
-              NoParent                  -> UniqueOccurrence p
+              NoParent                  -> UniqueOccurrence gre
 {-# INLINEABLE lookupSubBndrOcc_helper #-}
 
--- This domain specific datatype is used to record why we decided it was
+-- | This domain specific datatype is used to record why we decided it was
 -- possible that a GRE could be exported with a parent.
 data DisambigInfo
        = NoOccurrence
-          -- The GRE could never be exported. It has the wrong parent.
+          -- ^ The GRE could not be found, or it has the wrong parent.
        | UniqueOccurrence GlobalRdrElt
-          -- The GRE has no parent. It could be a pattern synonym.
+          -- ^ The GRE has no parent. It could be a pattern synonym.
        | DisambiguatedOccurrence GlobalRdrElt
-          -- The parent of the GRE is the correct parent
+          -- ^ The parent of the GRE is the correct parent.
        | AmbiguousOccurrence (NE.NonEmpty GlobalRdrElt)
+          -- ^ The GRE is ambiguous.
+          --
           -- For example, two normal identifiers with the same name are in
           -- scope. They will both be resolved to "UniqueOccurrence" and the
           -- monoid will combine them to this failing case.
@@ -787,7 +790,7 @@ instance Outputable DisambigInfo where
   ppr (AmbiguousOccurrence gres)    = text "Ambiguous:" <+> ppr gres
 
 instance Semi.Semigroup DisambigInfo where
-  -- This is the key line: We prefer disambiguated occurrences to other
+  -- These are the key lines: we prefer disambiguated occurrences to other
   -- names.
   _ <> DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
   DisambiguatedOccurrence g' <> _ = DisambiguatedOccurrence g'
