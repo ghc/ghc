@@ -29,31 +29,31 @@ source-repository head
     subdir:   rts
 
 flag libm
-  default: @CabalHaveLibm@
+  default: False
 flag librt
-  default: @CabalHaveLibrt@
+  default: False
 flag libdl
-  default: @CabalHaveLibdl@
+  default: False
 flag use-system-libffi
-  default: @CabalUseSystemLibFFI@
+  default: False
 flag libffi-adjustors
-  default: @CabalLibffiAdjustors@
+  default: False
 flag need-pthread
-  default: @CabalNeedLibpthread@
+  default: False
 flag libbfd
-  default: @CabalHaveLibbfd@
+  default: False
 flag need-atomic
-  default: @CabalNeedLibatomic@
+  default: False
 flag libdw
-  default: @CabalHaveLibdw@
+  default: False
 flag libnuma
-  default: @CabalHaveLibNuma@
+  default: False
 flag libzstd
-  default: @CabalHaveLibZstd@
+  default: False
 flag static-libzstd
-  default: @CabalStaticLibZstd@
+  default: False
 flag leading-underscore
-  default: @CabalLeadingUnderscore@
+  default: False
 flag smp
   default: True
 flag find-ptr

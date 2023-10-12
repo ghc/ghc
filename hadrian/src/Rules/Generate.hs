@@ -268,17 +268,6 @@ runInterpolations (Interpolations mk_substs) input = do
         subst = foldr (.) id [replace ("@"++k++"@") v | (k,v) <- substs]
     return (subst input)
 
-toCabalBool :: Bool -> String
-toCabalBool True  = "True"
-toCabalBool False = "False"
-
--- | Interpolate the given variable with the value of the given 'Flag', using
--- Cabal's boolean syntax.
-interpolateCabalFlag :: String -> Flag -> Interpolations
-interpolateCabalFlag name flg = interpolateVar name $ do
-    val <- flag flg
-    return (toCabalBool val)
-
 -- | Interpolate the given variable with the value of the given 'Setting'.
 interpolateSetting :: String -> Setting -> Interpolations
 interpolateSetting name settng = interpolateVar name $ setting settng
@@ -289,31 +278,6 @@ projectVersion = mconcat
     [ interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateSetting "ProjectVersionMunged" ProjectVersionMunged
     ]
-
-rtsCabalFlags :: Interpolations
-rtsCabalFlags = mconcat
-    [ flag "CabalHaveLibdw" UseLibdw
-    , flag "CabalHaveLibm" UseLibm
-    , flag "CabalHaveLibrt" UseLibrt
-    , flag "CabalHaveLibdl" UseLibdl
-    , flag "CabalNeedLibpthread" UseLibpthread
-    , flag "CabalHaveLibbfd" UseLibbfd
-    , flag "CabalHaveLibNuma" UseLibnuma
-    , flag "CabalHaveLibZstd" UseLibzstd
-    , flag "CabalStaticLibZstd" StaticLibzstd
-    , flag "CabalNeedLibatomic" NeedLibatomic
-    , flag "CabalUseSystemLibFFI" UseSystemFfi
-    , targetFlag "CabalLibffiAdjustors" tgtUseLibffiForAdjustors
-    , targetFlag "CabalLeadingUnderscore" tgtSymbolsHaveLeadingUnderscore
-    ]
-  where
-    flag = interpolateCabalFlag
-    targetFlag name q = interpolateVar name $ do
-      val <- queryTargetTarget q
-      return (toCabalBool val)
-
-ghcPrimCabalFlags :: Interpolations
-ghcPrimCabalFlags = interpolateCabalFlag "CabalNeedLibatomic" NeedLibatomic
 
 packageVersions :: Interpolations
 packageVersions = foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaskell, ghcCompact, array ]
@@ -347,8 +311,6 @@ templateRule outPath interps = do
 templateRules :: Rules ()
 templateRules = do
   templateRule "compiler/ghc.cabal" $ projectVersion
-  templateRule "rts/rts.cabal" $ rtsCabalFlags
-  templateRule "libraries/ghc-prim/ghc-prim.cabal" $ ghcPrimCabalFlags
   templateRule "driver/ghci/ghci-wrapper.cabal" $ projectVersion
   templateRule "ghc/ghc-bin.cabal" $ projectVersion
   templateRule "utils/iserv/iserv.cabal" $ projectVersion

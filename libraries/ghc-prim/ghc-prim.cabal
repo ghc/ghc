@@ -28,7 +28,7 @@ custom-setup
     setup-depends: base >= 4 && < 5, process, filepath, directory, Cabal >= 1.23 && < 3.9
 
 flag need-atomic
-  default: @CabalNeedLibatomic@
+  default: False
 
 Library
     default-language: Haskell2010

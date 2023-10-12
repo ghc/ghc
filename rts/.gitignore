@@ -2,8 +2,6 @@
 /dist/
 /dist-*/
 
-/rts.cabal
-
 /include/ghcversion.h
 
 /package.conf.inplace

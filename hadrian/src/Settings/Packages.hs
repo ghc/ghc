@@ -114,7 +114,7 @@ packageArgs = do
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
-          [ builder (Cabal Flags) ? arg "include-ghc-prim"
+          [ builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
 
           , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
@@ -401,8 +401,19 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
           , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
+          , flag UseLibm                    `cabalFlag` "libm"
+          , flag UseLibrt                   `cabalFlag` "librt"
+          , flag UseLibdl                   `cabalFlag` "libdl"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
+          , flag UseLibpthread              `cabalFlag` "need-pthread"
+          , flag UseLibbfd                  `cabalFlag` "libbfd"
+          , flag NeedLibatomic              `cabalFlag` "need-atomic"
+          , flag UseLibdw                   `cabalFlag` "libdw"
+          , flag UseLibnuma                 `cabalFlag` "libnuma"
+          , flag UseLibzstd                 `cabalFlag` "libzstd"
+          , flag StaticLibzstd              `cabalFlag` "static-libzstd"
+          , queryTargetTarget tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
