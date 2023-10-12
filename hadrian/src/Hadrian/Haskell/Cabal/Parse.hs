@@ -198,9 +198,10 @@ copyPackage context@Context {..} = do
 shakeVerbosityToCabalFlag :: Verbosity -> String
 shakeVerbosityToCabalFlag = \case
     Diagnostic -> "-v3"
-    Verbose -> "-v3"
+    Verbose -> "-v2"
+    -- Normal levels should not produce output to stdout
     Silent -> "-v0"
-    _ -> "-v2"
+    _ -> "-v1"
 
 -- | What type of file is Main
 data MainSourceType = HsMain | CppMain | CMain
