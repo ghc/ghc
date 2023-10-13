@@ -277,7 +277,6 @@ def setup(app):
     app.add_role('cabal-ref', haddock_role('Cabal'))
     app.add_role('ghc-compact-ref', haddock_role('ghc-compact'))
     app.add_role('ghc-prim-ref', haddock_role('ghc-prim'))
-    app.add_role('parallel-ref', haddock_role('parallel'))
     app.add_role('array-ref', haddock_role('array'))
 
     app.add_object_type('rts-flag', 'rts-flag',
