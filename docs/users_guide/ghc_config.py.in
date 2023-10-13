@@ -23,7 +23,6 @@ lib_versions = {
     'template-haskell': '@LIBRARY_template_haskell_UNIT_ID@',
     'ghc-compact': '@LIBRARY_ghc_compact_UNIT_ID@',
     'ghc': '@LIBRARY_ghc_UNIT_ID@',
-    'parallel': '@LIBRARY_parallel_UNIT_ID@',
     'Cabal': '@LIBRARY_Cabal_UNIT_ID@',
     'array': '@LIBRARY_array_UNIT_ID@',
 }
