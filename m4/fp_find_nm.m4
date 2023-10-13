@@ -16,6 +16,15 @@ AC_DEFUN([FP_FIND_NM],
       NmCmd="$NM"
     fi
     AC_SUBST([NmCmd])
+    if test "$HostOS" != "mingw32"; then
+        AC_CHECK_TOOL([NM_STAGE0], [nm])
+        if test "$NM_STAGE0" = ":"; then
+            AC_MSG_ERROR([cannot find nm stage0 in your PATH])
+        fi
+    fi
+    NmCmdStage0="$NM_STAGE0"
+    AC_SUBST([NmCmdStage0])
+	
 
     if test "$TargetOS_CPP" = "darwin"
     then
