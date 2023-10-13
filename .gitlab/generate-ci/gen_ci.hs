@@ -174,7 +174,7 @@ configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = unwords $
      ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
-  ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
+  ++ ["--with-intree-gmp" | Just _ <- [crossTarget bc] ]
   ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
   ++ ["--enable-strict-ghc-toolchain-check"]
