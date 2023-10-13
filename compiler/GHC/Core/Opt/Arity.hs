@@ -848,6 +848,12 @@ trimArityType max_arity at@(AT lams _)
   | lams `lengthAtMost` max_arity = at
   | otherwise                     = AT (take max_arity lams) topDiv
 
+-- | When `at` is the arity type for `e`, return the arity type
+-- of `x` in `case e of x' { __DEFAULT -> ... }`.
+evalArityType :: ArityType -> ArityType
+evalArityType (AT ((IsExpensive,os):is) div) = AT ((IsCheap,os):is) div
+evalArityType at                             = at
+
 data ArityOpts = ArityOpts
   { ao_ped_bot :: !Bool -- See Note [Dealing with bottom]
   , ao_dicts_cheap :: !Bool -- See Note [Eta expanding through dictionaries]
@@ -1543,7 +1549,7 @@ arityType env (Case scrut bndr _ alts)
   | otherwise            -- In the remaining cases we may not push
   = addWork alts_type -- evaluation of the scrutinee in
   where
-    env' = delInScope env bndr
+    env' = extendSigEnv env bndr (evalArityType (arityType env scrut))
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
     alts_type = foldr1 (andArityType env) (map arity_type_alt alts)
 
