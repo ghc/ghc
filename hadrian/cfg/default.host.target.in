@@ -20,11 +20,11 @@ Target
 , tgtCmmCPreprocessor = CmmCpp {cmmCppProgram = Program {prgPath = "@CmmCPPCmd_STAGE0@", prgFlags = @CmmCPPArgs_STAGE0List@}, cmmCppSupportsG0 = @CmmCPPSupportsG0_STAGE0@}
 , tgtCCompilerLink = CcLink
 { ccLinkProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @CONF_GCC_LINKER_OPTS_STAGE0List@}
-, ccLinkSupportsNoPie = False
-, ccLinkSupportsCompactUnwind = False
-, ccLinkSupportsFilelist = False
+, ccLinkSupportsNoPie = @CONF_GCC_SUPPORTS_NO_PIE_STAGE0Bool@
+, ccLinkSupportsCompactUnwind = @LdHasNoCompactUnwind_STAGE0Bool@
+, ccLinkSupportsFilelist = @LdHasFilelist_STAGE0Bool@
 , ccLinkSupportsSingleModule = True
-, ccLinkIsGnu = False
+, ccLinkIsGnu = @LdIsGNULd_STAGE0Bool@
 }
 
 , tgtAr = Ar
@@ -36,7 +36,7 @@ Target
 }
 
 , tgtRanlib = Nothing
-, tgtNm = Nm {nmProgram = Program {prgPath = "", prgFlags = []}}
+, tgtNm = Nm {nmProgram = Program {prgPath = "@NmCmdStage0@", prgFlags = []}}
 , tgtMergeObjs = Just (MergeObjs {mergeObjsProgram = Program {prgPath = "@LD_STAGE0@", prgFlags = ["-r"]}, mergeObjsSupportsResponseFiles = False})
 , tgtWindres = Nothing
 }

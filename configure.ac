@@ -200,6 +200,13 @@ if test "$WithGhc" != ""; then
   BOOTSTRAPPING_GHC_INFO_FIELD([SUPPORT_SMP_STAGE0],[Support SMP])
   BOOTSTRAPPING_GHC_INFO_FIELD([RTS_WAYS_STAGE0],[RTS ways])
 
+
+  BOOTSTRAPPING_GHC_INFO_FIELD([LdHasNoCompactUnwind_STAGE0],[ld supports compact unwind])
+  BOOTSTRAPPING_GHC_INFO_FIELD([LdIsGNULd_STAGE0],[ld is GNU ld])
+  BOOTSTRAPPING_GHC_INFO_FIELD([LdHasFilelist_STAGE0],[ld supports filelist])
+
+  BOOTSTRAPPING_GHC_INFO_FIELD([CONF_GCC_SUPPORTS_NO_PIE_STAGE0],[C compiler supports -no-pie])
+
   dnl Check whether or not the bootstrapping GHC has a threaded RTS. This
   dnl determines whether or not we can have a threaded stage 1.
   dnl See Note [Linking ghc-bin against threaded stage0 RTS] in

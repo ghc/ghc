@@ -164,6 +164,11 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CXX_OPTS_STAGE0])
     PREP_LIST([CONF_GCC_LINKER_OPTS_STAGE0])
 
+    PREP_BOOLEAN([LdHasNoCompactUnwind_STAGE0])
+    PREP_BOOLEAN([LdIsGNULd_STAGE0])
+    PREP_BOOLEAN([LdHasFilelist_STAGE0])
+    PREP_BOOLEAN([CONF_GCC_SUPPORTS_NO_PIE_STAGE0])
+
 
     if test -z "$MergeObjsCmd"; then
       MergeObjsCmdMaybe=Nothing
