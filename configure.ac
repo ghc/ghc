@@ -78,10 +78,8 @@ cat rts/ghcversion.h.top                                                >> rts/i
 echo "#define __GLASGOW_HASKELL__ ${ProjectVersionInt}"                 >> rts/include/ghcversion.h
 echo "#define __GLASGOW_HASKELL_FULL_VERSION__ \"${ProjectVersion}\""   >> rts/include/ghcversion.h
 echo                                                                    >> rts/include/ghcversion.h
-AS_IF([test x"${ProjectPatchLevel1}" != x],
-  [echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ ${ProjectPatchLevel1}" >> rts/include/ghcversion.h])
-AS_IF([test x"${ProjectPatchLevel2}" != x],
-  [echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ ${ProjectPatchLevel2}" >> rts/include/ghcversion.h])
+echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ ${ProjectPatchLevel1}"    >> rts/include/ghcversion.h
+echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ ${ProjectPatchLevel2}"    >> rts/include/ghcversion.h
 
 cat rts/ghcversion.h.bottom                                             >> rts/include/ghcversion.h
 
