@@ -323,6 +323,12 @@ templateRules = do
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
+  templateRule "rts/include/ghcversion.h" $ mconcat
+    [ interpolateSetting "ProjectVersionInt" ProjectVersionInt
+    , interpolateSetting "ProjectVersion" ProjectVersion
+    , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
+    , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
+    ]
   templateRule "docs/index.html" $ packageVersions
   templateRule "docs/users_guide/ghc_config.py" $ mconcat
     [ projectVersion

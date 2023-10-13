@@ -166,9 +166,14 @@ configureStageArgs = do
   let cFlags  = getStagedCCFlags
       linkFlags = prgFlags . ccLinkProgram . tgtCCompilerLink <$> getStagedTarget
   mconcat [ configureArgs cFlags linkFlags
-          , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"
+          , ghcVersionH
           ]
 
+ghcVersionH :: Args
+ghcVersionH = notStage0 ? do
+    let h = "rts/include/ghcversion.h"
+    expr $ need [h]
+    arg $ "--ghc-option=-ghcversion-file=" <> h
 
 configureArgs :: Args -> Args -> Args
 configureArgs cFlags' ldFlags' = do
@@ -199,7 +204,7 @@ configureArgs cFlags' ldFlags' = do
         -- ROMES:TODO: how is the Host set to TargetPlatformFull? That would be the target
         , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
-        , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"
+        , ghcVersionH
         ]
 
 bootPackageConstraints :: Args
