@@ -49,6 +49,8 @@ data Setting = CursesIncludeDir
              | GhcPatchLevel
              | GhcVersion
              | GhcSourcePath
+             | LlvmMinVersion
+             | LlvmMaxVersion
              | GmpIncludeDir
              | GmpLibDir
              | IconvIncludeDir
@@ -103,6 +105,8 @@ setting key = lookupSystemConfig $ case key of
     GhcPatchLevel      -> "ghc-patch-level"
     GhcVersion         -> "ghc-version"
     GhcSourcePath      -> "ghc-source-path"
+    LlvmMinVersion     -> "llvm-min-version"
+    LlvmMaxVersion     -> "llvm-max-version"
     GmpIncludeDir      -> "gmp-include-dir"
     GmpLibDir          -> "gmp-lib-dir"
     IconvIncludeDir    -> "iconv-include-dir"

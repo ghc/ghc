@@ -34,6 +34,9 @@ python         = @PythonCmd@
 
 cc-llvm-backend           = @CcLlvmBackend@
 
+llvm-min-version          = @LlvmMinVersion@
+llvm-max-version          = @LlvmMaxVersion@
+
 # Build options:
 #===============
 
