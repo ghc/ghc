@@ -58,6 +58,9 @@ Hadrian build system
 Environment variables affecting both build systems:
 
   CROSS_TARGET      Triple of cross-compilation target.
+  CROSS_STAGE       The stage of the cross-compiler to build either
+                      * 2: Build a normal cross-compiler bindist
+                      * 3: Build a target executable bindist (with the stage2 cross-compiler)
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
   MSYSTEM           (Windows-only) Which platform to build from (CLANG64).
@@ -496,6 +499,12 @@ function build_hadrian() {
     export XZ_OPT="${XZ_OPT:-} -T$cores"
   fi
 
+  case "${CROSS_STAGE:-2}" in
+    2) BINDIST_TARGET="binary-dist";;
+    3) BINDIST_TARGET="binary-dist-stage3";;
+    *) fail "Unknown CROSS_STAGE, must be 2 or 3";;
+  esac
+
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian build-cabal -V
   else
@@ -505,7 +514,7 @@ function build_hadrian() {
           mv _build/reloc-bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
           ;;
         *)
-          run_hadrian test:all_deps binary-dist -V
+          run_hadrian test:all_deps $BINDIST_TARGET
           mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
           ;;
     esac
