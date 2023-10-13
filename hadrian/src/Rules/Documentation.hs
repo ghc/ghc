@@ -356,6 +356,9 @@ buildSphinxInfoGuide = do
   root <- buildRootRules
   let path = "GHCUsersGuide"
   root -/- infoRoot -/- path <.> "info" %> \ file -> do
+
+        needDocDeps
+
         withTempDir $ \dir -> do
             let rstFilesDir = pathPath path
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
@@ -391,6 +394,8 @@ buildManPage = do
     root <- buildRootRules
     root -/- manPageBuildPath %> \file -> do
         need ["docs/users_guide/ghc.rst"]
+        needDocDeps
+
         withTempDir $ \dir -> do
             build $ target docContext (Sphinx ManMode) ["docs/users_guide"] [dir]
             checkSphinxWarnings dir

@@ -324,7 +324,12 @@ templateRules = do
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
   templateRule "docs/index.html" $ packageVersions
-  templateRule "docs/users_guide/ghc_config.py" $ packageUnitIds Stage1
+  templateRule "docs/users_guide/ghc_config.py" $ mconcat
+    [ projectVersion
+    , packageUnitIds Stage1
+    , interpolateSetting "LlvmMinVersion" LlvmMinVersion
+    , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
+    ]
 
 
 -- Generators

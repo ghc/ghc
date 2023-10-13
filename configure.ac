@@ -1069,7 +1069,6 @@ AC_CONFIG_FILES(
   hadrian/ghci-cabal
   hadrian/ghci-multi-cabal
   hadrian/ghci-stack
-  docs/users_guide/ghc_config.py
   distrib/configure.ac
   hadrian/cfg/default.host.target
   hadrian/cfg/default.target
