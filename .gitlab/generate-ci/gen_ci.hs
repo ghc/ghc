@@ -139,9 +139,14 @@ bignumString :: BignumBackend -> String
 bignumString Gmp = "gmp"
 bignumString Native = "native"
 
+data TimeoutIncrease = TimeoutIncrease | NoTimeoutIncrease
+
 data CrossEmulator
   = NoEmulator
-  | NoEmulatorNeeded
+  | NoEmulatorNeeded TimeoutIncrease
+      -- ^ Some targets (e.g. JavaScript) don't require an explicit emulator
+      -- managed by the testsuite (a shell script's shebang is used instead),
+      -- yet tests need more time to execute hence they require an increased timeout.
   | Emulator String
 
 -- | A BuildConfig records all the options which can be modified to affect the
@@ -891,16 +896,20 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           NoEmulator
             -- we need an emulator but it isn't set. Won't run the testsuite
             | Just _ <- crossTarget buildConfig
-                           -> "CROSS_EMULATOR" =: "NOT_SET"
-            | otherwise    -> mempty
-          Emulator s       -> "CROSS_EMULATOR" =: s
-          NoEmulatorNeeded -> mempty
+                             -> "CROSS_EMULATOR" =: "NOT_SET"
+            | otherwise      -> mempty
+          Emulator s         -> "CROSS_EMULATOR" =: s
+          NoEmulatorNeeded _ -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
-      , let testTimeoutArg =
+      , let
+            -- Emulators are naturally slower than native machines.
+            -- Triple the default of 300.
+            timeoutConf = "-e config.timeout=900"
+            testTimeoutArg =
                 case crossEmulator buildConfig of
-                  -- Emulators are naturally slower than native machines.
-                  -- Triple the default of 300.
-                  Emulator _ -> "-e config.timeout=900" :: String
+                  Emulator _ -> timeoutConf
+                  -- NodeJS (Javascript) is slower than native code
+                  NoEmulatorNeeded TimeoutIncrease -> timeoutConf
                   _ -> mempty
             runtestArgs =
                 testTimeoutArg :
@@ -1309,7 +1318,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure"))
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
@@ -1354,7 +1363,7 @@ cross_jobs = [
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
 
     wasm_build_config =
-      (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)
+      (crossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing)
         { hostFullyStatic = True
         , buildFlavour    = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
         , textWithSIMDUTF = True
