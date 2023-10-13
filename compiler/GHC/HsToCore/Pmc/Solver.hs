@@ -74,7 +74,7 @@ import GHC.Core.Equality
 import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
-import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
+import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr, mkCoreApp)
 import GHC.Core.Map.Type  (deBruijnize) -- ROMES:TODO: Doesn't look good great. At least export some function from HsToCore Equality module to create the types. It's wrong; we should keep a debruijn map while representing the expression, and assign it correctly to each type? Not sure.
 
 import GHC.Data.FastString
@@ -95,6 +95,7 @@ import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Tc.Instance.Family
+import GHC.Types.Id.Make (unboxedUnitExpr)
 import GHC.Core.FamInstEnv
 
 import Control.Applicative ((<|>))
@@ -833,11 +834,24 @@ addConCt (MkNabla tyst ts@TmSt{ts_facts=egr0}) _x alt tvs args = do
         -- talk about pattern synonyms in their "matching" form, and converting
         -- them with dsHsConLike assumes they are used as a constructor,
         -- meaning we will fail for unidirectional patterns
-        desugaredCon <- lift . lift . lift $ dsHsConLike conLike -- DsM action to desugar the conlike into the expression we'll represent for this constructor
+        desugaredCon <- lift . lift . lift $ ds_hs_con_like_pat conLike -- DsM action to desugar the conlike into the expression we'll represent for this constructor
         conLikeId <- StateT $ representCoreExprEgr desugaredCon
         tvs' <- mapM (EGM.addM . EG.Node . TypeF . DBT . deBruijnize . TyVarTy) tvs
         _ <- foldlM (\acc i -> EGM.addM (EG.Node $ AppF acc i)) conLikeId (tvs' ++ args)
         return ()
+          where
+            -- do something cleaner...
+            -- inlined dsHsConLike but use patSynMatcher instead of patSynBuilder
+            ds_hs_con_like_pat :: ConLike -> DsM CoreExpr
+            ds_hs_con_like_pat (RealDataCon dc)
+              = return (varToCoreExpr (dataConWrapId dc))
+            ds_hs_con_like_pat (PatSynCon ps)
+              | (builder_name, _, add_void) <- patSynMatcher ps
+              = do { builder_id <- dsLookupGlobalId builder_name
+                   ; return (if add_void
+                             then mkCoreApp (text "dsConLike" <+> ppr ps)
+                                            (Var builder_id) unboxedUnitExpr
+                             else Var builder_id) }
 
   -- Do (2) in Note [Coverage checking Newtype matches]
   -- ROMES:TODO: SOMEWHERE <-------------------------------- this is likely the next thing to do!
