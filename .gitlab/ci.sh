@@ -596,28 +596,8 @@ function test_hadrian() {
   if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
-    # special case for JS backend
-  elif [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" == "js-emulator" ]; then
-    # The JS backend doesn't support CROSS_EMULATOR logic yet
-    unset CROSS_EMULATOR
-    # run "hadrian test" directly, not using the bindist, even though it did get installed.
-    # This is a temporary solution, See !9515 for the status of hadrian support.
-    run_hadrian \
-      test \
-      --summary-junit=./junit.xml \
-      --test-have-intree-files    \
-      --docs=none                 \
-      "runtest.opts+=${RUNTEST_ARGS:-}" \
-      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
-      || fail "cross-compiled hadrian main testsuite"
-  elif [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
-    run_hadrian \
-      test \
-      --summary-junit=./junit.xml \
-      "runtest.opts+=${RUNTEST_ARGS:-}" \
-      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
-      || fail "hadrian main testsuite targetting $CROSS_TARGET"
-  elif [ -n "${CROSS_TARGET:-}" ]; then
+  # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
+  elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
