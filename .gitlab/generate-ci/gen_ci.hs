@@ -1165,7 +1165,6 @@ debian_x86 =
   ]
   where
     validate_debian = Debian12
-
     perfProfilingJob arch sys buildConfig =
         -- Rename the job to avoid conflicts
         rename (<> "-perf")
@@ -1290,7 +1289,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure"))
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
