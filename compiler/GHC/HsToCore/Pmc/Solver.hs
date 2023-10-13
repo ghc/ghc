@@ -8,6 +8,7 @@
 {-# LANGUAGE ViewPatterns          #-}
 {-# LANGUAGE RankNTypes, GADTs     #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- Analysis........
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-} -- ROMES:TODO: THIS IS FOR DEBUGGING REMOVE
 
 {-
 Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
