@@ -1022,7 +1022,7 @@ job_groups =
      ]
 
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure"))
                          { bignumBackend = Native }
 
     -- ghcilink002 broken due to #17869
