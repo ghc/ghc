@@ -1026,7 +1026,6 @@ debian_x86 =
   ]
   where
     validate_debian = Debian12
-
     perfProfilingJob arch sys buildConfig =
         -- Rename the job to avoid conflicts
         rename (<> "-perf")
@@ -1131,7 +1130,7 @@ cross_jobs = [
       make_wasm_jobs wasm_build_config {unregisterised = True}
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure"))
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
