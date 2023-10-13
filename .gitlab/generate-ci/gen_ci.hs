@@ -145,6 +145,7 @@ data BuildConfig
                 , withNuma       :: Bool
                 , withZstd       :: Bool
                 , crossTarget    :: Maybe String
+                , crossStage     :: Maybe Int
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
@@ -203,6 +204,7 @@ vanilla = BuildConfig
   , withNuma = False
   , withZstd = False
   , crossTarget = Nothing
+  , crossStage  = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
   , fullyStatic = False
@@ -249,6 +251,7 @@ crossConfig :: String       -- ^ target triple
             -> BuildConfig
 crossConfig triple emulator configure_wrapper =
     vanilla { crossTarget = Just triple
+            , crossStage  = Just 2
             , crossEmulator = emulator
             , configureWrapper = configure_wrapper
             }
@@ -745,6 +748,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
+      , maybe mempty (("CROSS_STAGE" =:) . show) (crossStage buildConfig)
       , case crossEmulator buildConfig of
           NoEmulator       -> case crossTarget buildConfig of
             Nothing -> mempty
