@@ -295,15 +295,15 @@ bignat_shiftr_neg
    -> State# s
    -> State# s
 bignat_shiftr_neg mwa wa n s1
-   -- initialize higher limb
-   = case mwaWrite# mwa (szA -# 1#) 0## s1 of
-      s2 -> case bignat_shiftr mwa wa n s2 of
-         s3 -> if nz_shifted_out
-                  -- round if non-zero bits were shifted out
-                  then mwaAddInplaceWord# mwa 0# 1## s3
-                  else s3
+   -- initialize higher limb of mwa
+   = case mwaSize# mwa s1 of
+      (# s2, sz_mwa #) -> case mwaWrite# mwa (sz_mwa -# 1#) 0## s2 of
+        s3 -> case bignat_shiftr mwa wa n s3 of
+           s4 -> if nz_shifted_out
+                    -- round if non-zero bits were shifted out
+                    then mwaAddInplaceWord# mwa 0# 1## s4
+                    else s4
    where
-      !szA          = wordArraySize# wa
       !(# nw, nb #) = count_words_bits_int n
 
       -- non-zero bits are shifted out?
