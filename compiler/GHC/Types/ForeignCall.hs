@@ -189,7 +189,7 @@ ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
-ccallConvAttribute JavaScriptCallConv = panic "ccallConvAttribute JavaScriptCallConv"
+ccallConvAttribute JavaScriptCallConv = empty
 
 type CLabelString = FastString          -- A C label, completely unencoded
 

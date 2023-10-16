@@ -555,7 +555,7 @@ checkCConv decl PrimCallConv = do
   return PrimCallConv
 checkCConv decl JavaScriptCallConv = do
   dflags <- getDynFlags
-  if platformArch (targetPlatform dflags) == ArchJavaScript
+  if platformArch (targetPlatform dflags) `elem` [ ArchJavaScript, ArchWasm32 ]
       then return JavaScriptCallConv
       else do
         addErrTc $ TcRnUnsupportedCallConv decl JavaScriptCallConvUnsupported
