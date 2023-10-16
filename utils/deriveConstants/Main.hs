@@ -401,6 +401,7 @@ wanteds os = concat
           ,structField C    "Capability" "total_allocated"
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
+          ,structField C    "Capability" "n_run_queue"
 
           ,structField Both "bdescr" "start"
           ,structField Both "bdescr" "free"
@@ -468,6 +469,7 @@ wanteds os = concat
           ,closureField  C    "StgTSO"      "dirty"
           ,closureField  C    "StgTSO"      "bq"
           ,closureField  C    "StgTSO"      "label"
+          ,closureField  C    "StgTSO"      "bound"
           ,closureField  Both "StgTSO"      "alloc_limit"
           ,closureField_ Both "StgTSO_cccs" "StgTSO" "prof.cccs"
           ,closureField  Both "StgTSO"      "stackobj"
