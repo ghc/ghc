@@ -15,6 +15,29 @@ type instance ElemsOf A = [ T1, T2, T3, T4, T5, T6, T7, T8
                           , T25, T26, T27, T28, T29, T30, T31, T32
                           ]
 
+{- Note [Sensitivity to unique increment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+T12545 is sensitive to -dunique-increments changes, see #19414. I've seen
+variations of as much as 4.8% by playing with that parameter.
+
+The issue with this test is that it does too little so is very sensitive to
+any small variations during initialisation and in particular populating the
+initial environments with wired-in things. Therefore it has a very high change
+threshold so we catch if it regresses a lot but don't worry if it regresses a little.
+
+You can measure the variance by running T12545.measure.sh.
+
+Whenever we identify such a test (T8095 being another example), we leave a link
+to this Note in the source code of the test *and* in the corresponding all.T,
+detailing the spread as measured by adjusting T12545.measure.sh.
+For example,
+
+# See Note [Sensitivity to unique increment] in T12545.hs; spread was 4.8%
+
+and then double the spread to come up with a stable acceptance threshold (e.g.,
+10%).
+-}
+
 data T1; instance ElemOf A T1 where
 data T2; instance ElemOf A T2 where
 data T3; instance ElemOf A T3 where

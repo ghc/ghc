@@ -167,14 +167,18 @@ test('T9872d',
       ],
      compile,
      [''])
+# Since major improvements to T8095 in in
+# 4bf9fa0f216bb294c1bd3644363b008a8643a653 it is subject to
+# Note [Sensitivity to unique increment] in T12545.hs; spread was 1.7%
 test ('T8095',
       [ only_ways(['normal']),
-        collect_compiler_stats('bytes allocated',2) ],
+        collect_compiler_stats('bytes allocated',4) ],
       compile,
       ['-v0 -O'])
+# See Note [Sensitivity to unique increment] in T12545.hs; spread was 1.5%
 test ('T13386',
       [ only_ways(['normal']),
-        collect_compiler_stats('bytes allocated',1) ],
+        collect_compiler_stats('bytes allocated',3) ],
       compile,
       ['-v0 -O0'])
 
@@ -261,15 +265,7 @@ test('T12234',
      compile,
      [''])
 
-# T12545 is sensitive to -dunique-increments changes, see #19414. I've seen
-# variations of as much as 4.8% by playing with that parameter,
-#
-# The issue with the test is that it does too little so is very sensitive to
-# any small variations during initialisation and in particular populating the
-# initial environments with wired-in things. Therefore it has a very high change
-# threshold so we catch if it regresses a lot but don't worry if it regresses a little.
-#
-# You can measure the variance by running T12545.measure.sh.
+# See Note [Sensitivity to unique increment] in T12545.hs; spread was 4.8%
 test('T12545',
      [ only_ways(['normal']),
        collect_compiler_stats('bytes allocated', 10), #
