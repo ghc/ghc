@@ -31,7 +31,7 @@ module GHC.Data.Graph.UnVar
 
 import GHC.Prelude
 
-import GHC.Types.Unique.FM( UniqFM, ufmToSet_Directly )
+import GHC.Types.Unique.FM( UniqFM, ufmToSet_Directly, getMixedKey, getUnmixedUnique )
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Types.Unique

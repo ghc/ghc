@@ -71,7 +71,7 @@ module GHC.Types.Unique.DFM (
 
 import GHC.Prelude
 
-import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
+import GHC.Types.Unique ( Uniquable(..), Unique )
 import GHC.Utils.Outputable
 
 import qualified GHC.Data.Word64Map.Strict as MS

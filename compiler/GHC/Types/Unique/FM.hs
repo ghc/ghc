@@ -122,7 +122,7 @@ newtype UniqFM key ele = UFM (M.Word64Map ele)
 type role UniqFM representational representational -- Don't allow coerces over the key
 
 -- | https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
-mix :: Word -> Int -> Int
+mix :: MS.Key -> MS.Key -> MS.Key
 {-# INLINE mix #-}
 mix k x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
   where
@@ -130,26 +130,21 @@ mix k x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
     g z = z * k
     s = finiteBitSize k `shiftR` 1 -- 32 for 64 bit, 16 for 32 bit
 
-kFORWARD, kBACKWARD :: Word
+kFORWARD, kBACKWARD :: MS.Key
 -- These are like "encryption" and "decryption" keys to mix
-#if UNIQUE_TAG_BITS == 8
 kFORWARD  = 0xD6E8FEB86659FD93
 kBACKWARD = 0xCFEE444D8B59A89B
-#else
-kFORWARD  = 0x45D9F3B
-kBACKWARD = 0x119DE1F3
-#endif
-enc, dec :: Int -> Int
+enc, dec :: MS.Key -> MS.Key
 enc = mix kFORWARD
 dec = mix kBACKWARD
 {-# INLINE enc #-}
 {-# INLINE dec #-}
 
-getMixedKey :: Unique -> Int
+getMixedKey :: Unique -> MS.Key
 {-# NOINLINE getMixedKey #-}
 getMixedKey = enc . getKey
 
-getUnmixedUnique :: Int -> Unique
+getUnmixedUnique :: MS.Key -> Unique
 {-# NOINLINE getUnmixedUnique #-}
 getUnmixedUnique = mkUniqueGrimily . dec
 
