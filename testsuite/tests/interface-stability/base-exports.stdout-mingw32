@@ -679,6 +679,8 @@ module Data.Bitraversable where
   bimapM :: forall (t :: * -> * -> *) (f :: * -> *) a c b d. (Bitraversable t, GHC.Internal.Base.Applicative f) => (a -> f c) -> (b -> f d) -> t a b -> f (t c d)
   bisequence :: forall (t :: * -> * -> *) (f :: * -> *) a b. (Bitraversable t, GHC.Internal.Base.Applicative f) => t (f a) (f b) -> f (t a b)
   bisequenceA :: forall (t :: * -> * -> *) (f :: * -> *) a b. (Bitraversable t, GHC.Internal.Base.Applicative f) => t (f a) (f b) -> f (t a b)
+  firstA :: forall (t :: * -> * -> *) (f :: * -> *) a c b. (Bitraversable t, GHC.Internal.Base.Applicative f) => (a -> f c) -> t a b -> f (t c b)
+  secondA :: forall (t :: * -> * -> *) (f :: * -> *) b c a. (Bitraversable t, GHC.Internal.Base.Applicative f) => (b -> f c) -> t a b -> f (t a c)
 
 module Data.Bits where
   -- Safety: Safe
