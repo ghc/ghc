@@ -46,7 +46,6 @@ import GHC.Prelude hiding (head, init, last, tail)
 import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
-import GHC.Core.Predicate( isDictId )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
@@ -1486,10 +1485,10 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br = 1, occ_in_lam = in_lam, occ_int_cxt = int_cxt }
-       | is_value_lam rhs, IsInteresting <- int_cxt
+       | is_value_lam, IsInteresting <- int_cxt
        = True
        | NotInsideLam <- in_lam
-       , not (isDictId bndr)  -- Solely for SpecConstr
+       , not spec_constr_inhibition
 --       , not (isTopLevel top_lvl) || not (exprIsExpandable rhs)
          -- Inline used-once things; except expandable things at top level
          -- These may arise from user code e.g.
@@ -1502,9 +1501,21 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
        = False
     one_occ _ = False
 
-    is_value_lam (Lam b e)  = isRuntimeVar b || is_value_lam e
-    is_value_lam (Tick t e) = not (tickishIsCode t) && is_value_lam e
-    is_value_lam _          = False
+    spec_constr_inhibition
+      = sePhase env == FinalPhase && (is_dfun_app || is_value_lam)
+
+    is_value_lam = go rhs
+                 where
+                   go (Lam b e)  = isRuntimeVar b || go e
+                   go (Tick t e) = not (tickishIsCode t) && go e
+                   go _          = False
+
+    is_dfun_app = go rhs
+                    where
+                      go (Var f)    = isDFunId f
+                      go (App f _)  = go f
+                      go (Tick t e) = not (tickishIsCode t) && go e
+                      go _          = False
 
 {-
     one_occ OneOcc{ occ_n_br   = 1
