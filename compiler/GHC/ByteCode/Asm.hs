@@ -43,16 +43,11 @@ import GHC.Platform
 import GHC.Platform.Profile
 
 import Control.Monad
-import Control.Monad.ST ( runST )
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 
-import Data.Array.MArray
-
 import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
-
-import Data.Array.Unsafe( castSTUArray )
 
 import Foreign hiding (shiftL, shiftR)
 import Data.Char        ( ord )
@@ -60,6 +55,7 @@ import Data.List        ( genericLength )
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
+import GHC.Float (castFloatToWord32, castDoubleToWord64)
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
@@ -416,7 +412,7 @@ assembleI platform i = case i of
                                                                 tuple_proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
-                                 info <- int (fromIntegral $
+                                 info <- word (fromIntegral $
                                               mkNativeCallInfoSig platform call_info)
                                  emit bci_PUSH_ALTS_T
                                       [Op p, Op info, Op p_tup]
@@ -466,21 +462,21 @@ assembleI platform i = case i of
                                  emit bci_TESTLT_W [Op np, LabelOp l]
   TESTEQ_W  w l            -> do np <- word w
                                  emit bci_TESTEQ_W [Op np, LabelOp l]
-  TESTLT_I64  i l          -> do np <- int64 i
+  TESTLT_I64  i l          -> do np <- word64 (fromIntegral i)
                                  emit bci_TESTLT_I64 [Op np, LabelOp l]
-  TESTEQ_I64  i l          -> do np <- int64 i
+  TESTEQ_I64  i l          -> do np <- word64 (fromIntegral i)
                                  emit bci_TESTEQ_I64 [Op np, LabelOp l]
-  TESTLT_I32  i l          -> do np <- int (fromIntegral i)
+  TESTLT_I32  i l          -> do np <- word (fromIntegral i)
                                  emit bci_TESTLT_I32 [Op np, LabelOp l]
-  TESTEQ_I32 i l           -> do np <- int (fromIntegral i)
+  TESTEQ_I32 i l           -> do np <- word (fromIntegral i)
                                  emit bci_TESTEQ_I32 [Op np, LabelOp l]
-  TESTLT_I16  i l          -> do np <- int (fromIntegral i)
+  TESTLT_I16  i l          -> do np <- word (fromIntegral i)
                                  emit bci_TESTLT_I16 [Op np, LabelOp l]
-  TESTEQ_I16 i l           -> do np <- int (fromIntegral i)
+  TESTEQ_I16 i l           -> do np <- word (fromIntegral i)
                                  emit bci_TESTEQ_I16 [Op np, LabelOp l]
-  TESTLT_I8  i l           -> do np <- int (fromIntegral i)
+  TESTLT_I8  i l           -> do np <- word (fromIntegral i)
                                  emit bci_TESTLT_I8 [Op np, LabelOp l]
-  TESTEQ_I8 i l            -> do np <- int (fromIntegral i)
+  TESTEQ_I8 i l            -> do np <- word (fromIntegral i)
                                  emit bci_TESTEQ_I8 [Op np, LabelOp l]
   TESTLT_W64  w l          -> do np <- word64 w
                                  emit bci_TESTLT_W64 [Op np, LabelOp l]
@@ -530,42 +526,80 @@ assembleI platform i = case i of
      -- On Windows, stdcall labels have a suffix indicating the no. of
      -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
     literal (LitLabel fs _ _) = litlabel fs
-    literal LitNullAddr       = int 0
+    literal LitNullAddr       = word 0
     literal (LitFloat r)      = float (fromRational r)
     literal (LitDouble r)     = double (fromRational r)
     literal (LitChar c)       = int (ord c)
     literal (LitString bs)    = lit [BCONPtrStr bs]
        -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i) = case nt of
-      LitNumInt     -> int (fromIntegral i)
-      LitNumWord    -> int (fromIntegral i)
-      LitNumInt8    -> int8 (fromIntegral i)
-      LitNumWord8   -> int8 (fromIntegral i)
-      LitNumInt16   -> int16 (fromIntegral i)
-      LitNumWord16  -> int16 (fromIntegral i)
-      LitNumInt32   -> int32 (fromIntegral i)
-      LitNumWord32  -> int32 (fromIntegral i)
-      LitNumInt64   -> int64 (fromIntegral i)
-      LitNumWord64  -> int64 (fromIntegral i)
+      LitNumInt     -> word (fromIntegral i)
+      LitNumWord    -> word (fromIntegral i)
+      LitNumInt8    -> word8 (fromIntegral i)
+      LitNumWord8   -> word8 (fromIntegral i)
+      LitNumInt16   -> word16 (fromIntegral i)
+      LitNumWord16  -> word16 (fromIntegral i)
+      LitNumInt32   -> word32 (fromIntegral i)
+      LitNumWord32  -> word32 (fromIntegral i)
+      LitNumInt64   -> word64 (fromIntegral i)
+      LitNumWord64  -> word64 (fromIntegral i)
       LitNumBigNat  -> panic "GHC.ByteCode.Asm.literal: LitNumBigNat"
 
     -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence
     -- analysis messed up.
-    literal (LitRubbish {}) = int 0
+    literal (LitRubbish {}) = word 0
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]
-    float = words . mkLitF platform
-    double = words . mkLitD platform
-    int = words . mkLitI
-    int8 = words . mkLitI64 platform
-    int16 = words . mkLitI64 platform
-    int32 = words . mkLitI64 platform
-    int64 = words . mkLitI64 platform
-    word64 = words . mkLitW64 platform
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]
+    word_size  = platformWordSize platform
+    word_size_bits = platformWordSizeInBits platform
+
+    -- Make lists of host-sized words for literals, so that when the
+    -- words are placed in memory at increasing addresses, the
+    -- bit pattern is correct for the host's word size and endianness.
+    --
+    -- Note that we only support host endianness == target endianness for now,
+    -- even with the external interpreter. This would need to be fixed to
+    -- support host endianness /= target endianness
+    int :: Int -> Assembler Word
+    int  i = word (fromIntegral i)
+
+    float :: Float -> Assembler Word
+    float f = word32 (castFloatToWord32 f)
+
+    double :: Double -> Assembler Word
+    double d = word64 (castDoubleToWord64 d)
+
+    word64 :: Word64 -> Assembler Word
+    word64 ww = case word_size of
+       PW4 ->
+        let !wl = fromIntegral ww
+            !wh = fromIntegral (ww `unsafeShiftR` 32)
+        in case platformByteOrder platform of
+            LittleEndian -> words [wl,wh]
+            BigEndian    -> words [wh,wl]
+       PW8 -> word (fromIntegral ww)
+
+    word8 :: Word8 -> Assembler Word
+    word8  x = case platformByteOrder platform of
+      LittleEndian -> word (fromIntegral x)
+      BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 8))
+
+    word16 :: Word16 -> Assembler Word
+    word16 x = case platformByteOrder platform of
+      LittleEndian -> word (fromIntegral x)
+      BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 16))
+
+    word32 :: Word32 -> Assembler Word
+    word32 x = case platformByteOrder platform of
+      LittleEndian -> word (fromIntegral x)
+      BigEndian    -> case word_size of
+        PW4 -> word (fromIntegral x)
+        PW8 -> word (fromIntegral x `unsafeShiftL` 32)
+
 
 isLargeW :: Word -> Bool
 isLargeW n = n > 65535
@@ -647,75 +681,6 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
 mkNativeCallInfoLit :: Platform -> NativeCallInfo -> Literal
 mkNativeCallInfoLit platform call_info =
   mkLitWord platform . fromIntegral $ mkNativeCallInfoSig platform call_info
-
--- Make lists of host-sized words for literals, so that when the
--- words are placed in memory at increasing addresses, the
--- bit pattern is correct for the host's word size and endianness.
-mkLitI   ::             Int    -> [Word]
-mkLitF   :: Platform -> Float  -> [Word]
-mkLitD   :: Platform -> Double -> [Word]
-mkLitI64 :: Platform -> Int64  -> [Word]
-mkLitW64 :: Platform -> Word64 -> [Word]
-
-mkLitF platform f = case platformWordSize platform of
-  PW4 -> runST $ do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 f
-        f_arr <- castSTUArray arr
-        w0 <- readArray f_arr 0
-        return [w0 :: Word]
-
-  PW8 -> runST $ do
-        arr <- newArray_ ((0::Int),1)
-        writeArray arr 0 f
-        -- on 64-bit architectures we read two (32-bit) Float cells when we read
-        -- a (64-bit) Word: so we write a dummy value in the second cell to
-        -- avoid an out-of-bound read.
-        writeArray arr 1 0.0
-        f_arr <- castSTUArray arr
-        w0 <- readArray f_arr 0
-        return [w0 :: Word]
-
-mkLitD platform d = case platformWordSize platform of
-   PW4 -> runST (do
-        arr <- newArray_ ((0::Int),1)
-        writeArray arr 0 d
-        d_arr <- castSTUArray arr
-        w0 <- readArray d_arr 0
-        w1 <- readArray d_arr 1
-        return [w0 :: Word, w1]
-     )
-   PW8 -> runST (do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 d
-        d_arr <- castSTUArray arr
-        w0 <- readArray d_arr 0
-        return [w0 :: Word]
-     )
-
-mkLitI64 platform ii = case platformWordSize platform of
-   PW4 -> runST (do
-        arr <- newArray_ ((0::Int),1)
-        writeArray arr 0 ii
-        d_arr <- castSTUArray arr
-        w0 <- readArray d_arr 0
-        w1 <- readArray d_arr 1
-        return [w0 :: Word,w1]
-     )
-   PW8 -> [fromIntegral ii :: Word]
-
-mkLitW64 platform ww = case platformWordSize platform of
-   PW4 -> runST (do
-        arr <- newArray_ ((0::Word),1)
-        writeArray arr 0 ww
-        d_arr <- castSTUArray arr
-        w0 <- readArray d_arr 0
-        w1 <- readArray d_arr 1
-        return [w0 :: Word,w1]
-     )
-   PW8 -> [fromIntegral ww :: Word]
-
-mkLitI i = [fromIntegral i :: Word]
 
 iNTERP_STACK_CHECK_THRESH :: Int
 iNTERP_STACK_CHECK_THRESH = INTERP_STACK_CHECK_THRESH
