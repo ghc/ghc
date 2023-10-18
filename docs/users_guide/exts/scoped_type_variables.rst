@@ -293,11 +293,11 @@ signatures/ of the methods. For example, the following will be accepted without
 explicitly enabling :extension:`ScopedTypeVariables`: ::
 
       class D a where
-        m :: [a] -> a
+        m :: a -> a
 
-      instance D [a] where
+      instance Num a => D [a] where
         m :: [a] -> [a]
-        m = reverse
+        m x = map (*2) x
 
 Note that writing ``m :: [a] -> [a]`` requires the use of the
 :extension:`InstanceSigs` extension.
