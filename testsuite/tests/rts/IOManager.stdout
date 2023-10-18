@@ -1,0 +1,21 @@
+I/O manager tests
+1. Scenario {mode = EmptyBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 10}
+2. Scenario {mode = EmptyBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 100}
+3. Scenario {mode = EmptyBufs, nsockets = 2, nthreads = 1, cancelio = False, size = 100}
+4. Scenario {mode = EmptyBufs, nsockets = 2, nthreads = 3, cancelio = False, size = 100}
+5. Scenario {mode = EmptyBufs, nsockets = 3, nthreads = 5, cancelio = False, size = 1000}
+6. Scenario {mode = FullBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 10}
+7. Scenario {mode = FullBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 100}
+8. Scenario {mode = FullBufs, nsockets = 2, nthreads = 1, cancelio = False, size = 100}
+9. Scenario {mode = FullBufs, nsockets = 2, nthreads = 3, cancelio = False, size = 100}
+10. Scenario {mode = FullBufs, nsockets = 3, nthreads = 5, cancelio = False, size = 1000}
+11. Scenario {mode = EmptyFullBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 10}
+12. Scenario {mode = EmptyFullBufs, nsockets = 1, nthreads = 0, cancelio = False, size = 100}
+13. Scenario {mode = EmptyFullBufs, nsockets = 2, nthreads = 1, cancelio = False, size = 100}
+14. Scenario {mode = EmptyFullBufs, nsockets = 2, nthreads = 3, cancelio = False, size = 100}
+15. Scenario {mode = EmptyFullBufs, nsockets = 3, nthreads = 5, cancelio = False, size = 1000}
+16. Scenario {mode = EmptyBufs, nsockets = 2, nthreads = 3, cancelio = True, size = 100}
+17. Scenario {mode = FullBufs, nsockets = 2, nthreads = 3, cancelio = True, size = 100}
+18. Scenario {mode = EmptyFullBufs, nsockets = 2, nthreads = 3, cancelio = True, size = 100}
+19. Scenario {mode = EmptyFullBufs, nsockets = 3, nthreads = 5, cancelio = True, size = 1000}
+20. Scenario {mode = EmptyFullBufs, nsockets = 7, nthreads = 10, cancelio = True, size = 5000}

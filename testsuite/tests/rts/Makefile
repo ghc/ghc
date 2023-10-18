@@ -157,3 +157,8 @@ T23142:
 	grep -m1 -c "CATCH_STM_FRAME" T23142.log
 	grep -m1 -c "MUT_ARR_PTRS_FROZEN_DIRTY" T23142.log
 	grep -m1 -c "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY" T23142.log
+
+HSC2HS_OPTS = --cc="$(TEST_CC)" $(addprefix --cflag=,$(TEST_CC_OPTS)) --ld=$(TEST_CC) $(addprefix --lflag=,$(TEST_CC_OPTS))
+
+IOManager.hs: IOManager.hsc
+	'$(HSC2HS)' $(HSC2HS_OPTS) $<
