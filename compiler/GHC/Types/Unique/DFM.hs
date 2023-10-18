@@ -398,7 +398,7 @@ listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 
 -- | Apply a function to a particular element
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM key elt -> key -> UniqDFM key elt
-adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getMixedKey $ getUnique k) m) i
+adjustUDFM f m k = adjustUDFM_Directly f m (getUnique k)
 
 -- | Apply a function to a particular element
 adjustUDFM_Directly :: (elt -> elt) -> UniqDFM key elt -> Unique -> UniqDFM key elt

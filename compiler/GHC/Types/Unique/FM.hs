@@ -27,6 +27,7 @@ of arguments of combining function.
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-asm -ddump-cmm -ddump-prep -ddump-to-file #-}
 
 module GHC.Types.Unique.FM (
         -- * Unique-keyed mappings
@@ -124,7 +125,7 @@ type role UniqFM representational representational -- Don't allow coerces over t
 -- | https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
 mix :: MS.Key -> MS.Key -> MS.Key
 {-# INLINE mix #-}
-mix k x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
+mix k = fromIntegral . f . g . f . g . f . fromIntegral
   where
     f y = (y `shiftR` s) `xor` y
     g z = z * k
@@ -137,15 +138,15 @@ kBACKWARD = 0xCFEE444D8B59A89B
 enc, dec :: MS.Key -> MS.Key
 enc = mix kFORWARD
 dec = mix kBACKWARD
-{-# INLINE enc #-}
-{-# INLINE dec #-}
+{-# NOINLINE enc #-}
+{-# NOINLINE dec #-}
 
 getMixedKey :: Unique -> MS.Key
-{-# NOINLINE getMixedKey #-}
+{-# INLINE getMixedKey #-}
 getMixedKey = enc . getKey
 
 getUnmixedUnique :: MS.Key -> Unique
-{-# NOINLINE getUnmixedUnique #-}
+{-# INLINE getUnmixedUnique #-}
 getUnmixedUnique = mkUniqueGrimily . dec
 
 emptyUFM :: UniqFM key elt
@@ -239,7 +240,7 @@ addToUFM_L f k v (UFM m) =
   coerce $
     M.insertLookupWithKey
       (\_ _n _o -> f k _o _n)
-      (getKey $ getUnique k)
+      (getMixedKey $ getUnique k)
       v
       m
 
@@ -256,7 +257,7 @@ alterUFM_Directly
   -> UniqFM key elt            -- ^ old
   -> Unique                    -- ^ new
   -> UniqFM key elt            -- ^ result
-alterUFM_Directly f (UFM m) k = UFM (M.alter f (getKey k) m)
+alterUFM_Directly f (UFM m) k = UFM (M.alter f (getMixedKey k) m)
 
 -- | Add elements to the map, combining existing values with inserted ones using
 -- the given function.
