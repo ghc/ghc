@@ -643,13 +643,20 @@ cpeBind top_lvl env (Rec pairs)
   where
     (bndrs, rhss) = unzip pairs
 
-        -- Flatten all the floats, and the current
-        -- group into a single giant Rec
+    -- Flatten all the floats, and the current
+    -- group into a single giant Rec
     add_float (Float bind bound _) prs2
-      | bound /= CaseBound = case bind of
+      | bound /= CaseBound
+      || all (definitelyLiftedType . idType) (bindersOf bind)
+           -- The latter check is hit in -O0 (i.e., flavours quick, devel2)
+           -- for dictionary args which haven't been floated out yet, #24102.
+           -- They are preferably CaseBound, but since they are lifted we may
+           -- just as well put them in the Rec, in contrast to lifted bindings.
+      = case bind of
           NonRec x e -> (x,e) : prs2
           Rec prs1 -> prs1 ++ prs2
-    add_float f                       _    = pprPanic "cpeBind" (ppr f)
+    add_float f _ = pprPanic "cpeBind" (ppr f)
+
 
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
