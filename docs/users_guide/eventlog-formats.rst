@@ -741,7 +741,6 @@ A variable-length packet encoding a heap profile sample broken down by,
    :field Word8: stack depth
    :field Word32[]: cost centre stack starting with inner-most (cost centre numbers)
 
-
 String break-down
 ^^^^^^^^^^^^^^^^^
 
@@ -771,8 +770,8 @@ the current cost centre stack is emitted. Together these
 enable a user to construct an approximate track of the
 executation of their program.
 
-Profile begin event
-~~~~~~~~~~~~~~~~~~~
+Time Profile begin event
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. event-type:: PROF_BEGIN
 
@@ -782,10 +781,8 @@ Profile begin event
 
    Marks the beginning of a time profile.
 
-Profile sample event
-~~~~~~~~~~~~~~~~~~~~
-
-A variable-length packet encoding a profile sample.
+Time profile sample event
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. event-type:: PROF_SAMPLE_COST_CENTRE
 
@@ -795,6 +792,43 @@ A variable-length packet encoding a profile sample.
    :field Word64: current profiling tick
    :field Word8: stack depth
    :field Word32[]: cost centre stack starting with inner-most (cost centre numbers)
+
+   Marks a point in time where a capability was seen to be executing in the
+   given cost-centre stack.
+
+Time profile cost-centre events
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. event-type:: PROF_BEGIN_COST_CENTRE_STACK_SAMPLES
+
+   :tag: 170
+   :length: fixed
+
+   Marks the beginning of a set of :event-type:`PROF_SAMPLE_COST_CENTRE_STACK`
+   samples.
+
+.. event-type:: PROF_SAMPLE_COST_CENTRE_STACK
+
+   :tag: 171
+   :length: fixed
+   :field Word64: cost-centre stack number
+   :field Word64: parent cost-centre stack number
+   :field Word64: cost-centre number
+   :field Word64: allocations performed by CCS in bytes
+   :field Word64: number of entries
+   :field Word64: number of ticks
+
+   Marks the total allocations, entries and ticks attributed to a cost-centre
+   stack up to this point in execution.
+
+.. event-type:: PROF_END_COST_CENTRE_STACK_SAMPLES
+
+   :tag: 172
+   :length: fixed
+
+   Marks the end of a set of :event-type:`PROF_SAMPLE_COST_CENTRE_STACK`
+   samples.
+
 
 Biographical profile sample event
 ---------------------------------

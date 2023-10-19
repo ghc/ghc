@@ -120,6 +120,12 @@ event_types = [
     EventType(167, 'PROF_SAMPLE_COST_CENTRE',      VariableLength,        'Time profile cost-centre stack'),
     EventType(168, 'PROF_BEGIN',                   [Word64],              'Start of a time profile'),
     EventType(169, 'IPE',                          VariableLength,        'An IPE entry'),
+    EventType(170, 'PROF_BEGIN_COST_CENTRE_STACK_SAMPLES',
+                                                   [],                    'Marks the beginning of a set of PROF_SAMPLE_COST_CENTRE_STACK samples'),
+    EventType(171, 'PROF_SAMPLE_COST_CENTRE_STACK',[Word64, Word64, Word64, Word64, Word64, Word64],
+                                                                          'Report allocations, ticks, and entries performed by a cost-centre stack'),
+    EventType(172, 'PROF_END_COST_CENTRE_STACK_SAMPLES',
+                                                   [],                    'Marks the end of a set of PROF_SAMPLE_COST_CENTRE_STACK samples'),
 
     EventType(181, 'USER_BINARY_MSG',              VariableLength,        'User binary message'),
 

@@ -1355,6 +1355,37 @@ void postProfSampleCostCentre(Capability *cap,
     RELEASE_LOCK(&eventBufMutex);
 }
 
+static void postProfCostCentreStackAllocs_(CostCentreStack const *ccs)
+{
+    ensureRoomForEvent(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE_STACK);
+    postEventHeader(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE_STACK);
+    postWord64(&eventBuf, ccs->ccsID);
+    postWord64(&eventBuf, ccs->cc->ccID);
+    postWord64(&eventBuf, ccs->prevStack->ccsID);
+    postWord64(&eventBuf, ccs->mem_alloc * sizeof(W_));
+    postWord64(&eventBuf, ccs->scc_count);
+    postWord64(&eventBuf, ccs->time_ticks);
+
+    for (IndexTable *i = ccs->indexTable; i != 0; i = i->next) {
+        if (!i->back_edge) {
+            postProfCostCentreStackAllocs_(i->ccs);
+        }
+    }
+}
+
+void postProfCostCentreStackAllocs(CostCentreStack const *ccs)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_PROF_BEGIN_COST_CENTRE_STACK_SAMPLES);
+    postEventHeader(&eventBuf, EVENT_PROF_BEGIN_COST_CENTRE_STACK_SAMPLES);
+
+    postProfCostCentreStackAllocs_(ccs);
+
+    ensureRoomForEvent(&eventBuf, EVENT_PROF_END_COST_CENTRE_STACK_SAMPLES);
+    postEventHeader(&eventBuf, EVENT_PROF_END_COST_CENTRE_STACK_SAMPLES);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
 // This event is output at the start of profiling so the tick interval can
 // be reported. Once the tick interval is reported the total executation time
 // can be calculated from how many samples there are.
