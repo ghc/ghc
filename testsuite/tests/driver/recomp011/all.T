@@ -2,7 +2,6 @@
 
 test('recomp011',
      [ extra_files(['Main.hs'])
-     , when(arch('powerpc64'), expect_broken(11260))
      , js_broken(22261)
      ],
      makefile_test, [])
