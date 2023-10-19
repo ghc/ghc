@@ -1970,10 +1970,9 @@ Here the right-hand sides of @range@ and @ys@ are both thunks; the former
 is static while the latter is dynamic.
 
 The layout of a thunk is the same as that for a function closure.
-However, thunks must have a payload of at least @MIN_UPD_SIZE@
-words to allow it to be overwritten with a black hole and an
-indirection.  The compiler may have to add extra non-pointer fields to
-satisfy this constraint.
+However, a thunk header always contains an extra padding word at the
+end. This allows the thunk to be overwritten with an indirection,
+where the padding word will be repurposed as the indirectee pointer.
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|l|}\hline
