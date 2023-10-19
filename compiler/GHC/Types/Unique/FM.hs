@@ -33,8 +33,12 @@ module GHC.Types.Unique.FM (
         -- * Unique-keyed mappings
         UniqFM,           -- abstract type
         NonDetUniqFM(..), -- wrapper for opting into nondeterminism
+        UniqFMKeySet,     -- A Word64Set with keys that are mixed the same way as UniqFM's
         getMixedKey,
         getUnmixedUnique,
+
+        -- ** Manipulating UniqFMKeySets
+        emptyUniqFMKeySet, mkUniqFMKeySet, unionUniqFMKeySet,
 
         -- ** Manipulating those mappings
         emptyUFM,
@@ -83,8 +87,8 @@ module GHC.Types.Unique.FM (
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, nonDetKeysUFM,
-        ufmToSet_Directly,
-        nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
+        ufmToSet_Directly, ufmksToMixedSet,
+        nonDetUFMToList, ufmToMixedIntMap, mixedIntMapToUFM,
         unsafeCastUFMKey,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
@@ -103,10 +107,6 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.Bits
 import Data.Coerce
 
--- for UNIQUE_TAG_BITS. @mix@ will silently fail if this isn't included and
--- you'll get panics.
-#include "Unique.h"
-
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
 --
@@ -122,6 +122,10 @@ newtype UniqFM key ele = UFM (M.Word64Map ele)
   -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
 type role UniqFM representational representational -- Don't allow coerces over the key
 
+-- | The result of `ufmToSet_Directly`: A very dense `S.Word64Set` the keys of
+-- which are mixed exactly like the keys of the `UniqFM` from whence it came.
+newtype UniqFMKeySet = UFMKS S.Word64Set
+
 -- | https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
 mix :: MS.Key -> MS.Key -> MS.Key
 {-# INLINE mix #-}
@@ -129,7 +133,7 @@ mix k = fromIntegral . f . g . f . g . f . fromIntegral
   where
     f y = (y `shiftR` s) `xor` y
     g z = z * k
-    s = finiteBitSize k `shiftR` 1 -- 32 for 64 bit, 16 for 32 bit
+    s = finiteBitSize k `shiftR` 1
 
 kFORWARD, kBACKWARD :: MS.Key
 -- These are like "encryption" and "decryption" keys to mix
@@ -148,6 +152,15 @@ getMixedKey = enc . getKey
 getUnmixedUnique :: MS.Key -> Unique
 {-# INLINE getUnmixedUnique #-}
 getUnmixedUnique = mkUniqueGrimily . dec
+
+emptyUniqFMKeySet :: UniqFMKeySet
+emptyUniqFMKeySet = UFMKS S.empty
+
+mkUniqFMKeySet :: Uniquable k => [k] -> UniqFMKeySet
+mkUniqFMKeySet us = UFMKS (S.fromList (map (getMixedKey . getUnique) us))
+
+unionUniqFMKeySet :: UniqFMKeySet -> UniqFMKeySet -> UniqFMKeySet
+unionUniqFMKeySet (UFMKS s1) (UFMKS s2) = UFMKS (S.union s1 s2)
 
 emptyUFM :: UniqFM key elt
 emptyUFM = UFM M.empty
@@ -374,7 +387,7 @@ plusUFMList :: [UniqFM key elt] -> UniqFM key elt
 plusUFMList = foldl' plusUFM emptyUFM
 
 plusUFMListWith :: (elt -> elt -> elt) -> [UniqFM key elt] -> UniqFM key elt
-plusUFMListWith f xs = unsafeIntMapToUFM $ M.unionsWith f (map ufmToIntMap xs)
+plusUFMListWith f xs = mixedIntMapToUFM $ M.unionsWith f (map ufmToMixedIntMap xs)
 
 sequenceUFMList :: forall key elt. [UniqFM key elt] -> UniqFM key [elt]
 sequenceUFMList = foldr (plusUFM_CD2 cons) emptyUFM
@@ -471,8 +484,8 @@ lookupWithDefaultUFM_Directly :: UniqFM key elt -> elt -> Unique -> elt
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getMixedKey u) m
 
 -- | NB: This provides a set of keys with with `getMixedKey`!
-ufmToSet_Directly :: UniqFM key elt -> S.Word64Set
-ufmToSet_Directly (UFM m) = M.keysSet m
+ufmToSet_Directly :: UniqFM key elt -> UniqFMKeySet
+ufmToSet_Directly (UFM m) = UFMKS (M.keysSet m)
 
 anyUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
 anyUFM p (UFM m) = M.foldr ((||) . p) False m
@@ -546,11 +559,20 @@ instance forall key. Foldable (NonDetUniqFM key) where
 instance forall key. Traversable (NonDetUniqFM key) where
   traverse f (NonDetUniqFM (UFM m)) = NonDetUniqFM . UFM <$> traverse f m
 
-ufmToIntMap :: UniqFM key elt -> M.Word64Map elt
-ufmToIntMap (UFM m) = m
+-- | Interpret a `UniqFMKeySet` as a `Word64Set`, where the Unique keys can be
+-- recovered by applying `getUnmixedUnique` to the keys.
+ufmksToMixedSet :: UniqFMKeySet -> S.Word64Set
+ufmksToMixedSet (UFMKS s) = s
 
-unsafeIntMapToUFM :: M.Word64Map elt -> UniqFM key elt
-unsafeIntMapToUFM = UFM
+-- | Interpret a `UniqFM` as a `Word64Map`, where the Unique keys can be
+-- recovered by applying `getUnmixedUnique` to the keys.
+ufmToMixedIntMap :: UniqFM key elt -> M.Word64Map elt
+ufmToMixedIntMap (UFM m) = m
+
+-- | Interpret a `Word64Map` as a `UniqFM`, where the Unique keys of the
+-- `Word64Map` can be recovered by applying `getUnmixedUnique` to the keys.
+mixedIntMapToUFM :: M.Word64Map elt -> UniqFM key elt
+mixedIntMapToUFM = UFM
 
 -- | Cast the key domain of a UniqFM.
 --

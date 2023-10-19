@@ -80,9 +80,8 @@ import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
-import GHC.Types.Unique.FM (UniqFM, getMixedKey, getUnmixedUnique, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
+import GHC.Types.Unique.FM
 import Unsafe.Coerce
-import qualified GHC.Data.Word64Set as W
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -325,10 +324,9 @@ filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
 udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
 udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
 
-udfmRestrictKeysSet :: UniqDFM key elt -> W.Word64Set -> UniqDFM key elt
+udfmRestrictKeysSet :: UniqDFM key elt -> UniqFMKeySet -> UniqDFM key elt
 udfmRestrictKeysSet (UDFM val_set i) set =
-  let key_set = set
-  in UDFM (M.restrictKeys val_set key_set) i
+  UDFM (M.restrictKeys val_set (ufmksToMixedSet set)) i
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
@@ -353,7 +351,7 @@ intersectUDFM (UDFM x i) (UDFM y _j) = UDFM (M.intersection x y) i
   -- a subset of elements from the left set, so `i` is a good upper bound.
 
 udfmIntersectUFM :: UniqDFM key elt1 -> UniqFM key elt2 -> UniqDFM key elt1
-udfmIntersectUFM (UDFM x i) y = UDFM (M.intersection x (ufmToIntMap y)) i
+udfmIntersectUFM (UDFM x i) y = UDFM (M.intersection x (ufmToMixedIntMap y)) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.
 
@@ -361,7 +359,7 @@ disjointUDFM :: UniqDFM key elt -> UniqDFM key elt -> Bool
 disjointUDFM (UDFM x _i) (UDFM y _j) = M.disjoint x y
 
 disjointUdfmUfm :: UniqDFM key elt -> UniqFM key elt2 -> Bool
-disjointUdfmUfm (UDFM x _i) y = M.disjoint x (ufmToIntMap y)
+disjointUdfmUfm (UDFM x _i) y = M.disjoint x (ufmToMixedIntMap y)
 
 minusUDFM :: UniqDFM key elt1 -> UniqDFM key elt2 -> UniqDFM key elt1
 minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i
@@ -369,12 +367,12 @@ minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i
   -- bound.
 
 udfmMinusUFM :: UniqDFM key elt1 -> UniqFM key elt2 -> UniqDFM key elt1
-udfmMinusUFM (UDFM x i) y = UDFM (M.difference x (ufmToIntMap y)) i
+udfmMinusUFM (UDFM x i) y = UDFM (M.difference x (ufmToMixedIntMap y)) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
   -- bound.
 
 ufmMinusUDFM :: UniqFM key elt1 -> UniqDFM key elt2 -> UniqFM key elt1
-ufmMinusUDFM x (UDFM y _i) = unsafeIntMapToUFM (M.difference (ufmToIntMap x) y)
+ufmMinusUDFM x (UDFM y _i) = mixedIntMapToUFM (M.difference (ufmToMixedIntMap x) y)
 
 -- | Partition UniqDFM into two UniqDFMs according to the predicate
 partitionUDFM :: (elt -> Bool) -> UniqDFM key elt -> (UniqDFM key elt, UniqDFM key elt)
@@ -388,7 +386,7 @@ delListFromUDFM = foldl' delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM key elt -> UniqFM key elt
-udfmToUfm (UDFM m _i) = unsafeIntMapToUFM (M.map taggedFst m)
+udfmToUfm (UDFM m _i) = mixedIntMapToUFM (M.map taggedFst m)
 
 listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM key elt
 listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM

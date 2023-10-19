@@ -151,10 +151,8 @@ import GHC.Runtime.Loader
 import GHC.Rename.Names
 import GHC.Utils.Constants
 import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
-import GHC.Types.Unique
+import GHC.Types.Unique.FM (UniqFMKeySet, emptyUniqFMKeySet, mkUniqFMKeySet, unionUniqFMKeySet)
 import GHC.Iface.Errors.Types
-
-import qualified GHC.Data.Word64Set as W
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -2812,7 +2810,7 @@ Before a module is compiled, we use this set to restrict the HUG to the visible
 modules only, avoiding this tricky space leak.
 
 Efficiency of the ModuleNameSet is of utmost importance, because a union occurs for
-each edge in the module graph. To achieve this, the set is represented directly as an IntSet,
+each edge in the module graph. To achieve this, the set is represented directly as a UniqFMKeySet,
 which provides suitable performance – even using a UniqSet (which is backed by an IntMap) is
 too slow. The crucial test of performance here is the time taken to a do a no-op build in --make mode.
 
@@ -2821,12 +2819,11 @@ See test "jspace" for an example which used to trigger this problem.
 -}
 
 -- See Note [ModuleNameSet, efficiency and space leaks]
-type ModuleNameSet = M.Map UnitId W.Word64Set
+type ModuleNameSet = M.Map UnitId UniqFMKeySet
 
 addToModuleNameSet :: UnitId -> ModuleName -> ModuleNameSet -> ModuleNameSet
 addToModuleNameSet uid mn s =
-  let k = (getKey $ getUnique $ mn)
-  in M.insertWith (W.union) uid (W.singleton k) s
+  M.insertWith unionUniqFMKeySet uid (mkUniqFMKeySet [mn]) s
 
 -- | Wait for some dependencies to finish and then read from the given MVar.
 wait_deps_hug :: MVar HomeUnitGraph -> [BuildResult] -> ReaderT MakeEnv (MaybeT IO) (HomeUnitGraph, ModuleNameSet)
@@ -2837,7 +2834,7 @@ wait_deps_hug hug_var deps = do
         let -- Restrict to things which are in the transitive closure to avoid retaining
             -- reference to loop modules which have already been compiled by other threads.
             -- See Note [ModuleNameSet, efficiency and space leaks]
-            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe W.empty $ M.lookup  uid module_deps)
+            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe emptyUniqFMKeySet $ M.lookup  uid module_deps)
         in hme { homeUnitEnv_hpt = new }
   return (unitEnv_mapWithKey pruneHomeUnitEnv hug, module_deps)
 
@@ -2852,7 +2849,7 @@ wait_deps (x:xs) = do
     Nothing -> return (hmis, new_deps)
     Just hmi -> return (hmi:hmis, new_deps)
   where
-    unionModuleNameSet = M.unionWith W.union
+    unionModuleNameSet = M.unionWith unionUniqFMKeySet
 
 
 -- Executing the pipelines

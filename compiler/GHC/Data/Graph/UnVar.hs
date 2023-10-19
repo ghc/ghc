@@ -31,7 +31,7 @@ module GHC.Data.Graph.UnVar
 
 import GHC.Prelude
 
-import GHC.Types.Unique.FM( UniqFM, ufmToSet_Directly, getMixedKey, getUnmixedUnique )
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Types.Unique
@@ -44,7 +44,10 @@ import qualified GHC.Data.Word64Set as S
 -- at hand, and we do not have that when we turn the domain of a VarEnv into a UnVarSet.
 -- Therefore, use a Word64Set directly (which is likely also a bit more efficient).
 
--- Set of uniques, i.e. for adjacent nodes
+-- Set of mixed unique keys, i.e. for adjacent nodes
+-- This could very well be backed by a UniqFMKeySet! But that would require
+-- moving a lot of functions to GHC.Types.Unique.FM, because we definitely
+-- don't want to expose the newtype constructor of UniqFMKeySet.
 newtype UnVarSet = UnVarSet S.Word64Set
     deriving Eq
 
@@ -52,7 +55,7 @@ k :: Var -> Word64
 k v = getMixedKey (getUnique v)
 
 domUFMUnVarSet :: UniqFM key elt -> UnVarSet
-domUFMUnVarSet ae = UnVarSet $ ufmToSet_Directly ae
+domUFMUnVarSet ae = UnVarSet $ ufmksToMixedSet $ ufmToSet_Directly ae
 
 emptyUnVarSet :: UnVarSet
 emptyUnVarSet = UnVarSet S.empty
