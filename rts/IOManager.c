@@ -74,7 +74,9 @@
  * simply disable these two warnings for the whole file.
  */
 #pragma GCC diagnostic push
+#if __GNUC__ >= 5
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#endif
 #pragma GCC diagnostic ignored "-Wmissing-noreturn"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
