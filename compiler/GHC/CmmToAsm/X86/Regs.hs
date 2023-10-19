@@ -195,6 +195,8 @@ spRel platform n
 -- allocator.
 
 
+data Subplatform = SP_I386 | SP_X86_64
+
 
 firstxmm :: RegNo
 firstxmm  = 16

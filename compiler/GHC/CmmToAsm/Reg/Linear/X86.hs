@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds #-}
 
 -- | Free regs map for i386
 module GHC.CmmToAsm.Reg.Linear.X86 where
@@ -10,14 +11,15 @@ import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.Platform
 import GHC.Utils.Outputable
+import qualified GHC.Types.BitSet as BitSet
 
 import Data.Word
 
-newtype FreeRegs = FreeRegs Word32
+newtype FreeRegs = FreeRegs (BitSet.BitSet 32)
     deriving (Show,Outputable)
 
 noFreeRegs :: FreeRegs
-noFreeRegs = FreeRegs 0
+noFreeRegs = FreeRegs BitSet.empty
 
 releaseReg :: RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle n) (FreeRegs f)
@@ -27,8 +29,15 @@ initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
         = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
+integerRegs :: FreeRegs
+integerRegs =
+    FreeRegs $ BitSet.fromList
+    [ classOfRealReg platform (RealRegSingle m) == RcInteger
+    | m <- [0..32]
+    ]
+
 getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
-getFreeRegs platform cls (FreeRegs f) = go f 0
+getFreeRegs platform cls (FreeRegs f) = BitSet. go f 0
 
   where go 0 _ = []
         go n m

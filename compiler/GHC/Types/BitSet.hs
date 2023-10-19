@@ -9,9 +9,15 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
+#include "MachDeps.h"
+#define WORD_SIZE_IN_BITS 64
 
 module GHC.Types.BitSet
     ( BitSet
+    , empty
     , fromList
     , toList
     , member
@@ -27,12 +33,14 @@ import Data.Kind
 import Data.Proxy
 import Data.Coerce
 import GHC.TypeLits
-import Prelude hiding (filter)
+import Data.Array.ST
+import GHC.Prelude hiding (filter)
+import GHC.Utils.Outputable hiding (empty)
 
-#if WORD_SIZE == 8
+#if WORD_SIZE_IN_BITS == 64
 type WordSize = 64
 wordSize = 64
-#elif WORD_SIZE == 4
+#elif WORD_SIZE_IN_BITS == 32
 type WordSize = 32
 wordSize = 32
 #else
@@ -126,14 +134,19 @@ newtype BitSet (n :: Nat) = BitSet (Words (NumWords n))
 instance (HasBitSet n, KnownNat n) => Show (BitSet n) where
     show is = "fromList " ++ show (toList is)
 
+instance (HasBitSet n, KnownNat n) => Outputable (BitSet n) where
+    ppr = text . show
+
 -- | Fold over all integers from @[0,n)@.
 foldN :: forall n a. KnownNat n
       => Proxy (n :: Nat) -> (Int -> a -> a) -> a -> a
 foldN Proxy f x0 = foldr (.) id (map f [0 .. n-1]) x0
   where n = fromInteger $ natVal (Proxy @n)
 
-member :: (HasBitSet n)
-       => Int -> BitSet n -> Bool
+empty :: HasBitSet n => BitSet n
+empty = BitSet zeroBits
+
+member :: HasBitSet n => Int -> BitSet n -> Bool
 member n (BitSet ws) = testBit ws n
 
 filter :: forall n. (KnownNat n, HasBitSet n)
@@ -149,27 +162,22 @@ filter f = foldN (Proxy @n) g
       | otherwise
       = ws
 
-toList :: forall n. (KnownNat n, HasBitSet n)
-       => BitSet n -> [Int]
+toList :: forall n. (KnownNat n, HasBitSet n) => BitSet n -> [Int]
 toList ws = foldN (Proxy @n) f []
   where
     f :: Int -> [Int] -> [Int]
     f i rest | member i ws = i : rest
     f _ rest = rest
 
-fromList :: forall n. (KnownNat n, HasBitSet n)
-         => [Int] -> BitSet n
+fromList :: forall n. (KnownNat n, HasBitSet n) => [Int] -> BitSet n
 fromList xs = BitSet $ foldl' (.|.) zeroBits (map bit xs)
 
-union :: (KnownNat n, HasBitSet n)
-      => BitSet n -> BitSet n -> BitSet n
+union :: (KnownNat n, HasBitSet n) => BitSet n -> BitSet n -> BitSet n
 union (BitSet a) (BitSet b) = BitSet (a .|. b)
 
-difference :: (KnownNat n, HasBitSet n)
-           => BitSet n -> BitSet n -> BitSet n
+difference :: (KnownNat n, HasBitSet n) => BitSet n -> BitSet n -> BitSet n
 difference (BitSet a) (BitSet b) = BitSet (a .&. complement b)
 
-intersection :: (KnownNat n, HasBitSet n)
-             => BitSet n -> BitSet n -> BitSet n
+intersection :: (KnownNat n, HasBitSet n) => BitSet n -> BitSet n -> BitSet n
 intersection (BitSet a) (BitSet b) = BitSet (a .&. b)
 
