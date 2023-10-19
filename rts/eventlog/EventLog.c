@@ -1311,9 +1311,11 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
     ACQUIRE_LOCK(&eventBufMutex);
     StgWord depth = 0;
     CostCentreStack *ccs;
-    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
+    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack) {
         depth++;
-    if (depth > 0xff) depth = 0xff;
+        if (depth > 0xff)
+            break;
+    }
 
     StgWord len = 1+8+1+depth*4;
     ensureRoomForVariableEvent(&eventBuf, len);
@@ -1322,9 +1324,7 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
     postWord8(&eventBuf, profile_id);
     postWord64(&eventBuf, residency);
     postWord8(&eventBuf, depth);
-    for (ccs = stack;
-         depth>0 && ccs != NULL && ccs != CCS_MAIN;
-         ccs = ccs->prevStack, depth--)
+    for (ccs = stack; depth>0; ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
     RELEASE_LOCK(&eventBufMutex);
 }
@@ -1337,9 +1337,11 @@ void postProfSampleCostCentre(Capability *cap,
     ACQUIRE_LOCK(&eventBufMutex);
     StgWord depth = 0;
     CostCentreStack *ccs;
-    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
+    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack) {
         depth++;
-    if (depth > 0xff) depth = 0xff;
+        if (depth > 0xff)
+            break;
+    }
 
     StgWord len = 4+8+1+depth*4;
     ensureRoomForVariableEvent(&eventBuf, len);
@@ -1348,9 +1350,7 @@ void postProfSampleCostCentre(Capability *cap,
     postWord32(&eventBuf, cap->no);
     postWord64(&eventBuf, tick);
     postWord8(&eventBuf, depth);
-    for (ccs = stack;
-         depth>0 && ccs != NULL && ccs != CCS_MAIN;
-         ccs = ccs->prevStack, depth--)
+    for (ccs = stack; depth>0; ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
     RELEASE_LOCK(&eventBufMutex);
 }
