@@ -136,28 +136,30 @@ representCoreExprEgr expr egr = EGM.runEGraphMT egr (runReaderT (go expr) emptyC
 
   addE :: Analysis m a CoreExprF => CoreExprF ClassId -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) ClassId
   addE e = lift $ EGM.addM $ Node e
+{-# INLINEABLE representCoreExprEgr #-}
 
 type CoreExprF = ExprF
 type CoreAltF = AltF
 type CoreBindF = BindF
 
-cmpDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Ordering
-cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
-    go (Breakpoint lext lid lids _) (Breakpoint rext rid rids _)
-        = case compare lid rid of
-            LT -> LT
-            EQ -> case compare (D env1 lids) (D env2 rids) of
-                    LT -> LT
-                    EQ -> compare lext rext
-                    GT -> GT
-            GT -> GT
-    go l r = compare l r
+-- cmpDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Ordering
+-- cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
+--     go (Breakpoint lext lid lids _) (Breakpoint rext rid rids _)
+--         = case compare lid rid of
+--             LT -> LT
+--             EQ -> case compare (D env1 lids) (D env2 rids) of
+--                     LT -> LT
+--                     EQ -> compare lext rext
+--                     GT -> GT
+--             GT -> GT
+--     go l r = compare l r
 
 cmpDeBruijnType :: DeBruijn Type -> DeBruijn Type -> Ordering
 cmpDeBruijnType d1@(D _ t1) d2@(D _ t2)
   = if eqDeBruijnType d1 d2
        then EQ
        -- ROMES:TODO: This definitely does not look OK.
+       -- ROMES:TODO: This hurts performance a lot (50% of regression is basically this)
        else compare (showPprUnsafe t1) (showPprUnsafe t2)
 
 cmpDeBruijnCoercion :: DeBruijn Coercion -> DeBruijn Coercion -> Ordering

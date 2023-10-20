@@ -586,6 +586,18 @@ where you can find the solution in a perhaps more digestible format.
 -- | A high-level pattern-match constraint. Corresponds to φ from Figure 3 of
 -- the LYG paper.
 -- Additionally, we use class-ids instead of ids (note... TODO)
+-- ROMES:TODO:
+-- Actually, I now think that we should only use e-class Ids within this module? and PhiCt should used Ids.
+-- The reasoning is that we only represent Ids and merge them to their RHS
+-- That sounds like the cleanest design, and we might even be able to rid other
+-- modules of thinking about e-class Ids and just use them for our
+-- representation of normalised refinement types
+-- Even though other modules are aware of Nablas, which means somehow they will
+-- have to know a bit about ClassIds, but we could also just refactor what we
+-- used to have (in terms of lookupId) to lookup the id through representing
+-- it, which is probably not that expensive. Eventually, if it is in fact
+-- expensive, we can try again talking about ClassIds more often. But I dislike
+-- how that breaks the illusion now.
 data PhiCt
   = PhiTyCt !PredType
   -- ^ A type constraint "T ~ U".
@@ -707,6 +719,7 @@ addPhiTmCt nabla (PhiNotConCt x con)       = addNotConCt nabla x con
 addPhiTmCt nabla (PhiBotCt x)              = addBotCt nabla x
 addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 
+-- ROMES:TODO: For example this one would be trivial if we still had Ids at this level...
 filterUnliftedFields :: Nabla -> PmAltCon -> [ClassId] -> [ClassId]
 filterUnliftedFields nabla con args =
   [ arg_id | (arg_id, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
@@ -739,7 +752,7 @@ mergeBotCt vi@VI { vi_bot = bot }
 addNotBotCt :: Nabla -> ClassId -> MaybeT DsM Nabla
 addNotBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts=env} } x = do
   -- This means we only add not-bottom constraints to the true match-id of newtype constructors (ie skipping NT classes)
-  -- This is the only occurrence of lookupVarInfoNT.
+  -- This is the only occurrence of lookupVarInfoNT.(nope)
   let (yid, vi@VI { vi_bot = bot }) = lookupVarInfoNT ts x
   case bot of
     IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
