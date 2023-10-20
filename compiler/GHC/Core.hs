@@ -11,6 +11,8 @@ module GHC.Core (
         Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
+        ExprTree(..), CaseTree(..), AltTree(..),
+        Size, Discount,
 
         -- * In/Out type synonyms
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
@@ -95,20 +97,24 @@ module GHC.Core (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Var.Env( InScopeSet )
-import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
+import GHC.Core.DataCon
+
 import GHC.Types.InlinePragma
+import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
 import GHC.Types.Tickish
-import GHC.Core.DataCon
-import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
+
+import GHC.Unit.Module
+
+import GHC.Data.Bag
 
 import GHC.Utils.Binary
 import GHC.Utils.Misc
@@ -1483,21 +1489,38 @@ data UnfoldingGuidance
                 -- So True,True means "always"
     }
 
-  | UnfIfGoodArgs {     -- Arose from a normal Id; the info here is the
-                        -- result of a simple analysis of the RHS
-
-      ug_args ::  [Int],  -- Discount if the argument is evaluated.
-                          -- (i.e., a simplification will definitely
-                          -- be possible).  One elt of the list per *value* arg.
-
-      ug_size :: Int,     -- The "size" of the unfolding.
-
-      ug_res :: Int       -- Scrutinee discount: the discount to subtract if the thing is in
-    }                     -- a context (case (thing args) of ...),
-                          -- (where there are the right number of arguments.)
+  | UnfIfGoodArgs {     -- Arose from a normal Id
+      ug_args :: [Id],       -- Value arguments only
+      ug_tree :: ExprTree    -- Abstraction of the body
+      -- Invariant: free Ids of ug_tree are the ug_args, plus Ids
+      --            in scope at the binding site of the function definition
+    }
 
   | UnfNever        -- The RHS is big, so don't inline it
-  deriving (Eq)
+
+type Size     = Int
+type Discount = Int
+
+data ExprTree
+  = ExprTree { et_wc_tot :: {-# UNPACK #-} !Size      -- ^ Total worst-case size of whole tree
+             , et_ret    :: {-# UNPACK #-} !Discount  -- ^ Total discount when result is scrutinised
+                  -- Both et_wc_tot and et_rec /include/ et_cases
+
+             , et_size   :: {-# UNPACK #-} !Size      -- ^ Size of the tree /apart from/ et_cases
+             , et_cases  :: Bag CaseTree              -- ^ Case exprsions and discounts
+    }
+
+data CaseTree
+  = CaseOf Id            -- Abstracts a case expression on this Id
+           Id            -- Case binder
+           [AltTree]     -- Always non-empty, but not worth making NonEmpty;
+                         -- nothing relies on non-empty-ness
+
+  | ScrutOf Id Discount  -- If this Id is bound to a value, apply this discount
+
+data AltTree  = AltTree AltCon
+                        [Id]      -- Term variables only
+                        ExprTree
 
 {- Note [UnfoldingCache]
 ~~~~~~~~~~~~~~~~~~~~~~~~

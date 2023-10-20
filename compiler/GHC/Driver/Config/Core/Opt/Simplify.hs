@@ -19,15 +19,17 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
 import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
 
-import GHC.Runtime.Context ( InteractiveContext(..) )
+import GHC.Runtime.Context ( InteractiveContext(..), icInteractiveModule )
 
 import GHC.Types.InlinePragma ( CompilerPhase(..) )
 import GHC.Types.Var ( Var )
 
+import GHC.Unit.Types( Module )
+
 initSimplifyExprOpts :: DynFlags -> InteractiveContext -> SimplifyExprOpts
 initSimplifyExprOpts dflags ic = SimplifyExprOpts
   { se_fam_inst = snd $ ic_instances ic
-  , se_mode = (initSimplMode dflags InitialPhase "GHCi")
+  , se_mode = (initSimplMode dflags mod InitialPhase "GHCi")
     { sm_inline = False
       -- Do not do any inlining, in case we expose some
       -- unboxed tuple stuff that confuses the bytecode
@@ -38,6 +40,8 @@ initSimplifyExprOpts dflags ic = SimplifyExprOpts
     , te_tick_factor = simplTickFactor dflags
     }
   }
+  where
+    mod = icInteractiveModule ic
 
 initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> RuleBase -> SimplifyOpts
 initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
@@ -56,9 +60,10 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
     }
   in opts
 
-initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
+initSimplMode :: DynFlags -> Module -> CompilerPhase -> String -> SimplMode
 initSimplMode dflags phase name = SimplMode
-  { sm_names = [name]
+  { sm_module = mod
+  , sm_names = [name]
   , sm_phase = SimplPhase phase
   , sm_rules = gopt Opt_EnableRewriteRules dflags
   , sm_eta_expand = gopt Opt_DoLambdaEtaExpansion dflags
@@ -76,8 +81,8 @@ initSimplMode dflags phase name = SimplMode
   , sm_co_opt_opts = initOptCoercionOpts dflags
   }
 
-initGentleSimplMode :: DynFlags -> SimplMode
-initGentleSimplMode dflags = (initSimplMode dflags InitialPhase "Gentle")
+initGentleSimplMode :: DynFlags -> Module -> SimplMode
+initGentleSimplMode dflags mod = (initSimplMode dflags mod InitialPhase "Gentle")
   { -- Don't do case-of-case transformations.
     -- This makes full laziness work better
     -- See Note [Case-of-case and full laziness]

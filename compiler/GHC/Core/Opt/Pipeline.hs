@@ -80,7 +80,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_rdr_env = rdr_env })
   = do { hpt_rule_base <- home_pkg_rules
-       ; let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
+       ; let builtin_passes = getCoreToDo dflags mod hpt_rule_base extra_vars
              uniq_tag = SimplTag
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
@@ -120,9 +120,9 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 ************************************************************************
 -}
 
-getCoreToDo :: DynFlags -> RuleBase -> [Var] -> [CoreToDo]
+getCoreToDo :: DynFlags -> Module -> RuleBase -> [Var] -> [CoreToDo]
 -- This function builds the pipeline of optimisations
-getCoreToDo dflags hpt_rule_base extra_vars
+getCoreToDo dflags mod hpt_rule_base extra_vars
   = flatten_todos core_todo
   where
     phases        = simplPhases        dflags
@@ -160,7 +160,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
       = CoreDoPasses
       $   [ maybe_strictness_before phase
           , CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter
-                             (initSimplMode dflags phase name) hpt_rule_base
+                             (initSimplMode dflags mod phase name) hpt_rule_base
           , maybe_rule_check phase ]
 
     -- Run GHC's internal simplification phase, after all rules have run.
@@ -171,7 +171,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     -- See Note [Inline in InitialPhase]
     -- See Note [RULEs enabled in InitialPhase]
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
-                                    (initGentleSimplMode dflags) hpt_rule_base
+                                    (initGentleSimplMode dflags mod) hpt_rule_base
 
     dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
                           else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]

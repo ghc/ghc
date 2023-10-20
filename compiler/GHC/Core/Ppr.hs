@@ -28,6 +28,11 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr
+import GHC.Core.Coercion
+
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
@@ -37,15 +42,15 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr
-import GHC.Core.Coercion
 import GHC.Types.Basic
-import GHC.Utils.Misc
-import GHC.Utils.Outputable
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 import GHC.Types.Tickish
+
+import GHC.Data.Bag
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+
 
 {-
 ************************************************************************
@@ -615,11 +620,23 @@ instance Outputable UnfoldingGuidance where
         parens (text "arity="     <> int arity    <> comma <>
                 text "unsat_ok="  <> ppr unsat_ok <> comma <>
                 text "boring_ok=" <> ppr boring_ok)
-    ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
+    ppr (UnfIfGoodArgs { ug_args = cs, ug_tree = et })
       = hsep [ text "IF_ARGS",
-               brackets (hsep (map int cs)),
-               int size,
-               int discount ]
+               brackets (hsep (map ppr cs)),
+               ppr et ]
+
+instance Outputable ExprTree where
+  ppr (ExprTree { et_wc_tot = tot, et_size = size, et_ret = ret, et_cases = cases })
+    = int tot <> char '/' <> int size <> char '/' <> int ret
+       <> brackets (sep (map ppr (bagToList cases)))
+
+instance Outputable CaseTree where
+  ppr (ScrutOf x n)   = ppr x <> colon <> int n
+  ppr (CaseOf x b alts) = sep [ text "case" <+> ppr x <+> ppr b
+                              , nest 2 $ braces $ sep $ map ppr alts ]
+
+instance Outputable AltTree where
+  ppr (AltTree con bs rhs) = sep [ppr con <+> ppr bs <+> text "->", nest 2 (ppr rhs)]
 
 instance Outputable Unfolding where
   ppr NoUnfolding                = text "No unfolding"

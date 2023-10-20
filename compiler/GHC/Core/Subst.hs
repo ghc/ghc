@@ -38,14 +38,13 @@ module GHC.Core.Subst (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Seq
 import GHC.Core.Utils
-
-        -- We are defining local versions
-import GHC.Core.Type hiding ( substTy )
-import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+import GHC.Core.TyCo.Subst    -- Subst comes from here
+import GHC.Core.Type( mkTyVarTy, noFreeVarsOfType, tyCoFVsOfType, tyCoVarsOfType )
+import GHC.Core.Coercion( tyCoFVsOfCo, mkCoVarCo )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -58,6 +57,7 @@ import GHC.Types.Unique.Supply
 
 import GHC.Builtin.Names
 import GHC.Data.Maybe
+import GHC.Data.Bag
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -344,14 +344,14 @@ preserve occ info in rules.
 -- | Substitutes a 'Var' for another one according to the 'Subst' given, returning
 -- the result and an updated 'Subst' that should be used by subsequent substitutions.
 -- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
-substBndr :: Subst -> Var -> (Subst, Var)
+substBndr :: HasDebugCallStack => Subst -> Var -> (Subst, Var)
 substBndr subst bndr
   | isTyVar bndr  = substTyVarBndr subst bndr
   | isCoVar bndr  = substCoVarBndr subst bndr
   | otherwise     = substIdBndr (text "var-bndr") subst subst bndr
 
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
-substBndrs :: Traversable f => Subst -> f Var -> (Subst, f Var)
+substBndrs :: (HasDebugCallStack, Traversable f) => Subst -> f Var -> (Subst, f Var)
 substBndrs = mapAccumL substBndr
 {-# INLINE substBndrs #-}
 
@@ -527,17 +527,64 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
     (subst',bndrs') = substBndrs subst bndrs
     args'           = map (substExpr subst') args
 
-substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
+substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src
+                                        , uf_guidance = guidance })
   -- Retain stable unfoldings
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
   = NoUnfolding
   | otherwise                 -- But keep a stable one!
-  = seqExpr new_tmpl `seq`
-    unf { uf_tmpl = new_tmpl }
+  = seqExpr new_tmpl `seq` seqGuidance new_guidance `seq`
+    unf { uf_tmpl = new_tmpl, uf_guidance = new_guidance  }
   where
-    new_tmpl = substExpr subst tmpl
+    new_tmpl     = substExpr subst tmpl
+    new_guidance = substGuidance subst guidance
 
 substUnfolding _ unf = unf      -- NoUnfolding, OtherCon
+
+substGuidance :: Subst -> UnfoldingGuidance -> UnfoldingGuidance
+substGuidance subst guidance
+  = case guidance of
+      UnfNever   -> guidance
+      UnfWhen {} -> guidance
+      UnfIfGoodArgs { ug_args = args, ug_tree = et }
+        -> UnfIfGoodArgs { ug_args = args, ug_tree = substExprTree id_env et }
+        where
+           id_env = getIdSubstEnv subst `delVarEnvList` args
+
+-------------------------
+substExprTree :: IdSubstEnv -> ExprTree -> ExprTree
+-- ExprTrees have free Ids, and so must be substituted
+-- But Ids /only/ not tyvars, so substitution is very simple
+--
+-- We might be substituting a big tree in place of a variable
+-- but we don't account for that in the size: I think it doesn't
+-- matter, and the ExprTree will be refreshed soon enough.
+substExprTree id_env et@(ExprTree { et_size = size, et_cases = cases })
+   = et { et_size = size + extra_size , et_cases = cases' }
+   where
+     (extra_size, cases') = foldr subst_ct (0, emptyBag) cases
+     -- The extra_size is just in case we substitute a non-variable for
+     -- for a variable, in which case a CaseOf won't work. Unlikely.
+
+     subst_ct :: CaseTree -> (Size, Bag CaseTree) -> (Size, Bag CaseTree)
+     subst_ct (ScrutOf v d) (n, cts)
+        = case lookupVarEnv id_env v of
+             Just (Var v') -> (n, ScrutOf v' d `consBag` cts)
+             _ -> (n, cts)
+
+     subst_ct (CaseOf v case_bndr alts) (n, cts)
+        = case lookupVarEnv id_env v of
+             Just (Var v') -> (n, CaseOf v' case_bndr alts' `consBag` cts)
+             _ -> (n + extra, cts)
+        where
+          id_env' = id_env `delVarEnv` case_bndr
+          alts' = map (subst_alt id_env') alts
+          extra = altTreesSize alts
+
+     subst_alt id_env (AltTree con bs rhs)
+        = AltTree con bs (substExprTree id_env' rhs)
+        where
+          id_env' = id_env `delVarEnvList` bs
 
 ------------------
 substIdOcc :: Subst -> Id -> Id

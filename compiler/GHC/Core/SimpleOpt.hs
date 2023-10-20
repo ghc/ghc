@@ -1504,6 +1504,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         -- CPR'd workers getting inlined back into their wrappers,
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
+-- If `fun` is in the in-scope set then the free var of its RHS should be too
         , let in_scope' = extend_in_scope (exprFreeVars rhs)
         = go (Left in_scope') floats rhs cont
 
