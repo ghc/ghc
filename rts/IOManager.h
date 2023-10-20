@@ -282,13 +282,20 @@ typedef enum { IORead, IOWrite } IOReadOrWrite;
 /* Synchronous operations: I/O and delays. As synchronous operations they
  * necessarily operate on threads. The thread is suspended until the operation
  * completes.
+ *
+ * These are called from CMM primops. The ones returing int can perform heap
+ * allocation, which might fail. They return 0 on success, or n > 0 on heap
+ * allocation failure, needing n words. The CMM primops should invoke the
+ * GC to free up at least n words and then retry the operation.
  */
 
-void syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+/* Result is true on success, or false on allocation failure. */
+bool syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
 void syncIOCancel(Capability *cap, StgTSO *tso);
 
-void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
+/* Result is true on success, or false on allocation failure. */
+bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
 
 void syncDelayCancel(Capability *cap, StgTSO *tso);
 

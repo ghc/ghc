@@ -707,7 +707,7 @@ void awaitCompletedTimeoutsOrIO(Capability *cap)
 }
 
 
-void syncIOWaitReady(Capability   *cap,
+bool syncIOWaitReady(Capability   *cap,
                      StgTSO       *tso,
                      IOReadOrWrite rw,
                      HsInt         fd)
@@ -724,7 +724,7 @@ void syncIOWaitReady(Capability   *cap,
             tso->block_info.fd = fd;
             RELEASE_STORE(&tso->why_blocked, why_blocked);
             appendToIOBlockedQueue(cap, tso);
-            break;
+            return true;
         }
 #endif
         default:
@@ -761,7 +761,7 @@ static void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime tar
 #endif
 
 
-void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
+bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
 {
     debugTrace(DEBUG_iomanager, "thread %ld waiting for %lld us", tso->id, us_delay);
     ASSERT(tso->why_blocked == NotBlocked);
@@ -773,7 +773,7 @@ void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
             tso->block_info.target = target;
             RELEASE_STORE(&tso->why_blocked, BlockedOnDelay);
             insertIntoSleepingQueue(cap, tso, target);
-            break;
+            return true;
         }
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -795,7 +795,7 @@ void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
              */
             RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
             appendToIOBlockedQueue(cap, tso);
-            break;
+            return true;
         }
 #endif
         default:
