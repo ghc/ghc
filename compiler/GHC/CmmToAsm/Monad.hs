@@ -73,20 +73,33 @@ import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
 
+-- | A Native Code Generator implementation is parametrised over
+-- * The type of static data (typically related to 'CmmStatics')
+-- * The type of instructions
+-- * The type of jump destinations
 data NcgImpl statics instr jumpDest = NcgImpl {
     ncgConfig                 :: !NCGConfig,
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
+    -- | Given a jump destination, if it refers to a block, return the block id of the destination.
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     -- | Does this jump always jump to a single destination and is shortcutable?
     --
-    -- We use this to determine shortcutable instructions - See Note [What is shortcutting]
+    -- We use this to determine whether the given instruction is a shortcutable
+    -- jump to some destination - See Note [supporting shortcutting]
     -- Note that if we return a destination here we *most* support the relevant shortcutting in
     -- shortcutStatics for jump tables and shortcutJump for the instructions itself.
     canShortcut               :: instr -> Maybe jumpDest,
     -- | Replace references to blockIds with other destinations - used to update jump tables.
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     -- | Change the jump destination(s) of an instruction.
+    --
+    -- Rewrites the destination of a jump instruction to another
+    -- destination, if the given function returns a new jump destination for
+    -- the 'BlockId' of the original destination.
+    --
+    -- For instance, for a mapping @block_a -> dest_b@ and a instruction @goto block_a@ we would
+    -- rewrite the instruction to @goto dest_b@
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     -- | 'Module' is only for printing internal labels. See Note [Internal proc
     -- labels] in CLabel.
