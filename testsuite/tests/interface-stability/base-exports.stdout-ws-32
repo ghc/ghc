@@ -1657,7 +1657,7 @@ module Data.Type.Bool where
     forall k (tru :: k) (fls :: k). If GHC.Types.True tru fls = tru
     forall k (tru :: k) (fls :: k). If GHC.Types.False tru fls = fls
   type Not :: GHC.Types.Bool -> GHC.Types.Bool
-  type family Not a where = res | res -> a
+  type family Not a = res | res -> a where
       Not GHC.Types.False = GHC.Types.True
       Not GHC.Types.True = GHC.Types.False
   type (||) :: GHC.Types.Bool -> GHC.Types.Bool -> GHC.Types.Bool
