@@ -304,7 +304,7 @@ instance Outputable CmmStatic where
   ppr (CmmString _) = text "CmmString"
   ppr (CmmFileEmbed fp _) = text "CmmFileEmbed" <+> text fp
 
--- Static data before SRT generation
+-- | Static data before or after SRT generation
 data GenCmmStatics (rawOnly :: Bool) where
     CmmStatics
       :: CLabel       -- Label of statics
