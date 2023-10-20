@@ -1067,8 +1067,9 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
          , hang (text "type family"
                    <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+                   <+> pp_inj res_var inj
                    <+> ppShowRhs ss (pp_where rhs))
-              2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
+              2 (ppShowRhs ss (pp_rhs rhs))
            $$
            nest 2 (ppShowRhs ss (pp_branches rhs))
          ]
