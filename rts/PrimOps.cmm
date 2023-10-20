@@ -2279,33 +2279,52 @@ stg_whereFromzh (P_ clos, W_ buf)
 
 stg_waitReadzh ( W_ fd )
 {
-    ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
-                          /* IORead */ 0::I32, fd);
-    jump stg_block_noregs();
+    CBool ok; /* Ok, or heap alloc failure. */
+
+    (ok) = ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+                                 /* IORead */ 0::I32, fd);
+    if (ok != 0::CBool) (likely: True) {
+        jump stg_block_noregs();
+    } else {
+        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+    }
 }
 
 stg_waitWritezh ( W_ fd )
 {
-    ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
-                          /* IOWrite */ 1::I32, fd);
-    jump stg_block_noregs();
+    CBool ok; /* Ok, or heap alloc failure. */
+
+    (ok) = ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+                                 /* IOWrite */ 1::I32, fd);
+    if (ok != 0::CBool) (likely: True) {
+        jump stg_block_noregs();
+    } else {
+        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+    }
 }
 
 stg_delayzh ( W_ us_delay )
 {
-    ccall syncDelay(MyCapability() "ptr", CurrentTSO "ptr", us_delay);
+    CBool ok; /* Ok, or heap alloc failure. */
 
-    /* Annoyingly, we cannot be consistent with how we wait and resume the
-     * blocked thread. The reason is that the win32 legacy I/O manager
-     * allocates a StgAsyncIOResult struct on the C heap which has to be
-     * freed when the thread resumes. It's a bit awkward to arrange to
-     * allocate it on the GC heap instead, so that's how it is for now. Sigh.
-     */
+    (ok) = ccall syncDelay(MyCapability() "ptr", CurrentTSO "ptr", us_delay);
+
+    if (ok != 0::CBool) (likely: True) {
+        /* Annoyingly, we cannot be consistent with how we wait and resume the
+         * blocked thread. The reason is that the win32 legacy I/O manager
+         * allocates a StgAsyncIOResult struct on the C heap which has to be
+         * freed when the thread resumes. It's a bit awkward to arrange to
+         * allocate it on the GC heap instead, so that's how it is for now.
+         * Sigh.
+         */
 #if defined(mingw32_HOST_OS)
-    jump stg_block_async_void();
+        jump stg_block_async_void();
 #else
-    jump stg_block_noregs();
+        jump stg_block_noregs();
 #endif
+    } else {
+        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+    }
 }
 
 
