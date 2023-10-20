@@ -1,0 +1,9 @@
+The current failures might be because congruence isn't being maintained properly downwards, I think...?
+Instead, we might do this manually for merging positive constructor info in the e-graphs analysis modify function?
+
+If this works, the major todos are
+* Propagating strictness annotations to underlying newtypes (likely modify analysis)
+* Clean up equality
+    * How to do Ord Type?
+* Clean up solver
+    * Merge args of data cons when merging by congruence (likely modify analysis as well)

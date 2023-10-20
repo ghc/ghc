@@ -17,7 +17,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Map.Type
 import GHC.Types.Var
 import GHC.Types.Literal
-import GHC.Types.Tickish
 
 import Data.Equality.Graph as EG
 import Data.Equality.Analysis.Monadic
@@ -91,7 +90,7 @@ instance Ord AltCon' where
 -- we might as well make it a better suited representation for the e-graph...
 -- keeping the on-fly debruijn is harder
 representCoreExprEgr :: forall a m
-                   . Analysis m a CoreExprF
+                   . AnalysisM m a CoreExprF
                   => CoreExpr
                   -> EGraph a CoreExprF
                   -> m (ClassId, EGraph a CoreExprF)
@@ -134,13 +133,16 @@ representCoreExprEgr expr egr = EGM.runEGraphMT egr (runReaderT (go expr) emptyC
     e' <- local (`extendCMEs` bs) $ go e
     return (AltF (AC' c) (map (const ()) bs) e')
 
-  addE :: Analysis m a CoreExprF => CoreExprF ClassId -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) ClassId
+  addE :: AnalysisM m a CoreExprF => CoreExprF ClassId -> ReaderT CmEnv (EGM.EGraphMT a CoreExprF m) ClassId
   addE e = lift $ EGM.addM $ Node e
 {-# INLINEABLE representCoreExprEgr #-}
 
 type CoreExprF = ExprF
 type CoreAltF = AltF
 type CoreBindF = BindF
+
+instance Outputable (EG.ENode CoreExprF) where
+  ppr (EG.Node n) = text (show n)
 
 -- cmpDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Ordering
 -- cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where

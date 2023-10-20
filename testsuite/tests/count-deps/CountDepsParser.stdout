@@ -20,11 +20,11 @@ GHC.Core.Coercion.Axiom
 GHC.Core.Coercion.Opt
 GHC.Core.ConLike
 GHC.Core.DataCon
+GHC.Core.Equality
 GHC.Core.FVs
 GHC.Core.FamInstEnv
 GHC.Core.InstEnv
 GHC.Core.Make
-GHC.Core.Map.Expr
 GHC.Core.Map.Type
 GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
@@ -195,7 +195,6 @@ GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
 GHC.Types.Unique.FM
 GHC.Types.Unique.Map
-GHC.Types.Unique.SDFM
 GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
 GHC.Types.Var

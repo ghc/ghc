@@ -1,6 +1,13 @@
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE RankNTypes, GADTs     #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- Analysis........
 
 {-
 Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
@@ -48,22 +55,22 @@ import GHC.Data.Bag
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.SDFM
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var      (EvVar)
 import GHC.Types.Var.Env
-import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 
 import GHC.Core
+import GHC.Core.Equality
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.Map.Expr
+import GHC.Core.Map.Type (deBruijnize)
 import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
-import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
+import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr, mkCoreApp)
+import GHC.Types.Id.Make (unboxedUnitExpr)
 
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
@@ -96,6 +103,14 @@ import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
+
+import Data.Equality.Analysis.Monadic
+import Data.Equality.Graph (ClassId)
+import Data.Equality.Graph.Lens
+import qualified Data.Equality.Graph as EG
+import qualified Data.Equality.Graph.Monad as EGM
+import Data.Function ((&))
+import qualified Data.IntSet as IS
 
 --
 -- * Main exports
@@ -602,8 +617,10 @@ addPhiCts :: Nabla -> PhiCts -> DsM (Maybe Nabla)
 -- See Note [TmState invariants].
 addPhiCts nabla cts = runMaybeT $ do
   let (ty_cts, tm_cts) = partitionPhiCts cts
-  nabla' <- addTyCts nabla (listToBag ty_cts)
+  nabla'  <- addTyCts nabla (listToBag ty_cts)
   nabla'' <- foldlM addPhiTmCt nabla' (listToBag tm_cts)
+  lift $ tracePm "addPhiCts, doing inhabitationTest" (ppr nabla'')
+  -- ROMES:TODO: Should the ty_st be nabla' or nabla'' !?
   inhabitationTest initFuel (nabla_ty_st nabla) nabla''
 
 partitionPhiCts :: PhiCts -> ([PredType], [PhiCt])
@@ -666,7 +683,7 @@ addPhiTmCt nabla (PhiConCt x con tvs dicts args) = do
   -- PhiConCt correspond to the higher-level φ constraints from the paper with
   -- bindings semantics. It disperses into lower-level δ constraints that the
   -- 'add*Ct' functions correspond to.
-  nabla' <- addTyCts nabla (listToBag dicts)
+  nabla'  <- addTyCts nabla (listToBag dicts)
   nabla'' <- addConCt nabla' x con tvs args
   foldlM addNotBotCt nabla'' (filterUnliftedFields con args)
 addPhiTmCt nabla (PhiNotConCt x con)       = addNotConCt nabla x con
@@ -682,33 +699,68 @@ filterUnliftedFields con args =
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
 -- ⊥.
 addBotCt :: Nabla -> Id -> MaybeT DsM Nabla
-addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
-  let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
-  case bot of
-    IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
-    IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
-    MaybeBot               -- We add x ~ ⊥
-      | definitelyUnliftedType (idType x)
-      -- Case (3) in Note [Strict fields and variables of unlifted type]
-      -> mzero -- unlifted vars can never be ⊥
-      | otherwise
-      -> do
-          let vi' = vi{ vi_bot = IsBot }
-          pure nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env y vi' } }
+addBotCt nabla0@MkNabla{nabla_tm_st = ts0} x = do
+  let (y, vi@VI { vi_bot = bot0 }) = lookupVarInfoNT ts0 x
+  -- NOTE FOR REVIEWER:
+  -- we were previously using the idType of |x|, but I think it should rather
+  -- be |y|, since, if y /= x, then x is a newtype and newtypes cannot be
+  -- unlifted
+  bot1 <- mergeBots (idType y) IsBot bot0
+  let vi' = vi{ vi_bot = bot1 }
+
+  (yid, nabla1) <- representId y nabla0
+
+  pure (nabla1 & nabla_egr._class yid._data .~ Just vi')
 
 -- | Adds the constraint @x ~/ ⊥@ to 'Nabla'. Quite similar to 'addNotConCt',
 -- but only cares for the ⊥ "constructor".
 addNotBotCt :: Nabla -> Id -> MaybeT DsM Nabla
-addNotBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts=env} } x = do
-  let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
-  case bot of
-    IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
-    IsNotBot -> pure nabla -- There already is x ≁ ⊥. Nothing left to do
-    MaybeBot -> do         -- We add x ≁ ⊥ and test if x is still inhabited
-      -- Mark dirty for a delayed inhabitation test
-      let vi' = vi{ vi_bot = IsNotBot}
-      pure $ markDirty y
-           $ nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env y vi' } }
+addNotBotCt nabla0@MkNabla{ nabla_tm_st = ts0 } x = do
+  let (y, vi@VI { vi_bot = bot0 }) = lookupVarInfoNT ts0 x
+  bot1 <- mergeBots (idType y) IsNotBot bot0
+  let vi' = vi{ vi_bot = bot1 }
+
+  (yid, nabla1) <- representId y nabla0
+  let
+    marked
+      = case bot0 of
+        -- Mark dirty for a delayed inhabitation test (see comment in 'mergeBots' as well)
+        MaybeBot -> markDirty y
+        _        -> id
+  return $
+    marked
+    (nabla1 & nabla_egr._class yid._data .~ Just vi')
+
+mergeBots :: Type
+          -- ^ The type of the pattern whose 'BotInfo's are being merged
+          -> BotInfo
+          -> BotInfo
+          -> MaybeT DsM BotInfo
+-- There already is x ~ ⊥. Nothing left to do
+mergeBots _ IsBot IsBot    = pure IsBot
+-- There was x ≁ ⊥. Contradiction!
+mergeBots _ IsBot IsNotBot = mzero
+-- We add x ~ ⊥
+mergeBots t IsBot MaybeBot
+  | definitelyUnliftedType t
+  -- Case (3) in Note [Strict fields and variables of unlifted type]
+  -- (unlifted vars can never be ⊥)
+  = mzero
+  | otherwise
+  = pure IsBot
+-- There was x ~ ⊥. Contradiction!
+mergeBots _ IsNotBot IsBot    = mzero
+-- There already is x ≁ ⊥. Nothing left to do
+mergeBots _ IsNotBot IsNotBot = pure IsNotBot
+-- We add x ≁ ⊥ and will need to test if x is still inhabited (see addNotBotCt)
+-- romes:todo: We don't have the dirty set in the e-graph, so
+-- congruence-fueled merging won't mark anything as dirty... hmm...
+mergeBots _ IsNotBot MaybeBot = pure IsNotBot
+-- Commutativity of 'mergeBots',
+-- and trivially merging MaybeBots
+mergeBots x MaybeBot IsBot    = mergeBots x IsBot    MaybeBot
+mergeBots x MaybeBot IsNotBot = mergeBots x IsNotBot MaybeBot
+mergeBots _ MaybeBot MaybeBot = pure MaybeBot
 
 -- | Record a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
 -- take the shape of a 'PmAltCon' @K@ in the 'Nabla' and return @Nothing@ if
@@ -717,47 +769,54 @@ addNotBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts=env} } x = do
 addNotConCt :: Nabla -> Id -> PmAltCon -> MaybeT DsM Nabla
 addNotConCt _     _ (PmAltConLike (RealDataCon dc))
   | isNewDataCon dc = mzero -- (3) in Note [Coverage checking Newtype matches]
-addNotConCt nabla x nalt = do
-  (mb_mark_dirty, nabla') <- trvVarInfo go nabla x
+addNotConCt nabla0 x nalt = do
+  (xid, nabla1) <- representId x nabla0
+  (mb_mark_dirty, nabla2) <- trvVarInfo (`mergeNotConCt` nalt) nabla1 (xid, x)
   pure $ case mb_mark_dirty of
-    Just x  -> markDirty x nabla'
-    Nothing -> nabla'
-  where
-    -- Update `x`'s 'VarInfo' entry. Fail ('MaybeT') if contradiction,
-    -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
-    -- where `x'` is the representative of `x`.
-    go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
-    go vi@(VI x' pos neg _ rcm) = do
-      -- 1. Bail out quickly when nalt contradicts a solution
-      let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
-      guard (not (any (contradicts nalt) pos))
-      -- 2. Only record the new fact when it's not already implied by one of the
-      -- solutions
-      let implies nalt sol = eqPmAltCon (paca_con sol) nalt == Disjoint
-      let neg'
-            | any (implies nalt) pos = neg
-            -- See Note [Completeness checking with required Thetas]
-            | hasRequiredTheta nalt  = neg
-            | otherwise              = extendPmAltConSet neg nalt
-      massert (isPmAltConMatchStrict nalt)
-      let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
-      -- 3. Make sure there's at least one other possible constructor
-      mb_rcm' <- lift (markMatched nalt rcm)
-      pure $ case mb_rcm' of
-        -- If nalt could be removed from a COMPLETE set, we'll get back Just and
-        -- have to mark x dirty, by returning Just x'.
-        Just rcm' -> (Just x',  vi'{ vi_rcm = rcm' })
-        -- Otherwise, nalt didn't occur in any residual COMPLETE set and we
-        -- don't have to mark it dirty. So we return Nothing, which in the case
-        -- above would have compromised precision.
-        -- See Note [Shortcutting the inhabitation test], grep for T17836.
-        Nothing   -> (Nothing, vi')
+    Just x  -> markDirty x nabla2
+    Nothing -> nabla2
+
+-- Update `x`'s 'VarInfo' entry. Fail ('MaybeT') if contradiction,
+-- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
+-- where `x'` is the representative of `x`.
+mergeNotConCt :: VarInfo -> PmAltCon -> MaybeT DsM (Maybe Id, VarInfo)
+mergeNotConCt vi@(VI x' pos neg _ rcm) nalt = do
+  lift $ tracePm "mergeNotConCt vi nalt" (ppr vi <+> ppr nalt)
+  -- 1. Bail out quickly when nalt contradicts a solution
+  let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
+  guard (not (any (contradicts nalt) pos))
+  -- 2. Only record the new fact when it's not already implied by one of the
+  -- solutions
+  let implies nalt sol = eqPmAltCon (paca_con sol) nalt == Disjoint
+  let neg'
+        | any (implies nalt) pos = neg
+        -- See Note [Completeness checking with required Thetas]
+        | hasRequiredTheta nalt  = neg
+        | otherwise              = extendPmAltConSet neg nalt
+  massert (isPmAltConMatchStrict nalt)
+  let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
+  -- 3. Make sure there's at least one other possible constructor
+  mb_rcm' <- lift (markMatched nalt rcm)
+  lift $ tracePm "mergeNotConCt vi' (no upd. rcm)" (ppr vi')
+  pure $ case mb_rcm' of
+    -- If nalt could be removed from a COMPLETE set, we'll get back Just and
+    -- have to mark x dirty, by returning Just x'.
+    Just rcm' -> (Just x',  vi'{ vi_rcm = rcm' })
+    -- Otherwise, nalt didn't occur in any residual COMPLETE set and we
+    -- don't have to mark it dirty. So we return Nothing, which in the case
+    -- above would have compromised precision.
+    -- See Note [Shortcutting the inhabitation test], grep for T17836.
+    Nothing   -> (Nothing, vi')
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
   where
     (_,_,_,_,req_theta,_,_) = conLikeFullSig cl
 hasRequiredTheta _                 = False
+
+-- | Worth making a lens from Nabla to EGraph, to make changing data operations much easier
+nabla_egr :: Functor f => (TmEGraph -> f TmEGraph) -> (Nabla -> f Nabla)
+nabla_egr f (MkNabla tyst ts@TmSt{ts_facts=egr}) = (\egr' -> MkNabla tyst ts{ts_facts=egr'}) <$> f egr
 
 -- | Add a @x ~ K tvs args ts@ constraint.
 -- @addConCt x K tvs args ts@ extends the substitution with a solution
@@ -766,8 +825,42 @@ hasRequiredTheta _                 = False
 --
 -- See Note [TmState invariants].
 addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
-addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
-  let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
+addConCt nabla0 x alt tvs args = do
+  (xid, nabla1) <- representId x nabla0
+  let vi_x = lookupVarInfo (nabla_tm_st nabla1) x
+  (kid, nabla2) <- fromMaybe (xid, nabla1) <$> representPattern vi_x alt tvs args nabla1 -- VarInfo contains K data in pos info
+  let k_vi = (emptyVarInfo x){vi_pos=[PACA alt tvs args]}
+
+  nabla3 <- case (alt, args) of
+    (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc -> do
+      (_yid, nabla3) <- representId y nabla2
+
+      -- A newtype con and the underlying var are in the same e-class
+      -- nabla4 <- mergeVarIds xid yid nabla3
+
+      -- Return the nabla3 and set the k_vi unchanged
+      pure (nabla3 & nabla_egr._class kid._data .~ Just k_vi)
+
+      -- If the merging y and N y thing works, we won't need this.
+      -- (UPDT: It didn't work (looped, i Think. Try uncommenting that line above).
+      -- That means we're not currently moving the strictness information from the NT pattern to the underlying variable.
+      -- We need to.)
+      -- Also, if we do that manually here, that means we won't add strictness
+      -- annotations to underlying NT representatives if merging is done by
+      -- congruence instead of by manually calling 'addConCt'
+      -- case bot of
+        -- MaybeBot -> pure (nabla_with MaybeBot)
+        -- IsBot    -> addBotCt (nabla_with IsBot) y
+        -- IsNotBot -> addNotBotCt (nabla_with IsNotBot) y
+
+    _ -> assert (isPmAltConMatchStrict alt)
+         -- Return the nabla2 and set the k_vi with additional IsNotBot info
+         pure (nabla2 & nabla_egr._class kid._data .~ Just k_vi{vi_bot=IsNotBot}) -- strict match ==> not ⊥
+
+  mergeVarIds xid kid nabla3
+
+mergeConCt :: VarInfo -> PmAltConApp -> StateT TyState (MaybeT DsM) VarInfo
+mergeConCt vi@(VI _ pos neg _bot _) paca@(PACA alt tvs _args) = StateT $ \tyst -> do
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -777,25 +870,19 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
   -- Now we should be good! Add (alt, tvs, args) as a possible solution, or
   -- refine an existing one
   case find ((== Equal) . eqPmAltCon alt . paca_con) pos of
-    Just (PACA _con other_tvs other_args) -> do
+    Just (PACA _con other_tvs _other_args) -> do
       -- We must unify existentially bound ty vars and arguments!
+      --
+      -- The arguments are handled automatically by representing K in
+      -- the e-class...! all equivalent things will be merged.
+      --
+      -- So we treat the ty vars:
       let ty_cts = equateTys (map mkTyVarTy tvs) (map mkTyVarTy other_tvs)
-      nabla' <- MaybeT $ addPhiCts nabla (listToBag ty_cts)
-      let add_var_ct nabla (a, b) = addVarCt nabla a b
-      foldlM add_var_ct nabla' $ zipEqual "addConCt" args other_args
+      tyst' <- MaybeT (tyOracle tyst (listToBag $ map (\case (PhiTyCt pred) -> pred; _ -> error "impossible") ty_cts))
+      return (vi, tyst') -- All good, and we get no new term information.
     Nothing -> do
-      let pos' = PACA alt tvs args : pos
-      let nabla_with bot' =
-            nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env x (vi{vi_pos = pos', vi_bot = bot'})} }
-      -- Do (2) in Note [Coverage checking Newtype matches]
-      case (alt, args) of
-        (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc ->
-          case bot of
-            MaybeBot -> pure (nabla_with MaybeBot)
-            IsBot    -> addBotCt (nabla_with MaybeBot) y
-            IsNotBot -> addNotBotCt (nabla_with MaybeBot) y
-        _ -> assert (isPmAltConMatchStrict alt )
-             pure (nabla_with IsNotBot) -- strict match ==> not ⊥
+      -- Add new con info
+      return (vi{vi_pos = paca:pos}, tyst)
 
 equateTys :: [Type] -> [Type] -> [PhiCt]
 equateTys ts us =
@@ -815,18 +902,22 @@ equateTys ts us =
 --
 -- See Note [TmState invariants].
 addVarCt :: Nabla -> Id -> Id -> MaybeT DsM Nabla
-addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
-  case equateUSDFM env x y of
-    (Nothing,   env') -> pure (nabla{ nabla_tm_st = ts{ ts_facts = env' } })
-    -- Add the constraints we had for x to y
-    (Just vi_x, env') -> do
-      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env'} }
-      -- and then gradually merge every positive fact we have on x into y
-      let add_pos nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
-      nabla_pos <- foldlM add_pos nabla_equated (vi_pos vi_x)
-      -- Do the same for negative info
-      let add_neg nabla nalt = addNotConCt nabla y nalt
-      foldlM add_neg nabla_pos (pmAltConSetElems (vi_neg vi_x))
+addVarCt nabla0 x y = do
+
+  -- We'd really rather ([xid, yid], nabla1) <- representIds [x,y] nabla0, but that's not exhaustive...
+  ((xid, yid), nabla1)
+    <- runStateT ((,) <$> StateT (representId x) <*> StateT (representId y)) nabla0
+
+  mergeVarIds xid yid nabla1
+
+mergeVarIds :: ClassId -> ClassId -> Nabla -> MaybeT DsM Nabla
+mergeVarIds xid yid (MkNabla tyst0 (TmSt egr0 is)) = do
+
+  -- @merge env x y@ makes @x@ and @y@ point to the same entry,
+  -- thereby merging @x@'s class with @y@'s.
+  (egr1, tyst1) <- runStateT (EG.mergeM xid yid egr0 >>= EG.rebuildM . snd) tyst0
+
+  return (MkNabla tyst1 (TmSt egr1 is))
 
 -- | Inspects a 'PmCoreCt' @let x = e@ by recording constraints for @x@ based
 -- on the shape of the 'CoreExpr' @e@. Examples:
@@ -894,9 +985,11 @@ addCoreCt nabla x e = do
     -- @x ~ y@.
     equate_with_similar_expr :: Id -> CoreExpr -> StateT Nabla (MaybeT DsM) ()
     equate_with_similar_expr x e = do
-      rep <- StateT $ \nabla -> lift (representCoreExpr nabla e)
+      rep <- StateT $ \nabla -> representCoreExpr nabla e
       -- Note that @rep == x@ if we encountered @e@ for the first time.
-      modifyT (\nabla -> addVarCt nabla x rep)
+      modifyT (\nabla0 -> do
+        (xid, nabla1) <- representId x nabla0
+        mergeVarIds xid rep nabla1)
 
     bind_expr :: CoreExpr -> StateT Nabla (MaybeT DsM) Id
     bind_expr e = do
@@ -951,14 +1044,13 @@ modifyT f = StateT $ fmap ((,) ()) . f
 -- Which is the @x@ of a @let x = e'@ constraint (with @e@ semantically
 -- equivalent to @e'@) we encountered earlier, or a fresh identifier if
 -- there weren't any such constraints.
-representCoreExpr :: Nabla -> CoreExpr -> DsM (Id, Nabla)
-representCoreExpr nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_reps = reps } } e
-  | Just rep <- lookupCoreMap reps key = pure (rep, nabla)
-  | otherwise = do
-      rep <- mkPmId (exprType e)
-      let reps'  = extendCoreMap reps key rep
-      let nabla' = nabla{ nabla_tm_st = ts{ ts_reps = reps' } }
-      pure (rep, nabla')
+representCoreExpr :: Nabla -> CoreExpr -> MaybeT DsM (ClassId, Nabla)
+representCoreExpr (MkNabla tyst ts@TmSt{ ts_facts = egraph }) e = do
+  ((xid, egr''), tysty') <- (`runStateT` tyst) $ do
+      (xid, egr') <- representCoreExprEgr key egraph
+      egr'' <- EG.rebuildM egr'
+      return (xid, egr'')
+  return (xid, MkNabla tysty' ts{ts_facts = egr''})
   where
     key = makeDictsCoherent e
       -- Use a key in which dictionaries for the same type become equal.
@@ -969,6 +1061,8 @@ representCoreExpr nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_reps = reps } } e
 -- are considered equal when building a 'CoreMap'.
 --
 -- See Note [Unique dictionaries in the TmOracle CoreMap]
+-- ROMES:TODO: I suppose this should be taken into account by the Eq instance of DeBruijnF CoreExprF
+-- if we do that there then we're sure that EG.represent takes that into account.
 makeDictsCoherent :: CoreExpr -> CoreExpr
 makeDictsCoherent var@(Var v)
   | let ty = idType v
@@ -1271,21 +1365,30 @@ tyStateRefined a b = ty_st_n a /= ty_st_n b
 
 markDirty :: Id -> Nabla -> Nabla
 markDirty x nabla@MkNabla{nabla_tm_st = ts@TmSt{ts_dirty = dirty} } =
-  nabla{ nabla_tm_st = ts{ ts_dirty = extendDVarSet dirty x } }
+  case lookupId ts x of
+    Nothing -> error "Marking as dirty an Id that is not represented in the Nabla"
+    Just xid ->
+      nabla{ nabla_tm_st = ts{ ts_dirty = IS.insert xid dirty } }
 
 traverseDirty :: Monad m => (VarInfo -> m VarInfo) -> TmState -> m TmState
 traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
-  go (uniqDSetToList dirty) env
+  go (IS.elems dirty) env
   where
     go []     env  = pure ts{ts_facts=env}
-    go (x:xs) !env = do
-      vi' <- f (lookupVarInfo ts x)
-      go xs (addToUSDFM env x vi')
+    go (xid:xs) !env = do
+      vi' <- f' (env ^._class xid._data)
+      go xs (env & _class xid._data .~ vi')
+
+    f' Nothing  = pure Nothing
+    f' (Just x) = Just <$> f x
 
 traverseAll :: Monad m => (VarInfo -> m VarInfo) -> TmState -> m TmState
 traverseAll f ts@TmSt{ts_facts = env} = do
-  env' <- traverseUSDFM f env
+  env' <- (_classes._data) f' env
   pure ts{ts_facts = env'}
+  where
+    f' Nothing  = pure Nothing
+    f' (Just x) = Just <$> f x
 
 -- | Makes sure the given 'Nabla' is still inhabited, by trying to instantiate
 -- all dirty variables (or all variables when the 'TyState' changed) to concrete
@@ -1296,48 +1399,50 @@ traverseAll f ts@TmSt{ts_facts = env} = do
 inhabitationTest :: Int -> TyState -> Nabla -> MaybeT DsM Nabla
 inhabitationTest 0     _         nabla             = pure nabla
 inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = {-# SCC "inhabitationTest" #-} do
-  -- lift $ tracePm "inhabitation test" $ vcat
-  --   [ ppr fuel
-  --   , ppr old_ty_st
-  --   , ppr nabla
-  --   , text "tyStateRefined:" <+> ppr (tyStateRefined old_ty_st (nabla_ty_st nabla))
-  --   ]
+  lift $ tracePm "inhabitation test" $ vcat
+    [ ppr fuel
+    , ppr old_ty_st
+    , ppr nabla
+    , text "tyStateRefined:" <+> ppr (tyStateRefined old_ty_st (nabla_ty_st nabla))
+    ]
   -- When type state didn't change, we only need to traverse dirty VarInfos
   ts' <- if tyStateRefined old_ty_st (nabla_ty_st nabla)
             then traverseAll   test_one ts
             else traverseDirty test_one ts
-  pure nabla{ nabla_tm_st = ts'{ts_dirty=emptyDVarSet}}
+  pure nabla{ nabla_tm_st = ts'{ts_dirty=IS.empty}}
   where
-    nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }
+    nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=IS.empty} }
     test_one :: VarInfo -> MaybeT DsM VarInfo
-    test_one vi =
+    test_one vi = do
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
-          -- lift $ tracePm "test_one" (ppr vi)
+          lift $ tracePm "test_one" (ppr vi)
           -- No solution yet and needs testing
           -- We have to test with a Nabla where all dirty bits are cleared
           instantiate (fuel-1) nabla_not_dirty vi
-        _ -> pure vi
+        _ -> do
+          lift $ tracePm "test_one needs no testing" (ppr vi)
+          pure vi
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
 -- Returns `False` when we can skip the inhabitation test, presuming it would
 -- say "yes" anyway. See Note [Shortcutting the inhabitation test].
 varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
-varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
-  | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
-varNeedsTesting _         _                              vi
-  | notNull (vi_pos vi)                     = pure False
-varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
-  -- Same type state => still inhabited
-  | not (tyStateRefined old_ty_st new_ty_st) = pure False
-varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
-  -- These normalisations are relatively expensive, but still better than having
-  -- to perform a full inhabitation test
-  (_, _, old_norm_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (idType $ vi_id vi)
-  (_, _, new_norm_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)
-  if old_norm_ty `eqType` new_norm_ty
-    then pure False
-    else pure True
+varNeedsTesting old_ty_st n@MkNabla{nabla_ty_st=new_ty_st,nabla_tm_st=tm_st} vi
+  = do
+    Just (xid, _) <- runMaybeT $ representId (vi_id vi) n
+    if | IS.member xid (IS.map (`EG.find` ts_facts tm_st) $ ts_dirty tm_st) -> pure True
+       | notNull (vi_pos vi)            -> pure False
+       -- Same type state => still inhabited
+       | not (tyStateRefined old_ty_st new_ty_st) -> pure False
+       -- These normalisations are relatively expensive, but still better than having
+       -- to perform a full inhabitation test
+       | otherwise -> do
+          (_, _, old_norm_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (idType $ vi_id vi)
+          (_, _, new_norm_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)
+          if old_norm_ty `eqType` new_norm_ty
+            then pure False
+            else pure True
 
 -- | Returns (Just vi) if at least one member of each ConLike in the COMPLETE
 -- set satisfies the oracle
@@ -1358,8 +1463,10 @@ instBot _fuel nabla vi = {-# SCC "instBot" #-} do
   pure vi
 
 addNormalisedTypeMatches :: Nabla -> Id -> DsM (ResidualCompleteMatches, Nabla)
-addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } x
-  = trvVarInfo add_matches nabla x
+addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st, nabla_tm_st = ts } x
+  = case lookupId ts x of
+      Just xid -> trvVarInfo add_matches nabla (xid, x)
+      Nothing  -> error "An Id with a VarInfo (see call site) is not represented in the e-graph..."
   where
     add_matches vi@VI{ vi_rcm = rcm }
       -- important common case, shaving down allocations of PmSeriesG by -5%
@@ -2080,3 +2187,135 @@ Note that for -XEmptyCase, we don't want to emit a minimal cover. We arrange
 that by passing 'CaseSplitTopLevel' to 'generateInhabitingPatterns'. We detect
 the -XEmptyCase case in 'reportWarnings' by looking for 'ReportEmptyCase'.
 -}
+
+------------------------------------------------
+-- * E-graphs for pattern match checking
+
+representPattern :: VarInfo
+                 -- ^ Var info of e-class in which this pattern is going to be represented...
+                 -- The things we are doing with this should rather be done as
+                 -- an e-graph analysis modify to "downwards" merge in the e-graph the sub-nodes
+                 -- A bit weird that the e-graph doesn't do this, but it seems like it doesn't... (see egraphs zulip discussion)
+                 -> PmAltCon -> [TyVar] -> [Id] -> Nabla -> MaybeT DsM (Maybe (ClassId, Nabla))
+-- We don't need to do anything in the case of PmAltLit.
+-- The Constructor information is recorded in the positive info e-class
+-- it is represented in, so when we merge we take care of handling this
+-- equality right.
+-- If we did this even more ideally, we'd just represent PmAltLit in the e-graph and it would fail on merge without having to edit the e-class.
+-- Wait, is it even safe to edit the e-class? Won't that *NOT* trigger the merging??
+-- Here I suppose we're creating the e-class. So we can add information at will. When we eventually merge this class with another one, we can do things.
+-- But we could definitely check whether the information we're adding isn't colliding with the existing one.
+representPattern _ (PmAltLit _) _ _ _ = return Nothing
+                 -- We might need represent patterns alongside expressions -- then we can use the "real" equality instances for the patterns (e.g. eqPmLit)
+representPattern (VI _ pos _ _ _) alt@(PmAltConLike conLike) tvs args nab00 = do
+  (args', nab01) <- representIds args nab00
+
+  -- rOMES: It is very akward that this is being done here... perhaps it would be best as a modify method in the analysis
+  -- it certainly won't work for things we learn by congruence...
+  MkNabla tyst0 ts@TmSt{ts_facts=egr0} <-
+    case find ((== Equal) . eqPmAltCon alt . paca_con) pos of
+      Just (PACA _con _other_tvs other_args) -> do
+        let add_var_ct nabla (a, b) = addVarCt nabla a b
+        foldlM add_var_ct nab01 $ zipEqual "addConCt" args other_args
+      Nothing -> pure nab01
+
+  ((cid, egr1), tyst1) <- (`runStateT` tyst0) $ EGM.runEGraphMT egr0 $ do
+    -- We must represent the constructor application in the e-graph to make
+    -- sure the children are recursively merged against other children of
+    -- other constructors represneted in the same e-class.
+    -- We need to represent the constructor correctly to ensure existing
+    -- constructors match or not the new one
+    -- dsHsConLike basically implements the logic we want.
+    -- ROMES:TODO: Nevermind, the dsHsConLike won't work because we want to
+    -- talk about pattern synonyms in their "matching" form, and converting
+    -- them with dsHsConLike assumes they are used as a constructor,
+    -- meaning we will fail for unidirectional patterns
+    desugaredCon <- lift . lift . lift $ ds_hs_con_like_pat conLike -- DsM action to desugar the conlike into the expression we'll represent for this constructor
+    conLikeId <- StateT $ representCoreExprEgr desugaredCon
+    tvs' <- mapM (EGM.addM . EG.Node . TypeF . DBT . deBruijnize . TyVarTy) tvs -- ugh...
+    foldlM (\acc i -> EGM.addM (EG.Node $ AppF acc i)) conLikeId (tvs' ++ args')
+  return (Just (cid, MkNabla tyst1 ts{ts_facts=egr1}))
+  where
+    -- TODO: do something cleaner than the following inlined thing...
+
+    -- We inlined dsHsConLike but use patSynMatcher instead of patSynBuilder
+    ds_hs_con_like_pat :: ConLike -> DsM CoreExpr
+    ds_hs_con_like_pat (RealDataCon dc)
+      = return (varToCoreExpr (dataConWrapId dc))
+    ds_hs_con_like_pat (PatSynCon ps)
+      | (builder_name, _, add_void) <- patSynMatcher ps
+      = do { builder_id <- dsLookupGlobalId builder_name
+           ; return (if add_void
+                     then mkCoreApp (text "dsConLike" <+> ppr ps)
+                                    (Var builder_id) unboxedUnitExpr
+                     else Var builder_id) }
+
+representId :: Id -> Nabla -> MaybeT DsM (ClassId, Nabla)
+representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0})
+  = do
+    ((xid, tmst'),tyst') <- (`runStateT` tyst) $ do
+        (xid, eg1) <- EG.addM (EG.Node (FreeVarF x)) eg0
+        eg2 <- EG.rebuildM eg1 -- why do this here? I guess a good place as any, and should be cheap anyway (workload is not something like eqsat)
+        return (xid, tmst{ts_facts=eg2})
+    return (xid, MkNabla tyst' tmst')
+
+representIds :: [Id] -> Nabla -> MaybeT DsM ([ClassId], Nabla)
+representIds xs = runStateT (mapM (StateT . representId) xs)
+
+-- There are too many cycles for this to be in Solver.Types...
+-- We need the TyState to check insoluble constraints while merging VarInfos
+instance AnalysisM (StateT TyState (MaybeT DsM)) (Maybe VarInfo) ExprF where
+  {-# INLINE makeA #-}
+
+  -- When an e-class is created for a variable, we create an VarInfo from it.
+  -- It doesn't matter if this variable is bound or free, since it's the first
+  -- variable in this e-class (and all others would have to be equivalent to
+  -- it)
+  --
+  -- Also, the Eq instance for DeBruijn Vars will ensure that two free
+  -- variables with the same Id are equal and so they will be represented in
+  -- the same e-class
+  --
+  -- It would be good if we didn't do this always... It might be a bit expensive
+  makeA (FreeVarF x) = pure $ Just $ emptyVarInfo x
+  makeA _ = pure $ Nothing
+
+  joinA Nothing Nothing  = pure $ Nothing
+  joinA Nothing (Just b) = pure $ Just b
+  joinA (Just a) Nothing = pure $ Just a
+
+  -- Merge the 'VarInfo's from @x@ and @y@
+  joinA (Just vi_x@VI{ vi_id=_id_x
+                     , vi_pos=pos_x
+                     , vi_neg=neg_x
+                     , vi_bot=bot_x
+                     , vi_rcm=_rcm_x
+                     })
+        (Just vi_y) = do
+    lift . lift $ tracePm "merging vi_x and vi_y" (ppr vi_x <+> ppr vi_y)
+    -- If we can merge x ~ N y with y too, then we no longer need to worry
+    -- about propagating the bottomness information, since it will always be
+    -- right... though I'm not sure if that would be correct
+
+    -- Gradually merge every positive fact we have on x into y
+    -- The args are merged by congruence, since we represent the
+    -- constructor in the e-graph in addConCt.
+    vi_res1 <- foldlM mergeConCt vi_y pos_x
+
+    -- Do the same for negative info
+    let add_neg vi nalt = lift $ snd <$> mergeNotConCt vi nalt
+    vi_res2 <- foldlM add_neg vi_res1 (pmAltConSetElems neg_x)
+
+    -- We previously were not merging the bottom information, but now we do.
+    -- TODO: We don't need to do it yet if we are only trying to be as good as before, but not better
+    -- Although it might not be so simple if we consider one of the classes is a newtype?
+    -- (No, I think that situation can occur)
+    bot_res <- lift $
+               mergeBots (idType (vi_id vi_res2))
+                         bot_x (vi_bot vi_y)
+    let vi_res3 = vi_res2{vi_bot = bot_res}
+
+    lift . lift $ tracePm "result of merging vi_x and vi_y" (ppr vi_res3)
+    return (Just vi_res3)
+
+

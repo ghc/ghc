@@ -1,7 +1,11 @@
 {-# LANGUAGE ApplicativeDo       #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE TypeApplications    #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -10,12 +14,15 @@
 module GHC.HsToCore.Pmc.Solver.Types (
 
         -- * Normalised refinement types
-        BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..),
-        Nabla(..), Nablas(..), initNablas,
+        BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..), TmEGraph,
+        Nabla(..), Nablas(..), initNablas, emptyVarInfo,
         lookupRefuts, lookupSolution,
 
         -- ** Looking up 'VarInfo'
         lookupVarInfo, lookupVarInfoNT, trvVarInfo,
+
+        -- *** Looking up 'ClassId'
+        lookupId,
 
         -- ** Caching residual COMPLETE sets
         CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
@@ -42,9 +49,7 @@ import GHC.Prelude
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
-import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.SDFM
 import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -58,7 +63,6 @@ import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -74,6 +78,18 @@ import Data.Foldable (find)
 import Data.Ratio
 import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
+
+import GHC.Core.Equality
+import Data.Functor.Const
+import Data.Functor.Compose
+import Data.Equality.Graph (EGraph, ClassId)
+import Data.Equality.Graph.Lens
+import qualified Data.Equality.Graph.Nodes as EGN
+import qualified Data.Equality.Graph as EG
+import qualified Data.Equality.Graph.Internal as EGI
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IS (empty, toList)
+import Data.Bifunctor (second)
 
 -- import GHC.Driver.Ppr
 
@@ -138,14 +154,12 @@ initTyState = TySt 0 emptyInert
 -- See Note [TmState invariants] in "GHC.HsToCore.Pmc.Solver".
 data TmState
   = TmSt
-  { ts_facts :: !(UniqSDFM Id VarInfo)
-  -- ^ Facts about term variables. Deterministic env, so that we generate
-  -- deterministic error messages.
-  , ts_reps  :: !(CoreMap Id)
-  -- ^ An environment for looking up whether we already encountered semantically
-  -- equivalent expressions that we want to represent by the same 'Id'
-  -- representative.
-  , ts_dirty :: !DIdSet
+  { ts_facts :: !TmEGraph
+  -- ^ Facts about term variables.
+
+  -- ROMES:TODO: ts_dirty looks a bit to me like the bookkeeping done by the
+  -- analysis rebuilding mechanism, so perhaps we can get rid of it too
+  , ts_dirty :: !IntSet
   -- ^ Which 'VarInfo' needs to be checked for inhabitants because of new
   -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
@@ -161,6 +175,7 @@ data VarInfo
   { vi_id  :: !Id
   -- ^ The 'Id' in question. Important for adding new constraints relative to
   -- this 'VarInfo' when we don't easily have the 'Id' available.
+  -- ROMES:TODO: Do we still need this?
 
   , vi_pos :: ![PmAltConApp]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
@@ -168,7 +183,7 @@ data VarInfo
   -- pattern matches involving pattern synonym
   --    case x of { Just y -> case x of PatSyn z -> ... }
   -- However, no more than one RealDataCon in the list, otherwise contradiction
-  -- because of generativity.
+  -- because of generativity (which would violate Invariant 1 from the paper).
 
   , vi_neg :: !PmAltConSet
   -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
@@ -227,7 +242,13 @@ instance Outputable BotInfo where
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt state reps dirty) = ppr state $$ ppr reps $$ ppr dirty
+  ppr (TmSt state dirty) =
+    (vcat $ getConst $ _iclasses (\(i,cl) -> Const [ppr i <> text ":" <+> ppr cl]) state)
+      $$ ppr (IS.toList dirty)
+
+
+instance Outputable (EG.EClass (Maybe VarInfo) CoreExprF) where
+  ppr cl = ppr (cl^._nodes) $$ ppr (cl^._data)
 
 -- | Not user-facing.
 instance Outputable VarInfo where
@@ -248,7 +269,7 @@ instance Outputable VarInfo where
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptyUSDFM emptyCoreMap emptyDVarSet
+initTmState = TmSt EG.emptyEGraph IS.empty
 
 -- | A data type that caches for the 'VarInfo' of @x@ the results of querying
 -- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
@@ -302,7 +323,9 @@ emptyVarInfo x
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
+lookupVarInfo ts@(TmSt env _) x = fromMaybe (emptyVarInfo x) $ do
+  xid <- lookupId ts x
+  env ^. _class xid . _data
 
 -- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
 -- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
@@ -324,17 +347,32 @@ lookupVarInfoNT ts x = case lookupVarInfo ts x of
       | isNewDataCon dc = Just y
     go _                = Nothing
 
-trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
+trvVarInfo :: forall f a. Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla
+           -> (ClassId,Id)
+           -- ^ The ClassId of the VarInfo to traverse, and the Id represented
+           -- to get it, to determine the empty var info in case it isn't available.
+           -- ... Feels a bit weird, but let's see if it works at all
+           -> f (a, Nabla)
 {-# INLINE trvVarInfo #-}
 -- This function is called a lot and we want to specilise it, not only
 -- for the type class, but also for its 'f' function argument.
 -- Before the INLINE pragma it sometimes inlined and sometimes didn't,
 -- depending delicately on GHC's optimisations.  Better to use a pragma.
-trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
-  = set_vi <$> f (lookupVarInfo ts x)
+trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } (xid,x)
+  = second (\g -> nabla{nabla_tm_st = ts{ts_facts=g}}) <$>
+    updateAccum (_class xid._data.defaultEmpty) f env
   where
-    set_vi (a, vi') =
-      (a, nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env (vi_id vi') vi' } })
+    updateAccum :: forall f a s c. Functor f => Lens' s a -> (a -> f (c,a)) -> s -> f (c,s)
+    updateAccum lens g = getCompose . lens @(Compose f ((,) c)) (Compose . g)
+
+    defaultEmpty :: Lens' (Maybe VarInfo) VarInfo
+    defaultEmpty f s = Just <$> (f (fromMaybe (emptyVarInfo x) s))
+
+------------------------------------------
+-- * Utility for looking up Ids in 'Nabla'
+
+lookupId :: TmState -> Id -> Maybe ClassId
+lookupId TmSt{ts_facts = eg0} x = EGN.lookupNM (EG.Node (FreeVarF x)) (EGI.memo eg0)
 
 ------------------------------------------------
 -- * Exported utility functions querying 'Nabla'
@@ -802,3 +840,19 @@ instance Outputable PmAltCon where
 
 instance Outputable PmEquality where
   ppr = text . show
+
+-----------------------------------------------------
+-- * E-graphs to represent normalised refinment types
+
+type TmEGraph = EGraph (Maybe VarInfo) CoreExprF
+
+-- TODO delete orphans for showing TmEGraph for debugging reasons
+instance Show VarInfo where
+  show = showPprUnsafe . ppr
+
+-- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
+-- There ought to be a better way.
+-- ROMES:TODO:
+instance Eq VarInfo where
+  (==) a b = vi_id a == vi_id b -- ROMES:TODO: The rest of the equality comparisons
+
