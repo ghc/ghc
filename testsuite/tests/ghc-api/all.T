@@ -1,3 +1,5 @@
+setTestOpts(when(arch('wasm32'), run_timeout_multiplier(2)))
+
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
 test('T6145', js_broken(22352), makefile_test, ['T6145'])
 test('T8639_api', req_rts_linker,
