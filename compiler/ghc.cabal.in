@@ -896,7 +896,6 @@ Library
         GHC.Types.Unique.FM
         GHC.Types.Unique.Map
         GHC.Types.Unique.MemoFun
-        GHC.Types.Unique.SDFM
         GHC.Types.Unique.Set
         GHC.Types.Unique.Supply
         GHC.Types.Var
