@@ -7,12 +7,15 @@
 module GHC.Core.Seq (
         -- * Utilities for forcing Core structures
         seqExpr, seqExprs, seqUnfolding, seqRules,
-        megaSeqIdInfo, seqRuleInfo, seqBinds,
+        megaSeqIdInfo, seqRuleInfo, seqBinds, seqGuidance
     ) where
 
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Type( seqType, isTyVar )
+import GHC.Core.Coercion( seqCo )
+
 import GHC.Types.Id.Info
 import GHC.Types.Demand( seqDemand, seqDmdSig )
 import GHC.Types.Cpr( seqCprSig )
@@ -20,9 +23,9 @@ import GHC.Types.Basic( seqOccInfo )
 import GHC.Types.Tickish
 import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
-import GHC.Core.Type( seqType, isTyVar )
-import GHC.Core.Coercion( seqCo )
 import GHC.Types.Id( idInfo )
+
+import GHC.Data.Bag( Bag )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler
@@ -69,8 +72,13 @@ seqExpr (Type t)        = seqType t
 seqExpr (Coercion co)   = seqCo co
 
 seqExprs :: [CoreExpr] -> ()
-seqExprs [] = ()
-seqExprs (e:es) = seqExpr e `seq` seqExprs es
+seqExprs = seqList seqExpr
+
+seqBag :: (a -> ()) -> Bag a -> ()
+seqBag f = foldr (seq . f) ()
+
+seqList :: (a -> ()) -> [a] -> ()
+seqList f = foldr (seq . f) ()
 
 seqTickish :: CoreTickish -> ()
 seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
@@ -84,11 +92,10 @@ seqBndr b | isTyVar b = seqType (tyVarKind b)
                         megaSeqIdInfo (idInfo b)
 
 seqBndrs :: [CoreBndr] -> ()
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
+seqBndrs = seqList seqBndr
 
 seqBinds :: [Bind CoreBndr] -> ()
-seqBinds bs = foldr (seq . seqBind) () bs
+seqBinds = seqList seqBind
 
 seqBind :: Bind CoreBndr -> ()
 seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
@@ -99,12 +106,14 @@ seqPairs [] = ()
 seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
 
 seqAlts :: [CoreAlt] -> ()
-seqAlts [] = ()
-seqAlts (Alt c bs e:alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
+seqAlts = seqList seqAlt
+
+seqAlt :: CoreAlt -> ()
+seqAlt (Alt c bs e) = c `seq` seqBndrs bs `seq` seqExpr e
 
 seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
-                uf_cache = cache, uf_guidance = g})
+seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top
+                            , uf_cache = cache, uf_guidance = g})
   = seqExpr e `seq` top `seq` cache `seq` seqGuidance g
     -- The unf_cache :: UnfoldingCache field is a strict data type,
     -- so it is sufficient to use plain `seq` for this field
@@ -113,5 +122,17 @@ seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
 seqUnfolding _ = ()
 
 seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                      = ()
+seqGuidance (UnfIfGoodArgs bs et) = seqBndrs bs `seq` seqET et
+seqGuidance _                     = ()
+
+seqET :: ExprTree -> ()
+seqET (ExprTree { et_wc_tot = tot, et_size = size, et_cases = cases, et_ret = ret })
+  = tot `seq` size `seq` ret `seq` seqBag seqCT cases
+
+seqCT :: CaseTree -> ()
+seqCT (ScrutOf x i) = x `seq` i `seq` ()
+seqCT (CaseOf x y alts) = x `seq` y `seq` seqList seqAT alts
+
+seqAT :: AltTree -> ()
+seqAT (AltTree con bs e) = con `seq` seqBndrs bs `seq` seqET e
+

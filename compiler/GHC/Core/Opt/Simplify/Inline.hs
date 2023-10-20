@@ -8,12 +8,10 @@ This module contains inlining logic used by the simplifier.
 
 
 module GHC.Core.Opt.Simplify.Inline (
-        -- * Cheap and cheerful inlining checks.
-        couldBeSmallEnoughToInline,
-        smallEnoughToInline, activeUnfolding,
-
         -- * The smart inlining decisions are made by callSiteInline
-        callSiteInline, CallCtxt(..),
+        callSiteInline,
+
+        exprSummary
     ) where
 
 import GHC.Prelude
@@ -21,57 +19,26 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core.Opt.Simplify.Env
-
+import GHC.Core.Opt.Simplify.Utils
 import GHC.Core
 import GHC.Core.Unfold
-import GHC.Core.FVs( exprFreeIds )
 
 import GHC.Types.Id
-import GHC.Types.Var.Env( InScopeSet, lookupInScope )
+import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic  ( Arity, RecFlag(..) )
-import GHC.Utils.Logger
-import GHC.Utils.Misc
-import GHC.Utils.Outputable
 import GHC.Types.Name
+
+import GHC.Utils.Logger
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (isPrefixOf)
 
 {-
 ************************************************************************
 *                                                                      *
-\subsection[considerUnfolding]{Given all the info, do (not) do the unfolding}
-*                                                                      *
-************************************************************************
-
-We use 'couldBeSmallEnoughToInline' to avoid exporting inlinings that
-we ``couldn't possibly use'' on the other side.  Can be overridden w/
-flaggery.  Just the same as smallEnoughToInline, except that it has no
-actual arguments.
--}
-
-couldBeSmallEnoughToInline :: UnfoldingOpts -> Int -> CoreExpr -> Bool
-couldBeSmallEnoughToInline opts threshold rhs
-  = case sizeExpr opts threshold [] body of
-       TooBig -> False
-       _      -> True
-  where
-    (_, body) = collectBinders rhs
-
-----------------
-smallEnoughToInline :: UnfoldingOpts -> Unfolding -> Bool
-smallEnoughToInline opts (CoreUnfolding {uf_guidance = guidance})
-  = case guidance of
-       UnfIfGoodArgs {ug_size = size} -> size <= unfoldingUseThreshold opts
-       UnfWhen {} -> True
-       UnfNever   -> False
-smallEnoughToInline _ _
-  = False
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{callSiteInline}
+                  callSiteInline
 *                                                                      *
 ************************************************************************
 
@@ -92,31 +59,24 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 -}
 
-callSiteInline :: SimplEnv
-               -> Logger
-               -> Id                    -- The Id
-               -> Bool                  -- True if there are no arguments at all (incl type args)
-               -> [ArgSummary]          -- One for each value arg; True if it is interesting
-               -> CallCtxt              -- True <=> continuation is interesting
+callSiteInline :: Logger -> SimplEnv
+               -> Id -> SimplCont
                -> Maybe CoreExpr        -- Unfolding, if any
-callSiteInline env logger id lone_variable arg_infos cont_info
-  = case idUnfolding id of
+callSiteInline logger env fn cont
+  = case idUnfolding fn of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_cache = unf_cache
                       , uf_guidance = guidance }
-          | active_unf -> tryUnfolding env logger id lone_variable
-                                    arg_infos cont_info unf_template
-                                    unf_cache guidance
-          | otherwise -> traceInline logger uf_opts id "Inactive unfolding:" (ppr id) Nothing
+          | active_unf -> tryUnfolding logger env fn cont unf_template unf_cache guidance
+          | otherwise  -> traceInline logger env fn "Inactive unfolding:" (ppr fn) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
   where
-    uf_opts    = seUnfoldingOpts env
     active_unf = activeUnfolding (seMode env) id
 
 activeUnfolding :: SimplMode -> Id -> Bool
@@ -124,7 +84,7 @@ activeUnfolding mode id
   | isCompulsoryUnfolding (realIdUnfolding id)
   = True   -- Even sm_inline can't override compulsory unfoldings
   | otherwise
-  =  isActive (sm_phase mode) (idInlineActivation id)
+  = isActive (sm_phase mode) (idInlineActivation id)
   && sm_inline mode
       -- `or` isStableUnfolding (realIdUnfolding id)
       -- Inline things when
@@ -133,14 +93,15 @@ activeUnfolding mode id
       --                         (ie pragmas) we inline anyway
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
-traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a
-traceInline logger opts inline_id str doc result
+traceInline :: Logger -> SimplEnv -> Id -> String -> SDoc -> a -> a
+traceInline logger env inline_id str doc result
   -- We take care to ensure that doc is used in only one branch, ensuring that
   -- the simplifier can push its allocation into the branch. See Note [INLINE
   -- conditional tracing utilities].
   | enable    = logTraceMsg logger str doc result
   | otherwise = result
   where
+    opts = seUnfoldingOpts env
     enable
       | logHasDumpFlag logger Opt_D_dump_verbose_inlinings
       = True
@@ -299,25 +260,24 @@ more/less inlining as needed on a per-module basis.
 
 -}
 
-tryUnfolding :: SimplEnv -> Logger -> Id -> Bool -> [ArgSummary] -> CallCtxt
+tryUnfolding :: Logger -> SimplEnv -> Id -> SimplCont
              -> CoreExpr -> UnfoldingCache -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding env logger id lone_variable arg_infos
-             cont_info unf_template unf_cache guidance
+tryUnfolding logger env fn cont unf_template unf_cache guidance
  = case guidance of
-     UnfNever -> traceInline logger opts id str (text "UnfNever") Nothing
+     UnfNever -> traceInline logger env fn str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
         | enough_args && (boring_ok || some_benefit || unfoldingVeryAggressive opts)
                 -- See Note [INLINE for small functions] (3)
-        -> traceInline logger opts id str (mk_doc some_benefit empty True) (Just unf_template)
+        -> traceInline logger env fn str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
-        -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
+        -> traceInline logger env fn str (mk_doc some_benefit empty False) Nothing
         where
           some_benefit = calc_some_benefit uf_arity True
           enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
-     UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+     UnfIfGoodArgs { ug_args = arg_bndrs, ug_tree = expr_tree }
         | isJoinId id, small_enough         -> inline_join_point
         | unfoldingVeryAggressive opts      -> yes
         | is_wf, some_benefit, small_enough -> yes
@@ -325,26 +285,6 @@ tryUnfolding env logger id lone_variable arg_infos
         where
           yes = traceInline logger opts id str (mk_doc some_benefit extra_doc True)  (Just unf_template)
           no  = traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
-
-          some_benefit = calc_some_benefit (length arg_discounts) False
-
-          -- depth_penalty: see Note [Avoid inlining into deeply nested cases]
-          depth_threshold = unfoldingCaseThreshold opts
-          depth_scaling   = unfoldingCaseScaling opts
-          depth_penalty | case_depth <= depth_threshold = 0
-                        | otherwise = (size * (case_depth - depth_threshold)) `div` depth_scaling
-
-          adjusted_size = size + depth_penalty - discount
-          small_enough = adjusted_size <= unfoldingUseThreshold opts
-          discount = computeDiscount arg_discounts res_discount arg_infos cont_info
-
-          extra_doc = vcat [ ppWhen (isJoinId id) $
-                             text "join" <+> fsep [ ppr (v, hasCoreUnfolding (idUnfolding v)
-                                                        , fmap (isEvaldUnfolding . idUnfolding) (lookupInScope in_scope v)
-                                                        , is_more_evald in_scope v)
-                                                  | v <- vselems (exprFreeIds unf_template) ]
-                           , text "depth based penalty =" <+> int depth_penalty
-                           , text "adjusted size =" <+> int adjusted_size ]
 
           inline_join_point  -- See Note [Inlining join points]
             | or (zipWith scrut_arg arg_discounts arg_infos) = yes
@@ -355,11 +295,83 @@ tryUnfolding env logger id lone_variable arg_infos
           scrut_arg disc ValueArg = disc > 0
           scrut_arg _    _        = False
 
+          some_benefit = calc_some_benefit (length arg_discounts)
+          -- See Note [Avoid inlining into deeply nested cases]
+          depth_treshold = unfoldingCaseThreshold opts
+          depth_scaling = unfoldingCaseScaling opts
+          depth_penalty | case_depth <= depth_treshold = 0
+                        | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
+          adjusted_size = size + depth_penalty - discount
+          small_enough = adjusted_size <= unfoldingUseThreshold opts
+          discount = computeDiscount arg_discounts res_discount arg_infos cont_info
+
+          extra_doc = vcat [ text "case depth =" <+> int case_depth
+                           , text "depth based penalty =" <+> int depth_penalty
+                           , text "discounted size =" <+> int adjusted_size ]
+
+          n_bndrs = length arg_bndrs
+          some_benefit  = calc_some_benefit n_bndrs
+          small_enough  = adjusted_size <= unfoldingUseThreshold opts
+          rhs_size      = exprTreeSize context expr_tree
+          adjusted_size = rhs_size - call_size + depth_penalty
+
+          --------  Compute the size of the ExprTree in this context -----------
+          want_result
+             | n_bndrs < n_val_args = True  -- Over-saturated
+             | otherwise            = case cont_info of
+                                        BoringCtxt -> False
+                                        _          -> True
+
+          bound_env = mkVarEnv (arg_bndrs `zip` (arg_infos ++ repeat ArgNoInfo))
+                      -- Crucial to include /all/ arg_bndrs, lest we treat
+                      -- them as free and use ic_free instead
+          context = IC { ic_bound    = bound_env
+                       , ic_free     = getFreeSummary
+                       , ic_want_res = want_result }
+
+          in_scope = seInScope env
+          getFreeSummary :: Id -> ArgSummary
+          -- Get the ArgSummary of a free variable
+          getFreeSummary x
+            = case lookupInScope in_scope x of
+                Just x' | warnPprTrace (not (isId x')) "GFS" (vcat
+                            [ ppr fn <+> equals <+> ppr unf_template
+                            , text "expr_tree:" <+> ppr expr_tree
+                            , ppr x <+> ppr x'
+                           ]) True
+                        , Just expr <- maybeUnfoldingTemplate (idUnfolding x')
+                        -> exprSummary env expr
+                _ -> ArgNoInfo
+
+          -------- Size adjustements ----------------
+          -- Subtract size of the call, because the result replaces the call
+          -- We count 10 for the function itself, 10 for each arg supplied,
+          call_size = 10 + 10*n_val_args
+
+          -- Adjust by the depth scaling
+          -- See Note [Avoid inlining into deeply nested cases]
+          depth_threshold = unfoldingCaseThreshold opts
+          depth_scaling   = unfoldingCaseScaling opts
+
+          depth_penalty
+            | case_depth <= depth_threshold = 0
+            | otherwise = (rhs_size * (case_depth - depth_threshold)) `div` depth_scaling
+
+          extra_doc = vcat [ text "size =" <+> ppr rhs_size
+                           , text "case depth =" <+> int case_depth
+                           , text "adjusted_size =" <+> ppr adjusted_size ]
+
   where
-    opts         = seUnfoldingOpts env
-    case_depth   = seCaseDepth env
-    inline_depth = seInlineDepth env
-    in_scope     = seInScope env
+    (arg_infos, call_cont) = contArgs cont
+    n_val_args       = length arg_infos
+    lone_variable    = loneVariable cont
+    cont_info        = interestingCallContext env call_cont
+    case_depth       = seCaseDepth env
+    opts             = seUnfoldingOpts env
+    interesting_args = any hasArgInfo arg_infos
+                -- NB: (any hasArgInfo arg_infos) looks at the
+                -- over-saturated args too which is "wrong";
+                -- but if over-saturated we inline anyway.
 
     -- Unpack the UnfoldingCache lazily because it may not be needed, and all
     -- its fields are strict; so evaluating unf_cache at all forces all the
@@ -367,22 +379,6 @@ tryUnfolding env logger id lone_variable arg_infos
     -- Ids that are never going to inline anyway.
     -- See Note [UnfoldingCache] in GHC.Core
     UnfoldingCache{ uf_is_work_free = is_wf, uf_expandable = is_exp } = unf_cache
-
-    mk_doc some_benefit extra_doc yes_or_no
-      = vcat [ text "arg infos" <+> ppr arg_infos
-             , text "interesting continuation" <+> ppr cont_info
-             , text "some_benefit" <+> ppr some_benefit
-             , text "is exp:" <+> ppr is_exp
-             , text "is work-free:" <+> ppr is_wf
-             , text "guidance" <+> ppr guidance
-             , text "case depth =" <+> int case_depth
-             , text "inline depth =" <+> int inline_depth
-             , extra_doc
-             , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
-
-    ctx = log_default_dump_context (logFlags logger)
-    str = "Considering inlining: " ++ showSDocOneLine ctx (ppr id)
-    n_val_args = length arg_infos
 
            -- some_benefit is used when the RHS is small enough
            -- and the call has enough (or too many) value
@@ -399,10 +395,6 @@ tryUnfolding env logger id lone_variable arg_infos
       where
         saturated      = n_val_args >= uf_arity
         over_saturated = n_val_args > uf_arity
-        interesting_args = any nonTriv arg_infos
-                -- NB: (any nonTriv arg_infos) looks at the
-                -- over-saturated args too which is "wrong";
-                -- but if over-saturated we inline anyway.
 
         interesting_call
           | over_saturated
@@ -417,6 +409,18 @@ tryUnfolding env logger id lone_variable arg_infos
                           -> uf_arity > 0  -- See Note [RHS of lets]
               _other      -> False         -- See Note [Nested functions]
 
+    mk_doc some_benefit extra_doc yes_or_no
+      = vcat [ text "arg infos" <+> ppr arg_infos
+             , text "interesting continuation" <+> ppr cont_info
+             , text "some_benefit" <+> ppr some_benefit
+             , text "is exp:" <+> ppr is_exp
+             , text "is work-free:" <+> ppr is_wf
+             , text "guidance" <+> ppr guidance
+             , extra_doc
+             , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
+
+    ctx = log_default_dump_context (logFlags logger)
+    str = "Considering inlining: " ++ showSDocOneLine ctx (ppr fn)
 
 vselems :: VarSet -> [Var]
 vselems s = nonDetStrictFoldVarSet (\v vs -> v : vs) [] s
@@ -702,50 +706,150 @@ This kind of thing can occur if you have
         foo = let x = e in (x,x)
 
 which Roman did.
-
-
 -}
 
-computeDiscount :: [Int] -> Int -> [ArgSummary] -> CallCtxt
-                -> Int
-computeDiscount arg_discounts res_discount arg_infos cont_info
 
-  = 10          -- Discount of 10 because the result replaces the call
-                -- so we count 10 for the function itself
+{- *********************************************************************
+*                                                                      *
+                  Computing ArgSummary
+*                                                                      *
+********************************************************************* -}
 
-    + 10 * length actual_arg_discounts
-               -- Discount of 10 for each arg supplied,
-               -- because the result replaces the call
+{- Note [Interesting arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An argument is interesting if it deserves a discount for unfoldings
+with a discount in that argument position.  The idea is to avoid
+unfolding a function that is applied only to variables that have no
+unfolding (i.e. they are probably lambda bound): f x y z There is
+little point in inlining f here.
 
-    + total_arg_discount + res_discount'
+Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
+we must look through lets, eg (let x = e in C a b), because the let will
+float, exposing the value, if we inline.  That makes it different to
+exprIsHNF.
+
+Before 2009 we said it was interesting if the argument had *any* structure
+at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
+
+But we don't regard (f x y) as interesting, unless f is unsaturated.
+If it's saturated and f hasn't inlined, then it's probably not going
+to now!
+
+Note [Conlike is interesting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+        f d = ...((*) d x y)...
+        ... f (df d')...
+where df is con-like. Then we'd really like to inline 'f' so that the
+rule for (*) (df d) can fire.  To do this
+  a) we give a discount for being an argument of a class-op (eg (*) d)
+  b) we say that a con-like argument (eg (df d)) is interesting
+-}
+
+-------------------
+contArgs :: SimplCont -> ( [ArgSummary]   -- One for each value argument
+                         , SimplCont )    -- The rest
+-- Summarises value args, discards type args and casts.
+-- The returned continuation of the call is only used to
+-- answer questions like "are you interesting?"
+contArgs cont = go [] cont
   where
-    actual_arg_discounts = zipWith mk_arg_discount arg_discounts arg_infos
-    total_arg_discount   = sum actual_arg_discounts
+    go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
+                                        = go (exprSummary se arg : args) k
+    go args (ApplyToTy { sc_cont = k }) = go args k
+    go args (CastIt _ k)                = go args k
+    go args k                           = (reverse args, k)
 
-    mk_arg_discount _        TrivArg    = 0
-    mk_arg_discount _        NonTrivArg = 10
-    mk_arg_discount discount ValueArg   = discount
+loneVariable :: SimplCont -> Bool
+loneVariable (ApplyToTy  {}) = False  -- See Note [Lone variables] in GHC.Core.Unfold
+loneVariable (ApplyToVal {}) = False  -- NB: even a type application or cast
+loneVariable (CastIt {})     = False  --     stops it being "lone"
+loneVariable _               = True
 
-    res_discount'
-      | LT <- arg_discounts `compareLength` arg_infos
-      = res_discount   -- Over-saturated
+------------------------------
+exprSummary :: SimplEnv -> CoreExpr -> ArgSummary
+-- Very simple version of exprIsConApp_maybe
+-- But /do/ take the SimplEnv into account.  We must:
+-- (a) Apply the substitution.  E.g
+--       (\x. ...(f x)...) (a,b)
+---    We may have x:->(a,b) in the substitution, and we want to see that
+--     (a,b) when we are deciding whether or not to inline f
+-- (b) Refine using the in-scope set. E.g
+--       \x. ....case x of { (a,b) -> ...f x... }....
+--     We want to see that x is (a,b) at the call site of f
+exprSummary env e = go env e []
+  where
+    go :: SimplEnv -> CoreExpr
+       -> [CoreExpr]   -- Value arg only
+       -> ArgSummary
+    go env (Cast e _) as = go env e as
+    go env (Tick _ e) as = go env e as
+    go env (App f a)  as | isValArg a = go env f (a:as)
+                         | otherwise  = go env f as
+
+    -- Look through let-expressions
+    go env (Let b e)  as
+      | let env' = env `addNewInScopeIds` bindersOf b
+      = go env' e as
+
+{-
+    -- Look through single-branch case-expressions; like lets
+    go env (Case _ b _ alts) as
+      | [Alt _ bs e] <- alts
+      , let env' = env `addNewInScopeIds` (b:bs)
+      = go env' e as
+-}
+
+    go env (Var v) as
+       = -- Simplify.Env.substId Looks up in substitution
+         -- /and/ refines from the InScopeset
+         case substId env v of
+           DoneId v'            -> go_var env v' as
+           DoneEx e _           -> go (zapSubstEnv env)             e as
+           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) e as
+
+    go _ (Lit l) as
+       | isLitRubbish l = ArgNoInfo -- Leads to unproductive inlining in WWRec, #20035
+       | otherwise      = assertPpr (null as) (ppr as) $
+                          ArgIsCon (LitAlt l) []
+
+    go env (Lam b e)  as
+      | null as = if isRuntimeVar b
+                  then ArgIsLam
+                  else go env' e []
+      where
+        env' = modifyInScope env b  -- Tricky corner here
+
+    go _ _ _ = ArgIsNot []    -- Some structure; not all boring
+                              -- Example of improvement: base/tests/T9848
+
+    go_var :: SimplEnv -> Id
+           -> [CoreExpr]   -- Value args only
+           -> ArgSummary
+    go_var env f val_args
+      | Just con <- isDataConWorkId_maybe f
+      = ArgIsCon (DataAlt con) (map (exprSummary env) val_args)
+
+      | DFunUnfolding {} <- unfolding
+      = ArgIsNot []  -- Says "this is a data con" without saying which
+                     -- Will also return this for ($df d1 .. dn)
+
+      | Just rhs <- expandUnfolding_maybe unfolding
+      = go (zapSubstEnv env) rhs val_args
+
+      | OtherCon cs <- unfolding
+      = ArgIsNot cs
+
+      | idArity f > length val_args
+      = ArgIsLam
+
+      | not (null val_args)
+      = ArgIsNot []   -- Use ArgIsNot [] for args with some structure e.g. (f xs)
+                      -- This makes the call not totally-boring, and hence makes
+                      -- INLINE things inline (which they won't if all args are boring)
+
       | otherwise
-      = case cont_info of
-           BoringCtxt  -> 0
-           CaseCtxt    -> res_discount  -- Presumably a constructor
-           ValAppCtxt  -> res_discount  -- Presumably a function
-           _           -> 40 `min` res_discount
-                -- ToDo: this 40 `min` res_discount doesn't seem right
-                --   for DiscArgCtxt it shouldn't matter because the function will
-                --       get the arg discount for any non-triv arg
-                --   for RuleArgCtxt we do want to be keener to inline; but not only
-                --       constructor results
-                --   for RhsCtxt I suppose that exposing a data con is good in general
-                --   And 40 seems very arbitrary
-                --
-                -- res_discount can be very large when a function returns
-                -- constructors; but we only want to invoke that large discount
-                -- when there's a case continuation.
-                -- Otherwise we, rather arbitrarily, threshold it.  Yuk.
-                -- But we want to avoid inlining large functions that return
-                -- constructors into contexts that are simply "interesting"
+      = ArgNoInfo
+      where
+        unfolding = idUnfolding f
+

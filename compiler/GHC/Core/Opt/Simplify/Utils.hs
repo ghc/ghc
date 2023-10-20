@@ -29,6 +29,9 @@ module GHC.Core.Opt.Simplify.Utils (
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
+        -- The CallCtxt type
+        CallCtxt(..),
+
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addTyArgTo,
@@ -46,9 +49,7 @@ import GHC.Prelude hiding (head, init, last, tail)
 import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
-import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
@@ -485,6 +486,38 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
 
+contHasRules :: SimplCont -> Bool
+-- If the argument has form (f x y), where x,y are boring,
+-- and f is marked INLINE, then we don't want to inline f.
+-- But if the context of the argument is
+--      g (f x y)
+-- where g has rules, then we *do* want to inline f, in case it
+-- exposes a rule that might fire.  Similarly, if the context is
+--      h (g (f x x))
+-- where h has rules, then we do want to inline f.  So contHasRules
+-- tries to see if the context of the f-call is a call to a function
+-- with rules.
+--
+-- The ai_encl flag makes this happen; if it's
+-- set, the inliner gets just enough keener to inline f
+-- regardless of how boring f's arguments are, if it's marked INLINE
+--
+-- The alternative would be to *always* inline an INLINE function,
+-- regardless of how boring its context is; but that seems overkill
+-- For example, it'd mean that wrapper functions were always inlined
+contHasRules cont
+  = go cont
+  where
+    go (ApplyToVal { sc_cont = cont }) = go cont
+    go (ApplyToTy  { sc_cont = cont }) = go cont
+    go (CastIt _ cont)                 = go cont
+    go (StrictArg { sc_fun = fun })    = ai_encl fun
+    go (Stop _ RuleArgCtxt _)          = True
+    go (TickIt _ c)                    = go c
+    go (Select {})                     = False
+    go (StrictBind {})                 = False      -- ??
+    go (Stop _ _ _)                    = False
+
 -- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
 -- x ::(p) _ { … }) (respectively for arguments of functions), the scaling
 -- factor is p. And in E[G[]], the scaling factor is the product of the scaling
@@ -526,29 +559,6 @@ countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
-contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
--- Summarises value args, discards type args and coercions
--- The returned continuation of the call is only used to
--- answer questions like "are you interesting?"
-contArgs cont
-  | lone cont = (True, [], cont)
-  | otherwise = go [] cont
-  where
-    lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in GHC.Core.Unfold
-    lone (ApplyToVal {}) = False  -- NB: even a type application or cast
-    lone (CastIt {})     = False  --     stops it being "lone"
-    lone _               = True
-
-    go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (is_interesting arg se : args) k
-    go args (ApplyToTy { sc_cont = k }) = go args k
-    go args (CastIt { sc_cont = k })    = go args k
-    go args k                           = (False, reverse args, k)
-
-    is_interesting arg se = interestingArg se arg
-                   -- Do *not* use short-cutting substitution here
-                   -- because we want to get as much IdInfo as possible
-
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
 contOutArgs env cont
@@ -592,7 +602,7 @@ contEvalContext k = case k of
   Stop _ _ sd              -> sd
   TickIt _ k               -> contEvalContext k
   CastIt   { sc_cont = k } -> contEvalContext k
-  ApplyToTy{ sc_cont = k } -> contEvalContext k
+  ApplyToTy{sc_cont=k}     -> contEvalContext k
     --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
     -- Not 100% sure that's correct, . Here's an example:
     --   f (e x) and f :: <SC(S,C(1,L))>
@@ -631,9 +641,11 @@ mkArgInfo env fun rules_for_fun cont
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
-                        CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = discounts}}
-                              -> discounts ++ vanilla_discounts
+                        CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = _discounts}}
+                              -> {- discounts ++ -} vanilla_discounts
                         _     -> vanilla_discounts
+         -- ToDo: with the New Plan it's harder to know which arguments
+         -- attract a discount.  For now, let's just drop this and see.
 
     vanilla_dmds, arg_dmds :: [Demand]
     vanilla_dmds  = repeat topDmd
@@ -725,15 +737,36 @@ make use of the strictness info for the function.
 -}
 
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-        Interesting arguments
+             CallCtxt: the context of a call
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
-Note [Interesting call context]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+data CallCtxt
+  = BoringCtxt
+  | RhsCtxt RecFlag     -- Rhs of a let-binding; see Note [RHS of lets]
+  | DiscArgCtxt         -- Argument of a function with non-zero arg discount
+  | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
+
+  | ValAppCtxt          -- We're applied to at least one value arg
+                        -- This arises when we have ((f x |> co) y)
+                        -- Then the (f x) has argument 'x' but in a ValAppCtxt
+
+  | CaseCtxt            -- We're the scrutinee of a case
+                        -- that decomposes its scrutinee
+
+instance Outputable CallCtxt where
+  ppr CaseCtxt    = text "CaseCtxt"
+  ppr ValAppCtxt  = text "ValAppCtxt"
+  ppr BoringCtxt  = text "BoringCtxt"
+  ppr (RhsCtxt ir)= text "RhsCtxt" <> parens (ppr ir)
+  ppr DiscArgCtxt = text "DiscArgCtxt"
+  ppr RuleArgCtxt = text "RuleArgCtxt"
+
+
+{- Note [Interesting call context]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to avoid inlining an expression where there can't possibly be
 any gain, such as in an argument position.  Hence, if the continuation
 is interesting (eg. a case scrutinee that isn't just a seq, application etc.)
@@ -930,163 +963,6 @@ interestingCallContext env cont
         -- Here, the context of (f x) is strict, and if f's unfolding is
         -- a build it's *great* to inline it here.  So we must ensure that
         -- the context for (f x) is not totally uninteresting.
-
-contHasRules :: SimplCont -> Bool
--- If the argument has form (f x y), where x,y are boring,
--- and f is marked INLINE, then we don't want to inline f.
--- But if the context of the argument is
---      g (f x y)
--- where g has rules, then we *do* want to inline f, in case it
--- exposes a rule that might fire.  Similarly, if the context is
---      h (g (f x x))
--- where h has rules, then we do want to inline f.  So contHasRules
--- tries to see if the context of the f-call is a call to a function
--- with rules.
---
--- The ai_encl flag makes this happen; if it's
--- set, the inliner gets just enough keener to inline f
--- regardless of how boring f's arguments are, if it's marked INLINE
---
--- The alternative would be to *always* inline an INLINE function,
--- regardless of how boring its context is; but that seems overkill
--- For example, it'd mean that wrapper functions were always inlined
-contHasRules cont
-  = go cont
-  where
-    go (ApplyToVal { sc_cont = cont }) = go cont
-    go (ApplyToTy  { sc_cont = cont }) = go cont
-    go (CastIt { sc_cont = cont })     = go cont
-    go (StrictArg { sc_fun = fun })    = ai_encl fun
-    go (Stop _ RuleArgCtxt _)          = True
-    go (TickIt _ c)                    = go c
-    go (Select {})                     = False
-    go (StrictBind {})                 = False      -- ??
-    go (Stop _ _ _)                    = False
-
-{- Note [Interesting arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An argument is interesting if it deserves a discount for unfoldings
-with a discount in that argument position.  The idea is to avoid
-unfolding a function that is applied only to variables that have no
-unfolding (i.e. they are probably lambda bound): f x y z There is
-little point in inlining f here.
-
-Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
-we must look through lets, eg (let x = e in C a b), because the let will
-float, exposing the value, if we inline.  That makes it different to
-exprIsHNF.
-
-Before 2009 we said it was interesting if the argument had *any* structure
-at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
-
-But we don't regard (f x y) as interesting, unless f is unsaturated.
-If it's saturated and f hasn't inlined, then it's probably not going
-to now!
-
-Wrinkles:
-
-(IA1) Conlike is interesting.
-   Consider
-           f d = ...((*) d x y)...
-           ... f (df d')...
-   where df is con-like. Then we'd really like to inline 'f' so that the
-   rule for (*) (df d) can fire.  To do this
-     a) we give a discount for being an argument of a class-op (eg (*) d)
-     b) we say that a con-like argument (eg (df d)) is interesting
-
-(IA2) OtherCon.
-   interestingArg returns
-      (a) NonTrivArg for an arg with an OtherCon [] unfolding
-      (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
-
-   Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
-   inlining a pretty big function when all we knew was that its arguments
-   were evaluated, nothing more.  That in turn make the enclosing function
-   too big to inline elsewhere.
-
-   Reason for (b): we want to inline integerCompare here
-     integerLt# :: Integer -> Integer -> Bool#
-     integerLt# (IS x) (IS y)                  = x <# y
-     integerLt# x y | LT <- integerCompare x y = 1#
-     integerLt# _ _                            = 0#
-
-(IA3) Rubbish literals.
-   In a worker we might see
-     $wfoo x = let y = RUBBISH in
-               ...(g y True)...
-   where `g` has a wrapper that discards its first argment.  We really really
-   want to inline g's wrapper, to expose that it discards its RUBBISH arg.
-   That may not happen if RUBBISH looks like TrivArg, so we use NonTrivArg
-   instead.  See #26722.  (This reverses the plan in #20035, but the problem
-   reported there appears to have gone away.)
-
-(IA4) Consider a call `f (g x)`. If `f` has a an argument discount on its argument,
-   then f's body scrutinises its argument in a `case` expression, or perhaps applies
-   it.  We give the arg `(g x)` an ArgSummary of `NonTrivArg` so that `f` has a bit
-   of encouragment to inline in these cases.
-
-   Now consider `let y = g x in f y`.  Now we have to look through y's unfolding.
-   When should we do so?  Suppose we did inline `f` so we ended up with
-       let y = g x in ...(case y of alts)...
-   Then we'll call `exprIsConApp_maybe` on `y`; and that looks through "expandable"
-   unfoldings; indeed that's the whole purpose of `exprIsExpanadable`. See
-   Note [exprIsExpandable] in GHC.Core.Utils.
-
-   Conclusion: `interestingArg` should give some encouragement (NonTrivArg) to `f`
-   when the argument is expandable. Hence `uf_expandable` in the `Var` case.
-
--}
-
-interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
--- See Note [Interesting arguments]
-interestingArg env e = go env 0 e
-  where
-    -- n is # value args to which the expression is applied
-    go env n (Var v)
-       = case substId env v of
-           DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)             n e
-           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
-
-    go _   _ (Lit l)
-       | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
-       | otherwise             = ValueArg
-    go _   _ (Type _)          = TrivArg
-    go _   _ (Coercion _)      = TrivArg
-    go env n (App fn (Type _)) = go env n fn
-    go env n (App fn _)        = go env (n+1) fn
-    go env n (Tick _ a)        = go env n a
-    go env n (Cast e _)        = go env n e
-    go env n (Lam v e)
-       | isTyVar v             = go env n e
-       | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = ValueArg
-    go _ _ (Case {})           = NonTrivArg
-    go env n (Let b e)         = case go env' n e of
-                                   ValueArg -> ValueArg
-                                   _        -> NonTrivArg
-                               where
-                                 env' = env `addNewInScopeIds` bindersOf b
-
-    go_var n v
-       | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
-                                    --    data constructors here
-                                    -- DFuns are con-like;
-                                    --    see (IA1) in Note [Interesting arguments]
-       | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
-       | n > 0         = NonTrivArg -- Saturated or unknown call
-       | otherwise  -- n==0, no value arguments; look for an interesting unfolding
-       = case idUnfolding v of
-           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
-           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
-              -- See (IA2) in Note [Interesting arguments]
-           DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
-           CoreUnfolding{ uf_cache = cache }
-             | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
-             | uf_expandable cache -> NonTrivArg  -- See (IA4)
-             | otherwise           -> TrivArg
-           BootUnfolding           -> TrivArg
-           NoUnfolding             -> TrivArg
 
 
 {- *********************************************************************
@@ -1728,7 +1604,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
                                             -- so inlining duplicates code but nothing more
 
         | otherwise
-        -> work_ok in_lam int_cxt && (n_br == 1 || smallEnoughToInline uf_opts unfolding)
+        -> work_ok in_lam int_cxt && (n_br == 1 || smallEnoughToInline env unfolding)
               -- Multiple syntactic occurences; but lazy, and small enough to dup
               -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 
@@ -1759,9 +1635,21 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
     is_demanded = isStrUsedDmd (idDemandInfo bndr)
     occ_info    = idOccInfo old_bndr
     unfolding   = idUnfolding bndr
-    uf_opts     = seUnfoldingOpts env
     active      = isActive (sePhase env) $ idInlineActivation bndr
         -- See Note [pre/postInlineUnconditionally in gentle mode]
+
+smallEnoughToInline :: SimplEnv -> Unfolding -> Bool
+smallEnoughToInline env unfolding
+  | CoreUnfolding {uf_guidance = guidance} <- unfolding
+  = case guidance of
+       UnfIfGoodArgs {ug_tree = et} -> exprTreeWillInline limit et
+       UnfWhen {}                   -> True
+       UnfNever                     -> False
+  | otherwise
+  = False
+  where
+    uf_opts = seUnfoldingOpts env
+    limit   = unfoldingUseThreshold uf_opts
 
 {- Note [Inline small things to avoid creating a thunk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1990,20 +1990,17 @@ nodeScore !env new_bndr lb_deps
     -- is_lb: see Note [Loop breakers, node scoring, and stability]
     is_lb = isStrongLoopBreaker (idOccInfo old_bndr)
 
-    old_unf = realIdUnfolding old_bndr
+    old_unf    = realIdUnfolding old_bndr
     can_unfold = canUnfold old_unf
     rhs        = case old_unf of
                    CoreUnfolding { uf_src = src, uf_tmpl = unf_rhs }
                      | isStableSource src
                      -> unf_rhs
                    _ -> bind_rhs
-       -- 'bind_rhs' is irrelevant for inlining things with a stable unfolding
-    rhs_size = case old_unf of
-                 CoreUnfolding { uf_guidance = guidance }
-                    | UnfIfGoodArgs { ug_size = size } <- guidance
-                    -> size
-                 _  -> cheapExprSize rhs
+        -- 'bind_rhs' is irrelevant for inlining things with a stable unfolding
 
+    rhs_size = cheapExprSize rhs
+        -- ToDo: could exploit pre-computed unfolding size?
 
         -- Checking for a constructor application
         -- Cheap and cheerful; the simplifier moves casts out of the way

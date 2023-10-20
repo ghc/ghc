@@ -651,9 +651,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
            _ -> mkLetUnfolding env top_lvl VanillaSrc work_id False work_rhs
 
 tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
-  = do { traceSmpl "tcww:no" (vcat [ text "bndr:" <+> ppr bndr
-                                   , text "rhs:" <+> ppr rhs ])
-        ; return (mkFloatBind env (NonRec bndr rhs)) }
+  = return (mkFloatBind env (NonRec bndr rhs))
 
 mkCastWrapperInlinePrag :: InlinePragma GhcTc -> InlinePragma GhcTc
 -- See Note [Cast worker/wrapper]
@@ -947,7 +945,6 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
         -- See Note [In-scope set as a substitution]
 
       ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr_w_info eta_rhs
-
         then -- Inline and discard the binding
              do  { tick (PostInlineUnconditionally old_bndr)
                  ; let unf_rhs = maybeUnfoldingTemplate new_unfolding `orElse` eta_rhs
@@ -2437,7 +2434,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
 tryInlining env logger var cont
-  | Just expr <- callSiteInline env logger var lone_variable arg_infos interesting_cont
+  | Just expr <- callSiteInline logger env var cont
   = do { dump_inline expr cont
        ; return (Just expr) }
 
@@ -2445,9 +2442,6 @@ tryInlining env logger var cont
   = return Nothing
 
   where
-    (lone_variable, arg_infos, call_cont) = contArgs cont
-    interesting_cont = interestingCallContext env call_cont
-
     log_inlining doc
       = liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify)
            Opt_D_dump_inlinings
@@ -3407,10 +3401,9 @@ simplAlts :: SimplEnv
           -> SimplM OutExpr  -- Returns the complete simplified case expression
 
 simplAlts env0 scrut case_bndr alts cont'
-  = do  { traceSmpl "simplAlts" (vcat [ ppr case_bndr
-                                      , text "cont':" <+> ppr cont'
-                                      , text "in_scope" <+> ppr (seInScope env0) ])
-        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
+  = do  { (env1, case_bndr1) <- simplBinder env0 case_bndr
+        ; traceSmpl "simplAlts" (vcat [ ppr case_bndr <+> ppr case_bndr1
+                                      , text "cont':" <+> ppr cont' ])
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
