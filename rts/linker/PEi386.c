@@ -1932,29 +1932,32 @@ static size_t
 makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED, SymType type )
 {
     SymbolExtra *extra;
-
-    if (type == SYM_TYPE_CODE) {
-        // jmp *-14(%rip)
-        extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
-        CHECK(extra);
-        extra->addr = (uint64_t)s;
-        static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
-        memcpy(extra->jumpIsland, jmp, 6);
-        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(code): %s -> %p\n", symbol, &extra->jumpIsland));
-        return (size_t)&extra->jumpIsland;
-    } else if (type == SYM_TYPE_INDIRECT_DATA) {
-        extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
-        CHECK(extra);
-        void *v = *(void**) s;
-        extra->addr = (uint64_t)v;
-        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(data): %s -> %p\n", symbol, &extra->addr));
-        return (size_t)&extra->addr;
-    } else {
-        extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
-        CHECK(extra);
-        extra->addr = (uint64_t)s;
-        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(indirect-data): %s -> %p\n", symbol, &extra->addr));
-        return (size_t)&extra->addr;
+    switch(type & ~SYM_TYPE_DUP_DISCARD) {
+        case SYM_TYPE_CODE: {
+            // jmp *-14(%rip)
+            extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
+            CHECK(extra);
+            extra->addr = (uint64_t)s;
+            static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+            memcpy(extra->jumpIsland, jmp, 6);
+            IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(code): %s -> %p\n", symbol, &extra->jumpIsland));
+            return (size_t)&extra->jumpIsland;
+        }
+        case SYM_TYPE_INDIRECT_DATA: {
+            extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
+            CHECK(extra);
+            void *v = *(void**) s;
+            extra->addr = (uint64_t)v;
+            IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(data): %s -> %p\n", symbol, &extra->addr));
+            return (size_t)&extra->addr;
+        }
+        default: {
+            extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
+            CHECK(extra);
+            extra->addr = (uint64_t)s;
+            IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(indirect-data): %s -> %p\n", symbol, &extra->addr));
+            return (size_t)&extra->addr;
+        }
     }
 }
 
