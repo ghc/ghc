@@ -9,14 +9,16 @@
   * Always use `safe` call to `read` for regular files and block devices on unix if the RTS is multi-threaded, regardless of `O_NONBLOCK`.
     ([CLC proposal #166](https://github.com/haskell/core-libraries-committee/issues/166))
   * Export List from Data.List ([CLC proposal #182](https://github.com/haskell/core-libraries-committee/issues/182)).
+  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
 
-## 4.19.0.0 *TBA*
+## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/87) and [#114](https://github.com/haskell/core-libraries-committee/issues/114))
-  * `GHC.Conc.Sync` now exports `fromThreadId :: ThreadId -> Word64`, which maps a thread to a per-process-unique identifier ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
+  * Add `fromThreadId :: ThreadId -> Word64` to `GHC.Conc.Sync`, which maps a thread to a per-process-unique identifier ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
-  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
+  * Mark `maximumBy`/`minimumBy` as `INLINE` improving performance for unpackable
     types significantly.
   * Add INLINABLE pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
   * Export `getSolo` from `Data.Tuple`.
@@ -34,20 +36,18 @@
   * Add `COMPLETE` pragmas to the `TypeRep`, `SSymbol`, `SChar`, and `SNat` pattern synonyms.
       ([CLC proposal #149](https://github.com/haskell/core-libraries-committee/issues/149))
   * Make `($)` representation polymorphic ([CLC proposal #132](https://github.com/haskell/core-libraries-committee/issues/132))
-  * Implemented [GHC Proposal #433](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst),
+  * Implement [GHC Proposal #433](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst),
     adding the class `Unsatisfiable :: ErrorMessage -> TypeError` to `GHC.TypeError`,
     which provides a mechanism for custom type errors that reports the errors in
     a more predictable behaviour than `TypeError`.
   * Add more instances for `Compose`: `Enum`, `Bounded`, `Num`, `Real`, `Integral` ([CLC proposal #160](https://github.com/haskell/core-libraries-committee/issues/160))
   * Make `(&)` representation polymorphic in the return type ([CLC proposal #158](https://github.com/haskell/core-libraries-committee/issues/158))
   * Implement `GHC.IORef.atomicSwapIORef` via a new dedicated primop `atomicSwapMutVar#` ([CLC proposal #139](https://github.com/haskell/core-libraries-committee/issues/139))
-  * Change codebuffers to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
-  * Add nominal role annotations to SNat/SSymbol/SChar ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
+  * Change `BufferCodec` to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
+  * Add nominal role annotations to `SNat` / `SSymbol` / `SChar` ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
   * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
-  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
-  * Fixed exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
   * Implement `copyBytes`, `fillBytes`, `moveBytes` and `stimes` for `Data.Array.Byte.ByteArray` using primops ([CLC proposal #188](https://github.com/haskell/core-libraries-committee/issues/188))
-  * Add rewrite rules for conversion between Int64/Word64 and Float/Double on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
+  * Add rewrite rules for conversion between `Int64` / `Word64` and `Float` / `Double` on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
