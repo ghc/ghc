@@ -125,6 +125,17 @@ biModules pd = go [ comp | comp@(bi,_,_,_) <-
     go [x] = x
     go _   = error "Cannot handle more than one buildinfo yet."
 
+-- Extra files needed prior to configuring.
+--
+-- These should be "static" source files: ones whose contents do not
+-- change based on the build configuration, and ones which are therefore
+-- also safe to include in sdists for package-level builds.
+--
+-- Put another way, while Hadrian knows these are generated, Cabal
+-- should just think they are regular source files.
+extraPreConfigureDeps :: [String]
+extraPreConfigureDeps = ["compiler/GHC/CmmToLlvm/Version/Bounds.hs"]
+
 -- TODO: Track command line arguments and package configuration flags.
 -- | Configure a package using the Cabal library by collecting all the command
 -- line arguments (to be passed to the setup script) and package configuration
@@ -141,7 +152,7 @@ configurePackage context@Context {..} = do
     -- We'll need those packages in our package database.
     deps <- sequence [ pkgConfFile (context { package = pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
-    need deps
+    need $ extraPreConfigureDeps ++ deps
 
     -- Figure out what hooks we need.
     let configureFile = replaceFileName (pkgCabalFile package) "configure"

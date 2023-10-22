@@ -113,7 +113,7 @@ _darcs/
 /compiler/FunTypes.h
 /compiler/MachRegs.h
 /compiler/MachRegs
-/compiler/ghc-llvm-version.h
+/compiler/GHC/CmmToLlvm/Version/Bounds.hs
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
 /distrib/configure.ac
@@ -185,8 +185,6 @@ _darcs/
 /linter.log
 /mk/are-validating.mk
 /mk/build.mk
-/mk/unused.h
-/mk/unused.h.in
 /mk/config.mk
 /mk/config.mk.old
 /mk/system-cxx-std-lib-1.0.conf
