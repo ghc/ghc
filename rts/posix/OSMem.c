@@ -530,7 +530,7 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
             (void*)startAddress, (void*)minimumAddress);
     }
 
-#if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
+#if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H) && defined(RLIMIT_AS)
     struct rlimit asLimit;
     /* rlim_t is signed on some platforms, including FreeBSD;
      * explicitly cast to avoid sign compare error */
