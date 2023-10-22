@@ -463,7 +463,7 @@ defaultLogActionHPutStrDoc logflags asciiSpace h d
 -- -fdiagnostics-as-json. For temporary backwards compatibility while
 -- -ddump-json is being deprecated, `jsonLogAction` has been added in, but
 -- it should be removed along with -ddump-json. Similarly, the guard in
--- `defaultLogAction` should be removed.
+-- `defaultLogAction` should be removed. This cleanup is tracked in #24113.
 
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpCache -> LogAction -> DumpAction
