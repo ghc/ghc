@@ -41,6 +41,7 @@ import GHC.Utils.Panic
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
 import GHC.CmmToLlvm.Config
+import GHC.CmmToLlvm.Version
 
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )

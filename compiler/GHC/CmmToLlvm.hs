@@ -21,6 +21,7 @@ import GHC.CmmToLlvm.Data
 import GHC.CmmToLlvm.Ppr
 import GHC.CmmToLlvm.Regs
 import GHC.CmmToLlvm.Mangler
+import GHC.CmmToLlvm.Version
 
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm

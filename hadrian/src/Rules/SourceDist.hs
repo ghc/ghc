@@ -156,7 +156,6 @@ prepareTree dest = do
       , pkgPath terminfo -/- "configure"
       , "configure"
       , "aclocal.m4"
-      , "mk" -/- "unused.h.in"
       ]
 
     copyAlexHappyFiles =

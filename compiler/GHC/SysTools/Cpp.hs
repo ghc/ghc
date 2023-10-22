@@ -15,7 +15,7 @@ where
 import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.CmmToLlvm.Config
+import GHC.CmmToLlvm.Version
 import GHC.Platform
 import GHC.Platform.ArchOS
 
