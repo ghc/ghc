@@ -299,7 +299,7 @@
    These two issues mean that for GHC we need to take a different approach
    to handling import libraries.  For normal C libraries we have proper
    differentiation between CODE and DATA.   For GHC produced import libraries
-   we do not.   As such the SYM_TYPE_DUP_DISCARD tells the linker that if a
+   we do not.  As such the dup_discard flag tells the linker that if a
    duplicate symbol is found, and we were going to discard it anyway, just do
    so quitely.  This works because the RTS symbols themselves are provided by
    the currently loaded RTS as built-in symbols.
@@ -438,7 +438,7 @@ void initLinker_PEi386(void)
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
                                symhash, "__image_base__",
                                GetModuleHandleW (NULL), HS_BOOL_TRUE,
-                               SYM_TYPE_CODE, NULL)) {
+                               SYM_TYPE_CODE, SYM_ERROR_ON_DUPLICATE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 
@@ -1814,9 +1814,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           sname = strdup (sname);
           addr  = strdup (addr);
           type = has_code_section ? SYM_TYPE_CODE : SYM_TYPE_DATA;
-          type |= SYM_TYPE_DUP_DISCARD;
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, type, oc)) {
+                                     addr, false, type, SYM_DISCARD_ON_DUPLICATE, oc)) {
              releaseOcInfo (oc);
              stgFree (oc->image);
              oc->image = NULL;
@@ -1895,7 +1894,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           stgFree(tmp);
           sname = strdup (sname);
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, type, oc))
+                                     addr, false, type, SYM_ERROR_ON_DUPLICATE, oc))
                return false;
 
           break;
@@ -1918,7 +1917,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          }
 
          if (! ghciInsertSymbolTable(oc->fileName, symhash, sname, addr,
-                                     isWeak, type, oc))
+                                     isWeak, type, SYM_ERROR_ON_DUPLICATE, oc))
              return false;
       } else {
           /* We're skipping the symbol, but if we ever load this
@@ -2324,7 +2323,9 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
         sym = lookupSymbolInDLLs(lbl, dependent);
         return sym; // might be NULL if not found
     } else {
-        if (type) *type = pinfo->type;
+        if (type) {
+            *type = pinfo->type;
+        }
 
         if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
         {

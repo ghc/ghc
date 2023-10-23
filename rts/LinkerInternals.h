@@ -55,17 +55,24 @@ typedef struct _Section    Section;
 
 /* What kind of thing a symbol identifies. We need to know this to determine how
  * to process overflowing relocations. See Note [Processing overflowed relocations].
- * This is bitfield however only the option SYM_TYPE_DUP_DISCARD can be combined
- * with the other values. */
+ * Be sure to update the width of RtsSymbolInfo.type if you add variants
+ * to this enumeration.
+ */
 typedef enum _SymType {
     SYM_TYPE_CODE = 1 << 0, /* the symbol is a function and can be relocated via a jump island */
     SYM_TYPE_DATA = 1 << 1, /* the symbol is data */
     SYM_TYPE_INDIRECT_DATA = 1 << 2, /* see Note [_iob_func symbol] */
-    SYM_TYPE_DUP_DISCARD = 1 << 3, /* the symbol is a symbol in a BFD import library
-                                      however if a duplicate is found with a mismatching
-                                      SymType then discard this one.  */
 } SymType;
 
+/* How to handle duplicate symbols. */
+typedef enum {
+    // Throw an error if a duplicate symbol of different SymType is found
+    SYM_ERROR_ON_DUPLICATE = 0,
+    // Discard if a duplicate symbol of different SymType is found. This
+    // is necessary on PE platforms for symbols defined in BFD import
+    // libraries.
+    SYM_DISCARD_ON_DUPLICATE = 1
+} SymDuplicable;
 
 #if defined(OBJFORMAT_ELF)
 #  include "linker/ElfTypes.h"
@@ -438,7 +445,8 @@ typedef struct _RtsSymbolInfo {
     SymbolAddr* value;
     ObjectCode *owner;
     SymStrength strength;
-    SymType type;
+    SymType type: 16;
+    SymDuplicable duplicable: 1;
 } RtsSymbolInfo;
 
 #include "BeginPrivate.h"
@@ -466,6 +474,7 @@ int ghciInsertSymbolTable(
     SymbolAddr* data,
     SymStrength weak,
     SymType type,
+    SymDuplicable duplicable,
     ObjectCode *owner);
 
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a

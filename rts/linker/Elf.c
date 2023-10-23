@@ -1083,7 +1083,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                            setWeakSymbol(oc, nm);
                        }
                        if (!ghciInsertSymbolTable(oc->fileName, symhash,
-                                                  nm, symbol->addr, isWeak, sym_type, oc)
+                                                  nm, symbol->addr, isWeak, sym_type, SYM_ERROR_ON_DUPLICATE, oc)
                            ) {
                            goto fail;
                        }

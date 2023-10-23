@@ -1390,14 +1390,15 @@ ocGetNames_MachO(ObjectCode* oc)
                     {
                             IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
                             SymbolAddr* addr = oc->info->macho_symbols[i].addr;
-                            // TODO: Make figure out how to determine this from the object file
-                            SymType sym_type = SYM_TYPE_CODE;
+                            // TODO: Figure out how to determine this from the object file
+                            const SymType sym_type = SYM_TYPE_CODE;
                             ghciInsertSymbolTable( oc->fileName
                                                  , symhash
                                                  , nm
                                                  , addr
                                                  , HS_BOOL_FALSE
                                                  , sym_type
+                                                 , SYM_ERROR_ON_DUPLICATE
                                                  , oc);
 
                             oc->symbols[curSymbol].name = nm;
@@ -1440,7 +1441,7 @@ ocGetNames_MachO(ObjectCode* oc)
 
                 IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
-                                       (void*)commonCounter, HS_BOOL_FALSE, sym_type, oc);
+                                       (void*)commonCounter, HS_BOOL_FALSE, sym_type, SYM_ERROR_ON_DUPLICATE, oc);
                 oc->symbols[curSymbol].name = nm;
                 oc->symbols[curSymbol].addr = oc->info->macho_symbols[i].addr;
                 curSymbol++;

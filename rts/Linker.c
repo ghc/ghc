@@ -226,7 +226,7 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type & ~SYM_TYPE_DUP_DISCARD) {
+    switch (type) {
         case SYM_TYPE_CODE: return "code";
         case SYM_TYPE_DATA: return "data";
         case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
@@ -262,6 +262,7 @@ int ghciInsertSymbolTable(
    SymbolAddr* data,
    SymStrength strength,
    SymType type,
+   SymDuplicable duplicable,
    ObjectCode *owner)
 {
    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
@@ -272,13 +273,14 @@ int ghciInsertSymbolTable(
       pinfo->owner = owner;
       pinfo->strength = strength;
       pinfo->type = type;
+      pinfo->duplicable = duplicable;
       insertStrHashTable(table, key, pinfo);
       return 1;
    }
-   else if (pinfo->type ^ type)
+   else if (pinfo->type != type)
    {
        /* We were asked to discard the symbol on duplicates, do so quietly.  */
-       if (!(type & SYM_TYPE_DUP_DISCARD))
+       if (duplicable != SYM_DISCARD_ON_DUPLICATE)
        {
          debugBelch("Symbol type mismatch.\n");
          debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
@@ -466,7 +468,7 @@ initLinker_ (int retain_cafs)
     for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
         if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                     symhash, sym->lbl, sym->addr,
-                                    sym->strength, sym->type, NULL)) {
+                                    sym->strength, sym->type, SYM_ERROR_ON_DUPLICATE, NULL)) {
             barf("ghciInsertSymbolTable failed");
         }
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
@@ -476,7 +478,7 @@ initLinker_ (int retain_cafs)
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
                                 MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
                                 retain_cafs ? newRetainedCAF : newGCdCAF,
-                                HS_BOOL_FALSE, SYM_TYPE_CODE, NULL)) {
+                                HS_BOOL_FALSE, SYM_TYPE_CODE, SYM_ERROR_ON_DUPLICATE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 
@@ -864,7 +866,7 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index)
 HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 {
     return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE,
-                                 SYM_TYPE_CODE, NULL);
+                                 SYM_TYPE_CODE, SYM_ERROR_ON_DUPLICATE, NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1696,7 +1698,7 @@ int ocTryLoad (ObjectCode* oc) {
             && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name,
                                       symbol.addr,
                                       isSymbolWeak(oc, symbol.name),
-                                      symbol.type, oc)) {
+                                      symbol.type, SYM_ERROR_ON_DUPLICATE, oc)) {
             return 0;
         }
     }
