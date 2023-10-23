@@ -753,6 +753,7 @@ boxedMarshalableTyCon tc
                     , charTyConKey
                     , stablePtrTyConKey
                     , boolTyConKey
+                    , jsvalTyConKey
                     ]
   = IsValid
 

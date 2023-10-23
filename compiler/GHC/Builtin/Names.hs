@@ -358,6 +358,7 @@ basicKnownKeyNames
         stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+        jsvalTyConName,
 
         -- Others
         otherwiseIdName, inlineIdName,
@@ -1659,6 +1660,9 @@ constPtrConName :: Name
 constPtrConName =
     tcQual fOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
 
+jsvalTyConName :: Name
+jsvalTyConName = tcQual (mkGhcInternalModule (fsLit "GHC.Wasm.Prim.Types")) (fsLit "JSVal") jsvalTyConKey
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1863,7 +1867,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey, stackSnapshotPrimTyConKey,
-    promptTagPrimTyConKey, constPtrTyConKey :: Unique
+    promptTagPrimTyConKey, constPtrTyConKey, jsvalTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -2079,6 +2083,8 @@ typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 414
 typeCharToNatTyFamNameKey = mkPreludeTyConUnique 415
 typeNatToCharTyFamNameKey = mkPreludeTyConUnique 416
 constPtrTyConKey = mkPreludeTyConUnique 417
+
+jsvalTyConKey = mkPreludeTyConUnique 418
 
 {-
 ************************************************************************
