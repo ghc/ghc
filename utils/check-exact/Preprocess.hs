@@ -124,8 +124,9 @@ getCppTokensAsComments cppOptions sourceFile = do
 goodComment :: GHC.LEpaComment -> Bool
 goodComment c = isGoodComment (tokComment c)
   where
-    isGoodComment :: Comment -> Bool
-    isGoodComment (Comment "" _ _ _) = False
+    isGoodComment :: [Comment] -> Bool
+    isGoodComment []                 = False
+    isGoodComment [Comment "" _ _ _] = False
     isGoodComment _                  = True
 
 

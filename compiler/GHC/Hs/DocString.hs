@@ -21,6 +21,7 @@ module GHC.Hs.DocString
   , renderHsDocStrings
   , exactPrintHsDocString
   , pprWithDocString
+  , printDecorator
   ) where
 
 import GHC.Prelude

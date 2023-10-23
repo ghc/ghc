@@ -36,6 +36,7 @@ import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
+import GHC.Base (NonEmpty(..))
 
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, elemIndex)
@@ -236,8 +237,47 @@ ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
 ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
-tokComment :: LEpaComment -> Comment
-tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
+tokComment :: LEpaComment -> [Comment]
+tokComment t@(L lt c) =
+  case c of
+    (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments lt pt dc
+    _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
+
+hsDocStringComments :: Anchor -> RealSrcSpan -> GHC.HsDocString -> [Comment]
+hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
+  let
+    decStr = printDecorator dec
+    L lx x' = dedentDocChunkBy (3 + length decStr) x
+    str = "-- " ++ decStr ++ unpackHDSC x'
+    docChunk _ [] = []
+    docChunk pt' (L l chunk:cs)
+      = Comment ("--" ++ unpackHDSC chunk) (spanAsAnchor l) pt' Nothing : docChunk (rs l) cs
+  in
+    (Comment str (spanAsAnchor lx) pt Nothing : docChunk (rs lx) (map dedentDocChunk xs))
+hsDocStringComments anc pt (NestedDocString dec@(HsDocStringNamed _) (L _ chunk))
+  = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+hsDocStringComments anc pt (NestedDocString dec (L _ chunk))
+  = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+
+hsDocStringComments _ _ (GeneratedDocString _) = [] -- Should not appear in user-written code
+
+-- At the moment the locations of the 'HsDocStringChunk's are from the start of
+-- the string part, leaving aside the "--". So we need to subtract 2 columns from it
+dedentDocChunk :: LHsDocStringChunk -> LHsDocStringChunk
+dedentDocChunk chunk = dedentDocChunkBy 2 chunk
+
+dedentDocChunkBy :: Int -> LHsDocStringChunk -> LHsDocStringChunk
+dedentDocChunkBy  dedent (L (RealSrcSpan l mb) c) = L (RealSrcSpan l' mb) c
+  where
+    f = srcSpanFile l
+    sl = srcSpanStartLine l
+    sc = srcSpanStartCol l
+    el = srcSpanEndLine l
+    ec = srcSpanEndCol l
+    l' = mkRealSrcSpan (mkRealSrcLoc f sl (sc - dedent))
+                       (mkRealSrcLoc f el (ec - dedent))
+
+dedentDocChunkBy _ x = x
 
 mkEpaComments :: [Comment] -> [Comment] -> EpAnnComments
 mkEpaComments priorCs []
