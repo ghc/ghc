@@ -706,7 +706,7 @@ defaultDynFlags mySettings =
         maxInlineMemsetInsns = 32,
 
         initialUnique = 0,
-        uniqueIncrement = 1,
+        uniqueIncrement = 1111111111111111111,
 
         reverseErrors = False,
         maxErrors     = Nothing,
