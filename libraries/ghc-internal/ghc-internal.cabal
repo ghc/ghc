@@ -445,6 +445,17 @@ Library
             GHC.JS.Prim.Internal.Build
             GHC.JS.Foreign.Callback
 
+    if arch(wasm32)
+        exposed-modules:
+            GHC.Wasm.Prim
+        other-modules:
+            GHC.Wasm.Prim.Conc
+            GHC.Wasm.Prim.Conc.Internal
+            GHC.Wasm.Prim.Exports
+            GHC.Wasm.Prim.Flag
+            GHC.Wasm.Prim.Imports
+            GHC.Wasm.Prim.Types
+
     -- We need to set the unit id to ghc-internal (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-internal

@@ -1,0 +1,10 @@
+#include "Cmm.h"
+
+// This defines the unlifted JSVal# type. See Note [JSVal
+// representation for wasm] for detailed explanation.
+
+INFO_TABLE(stg_JSVAL, 0, 1, PRIM, "JSVAL", "JSVAL")
+  (P_ node)
+{
+  return (node);
+}

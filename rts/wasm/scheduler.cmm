@@ -1,0 +1,195 @@
+// Note [Async JSFFI scheduler]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// The biggest challenge of implementing JSFFI for the GHC wasm
+// backend, is how to make asynchronous JavaScript computation work
+// with existing RTS API, which is fundamentally synchronous.
+//
+// When a Haskell function is exported via C FFI, the generated C
+// function would call one of the rts_eval* functions, which will run
+// the main thread synchronously till completion, fetch the result and
+// return it to the C function's caller. The main thread may block in
+// between, but it's fine, since the RTS scheduler is still able to
+// make progress by running other threads and when the run queue is
+// drained, block on polling the pending I/O file descriptors until
+// I/O result is available (on single-threaded RTS, that is).
+//
+// So far so good, except it doesn't work for wasm JSFFI at all.
+// Suppose a Haskell function is exported via JSFFI, and it calls an
+// async import and needs to block waiting for the result. We need a
+// way to gracefully exit the RTS while leaving the current thread in
+// the suspended state, only to be resumed later when the async import
+// result is available. But alas, that's not supported by the RTS API
+// as of today. rts_eval* as well as the scheduler loop as implemented
+// in schedule() will not exit until the main thread is either
+// complete or killed. And given JavaScript's event loop model, we
+// can't stay in the current RTS API invocation and "poll" for
+// progress in the JavaScript world, since if we don't exit, the
+// JavaScript world would be unable to make any progress!
+//
+// It is surely possible to refactor the RTS scheduler and add async
+// flavours of the RTS API that doesn't insist waiting for the main
+// thread to complete, but it takes a lot of work. There exists other
+// hacks (e.g. web worker or asyncify) to make async JSFFI sorta work,
+// though I'll not elaborate them here and they're not satisfactory
+// anyway. However, all hope is not lost! There are a few key
+// observations that lead to our current implementation:
+//
+// 1. Forked threads have some chance of execution, but the RTS
+//    scheduler only waits for the main thread to complete and won't
+//    wait for forked threads.
+// 2. There exists the yield# primop which simply yields to other
+//    threads in the queue for execution, if there's any.
+// 3. In Haskell/Cmm, you can manipulate not just TSOs, but the thread
+//    run queue as well! With a tiny bit of patch, you can easily
+//    check whether the queue is empty or not, explicitly
+//    enqueue/dequeue TSOs, etc.
+//
+// tl;dr for a showerthought pieced together from the above
+// observations: yo dawg i heard you like concurrency so i put a
+// scheduler on top of your scheduler :)
+//
+// Meme aside, the complete solution can be summarized as follows:
+//
+// 1. Each JSFFI export function is run in a forked thread and upon
+//    completion, resolves a Promise value with the result. This is
+//    handled by the runIO/runNonIO top handler functions.
+// 2. The main thread forks the computation and returns the Promise to
+//    the caller. It'll also run a special "scheduler loop" to make
+//    some progress in the forked thread, though with no guarantee
+//    that the forked thread runs to completion.
+// 3. The main thread "scheduler loop" does one simple thing: check if
+//    the thread run queue is non-empty and if so, yield to other
+//    threads for execution, otherwise exit the loop.
+// 4. When a thread blocks for a JSFFI async import result, it pins
+//    the current TSO via a stable pointer, and calls Promise.then()
+//    on the particular Promise it's blocked on. When that Promise is
+//    fulfilled in the future, it will call back into the RTS, fetches
+//    the TSO indexed by that stable pointer, passes the result and
+//    wakes up the TSO, then finally does another round of scheduler
+//    loop. This is handled by stg_blockPromise.
+//
+// The async JSFFI scheduler is idempotent, it's safe to run it
+// multiple times, now or later, though it's not safe to forget to run
+// it when there's still thread that needs to make progress.
+//
+// A design issue with the async JSFFI scheduler is how often to yield
+// back to JavaScript. Even when the run queue is not drained yet, in
+// each iteration after some progress has been made in other threads,
+// we can choose to either keep looping, or exit immediately and
+// schedule future work to happen via setImmediate() so to avoid
+// jamming the main JavaScript thread. Given each iteration of JSFFI
+// scheduler loop has the overhead of allocating a new thread, maybe
+// it's not a good idea to always yield. In the current
+// implementation, we check the monotonic clock and yield if 15ms or
+// more has passed; this is not a hard guarantee that yielding does
+// happen around 15ms, and it's subject to future change.
+//
+// Another issue we need to deal with in the async JSFFI scheduler is
+// re-entrance. Async JSFFI mechanism allows re-entrance, JavaScript
+// may call into Haskell that calls back into JavaScript that calls
+// into Haskell again, the inception never ends. But you do not want
+// two JSFFI scheduler loops running at once, since that'll lead to an
+// infinite loop! And given we start the scheduler loop eagerly
+// instead of asynchronously, re-entrance is a real danger here.
+// Therefore, we have a global variable that is set to tso->id for the
+// TSO that runs the scheduler loop. If at some point we enter the
+// scheduler loop again and figure out another thread is already doing
+// so, we can safely exit immediately.
+//
+// The async JSFFI scheduler can be implemented in either Haskell or
+// Cmm. For efficiency reasons, it's written in Cmm for the time
+// being, though it can also be called in Haskell via a foreign import
+// prim.
+
+#include "Cmm.h"
+
+// Yield back to JavaScript and schedule future work via
+// setImmediate() after BUSY_YIELD_NS nanoseconds have passed. If it's
+// not defined, the async JSFFI scheduler will only return when the
+// thread run queue is drained, and will not check the monotonic clock
+// at all. Undefining it is useful when the wasm module is run in a
+// separate worker thread and there's no concern of blocking the
+// JavaScript main thread.
+#define BUSY_YIELD_NS 15000000
+
+import CLOSURE ghczmprim_GHCziTupleziPrim_Z0T_closure;
+#if !defined(UnregisterisedCompiler)
+import CLOSURE stg_scheduler_loop_epoch;
+import CLOSURE stg_scheduler_loop_tid;
+#endif
+
+section "data" {
+  stg_scheduler_loop_epoch: I64;
+}
+
+section "data" {
+  stg_scheduler_loop_tid: I64 0 :: I64;
+}
+
+// After creating a new thread with only a stop frame on the stack,
+// push a stg_scheduler_loop frame to make it a scheduler thread. We
+// could omit this and use C FFI to export a Haskell function that
+// invokes the scheduler loop via a foreign import prim, but that is
+// of course less efficient.
+INFO_TABLE_RET (stg_scheduler_loop, RET_SMALL, W_ info_ptr)
+  return ()
+{
+  jump stg_scheduler_loopzh ();
+}
+
+// This always returns () in R1 at the end. If only run via a foreign
+// import prim, it's fine to not return anything, but when run via a
+// stg_scheduler_loop stack frame, then the stop frame expects a valid
+// closure to be returned from R1 and placed in that frame, otherwise
+// the garbage collector can be unhappy.
+stg_scheduler_loopzh ()
+{
+  I64 epoch, now;
+
+  // Only meant to be run from a "main thread" (aka bound to an InCall
+  // frame), not from a forked thread!
+  if (StgTSO_bound(CurrentTSO) == NULL) {
+    return (ghczmprim_GHCziTupleziPrim_Z0T_closure);
+  }
+
+  // Entering the scheduler loop for the first time.
+  if (I64[stg_scheduler_loop_tid] == 0 :: I64) {
+#if defined(BUSY_YIELD_NS)
+    (epoch) = ccall getMonotonicNSec();
+    I64[stg_scheduler_loop_epoch] = epoch;
+#endif
+    I64[stg_scheduler_loop_tid] = StgTSO_id(CurrentTSO);
+    goto work;
+  }
+
+  // Someone else is running the loop, not my business anymore.
+  if (I64[stg_scheduler_loop_tid] != StgTSO_id(CurrentTSO)) {
+    return (ghczmprim_GHCziTupleziPrim_Z0T_closure);
+  }
+
+work:
+  // The thread run queue is drained.
+  if (Capability_n_run_queue(MyCapability()) == 0 :: I32) {
+    goto cleanup;
+  }
+
+  // Make progress in other threads.
+  call stg_yieldzh ();
+
+#if defined(BUSY_YIELD_NS)
+  (now) = ccall getMonotonicNSec();
+
+  if ((now - I64[stg_scheduler_loop_epoch]) < BUSY_YIELD_NS :: I64) {
+    jump stg_scheduler_loopzh ();
+  }
+
+  ccall rts_scheduleWork();
+#else
+  jump stg_scheduler_loopzh ();
+#endif
+
+cleanup:
+  I64[stg_scheduler_loop_tid] = 0 :: I64;
+  return (ghczmprim_GHCziTupleziPrim_Z0T_closure);
+}

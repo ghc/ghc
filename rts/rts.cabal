@@ -519,7 +519,12 @@ library
                    wasm/GetTime.c
                    wasm/OSMem.c
                    wasm/OSThreads.c
+                   wasm/JSFFI.c
+                   wasm/JSFFIGlobals.c
                    posix/Select.c
+        cmm-sources: wasm/jsval.cmm
+                     wasm/blocker.cmm
+                     wasm/scheduler.cmm
       else
          c-sources: posix/GetEnv.c
                     posix/GetTime.c
