@@ -14,32 +14,36 @@ import GHC.Types.SrcLoc
 
 import Debug.Trace
 
+import Macro
+
+-- import ParseOld
 import Parse
+import Types
 
 -- ---------------------------------------------------------------------
 
 type PP = P PpState
 
-initPpState :: PpState
-initPpState =
-    PpState
-        { pp_defines = Map.empty
-        , pp_includes = Map.empty
-        , pp_include_stack = []
-        , pp_continuation = []
-        , pp_context = []
-        , pp_accepting = True
-        }
+-- initPpState :: PpState
+-- initPpState =
+--     PpState
+--         { pp_defines = Map.empty
+--         , pp_includes = Map.empty
+--         , pp_include_stack = []
+--         , pp_continuation = []
+--         , pp_context = []
+--         , pp_accepting = True
+--         }
 
-data PpState = PpState
-    { pp_defines :: !(Map String [String])
-    , pp_includes :: !(Map String StringBuffer)
-    , pp_include_stack :: ![Lexer.AlexInput]
-    , pp_continuation :: ![Located Token]
-    , pp_context :: ![Token] -- What preprocessor directive we are currently processing
-    , pp_accepting :: !Bool
-    }
-    deriving (Show)
+-- data PpState = PpState
+--     { pp_defines :: !(Map String [String])
+--     , pp_includes :: !(Map String StringBuffer)
+--     , pp_include_stack :: ![Lexer.AlexInput]
+--     , pp_continuation :: ![Located Token]
+--     , pp_context :: ![Token] -- What preprocessor directive we are currently processing
+--     , pp_accepting :: !Bool
+--     }
+--     deriving (Show)
 
 -- deriving instance Show Lexer.AlexInput
 -- ---------------------------------------------------------------------
@@ -124,6 +128,9 @@ processCpp fs = do
             ppInclude filename
         Right (CppDefine name def) -> do
             ppDefine name def
+        Right (CppIf cond) -> do
+            ppIf cond
+            return ()
         Right (CppIfdef name) -> do
             defined <- ppIsDefined name
             setAccepting defined
@@ -237,12 +244,21 @@ ppInclude filename = do
 ppDefine :: String -> [String] -> PP ()
 ppDefine name val = P $ \s ->
     -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") name) val (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
 
 ppIsDefined :: String -> PP Bool
 ppIsDefined def = P $ \s ->
     -- POk s (Map.member def (pp_defines (pp s)))
-    POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
+    POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
+
+ppIf :: [String] -> PP Bool
+ppIf toks = P $ \s ->
+    -- -- POk s (Map.member def (pp_defines (pp s)))
+    -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
+    let
+        s' = cppIf (pp s) toks
+     in
+        POk s{pp = s'} (pp_accepting s')
 
 -- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
 cleanTokenString :: FastString -> String

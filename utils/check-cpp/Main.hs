@@ -26,7 +26,9 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import qualified Text.Parsec as Parsec
 
+-- import ParseOld
 import Parse
+import Types
 import ParseSimulate
 import PreProcess
 
@@ -300,3 +302,14 @@ testIncludes =
         , ["#define FOO"]
         )
     ]
+
+t11 :: IO ()
+t11 = do
+    doTest
+        [ "#define FOO 4"
+        , "#if FOO > 3"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
