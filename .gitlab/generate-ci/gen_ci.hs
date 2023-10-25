@@ -979,7 +979,7 @@ job_groups =
      , -- Nightly allowed to fail: #22343
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
-     , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
+     , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian12) llvm)
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      , disableValidate (standardBuilds Amd64 (Linux Debian12))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
@@ -1003,7 +1003,7 @@ job_groups =
      , fastCI (standardBuilds AArch64 Darwin)
      , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
-     , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
+     , disableValidate (validateBuilds AArch64 (Linux Debian12) llvm)
      , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.
      , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
@@ -1077,12 +1077,14 @@ platform_mapping = Map.map go combined_result
   where
     whitelist = [ "x86_64-linux-alpine3_12-validate"
                 , "x86_64-linux-deb11-validate"
+                , "x86_64-linux-deb12-validate"
                 , "x86_64-linux-deb10-validate+debug_info"
                 , "x86_64-linux-fedora33-release"
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
                 , "nightly-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
                 , "nightly-x86_64-linux-deb11-validate"
+                , "nightly-x86_64-linux-deb12-validate"
                 , "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate"
@@ -1092,6 +1094,7 @@ platform_mapping = Map.map go combined_result
                 , "release-x86_64-linux-alpine3_12-release+no_split_sections"
                 , "release-x86_64-linux-deb10-release"
                 , "release-x86_64-linux-deb11-release"
+                , "release-x86_64-linux-deb12-release"
                 , "release-x86_64-linux-fedora33-release"
                 , "release-x86_64-windows-release"
                 ]
