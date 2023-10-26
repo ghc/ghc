@@ -3640,7 +3640,7 @@ primop SparkOp "spark#" GenPrimOp
    with effect = ReadWriteEffect
    code_size = { primOpCodeSizeForeignCall }
 
--- See Note [seq# magic] in GHC.Core.Op.ConstantFold
+-- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
 primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    with

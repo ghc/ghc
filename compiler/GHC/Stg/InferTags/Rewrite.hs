@@ -217,7 +217,7 @@ withLcl fv act = do
 When compiling bytecode we call myCoreToStg to get STG code first.
 myCoreToStg in turn calls out to stg2stg which runs the STG to STG
 passes followed by free variables analysis and the tag inference pass including
-it's rewriting phase at the end.
+its rewriting phase at the end.
 Running tag inference is important as it upholds Note [Strict Field Invariant].
 While code executed by GHCi doesn't take advantage of the SFI it can call into
 compiled code which does. So it must still make sure that the SFI is upheld.
@@ -400,13 +400,11 @@ rewriteExpr :: InferStgExpr -> RM TgStgExpr
 rewriteExpr (e@StgCase {})          = rewriteCase e
 rewriteExpr (e@StgLet {})           = rewriteLet e
 rewriteExpr (e@StgLetNoEscape {})   = rewriteLetNoEscape e
-rewriteExpr (StgTick t e)     = StgTick t <$!> rewriteExpr e
+rewriteExpr (StgTick t e)           = StgTick t <$!> rewriteExpr e
 rewriteExpr e@(StgConApp {})        = rewriteConApp e
-rewriteExpr e@(StgApp {})     = rewriteApp e
-rewriteExpr (StgLit lit)           = return $! (StgLit lit)
-rewriteExpr (StgOpApp op@(StgPrimOp DataToTagOp) args res_ty) = do
-        (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
-rewriteExpr (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
+rewriteExpr e@(StgOpApp {})         = rewriteOpApp e
+rewriteExpr e@(StgApp {})           = rewriteApp e
+rewriteExpr (StgLit lit)            = return $! (StgLit lit)
 
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
@@ -487,6 +485,33 @@ rewriteApp (StgApp f args)
 
 rewriteApp (StgApp f args) = return $ StgApp f args
 rewriteApp _ = panic "Impossible"
+
+{-
+Note [Rewriting primop arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given an application `op# x y`, is it worth applying `rewriteArg` to
+`x` and `y`?  All that will do will be to set the `tagSig` for that
+occurrence of `x` and `y` to record whether it is evaluated and
+properly tagged. For the vast majority of primops that's a waste of
+time: the argument is an `Int#` or something.
+
+But code generation for `seq#` and `dataToTag#` /does/ consult that
+tag, to statically avoid generating an eval:
+* `seq#`: uses `getCallMethod` on its first argument, which looks at the `tagSig`
+* `dataToTag#`: checks `tagSig` directly in the `DataToTagOp` case of `cgExpr`.
+
+So for these we should call `rewriteArgs`.
+
+-}
+
+rewriteOpApp :: InferStgExpr -> RM TgStgExpr
+rewriteOpApp (StgOpApp op args res_ty) = case op of
+  op@(StgPrimOp primOp)
+    | primOp == SeqOp || primOp == DataToTagOp
+    -- see Note [Rewriting primop arguments]
+    -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
+  _ -> pure $! StgOpApp op args res_ty
+rewriteOpApp _ = panic "Impossible"
 
 -- `mkSeq` x x' e generates `case x of x' -> e`
 -- We could also substitute x' for x in e but that's so rarely beneficial

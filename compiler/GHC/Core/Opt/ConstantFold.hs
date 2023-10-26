@@ -2108,6 +2108,9 @@ Implementing seq#.  The compiler has magic for SeqOp in
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]
   in GHC.Core.Opt.Simplify.Iteration
+
+- Likewise, GHC.Stg.InferTags.inferTagExpr knows that seq# returns a
+  properly-tagged pointer inside of its unboxed-tuple result.
 -}
 
 seqRule :: RuleM CoreExpr
