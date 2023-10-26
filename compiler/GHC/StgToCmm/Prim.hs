@@ -140,7 +140,7 @@ shouldInlinePrimOp cfg op args = case emitPrimOp cfg op args of
 --
 -- In more complex cases, there is a foreign call (out of line) fallback. This
 -- might happen e.g. if there's enough static information, such as statically
--- know arguments.
+-- known arguments.
 emitPrimOp
   :: StgToCmmConfig
   -> PrimOp            -- ^ The primop
