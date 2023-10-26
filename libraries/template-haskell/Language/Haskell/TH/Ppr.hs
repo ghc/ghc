@@ -14,7 +14,7 @@ import Language.Haskell.TH.Syntax
 import Data.Word ( Word8 )
 import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
-import GHC.Lexeme( startsVarSym )
+import GHC.Lexeme( isVarSymChar )
 import Data.Ratio ( numerator, denominator )
 import Data.Foldable ( toList )
 import Prelude hiding ((<>))
@@ -122,8 +122,8 @@ isSymOcc :: Name -> Bool
 isSymOcc n
   = case nameBase n of
       []    -> True  -- Empty name; weird
-      (c:_) -> startsVarSym c
-                   -- c.f. OccName.startsVarSym in GHC itself
+      (c:_) -> isVarSymChar c
+                   -- c.f. isVarSymChar in GHC itself
 
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
@@ -471,7 +471,8 @@ ppr_dec _ (PatSynD name args dir pat)
     pprNameArgs | InfixPatSyn a1 a2 <- args = ppr a1 <+> pprName' Infix name <+> ppr a2
                 | otherwise                 = pprName' Applied name <+> ppr args
     pprPatRHS   | ExplBidir cls <- dir = hang (ppr pat <+> text "where")
-                                           nestDepth (pprName' Applied name <+> ppr cls)
+                                              nestDepth
+                                              (vcat $ (pprName' Applied name <+>) . ppr <$> cls)
                 | otherwise            = ppr pat
 ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
