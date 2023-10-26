@@ -2493,32 +2493,34 @@ But it is not necessary to gather CoVars from the types of other binders.
 -}
 
 occAnal env (Tick tickish body)
-  | SourceNote{} <- tickish
-  = WUD usage (Tick tickish body')
-                  -- SourceNotes are best-effort; so we just proceed as usual.
-                  -- If we drop a tick due to the issues described below it's
-                  -- not the end of the world.
-
-  | tickish `tickishScopesLike` SoftScope
-  = WUD (markAllNonTail usage) (Tick tickish body')
-
-  | Breakpoint _ _ ids _ <- tickish
-  = WUD (addManyOccs usage_lam (mkVarSet ids)) (Tick tickish body')
-    -- never substitute for any of the Ids in a Breakpoint
-
-  | otherwise
-  = WUD usage_lam (Tick tickish body')
+  = WUD usage' (Tick tickish body')
   where
-    (WUD usage body') = occAnal env body
-    -- for a non-soft tick scope, we can inline lambdas only
+    WUD usage body' = occAnal env body
+
+    usage'
+      | tickish `tickishScopesLike` SoftScope
+      = usage  -- For soft-scoped ticks (including SourceNotes) we don't want
+               -- to lose join-point-hood, so we don't mess with `usage` (#24078)
+
+      -- For a non-soft tick scope, we can inline lambdas only, so we
+      -- abandon tail calls, and do markAllInsideLam too: usage_lam
+
+      |  Breakpoint _ _ ids _ <- tickish
+      = -- Never substitute for any of the Ids in a Breakpoint
+        addManyOccs usage_lam (mkVarSet ids)
+
+      | otherwise
+      = usage_lam
+
     usage_lam = markAllNonTail (markAllInsideLam usage)
-                  -- TODO There may be ways to make ticks and join points play
-                  -- nicer together, but right now there are problems:
-                  --   let j x = ... in tick<t> (j 1)
-                  -- Making j a join point may cause the simplifier to drop t
-                  -- (if the tick is put into the continuation). So we don't
-                  -- count j 1 as a tail call.
-                  -- See #14242.
+
+    -- TODO There may be ways to make ticks and join points play
+    -- nicer together, but right now there are problems:
+    --   let j x = ... in tick<t> (j 1)
+    -- Making j a join point may cause the simplifier to drop t
+    -- (if the tick is put into the continuation). So we don't
+    -- count j 1 as a tail call.
+    -- See #14242.
 
 occAnal env (Cast expr co)
   = let  (WUD usage expr') = occAnal env expr
