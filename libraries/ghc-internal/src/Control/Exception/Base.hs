@@ -66,7 +66,8 @@ module Control.Exception.Base (
         onException,
 
         -- ** The @evaluate@ function
-        evaluate,
+        evaluate, evaluate2,
+        strictnessBarrier,
 
         -- ** The @mapException@ function
         mapException,

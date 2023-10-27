@@ -5,6 +5,8 @@
            , MagicHash
            , ScopedTypeVariables
            , UnboxedTuples
+           , PolyKinds
+           , DataKinds
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -39,11 +41,11 @@ module GHC.IO (
 
         FilePath,
 
-        catch, catchException, catchAny, throwIO,
+        catch, catchException, catchAny, raiseIO#, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
         unsafeUnmask, interruptible,
-        onException, bracket, finally, evaluate,
+        onException, bracket, finally, evaluate, evaluate2, strictnessBarrier,
         mkUserError
     ) where
 
@@ -206,6 +208,10 @@ catchAny !(IO io) handler = IO $ catch# io handler'
 -- it. No one should really be doing that anyway.
 mplusIO :: IO a -> IO a -> IO a
 mplusIO m n = m `catchException` \ (_ :: IOError) -> n
+
+raiseIO# :: forall (l :: Levity) (r :: RuntimeRep) (a :: TYPE ('BoxedRep l)) (b :: TYPE r). a -> State# RealWorld -> (# State# RealWorld, b #)
+raiseIO# = unsafeCoerce $ \a s -> case strictnessBarrier# s of _s' -> raise# a
+{-# NOINLINE raiseIO# #-}
 
 -- | A variant of 'throw' that can only be used within the 'IO' monad.
 --
@@ -425,39 +431,119 @@ a `finally` sequel =
 -- | Evaluate the argument to weak head normal form.
 --
 -- 'evaluate' is typically used to uncover any exceptions that a lazy value
--- may contain, and possibly handle them.
+-- may contain, and possibly handle them, before the rest of the program is
+-- executed.
 --
 -- 'evaluate' only evaluates to /weak head normal form/. If deeper
 -- evaluation is needed, the @force@ function from @Control.DeepSeq@
--- may be handy:
+-- may be handy: @evaluate $ force x@.
 --
--- > evaluate $ force x
+-- The semantics of 'evaluate' is to be taken with care.
+-- Consider the following example:
 --
--- There is a subtle difference between @'evaluate' x@ and @'return' '$!' x@,
--- analogous to the difference between 'throwIO' and 'throw'. If the lazy
--- value @x@ throws an exception, @'return' '$!' x@ will fail to return an
--- 'IO' action and will throw an exception instead. @'evaluate' x@, on the
--- other hand, always produces an 'IO' action; that action will throw an
--- exception upon /execution/ iff @x@ throws an exception upon /evaluation/.
+-- > f :: Int -> Int -> IO ()
+-- > f x y = evaluate y >> print $! x
+-- > {-# NOINLINE f #-}
+-- > main = f (error "x") (error "y")
 --
--- The practical implication of this difference is that due to the
--- /imprecise exceptions/ semantics,
+-- 'evaluate' guarantees that no side-effect that follows (e.g., @print $! x@)
+-- will be observed before @y@ has been evaluated.
+-- However, it does /not/ guarantee that evaluation of @y@ will be observed
+-- at all!
+-- The program above will error out with "y" without optimisations but error out
+-- with "x" with optimisations, because `x` will be unboxed and thus eagerly
+-- evaluated.
 --
--- > (return $! error "foo") >> error "bar"
---
--- may throw either @"foo"@ or @"bar"@, depending on the optimizations
--- performed by the compiler. On the other hand,
---
--- > evaluate (error "foo") >> error "bar"
---
--- is guaranteed to throw @"foo"@.
---
--- The rule of thumb is to use 'evaluate' to force or handle exceptions in
--- lazy values. If, on the other hand, you are forcing a lazy value for
--- efficiency reasons only and do not care about exceptions, you may
--- use @'return' '$!' x@.
+-- We provide 'evaluate2' as a saner alternative, and keep 'evaluate' only for
+-- backwards compatibility.
 evaluate :: a -> IO a
-evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
+-- See #implementation_of_evaluate#.
+evaluate y = IO $ \s -> seq# (lazy y) s
+
+-- | Evaluate the argument to weak head normal form.
+--
+-- 'evaluate2' is typically used to uncover any exceptions that a lazy value
+-- may contain, and possibly handle them.
+--
+-- 'evaluate2' only evaluates to /weak head normal form/. If deeper
+-- evaluation is needed, the @force@ function from @Control.DeepSeq@
+-- may be handy: @evaluate2 $ force x@.
+--
+-- 'evaluate2' is an evolution of 'evaluate' with saner semantics.
+--
+-- How is @evaluate2 x@ different to @x `seq` return ()@?
+-- Consider the following example:
+--
+-- > f1 :: Int -> Int -> IO ()
+-- > f1 x y = y `seq` print x
+-- > f2 :: Int -> Int -> IO ()
+-- > f2 x y = evaluate2 y >> print $! x
+-- > {-# NOINLINE f1, f2 #-}
+-- > main = f (error "x") (error "y")
+--
+-- If @f = f1@, then you will observe @error "y"@ without optimisations
+-- and @error "x"@ with optimisations, because GHC is eager to unbox
+-- the strictly used @x@.
+-- There are many more examples like this.
+--
+-- If on the other @f = f2@, then the user will always observe @error "y"@,
+-- regardless of optimisation level.
+--
+-- More precisely, 'evaluate2' guarantees that no side-effect that follows
+-- (e.g., @print $! x@) will be observed before @y@ has been evaluated.
+-- Moreover (and in contrast to 'evaluate'), it guarantees that evaluation of
+-- @y@ will be observed whenever @f@ is called.
+--
+-- The rule of thumb is to use 'evaluate2' to observe evaluation, for example to
+-- squeeze out an exception in lazy values, at exactly the point in the
+-- @do@-block where it is called.
+-- Doing so comes at a performance price; for example in the program above,
+-- neither @x@ nor @y@ are unboxed.
+-- If, on the other hand, you are forcing a lazy value for efficiency reasons
+-- only and do not care about evaluation order, you should use 'seq' or
+-- bang patterns.
+evaluate2 :: a -> IO a
+-- See #implementation_of_evaluate2#.
+evaluate2 y = IO $ \s ->
+  case seq# (lazy y) s of
+    (# s1, y' #) -> case strictnessBarrier# s1 of
+      s2 -> (# s2, y' #)
+
+-- | 'strictnessBarrier' is used to tell GHC to discard any strict uses it
+-- infers for what comes after it. For example, consider
+--
+-- > import Data.IORef
+-- > import Control.Exception
+-- >
+-- > f :: Int -> IORef Bool -> IO ()
+-- > f x ref = do
+-- >   atomicWriteIORef ref True
+-- >   print $! x
+-- > {-# NOINLINE f #-}
+-- >
+-- > main = do
+-- >   ref <- newIORef False
+-- >   catch (f (error "x") ref)
+-- >         (\(_ :: SomeException) ->  readIORef ref >>= print)
+--
+-- @f@ should write to the 'IORef' before evaluating @x@.
+-- Indeed, if compiled with @-O0@, the exception handler will print @True@.
+-- But not so with @-O1@; then the program will print @False@.
+-- That is because GHC sees @f@ as strict in @x@, so it will unbox it and
+-- evaluate @x@ before the call.
+-- Hence the error will be thrown before @True@ has been written to @ref@.
+--
+-- With 'strictnessBarrier', we could have written
+--
+-- > f x ref = do
+-- >   atomicWriteIORef ref True
+-- >   strictnessBarrier
+-- >   print $! x
+--
+-- and now GHC will no longer unbox @x@, because we told it to forget any strict
+-- uses in the continuation @print $! x@.
+strictnessBarrier :: IO ()
+strictnessBarrier = IO (\s -> (# strictnessBarrier# s, () #))
 
 {- $exceptions_and_strictness
 
@@ -478,6 +564,80 @@ execution of the action will be handled by the exception handler.
 Since this strictness is a small optimization and may lead to surprising
 results, all of the @catch@ and @handle@ variants offered by "Control.Exception"
 use 'catch' rather than 'catchException'.
+-}
+
+{- $legacy_implementation_of_evaluate
+
+Related tickets: #2273, #5129, #15226, #22935, #23847
+
+First read the haddock on 'evaluate'. The main example is
+
+  f :: Int -> Int -> IO ()
+  f x y = evaluate y >> print $! x
+  {-# NOINLINE f #-}
+  main = f (error "x") (error "y")
+
+The important bit is
+
+> @evaluate y@ guarantees that no side-effect that follows (e.g., @print $! x@)
+> will be observed before @y@ has been evaluated.
+> However, it does /not/ guarantee that evaluation of @y@ will be observed at
+> all!
+
+This reflects as follows in the implementation of 'evaluate':
+
+1. We `seq#` the input value `y` (see Note [seq# magic] in GHC.Types.Id.Make),
+   so that the input is really evaluated before the next side-effect.
+2. For backwards compatibility, `y` is wrapped in `lazy`
+   (see Note [lazyId magic]). Presumably the intention of `evaluate` being lazy
+   was so that
+
+     f x y = evaluate y >> evaluate x
+
+   is not discovered as strict in both `x` and `y` by strictness analysis, which
+   would subsequently lead to unboxing and thus evaluating `x` before `y`,
+   despite what the user probably intended.
+
+   But this is all in vain, as the haddock explains (for @evaluate y >> print x@).
+   Hence this Note is merely to *document* the status quo, not to justify it.
+-}
+
+{- $implementation_of_evaluate2
+
+Related tickets: #2273, #5129, #15226, #22935, #23847
+
+First read the haddock on 'evaluate2'. The main example is
+
+  f :: Int -> Int -> IO ()
+  f x y = evaluate y >> print $! x
+  {-# NOINLINE f #-}
+  main = f (error "x") (error "y")
+
+The important bit specifying the semantics of 'evaluate2' is
+
+> @evaluate2 y@ guarantees that no side-effect that follows (e.g., @print $! x@)
+> will be observed before @y@ has been evaluated.
+> Moreover (and in contrast to 'evaluate'), it guarantees that evaluation of @y@
+> will be observed whenever @f@ is called.
+
+This reflects as follows in the implementation of 'evaluate':
+
+  evaluate2 y = IO $ \s ->
+    case seq# (lazy y) s of (# s1, y' #) ->
+      case strictnessBarrier# s1 of s2 ->
+        (# s2, y' #)
+
+1. We @seq#@ the input value @y@ (see Note [seq# magic] in GHC.Types.Id.Make), so
+   that the input is really evaluated before the next side-effect.
+2. We wrap the input in @lazy@ so that strictness analysis does not
+   evaluate @y@ before a /previous/ side-effect, e.g.,
+     f a b = print b >> evaluate a
+   should print @b@ before evaluating @a@, and without @lazy@ strictness
+   analysis would evaluate @a@ before the call to @f@.
+   The user can always write @evaluate $! a@ to recover the non-@lazy@ behavior.
+3. To guarantee that nothing in @f@ is evaluated before @y@ (in particular, @x@)
+   this is followed up with a `strictnessBarrier#` (see Note [strictnessBarrier# magic]),
+   so that strictness analysis forgets that `x` is evaluated strictly.
 -}
 
 -- For SOURCE import by GHC.Base to define failIO.

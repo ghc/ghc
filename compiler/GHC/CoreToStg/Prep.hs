@@ -156,19 +156,19 @@ Note [CorePrep invariants]
 Here is the syntax of the Core produced by CorePrep:
 
     Trivial expressions
-       arg ::= lit |  var
-              | arg ty  |  /\a. arg
-              | truv co  |  /\c. arg  |  arg |> co
+       arg ::= lit     |  var
+            |  arg ty  |  /\a. arg
+            |  co      |  arg |> co
 
     Applications
-       app ::= lit  |  var  |  app arg  |  app ty  | app co | app |> co
+       app ::= lit  |  var  |  app arg  |  app ty  |  app co  |  app |> co
 
     Expressions
        body ::= app
-              | let(rec) x = rhs in body     -- Boxed only
-              | case app of pat -> body
-              | /\a. body | /\c. body
-              | body |> co
+             |  let(rec) x = rhs in body     -- Boxed only
+             |  case body of pat -> body
+             |  /\a. body | /\c. body
+             |  body |> co
 
     Right hand sides (only place where value lambdas can occur)
        rhs ::= /\a.rhs  |  \x.rhs  |  body
@@ -302,6 +302,13 @@ There are 3 main categories of floats, encoded in the `FloatingBind` type:
     (see `mkNonRecFloat`), but one that has a non-DEFAULT Case alternative to
     bind the unsafe coercion field of the Refl constructor.
   * `FloatTick`: A floated `Tick`. See Note [Floating Ticks in CorePrep].
+
+It is quite essential that CorePrep *does not* rearrange the order in which
+evaluations happen, in contrast to, e.g., FloatOut, because CorePrep lowers
+the seq# primop into a Case (see Note [seq# magic]). Fortunately, CorePrep does
+not attempt to reorder the telescope of Floats or float out out of non-floated
+binding sites (such as Case alts) in the first place; for that it would have to
+do some kind of data dependency analysis.
 
 Note [Floating out of top level bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -593,7 +600,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                      | otherwise
                      = snocFloat floats new_float
 
-             new_float = mkNonRecFloat env dmd is_unlifted bndr1 rhs1
+             new_float = mkNonRecFloat env is_unlifted bndr1 rhs1
 
        ; return (env2, floats1, Nothing) }
 
@@ -646,7 +653,7 @@ cpeBind top_lvl env (Rec pairs)
     -- group into a single giant Rec
     add_float (Float bind bound _) prs2
       | bound /= CaseBound
-      || all (definitelyLiftedType . idType) (bindersOf bind)
+      || all (not . isUnliftedType . idType) (bindersOf bind)
            -- The latter check is hit in -O0 (i.e., flavours quick, devel2)
            -- for dictionary args which haven't been floated out yet, #24102.
            -- They are preferably CaseBound, but since they are lifted we may
@@ -678,7 +685,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
                else warnPprTrace True "CorePrep: silly extra arguments:" (ppr bndr) $
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
-                        ; let float = mkNonRecFloat env topDmd False v rhs2
+                        ; let float = mkNonRecFloat env False v rhs2
                         ; return ( snocFloat floats2 float
                                  , cpeEtaExpand arity (Var v)) })
 
@@ -841,13 +848,23 @@ cpeRhsE env (Case scrut bndr ty alts)
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
                | cp_catchNonexhaustiveCases $ cpe_config env
+                 -- Suppose the alternatives do not cover all the data constructors of the type.
+                 -- That may be fine: perhaps an earlier case has dealt with the missing cases.
+                 -- But this is a relatively sophisticated property, so we provide a GHC-debugging flag
+                 -- `-fcatch-nonexhaustive-cases` which adds a DEFAULT alternative to such cases
+                 -- (This alternative will only be taken if there is a bug in GHC.)
                , not (altsAreExhaustive alts)
                = addDefault alts (Just err)
                | otherwise = alts
                where err = mkImpossibleExpr ty "cpeRhsE: missing case alternative"
        ; alts'' <- mapM (sat_alt env') alts'
 
-       ; return (floats, Case scrut' bndr2 ty alts'') }
+       ; case alts'' of
+           [Alt DEFAULT _ rhs] -- See Note [Flatten case-binds]
+             | let is_unlifted = isUnliftedType (idType bndr2)
+             , let float = mkCaseFloat is_unlifted bndr2 scrut'
+             -> return (snocFloat floats float, rhs)
+           _ -> return (floats, Case scrut' bndr2 ty alts'') }
   where
     sat_alt env (Alt con bs rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs
@@ -936,14 +953,14 @@ and it's extra work.
 --              CpeApp: produces a result satisfying CpeApp
 -- ---------------------------------------------------------------------------
 
-data ArgInfo = CpeApp  CoreArg
-             | CpeCast Coercion
-             | CpeTick CoreTickish
+data ArgInfo = AIApp  CoreArg -- NB: Not a CpeApp yet
+             | AICast Coercion
+             | AITick CoreTickish
 
 instance Outputable ArgInfo where
-  ppr (CpeApp arg) = text "app" <+> ppr arg
-  ppr (CpeCast co) = text "cast" <+> ppr co
-  ppr (CpeTick tick) = text "tick" <+> ppr tick
+  ppr (AIApp arg) = text "app" <+> ppr arg
+  ppr (AICast co) = text "cast" <+> ppr co
+  ppr (AITick tick) = text "tick" <+> ppr tick
 
 {- Note [Ticks and mandatory eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -985,7 +1002,7 @@ cpe_app filters out the tick as a underscoped tick on the expression
 body of the eta-expansion lambdas. Giving us `\x -> Tick<foo> (tagToEnum# @Bool x)`.
 -}
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
--- May return a CpeRhs because of saturating primops
+-- May return a CpeRhs (instead of CpeApp) because of saturating primops
 cpeApp top_env expr
   = do { let (terminal, args) = collect_args expr
       --  ; pprTraceM "cpeApp" $ (ppr expr)
@@ -1004,9 +1021,9 @@ cpeApp top_env expr
     collect_args e = go e []
       where
         go (App fun arg)      as
-            = go fun (CpeApp arg : as)
+            = go fun (AIApp arg : as)
         go (Cast fun co)      as
-            = go fun (CpeCast co : as)
+            = go fun (AICast co : as)
         go (Tick tickish fun) as
             -- Profiling ticks are slightly less strict so we expand their scope
             -- if they cover partial applications of things like primOps.
@@ -1019,7 +1036,7 @@ cpeApp top_env expr
             , etaExpansionTick head' tickish
             = (head,as')
             where
-              (head,as') = go fun (CpeTick tickish : as)
+              (head,as') = go fun (AITick tickish : as)
 
         -- Terminal could still be an app if it's wrapped by a tick.
         -- E.g. Tick<foo> (f x) can give us (f x) as terminal.
@@ -1029,7 +1046,7 @@ cpeApp top_env expr
             -> CoreExpr -- The thing we are calling
             -> [ArgInfo]
             -> UniqSM (Floats, CpeRhs)
-    cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args)
+    cpe_app env (Var f) (AIApp Type{} : AIApp arg : args)
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
             -- See Note [lazyId magic] in GHC.Types.Id.Make
        || f `hasKey` noinlineIdKey || f `hasKey` noinlineConstraintIdKey
@@ -1054,24 +1071,45 @@ cpeApp top_env expr
         = let (terminal, args') = collect_args arg
           in cpe_app env terminal (args' ++ args)
 
-    -- runRW# magic
-    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest)
+    -- See Note [runRW magic]
+    cpe_app env (Var f) (AIApp _runtimeRep@Type{} : AIApp _type@Type{} : AIApp arg : rest)
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
         -- applications, keep in mind that we may have applications that return
-        , has_value_arg (CpeApp arg : rest)
+        , has_value_arg (AIApp arg : rest)
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest
-            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest)
+            _          -> cpe_app env arg (AIApp (Var realWorldPrimId) : rest)
              -- TODO: What about casts?
         where
           has_value_arg [] = False
-          has_value_arg (CpeApp arg:_rest)
+          has_value_arg (AIApp arg:_rest)
             | not (isTyCoArg arg) = True
           has_value_arg (_:rest) = has_value_arg rest
+
+    -- See Note [seq# magic]. This is the step for CorePrep
+    cpe_app env (Var f) [AIApp (Type ty), AIApp _st_ty@Type{}, AIApp thing, AIApp token]
+        | f `hasKey` seqHashIdKey
+        -- seq# thing token
+        --    ==>   case token of s   { __DEFAULT ->
+        --          case thing of res { __DEFAULT -> (# token, res#) } },
+        -- allocating CaseBound Floats for token and thing as needed
+        = do { (floats1, token) <- cpeArg env topDmd token
+             ; (floats2, thing) <- cpeBody env thing
+             ; case_bndr <- newVar ty
+             ; let tup = mkCoreUnboxedTuple [token, Var case_bndr]
+             ; let is_unlifted = False -- otherwise seq# would not type-check
+             ; let float = mkCaseFloat is_unlifted case_bndr thing
+             ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
+
+    -- See Note [strictnessBarrier# magic]
+    cpe_app env (Var f) [AIApp token]
+        | f `hasKey` strictnessBarrierIdKey
+        -- strictnessBarrier# token ==> token
+        = cpeApp env token
 
     cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
@@ -1119,13 +1157,13 @@ cpeApp top_env expr
         go [] !n = n
         go (info:infos) n =
           case info of
-            CpeCast {} -> go infos n
-            CpeTick tickish
+            AICast {} -> go infos n
+            AITick tickish
               | tickishFloatable tickish                 -> go infos n
               -- If we can't guarantee a tick will be floated out of the application
               -- we can't guarantee the value args following it will be applied.
               | otherwise                             -> n
-            CpeApp e                                  -> go infos n'
+            AIApp e                                  -> go infos n'
               where
                 !n'
                   | isTypeArg e = n
@@ -1181,13 +1219,13 @@ cpeApp top_env expr
             let tick_fun = foldr mkTick fun' rt_ticks
             in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
-      CpeApp (Type arg_ty)
+      AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty)) floats ss rt_ticks req_depth
 
-      CpeApp (Coercion co)
+      AIApp (Coercion co)
         -> rebuild_app' env as (App fun' (Coercion co)) floats (drop 1 ss) rt_ticks req_depth
 
-      CpeApp arg -> do
+      AIApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
@@ -1196,10 +1234,10 @@ cpeApp top_env expr
         (fs, arg') <- cpeArg top_env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
-      CpeCast co
+      AICast co
         -> rebuild_app' env as (Cast fun' co) floats ss rt_ticks req_depth
       -- See Note [Ticks and mandatory eta expansion]
-      CpeTick tickish
+      AITick tickish
         | tickishPlace tickish == PlaceRuntime
         , req_depth > 0
         -> assert (isProfTick tickish) $
@@ -1480,10 +1518,11 @@ cpeArg env dmd arg
        -- see Note [ANF-ising literal string arguments]
        ; if exprIsTrivial arg2
          then return (floats2, arg2)
-         else do { v <- newVar arg_ty
-                 -- See Note [Eta expansion of arguments in CorePrep]
+         else do { v <- (`setIdDemandInfo` dmd) <$> newVar arg_ty
+                       -- See Note [Pin demand info on floats]
                  ; let arg3 = cpeEtaExpandArg env arg2
-                       arg_float = mkNonRecFloat env dmd is_unlifted v arg3
+                       -- See Note [Eta expansion of arguments in CorePrep]
+                 ; let arg_float = mkNonRecFloat env is_unlifted v arg3
                  ; return (snocFloat floats2 arg_float, varToCoreExpr v) }
        }
 
@@ -1702,6 +1741,51 @@ cpeEtaExpand arity expr
 Note [Pin demand info on floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We pin demand info on floated lets, so that we can see the one-shot thunks.
+For example,
+  f (g x)
+where `f` uses its argument at least once, creates a Float for `y = g x` and we
+should better pin appropriate demand info on `y`.
+
+Note [Flatten case-binds]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have the following call, where f is strict:
+   f (case x of DEFAULT -> blah)
+(For the moment, ignore the fact that the Simplifier will have floated that
+`case` out because `f` is strict.)
+In Prep, `cpeArg` will ANF-ise that argument, and we'll get a `FloatingBind`
+
+    Float (a = case x of y { DEFAULT -> blah }) CaseBound top_lvl
+
+with the call `f a`.  When we wrap that `Float` we will get
+
+   case (case x of y { DEFAULT -> blah }) of a { DEFAULT -> f a }
+
+which is a bit silly. Actually the rest of the back end can cope with nested
+cases like this, but it is harder to read and we'd prefer the more direct:
+
+   case x of y { DEFAULT ->
+   case blah of a { DEFAULT -> f a }}
+
+This is easy to avoid: turn that
+
+   case x of DEFAULT -> blah
+
+into a FloatingBind of its own.  This is easily done in the Case
+equation for `cpsRhsE`.  Then our example will generate /two/ floats:
+
+    Float (y = x)    CaseBound top_lvl
+    Float (a = blah) CaseBound top_lvl
+
+and we'll end up with nested cases.
+
+Of course, the Simplifier never leaves us with an argument like this, but we
+/can/ see
+
+  data T a = T !a
+  ... case seq# (case x of y { __DEFAULT -> T y }) s of (# s', x' #) -> rhs
+
+and the above footwork in cpsRhsE avoids generating a nested case.
+
 
 Note [Speculative evaluation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1815,6 +1899,9 @@ The `FloatInfo` of a `Float` describes how far it can float without
 
   * Any binding is at least `StrictContextFloatable`, meaning we may float it
     out of a strict context such as `f <>` where `f` is strict.
+    We may never float out of a Case alternative `case e of p -> <>`, though,
+    even if we made sure that `p` does not capture any variables of the float,
+    because that risks sequencing guarantees of Note [seq# magic].
 
   * A binding is `LazyContextFloatable` if we may float it out of a lazy context
     such as `let x = <> in Just x`.
@@ -1981,23 +2068,42 @@ zipFloats = appFloats
 zipManyFloats :: [Floats] -> Floats
 zipManyFloats = foldr zipFloats emptyFloats
 
-mkNonRecFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
-mkNonRecFloat env dmd is_unlifted bndr rhs
+mkCaseFloat :: Bool -> Id -> CpeRhs -> FloatingBind
+mkCaseFloat is_unlifted bndr scrut = Float (NonRec bndr scrut) bound info
+  where
+    (bound, info)
+{-
+Eventually we want the following code, when #20749 is fixed.
+Unfortunately, today it breaks T24124.
+      | is_lifted, is_hnf        = (LetBound,  TopLvlFloatable)
+          -- `seq# (case x of x' { __DEFAULT -> StrictBox x' }) s` should
+          -- let-bind `StrictBox x'` after Note [Flatten case-binds].
+-}
+      | exprIsTickedString scrut = (CaseBound, TopLvlFloatable)
+          -- String literals are unboxed (so must be case-bound) and float to
+          -- the top-level
+      | otherwise                = (CaseBound, StrictContextFloatable)
+         -- For a Case, we never want to drop the eval; hence no need to test
+         -- for ok-for-spec-eval
+    _is_lifted   = not is_unlifted
+    _is_hnf      = exprIsHNF scrut
+
+mkNonRecFloat :: CorePrepEnv -> Bool -> Id -> CpeRhs -> FloatingBind
+mkNonRecFloat env is_unlifted bndr rhs
   = -- pprTrace "mkNonRecFloat" (ppr bndr <+> ppr (bound,info)
     --                             <+> ppr is_lifted <+> ppr is_strict
     --                             <+> ppr ok_for_spec
     --                           $$ ppr rhs) $
-    Float (NonRec bndr' rhs) bound info
+    Float (NonRec bndr rhs) bound info
   where
-    bndr' = setIdDemandInfo bndr dmd -- See Note [Pin demand info on floats]
-    (bound,info)
+    (bound, info)
       | is_lifted, is_hnf        = (LetBound, TopLvlFloatable)
           -- is_lifted: We currently don't allow unlifted values at the
           --            top-level or inside letrecs
           --            (but SG thinks that in principle, we should)
       | is_data_con bndr         = (LetBound, TopLvlFloatable)
-          -- We need this special case for unlifted DataCon workers/wrappers
-          -- until #17521 is fixed
+          -- We need this special case for nullary unlifted DataCon
+          -- workers/wrappers (top-level bindings) until #17521 is fixed
       | exprIsTickedString rhs   = (CaseBound, TopLvlFloatable)
           -- String literals are unboxed (so must be case-bound) and float to
           -- the top-level
@@ -2015,6 +2121,7 @@ mkNonRecFloat env dmd is_unlifted bndr rhs
 
     is_lifted   = not is_unlifted
     is_hnf      = exprIsHNF rhs
+    dmd         = idDemandInfo bndr
     is_strict   = isStrUsedDmd dmd
     ok_for_spec = exprOkForSpecEval (not . is_rec_call) rhs
     is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
@@ -2047,7 +2154,7 @@ deFloatTop floats
   where
     get (Float b _ TopLvlFloatable) bs
       = get_bind b : bs
-    get b _  = pprPanic "corePrepPgm" (ppr b)
+    get b _  = pprPanic "deFloatTop" (ppr b)
 
     -- See Note [Dead code in CorePrep]
     get_bind (NonRec x e) = NonRec x (occurAnalyseExpr e)

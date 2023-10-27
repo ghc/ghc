@@ -897,7 +897,6 @@ genPrim prof bound ty op = case op of
                              -- fully ignore the result arity as it can use 1 or 2
                              -- slots, depending on the return type.
   RaiseOp                 -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
-  RaiseIOOp               -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
   RaiseUnderflowOp        -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypeziunderflowException", false_])
   RaiseOverflowOp         -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypezioverflowException", false_])
   RaiseDivZeroOp          -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypezidivZZeroException", false_])
@@ -1007,7 +1006,6 @@ genPrim prof bound ty op = case op of
 
   ParOp     -> \[r] [_a] -> pure $ PrimInline $ r |= zero_
   SparkOp   -> \[r] [a]  -> pure $ PrimInline $ r |= a
-  SeqOp     -> \[_r] [e] -> pure $ PRPrimCall $ returnS (app "h$e" [e])
   NumSparks -> \[r] []   -> pure $ PrimInline $ r |= zero_
 
 ------------------------------ Tag to enum stuff --------------------------------

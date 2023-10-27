@@ -61,7 +61,7 @@ import GHC.Stg.Syntax
 import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.Names
-import GHC.Builtin.PrimOps (PrimOp(SeqOp), primOpIsReallyInline)
+import GHC.Builtin.PrimOps (primOpIsReallyInline)
 
 import GHC.Types.RepType
 import GHC.Types.Var
@@ -431,8 +431,6 @@ isInlineExpr = \case
     -> True
   StgOpApp (StgFCallOp f _) _ _
     -> isInlineForeignCall f
-  StgOpApp (StgPrimOp SeqOp) [StgVarArg e] t
-    -> ctxIsEvaluated e || isStrictType t
   StgOpApp (StgPrimOp op) _ _
     -> primOpIsReallyInline op
   StgOpApp (StgPrimCallOp _c) _ _

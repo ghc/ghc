@@ -678,7 +678,6 @@ extern char **environ;
       SymI_HasDataProto(stg_raiseDivZZerozh)                                \
       SymI_HasDataProto(stg_raiseUnderflowzh)                               \
       SymI_HasDataProto(stg_raiseOverflowzh)                                \
-      SymI_HasDataProto(stg_raiseIOzh)                                      \
       SymI_HasDataProto(stg_keepAlivezh)                                    \
       SymI_HasDataProto(stg_paniczh)                                        \
       SymI_HasDataProto(stg_absentErrorzh)                                  \

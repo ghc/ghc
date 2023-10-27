@@ -1671,7 +1671,6 @@ emitPrimOp cfg primop =
   RaiseUnderflowOp -> alwaysExternal
   RaiseOverflowOp -> alwaysExternal
   RaiseDivZeroOp -> alwaysExternal
-  RaiseIOOp -> alwaysExternal
   MaskAsyncExceptionsOp -> alwaysExternal
   MaskUninterruptibleOp -> alwaysExternal
   UnmaskAsyncExceptionsOp -> alwaysExternal
@@ -1729,7 +1728,6 @@ emitPrimOp cfg primop =
   CompactAdd -> alwaysExternal
   CompactAddWithSharing -> alwaysExternal
   CompactSize -> alwaysExternal
-  SeqOp -> alwaysExternal
   GetSparkOp -> alwaysExternal
   NumSparks -> alwaysExternal
   DataToTagSmallOp -> alwaysExternal

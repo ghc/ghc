@@ -157,11 +157,17 @@ The magicIds
   * May have IdInfo that differs from what would be imported from GHC.Magic.hi.
     For example, 'lazy' gets a lazy strictness signature, per Note [lazyId magic].
 
-  The two remaining identifiers in GHC.Magic, runRW# and inline, are not listed
-  in magicIds: they have special behavior but they can be known-key and
-  not wired-in.
+  The four remaining identifiers in GHC.Magic, runRW#, seq#, strictnessBarrier#
+  and inline, are not listed in magicIds: they have special behavior but they
+  can be known-key and not wired-in.
+  SG: This makes me wonder how they are different from, e.g.,
+      considerAccessible, which lives in GHC.Exts.
+      I feel like either the latter should be magic or the former should not
+      be magic but just "regular known-key".
   runRW#: see Note [Simplification of runRW#] in Prep, runRW# code in
-  Simplifier, Note [Linting of runRW#].
+          Simplifier, Note [Linting of runRW#].
+  seq#:   see Note [seq# magic]
+  strictnessBarrier#: see Note [strictnessBarrier# magic]
   inline: see Note [inlineId magic]
 -}
 
@@ -2238,8 +2244,151 @@ This is crucial: otherwise, we could import an unfolding in which
 * To defeat the specialiser when we have incoherent instances.
   See Note [Coherence and specialisation: overview] in GHC.Core.InstEnv.
 
+Note [seq# magic]
+~~~~~~~~~~~~~~~~~
+The purpose of the magic Id (See Note [magicIds])
+
+  seq# :: forall a s . a -> State# s -> (# State# s, a #)
+  seq# !x s = (# s, x #)
+  {-# NOINLINE seq# #-}
+
+is to implement GHC.IO.evaluate2.
+
+Note that strictness analysis sees that seq# is strict in x and its
+continuation. This might lead to observable reordering of pure evaluations;
+see #implementation_of_evaluate2# for examples and how we cope with that.
+
+Note that seq# behaves exactly as if it was defined as above.
+It is merely a magic Id for the following special treatment by the compiler:
+
+- GHC.Builtin.Names: Wire in `seq#`.
+
+- Simplify.addEvals records evaluated-ness for the result; see
+  Note [Adding evaluatedness info to pattern-bound variables]
+  in GHC.Core.Opt.Simplify.Iteration
+
+- GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s),
+    and (seq# (lazy <whnf>) s) (the latter form is used by evaluate).
+    This is practice is questionable. See #24334.
+
+- GHC.Core.Opt.DmdAnal.exprMayContainStrictnessBarrier:
+  return False for seq#, see Note [Which scrutinees may contain strictness barriers]
+
+- GHC.CoreToStg.Prep: Inline saturated applications to a Case, e.g.,
+
+    seq# (f 13) s
+    ==>
+    case f 13 of sat of __DEFAULT -> (# s, sat #)
+
+  This is implemented in `cpeApp`, not unlike Note [runRW magic].
+  We are only inlining `seq#`, leaving opportunities for case-of-known-con
+  behind that are easily picked up by Unarise:
+
+    case seq# (f 13) s of (# s', r #) -> rhs
+    ==> {Prep}
+    case f 13 of sat of __DEFAULT -> case (# s, sat #) of (# s', r #) -> rhs
+    ==> {Unarise}
+    case f 13 of sat of __DEFAULT -> rhs[s/s',sat/r]
+
+  Note that CorePrep really allocates a CaseBound FloatingBind for `f 13`.
+  That's OK, because the telescope of Floats always stays in the same order
+  and won't be floated out of binders, so all guarantees of evaluation order
+  provided by seq# are upheld.
+
+Note [strictnessBarrier# magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The magic Id
+
+  strictnessBarrier# :: State# RealWorld -> State# RealWorld
+
+implements the semantics described in GHC.IO.strictnessBarrier, also used in
+GHC.IO.evaluate2.
+Furthermore, it is used to define raiseIO#, so it also plays a crucial role in
+how we treat imprecise exceptions (see Note [Precise vs imprecise exceptions]).
+
+Its magic mainly concerns strictness analysis, but we also inline it in CorePrep
+to make it zero-cost, much like other magic Ids such as `seq#`, `lazy` or
+`runRW#`.
+
+Main idea
+---------
+Consider the main example from the haddock of 'strictnessBarrier':
+
+  f :: Int -> IORef Bool -> IO ()
+  f x ref = do
+    atomicWriteIORef ref True
+    print $! x
+  {-# NOINLINE f #-}
+
+`f` must not be strict in `x`.
+
+After desugaring and optimisation, we end up with code like this:
+
+  case atomicModifyMutVar2# ref ... s of (# s1, _, _ #) ->
+    case strictnessBarrier# s1 of s2 ->
+      ... x ...
+
+Note that everything that should be lazy comes in the case alternative
+associated to the scrutinee `strictnessBarrier# s1`.
+So we detect this kind of scrutinee during strictness analysis and behave
+as if we really had seen
+
+  case atomicModifyMutVar2# ref ... s of (# s1, _, _ #) ->
+    case strictnessBarrier# s1 of
+      Just s2 -> ... x ...
+      Nothing -> exitSuccess
+
+where `exitSuccess` throws a precise exception to exit the program (but the kind
+of imprecise exception is not important).
+In contrast to `error "foo"`, `exitSuccess` is *not* strict in `x` and `y`,
+because it has divergence `exnDiv` as explained in
+Note [Precise exceptions and strictness analysis].
+So we use Note [deferAfterStrictnessBarrier] to compute the figurative lub of
+the two case alternatives, and the case expression is inferred lazy in `x`.
+
+Dead code elimination
+---------------------
+Why lub with a precise exception branch `exitSuccess` instead of, e.g.,
+`return undefined`? Consider (#18086)
+
+  foo = putStrLn "foo" >> strictnessBarrier >> error "foo"
+  main = foo >> bar
+
+foo surely diverges after printing to stdout, hence GHC should detect the
+continuation `>> bar` as dead code and eliminate it, just as it would do
+for `foo = error "foo"`.
+Thus it is insufficient to lub with 'nopDmdType' (which has 'topDiv') and we
+use 'exnDivType' in 'deferAfterStrictnessBarrier', so that it is detected as a
+dead end (see Note [Dead ends]).
+
+Conservative analysis
+---------------------
+Not all uses of `strictnessBarrier#` are syntactically manifest.
+Consider (more complete examples in #148, #1592, testcase strun003)
+
+  case foo x s of { (# s', r #) -> y }
+
+Should this be strict in y? Often not!
+If `foo x s` transitively calls strictnessBarrier#, then we must not force
+y, which may fail to terminate or throw an imprecise exception (perhaps even
+using `unsafePerformIO`), until we have performed `foo x s`.
+
+So our analysis of scrutinees is a bit more intricate and conservative in the
+absence of uses of `unsafe*` in the scrutinee.
+See Note [Which scrutinees may contain strictness barriers] in
+"GHC.Core.Opt.DmdAnal" for details. Motivated in T13380{d,e,f}.
+
+Historical Note: This used to be called the "IO hack". But that term is rather
+a bad fit because
+1. It's easily confused with the "State hack", which also affects IO.
+2. Neither "IO" nor "hack" is a good description of what goes on here, which
+   is deferring strictness results for some select primitives only.
+   The "hack" is probably not having to defer when we can prove that the
+   expression may not contain a strictness barrier (increasing precision of the
+   analysis), but that's just a favourable guess.
+
 Note [oneShot magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
 and Note [Left folds via right fold]) it was determined that it would be useful
 if library authors could explicitly tell the compiler that a certain lambda is

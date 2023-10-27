@@ -33,7 +33,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
 
-import GHC.Builtin.PrimOps
+import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
 import GHC.Types.Unique.Set
@@ -536,8 +536,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
 
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-          | exprMayThrowPreciseException (ae_fam_envs env) scrut
-          = deferAfterPreciseException alt_ty2
+          | exprMayContainStrictnessBarrier (ae_fam_envs env) scrut
+          = deferAfterStrictnessBarrier alt_ty2
           | otherwise
           = alt_ty2
 
@@ -575,8 +575,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
         fam_envs             = ae_fam_envs env
         alt_ty2
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-          | exprMayThrowPreciseException fam_envs scrut
-          = deferAfterPreciseException alt_ty1
+          | exprMayContainStrictnessBarrier fam_envs scrut
+          = deferAfterStrictnessBarrier alt_ty1
           | otherwise
           = alt_ty1
         res_ty               = scrut_ty `plusDmdType` discardArgDmds alt_ty2
@@ -597,21 +597,24 @@ dmdAnal' env dmd (Let bind body)
 
 -- | A simple, syntactic analysis of whether an expression MAY throw a precise
 -- exception when evaluated. It's always sound to return 'True'.
--- See Note [Which scrutinees may throw precise exceptions].
-exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
-exprMayThrowPreciseException envs e
+-- See Note [Which scrutinees may contain strictness barriers].
+exprMayContainStrictnessBarrier :: FamInstEnvs -> CoreExpr -> Bool
+exprMayContainStrictnessBarrier envs e
   | not (forcesRealWorld envs (exprType e))
   = False -- 1. in the Note
-  | (Var f, _) <- collectArgs e
-  , Just op    <- isPrimOpId_maybe f
-  , op /= RaiseIOOp
-  = False -- 2. in the Note
-  | (Var f, _) <- collectArgs e
-  , Just fcall <- isFCallId_maybe f
-  , not (isSafeForeignCall fcall)
-  = False -- 3. in the Note
+  | Var f <- fn
+  = call_may_contain_barrier f
   | otherwise
   = True  -- _. in the Note
+  where
+    (fn, _) = collectArgs e
+    call_may_contain_barrier f
+      | f `hasKey` strictnessBarrierIdKey = True  -- 2. in the Note
+      | f `hasKey` seqHashIdKey           = False -- 3. in the Note
+      | isPrimOpId f                      = False -- 4. in the Note
+      | Just fcall <- isFCallId_maybe f
+      , not (isSafeForeignCall fcall)     = False -- 5. in the Note
+      | otherwise                         = True  -- _. in the Note
 
 -- | Recognises types that are
 --    * @State# RealWorld@
@@ -787,37 +790,51 @@ nofib/spectral/fibheaps.)
 So in the virgin pass we make sure that we do analyse the expression
 at least once, to initialise its signatures.
 
-Note [Which scrutinees may throw precise exceptions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is the specification of 'exprMayThrowPreciseExceptions',
-which is important for Scenario 2 of
-Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
+Note [Which scrutinees may contain strictness barriers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is the specification of 'exprMayContainStrictnessBarrier',
+which is important for Note [strictnessBarrier# magic] and hence for Scenario 2
+of Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
 
-For an expression @f a1 ... an :: ty@ we determine that
-  1. False  If ty is *not* @State# RealWorld@ or an unboxed tuple thereof.
-            This check is done by 'forcesRealWorld'.
-            (Why not simply unboxed pairs as above? This is motivated by
-            T13380{d,e}.)
-  2. False  If f is a PrimOp, and it is *not* raiseIO#
-  3. False  If f is an unsafe FFI call ('PlayRisky')
+For an expression @f a1 ... an :: ty@ we return
+  1. False  If ty is *not* @State# RealWorld@ (the return type of 'strictnessBarrier#')
+            or an unboxed tuple thereof. This check is done by
+            'forcesRealWorld'.
+  2. True   If f is the magic `strictnessBarrier#`, the entire point of the
+            analysis. See Note [strictnessBarrier# magic].
+  3. False  If f is any other magic Id.
+            Currently, currently `seq#` is the only magic Id with RealWorld type.
+  4. False  If f is a PrimOp
+  5. False  If f is an unsafe FFI call ('PlayRisky')
   _. True   Otherwise "give up".
 
 It is sound to return False in those cases, because
   1. We don't give any guarantees for unsafePerformIO, so no precise exceptions
      from pure code.
-  2. raiseIO# is the only primop that may throw a precise exception.
-  3. Unsafe FFI calls may not interact with the RTS (to throw, for example).
+  2. (Returns True)
+  3. `seq#` does not call `strictnessBarrier#` (nor does any other magic Id).
+  4. Primops don't call `strictnessBarrier#`; it is the library writer's
+     responsibility to insert strictness barriers between effects.
+  5. Unsafe FFI calls may not interact with the RTS (to throw, for example).
      See haddock on GHC.Types.ForeignCall.PlayRisky.
 
 We *need* to return False in those cases, because
   1. We would lose too much strictness in pure code, all over the place.
-  2. We would lose strictness for primops like getMaskingState#, which
+  2. (Returns True)
+  3. `seq#` used to be a PrimOp and we want to stay backwards compatible.
+  4. We would lose strictness for primops like getMaskingState#, which
      introduces a substantial regression in
      GHC.IO.Handle.Internals.wantReadableHandle.
-  3. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
+  5. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
      where an intermittent FFI call to c_MD5Init would otherwise lose
      strictness on the arguments len and buf, leading to regressions in T9203
      (2%) and i386's haddock.base (5%). Tested by T13380f.
+
+Historical Note:
+
+We used to define `raiseIO#` as a primop and detect it during strictness
+analysis, but nowadays it is defined in terms of `raise#` and
+`strictnessBarrier#`.
 
 In !3014 we tried a more sophisticated analysis by introducing ConOrDiv (nic)
 to the Divergence lattice, but in practice it turned out to be hard to untaint

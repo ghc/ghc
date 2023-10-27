@@ -105,7 +105,7 @@ module GHC.Exts
         currentCallStack,
 
         -- * Ids with special behaviour
-        inline, noinline, lazy, oneShot, considerAccessible,
+        inline, noinline, lazy, oneShot, considerAccessible, seq#,
 
         -- * SpecConstr annotations
         SpecConstrAnnotation(..), SPEC (..),

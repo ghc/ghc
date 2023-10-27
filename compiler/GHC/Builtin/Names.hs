@@ -331,6 +331,7 @@ basicKnownKeyNames
 
         -- GHC Extensions
         considerAccessibleName,
+        seqHashIdName, strictnessBarrierIdName,
 
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
@@ -1035,9 +1036,11 @@ unpackCStringAppendUtf8Name = varQual gHC_CSTRING (fsLit "unpackAppendCStringUtf
 unpackCStringFoldrUtf8Name  = varQual gHC_CSTRING (fsLit "unpackFoldrCStringUtf8#") unpackCStringFoldrUtf8IdKey
 
 
--- The 'inline' function
-inlineIdName :: Name
-inlineIdName            = varQual gHC_MAGIC (fsLit "inline") inlineIdKey
+-- Magic Ids that don't need to be wired-in
+inlineIdName, seqHashIdName, strictnessBarrierIdName :: Name
+inlineIdName            = varQual gHC_MAGIC (fsLit "inline")             inlineIdKey
+seqHashIdName           = varQual gHC_MAGIC (fsLit "seq#")               seqHashIdKey
+strictnessBarrierIdName = varQual gHC_MAGIC (fsLit "strictnessBarrier#") strictnessBarrierIdKey
 
 -- Base classes (Eq, Ord, Functor)
 fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
@@ -2346,7 +2349,7 @@ rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: Unique
+thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey, seqHashIdKey, strictnessBarrierIdKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
@@ -2380,6 +2383,9 @@ naturalToDoubleIdKey   = mkPreludeMiscIdUnique 131
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 133
+
+seqHashIdKey                  = mkPreludeMiscIdUnique 134
+strictnessBarrierIdKey        = mkPreludeMiscIdUnique 135
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157

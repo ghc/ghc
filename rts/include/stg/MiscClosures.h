@@ -508,7 +508,6 @@ RTS_FUN_DECL(stg_raisezh);
 RTS_FUN_DECL(stg_raiseDivZZerozh);
 RTS_FUN_DECL(stg_raiseUnderflowzh);
 RTS_FUN_DECL(stg_raiseOverflowzh);
-RTS_FUN_DECL(stg_raiseIOzh);
 RTS_FUN_DECL(stg_paniczh);
 RTS_FUN_DECL(stg_keepAlivezh);
 RTS_FUN_DECL(stg_absentErrorzh);

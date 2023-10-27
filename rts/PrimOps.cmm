@@ -2200,7 +2200,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
         if (StgMVar_head(ioport) != stg_END_TSO_QUEUE_closure ||
             StgMVar_tail(ioport) != stg_END_TSO_QUEUE_closure) {
                 unlockClosure(ioport, info);
-                jump stg_raiseIOzh(ghczminternal_GHCziIOPort_doubleReadException_closure);
+                jump stg_raisezh(ghczminternal_GHCziIOPort_doubleReadException_closure);
         }
 
         if (info == stg_MVAR_CLEAN_info) {
@@ -2240,7 +2240,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
     } else {
          //Or another thread has read already: Throw an exception.
         unlockClosure(ioport, info);
-        jump stg_raiseIOzh(ghczminternal_GHCziIOPort_doubleReadException_closure);
+        jump stg_raisezh(ghczminternal_GHCziIOPort_doubleReadException_closure);
     }
 
     val = StgMVar_value(ioport);
@@ -2262,7 +2262,7 @@ stg_writeIOPortzh ( P_ ioport, /* :: IOPort a */
        write. */
     if (StgMVar_value(ioport) != stg_END_TSO_QUEUE_closure) {
         unlockClosure(ioport, info);
-        jump stg_raiseIOzh(ghczminternal_GHCziIOPort_doubleReadException_closure);
+        jump stg_raisezh(ghczminternal_GHCziIOPort_doubleReadException_closure);
         return (0);
     }
 

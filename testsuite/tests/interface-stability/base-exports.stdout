@@ -276,6 +276,7 @@ module Control.Exception where
   catchJust :: forall e b a. Exception e => (e -> GHC.Maybe.Maybe b) -> GHC.Types.IO a -> (b -> GHC.Types.IO a) -> GHC.Types.IO a
   catches :: forall a. GHC.Types.IO a -> [Handler a] -> GHC.Types.IO a
   evaluate :: forall a. a -> GHC.Types.IO a
+  evaluate2 :: forall a. a -> GHC.Types.IO a
   finally :: forall a b. GHC.Types.IO a -> GHC.Types.IO b -> GHC.Types.IO a
   getMaskingState :: GHC.Types.IO MaskingState
   handle :: forall e a. Exception e => (e -> GHC.Types.IO a) -> GHC.Types.IO a -> GHC.Types.IO a
@@ -360,6 +361,7 @@ module Control.Exception.Base where
   catch :: forall e a. Exception e => GHC.Types.IO a -> (e -> GHC.Types.IO a) -> GHC.Types.IO a
   catchJust :: forall e b a. Exception e => (e -> GHC.Maybe.Maybe b) -> GHC.Types.IO a -> (b -> GHC.Types.IO a) -> GHC.Types.IO a
   evaluate :: forall a. a -> GHC.Types.IO a
+  evaluate2 :: forall a. a -> GHC.Types.IO a
   finally :: forall a b. GHC.Types.IO a -> GHC.Types.IO b -> GHC.Types.IO a
   getMaskingState :: GHC.Types.IO MaskingState
   handle :: forall e a. Exception e => (e -> GHC.Types.IO a) -> GHC.Types.IO a -> GHC.Types.IO a
@@ -379,6 +381,7 @@ module Control.Exception.Base where
   patError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recConError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recSelError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
+  strictnessBarrier :: GHC.Types.IO ()
   throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. Exception e => e -> a
   throwIO :: forall e a. Exception e => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
@@ -4292,7 +4295,7 @@ module GHC.Base where
   quotWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   raise# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> b
   raiseDivZero# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
-  raiseIO# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> State# RealWorld -> (# State# RealWorld, b #)
+  raiseIO# :: forall (l :: Levity) (r :: RuntimeRep) (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> State# RealWorld -> (# State# RealWorld, b #)
   raiseOverflow# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
   raiseUnderflow# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
   readAddrArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Addr# #)
@@ -4538,7 +4541,7 @@ module GHC.Base where
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
   seq :: forall {r :: RuntimeRep} a (b :: TYPE r). a -> b -> b
-  seq# :: forall a d. a -> State# d -> (# State# d, a #)
+  seq# :: forall a s. a -> State# s -> (# State# s, a #)
   sequence :: forall (m :: * -> *) a. Monad m => [m a] -> m [a]
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
@@ -4562,6 +4565,7 @@ module GHC.Base where
   sqrtDouble# :: Double# -> Double#
   sqrtFloat# :: Float# -> Float#
   stableNameToInt# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). StableName# a -> Int#
+  strictnessBarrier# :: State# RealWorld -> State# RealWorld
   subInt16# :: Int16# -> Int16# -> Int16#
   subInt32# :: Int32# -> Int32# -> Int32#
   subInt64# :: Int64# -> Int64# -> Int64#
@@ -6387,7 +6391,6 @@ module GHC.Exts where
   quotWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   raise# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> b
   raiseDivZero# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
-  raiseIO# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> State# RealWorld -> (# State# RealWorld, b #)
   raiseOverflow# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
   raiseUnderflow# :: forall {r :: RuntimeRep} (b :: TYPE r). (# #) -> b
   readAddrArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Addr# #)
@@ -6638,7 +6641,7 @@ module GHC.Exts where
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
   seq :: forall {r :: RuntimeRep} a (b :: TYPE r). a -> b -> b
-  seq# :: forall a d. a -> State# d -> (# State# d, a #)
+  seq# :: forall a s. a -> State# s -> (# State# s, a #)
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
@@ -7449,6 +7452,7 @@ module GHC.IO where
   catchAny :: forall a. IO a -> (forall e. GHC.Exception.Type.Exception e => e -> IO a) -> IO a
   catchException :: forall e a. GHC.Exception.Type.Exception e => IO a -> (e -> IO a) -> IO a
   evaluate :: forall a. a -> IO a
+  evaluate2 :: forall a. a -> IO a
   finally :: forall a b. IO a -> IO b -> IO a
   getMaskingState :: IO MaskingState
   interruptible :: forall a. IO a -> IO a
@@ -7460,7 +7464,9 @@ module GHC.IO where
   mplusIO :: forall a. IO a -> IO a -> IO a
   noDuplicate :: IO ()
   onException :: forall a b. IO a -> IO b -> IO a
+  raiseIO# :: forall (l :: GHC.Types.Levity) (r :: GHC.Types.RuntimeRep) (a :: TYPE (GHC.Types.BoxedRep l)) (b :: TYPE r). a -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, b #)
   stToIO :: forall a. GHC.ST.ST GHC.Prim.RealWorld a -> IO a
+  strictnessBarrier :: IO ()
   throwIO :: forall e a. GHC.Exception.Type.Exception e => e -> IO a
   unIO :: forall a. IO a -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, a #)
   uninterruptibleMask :: forall b. ((forall a. IO a -> IO a) -> IO b) -> IO b

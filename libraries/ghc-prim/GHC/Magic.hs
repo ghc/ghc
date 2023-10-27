@@ -1,6 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -24,7 +26,10 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, DataToTag(..) ) where
+module GHC.Magic (
+    inline, noinline, lazy, oneShot,
+    runRW#, seq#, strictnessBarrier#, DataToTag(..)
+  ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -118,6 +123,20 @@ runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
 -- See Note [runRW magic] in GHC.CoreToStg.Prep.
 {-# NOINLINE runRW# #-}  -- runRW# is inlined manually in CorePrep
 runRW# m = m realWorld#
+
+-- | The primitive used to implement 'GHC.IO.evaluate2', but is subject to
+-- breaking changes. For example, this magic Id used to live in "GHC.Prim".
+-- Prefer to use 'GHC.IO.evaluate2' whenever possible!
+seq# :: forall a s. a -> State# s -> (# State# s, a #)
+-- See Note [seq# magic] in GHC.Types.Id.Make
+{-# NOINLINE seq# #-}  -- seq# is inlined manually in CorePrep
+seq# !a s = (# s, a #)
+
+-- | A primitive used to implement 'GHC.IO.evaluate2' and 'GHC.IO.strictnessBarrier'.
+strictnessBarrier# :: State# RealWorld -> State# RealWorld
+-- See Note [strictnessBarrier# magic] in GHC.Types.Id.Make
+{-# NOINLINE strictnessBarrier# #-}  -- strictnessBarrier# is inlined manually in CorePrep
+strictnessBarrier# s = s
 
 -- | @'dataToTag#'@ evaluates its argument and returns the index
 -- (starting at zero) of the constructor used to produce that

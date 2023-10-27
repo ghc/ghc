@@ -640,12 +640,6 @@ retry_pop_stack:
     jump RET_LBL(stg_ap_pv) [R1];
 }
 
-stg_raiseIOzh (P_ exception)
-{
-    jump stg_raisezh (exception);
-}
-
-
 stg_raiseDivZZerozh ()
 {
     jump stg_raisezh(ghczminternal_GHCziExceptionziType_divZZeroException_closure);

@@ -67,11 +67,6 @@ cgExpr  :: CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
--- seq# a s ==> a
--- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
-cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
-  cgIdApp a []
-
 -- dataToTagSmall# :: a_levpoly -> Int#
 -- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
 -- particularly wrinkles H3 and DTW4
@@ -547,27 +542,6 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; emit (mkBranch l)  -- an infinite loop
        ; return AssignedDirectly
        }
-
-{- Note [Handle seq#]
-~~~~~~~~~~~~~~~~~~~~~
-See Note [seq# magic] in GHC.Core.Opt.ConstantFold.
-The special case for seq# in cgCase does this:
-
-  case seq# a s of v
-    (# s', a' #) -> e
-==>
-  case a of v
-    (# s', a' #) -> e
-
-(taking advantage of the fact that the return convention for (# State#, a #)
-is the same as the return convention for just 'a')
--}
-
-cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
-  = -- Note [Handle seq#]
-    -- And see Note [seq# magic] in GHC.Core.Opt.ConstantFold
-    -- Use the same return convention as vanilla 'a'.
-    cgCase (StgApp a []) bndr alt_type alts
 
 {-
 Note [Eliminate trivial Solo# continuations]

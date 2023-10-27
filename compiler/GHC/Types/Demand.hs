@@ -58,7 +58,7 @@ module GHC.Types.Demand (
     nopDmdType, botDmdType,
     lubDmdType, plusDmdType, multDmdType, discardArgDmds,
     -- ** Other operations
-    peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
+    peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterStrictnessBarrier,
 
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig, mkVanillaDmdSig,
@@ -342,7 +342,7 @@ that needed all kinds of fixes and workarounds. Examples (from #21119):
 
   * As #20767 says, L and B were no longer top and bottom of our lattice
   * In #20746 we unboxed huge Handle types that were never needed boxed in the
-    first place. See Note [deferAfterPreciseException].
+    first place. See Note [deferAfterStrictnessBarrier].
   * It also caused unboxing of huge records where we better shouldn't, for
     example in T19871.absent.
   * It became impossible to work with when implementing !7599, mostly due to the
@@ -1519,16 +1519,21 @@ defaultArgDmd Diverges = botDmd
 
 {- Note [Precise vs imprecise exceptions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An exception is considered to be /precise/ when it is thrown by the 'raiseIO#'
-primop. It follows that all other primops (such as 'raise#' or
-division-by-zero) throw /imprecise/ exceptions. Note that the actual type of
-the exception thrown doesn't have any impact!
+An exception is considered to be /precise/ when it is thrown by
+'GHC.IO.raiseIO#', because its effect can be properly sequenced wrt. other
+side-effects.
+By contrast, an exception thrown from pure code (ultimately via primops such as
+'raise#' or division-by-zero) are /imprecise/ exceptions.
+Note that the actual type of the exception thrown doesn't have any impact!
 
 GHC undertakes some effort not to apply an optimisation that would mask a
 /precise/ exception with some other source of nontermination, such as genuine
 divergence or an imprecise exception, so that the user can reliably
 intercept the precise exception with a catch handler before and after
 optimisations.
+The implementation of 'GHC.IO.raiseIO#' uses the strictnessBarrier# magic Id to
+achieve the desired sequencing properties, as described in
+Note [Precise exceptions and strictness analysis] and Note [strictnessBarrier# magic].
 
 See also the wiki page on precise exceptions:
 https://gitlab.haskell.org/ghc/ghc/wikis/exceptions/precise-exceptions
@@ -1560,6 +1565,17 @@ https://gitlab.haskell.org/ghc/ghc/wikis/fixing-precise-exceptions
 
 Recall that raiseIO# raises a *precise* exception, in contrast to raise# which
 raises an *imprecise* exception. See Note [Precise vs imprecise exceptions].
+We used to implement raiseIO# as a primop, but nowadays we implement it
+like this, in GHC.IO:
+
+  raiseIO# a s = case strictnessBarrier# s of s' -> raise# a
+
+In other words, an exception becomes precise by throwing it directly following a
+strictnessBarrier# (see Note [strictnessBarrier# magic] for the exact
+semantics).
+The effect of the barrier is that the botDiv divergence of raise# turns into the
+special divergence exnDiv.
+The following scenarios explain why this is important:
 
 Scenario 1: Precise exceptions in case alternatives
 ---------------------------------------------------
@@ -1587,18 +1603,24 @@ This is tracked by T13380b.
 
 Scenario 2: Precise exceptions in case scrutinees
 -------------------------------------------------
+TODO: Perhaps move this to Note [strictnessBarrier# magic]
 Consider (more complete examples in #148, #1592, testcase strun003)
 
   case foo x s of { (# s', r #) -> y }
 
 Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
-(ultimately via raiseIO#), then we must not force 'y', which may fail to
-terminate or throw an imprecise exception, until we have performed @foo x s@.
+(ultimately via a raise# after a strictnessBarrier#), then we must not force
+'y', which may fail to terminate or throw an imprecise exception, until we have
+performed @foo x s@.
 
-So we have to 'deferAfterPreciseException' (which 'lub's with 'exnDmdType' to
-model the exceptional control flow) when @foo x s@ may throw a precise
-exception. Motivated by T13380{d,e,f}.
-See Note [Which scrutinees may throw precise exceptions] in "GHC.Core.Opt.DmdAnal".
+This is exactly why we build on strictnessBarrier#
+(see Note [strictnessBarrier# magic] in GHC.Types.Id.Make).
+Its special handling in demand analysis will lazify any result coming from the
+case alternative since it recognises that `foo` might contain a strictness
+barrier, so the above program is lazy in `y`.
+See Note [Which scrutinees may contain strictness barriers] in
+"GHC.Core.Opt.DmdAnal" for details.
+This was all motivated test cases T13380{d,e,f}.
 
 We have to be careful not to discard dead-end Divergence from case
 alternatives, though (#18086):
@@ -1606,7 +1628,7 @@ alternatives, though (#18086):
   m = putStrLn "foo" >> error "bar"
 
 'm' should still have 'exnDiv', which is why it is not sufficient to lub with
-'nopDmdType' (which has 'topDiv') in 'deferAfterPreciseException'.
+'nopDmdType' (which has 'topDiv') in 'deferAfterStrictnessBarrier'.
 
 Historical Note: This used to be called the "IO hack". But that term is rather
 a bad fit because
@@ -1616,6 +1638,10 @@ a bad fit because
    The "hack" is probably not having to defer when we can prove that the
    expression may not throw a precise exception (increasing precision of the
    analysis), but that's just a favourable guess.
+
+So we have to 'deferAfterStrictnessBarrier' (which 'lub's with 'exnDmdType' to
+model the exceptional control flow) when @foo x s@ may throw a precise
+exception.
 
 Note [Exceptions and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1685,6 +1711,11 @@ subtly different variant of `ThrowsExn` (which we call `ExnOrDiv` now) that is
 only used by `raiseIO#` in order to preserve precise exceptions by strictness
 analysis, while not impacting the ability to eliminate dead code.
 See Note [Precise exceptions and strictness analysis].
+
+In Feb 24, we redefined `raiseIO#` in terms of the primop `raise#` and a new,
+versatile magic Id `strictnessBarrier#`.
+We keep the precise vs. imprecise exception distinction as an abstract concept,
+but define `raiseIO#` in GHC.IO since then.
 
 Note [Default demand on free variables and arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1917,40 +1948,41 @@ addDemand dmd (DmdType fv ds) = DmdType fv (dmd:ds)
 findIdDemand :: DmdType -> Var -> Demand
 findIdDemand (DmdType fv _) id = lookupDmdEnv fv id
 
--- | When e is evaluated after executing an IO action that may throw a precise
--- exception, we act as if there is an additional control flow path that is
--- taken if e throws a precise exception. The demand type of this control flow
--- path
+-- | When e is evaluated after executing an IO action that may contain a
+-- strictness barrier, we act as if there is an additional control flow path
+-- that is taken if e throws a precise exception (i.e. `exitSuccess`).
+-- The demand type of this control flow path
 --   * is lazy and absent ('topDmd') and boxed in all free variables and arguments
 --   * has 'exnDiv' 'Divergence' result
--- See Note [Precise exceptions and strictness analysis]
+-- See Note [strictnessBarrier# magic] in GHC.Typed.Id.Make.
 --
 -- So we can simply take a variant of 'nopDmdType', 'exnDmdType'.
 -- Why not 'nopDmdType'? Because then the result of 'e' can never be 'exnDiv'!
 -- That means failure to drop dead-ends, see #18086.
-deferAfterPreciseException :: DmdType -> DmdType
-deferAfterPreciseException = lubDmdType exnDmdType
+deferAfterStrictnessBarrier :: DmdType -> DmdType
+-- See Note [deferAfterStrictnessBarrier]
+deferAfterStrictnessBarrier = lubDmdType exnDmdType
 
-{- Note [deferAfterPreciseException]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The big picture is in Note [Precise exceptions and strictness analysis]
+{- Note [deferAfterStrictnessBarrier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The big picture is in Note [strictnessBarrier# magic].
 The idea is that we want to treat
    case <I/O operation> of (# s', r #) -> rhs
 
 as if it was
    case <I/O operation> of
       Just (# s', r #) -> rhs
-      Nothing          -> error
+      Nothing          -> exitSuccess
 
 That is, the I/O operation might throw an exception, so that 'rhs' never
 gets reached.  For example, we don't want to be strict in the strict free
 variables of 'rhs'.
 
 So we have the simple definition
-  deferAfterPreciseException = lubDmdType (DmdType emptyDmdEnv [] exnDiv)
+  deferAfterStrictnessBarrier = lubDmdType (DmdType emptyDmdEnv [] exnDiv)
 
 Historically, when we had `lubBoxity = _unboxedWins` (see Note [unboxedWins]),
-we had a more complicated definition for deferAfterPreciseException to make sure
+we had a more complicated definition for deferAfterStrictnessBarrier to make sure
 it preserved boxity in its argument. That was needed for code like
    case <I/O operation> of
       (# s', r) -> f x

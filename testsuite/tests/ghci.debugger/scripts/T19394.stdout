@@ -7,5 +7,5 @@ Identifier ‘void#’ is not eligible for the :print, :sprint or :force command
 error = (_t1::GHC.Stack.Types.HasCallStack => [Char] -> a)
 oneShot = (_t2::(a -> b) -> a -> b)
 xor# = (_t3::Word# -> Word# -> Word#)
-seq# = (_t4::a -> State# d -> (# State# d, a #))
+seq# = (_t4::a -> State# s -> (# State# s, a #))
 lazy = (_t5::a -> a)

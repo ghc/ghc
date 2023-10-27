@@ -105,6 +105,7 @@ module GHC.Base
         module GHC.Magic.Dict,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim, GHC.Prim.Ext,
+        raiseIO#,               -- used to live in GHC.Prim, so re-exported as well for back compat
         module GHC.Prim.Ext,    -- GHC.Prim.PtrEq and [boot] GHC.Err
         module GHC.Prim.PtrEq,  -- to avoid lots of people having to
         module GHC.Err,         -- import these modules explicitly
@@ -126,7 +127,7 @@ import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Err
 import GHC.Maybe
-import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
+import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO, raiseIO#)
 
 import GHC.Tuple (Solo (MkSolo)) -- Note [Depend on GHC.Tuple]
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]

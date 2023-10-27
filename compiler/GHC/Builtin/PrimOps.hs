@@ -338,7 +338,7 @@ sometimes called exceptions:
 
   * Synchronous exceptions:
     * These are produced by the code being executed, most commonly via
-      a call to the `raise#` or `raiseIO#` primops.
+      a call to the `raise#` primops.
     * At run-time, if a piece of pure code raises a synchronous
       exception, it will always raise the same synchronous exception
       if it is run again (and not interrupted by an asynchronous
@@ -400,10 +400,7 @@ follows, in decreasing order of permissiveness:
       even when used in a "correct" and well-specified way.
 
     See also Note [Exceptions: asynchronous, synchronous, and unchecked].
-    Examples include raise#, raiseIO#, dataToTagLarge#, and seq#.
-
-    Note that whether an exception is considered precise or imprecise
-    does not matter for the purposes of the PrimOpEffect flag.
+    Examples include raise# and dataToTagLarge#.
 
 * CanFail
     A primop is marked CanFail if
@@ -479,7 +476,7 @@ Duplicate              YES        YES            YES                NO
       in a different place anyway.
 
     Discarding a ThrowsException primop would also discard any exception
-    it might have thrown.  For `raise#` or `raiseIO#` this would defeat
+    it might have thrown.  For `raise#` this would defeat
     the whole point of the primop, while for `dataToTagLarge#` or `seq#`
     this would make programs unexpectly lazier.
 
@@ -920,11 +917,10 @@ instance Outputable PrimCall where
         = text "__primcall" <+> ppr pkgId <+> ppr lbl
 
 -- | Indicate if a primop is really inline: that is, it isn't out-of-line and it
--- isn't SeqOp/DataToTagOp which are two primops that evaluate their argument
+-- isn't DataToTagOp which are two primops that evaluate their argument
 -- hence induce thread/stack/heap changes.
 primOpIsReallyInline :: PrimOp -> Bool
 primOpIsReallyInline = \case
-  SeqOp       -> False
   DataToTagSmallOp -> False
   DataToTagLargeOp -> False
-  p           -> not (primOpOutOfLine p)
+  p                -> not (primOpOutOfLine p)

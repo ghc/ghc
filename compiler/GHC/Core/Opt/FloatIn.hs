@@ -484,8 +484,8 @@ But there are wrinkles
    - We don't want to discard a synchronous exception or side effect
      so we don't float those at all. Hence exprOkToDiscard.
    - Throwing precise exceptions is a special case of the previous point: We
-     may /never/ float in a call to (something that ultimately calls)
-     'raiseIO#'.
+     may /never/ float in a call to 'GHC.IO.raiseIO#', because that is a
+     side-effecting function.
      See Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
 
 * Because we can float can-fail primops (array indexing, division) inwards

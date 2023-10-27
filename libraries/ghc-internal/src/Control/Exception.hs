@@ -87,7 +87,7 @@ module Control.Exception (
         tryJust,
 
         -- ** The @evaluate@ function
-        evaluate,
+        evaluate, evaluate2,
 
         -- ** The @mapException@ function
         mapException,
@@ -395,4 +395,3 @@ the screen, and then exit gracefully. For these cases, you can use
 'catch' (or one of the other exception-catching functions) with the
 'SomeException' type.
 -}
-

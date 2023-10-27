@@ -2651,10 +2651,8 @@ primop  CatchOp "catch#" GenPrimOp
 primop  RaiseOp "raise#" GenPrimOp
    a_levpoly -> b_reppoly
    with
-   -- In contrast to 'raiseIO#', which throws a *precise* exception,
-   -- exceptions thrown by 'raise#' are considered *imprecise*.
-   -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
-   -- Hence, it has 'botDiv', not 'exnDiv'.
+   -- The main mechanism used to throw an exception with considerable support by
+   -- the RTS.
    strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
    out_of_line = True
    effect = ThrowsException
@@ -2685,16 +2683,6 @@ primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
    out_of_line = True
    effect = ThrowsException
    code_size = { primOpCodeSizeForeignCall }
-   work_free = True
-
-primop  RaiseIOOp "raiseIO#" GenPrimOp
-   a_levpoly -> State# RealWorld -> (# State# RealWorld, b_reppoly #)
-   with
-   -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-   -- for why this is the *only* primop that has 'exnDiv'
-   strictness  = { \ _arity -> mkClosedDmdSig [topDmd, topDmd] exnDiv }
-   out_of_line = True
-   effect = ThrowsException
    work_free = True
 
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
@@ -2759,17 +2747,17 @@ section "Continuations"
     some programs.
 
     Intuitively, the delimited control operators 'prompt#' and
-    'control0#' can be understood by analogy to 'catch#' and 'raiseIO#',
+    'control0#' can be understood by analogy to 'catch#' and 'raise#',
     respectively:
 
       * Like 'catch#', 'prompt#' does not do anything on its own, it
         just /delimits/ a subcomputation (the source of the name "delimited
         continuations").
 
-      * Like 'raiseIO#', 'control0#' aborts to the nearest enclosing
+      * Like 'raise#', 'control0#' aborts to the nearest enclosing
         'prompt#' before resuming execution.
 
-    However, /unlike/ 'raiseIO#', 'control0#' does /not/ discard
+    However, /unlike/ 'raise#', 'control0#' does /not/ discard
     the aborted computation: instead, it /captures/ it in a form that allows
     it to be resumed later. In other words, 'control0#' does not
     irreversibly abort the local computation before returning to the enclosing
@@ -3639,13 +3627,6 @@ primop SparkOp "spark#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    with effect = ReadWriteEffect
    code_size = { primOpCodeSizeForeignCall }
-
--- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
-primop SeqOp "seq#" GenPrimOp
-   a -> State# s -> (# State# s, a #)
-   with
-   effect = ThrowsException
-   work_free = True -- seq# does work iff its lifted arg does work
 
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
