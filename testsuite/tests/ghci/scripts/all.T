@@ -57,7 +57,11 @@ test('ghci024',
 test('T9367',
      [req_interp, when(fast() or config.os != 'mingw32', skip)],
      makefile_test, [])
-test('ghci025', extra_files(['Ghci025B.hs', 'Ghci025C.hs', 'Ghci025D.hs']), ghci_script, ['ghci025.script'])
+test('ghci025',
+     [  extra_files(['Ghci025B.hs', 'Ghci025C.hs', 'Ghci025D.hs']),
+        normalise_version("bytestring")],
+     ghci_script,
+     ['ghci025.script']),
 test('ghci026', extra_files(['../prog002']), ghci_script, ['ghci026.script'])
 
 test('ghci027', [], ghci_script, ['ghci027.script'])
@@ -215,7 +219,7 @@ test('T9762',
  , pre_cmd('$MAKE -s --no-print-directory T9762_prep')
  ],
  ghci_script, ['T9762.script'])
-test('T9881', normal, ghci_script, ['T9881.script'])
+test('T9881', normalise_version("bytestring"), ghci_script, ['T9881.script'])
 test('T9878', [], ghci_script, ['T9878.script'])
 test('T9878b', [extra_run_opts('-fobject-code')], ghci_script,
      ['T9878b.script'])
