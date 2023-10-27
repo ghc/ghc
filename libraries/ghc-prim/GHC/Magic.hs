@@ -58,8 +58,8 @@ inline x = x
 -- | The call @noinline f@ arranges that @f@ will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
-{-# NOINLINE noinline #-}
 noinline :: a -> a
+{-# NOINLINE noinline #-}  -- noinline is inlined manually in CorePrep
 noinline x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
@@ -79,6 +79,7 @@ noinline x = x
 -- If 'lazy' were not lazy, 'Control.Parallel.par' would look strict in
 -- @y@ which would defeat the whole purpose of 'Control.Parallel.par'.
 lazy :: a -> a
+{-# NOINLINE lazy #-}  -- lazy is inlined manually in CorePrep
 lazy x = x
 -- Implementation note: its strictness and unfolding are over-ridden
 -- by the definition in GHC.Types.Id.Make; in both cases to nothing at all.

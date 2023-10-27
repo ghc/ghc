@@ -920,11 +920,10 @@ instance Outputable PrimCall where
         = text "__primcall" <+> ppr pkgId <+> ppr lbl
 
 -- | Indicate if a primop is really inline: that is, it isn't out-of-line and it
--- isn't SeqOp/DataToTagOp which are two primops that evaluate their argument
+-- isn't DataToTagOp which are two primops that evaluate their argument
 -- hence induce thread/stack/heap changes.
 primOpIsReallyInline :: PrimOp -> Bool
 primOpIsReallyInline = \case
-  SeqOp       -> False
   DataToTagSmallOp -> False
   DataToTagLargeOp -> False
-  p           -> not (primOpOutOfLine p)
+  p                -> not (primOpOutOfLine p)

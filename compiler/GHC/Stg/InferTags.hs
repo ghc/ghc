@@ -19,7 +19,6 @@ import GHC.Types.Basic ( CbvMark (..) )
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
 import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Core (AltCon(..))
-import GHC.Builtin.PrimOps ( PrimOp(..) )
 import Data.List (mapAccumL)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( zipWithEqual, zipEqual, notNull )
@@ -333,21 +332,10 @@ inferTagExpr env (StgTick tick body)
     (info, body') = inferTagExpr env body
 
 inferTagExpr _ (StgOpApp op args ty)
-  | StgPrimOp SeqOp <- op
-  -- Recall seq# :: a -> State# s -> (# State# s, a #)
-  -- However the output State# token has been unarised away,
-  -- so we now effectively have
-  --    seq# :: a -> State# s -> (# a #)
-  -- The key point is the result of `seq#` is guaranteed evaluated and properly
-  -- tagged (because that result comes directly from evaluating the arg),
-  -- and we want tag inference to reflect that knowledge (#15226).
-  -- Hence `TagTuple [TagProper]`.
-  -- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
-  = (TagTuple [TagProper], StgOpApp op args ty)
-  -- Do any other primops guarantee to return a properly tagged value?
-  -- Probably not, and that is the conservative assumption anyway.
+  -- Which primops guarantee to return a properly tagged value?
+  -- Probably none, and that is the conservative assumption anyway.
   -- (And foreign calls definitely need not make promises.)
-  | otherwise = (TagDunno, StgOpApp op args ty)
+  = (TagDunno, StgOpApp op args ty)
 
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')

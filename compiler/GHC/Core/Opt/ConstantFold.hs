@@ -855,7 +855,6 @@ primOpRules nm = \case
 
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
-   SeqOp      -> mkPrimOpRule nm 4 [ seqRule ]
    SparkOp    -> mkPrimOpRule nm 4 [ sparkRule ]
 
    _          -> Nothing
@@ -2072,60 +2071,6 @@ unsafeEqualityProofRule
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [seq# magic]
-~~~~~~~~~~~~~~~~~~~~
-The primop
-   seq# :: forall a s . a -> State# s -> (# State# s, a #)
-
-is /not/ the same as the Prelude function seq :: a -> b -> b
-as you can see from its type.  In fact, seq# is the implementation
-mechanism for 'evaluate'
-
-   evaluate :: a -> IO a
-   evaluate a = IO $ \s -> seq# a s
-
-The semantics of seq# is
-  * evaluate its first argument
-  * and return it
-
-Things to note
-
-* Why do we need a primop at all?  That is, instead of
-      case seq# x s of (# x, s #) -> blah
-  why not instead say this?
-      case x of { DEFAULT -> blah }
-
-  Reason (see #5129): if we saw
-    catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
-
-  then we'd drop the 'case x' because the body of the case is bottom
-  anyway. But we don't want to do that; the whole /point/ of
-  seq#/evaluate is to evaluate 'x' first in the IO monad.
-
-  In short, we /always/ evaluate the first argument and never
-  just discard it.
-
-* Why return the value?  So that we can control sharing of seq'd
-  values: in
-     let x = e in x `seq` ... x ...
-  We don't want to inline x, so better to represent it as
-       let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
-  also it matches the type of rseq in the Eval monad.
-
-Implementing seq#.  The compiler has magic for SeqOp in
-
-- GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s)
-
-- GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
-
-- Simplify.addEvals records evaluated-ness for the result; see
-  Note [Adding evaluatedness info to pattern-bound variables]
-  in GHC.Core.Opt.Simplify.Iteration
-
-- Likewise, GHC.Stg.InferTags.inferTagExpr knows that seq# returns a
-  properly-tagged pointer inside of its unboxed-tuple result.
--}
-
 seqRule :: RuleM CoreExpr
 seqRule = do
   [Type _ty_a, Type _ty_s, a, s] <- getArgs
@@ -2213,7 +2158,9 @@ builtinRules
           platform <- getPlatform
           return $ Var (primOpId IntAndOp)
             `App` arg `App` mkIntVal platform (d - 1)
-        ]
+        ],
+
+     mkBasicRule seqHashName 4 seqRule
      ]
  ++ builtinBignumRules
 {-# NOINLINE builtinRules #-}

@@ -1012,7 +1012,6 @@ genPrim prof bound ty op = case op of
 
   ParOp     -> \[r] [_a] -> pure $ PrimInline $ r |= zero_
   SparkOp   -> \[r] [a]  -> pure $ PrimInline $ r |= a
-  SeqOp     -> \[_r] [e] -> pure $ PRPrimCall $ returnS (app "h$e" [e])
   NumSparks -> \[r] []   -> pure $ PrimInline $ r |= zero_
 
 ------------------------------ Tag to enum stuff --------------------------------

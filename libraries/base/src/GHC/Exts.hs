@@ -90,6 +90,7 @@ module GHC.Exts
      lazy,
      oneShot,
      considerAccessible,
+     seq#,
      -- *  SpecConstr annotations
      SpecConstrAnnotation(..),
      SPEC(..),

@@ -1729,7 +1729,6 @@ emitPrimOp cfg primop =
   CompactAdd -> alwaysExternal
   CompactAddWithSharing -> alwaysExternal
   CompactSize -> alwaysExternal
-  SeqOp -> alwaysExternal
   GetSparkOp -> alwaysExternal
   NumSparks -> alwaysExternal
   DataToTagSmallOp -> alwaysExternal
