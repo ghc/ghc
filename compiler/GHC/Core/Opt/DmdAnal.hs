@@ -33,6 +33,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
 
+import GHC.Builtin.Names
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
@@ -602,16 +603,21 @@ exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
 exprMayThrowPreciseException envs e
   | not (forcesRealWorld envs (exprType e))
   = False -- 1. in the Note
-  | (Var f, _) <- collectArgs e
+  | Var f <- fn
   , Just op    <- isPrimOpId_maybe f
   , op /= RaiseIOOp
   = False -- 2. in the Note
-  | (Var f, _) <- collectArgs e
+  | Var f <- fn
+  , f `hasKey` seqHashKey
+  = False -- 3. in the Note
+  | Var f <- fn
   , Just fcall <- isFCallId_maybe f
   , not (isSafeForeignCall fcall)
-  = False -- 3. in the Note
+  = False -- 4. in the Note
   | otherwise
   = True  -- _. in the Note
+  where
+    (fn, _) = collectArgs e
 
 -- | Recognises types that are
 --    * @State# RealWorld@
@@ -799,14 +805,18 @@ For an expression @f a1 ... an :: ty@ we determine that
             (Why not simply unboxed pairs as above? This is motivated by
             T13380{d,e}.)
   2. False  If f is a PrimOp, and it is *not* raiseIO#
-  3. False  If f is an unsafe FFI call ('PlayRisky')
+  3. False  If f is the PrimOp-like `seq#`, cf. Note [seq# magic].
+  4. False  If f is an unsafe FFI call ('PlayRisky')
   _. True   Otherwise "give up".
 
 It is sound to return False in those cases, because
   1. We don't give any guarantees for unsafePerformIO, so no precise exceptions
      from pure code.
   2. raiseIO# is the only primop that may throw a precise exception.
-  3. Unsafe FFI calls may not interact with the RTS (to throw, for example).
+  3. `seq#` used to be a primop that did not throw a precise exception.
+     We keep it that way for back-compat.
+     See the implementation bits of Note [seq# magic] in GHC.Types.Id.Make.
+  4. Unsafe FFI calls may not interact with the RTS (to throw, for example).
      See haddock on GHC.Types.ForeignCall.PlayRisky.
 
 We *need* to return False in those cases, because
@@ -814,7 +824,8 @@ We *need* to return False in those cases, because
   2. We would lose strictness for primops like getMaskingState#, which
      introduces a substantial regression in
      GHC.IO.Handle.Internals.wantReadableHandle.
-  3. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
+  3. `seq#` used to be a PrimOp and we want to stay backwards compatible.
+  4. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
      where an intermittent FFI call to c_MD5Init would otherwise lose
      strictness on the arguments len and buf, leading to regressions in T9203
      (2%) and i386's haddock.base (5%). Tested by T13380f.

@@ -157,12 +157,15 @@ The magicIds
   * May have IdInfo that differs from what would be imported from GHC.Magic.hi.
     For example, 'lazy' gets a lazy strictness signature, per Note [lazyId magic].
 
-  The two remaining identifiers in GHC.Magic, runRW# and inline, are not listed
-  in magicIds: they have special behavior but they can be known-key and
+  The two remaining identifiers in GHC.Magic, runRW# and inline, are not
+  listed in magicIds: they have special behavior but they can be known-key and
   not wired-in.
-  runRW#: see Note [Simplification of runRW#] in Prep, runRW# code in
-  Simplifier, Note [Linting of runRW#].
-  inline: see Note [inlineId magic]
+  Similarly for GHC.Internal.IO.seq# and GHC.Internal.Exts.considerAccessible.
+  runRW#:             see Note [Simplification of runRW#] in Prep,
+                      runRW# code in Simplifier, Note [Linting of runRW#].
+  seq#:               see Note [seq# magic]
+  inline:             see Note [inlineId magic]
+  considerAccessible: see Note [considerAccessible]
 -}
 
 wiredInIds :: [Id]
@@ -2235,8 +2238,99 @@ This is crucial: otherwise, we could import an unfolding in which
 * To defeat the specialiser when we have incoherent instances.
   See Note [Coherence and specialisation: overview] in GHC.Core.InstEnv.
 
+Note [seq# magic]
+~~~~~~~~~~~~~~~~~
+The purpose of the magic Id (See Note [magicIds])
+
+  seq# :: forall a s . a -> State# s -> (# State# s, a #)
+
+is to elevate evaluation of its argument `a` into an observable side effect.
+This implies that GHC's optimisations must preserve the evaluation "exactly
+here", in the state thread.
+
+The main use of seq# is to implement `evaluate`
+
+   evaluate :: a -> IO a
+   evaluate a = IO $ \s -> seq# a s
+
+Its (NOINLINE) definition in GHC.Magic is simply
+
+   seq# a s = let !a' = lazy a in (# s, a' #)
+
+Things to note
+
+(SEQ1)
+  It must be NOINLINE, because otherwise the eval !a' would be decoupled from
+  the state token s, and GHC's optimisations, in particular strictness analysis,
+  would happily move the eval around.
+
+  However, we *do* inline saturated applications of seq# in CorePrep, where
+  evaluation order is fixed; see the implementation notes below.
+  This is one reason why we need seq# to be known-key.
+
+(SEQ2)
+  The use of `lazy` ensures that strictness analysis does not see the eval
+  that takes place, so the final demand signature is <L><L>, not <1L><L>.
+  This is important for a definition like
+
+    foo x y = evaluate y >> evaluate x
+
+  Although both y and x are ultimately evaluated, the user made it clear
+  they want to evaluate y *before* x.
+  But if strictness analysis sees the evals, it infers foo as strict in
+  both parameters. This strictness would be exploited in the backend by
+  picking a call-by-value calling convention for foo, one that would evaluate
+  x *before* y. Nononono!
+
+  Because the definition of seq# uses `lazy`, it must live in a different module
+  (GHC.Internal.IO); otherwise strictness analysis uses its own strictness
+  signature for the definition of `lazy` instead of the one we wire in.
+
+(SEQ3)
+  Why does seq# return the value? Consider
+     let x = e in
+     case seq# x s of (# _, x' #) -> ... x' ... case x' of __DEFAULT -> ...
+  Here, we could simply use x instead of x', but doing so would
+  introduce an unnecessary indirection and tag check at runtime;
+  also we can attach an evaldUnfolding to x' to discard any
+  subsequent evals such as the `case x' of __DEFAULT`.
+
+Implementing seq#.  The compiler has magic for `seq#` in
+
+- GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s)
+
+- Simplify.addEvals records evaluated-ness for the result (cf. (SEQ3)); see
+  Note [Adding evaluatedness info to pattern-bound variables]
+  in GHC.Core.Opt.Simplify.Iteration
+
+- GHC.Core.Opt.DmdAnal.exprMayThrowPreciseException:
+  Historically, seq# used to be a primop, and the majority of primops
+  should return False in exprMayThrowPreciseException, so we do the same
+  for seq# for back compat.
+
+- GHC.CoreToStg.Prep: Inline saturated applications to a Case, e.g.,
+
+    seq# (f 13) s
+    ==>
+    case f 13 of sat of __DEFAULT -> (# s, sat #)
+
+  This is implemented in `cpeApp`, not unlike Note [runRW magic].
+  We are only inlining seq#, leaving opportunities for case-of-known-con
+  behind that are easily picked up by Unarise:
+
+    case seq# f 13 s of (# s', r #) -> rhs
+    ==> {Prep}
+    case f 13 of sat of __DEFAULT -> case (# s, sat #) of (# s', r #) -> rhs
+    ==> {Unarise}
+    case f 13 of sat of __DEFAULT -> rhs[s/s',sat/r]
+
+  Note that CorePrep really allocates a CaseBound FloatingBind for `f 13`.
+  That's OK, because the telescope of Floats always stays in the same order
+  and won't be floated out of binders, so all guarantees of evaluation order
+  provided by seq# are upheld.
+
 Note [oneShot magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
 and Note [Left folds via right fold]) it was determined that it would be useful
 if library authors could explicitly tell the compiler that a certain lambda is

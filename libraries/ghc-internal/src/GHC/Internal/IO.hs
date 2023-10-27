@@ -44,7 +44,7 @@ module GHC.Internal.IO (
         mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
         unsafeUnmask, interruptible,
-        onException, bracket, finally, evaluate,
+        onException, bracket, finally, evaluate, seq#,
         mkUserError
     ) where
 
@@ -439,6 +439,14 @@ a `finally` sequel =
     r <- restore a `onException` sequel
     _ <- sequel
     return r
+
+
+-- | The primitive used to implement 'GHC.IO.evaluate'.
+-- Prefer to use 'GHC.IO.evaluate' whenever possible!
+seq# :: forall a s. a -> State# s -> (# State# s, a #)
+-- See Note [seq# magic] in GHC.Types.Id.Make
+{-# NOINLINE seq# #-}  -- seq# is inlined manually in CorePrep
+seq# a s = let !a' = lazy a in (# s, a' #)
 
 -- | Evaluate the argument to weak head normal form.
 --

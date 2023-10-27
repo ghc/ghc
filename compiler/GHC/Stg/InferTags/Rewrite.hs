@@ -498,7 +498,7 @@ So for these we should call `rewriteArgs`.
 rewriteOpApp :: InferStgExpr -> RM TgStgExpr
 rewriteOpApp (StgOpApp op args res_ty) = case op of
   op@(StgPrimOp primOp)
-    | primOp == SeqOp || primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
+    | primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
     -- see Note [Rewriting primop arguments]
     -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
   _ -> pure $! StgOpApp op args res_ty

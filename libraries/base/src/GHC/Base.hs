@@ -47,7 +47,7 @@ module GHC.Base
     , unpackNBytes#
 
       -- * Magic combinators
-    , inline, noinline, lazy, oneShot, runRW#, DataToTag(..)
+    , inline, noinline, lazy, oneShot, runRW#, seq#, DataToTag(..)
     , WithDict(withDict)
 
       -- * Functions over 'Bool'
@@ -148,6 +148,7 @@ import GHC.Prim hiding (dataToTagLarge#, dataToTagSmall#, whereFrom#)
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Internal.Err
+import GHC.Internal.IO (seq#)
 import GHC.Internal.Maybe
 import GHC.Types hiding (
   Unit#,

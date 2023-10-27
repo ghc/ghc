@@ -4581,7 +4581,7 @@ module GHC.Base where
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
   seq :: forall {r :: RuntimeRep} a (b :: TYPE r). a -> b -> b
-  seq# :: forall a d. a -> State# d -> (# State# d, a #)
+  seq# :: forall a s. a -> State# s -> (# State# s, a #)
   sequence :: forall (m :: * -> *) a. Monad m => [m a] -> m [a]
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
@@ -6686,7 +6686,7 @@ module GHC.Exts where
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
   seq :: forall {r :: RuntimeRep} a (b :: TYPE r). a -> b -> b
-  seq# :: forall a d. a -> State# d -> (# State# d, a #)
+  seq# :: forall a s. a -> State# s -> (# State# s, a #)
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld

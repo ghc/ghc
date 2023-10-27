@@ -58,9 +58,8 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
-import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Names( runRWKey, seqHashKey )
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
@@ -3427,7 +3426,7 @@ NB: simplLamBndrs preserves this eval info
 
 In addition to handling data constructor fields with !s, addEvals
 also records the fact that the result of seq# is always in WHNF.
-See Note [seq# magic] in GHC.Core.Opt.ConstantFold.  Example (#15226):
+See Note [seq# magic] in GHC.Types.Id.Make.  Example (#15226):
 
   case seq# v s of
     (# s', v' #) -> E
@@ -3449,7 +3448,7 @@ addEvals scrut con vs
     -- Use stripNArgs rather than collectArgsTicks to avoid building
     -- a list of arguments only to throw it away immediately.
   , Just (Var f) <- stripNArgs 4 scr
-  , Just SeqOp <- isPrimOpId_maybe f
+  , f `hasKey` seqHashKey
   , let x' = zapIdOccInfoAndSetEvald MarkedStrict x
   = [s, x']
 
