@@ -1660,12 +1660,16 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
              swap_for_size = typesSize fun_args2 > typesSize fun_args1
 
              -- See Note [Orienting TyFamLHS/TyFamLHS]
-             swap_for_rewriting = anyVarSet (isTouchableMetaTyVar tclvl) tvs2 &&
+             meta_tv_lhs = anyVarSet (isTouchableMetaTyVar tclvl) tvs1
+             meta_tv_rhs = anyVarSet (isTouchableMetaTyVar tclvl) tvs2
+             swap_for_rewriting = meta_tv_rhs && not meta_tv_lhs
                                   -- See Note [Put touchable variables on the left]
-                                  not (anyVarSet (isTouchableMetaTyVar tclvl) tvs1)
                                   -- This second check is just to avoid unfruitful swapping
 
-       ; if swap_for_rewriting || swap_for_size
+         -- It's important that we don't flip-flop (#T24134)
+         -- So swap_for_rewriting "wins", and we only try swap_for_size
+         -- if swap_for_rewriting doesn't care either way
+       ; if swap_for_rewriting || (meta_tv_lhs == meta_tv_rhs && swap_for_size)
          then finish_with_swapping
          else finish_without_swapping } }
   where
@@ -1884,7 +1888,9 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
               -- If we had F a ~ G (F a), which gives an occurs check,
               -- then swap it to G (F a) ~ F a, which does not
               -- However `swap_for_size` above will orient it with (G (F a)) on
-              -- the left anwyway, so the next four lines of code are redundant
+              -- the left anwyway.  `swap_for_rewriting` "wins", but that doesn't
+              -- matter: in the occurs check case swap_for_rewriting will be moot.
+              -- TL;DR: the next four lines of code are redundant
               -- I'm leaving them here in case they become relevant again
 --              | TyFamLHS {} <- lhs
 --              , Just can_rhs <- canTyFamEqLHS_maybe rhs
