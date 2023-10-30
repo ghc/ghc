@@ -85,7 +85,7 @@ toIO x = pure x
 resolve :: JSVal# -> JSVal# -> Exts.Any -> IO ()
 resolve accept reject x = resolveIO accept reject (pure x)
 
-{-# NOINLINE resolveIO #-}
+{-# NOINLINE resolveIO #-} -- used by the rts
 resolveIO :: JSVal# -> JSVal# -> IO Exts.Any -> IO ()
 resolveIO accept reject x =
   (x >>= evaluate >>= js_callback_any accept) `catch`

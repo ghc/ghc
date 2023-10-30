@@ -157,14 +157,17 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
   idTag i = let (tag, u) = unpkUnique (getUnique i)
             in  CHeader (char tag <> word64 u)
 
+  normal_args = map (\(nm,_ty,_,_) -> nm) arg_info
+  all_args
+    | isNothing maybe_target = text "stableptr_offset" : normal_args
+    | otherwise              = normal_args
+
   fun_args
     | null arg_info = empty -- text "void"
-    | otherwise         = hsep $ punctuate comma
-                               $ map (\(nm,_ty,_,_) -> nm) arg_info
+    | otherwise     = hsep $ punctuate comma all_args
 
   fun_proto
-      = text "async" <+>
-        text "function" <+>
+      = text "function" <+>
         (if isNothing maybe_target
          then text "h$" <> ftext c_nm
          else ftext c_nm) <>
@@ -188,7 +191,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun
      = case maybe_target of
-          Nothing    -> text "h$deRefStablePtr(the_stableptr)"
+          Nothing    -> text "h$deRefStablePtr(stableptr_offset)"
           Just hs_fn -> idClosureText hs_fn
 
   -- the expression we give to rts_eval
@@ -210,8 +213,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                $$ vcat
                  [ lbrace
                  ,   text "return"
-                     <+> text "await"
-                     <+> text "h$rts_eval"
+                     <+> text "h$rts_eval_sync"
                      <> parens ((if is_IO_res_ty
                                  then expr_to_run
                                  else text "h$rts_toIO" <> parens expr_to_run)

@@ -519,8 +519,14 @@ function h$initPtrLbl(isFun, lbl) {
     return lbl;
 }
 
-function h$callDynamic(f) {
-    return f.apply(f, Array.prototype.slice.call(arguments, 2));
+function h$callDynamic(f_d,f_o) {
+  // make sure that we got a StablePtr
+  if (f_d !== h$stablePtrBuf) {
+    throw ("callDynamic: expecting a StablePtr and got: " + f_d)
+  }
+  var f = h$deRefStablePtr(f_o);
+  var args = Array.prototype.slice.call(arguments, 2);
+  return f.apply(f, args);
 }
 
 // slice an array of heap objects

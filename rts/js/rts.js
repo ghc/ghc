@@ -16,8 +16,8 @@ function h$rts_eval_sync(closure, unbox) {
   var res, status = 0;
   try {
   h$runSync(MK_AP3( h$baseZCGHCziJSziPrimziresolveIO
-           , MK_JSVAL(x => { status = 1; res = unbox(x); })
-           , MK_JSVAL(e => { status = 2; res = new h$HaskellException(e); })
+           , x => { status = 1; res = unbox(x); }
+           , e => { status = 2; res = new h$HaskellException(e); }
            , closure), false);
   } catch(e) { status = 2; res = e; }
   switch(status) {
@@ -26,7 +26,6 @@ function h$rts_eval_sync(closure, unbox) {
     default: throw res;
   }
 }
-
 
 function h$rts_apply(f, x) {
   return MK_AP1(f, x);
@@ -51,7 +50,7 @@ function h$rts_apply(f, x) {
 function h$rts_mkChar(x) { return x|0; }
 function h$rts_getChar(x) { return UNWRAP_NUMBER(x); }
 
-function h$rts_mkWord(x) { return x|0; }
+function h$rts_mkWord(x) { return x>>>0; }
 function h$rts_getWord(x) { return UNWRAP_NUMBER(x); }
 
 function h$rts_mkInt(x) { return x|0; }
@@ -60,7 +59,7 @@ function h$rts_getInt(x) { return UNWRAP_NUMBER(x); }
 function h$rts_mkInt32(x) { return x|0; }
 function h$rts_getInt32(x) { return UNWRAP_NUMBER(x); }
 
-function h$rts_mkWord32(x) { return x|0; }
+function h$rts_mkWord32(x) { return x>>>0; }
 function h$rts_getWord32(x) { return UNWRAP_NUMBER(x); }
 
 function h$rts_mkInt16(x) { return (x<<16)>>16; }

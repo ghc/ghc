@@ -38,7 +38,7 @@ test('ffi005', [ omit_ways(prof_ways),
                  req_c ],
                compile_and_run, ['ffi005_c.c'])
 
-test('ffi006', [normal, js_broken(22363)], compile_and_run, [''])
+test('ffi006', normal, compile_and_run, [''])
 
 # Skip ffi00{7,8} for GHCi.  These tests both try to exit or raise an
 # error from a foreign export, which shuts down the runtime.  When
@@ -59,7 +59,7 @@ else:
     opts = ''
 
 test('ffi010', normal, compile_and_run, [''])
-test('ffi011', [normal, js_broken(22363)], compile_and_run, [''])
+test('ffi011', normal, compile_and_run, [''])
 
 # The stdcall calling convention works on Windows, and sometimes on
 # Linux, and fails everywhhere else.  For now, we test only on Windows,
@@ -115,7 +115,7 @@ test('T2276_ghci', [ only_ghci,
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
-test('T2469', js_broken(22261), compile_and_run, ['-optc-std=gnu99'])
+test('T2469', normal, compile_and_run, ['-optc-std=gnu99'])
 
 test('T2594', [req_c], compile_and_run, ['T2594_c.c'])
 
@@ -143,7 +143,7 @@ if config.os == 'mingw32':
 	flagsForT4038 = ['-optl-Wl,--stack,10485760']
 else:
 	flagsForT4038 = ['']
-test('T4038', [js_broken(22261), when(arch('wasm32'), fragile(22606))], compile_and_run, flagsForT4038)
+test('T4038', [when(arch('wasm32'), fragile(22606))], compile_and_run, flagsForT4038)
 
 test('T4221', [req_c, when(arch('wasm32'), fragile(22606))], compile_and_run, ['T4221_c.c'])
 
