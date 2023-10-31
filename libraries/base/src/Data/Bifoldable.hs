@@ -92,6 +92,15 @@ import GHC.Generics (K1(..))
 -- 'bifoldr' f g z t ≡ 'appEndo' ('bifoldMap' (Endo . f) (Endo . g) t) z
 -- @
 --
+-- If the type is also an instance of 'Foldable', then
+-- it must satisfy (up to laziness):
+--
+-- @
+-- 'bifoldl' 'const' ≡ 'foldl'
+-- 'bifoldr' ('flip' 'const') ≡ 'foldr'
+-- 'bifoldMap' ('const' 'mempty') ≡ 'foldMap'
+-- @
+--
 -- If the type is also a 'Data.Bifunctor.Bifunctor' instance, it should satisfy:
 --
 -- @
@@ -221,7 +230,17 @@ class Bifoldable p where
   bifoldl f g z t = appEndo (getDual (bifoldMap (Dual . Endo . flip f)
                                                 (Dual . Endo . flip g) t)) z
 
--- | @since 4.10.0.0
+-- | Class laws for tuples hold only up to laziness. The
+-- Bifoldable methods are lazier than their Foldable counterparts.
+-- For example the law @'bifoldr' ('flip' 'const') ≡ 'foldr'@ does
+-- not hold for tuples if lazyness is exploited:
+--
+-- >>> bifoldr (flip const) (:) [] (undefined :: (Int, Word)) `seq` ()
+-- ()
+-- >>> foldr (:) [] (undefined :: (Int, Word)) `seq` ()
+-- *** Exception: Prelude.undefined
+--
+-- @since 4.10.0.0
 instance Bifoldable (,) where
   bifoldMap f g ~(a, b) = f a `mappend` g b
 

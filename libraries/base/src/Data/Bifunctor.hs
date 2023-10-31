@@ -44,7 +44,7 @@ import GHC.Generics ( K1(..) )
 -- must be a 'Functor' and the 'second' method must agree with 'fmap'.
 -- From this it follows that:
 --
--- @'second' 'id' = 'id'@
+-- @'second' 'id' ≡ 'id'@
 --
 -- If you supply 'bimap', you should ensure that:
 --

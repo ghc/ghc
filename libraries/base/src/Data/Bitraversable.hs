@@ -70,8 +70,8 @@ import GHC.Generics (K1(..))
 -- preserving the 'Applicative' operations:
 --
 -- @
--- t ('pure' x) = 'pure' x
--- t (f '<*>' x) = t f '<*>' t x
+-- t ('pure' x) ≡ 'pure' x
+-- t (f '<*>' x) ≡ t f '<*>' t x
 -- @
 --
 -- and the identity functor 'Identity' and composition functors
@@ -91,10 +91,17 @@ import GHC.Generics (K1(..))
 --
 -- @
 -- 'bimap' f g ≡ 'runIdentity' . 'bitraverse' ('Identity' . f) ('Identity' . g)
--- 'bifoldMap' f g = 'getConst' . 'bitraverse' ('Const' . f) ('Const' . g)
+-- 'bifoldMap' f g ≡ 'getConst' . 'bitraverse' ('Const' . f) ('Const' . g)
 -- @
 --
 -- These are available as 'bimapDefault' and 'bifoldMapDefault' respectively.
+--
+-- If the type is also an instance of 'Traversable', then
+-- it must satisfy (up to laziness):
+--
+-- @
+-- 'traverse' ≡ 'bitraverse' 'pure'
+-- @
 --
 -- @since 4.10.0.0
 class (Bifunctor t, Bifoldable t) => Bitraversable t where
@@ -164,7 +171,17 @@ bimapM = bitraverse
 bisequence :: (Bitraversable t, Applicative f) => t (f a) (f b) -> f (t a b)
 bisequence = bitraverse id id
 
--- | @since 4.10.0.0
+-- | Class laws for tuples hold only up to laziness. The
+-- Bitraversable methods are lazier than their Traversable counterparts.
+-- For example the law @'bitraverse' 'pure' ≡ 'traverse'@ does
+-- not hold for tuples if lazyness is exploited:
+--
+-- >>> (bitraverse pure pure undefined :: IO (Int, Word)) `seq` ()
+-- ()
+-- >>> (traverse pure undefined :: IO (Int, Word)) `seq` ()
+-- *** Exception: Prelude.undefined
+--
+-- @since 4.10.0.0
 instance Bitraversable (,) where
   bitraverse f g ~(a, b) = liftA2 (,) (f a) (g b)
 
