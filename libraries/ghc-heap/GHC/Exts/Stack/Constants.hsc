@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Exts.Stack.Constants where
 
-#if MIN_TOOL_VERSION_ghc(9,7,0)
+#if MIN_TOOL_VERSION_ghc(9,9,0)
 
 import           Prelude
 
