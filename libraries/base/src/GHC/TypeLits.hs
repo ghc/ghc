@@ -358,7 +358,7 @@ type role SSymbol nominal
 --
 -- @
 -- f :: 'SSymbol' s -> ..
--- f SSymbol = {- SSymbol s in scope -}
+-- f SSymbol = {- KnownSymbol s in scope -}
 -- @
 --
 -- @since 4.18.0.0
@@ -461,7 +461,7 @@ type role SChar nominal
 --
 -- @
 -- f :: 'SChar' c -> ..
--- f SChar = {- SChar c in scope -}
+-- f SChar = {- KnownChar c in scope -}
 -- @
 --
 -- @since 4.18.0.0
