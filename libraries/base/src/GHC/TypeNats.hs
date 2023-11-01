@@ -362,7 +362,7 @@ type role SNat nominal
 --
 -- @
 -- f :: 'SNat' n -> ..
--- f SNat = {- SNat n in scope -}
+-- f SNat = {- KnownNat n in scope -}
 -- @
 --
 -- @since 4.18.0.0
