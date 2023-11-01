@@ -39,9 +39,23 @@ import GHC.Generics ( K1(..) )
 -- Intuitively it is a bifunctor where both the first and second
 -- arguments are covariant.
 --
+-- The class definition of a 'Bifunctor' @p@ uses the
+-- [QuantifiedConstraints](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/quantified_constraints.html)
+-- language extension to quantify over the first type
+-- argument @a@ in its context. The context requires that @p a@
+-- must be a 'Functor' for all @a@. In other words a partially
+-- applied 'Bifunctor' must be a 'Functor'. This makes 'Functor' a
+-- superclass of 'Bifunctor' such that a function with a
+-- 'Bifunctor' constraint may use 'fmap' in its implementation.
+-- 'Functor' has been a quantified superclass of
+-- 'Bifunctor' since base-4.18.0.0.
+--
 -- You can define a 'Bifunctor' by either defining 'bimap' or by
--- defining both 'first' and 'second'. A partially applied 'Bifunctor'
--- must be a 'Functor' and the 'second' method must agree with 'fmap'.
+-- defining both 'first' and 'second'. The 'second' method must
+-- agree with 'fmap':
+--
+-- @'second' ≡ 'fmap'@
+--
 -- From this it follows that:
 --
 -- @'second' 'id' ≡ 'id'@
@@ -68,8 +82,6 @@ import GHC.Generics ( K1(..) )
 -- 'first'  (f '.' g) ≡ 'first'  f '.' 'first'  g
 -- 'second' (f '.' g) ≡ 'second' f '.' 'second' g
 -- @
---
--- Since 4.18.0.0 'Functor' is a superclass of 'Bifunctor.
 --
 -- @since 4.8.0.0
 class (forall a. Functor (p a)) => Bifunctor p where
