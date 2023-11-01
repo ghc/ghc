@@ -1019,13 +1019,13 @@ exportlist1 :: { OrdList (LIE GhcPs) }
 export  :: { OrdList (LIE GhcPs) }
         : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
-                                                          ; return $ unitOL $ reLocA $ sL span $ impExp } }
+                                                          ; return $ unitOL $ reLoc $ sL span $ impExp } }
         | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                    ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
                                                           ; locImpExp <- acs (\cs -> sL span (IEModuleContents ($1, EpAnn anchor [mj AnnModule $2] cs) $3))
-                                                          ; return $ unitOL $ reLocA $ locImpExp } }
+                                                          ; return $ unitOL $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
-                                                       in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) }
+                                                       in unitOL $ reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) }
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1117,7 +1117,7 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnAs        = fst $8
                              }
                   ; let loc = (comb5 $1 $6 $7 (snd $8) $9);
-                  ; fmap reLocA $ acs (\cs -> L loc $
+                  ; fmap reLoc $ acs (\cs -> L loc $
                       ImportDecl { ideclExt = XImportDeclPass (EpAnn (spanAsAnchor loc) anns cs) (snd $ fst $2) False
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
@@ -1192,9 +1192,9 @@ importlist1 :: { OrdList (LIE GhcPs) }
         | import          { $1 }
 
 import  :: { OrdList (LIE GhcPs) }
-        : qcname_ext export_subspec {% fmap (unitOL . reLocA . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
-        | 'module' modid            {% fmap (unitOL . reLocA) $ acs (\cs -> sLL $1 $> (IEModuleContents (Nothing, EpAnn (glEE $1 $>) [mj AnnModule $1] cs) $2)) }
-        | 'pattern' qcon            { unitOL $ reLocA $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) }
+        : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
+        | 'module' modid            {% fmap (unitOL . reLoc) $ acs (\cs -> sLL $1 $> (IEModuleContents (Nothing, EpAnn (glEE $1 $>) [mj AnnModule $1] cs) $2)) }
+        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
@@ -2174,7 +2174,7 @@ ctype   :: { LHsType GhcPs }
                                                      , hst_xqual = NoExtField
                                                      , hst_body = $3 })) }
 
-        | ipvar '::' ctype            {% acsA (\cs -> sLL $1 $> (HsIParamTy (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs) (reLocA $1) $3)) }
+        | ipvar '::' ctype            {% acsA (\cs -> sLL $1 $> (HsIParamTy (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs) (reLoc $1) $3)) }
         | type                        { $1 }
 
 ----------------------
@@ -2736,7 +2736,7 @@ exp   :: { ECP }
         -- Embed types into expressions and patterns for required type arguments
         | 'type' atype
                 {% do { requireExplicitNamespaces (getLoc $1)
-                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 (reLoc $>)) (hsTok $1) $2 } }
+                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 $>) (hsTok $1) $2 } }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -2998,7 +2998,7 @@ aexp2   :: { ECP }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ pvA $ mkHsSplicePV $1 }
-        | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLocA $1) }
+        | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLoc $1) }
 
         | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 $> $ HsUntypedBracket (EpAnn (glEE $1 $>) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 $> $ HsUntypedBracket (EpAnn (glEE $1 $>) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
@@ -3036,8 +3036,8 @@ projection
         | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (EpAnn (glEE $1 $>) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
-        : splice_untyped { fmap (HsUntypedSplice noAnn) (reLocA $1) }
-        | splice_typed   { fmap (uncurry HsTypedSplice) (reLocA $1) }
+        : splice_untyped { fmap (HsUntypedSplice noAnn) (reLoc $1) }
+        | splice_typed   { fmap (uncurry HsTypedSplice) (reLoc $1) }
 
 splice_untyped :: { Located (HsUntypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -3338,7 +3338,7 @@ alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
-                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (spanAsAnchor $ comb2 $1 (reLoc $2)) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 (reLoc $2)) $2)) }
+                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (spanAsAnchor $ comb2 $1 $2) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 $2) $2)) }
         | gdpats              { $1 >>= \gdpats ->
                                 return $ sL1 gdpats (reverse (unLoc gdpats)) }
 
@@ -3535,7 +3535,7 @@ dbinds  :: { Located [LIPBind GhcPs] } -- reversed
 
 dbind   :: { LIPBind GhcPs }
 dbind   : ipvar '=' exp                {% runPV (unECP $3) >>= \ $3 ->
-                                          acsA (\cs -> sLL $1 $> (IPBind (EpAnn (glEE $1 $>) [mj AnnEqual $2] cs) (reLocA $1) $3)) }
+                                          acsA (\cs -> sLL $1 $> (IPBind (EpAnn (glEE $1 $>) [mj AnnEqual $2] cs) (reLoc $1) $3)) }
 
 ipvar   :: { Located HsIPName }
         : IPDUPVARID            { sL1 $1 (HsIPName (getIPDUPVARID $1)) }
@@ -4361,7 +4361,7 @@ acsa a = do
   return (a cs)
 
 acsA :: MonadP m => (EpAnnComments -> Located a) -> m (LocatedAn t a)
-acsA a = reLocA <$> acs a
+acsA a = reLoc <$> acs a
 
 acsExpr :: (EpAnnComments -> LHsExpr GhcPs) -> P ECP
 acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acsa a
@@ -4421,7 +4421,7 @@ mcs ll = mj AnnCloseS ll
 
 pvA :: MonadP m => m (Located a) -> m (LocatedAn t a)
 pvA a = do { av <- a
-           ; return (reLocA av) }
+           ; return (reLoc av) }
 
 pvN :: MonadP m => m (Located a) -> m (LocatedN a)
 pvN a = do { (L l av) <- a
@@ -4475,7 +4475,7 @@ hsDoAnn (L l _) (L ll _) kw
 
 listAsAnchor :: [LocatedAn t a] -> Located b -> Anchor
 listAsAnchor [] (L l _) = spanAsAnchor l
-listAsAnchor (h:_) s = spanAsAnchor (comb2 (reLoc h) s)
+listAsAnchor (h:_) s = spanAsAnchor (comb2 h s)
 
 listAsAnchorM :: [LocatedAn t a] -> Maybe Anchor
 listAsAnchorM [] = Nothing
