@@ -5,9 +5,8 @@
   "compiler-id": "ghc-9.6.2",
   "install-plan": [
     {
-      "component-name": "lib",
       "depends": [
-        "Cabal-syntax-3.10.1.0-a7e09e0ed12b8981fd4bb5283acfafac1e1e07aeb2b44507502ae461bb01f1b4",
+        "Cabal-syntax-3.10.1.0",
         "array-0.5.5.0",
         "base-4.18.0.0",
         "bytestring-0.11.4.0",
@@ -24,25 +23,12 @@
         "transformers-0.6.1.0",
         "unix-2.8.1.0"
       ],
-      "exe-depends": [],
-      "flags": {},
-      "id": "Cabal-3.10.1.0-08e8e38266cef863dfe810047ea2fb0574df80fd2bdeee7f2fbd09dadd0ddc38",
-      "pkg-cabal-sha256": "6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94",
+      "id": "Cabal-3.10.1.0",
       "pkg-name": "Cabal",
-      "pkg-src": {
-        "repo": {
-          "type": "secure-repo",
-          "uri": "http://hackage.haskell.org/"
-        },
-        "type": "repo-tar"
-      },
-      "pkg-src-sha256": "0bdbab8e4c3178016fb0f070d8b62bc3067f93afabfbd3aa17c8065d0ecc98ee",
       "pkg-version": "3.10.1.0",
-      "style": "global",
-      "type": "configured"
+      "type": "pre-existing"
     },
     {
-      "component-name": "lib",
       "depends": [
         "array-0.5.5.0",
         "base-4.18.0.0",
@@ -60,22 +46,10 @@
         "transformers-0.6.1.0",
         "unix-2.8.1.0"
       ],
-      "exe-depends": [],
-      "flags": {},
-      "id": "Cabal-syntax-3.10.1.0-a7e09e0ed12b8981fd4bb5283acfafac1e1e07aeb2b44507502ae461bb01f1b4",
-      "pkg-cabal-sha256": "bb835ebab577fd0f9c11dab96210dbb8d68ffc62652576f4b092563c345930e7",
+      "id": "Cabal-syntax-3.10.1.0",
       "pkg-name": "Cabal-syntax",
-      "pkg-src": {
-        "repo": {
-          "type": "secure-repo",
-          "uri": "http://hackage.haskell.org/"
-        },
-        "type": "repo-tar"
-      },
-      "pkg-src-sha256": "3b80092355327768a0de8298ac50ee906b7e82462e2ba14542730573b453f522",
       "pkg-version": "3.10.1.0",
-      "style": "global",
-      "type": "configured"
+      "type": "pre-existing"
     },
     {
       "depends": [
@@ -106,7 +80,7 @@
       "exe-depends": [],
       "flags": {},
       "id": "base16-bytestring-1.0.2.0-53ed4e283858e02cbf91231d1ff6b983d0bc92a6868605ebee0c8b080a87d802",
-      "pkg-cabal-sha256": "64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a",
+      "pkg-cabal-sha256": "a694e88f9ec9fc79f0b03f233d3fea592b68f70a34aac2ddb5bcaecb6562e2fd",
       "pkg-name": "base16-bytestring",
       "pkg-src": {
         "repo": {
@@ -153,8 +127,8 @@
       "flags": {
         "llvm": false
       },
-      "id": "clock-0.8.3-fa29d07640716502864195caccc6d4d733d2e9a6f3aef03f812f6773c2031d61",
-      "pkg-cabal-sha256": "a692159828c2cd278eaec317b3a7e9fb6d7b787c8a19f086004d15d9fa1fd72c",
+      "id": "clock-0.8.4-4faceb736193c59834ecdeea1311018e03f8c666706c3be6e2af59ff1cb32f39",
+      "pkg-cabal-sha256": "b938655b00cf204ce69abfff946021bed111d2609a9f7a9c22e28a1a202e9115",
       "pkg-name": "clock",
       "pkg-src": {
         "repo": {
@@ -163,8 +137,8 @@
         },
         "type": "repo-tar"
       },
-      "pkg-src-sha256": "845ce5db4c98cefd517323e005f87effceff886987305e421c4ef616dc0505d1",
-      "pkg-version": "0.8.3",
+      "pkg-src-sha256": "6ae9898afe788a5e334cd5fad5d18a3c2e8e59fa09aaf7b957dbb38a4767df2e",
+      "pkg-version": "0.8.4",
       "style": "global",
       "type": "configured"
     },
@@ -192,7 +166,7 @@
         "use-cbits": true
       },
       "id": "cryptohash-sha256-0.11.102.1-416cb65d2ba2e911cfd127aac9042e29b4fde24e1038bc41573c028664a2129d",
-      "pkg-cabal-sha256": "72ce9095872eae653addca5f412ac8070d6282d8e1c8578c2237c33f2cbbf4bc",
+      "pkg-cabal-sha256": "03db065161987f614a3a2bbcd16264f78e47efe231fb5bd161be2043eaf20488",
       "pkg-name": "cryptohash-sha256",
       "pkg-src": {
         "repo": {
@@ -246,7 +220,7 @@
       "component-name": "lib",
       "depends": [
         "base-4.18.0.0",
-        "clock-0.8.3-fa29d07640716502864195caccc6d4d733d2e9a6f3aef03f812f6773c2031d61",
+        "clock-0.8.4-4faceb736193c59834ecdeea1311018e03f8c666706c3be6e2af59ff1cb32f39",
         "directory-1.3.8.1",
         "filepath-1.4.100.1",
         "process-1.6.17.0",
@@ -255,8 +229,8 @@
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "extra-1.7.12-66d5ea28661bc294ae48ee5c5c1f9c3dcd9c15223f2c29bbc866738acd6493c9",
-      "pkg-cabal-sha256": "3ac58d7341976173d1052e7b2837d119212d9afcf911735667c7f1ab67aec25f",
+      "id": "extra-1.7.14-8a107eea573f4887736761768ba87d6e46aaf7af34296143c18322b2937a7f72",
+      "pkg-cabal-sha256": "e3d3ce1dc7746b1132930e48c59fb5e8c51a09e92e0c031316be031067a273fb",
       "pkg-name": "extra",
       "pkg-src": {
         "repo": {
@@ -265,8 +239,8 @@
         },
         "type": "repo-tar"
       },
-      "pkg-src-sha256": "e571a9ec1d8865f0fbb0e0ba1eb575f783b0365c80db19b54a93600bae43b03c",
-      "pkg-version": "1.7.12",
+      "pkg-src-sha256": "b6a909f8f0e4b8076a1653b4d34815a782f0a8c1e83d5267f4d00496471ef567",
+      "pkg-version": "1.7.14",
       "style": "global",
       "type": "configured"
     },
@@ -288,12 +262,12 @@
       "depends": [
         "base-4.18.0.0",
         "directory-1.3.8.1",
-        "extra-1.7.12-66d5ea28661bc294ae48ee5c5c1f9c3dcd9c15223f2c29bbc866738acd6493c9",
+        "extra-1.7.14-8a107eea573f4887736761768ba87d6e46aaf7af34296143c18322b2937a7f72",
         "filepath-1.4.100.1"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "filepattern-0.1.3-7d2f06a174fdc538912500214867109a6f62268fee720f1f717867534c115be9",
+      "id": "filepattern-0.1.3-c47ce75a6455744e5cfe5cc7369e4575f475f60626232210fd29e6eebe486d1a",
       "pkg-cabal-sha256": "372c1733d83b90045eb29da9f010fed79bfef8771ce65eb126a1d83ecc54a9a2",
       "pkg-name": "filepattern",
       "pkg-src": {
@@ -327,18 +301,18 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.18.0.0"
       ],
-      "dist-dir": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-platform-0.1.0.0-inplace",
       "pkg-name": "ghc-platform",
       "pkg-src": {
-        "path": "/home/matt/ghc-bootstrap/hadrian/../libraries/ghc-platform",
+        "path": "/home/matt/ghc-clean/hadrian/../libraries/ghc-platform",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -355,7 +329,7 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.18.0.0",
@@ -366,13 +340,13 @@
         "text-2.0.2",
         "transformers-0.6.1.0"
       ],
-      "dist-dir": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-toolchain-0.1.0.0-inplace",
       "pkg-name": "ghc-toolchain",
       "pkg-src": {
-        "path": "/home/matt/ghc-bootstrap/hadrian/../utils/ghc-toolchain",
+        "path": "/home/matt/ghc-clean/hadrian/../utils/ghc-toolchain",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -380,30 +354,30 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
-      "build-info": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build-info.json",
+      "bin-file": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
+      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build-info.json",
       "component-name": "exe:hadrian",
       "depends": [
-        "Cabal-3.10.1.0-08e8e38266cef863dfe810047ea2fb0574df80fd2bdeee7f2fbd09dadd0ddc38",
+        "Cabal-3.10.1.0",
         "base-4.18.0.0",
         "base16-bytestring-1.0.2.0-53ed4e283858e02cbf91231d1ff6b983d0bc92a6868605ebee0c8b080a87d802",
         "bytestring-0.11.4.0",
         "containers-0.6.7",
         "cryptohash-sha256-0.11.102.1-416cb65d2ba2e911cfd127aac9042e29b4fde24e1038bc41573c028664a2129d",
         "directory-1.3.8.1",
-        "extra-1.7.12-66d5ea28661bc294ae48ee5c5c1f9c3dcd9c15223f2c29bbc866738acd6493c9",
+        "extra-1.7.14-8a107eea573f4887736761768ba87d6e46aaf7af34296143c18322b2937a7f72",
         "filepath-1.4.100.1",
         "ghc-platform-0.1.0.0-inplace",
         "ghc-toolchain-0.1.0.0-inplace",
         "mtl-2.3.1",
         "parsec-3.1.16.1",
-        "shake-0.19.7-1bc6bfe7a2256cae471b2c5f47c26dff8e74dc398756c6509cf0e167dd8a93f4",
+        "shake-0.19.7-632134969c9258f0ad3b91ced6c1da51cbff69b37ea66bfd4c13106b8ef9398c",
         "text-2.0.2",
         "time-1.12.2",
         "transformers-0.6.1.0",
-        "unordered-containers-0.2.19.1-275e0d519a94616dfc2e6c521bb36eb6126f2e65f16f8ea692a1a58b37e507fe"
+        "unordered-containers-0.2.19.1-7787c3bb22d737a5bf8288fcb0729fed0251ae813c48daa4b7d7392c7c7eff03"
       ],
-      "dist-dir": "/home/matt/ghc-bootstrap/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian",
+      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian",
       "exe-depends": [],
       "flags": {
         "selftest": false,
@@ -412,7 +386,7 @@
       "id": "hadrian-0.1.0.0-inplace-hadrian",
       "pkg-name": "hadrian",
       "pkg-src": {
-        "path": "/home/matt/ghc-bootstrap/hadrian/.",
+        "path": "/home/matt/ghc-clean/hadrian/.",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -436,8 +410,8 @@
         "integer-gmp": true,
         "random-initial-seed": false
       },
-      "id": "hashable-1.4.2.0-bd54a516580c7069cc2f4fc70f9822afde7c7143c81e1e601b62784493c2ff53",
-      "pkg-cabal-sha256": "585792335d5541dba78fa8dfcb291a89cd5812a281825ff7a44afa296ab5d58a",
+      "id": "hashable-1.4.3.0-12b4c106ea9997dda7b5804951ce00ac340b072a43a6d57468ee2eafd06e476d",
+      "pkg-cabal-sha256": "f3bf68acfa0df7a064a378ef2cdcfeb55e6fb96100675f4c593556dcbf3d7194",
       "pkg-name": "hashable",
       "pkg-src": {
         "repo": {
@@ -446,8 +420,8 @@
         },
         "type": "repo-tar"
       },
-      "pkg-src-sha256": "1b4000ea82b81f69d46d0af4152c10c6303873510738e24cfc4767760d30e3f8",
-      "pkg-version": "1.4.2.0",
+      "pkg-src-sha256": "32efb16c2891786209b7cbe5c39df9b3a9ae51e836f1a54f646bc4602b7ab0f5",
+      "pkg-version": "1.4.3.0",
       "style": "global",
       "type": "configured"
     },
@@ -583,7 +557,7 @@
       "exe-depends": [],
       "flags": {},
       "id": "primitive-0.8.0.0-71df968629ed55f39ba9d58a7727f3762a6aaadfe4267e8b12b6a73392407f07",
-      "pkg-cabal-sha256": "826bf2a702a26ef87532a135808abad69d74f70ead39f26c06d034b1f0537a19",
+      "pkg-cabal-sha256": "d0ff45fa6e61f92af23611ceb8b9a6a04c236b50fb70c60e2ed3bfa532703670",
       "pkg-name": "primitive",
       "pkg-src": {
         "repo": {
@@ -617,12 +591,12 @@
         "bytestring-0.11.4.0",
         "deepseq-1.4.8.1",
         "mtl-2.3.1",
-        "splitmix-0.1.0.4-bdb435860672a71aa2e76fcd96f3124f558293a082700121addb19dd682caeae"
+        "splitmix-0.1.0.5-45c2b5591fdddc5bd30ded60ad57c8a2d8c1ddf8a6bf2a75ef76a2528c94b230"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "random-1.2.1.1-f4e6f37178be563efc8a42cd5dc73b25970c63f5787d6b71b822326cb1c61394",
-      "pkg-cabal-sha256": "dea1f11e5569332dc6c8efaad1cb301016a5587b6754943a49f9de08ae0e56d9",
+      "id": "random-1.2.1.1-d7e9d1381b0228cade5383187d29d5917a4d002409155e9fe7cca4224924be1d",
+      "pkg-cabal-sha256": "e7c1f881159d5cc788619c9ee8b8f340ba2ff0db571cdf3d1a1968ebc5108789",
       "pkg-name": "random",
       "pkg-src": {
         "repo": {
@@ -651,21 +625,21 @@
         "bytestring-0.11.4.0",
         "deepseq-1.4.8.1",
         "directory-1.3.8.1",
-        "extra-1.7.12-66d5ea28661bc294ae48ee5c5c1f9c3dcd9c15223f2c29bbc866738acd6493c9",
+        "extra-1.7.14-8a107eea573f4887736761768ba87d6e46aaf7af34296143c18322b2937a7f72",
         "filepath-1.4.100.1",
-        "filepattern-0.1.3-7d2f06a174fdc538912500214867109a6f62268fee720f1f717867534c115be9",
-        "hashable-1.4.2.0-bd54a516580c7069cc2f4fc70f9822afde7c7143c81e1e601b62784493c2ff53",
+        "filepattern-0.1.3-c47ce75a6455744e5cfe5cc7369e4575f475f60626232210fd29e6eebe486d1a",
+        "hashable-1.4.3.0-12b4c106ea9997dda7b5804951ce00ac340b072a43a6d57468ee2eafd06e476d",
         "heaps-0.4-e780877104588c1b10a67a5aae3c0cd6a6a8f27aefe3d4a839b825c4892f8d5e",
         "js-dgtable-0.5.2-ac981654e6f161f9ae1994f00a961b6578ab18a1d0f487c3ea6cd89f93c0a3c8",
         "js-flot-0.8.3-bdd1fcc0842f60a8b532d63ef76ed02d43736c0b008305eed81753cba7d5a758",
         "js-jquery-3.3.1-ec81a4a89ca6fb90a7b5b94ed963d6d4ecae68f1fdb3f5a82090dcfd79583dbf",
         "primitive-0.8.0.0-71df968629ed55f39ba9d58a7727f3762a6aaadfe4267e8b12b6a73392407f07",
         "process-1.6.17.0",
-        "random-1.2.1.1-f4e6f37178be563efc8a42cd5dc73b25970c63f5787d6b71b822326cb1c61394",
+        "random-1.2.1.1-d7e9d1381b0228cade5383187d29d5917a4d002409155e9fe7cca4224924be1d",
         "time-1.12.2",
         "transformers-0.6.1.0",
         "unix-2.8.1.0",
-        "unordered-containers-0.2.19.1-275e0d519a94616dfc2e6c521bb36eb6126f2e65f16f8ea692a1a58b37e507fe",
+        "unordered-containers-0.2.19.1-7787c3bb22d737a5bf8288fcb0729fed0251ae813c48daa4b7d7392c7c7eff03",
         "utf8-string-1.0.2-f9200a046ce7ec1ea78ce8e2bdd5606fb1959cbc89a851c8371244c443d178e8"
       ],
       "exe-depends": [],
@@ -674,7 +648,7 @@
         "embed-files": false,
         "portable": false
       },
-      "id": "shake-0.19.7-1bc6bfe7a2256cae471b2c5f47c26dff8e74dc398756c6509cf0e167dd8a93f4",
+      "id": "shake-0.19.7-632134969c9258f0ad3b91ced6c1da51cbff69b37ea66bfd4c13106b8ef9398c",
       "pkg-cabal-sha256": "3cb5814cce210b9756fa9246ff1b2a1e1b86be46fdc4c5e2baacdc5bf83ce5c3",
       "pkg-name": "shake",
       "pkg-src": {
@@ -690,7 +664,7 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/matt/.cabal/store/ghc-9.6.2/shake-0.19.7-e-shake-fe6d16e046af8213ac87fb184283af5a4060b03aa7617bf7bcf87fc48621573d/bin/shake",
+      "bin-file": "/home/matt/.cabal/store/ghc-9.6.2/shake-0.19.7-e-shake-fe74cc6dbbea8d7e17d2769ca81df854de8cbaae5be4c6f6652d6e2071b440c0/bin/shake",
       "component-name": "exe:shake",
       "depends": [
         "base-4.18.0.0",
@@ -698,21 +672,21 @@
         "bytestring-0.11.4.0",
         "deepseq-1.4.8.1",
         "directory-1.3.8.1",
-        "extra-1.7.12-66d5ea28661bc294ae48ee5c5c1f9c3dcd9c15223f2c29bbc866738acd6493c9",
+        "extra-1.7.14-8a107eea573f4887736761768ba87d6e46aaf7af34296143c18322b2937a7f72",
         "filepath-1.4.100.1",
-        "filepattern-0.1.3-7d2f06a174fdc538912500214867109a6f62268fee720f1f717867534c115be9",
-        "hashable-1.4.2.0-bd54a516580c7069cc2f4fc70f9822afde7c7143c81e1e601b62784493c2ff53",
+        "filepattern-0.1.3-c47ce75a6455744e5cfe5cc7369e4575f475f60626232210fd29e6eebe486d1a",
+        "hashable-1.4.3.0-12b4c106ea9997dda7b5804951ce00ac340b072a43a6d57468ee2eafd06e476d",
         "heaps-0.4-e780877104588c1b10a67a5aae3c0cd6a6a8f27aefe3d4a839b825c4892f8d5e",
         "js-dgtable-0.5.2-ac981654e6f161f9ae1994f00a961b6578ab18a1d0f487c3ea6cd89f93c0a3c8",
         "js-flot-0.8.3-bdd1fcc0842f60a8b532d63ef76ed02d43736c0b008305eed81753cba7d5a758",
         "js-jquery-3.3.1-ec81a4a89ca6fb90a7b5b94ed963d6d4ecae68f1fdb3f5a82090dcfd79583dbf",
         "primitive-0.8.0.0-71df968629ed55f39ba9d58a7727f3762a6aaadfe4267e8b12b6a73392407f07",
         "process-1.6.17.0",
-        "random-1.2.1.1-f4e6f37178be563efc8a42cd5dc73b25970c63f5787d6b71b822326cb1c61394",
+        "random-1.2.1.1-d7e9d1381b0228cade5383187d29d5917a4d002409155e9fe7cca4224924be1d",
         "time-1.12.2",
         "transformers-0.6.1.0",
         "unix-2.8.1.0",
-        "unordered-containers-0.2.19.1-275e0d519a94616dfc2e6c521bb36eb6126f2e65f16f8ea692a1a58b37e507fe",
+        "unordered-containers-0.2.19.1-7787c3bb22d737a5bf8288fcb0729fed0251ae813c48daa4b7d7392c7c7eff03",
         "utf8-string-1.0.2-f9200a046ce7ec1ea78ce8e2bdd5606fb1959cbc89a851c8371244c443d178e8"
       ],
       "exe-depends": [],
@@ -721,7 +695,7 @@
         "embed-files": false,
         "portable": false
       },
-      "id": "shake-0.19.7-e-shake-fe6d16e046af8213ac87fb184283af5a4060b03aa7617bf7bcf87fc48621573d",
+      "id": "shake-0.19.7-e-shake-fe74cc6dbbea8d7e17d2769ca81df854de8cbaae5be4c6f6652d6e2071b440c0",
       "pkg-cabal-sha256": "3cb5814cce210b9756fa9246ff1b2a1e1b86be46fdc4c5e2baacdc5bf83ce5c3",
       "pkg-name": "shake",
       "pkg-src": {
@@ -746,8 +720,8 @@
       "flags": {
         "optimised-mixer": false
       },
-      "id": "splitmix-0.1.0.4-bdb435860672a71aa2e76fcd96f3124f558293a082700121addb19dd682caeae",
-      "pkg-cabal-sha256": "db25c2e17967aa6b6046ab8b1b96ba3f344ca59a62b60fb6113d51ea305a3d8e",
+      "id": "splitmix-0.1.0.5-45c2b5591fdddc5bd30ded60ad57c8a2d8c1ddf8a6bf2a75ef76a2528c94b230",
+      "pkg-cabal-sha256": "bac0ae8d46a04e410666b0c8081cff63f060f29157983b569ca86ddb6e6e0dc6",
       "pkg-name": "splitmix",
       "pkg-src": {
         "repo": {
@@ -756,8 +730,8 @@
         },
         "type": "repo-tar"
       },
-      "pkg-src-sha256": "6d065402394e7a9117093dbb4530a21342c9b1e2ec509516c8a8d0ffed98ecaa",
-      "pkg-version": "0.1.0.4",
+      "pkg-src-sha256": "9df07a9611ef45f1b1258a0b412f4d02c920248f69d2e2ce8ccda328f7e13002",
+      "pkg-version": "0.1.0.5",
       "style": "global",
       "type": "configured"
     },
@@ -834,14 +808,14 @@
       "depends": [
         "base-4.18.0.0",
         "deepseq-1.4.8.1",
-        "hashable-1.4.2.0-bd54a516580c7069cc2f4fc70f9822afde7c7143c81e1e601b62784493c2ff53",
+        "hashable-1.4.3.0-12b4c106ea9997dda7b5804951ce00ac340b072a43a6d57468ee2eafd06e476d",
         "template-haskell-2.20.0.0"
       ],
       "exe-depends": [],
       "flags": {
         "debug": false
       },
-      "id": "unordered-containers-0.2.19.1-275e0d519a94616dfc2e6c521bb36eb6126f2e65f16f8ea692a1a58b37e507fe",
+      "id": "unordered-containers-0.2.19.1-7787c3bb22d737a5bf8288fcb0729fed0251ae813c48daa4b7d7392c7c7eff03",
       "pkg-cabal-sha256": "9ad8972c2e913c37b1d4f0e1261517fd7a1b8c8a58077e057be69837e3dbaa00",
       "pkg-name": "unordered-containers",
       "pkg-src": {
