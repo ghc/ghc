@@ -10,6 +10,7 @@ import Settings.Builders.Common (wayCcArgs)
 
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
+import Data.Version.Extra
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -33,6 +34,7 @@ packageArgs = do
     cursesLibraryDir <- getSetting CursesLibDir
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
+    stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -83,7 +85,7 @@ packageArgs = do
             -- not being fixed to `ghc`, when building stage0, we must set
             -- -this-unit-id to `ghc` because the boot compiler expects that.
             -- We do it through a cabal flag in ghc.cabal
-            , stage0 ? arg "+hadrian-stage0"
+            , stageVersion < makeVersion [9,8,1] ? arg "+hadrian-stage0"
             , flag StaticLibzstd `cabalFlag` "static-libzstd"
             ]
 

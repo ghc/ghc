@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if MIN_TOOL_VERSION_ghc(9,7,0)
+#if MIN_TOOL_VERSION_ghc(9,9,0)
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Exts.Stack
