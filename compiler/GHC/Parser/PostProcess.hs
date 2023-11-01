@@ -1727,7 +1727,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (l2l $ getLoc c) $ HsCmdTop noExtField c
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLocL op) Infix Nothing [cmdArg c1, cmdArg c2]
+    return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLoc op) Infix Nothing [cmdArg c1, cmdArg c2]
 
   mkHsCasePV l c (L lm m) anns = do
     cs <- getCommentsFor l
@@ -1807,7 +1807,7 @@ instance DisambECP (HsExpr GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l e1 op e2 = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) $ OpApp (EpAnn (spanAsAnchor l) [] cs) e1 (reLocL op) e2
+    return $ L (noAnnSrcSpan l) $ OpApp (EpAnn (spanAsAnchor l) [] cs) e1 (reLoc op) e2
   mkHsCasePV l e (L lm m) anns = do
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
@@ -2092,7 +2092,7 @@ instance DisambTD DataConBuilder where
     = -- When the user writes  data T = {-# UNPACK #-} Int :+ Bool
       --   we apply {-# UNPACK #-} to the LHS
       do lhs' <- addUnpackednessP unpk lhs
-         let l = combineLocsA (reLocA unpk) constr_stuff
+         let l = combineLocsA (reLoc unpk) constr_stuff
          return $ L l (InfixDataConBuilder lhs' data_con rhs)
     | otherwise =
       do addError $ mkPlainErrorMsgEnvelope (getLoc unpk) PsErrUnpackDataCon
