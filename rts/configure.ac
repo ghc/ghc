@@ -408,7 +408,7 @@ dnl See Note [Undefined symbols in the RTS]
 
 [
 symbolExtraDefs=''
-if [[ "$CABAL_FLAG_find_ptr" = 1 ]]; then
+if [ "$CABAL_FLAG_find_ptr" = 1 ]; then
     symbolExtraDefs+=' -DFIND_PTR'
 fi
 
@@ -418,7 +418,7 @@ cat $srcdir/external-symbols.list.in \
     > external-symbols.list \
     || exit 1
 
-if [[ "$CABAL_FLAG_leading_underscore" = 1 ]]; then
+if [ "$CABAL_FLAG_leading_underscore" = 1 ]; then
     sedExpr='s/^(.*)$/  "-Wl,-u,_\1"/'
 else
     sedExpr='s/^(.*)$/  "-Wl,-u,\1"/'
