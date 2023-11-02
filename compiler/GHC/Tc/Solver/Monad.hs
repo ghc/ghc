@@ -1197,6 +1197,9 @@ if you do so.
 -- Getters and setters of GHC.Tc.Utils.Env fields
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+getUnifiedRef :: TcS (IORef Int)
+getUnifiedRef = TcS (return . tcs_unified)
+
 -- Getter of inerts and worklist
 getInertSetRef :: TcS (IORef InertSet)
 getInertSetRef = TcS (return . tcs_inerts)
@@ -2040,21 +2043,28 @@ wrapUnifierX :: CtEvidence -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
              -> TcS (a, Bag Ct, [TcTyVar], RewriterSet)
 wrapUnifierX ev role do_unifications
-  = wrapTcS $
-    do { defer_ref   <- TcM.newTcRef emptyBag
-       ; unified_ref <- TcM.newTcRef []
-       ; rewriters   <- TcM.zonkRewriterSet (ctEvRewriters ev)
-       ; let env = UE { u_role      = role
-                      , u_rewriters = rewriters
-                      , u_loc       = ctEvLoc ev
-                      , u_defer     = defer_ref
-                      , u_unified   = Just unified_ref}
+  = do { unif_count_ref <- getUnifiedRef
+       ; wrapTcS $
+         do { defer_ref   <- TcM.newTcRef emptyBag
+            ; unified_ref <- TcM.newTcRef []
+            ; rewriters   <- TcM.zonkRewriterSet (ctEvRewriters ev)
+            ; let env = UE { u_role      = role
+                           , u_rewriters = rewriters
+                           , u_loc       = ctEvLoc ev
+                           , u_defer     = defer_ref
+                           , u_unified   = Just unified_ref}
 
-       ; res <- do_unifications env
+            ; res <- do_unifications env
 
-       ; cts     <- TcM.readTcRef defer_ref
-       ; unified <- TcM.readTcRef unified_ref
-       ; return (res, cts, unified, rewriters) }
+            ; cts     <- TcM.readTcRef defer_ref
+            ; unified <- TcM.readTcRef unified_ref
+
+            -- Don't forget to update the count of variables
+            -- unified, lest we forget to iterate (#24146)
+            ; unless (null unified) $
+              TcM.updTcRef unif_count_ref (+ (length unified))
+
+            ; return (res, cts, unified, rewriters) } }
 
 
 {-
