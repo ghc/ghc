@@ -334,8 +334,8 @@ instance H.Builder Builder where
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
-                    stdin <- readFile' input
-                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
+                    need [input]
+                    Stdout stdout <- cmd' (FileStdin input) [path] buildArgs
                     -- see Note [Capture stdout as a ByteString]
                     writeFileChangedBS output stdout
 
