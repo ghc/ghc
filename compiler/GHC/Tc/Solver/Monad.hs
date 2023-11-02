@@ -1197,6 +1197,9 @@ if you do so.
 -- Getters and setters of GHC.Tc.Utils.Env fields
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+getUnifiedRef :: TcS (IORef Int)
+getUnifiedRef = TcS (return . tcs_unified)
+
 -- Getter of inerts and worklist
 getInertSetRef :: TcS (IORef InertSet)
 getInertSetRef = TcS (return . tcs_inerts)
@@ -2001,7 +2004,8 @@ wrapUnifierTcS :: CtEvidence -> Role
 -- unified the process; the (Bag Ct) are the deferred constraints.
 
 wrapUnifierTcS ev role do_unifications
-  = do { (cos, unified, rewriters, cts) <- wrapTcS $
+  = do { unif_count_ref <- getUnifiedRef
+       ; (cos, unified, rewriters, cts) <- wrapTcS $
              do { defer_ref   <- TcM.newTcRef emptyBag
                 ; unified_ref <- TcM.newTcRef []
                 ; rewriters <- TcM.zonkRewriterSet (ctEvRewriters ev)
@@ -2015,6 +2019,13 @@ wrapUnifierTcS ev role do_unifications
 
                 ; cts     <- TcM.readTcRef defer_ref
                 ; unified <- TcM.readTcRef unified_ref
+
+
+                -- Don't forget to update the count of variables
+                -- unified, lest we forget to iterate (#24146)
+                ; unless (null unified) $
+                  TcM.updTcRef unif_count_ref (+ (length unified))
+
                 ; return (cos, unified, rewriters, cts) }
 
        -- Emit the deferred constraints
