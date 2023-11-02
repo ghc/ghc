@@ -105,7 +105,7 @@ tyThingToLHsDecl prr t = case t of
              -- Without this signature, we trigger GHC#18932
            cvt (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
            cvt (KindedTyVar _ _ (L name_loc n) kind) = HsKindSig noAnn
-              (L (na2la name_loc) (HsTyVar noAnn NotPromoted (L name_loc n))) kind
+              (L (l2l name_loc) (HsTyVar noAnn NotPromoted (L name_loc n))) kind
 
            -- | Convert a LHsTyVarBndr to an equivalent LHsType.
            hsLTyVarBndrToType :: LHsTyVarBndr flag GhcRn -> LHsType GhcRn
