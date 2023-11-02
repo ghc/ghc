@@ -13,6 +13,7 @@ import Data.Char
 import Data.List (union, intersperse, intercalate, nub)
 import Data.Maybe ( catMaybes )
 import System.Environment ( getArgs )
+import System.IO ( hSetEncoding, stdin, stdout, utf8 )
 
 vecOptions :: Entry -> [(String,String,Int)]
 vecOptions i =
@@ -116,7 +117,9 @@ main = getArgs >>= \args ->
                    ++ unlines (map ("            "++) known_args)
                   )
        else
-       do s <- getContents
+       do hSetEncoding stdin  utf8 -- The input file is in UTF-8. Set the encoding explicitly.
+          hSetEncoding stdout utf8
+          s <- getContents
           case parse s of
              Left err -> error ("parse error at " ++ (show err))
              Right p_o_specs@(Info _ _)
