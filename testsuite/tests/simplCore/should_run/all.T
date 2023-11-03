@@ -19,7 +19,8 @@ test('simplrun007', normal, compile_and_run, [''])
 test('simplrun008', normal, compile_and_run, [''])
 test('simplrun009', normal, compile_and_run, [''])
 test('simplrun010', [extra_run_opts('24 16 8 +RTS -M10m -RTS'),
-                     exit_code(251)]
+                     exit_code(251),
+                     when(arch('wasm32'), [ignore_stderr, exit_code(1)])]
                   , compile_and_run, [''])
 test('simplrun011', normal, compile_and_run, ['-fno-worker-wrapper'])
 
