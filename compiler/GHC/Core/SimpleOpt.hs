@@ -1388,9 +1388,17 @@ data ConCont = CC [CoreExpr] MCoercion
 --
 -- We also return the incoming InScopeSet, augmented with
 -- the binders from any [FloatBind] that we return
-exprIsConApp_maybe :: HasDebugCallStack
-                   => InScopeEnv -> CoreExpr
-                   -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
+exprIsConApp_maybe
+  :: HasDebugCallStack
+     => InScopeEnv               -- Includes an InScopeSet
+     -> CoreExpr
+     -> Maybe ( InScopeSet       -- Extends input InScopeSet with the
+                                 -- binders of the [FloatingBind]
+              , [FloatBind]
+              , DataCon
+              , [Type]           -- Existential type args
+              , [CoreExpr]       -- Arguments satisfy let-can-float invariant
+        )
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
   = go (Left in_scope) [] expr (CC [] MRefl)
   where
@@ -1411,8 +1419,9 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
 
     go subst floats (App fun arg) (CC args mco)
-       | let arg_type = exprType arg
-       , not (isTypeArg arg) && needsCaseBinding arg_type arg
+       | not (isTypeArg arg)
+       , let arg_type = exprType arg
+       , needsCaseBinding arg_type arg
        -- An unlifted argument that’s not ok for speculation must not simply be
        -- put into the args, as these are going to be substituted into the case
        -- alternatives, and possibly lost on the way.
@@ -1431,6 +1440,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        --       simplifier produces case exp of a { DEFAULT -> exp[x/a] }
        , (subst', float, bndr) <- case_bind subst arg arg_type
        = go subst' (float:floats) fun (CC (Var bndr : args) mco)
+
        | otherwise
        = go subst floats fun (CC (subst_expr subst arg : args) mco)
 
@@ -1488,8 +1498,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
-        , let in_scope' = extend_in_scope (exprsFreeVars dfun_args)
-              subst = mkOpenSubst in_scope' (bndrs `zip` args)
+        , let subst = mkOpenSubst in_scope (bndrs `zip` args)
               -- We extend the in-scope set here to silence warnings from
               -- substExpr when it finds not-in-scope Ids in dfun_args.
               -- simplOptExpr initialises the in-scope set with exprFreeVars,
@@ -1504,9 +1513,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         -- CPR'd workers getting inlined back into their wrappers,
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
--- If `fun` is in the in-scope set then the free var of its RHS should be too
-        , let in_scope' = extend_in_scope (exprFreeVars rhs)
-        = go (Left in_scope') floats rhs cont
+        = go (Left in_scope) floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
         | (fun `hasKey` unpackCStringIdKey) ||
@@ -1517,11 +1524,6 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
           dealWithStringLiteral fun str mco
         where
           unfolding = id_unf fun
-          extend_in_scope unf_fvs
-            | isLocalId fun = in_scope `extendInScopeSetSet` unf_fvs
-            | otherwise     = in_scope
-            -- A GlobalId has no (LocalId) free variables; and the
-            -- in-scope set tracks only LocalIds
 
     go _ _ _ _ = Nothing
 
@@ -1536,12 +1538,6 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     ----------------------------
     -- Operations on the (Either InScopeSet GHC.Core.Subst)
     -- The Left case is wildly dominant
-
-    subst_in_scope (Left in_scope) = in_scope
-    subst_in_scope (Right s) = substInScopeSet s
-
-    subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
-    subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)
 
     subst_co (Left {}) co = co
     subst_co (Right s) co = GHC.Core.Subst.substCo s co
@@ -1565,12 +1561,21 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     case_bind :: Either InScopeSet Subst -> CoreExpr -> Type -> (Either InScopeSet Subst, FloatBind, Id)
     case_bind subst expr expr_ty = (subst', float, bndr)
       where
-        bndr   = setCaseBndrEvald MarkedStrict $
-                 uniqAway (subst_in_scope subst) $
-                 mkWildValBinder ManyTy expr_ty
-        subst' = subst_extend_in_scope subst bndr
-        expr'  = subst_expr subst expr
-        float  = FloatCase expr' bndr DEFAULT []
+        expr'          = subst_expr subst expr
+        (bndr, subst') = fresh_case_bndr subst
+        float          = FloatCase expr' bndr DEFAULT []
+
+        fresh_case_bndr :: Either InScopeSet Subst -> (Id, Either InScopeSet Subst)
+        fresh_case_bndr (Left in_scope)
+          | let new_case_bndr = mk_new_case_bndr in_scope
+          = (new_case_bndr, Left (in_scope `extendInScopeSet` new_case_bndr))
+        fresh_case_bndr (Right subst)
+          | let new_case_bndr = mk_new_case_bndr (substInScopeSet subst)
+          = (new_case_bndr, Right (subst `extendSubstInScope` new_case_bndr))
+
+        mk_new_case_bndr in_scope = setCaseBndrEvald MarkedStrict $
+                                    uniqAway in_scope             $
+                                    mkWildValBinder ManyTy expr_ty
 
     mkFieldSeqFloats :: InScopeSet -> DataCon -> [CoreExpr] -> (InScopeSet, [FloatBind], [CoreExpr])
     -- See Note [Strict fields in Core] for what a field seq is and (SFC2) for
