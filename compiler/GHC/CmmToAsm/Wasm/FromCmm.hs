@@ -877,7 +877,7 @@ lower_CmmReg _ (CmmGlobal EagerBlackholeInfo) = do
   pure $
     SomeWasmExpr ty_word $
       WasmExpr $
-        WasmSymConst "stg_EAGER_BLACKHOLE_info"
+        WasmSymConst "__stg_EAGER_BLACKHOLE_info"
 lower_CmmReg _ (CmmGlobal GCEnter1) = do
   ty_word <- wasmWordTypeM
   ty_word_cmm <- wasmWordCmmTypeM
