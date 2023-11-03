@@ -44,6 +44,8 @@ test('derefnull',
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       when(opsys('mingw32'), [fragile(18548)]),
       when(arch('javascript'), [ignore_stderr, exit_code(1)]),
+      # On wasm32, 0x0 is a valid linear memory address
+      when(arch('wasm32'), [ignore_stdout, ignore_stderr, exit_code(0)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
       # since these test are supposed to crash the
@@ -82,6 +84,8 @@ test('divbyzero',
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
+      # wasmtime returns sigabrt error code upon wasm traps
+      when(arch('wasm32'), [ignore_stdout, ignore_stderr, exit_code(134)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling
