@@ -883,7 +883,7 @@ lower_CmmReg lbl (CmmGlobal (GlobalRegUse greg reg_use_ty)) = do
       pure $
         SomeWasmExpr ty_word $
           WasmExpr $
-            WasmSymConst "stg_EAGER_BLACKHOLE_info"
+            WasmSymConst "__stg_EAGER_BLACKHOLE_info"
     GCEnter1 -> do
       onFuncSym "__stg_gc_enter_1" [] [ty_word_cmm]
       pure $ SomeWasmExpr ty_word $ WasmExpr $ WasmSymConst "__stg_gc_enter_1"
