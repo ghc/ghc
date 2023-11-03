@@ -1046,14 +1046,17 @@ substId (SimplEnv { seMode = mode, seInScope = in_scope, seIdSubst = ids }) v
         Nothing               -> DoneId (refineFromInScope mode in_scope v)
         Just (DoneId v)       -> DoneId (refineFromInScope mode in_scope v)
         Just res              -> res    -- DoneEx non-var, or ContEx
+        -- NB: in the DoneEx case we don't need to do refineFromInScope
+        --     because simplIdF just invokes simplExprF again, which will
+        --     take another look.
 
-        -- Get the most up-to-date thing from the in-scope set
-        -- Even though it isn't in the substitution, it may be in
-        -- the in-scope set with better IdInfo.
-        --
-        -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
 
 refineFromInScope :: HasDebugCallStack => SimplMode -> InScopeSet -> Var -> Var
+-- refineFromInScope: get the most up-to-date thing from the in-scope set
+-- Even though it isn't in the substitution, it may be in
+-- the in-scope set with better IdInfo.
+--
+-- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
 refineFromInScope mode in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'

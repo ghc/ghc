@@ -3486,6 +3486,22 @@ simplAlt env scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
 
+
+{- -------- Debugging only -------------
+
+ppr_in_scope :: SimplEnv -> SDoc
+-- Show only in-scope thing with unfoldings
+ppr_in_scope env
+  = text "InScope(unf)" <+> braces (nonDetStrictFoldVarSet do_one empty (getInScopeVars (seInScope env)))
+  where
+    do_one v d | isId v
+               , Just e <- maybeUnfoldingTemplate (idUnfolding v)
+               = (ppr v <+> equals <+> my_ppr e) $$ d
+               | otherwise = d
+    my_ppr (Lam {}) = text "<lambda>"
+    my_ppr e        = ppr e
+---------------------------------------- -}
+
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 addEvals records the evaluated-ness of the bound variables of
