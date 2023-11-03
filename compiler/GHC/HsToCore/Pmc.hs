@@ -278,7 +278,6 @@ pmcRecSel _ _ = return ()
 {- Note [pmcPatBind doesn't warn on pattern guards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @pmcPatBind@'s main purpose is to check vanilla pattern bindings, like
->>>>>>> 8760510af3 (This MR is an implementation of the proposal #516.)
 @x :: Int; Just x = e@, which is in a @PatBindRhs@ context.
 But its caller is also called for individual pattern guards in a @StmtCtxt@.
 For example, both pattern guards in @f x y | True <- x, False <- y = ...@ will
