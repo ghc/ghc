@@ -605,6 +605,6 @@ test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'
 
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 
-test('IOManager', [js_skip, when(opsys('mingw32'), skip),
+test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), skip),
                    pre_cmd('$MAKE -s --no-print-directory IOManager.hs')],
                   compile_and_run, [''])
