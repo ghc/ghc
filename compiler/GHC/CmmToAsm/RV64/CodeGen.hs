@@ -616,8 +616,10 @@ getRegister' config plat expr =
                                                                       -- W32 is the smallest width to convert to. Decrease width afterwards.
                                                                       annExpr expr (FCVTZS (OpReg W32 dst) (OpReg from reg)) `appOL`
                                                                       signExtendAdjustPrecission W32 to dst dst) -- (float convert (-> zero) signed)
-        MO_FS_Conv from to -> pure $ Any (intFormat to) (\dst -> code `snocOL` annExpr expr (FCVTZS (OpReg to dst) (OpReg from reg))) -- (float convert (-> zero) signed)
-
+        MO_FS_Conv from to -> pure $ Any (intFormat to) (\dst ->
+                                                           code `snocOL`
+                                                           annExpr expr (FCVTZS (OpReg to dst) (OpReg from reg)) `appOL` -- (float convert (-> zero) signed)
+                                                           truncateReg from to dst)
         MO_UU_Conv from to | from <= to -> pure $ Any (intFormat to) (\dst ->
                                                                           code `snocOL`
                                                                           annExpr e (MOV (OpReg to dst) (OpReg from reg))
