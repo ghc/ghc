@@ -579,7 +579,7 @@ pprInstr platform instr = case instr of
   CSET o l r c  -> case c of
     EQ | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tseqz" <+> pprOp platform o <> comma <+> pprOp platform o]
-    EQ | isFloatOp l && isFloatOp r -> line $ binOp "\tfeq.s"
+    EQ | isFloatOp l && isFloatOp r -> line $ binOp ("\tfeq." ++ floatOpPrecision platform l r)
     NE | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o]
     --    feq.s   a0,fa0,fa1
@@ -597,10 +597,10 @@ pprInstr platform instr = case instr of
     UGE -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
     UGT -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l ]
-    OLT | isFloatOp l && isFloatOp r -> line $ binOp "\tflt.s"
-    OLE | isFloatOp l && isFloatOp r -> line $ binOp "\tfle.s"
-    OGT | isFloatOp l && isFloatOp r -> line $ binOp "\tfgt.s"
-    OGE | isFloatOp l && isFloatOp r -> line $ binOp "\tfge.s"
+    OLT | isFloatOp l && isFloatOp r -> line $ binOp ("\tflt." ++ floatOpPrecision platform l r)
+    OLE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfle." ++ floatOpPrecision platform l r)
+    OGT | isFloatOp l && isFloatOp r -> line $ binOp ("\tfgt." ++ floatOpPrecision platform l r)
+    OGE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfge." ++ floatOpPrecision platform l r)
     x  -> pprPanic "RV64.ppr: unhandled CSET conditional" (text (show x) <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
@@ -612,6 +612,7 @@ pprInstr platform instr = case instr of
       sltuFor l r| (OpImm _) <- r = text "\tsltui"
                  | (OpImm _) <- l = panic "PV64.ppr: Cannot SLTU IMM _"
                  | otherwise      = text "\tsltu"
+      binOp :: (IsLine doc) => String -> doc
       binOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
 
   CBZ o (TBlock bid) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
@@ -686,8 +687,8 @@ pprInstr platform instr = case instr of
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
   SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.l") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
   SCVTF o1 o2 -> pprPanic "RV64.pprInstr - impossible integer to float conversion" $
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
 
@@ -710,6 +711,11 @@ pprInstr platform instr = case instr of
        pprDmbType DmbRead = text "r"
        pprDmbType DmbWrite = text "w"
        pprDmbType DmbReadWrite = text "rw"
+
+floatOpPrecision :: Platform -> Operand -> Operand -> String
+floatOpPrecision p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
+floatOpPrecision p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
+floatOpPrecision p l r = pprPanic "Cannot determine floating point precission" (text "op1" <+> pprOp p l <+> text "op2" <+> pprOp p r)
 
 pprBcond :: IsLine doc => Cond -> doc
 pprBcond c = text "b." <> pprCond c
