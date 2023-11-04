@@ -492,7 +492,6 @@ Note [Worker/wrapper for INLINABLE functions]
 
 Note [Thoughtful forcing in mkCoreUnfolding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Core expressions retained in unfoldings is one of biggest uses of memory when compiling
 a program. Therefore we have to be careful about retaining copies of old or redundant
 templates (see !6202 for a particularly bad case).

@@ -10,8 +10,7 @@ This module contains inlining logic used by the simplifier.
 module GHC.Core.Opt.Simplify.Inline (
         -- * The smart inlining decisions are made by callSiteInline
         callSiteInline,
-
-        exprSummary
+        exprDigest
     ) where
 
 import GHC.Prelude
@@ -33,7 +32,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.List (isPrefixOf)
+import Data.List ( isPrefixOf )
 
 {-
 ************************************************************************
@@ -277,7 +276,8 @@ tryUnfolding logger env fn cont unf_template unf_cache guidance
           some_benefit = calc_some_benefit uf_arity True
           enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
-     UnfIfGoodArgs { ug_args = arg_bndrs, ug_tree = expr_tree }
+     UnfIfGoodArgs { ug_args = val_arg_bndrs
+                   , ug_tree = expr_tree@(ExprTree { et_ret = ret_discount}) }
         | isJoinId id, small_enough         -> inline_join_point
         | unfoldingVeryAggressive opts      -> yes
         | is_wf, some_benefit, small_enough -> yes
@@ -309,30 +309,23 @@ tryUnfolding logger env fn cont unf_template unf_cache guidance
                            , text "depth based penalty =" <+> int depth_penalty
                            , text "discounted size =" <+> int adjusted_size ]
 
-          n_bndrs = length arg_bndrs
+          n_bndrs       = length arg_bndrs
           some_benefit  = calc_some_benefit n_bndrs
           small_enough  = adjusted_size <= unfoldingUseThreshold opts
           rhs_size      = exprTreeSize context expr_tree
-          adjusted_size = rhs_size - call_size + depth_penalty
+          adjusted_size = rhs_size - call_size_discount - actual_ret_discount + depth_penalty
 
           --------  Compute the size of the ExprTree in this context -----------
-          want_result
-             | n_bndrs < n_val_args = True  -- Over-saturated
-             | otherwise            = case cont_info of
-                                        BoringCtxt -> False
-                                        _          -> True
+          context = IC { ic_bound = bound_env
+                       , ic_free  = getFreeDigest }
 
-          bound_env = mkVarEnv (arg_bndrs `zip` (arg_infos ++ repeat ArgNoInfo))
-                      -- Crucial to include /all/ arg_bndrs, lest we treat
+          bound_env = mkVarEnv (val_arg_bndrs `zip` (arg_infos ++ repeat ArgNoInfo))
+                      -- Crucial to include /all/ val_arg_bndrs, lest we treat
                       -- them as free and use ic_free instead
-          context = IC { ic_bound    = bound_env
-                       , ic_free     = getFreeSummary
-                       , ic_want_res = want_result }
 
           in_scope = seInScope env
-          getFreeSummary :: Id -> ArgSummary
-          -- Get the ArgSummary of a free variable
-          getFreeSummary x
+          getFreeDigest :: Id -> ArgDigest -- The ArgDigest of a free variable
+          getFreeDigest x
             = case lookupInScope in_scope x of
                 Just x' | warnPprTrace (not (isId x')) "GFS" (vcat
                             [ ppr fn <+> equals <+> ppr unf_template
@@ -340,13 +333,35 @@ tryUnfolding logger env fn cont unf_template unf_cache guidance
                             , ppr x <+> ppr x'
                            ]) True
                         , Just expr <- maybeUnfoldingTemplate (idUnfolding x')
-                        -> exprSummary env expr
+                        -> exprDigest env expr
                 _ -> ArgNoInfo
 
           -------- Size adjustements ----------------
           -- Subtract size of the call, because the result replaces the call
           -- We count 10 for the function itself, 10 for each arg supplied,
-          call_size = 10 + 10*n_val_args
+          -- plus an extra discount of 10 for each argument which has
+          -- interesting info, regardless of the function body.
+          call_size_discount = 10 + args_discount
+          args_discount = foldr ((+) . arg_discount) 0 (take n_bndrs arg_infos)
+          arg_discount arg_info | hasArgInfo arg_info = 20
+                                | otherwise           = 10
+
+          actual_ret_discount | n_bndrs < n_val_args
+                              = ret_discount
+                              | otherwise
+                              = case cont_info of
+                                  BoringCtxt  -> 0
+                                  DiscArgCtxt -> 0
+                                  RuleArgCtxt -> ret_discount
+                                  CaseCtxt    -> ret_discount
+                                  ValAppCtxt  -> ret_discount
+                                  RhsCtxt {}  -> 40 `min` ret_discount
+                -- For RhsCtxt I suppose that exposing a data con is good in general;
+                -- although 40 seems very arbitrary
+                --
+                -- `min` thresholding: res_discount can be very large when a
+                -- function returns constructors; but we only want to invoke
+                -- that large discount when there's a case continuation.
 
           -- Adjust by the depth scaling
           -- See Note [Avoid inlining into deeply nested cases]
@@ -368,10 +383,6 @@ tryUnfolding logger env fn cont unf_template unf_cache guidance
     cont_info        = interestingCallContext env call_cont
     case_depth       = seCaseDepth env
     opts             = seUnfoldingOpts env
-    interesting_args = any hasArgInfo arg_infos
-                -- NB: (any hasArgInfo arg_infos) looks at the
-                -- over-saturated args too which is "wrong";
-                -- but if over-saturated we inline anyway.
 
     -- Unpack the UnfoldingCache lazily because it may not be needed, and all
     -- its fields are strict; so evaluating unf_cache at all forces all the
@@ -393,6 +404,10 @@ tryUnfolding logger env fn cont unf_template unf_cache guidance
        | otherwise = interesting_args   -- Saturated or over-saturated
                   || interesting_call
       where
+        interesting_args = any hasArgInfo arg_infos
+          -- NB: (any hasArgInfo arg_infos) looks at the
+          -- over-saturated args too which is "wrong";
+          -- but if over-saturated we return True anyway
         saturated      = n_val_args >= uf_arity
         over_saturated = n_val_args > uf_arity
 
@@ -711,7 +726,7 @@ which Roman did.
 
 {- *********************************************************************
 *                                                                      *
-                  Computing ArgSummary
+                  Computing ArgDigest
 *                                                                      *
 ********************************************************************* -}
 
@@ -747,7 +762,7 @@ rule for (*) (df d) can fire.  To do this
 -}
 
 -------------------
-contArgs :: SimplCont -> ( [ArgSummary]   -- One for each value argument
+contArgs :: SimplCont -> ( [ArgDigest]   -- One for each value argument
                          , SimplCont )    -- The rest
 -- Summarises value args, discards type args and casts.
 -- The returned continuation of the call is only used to
@@ -755,7 +770,7 @@ contArgs :: SimplCont -> ( [ArgSummary]   -- One for each value argument
 contArgs cont = go [] cont
   where
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (exprSummary se arg : args) k
+                                        = go (exprDigest se arg : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt _ k)                = go args k
     go args k                           = (reverse args, k)
@@ -767,7 +782,7 @@ loneVariable (CastIt {})     = False  --     stops it being "lone"
 loneVariable _               = True
 
 ------------------------------
-exprSummary :: SimplEnv -> CoreExpr -> ArgSummary
+exprDigest :: SimplEnv -> CoreExpr -> ArgDigest
 -- Very simple version of exprIsConApp_maybe
 -- But /do/ take the SimplEnv into account.  We must:
 -- (a) Apply the substitution.  E.g
@@ -777,11 +792,11 @@ exprSummary :: SimplEnv -> CoreExpr -> ArgSummary
 -- (b) Refine using the in-scope set. E.g
 --       \x. ....case x of { (a,b) -> ...f x... }....
 --     We want to see that x is (a,b) at the call site of f
-exprSummary env e = go env e []
+exprDigest env e = go env e []
   where
     go :: SimplEnv -> CoreExpr
        -> [CoreExpr]   -- Value arg only
-       -> ArgSummary
+       -> ArgDigest
     go env (Cast e _) as = go env e as
     go env (Tick _ e) as = go env e as
     go env (App f a)  as | isValArg a = go env f (a:as)
@@ -792,8 +807,14 @@ exprSummary env e = go env e []
       | let env' = env `addNewInScopeIds` bindersOf b
       = go env' e as
 
-{-
-    -- Look through single-branch case-expressions; like lets
+{-  -- Look through single-branch case-expressions; like lets
+    -- This is a bit aggressive, because we might have
+    --     f (case x of (a,b) -> (b,a))
+    -- where   f p = Just (case p of (a,b) -> a)
+    -- So f is lazy, and we won't get cancellation of the case in the body.
+    --
+    -- If f is strict and we don't inline, we'll float the case out, so we don't
+    -- need to be clever here.
     go env (Case _ b _ alts) as
       | [Alt _ bs e] <- alts
       , let env' = env `addNewInScopeIds` (b:bs)
@@ -820,22 +841,34 @@ exprSummary env e = go env e []
       where
         env' = modifyInScope env b  -- Tricky corner here
 
-    go _ _ _ = ArgIsNot []    -- Some structure; not all boring
-                              -- Example of improvement: base/tests/T9848
+    go _ _ _ = ArgNonTriv  -- Some structure; not all boring
+                           -- Example of improvement: base/tests/T9848
 
     go_var :: SimplEnv -> Id
            -> [CoreExpr]   -- Value args only
-           -> ArgSummary
+           -> ArgDigest
     go_var env f val_args
       | Just con <- isDataConWorkId_maybe f
-      = ArgIsCon (DataAlt con) (map (exprSummary env) val_args)
-
-      | DFunUnfolding {} <- unfolding
-      = ArgIsNot []  -- Says "this is a data con" without saying which
-                     -- Will also return this for ($df d1 .. dn)
+      = ArgIsCon (DataAlt con) (map (exprDigest env) val_args)
 
       | Just rhs <- expandUnfolding_maybe unfolding
       = go (zapSubstEnv env) rhs val_args
+
+--      | DFunUnfolding {} <- unfolding
+      | hasSomeUnfolding unfolding
+      = ArgIsNot []  -- We (slightly hackily) use ArgIsNot [] for dfun applications
+                     -- ($df d1 .. dn).  This is very important to encourage inlining
+                     -- of overloaded functions.  Example. GHC.Base.liftM2. It has
+                     -- three uses of its dict arg, each of which attracts a ScrutOf
+                     -- discount.  But the ArgDigest had better be good enough to
+                     -- attract that ScrutOf discount!  We want liftM2 to be inlined
+                     -- in its use in the liftA2 method of instance Applicative (ST s)
+                     --
+                     -- Actually in spectral/puzzle I found that we got a big (40%!)
+                     -- benefit from    let newDest = ... in case (notSeen newDest) of ...
+                     -- We want to inline notSeen.  The argument has structure (its RHS)
+                     -- and in fact if we inline notSeen, newDest stops being a thunk
+                     -- (SPJ GHC log 13 Nov).
 
       | OtherCon cs <- unfolding
       = ArgIsNot cs
@@ -844,9 +877,9 @@ exprSummary env e = go env e []
       = ArgIsLam
 
       | not (null val_args)
-      = ArgIsNot []   -- Use ArgIsNot [] for args with some structure e.g. (f xs)
-                      -- This makes the call not totally-boring, and hence makes
-                      -- INLINE things inline (which they won't if all args are boring)
+      = ArgNonTriv  -- Use ArgNonTriv args with some structure e.g. (f xs)
+                    -- This makes the call not totally-boring, and hence makes
+                    -- INLINE things inline (which they won't if all args are boring)
 
       | otherwise
       = ArgNoInfo

@@ -579,7 +579,7 @@ substExprTree id_env et@(ExprTree { et_size = size, et_cases = cases })
         where
           id_env' = id_env `delVarEnv` case_bndr
           alts' = map (subst_alt id_env') alts
-          extra = altTreesSize alts
+          extra = altTreesSize v alts
 
      subst_alt id_env (AltTree con bs rhs)
         = AltTree con bs (substExprTree id_env' rhs)
