@@ -432,7 +432,6 @@ isMetaInstr instr
     COMMENT{}   -> True
     MULTILINE_COMMENT{} -> True
     LOCATION{}  -> True
-    LDATA{}     -> True
     NEWBLOCK{}  -> True
     DELTA{}     -> True
     PUSH_STACK_FRAME -> True
@@ -534,11 +533,6 @@ data Instr
 
     -- location pseudo-op (file, line, col, name)
     | LOCATION Int Int Int String
-
-    -- some static data spat out during code
-    -- generation.  Will be extracted before
-    -- pretty-printing.
-    | LDATA   Section RawCmmStatics
 
     -- start a new basic block.  Useful during
     -- codegen, removed later.  Preceding
@@ -672,7 +666,6 @@ instrCon i =
       MULTILINE_COMMENT{} -> "COMMENT"
       ANN{} -> "ANN"
       LOCATION{} -> "LOCATION"
-      LDATA{} -> "LDATA"
       NEWBLOCK{} -> "NEWBLOCK"
       DELTA{} -> "DELTA"
       SXTB{} -> "SXTB"

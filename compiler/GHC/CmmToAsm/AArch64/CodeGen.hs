@@ -162,8 +162,9 @@ basicBlockCodeGen block = do
   --      unwinding info. See Ticket 19913
   -- code generation may introduce new basic block boundaries, which
   -- are indicated by the NEWBLOCK instruction.  We must split up the
-  -- instruction stream into basic blocks again.  Also, we extract
-  -- LDATAs here too.
+  -- instruction stream into basic blocks again. Also, we may extract
+  -- LDATAs here too (if they are implemented by AArch64 again - See
+  -- PPC how to do that.)
   let
         (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
 
@@ -174,8 +175,6 @@ mkBlocks :: Instr
           -> ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g])
 mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
   = ([], BasicBlock id instrs : blocks, statics)
-mkBlocks (LDATA sec dat) (instrs,blocks,statics)
-  = (instrs, blocks, CmmData sec dat:statics)
 mkBlocks instr (instrs,blocks,statics)
   = (instr:instrs, blocks, statics)
 -- -----------------------------------------------------------------------------

@@ -357,7 +357,6 @@ pprInstr platform instr = case instr of
                       -- in the final instruction stream. But we still want to be able to
                       -- print it for debugging purposes.
                       line (text "BLOCK " <> pprAsmLabel platform (blockLbl blockid))
-  LDATA _ _  -> panic "pprInstr: LDATA"
 
   -- Pseudo Instructions -------------------------------------------------------
 
