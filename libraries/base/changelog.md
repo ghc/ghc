@@ -1,5 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.17.2.1 *November 2023*
+
+   * Add missing int64/word64-to-double/float rules ([CLC Proposal #203](https://github.com/haskell/core-libraries-committee/issues/203))
+
+   * Improve String & IsString documentation.
+
 ## 4.17.2.0 *August 2023*
 
    * Restore `mingwex` dependency on Windows (#23309).

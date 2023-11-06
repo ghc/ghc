@@ -1,6 +1,6 @@
-.. _release-9-4-7:
+.. _release-9-4-8:
 
-Version 9.4.7
+Version 9.4.8
 ==============
 
 The significant changes to the various parts of the compiler are listed in the
@@ -17,25 +17,40 @@ Issues fixed in this release include:
 Compiler
 --------
 
-- Fix a number of scoping bugs in the specialiser, prevent simplifier
-  panics (:ghc-ticket:`21391`, :ghc-ticket:`21689`, :ghc-ticket:`21828`,
-  :ghc-ticket:`23762`).
+- Fix a recompilation checking bug where GHC may miss changes in transitive
+  dependencies when deciding to relink a program (:ghc-ticket:`23724`).
+- Fix a compiler panic resulting from incorrect eta-reduction of join points
+  (:ghc-ticket:`23922`).
+- Fix a code generator bug on AArch64 platforms resulting in invalid conditional
+  jumps (:ghc-ticket:`23746`).
+- Improve STG code generation in certain scenarios (:ghc-ticket:`23783`).
+- Fix a bug where we could silently truncate 64 bit values to 32 bit on
+  32 bit architectures.
+- Fix ``-split-sections`` on Windows (:ghc-ticket:`22834`).
+
+Runtime system
+--------------
+
+- Remove an assertion prone to race conditions (:ghc-ticket:`22563`).
+- Fix some crashes and loops with the non-moving GC (:ghc-ticket:`24042, :ghc-ticket:`23003`).
+- Properly escape characters when writing JSON profiles (``-pJ``) (:ghc-ticket:`23924`).
 
 Build system and packaging
 --------------------------
 
-- Allow building documentation with sphinx versions older than ``4.0`` along
-  with older versions of ``python`` (:ghc-ticket:`23807`, :ghc-ticket:`23818`).
-
-- Also build vanilla (non-static) alpine bindists (:ghc-ticket:`23349`, :ghc-ticket:`23828`).
-
-- Make hadrian buildable with Cabal-3.8.
+- Ensure ``-split-sections`` is enabled while building binary distributions for
+  all platforms where this is supported (:ghc-ticket:`21135`).
+- Make the configure script use ``AC_PATH_TOOL`` instead of ``AC_PATH_PROG`` to
+  detect tools, making cross-compilation easier (:ghc-ticket:`21601`).
+- Fix a bug where ``-DNOSMP`` wasn't being passed to the C compiler even if the
+  target doesn't support SMP (:ghc-ticket:`24082`).
 
 Core libraries
 --------------
 
-- Bump ``bytestring`` to 0.11.5.2 (:ghc-ticket:`23789`), allowing GHC to be
-  bootstrapped on systems having ``HAVE_PTHREAD_CONDATTR_SETCLOCK``
+- Bump ``base`` to 4.17.2.1
+- Bump ``bytestring`` to 0.11.5.3
+- Bump ``process`` to 1.6.18.0
 
 Included libraries
 ------------------
