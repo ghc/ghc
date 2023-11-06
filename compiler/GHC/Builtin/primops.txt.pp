@@ -2907,20 +2907,20 @@ section "Continuations"
     expectations or invariants of the enclosing computation. }
 ------------------------------------------------------------------------
 
-primtype PromptTag# a
+primtype PromptTag# s a
    { See "GHC.Prim#continuations". }
 
 primop  NewPromptTagOp "newPromptTag#" GenPrimOp
-        State# RealWorld -> (# State# RealWorld, PromptTag# a #)
+        State# s -> (# State# s, PromptTag# s a #)
    { See "GHC.Prim#continuations". }
    with
    out_of_line = True
    effect = ReadWriteEffect
 
 primop  PromptOp "prompt#" GenPrimOp
-        PromptTag# a
-     -> (State# RealWorld -> (# State# RealWorld, a #))
-     -> State# RealWorld -> (# State# RealWorld, a #)
+        PromptTag# s a
+     -> (State# s -> (# State# s, a #))
+     -> State# s -> (# State# s, a #)
    { See "GHC.Prim#continuations". }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, strictOnceApply1Dmd, topDmd] topDiv }
@@ -2928,11 +2928,11 @@ primop  PromptOp "prompt#" GenPrimOp
    effect = ReadWriteEffect
 
 primop  Control0Op "control0#" GenPrimOp
-        PromptTag# a
-     -> (((State# RealWorld -> (# State# RealWorld, b_reppoly #))
-          -> State# RealWorld -> (# State# RealWorld, a #))
-         -> State# RealWorld -> (# State# RealWorld, a #))
-     -> State# RealWorld -> (# State# RealWorld, b_reppoly #)
+        PromptTag# s a
+     -> (((State# s -> (# State# s, b_reppoly #))
+          -> State# s -> (# State# s, a #))
+         -> State# s -> (# State# s, a #))
+     -> State# s -> (# State# s, b_reppoly #)
    { See "GHC.Prim#continuations". }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, lazyApply2Dmd, topDmd] topDiv }

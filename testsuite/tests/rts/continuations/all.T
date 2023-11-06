@@ -9,3 +9,5 @@ test('cont_nondet_handler', [extra_files(['ContIO.hs'])], multimod_compile_and_r
 test('cont_stack_overflow', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_stack_overflow', '-with-rtsopts "-ki1k -kc2k -kb256"'])
 
 test('T23513', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['T23513', ''])
+
+test('cont_st_abort', [extra_files(['ContST.hs'])], multimod_compile_and_run, ['cont_st_abort', ''])

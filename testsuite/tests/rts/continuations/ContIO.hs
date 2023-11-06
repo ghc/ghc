@@ -8,7 +8,7 @@ module ContIO where
 import GHC.Prim
 import GHC.Types
 
-data PromptTag a = PromptTag (PromptTag# a)
+data PromptTag a = PromptTag (PromptTag# RealWorld a)
 
 newPromptTag :: IO (PromptTag a)
 newPromptTag = IO (\s -> case newPromptTag# s of

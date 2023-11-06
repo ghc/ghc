@@ -134,7 +134,7 @@ sameIOPort# :: forall {l} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a
 sameIOPort# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'PromptTag#'s.
-samePromptTag# :: forall a. PromptTag# a -> PromptTag# a -> Int#
+samePromptTag# :: forall s a. PromptTag# s a -> PromptTag# s a -> Int#
 samePromptTag# = unsafePtrEquality#
 
 -- Note [Comparing stable names]

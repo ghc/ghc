@@ -1438,10 +1438,10 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName unliftedRepTy
 -}
 
 promptTagPrimTyCon :: TyCon
-promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Representational] unliftedRepTy
+promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkPromptTagPrimTy :: Type -> Type
-mkPromptTagPrimTy v = TyConApp promptTagPrimTyCon [v]
+mkPromptTagPrimTy :: Type -> Type -> Type
+mkPromptTagPrimTy s v = TyConApp promptTagPrimTyCon [s, v]
 
 {-
 ************************************************************************

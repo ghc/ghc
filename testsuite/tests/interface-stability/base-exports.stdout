@@ -3330,8 +3330,9 @@ module GHC.Base where
     {-# MINIMAL compare | (<=) #-}
   type Ordering :: *
   data Ordering = LT | EQ | GT
-  type PromptTag# :: * -> UnliftedType
-  data PromptTag# a
+  type role PromptTag# nominal representational
+  type PromptTag# :: * -> * -> UnliftedType
+  data PromptTag# a b
   type role Proxy# phantom
   type Proxy# :: forall k. k -> ZeroBitType
   data Proxy# a
@@ -3573,7 +3574,7 @@ module GHC.Base where
   compareWord :: Word -> Word -> Ordering
   compareWord# :: Word# -> Word# -> Ordering
   const :: forall a b. a -> b -> a
-  control0# :: forall {r :: RuntimeRep} a (b :: TYPE r). PromptTag# a -> (((State# RealWorld -> (# State# RealWorld, b #)) -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, b #)
+  control0# :: forall {r :: RuntimeRep} d a (b :: TYPE r). PromptTag# d a -> (((State# d -> (# State# d, b #)) -> State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)) -> State# d -> (# State# d, b #)
   copyAddrToAddr# :: Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
   copyAddrToAddrNonOverlapping# :: Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
   copyAddrToByteArray# :: forall d. Addr# -> MutableByteArray# d -> Int# -> Int# -> State# d -> State# d
@@ -4094,7 +4095,7 @@ module GHC.Base where
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
-  newPromptTag# :: forall a. State# RealWorld -> (# State# RealWorld, PromptTag# a #)
+  newPromptTag# :: forall d a. State# d -> (# State# d, PromptTag# d a #)
   newSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Int# -> a -> State# d -> (# State# d, SmallMutableArray# d a #)
   newTVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, TVar# d a #)
   noDuplicate# :: forall d. State# d -> State# d
@@ -4223,7 +4224,7 @@ module GHC.Base where
   prefetchValue1# :: forall a d. a -> State# d -> State# d
   prefetchValue2# :: forall a d. a -> State# d -> State# d
   prefetchValue3# :: forall a d. a -> State# d -> State# d
-  prompt# :: forall a. PromptTag# a -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
+  prompt# :: forall d a. PromptTag# d a -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   proxy# :: forall {k} (a :: k). Proxy# a
   putMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> a -> State# d -> State# d
   quotInt :: Int -> Int -> Int
@@ -4500,7 +4501,7 @@ module GHC.Base where
   sameMutVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutVar# s a -> MutVar# s a -> Int#
   sameMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
   sameMutableByteArray# :: forall s. MutableByteArray# s -> MutableByteArray# s -> Int#
-  samePromptTag# :: forall a. PromptTag# a -> PromptTag# a -> Int#
+  samePromptTag# :: forall s a. PromptTag# s a -> PromptTag# s a -> Int#
   sameSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). SmallArray# a -> SmallArray# a -> Int#
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
@@ -5446,8 +5447,9 @@ module GHC.Exts where
   data MutableByteArray# a
   type Ordering :: *
   data Ordering = LT | EQ | GT
-  type PromptTag# :: * -> UnliftedType
-  data PromptTag# a
+  type role PromptTag# nominal representational
+  type PromptTag# :: * -> * -> UnliftedType
+  data PromptTag# a b
   type role Proxy# phantom
   type Proxy# :: forall k. k -> ZeroBitType
   data Proxy# a
@@ -5672,7 +5674,7 @@ module GHC.Exts where
   compactSize# :: Compact# -> State# RealWorld -> (# State# RealWorld, Word# #)
   compareByteArrays# :: ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
   considerAccessible :: Bool
-  control0# :: forall {r :: RuntimeRep} a (b :: TYPE r). PromptTag# a -> (((State# RealWorld -> (# State# RealWorld, b #)) -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, b #)
+  control0# :: forall {r :: RuntimeRep} d a (b :: TYPE r). PromptTag# d a -> (((State# d -> (# State# d, b #)) -> State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)) -> State# d -> (# State# d, b #)
   copyAddrToAddr# :: Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
   copyAddrToAddrNonOverlapping# :: Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
   copyAddrToByteArray# :: forall d. Addr# -> MutableByteArray# d -> Int# -> Int# -> State# d -> State# d
@@ -6149,7 +6151,7 @@ module GHC.Exts where
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
-  newPromptTag# :: forall a. State# RealWorld -> (# State# RealWorld, PromptTag# a #)
+  newPromptTag# :: forall d a. State# d -> (# State# d, PromptTag# d a #)
   newSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Int# -> a -> State# d -> (# State# d, SmallMutableArray# d a #)
   newTVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, TVar# d a #)
   noDuplicate# :: forall d. State# d -> State# d
@@ -6275,7 +6277,7 @@ module GHC.Exts where
   prefetchValue1# :: forall a d. a -> State# d -> State# d
   prefetchValue2# :: forall a d. a -> State# d -> State# d
   prefetchValue3# :: forall a d. a -> State# d -> State# d
-  prompt# :: forall a. PromptTag# a -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
+  prompt# :: forall d a. PromptTag# d a -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   proxy# :: forall {k} (a :: k). Proxy# a
   putMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> a -> State# d -> State# d
   quotInt# :: Int# -> Int# -> Int#
@@ -6555,7 +6557,7 @@ module GHC.Exts where
   sameMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
   sameMutableArrayArray# :: forall s. MutableArrayArray# s -> MutableArrayArray# s -> Int#
   sameMutableByteArray# :: forall s. MutableByteArray# s -> MutableByteArray# s -> Int#
-  samePromptTag# :: forall a. PromptTag# a -> PromptTag# a -> Int#
+  samePromptTag# :: forall s a. PromptTag# s a -> PromptTag# s a -> Int#
   sameSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). SmallArray# a -> SmallArray# a -> Int#
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#

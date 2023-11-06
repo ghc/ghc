@@ -21,7 +21,7 @@ test2 :: forall {r} (a :: TYPE r) (b :: TYPE (BoxedRep Lifted))
 test2 action handle s = catch# action handle s
 
 test3 :: forall {r} a (b :: TYPE r)
-      .  PromptTag# a
+      .  PromptTag# RealWorld a
       -> (((State# RealWorld -> (# State# RealWorld, b #))
            -> State# RealWorld -> (# State# RealWorld, a #))
           -> State# RealWorld -> (# State# RealWorld, a #))
