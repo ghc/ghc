@@ -149,6 +149,7 @@ import GHC.JS.JStg.Monad
 import GHC.JS.Transform
 
 import Control.Arrow ((***))
+import Control.Monad (replicateM)
 import Data.Tuple
 
 import qualified Data.Map as M
@@ -325,7 +326,7 @@ jFunctionSized
   -> ([JStgExpr] -> JSM JStgStat) -- ^ function body, input is locally unique generated variables
   -> JSM JStgStat
 jFunctionSized name arity body = do
-  func_args <- newIdents arity
+  func_args <- replicateM arity newIdent
   FuncStat name func_args <$> (body $ toJExpr <$> func_args)
 
 -- | Construct a top-level function subject to JS hoisting. Special case where

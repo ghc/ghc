@@ -40,7 +40,6 @@ module GHC.JS.JStg.Monad
   , JSM
   , withTag
   , newIdent
-  , newIdents
   , initJSM
   ) where
 
@@ -94,19 +93,6 @@ newIdent = do env <- get
 
 mk_ident :: FastString -> Unique -> Ident
 mk_ident t i = global (mconcat [t, "_", mkFastString (show i)])
-
-
-
--- | A special case optimization over @newIdent@. Given a number of @Ident@ to
--- generate, generate all of them at one time and update the state once rather
--- than n times.
-newIdents :: Int -> JSM [Ident]
-newIdents 0 = return []
-newIdents n = do env <- get
-                 let is  = take n (uniqsFromSupply $ ids env)
-                     tag = prefix env
-                 return $ fmap (mk_ident tag) is
-
 
 -- | Set the tag for @Ident@s for all remaining computations.
 tag_names :: FastString -> JSM ()
