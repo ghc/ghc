@@ -392,6 +392,8 @@ def _omit_ways( name: TestName, opts, ways: List[WayName] ):
     _lint_ways(name, ways)
     opts.omit_ways += ways
 
+omit_ghci = omit_ways([WayName('ghci'), WayName('ghci-opt')])
+
 # -----
 
 def only_ways( ways: List[WayName] ):
