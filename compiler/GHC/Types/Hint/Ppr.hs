@@ -215,6 +215,9 @@ instance Outputable GhcHint where
           what = case cls_or_qc of
             IsClsInst -> text "instance context"
             IsQC {}   -> text "context of the quantified constraint"
+    SuggestBindTyVarExplicitly tv
+      -> text "bind" <+> quotes (ppr tv)
+         <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

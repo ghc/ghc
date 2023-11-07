@@ -422,6 +422,9 @@ data GhcHint
 
   | LoopySuperclassSolveHint PredType ClsInstOrQC
 
+  {-| Suggest binding explicitly; e.g   data T @k (a :: F k) = .... -}
+  | SuggestBindTyVarExplicitly Name
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

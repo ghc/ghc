@@ -456,6 +456,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInvalidVisibleKindArgument"                = 20967
   GhcDiagnosticCode "TcRnTooManyBinders"                            = 05989
   GhcDiagnosticCode "TcRnDifferentNamesForTyVar"                    = 17370
+  GhcDiagnosticCode "TcRnDisconnectedTyVar"                         = 59738
   GhcDiagnosticCode "TcRnInvalidReturnKind"                         = 55233
   GhcDiagnosticCode "TcRnClassKindNotConstraint"                    = 80768
   GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634

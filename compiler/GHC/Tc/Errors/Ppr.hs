@@ -890,6 +890,12 @@ instance Diagnostic TcRnMessage where
                             -- Note [Swizzling the tyvars before generaliseTcTyCon]
                 = vcat [ quotes (ppr n1) <+> text "bound at" <+> ppr (getSrcLoc n1)
                        , quotes (ppr n2) <+> text "bound at" <+> ppr (getSrcLoc n2) ]
+
+    TcRnDisconnectedTyVar n
+      -> mkSimpleDecorated $
+           hang (text "Scoped type variable only appears non-injectively in declaration header:")
+              2 (quotes (ppr n) <+> text "bound at" <+> ppr (getSrcLoc n))
+
     TcRnInvalidReturnKind data_sort allowed_kind kind _suggested_ext
       -> mkSimpleDecorated $
            sep [ ppDataSort data_sort <+>
@@ -1535,6 +1541,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDifferentNamesForTyVar{}
       -> ErrorWithoutFlag
+    TcRnDisconnectedTyVar{}
+      -> ErrorWithoutFlag
     TcRnInvalidReturnKind{}
       -> ErrorWithoutFlag
     TcRnClassKindNotConstraint{}
@@ -1944,6 +1952,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnDifferentNamesForTyVar{}
       -> noHints
+    TcRnDisconnectedTyVar n
+      -> [SuggestBindTyVarExplicitly n]
     TcRnInvalidReturnKind _ _ _ mb_suggest_unlifted_ext
       -> case mb_suggest_unlifted_ext of
            Nothing -> noHints
