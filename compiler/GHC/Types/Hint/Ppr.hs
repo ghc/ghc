@@ -266,6 +266,9 @@ instance Outputable GhcHint where
             ppr_r = quotes $ ppr r
     SuggestBindTyVarOnLhs tv
       -> text "Bind" <+> quotes (ppr tv) <+> text "on the LHS of the type declaration"
+    SuggestBindTyVarExplicitly tv
+      -> text "bind" <+> quotes (ppr tv)
+         <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
