@@ -539,7 +539,7 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
                                  CLRLI arch_fmt dst src1 (arch_bits - size)
                  return (Any (intFormat to) code)
 
-getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
+getRegister' _ platform (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
       MO_F_Eq _ -> condFltReg EQQ x y
       MO_F_Ne _ -> condFltReg NE  x y
@@ -622,8 +622,9 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
                 (src, srcCode) <- getSomeReg x
                 let clear_mask = if imm == -4 then 2 else 3
                     fmt = intFormat rep
+                    arch_fmt = intFormat (wordWidth platform)
                     code dst = srcCode
-                               `appOL` unitOL (CLRRI fmt dst src clear_mask)
+                      `appOL` unitOL (CLRRI arch_fmt dst src clear_mask)
                 return (Any fmt code)
         _ -> trivialCode rep False AND x y
       MO_Or rep    -> trivialCode rep False OR x y
