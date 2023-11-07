@@ -12,7 +12,7 @@ AC_DEFUN([FP_LD_NO_FIXUP_CHAINS], [
       echo 'int main(void) {return 0;}' > conftest.c
       if $CC -o conftest.o -Wl,-no_fixup_chains conftest.c > /dev/null 2>&1
       then
-          $2="-Wl,-no_fixup_chains"
+          $2="$$2 -Wl,-no_fixup_chains"
           AC_MSG_RESULT([yes])
       else
           AC_MSG_RESULT([no])
