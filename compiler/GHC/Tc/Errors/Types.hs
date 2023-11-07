@@ -2276,6 +2276,13 @@ data TcRnMessage where
   -}
   TcRnDifferentNamesForTyVar :: !Name -> !Name -> TcRnMessage
 
+  {-| TcRnDisconnectedTyVar is an error for a data declaration that has a kind signature,
+      where the implicitly-bound type type variables can't be matched up unambiguously
+      with the ones from the signature. See Note [Disconnected type variables] in
+      GHC.Tc.Gen.HsType.
+  -}
+  TcRnDisconnectedTyVar :: !Name -> TcRnMessage
+
   {-| TcRnInvalidReturnKind is an error for a data declaration that has a kind signature
      with an invalid result kind.
 

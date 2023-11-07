@@ -271,6 +271,9 @@ instance Outputable GhcHint where
     SuggestExplicitQuantification tv
       -> hsep [ text "Use an explicit", quotes (text "forall")
               , text "to quantify over", quotes (ppr tv) ]
+    SuggestBindTyVarExplicitly tv
+      -> text "bind" <+> quotes (ppr tv)
+         <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

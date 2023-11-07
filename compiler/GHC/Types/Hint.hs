@@ -480,6 +480,10 @@ data GhcHint
   {-| Suggest explicitly quantifying a type variable instead of relying on implicit quantification -}
   | SuggestExplicitQuantification RdrName
 
+
+  {-| Suggest binding explicitly; e.g   data T @k (a :: F k) = .... -}
+  | SuggestBindTyVarExplicitly Name
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

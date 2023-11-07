@@ -2608,6 +2608,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
         ; checkForDuplicateScopedTyVars implicit_prs
+        ; checkForDisconnectedScopedTyVars all_tcbs implicit_prs
 
         -- Swizzle the Names so that the TyCon uses the user-declared implicit names
         -- E.g  type T :: k -> Type
@@ -2621,11 +2622,11 @@ kcCheckDeclHeader_sig sig_kind name flav
               all_tv_prs             = mkTyVarNamePairs (binderVars swizzled_tcbs)
 
         ; traceTc "kcCheckDeclHeader swizzle" $ vcat
-          [ text "implicit_prs = "  <+> ppr implicit_prs
-          , text "implicit_nms = "  <+> ppr implicit_nms
-          , text "hs_tv_bndrs = "  <+> ppr hs_tv_bndrs
-          , text "all_tcbs = "      <+> pprTyVars (binderVars all_tcbs)
-          , text "swizzled_tcbs = " <+> pprTyVars (binderVars swizzled_tcbs)
+          [ text "sig_tcbs ="       <+> ppr sig_tcbs
+          , text "implicit_prs ="   <+> ppr implicit_prs
+          , text "hs_tv_bndrs ="    <+> ppr hs_tv_bndrs
+          , text "all_tcbs ="       <+> pprTyVars (binderVars all_tcbs)
+          , text "swizzled_tcbs ="  <+> pprTyVars (binderVars swizzled_tcbs)
           , text "tycon_res_kind =" <+> ppr tycon_res_kind
           , text "swizzled_kind ="  <+> ppr swizzled_kind ]
 
@@ -2963,6 +2964,22 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
+checkForDisconnectedScopedTyVars :: [TcTyConBinder] -> [(Name,TcTyVar)] -> TcM ()
+-- See Note [Disconnected type variables]
+-- `scoped_prs` is the mapping gotten by unifying
+--    - the standalone kind signature for T, with
+--    - the header of the type/class declaration for T
+checkForDisconnectedScopedTyVars sig_tcbs scoped_prs
+  = mapM_ report_disconnected (filterOut ok scoped_prs)
+  where
+    sig_tvs = mkVarSet (binderVars sig_tcbs)
+    ok (_, tc_tv) = tc_tv `elemVarSet` sig_tvs
+
+    report_disconnected :: (Name,TcTyVar) -> TcM ()
+    report_disconnected (nm, _)
+      = setSrcSpan (getSrcSpan nm) $
+        addErrTc $ TcRnDisconnectedTyVar nm
+
 checkForDuplicateScopedTyVars :: [(Name,TcTyVar)] -> TcM ()
 -- Check for duplicates
 -- E.g. data SameKind (a::k) (b::k)
@@ -2992,6 +3009,45 @@ checkForDuplicateScopedTyVars scoped_prs
       = setSrcSpan (getSrcSpan n2) $
         addErrTc $ TcRnDifferentNamesForTyVar n1 n2
 
+
+{- Note [Disconnected type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This note applies when kind-checking the header of a type/class decl that has
+a separate, standalone kind signature.  See #24083.
+
+Consider:
+   type S a = Type
+
+   type C :: forall k. S k -> Constraint
+   class C (a :: S kk) where
+     op :: ...kk...
+
+Note that the class has a separate kind signature, so the elaborated decl should
+look like
+   class C @kk (a :: S kk) where ...
+
+But how can we "connect up" the scoped variable `kk` with the skolem kind from the
+standalone kind signature for `C`?  In general we do this by unifying the two.
+For example
+   type T k = (k,Type)
+   type W :: forall k. T k -> Type
+   data W (a :: (x,Type)) = ..blah blah..
+
+When we encounter (a :: (x,Type)) we unify the kind (x,Type) with the kind (T k)
+from the standalone kind signature.  Of course, unification looks through synonyms
+so we end up with the mapping [x :-> k] that connects the scoped type variable `x`
+with the kind from the signature.
+
+But in our earlier example this unification is ineffective -- because `S` is a
+phantom synonym that just discards its argument.  So our plan is this:
+
+  if matchUpSigWithDecl fails to connect `kk with `k`, by unification,
+  we give up and complain about a "disconnected" type variable.
+
+See #24083 for dicussion of alternatives, none satisfactory.  Also the fix is
+easy: just add an explicit `@kk` parameter to the declaration, to bind `kk`
+explicitly, rather than binding it implicitly via unification.
+-}
 
 {- *********************************************************************
 *                                                                      *
