@@ -73,6 +73,7 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
                        ccLinkSupportsCompactUnwind, ccLinkSupportsFilelist,
                        ccLinkIsGnu}
   ccLink <- linkRequiresNoFixupChains archOs cc ccLink
+  ccLink <- linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
   return ccLink
 
 
@@ -320,7 +321,7 @@ addNoAsNeeded archOs cc ccLink
       return ccLink'
   | otherwise = return ccLink
 
--- See if whether we are using a version of ld64 on darwin platforms which
+-- | See if whether we are using a version of ld64 on darwin platforms which
 -- requires us to pass -no_fixup_chains
 linkRequiresNoFixupChains :: ArchOS -> Cc -> CcLink -> M CcLink
 linkRequiresNoFixupChains archOs cc ccLink
@@ -329,4 +330,16 @@ linkRequiresNoFixupChains archOs cc ccLink
        in (ccLink' <$ checkLinkWorks cc (ccLinkProgram ccLink')) <|> return ccLink
   | otherwise = return ccLink
 
+-- | XCode 15 introduced a new linker which warns on duplicate libraries being
+-- linked. To disable this warning, we pass -Wl,-no_warn_duplicate_libraries as
+-- suggested by Brad King in CMake issue #25297.
+--
+-- This flag isn't necessarily available to other linkers on darwin, so we must
+-- only configure it into the CC linker arguments if valid.
+linkRequiresNoWarnDuplicateLibraries :: ArchOS -> Cc -> CcLink -> M CcLink
+linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
+  | OSDarwin <- archOS_OS archOs = checking "whether CC linker requires -no_warn_duplicate_libraries" $
+      let ccLink' = over (_ccLinkProgram % _prgFlags) (++["-Wl,-no_warn_duplicate_libraries"]) ccLink
+       in (ccLink' <$ checkLinkWorks cc (ccLinkProgram ccLink')) <|> return ccLink
+  | otherwise = return ccLink
 
