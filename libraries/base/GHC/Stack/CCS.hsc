@@ -19,6 +19,7 @@
 module GHC.Stack.CCS (
     -- * Call stacks
     currentCallStack,
+    currentCallStackIds,
     whoCreated,
 
     -- * Internals
@@ -31,8 +32,10 @@ module GHC.Stack.CCS (
     ccsParent,
     ccLabel,
     ccModule,
+    ccId,
     ccSrcSpan,
     ccsToStrings,
+    ccsToIds,
     renderStack,
   ) where
 
@@ -83,6 +86,12 @@ ccsCC p = peekByteOff p 4
 ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
 ccsParent p = peekByteOff p 8
 
+-- | Get the id of a 'CostCentre'.
+--
+-- @since 4.20.0.0
+ccId :: Ptr CostCentre -> IO Word32
+ccId p = peekByteOff p 0
+
 ccLabel :: Ptr CostCentre -> IO CString
 ccLabel p = peekByteOff p 4
 
@@ -98,6 +107,12 @@ ccsCC p = (# peek CostCentreStack, cc) p
 -- | Get the tail of a 'CostCentreStack'.
 ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
 ccsParent p = (# peek CostCentreStack, prevStack) p
+
+-- | Get the id of a 'CostCentre'.
+--
+-- @since 4.20.0.0
+ccId :: Ptr CostCentre -> IO Word32
+ccId p = (# peek CostCentre, ccID) p
 
 -- | Get the label of a 'CostCentre'.
 ccLabel :: Ptr CostCentre -> IO CString
@@ -125,6 +140,19 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
 
+-- | Returns a @[Word32]@ representing the current call stack.  This
+-- can be useful for debugging.
+--
+-- The implementation uses the call-stack simulation maintained by the
+-- profiler, so it only works if the program was compiled with @-prof@
+-- and contains suitable SCC annotations (e.g. by using @-fprof-auto@).
+-- Otherwise, the list returned is likely to be empty or
+-- uninformative.
+--
+-- @since 4.20.0.0
+currentCallStackIds :: IO [Word32]
+currentCallStackIds = ccsToIds =<< getCurrentCCS ()
+
 -- | Format a 'CostCentreStack' as a list of lines.
 ccsToStrings :: Ptr CostCentreStack -> IO [String]
 ccsToStrings ccs0 = go ccs0 []
@@ -140,6 +168,24 @@ ccsToStrings ccs0 = go ccs0 []
         if (mdl == "MAIN" && lbl == "MAIN")
            then return acc
            else go parent ((mdl ++ '.':lbl ++ ' ':'(':loc ++ ")") : acc)
+
+-- | Format a 'CostCentreStack' as a list of cost centre IDs.
+--
+-- @since 4.20.0.0
+ccsToIds :: Ptr CostCentreStack -> IO [Word32]
+ccsToIds ccs0 = go ccs0 []
+  where
+    go ccs acc
+     | ccs == nullPtr = return acc
+     | otherwise = do
+        cc <- ccsCC ccs
+        cc_id <- ccId cc
+        lbl <- GHC.peekCString utf8 =<< ccLabel cc
+        mdl <- GHC.peekCString utf8 =<< ccModule cc
+        parent <- ccsParent ccs
+        if (mdl == "MAIN" && lbl == "MAIN")
+           then return acc
+           else go parent (cc_id : acc)
 
 -- | Get the stack trace attached to an object.
 --

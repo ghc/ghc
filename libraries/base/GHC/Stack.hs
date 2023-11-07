@@ -23,6 +23,7 @@ module GHC.Stack (
 
     -- * Profiling call stacks
     currentCallStack,
+    currentCallStackIds,
     whoCreated,
 
     -- * HasCallStack call stacks
@@ -43,8 +44,10 @@ module GHC.Stack (
     ccsParent,
     ccLabel,
     ccModule,
+    ccId,
     ccSrcSpan,
     ccsToStrings,
+    ccsToIds,
     renderStack
   ) where
 
