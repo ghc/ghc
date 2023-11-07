@@ -84,6 +84,8 @@ module GHC.Exts
      traceEvent,
      -- **  The call stack
      currentCallStack,
+     currentCallStackIds,
+     CostCentreId,
      -- *  Ids with special behaviour
      inline,
      noinline,

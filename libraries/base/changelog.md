@@ -50,6 +50,10 @@
 
   * Treat all FDs as "nonblocking" on wasm32 ([CLC proposal #234](https://github.com/haskell/core-libraries-committee/issues/234))
 
+  * Export `CostCentreId` from `GHC.Exts` and `GHC.Stack`
+  * Export `currentCallStackIds` from `GHC.Exts` and `GHC.Stack`
+  * Export `ccId` and `ccsToIds` from `GHC.Stack`
+
 ## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.

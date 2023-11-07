@@ -5373,6 +5373,8 @@ module GHC.Exts where
   data Compact#
   type Constraint :: *
   type Constraint = CONSTRAINT LiftedRep
+  type CostCentreId :: *
+  newtype CostCentreId = ...
   type DataToTag :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
   class DataToTag a where
     dataToTag# :: a -> Int#
@@ -5758,6 +5760,7 @@ module GHC.Exts where
   ctz64# :: Word64# -> Word#
   ctz8# :: Word# -> Word#
   currentCallStack :: GHC.Types.IO [GHC.Internal.Base.String]
+  currentCallStackIds :: GHC.Types.IO [CostCentreId]
   deRefStablePtr# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
   deRefWeak# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
   decodeDouble_2Int# :: Double# -> (# Int#, Word#, Word#, Int# #)
@@ -9302,6 +9305,8 @@ module GHC.Stack where
   data CallStack = ...
   type CostCentre :: *
   data CostCentre
+  type CostCentreId :: *
+  newtype CostCentreId = ...
   type CostCentreStack :: *
   data CostCentreStack
   type HasCallStack :: Constraint
@@ -9309,14 +9314,17 @@ module GHC.Stack where
   type SrcLoc :: *
   data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
   callStack :: HasCallStack => CallStack
+  ccId :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO CostCentreId
   ccLabel :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
   ccModule :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
   ccSrcSpan :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
   ccsCC :: GHC.Internal.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Internal.Ptr.Ptr CostCentre)
   ccsParent :: GHC.Internal.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Internal.Ptr.Ptr CostCentreStack)
+  ccsToIds :: GHC.Internal.Ptr.Ptr CostCentreStack -> GHC.Types.IO [CostCentreId]
   ccsToStrings :: GHC.Internal.Ptr.Ptr CostCentreStack -> GHC.Types.IO [GHC.Internal.Base.String]
   clearCCS :: forall a. GHC.Types.IO a -> GHC.Types.IO a
   currentCallStack :: GHC.Types.IO [GHC.Internal.Base.String]
+  currentCallStackIds :: GHC.Types.IO [CostCentreId]
   emptyCallStack :: CallStack
   errorWithStackTrace :: forall a. GHC.Internal.Base.String -> a
   freezeCallStack :: CallStack -> CallStack
@@ -11557,6 +11565,7 @@ instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CULong -- Define
 instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Bounded GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
+instance GHC.Internal.Enum.Bounded GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
@@ -11632,6 +11641,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CUSeconds -- Define
 instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Enum GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
+instance GHC.Internal.Enum.Enum GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Internal.Enum.Enum GHC.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Enum.Enum GHC.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Enum.Enum GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
@@ -12014,6 +12024,7 @@ instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CULong -- Defined in 
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Num.Num GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Internal.Num.Num GHC.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Num.Num GHC.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Num.Num GHC.Types.Int -- Defined in ‘GHC.Internal.Num’
@@ -12125,6 +12136,7 @@ instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUSeconds -- Define
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
+instance GHC.Internal.Read.Read GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Internal.Read.Read (f (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -12198,6 +12210,7 @@ instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CULLong -- Defi
 instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CULong -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Integral GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Real.Integral GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance forall a k (b :: k). GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Real (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.Real (f (g a)) => GHC.Internal.Real.Real (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -12244,6 +12257,7 @@ instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CULong -- Defined i
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Real.Real GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Internal.Real.Real GHC.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Real.Real GHC.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall a k (b :: k). GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
@@ -12420,6 +12434,7 @@ instance GHC.Internal.Show.Show ghc-internal-0.1.0.0:GHC.Internal.Event.Internal
 instance GHC.Internal.Show.Show ghc-internal-0.1.0.0:GHC.Internal.Event.Manager.FdKey -- Defined in ‘ghc-internal-0.1.0.0:GHC.Internal.Event.Manager’
 instance GHC.Internal.Show.Show ghc-internal-0.1.0.0:GHC.Internal.Event.Manager.State -- Defined in ‘ghc-internal-0.1.0.0:GHC.Internal.Event.Manager’
 instance GHC.Internal.Show.Show ghc-internal-0.1.0.0:GHC.Internal.Event.TimerManager.State -- Defined in ‘ghc-internal-0.1.0.0:GHC.Internal.Event.TimerManager’
+instance GHC.Internal.Show.Show GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Internal.Show.Show GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance GHC.Internal.Show.Show GHC.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Show.Show GHC.Types.Float -- Defined in ‘GHC.Internal.Float’
@@ -12632,6 +12647,7 @@ instance GHC.Classes.Eq ghc-internal-0.1.0.0:GHC.Internal.Event.Manager.State --
 instance GHC.Classes.Eq GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
 instance GHC.Classes.Eq ghc-internal-0.1.0.0:GHC.Internal.Event.TimerManager.State -- Defined in ‘ghc-internal-0.1.0.0:GHC.Internal.Event.TimerManager’
 instance GHC.Classes.Eq GHC.Internal.Stack.Types.SrcLoc -- Defined in ‘GHC.Internal.Stack.Types’
+instance GHC.Classes.Eq GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Classes.Eq GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
 instance GHC.Classes.Eq GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Eq (f p), GHC.Classes.Eq (g p)) => GHC.Classes.Eq ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -12797,6 +12813,7 @@ instance forall a. GHC.Classes.Ord (GHC.Internal.Foreign.C.ConstPtr.ConstPtr a) 
 instance forall i e. (GHC.Internal.Ix.Ix i, GHC.Classes.Ord e) => GHC.Classes.Ord (GHC.Internal.Arr.Array i e) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Classes.Ord GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
 instance GHC.Classes.Ord GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
+instance GHC.Classes.Ord GHC.Internal.Stack.CCS.CostCentreId -- Defined in ‘GHC.Internal.Stack.CCS’
 instance GHC.Classes.Ord GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’

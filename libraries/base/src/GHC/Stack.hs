@@ -18,6 +18,7 @@ module GHC.Stack
     (errorWithStackTrace,
      -- *  Profiling call stacks
      currentCallStack,
+     currentCallStackIds,
      whoCreated,
      -- *  HasCallStack call stacks
      CallStack,
@@ -37,14 +38,17 @@ module GHC.Stack
      -- *  Internals
      CostCentreStack,
      CostCentre,
+     CostCentreId,
      getCurrentCCS,
      getCCSOf,
      clearCCS,
      ccsCC,
      ccsParent,
+     ccId,
      ccLabel,
      ccModule,
      ccSrcSpan,
+     ccsToIds,
      ccsToStrings,
      renderStack
      ) where

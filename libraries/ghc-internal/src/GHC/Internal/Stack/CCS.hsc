@@ -16,14 +16,17 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude #-}
+{-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving #-}
 module GHC.Internal.Stack.CCS (
     -- * Call stacks
     currentCallStack,
+    currentCallStackIds,
     whoCreated,
 
     -- * Internals
     CostCentreStack,
     CostCentre,
+    CostCentreId,
     getCurrentCCS,
     getCCSOf,
     clearCCS,
@@ -31,7 +34,9 @@ module GHC.Internal.Stack.CCS (
     ccsParent,
     ccLabel,
     ccModule,
+    ccId,
     ccSrcSpan,
+    ccsToIds,
     ccsToStrings,
     renderStack,
   ) where
@@ -44,6 +49,12 @@ import GHC.Internal.Base
 import GHC.Internal.Ptr
 import GHC.Internal.IO.Encoding
 import GHC.Internal.List ( concatMap, reverse )
+import GHC.Internal.Word ( Word32 )
+import GHC.Internal.Show
+import GHC.Internal.Read
+import GHC.Internal.Enum
+import GHC.Internal.Real
+import GHC.Internal.Num
 
 #define PROFILING
 #include "Rts.h"
@@ -53,6 +64,13 @@ data CostCentreStack
 
 -- | A cost-centre from GHC's cost-center profiler.
 data CostCentre
+
+-- | Cost centre identifier
+--
+-- @since 4.20.0.0
+newtype CostCentreId = CostCentreId Word32
+  deriving (Show, Read)
+  deriving newtype (Eq, Ord, Bounded, Enum, Integral, Num, Real)
 
 -- | Returns the current 'CostCentreStack' (value is @nullPtr@ if the current
 -- program was not compiled with profiling support). Takes a dummy argument
@@ -83,6 +101,12 @@ ccsCC p = peekByteOff p 4
 ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
 ccsParent p = peekByteOff p 8
 
+-- | Get the 'CostCentreId' of a 'CostCentre'.
+--
+-- @since 4.20.0.0
+ccId :: Ptr CostCentre -> IO CostCentreId
+ccId p = fmap CostCentreId $ peekByteOff p 0
+
 ccLabel :: Ptr CostCentre -> IO CString
 ccLabel p = peekByteOff p 4
 
@@ -98,6 +122,12 @@ ccsCC p = (# peek CostCentreStack, cc) p
 -- | Get the tail of a 'CostCentreStack'.
 ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
 ccsParent p = (# peek CostCentreStack, prevStack) p
+
+-- | Get the 'CostCentreId' of a 'CostCentre'.
+--
+-- @since 4.20.0.0
+ccId :: Ptr CostCentre -> IO CostCentreId
+ccId p = fmap CostCentreId $ (# peek CostCentre, ccID) p
 
 -- | Get the label of a 'CostCentre'.
 ccLabel :: Ptr CostCentre -> IO CString
@@ -125,6 +155,19 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
 
+-- | Returns a @[CostCentreId]@ representing the current call stack.  This
+-- can be useful for debugging.
+--
+-- The implementation uses the call-stack simulation maintained by the
+-- profiler, so it only works if the program was compiled with @-prof@
+-- and contains suitable SCC annotations (e.g. by using @-fprof-late@).
+-- Otherwise, the list returned is likely to be empty or
+-- uninformative.
+--
+-- @since 4.20.0.0
+currentCallStackIds :: IO [CostCentreId]
+currentCallStackIds = ccsToIds =<< getCurrentCCS ()
+
 -- | Format a 'CostCentreStack' as a list of lines.
 ccsToStrings :: Ptr CostCentreStack -> IO [String]
 ccsToStrings ccs0 = go ccs0 []
@@ -140,6 +183,24 @@ ccsToStrings ccs0 = go ccs0 []
         if (mdl == "MAIN" && lbl == "MAIN")
            then return acc
            else go parent ((mdl ++ '.':lbl ++ ' ':'(':loc ++ ")") : acc)
+
+-- | Format a 'CostCentreStack' as a list of cost centre IDs.
+--
+-- @since 4.20.0.0
+ccsToIds :: Ptr CostCentreStack -> IO [CostCentreId]
+ccsToIds ccs0 = go ccs0 []
+  where
+    go ccs acc
+     | ccs == nullPtr = return acc
+     | otherwise = do
+        cc <- ccsCC ccs
+        cc_id <- ccId cc
+        lbl <- GHC.peekCString utf8 =<< ccLabel cc
+        mdl <- GHC.peekCString utf8 =<< ccModule cc
+        parent <- ccsParent ccs
+        if (mdl == "MAIN" && lbl == "MAIN")
+           then return acc
+           else go parent (cc_id : acc)
 
 -- | Get the stack trace attached to an object.
 --

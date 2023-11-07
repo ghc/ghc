@@ -244,6 +244,12 @@ Runtime system
   constructors in scope and the levity of ``t`` is statically known,
   then the constraint ``DataToTag t`` can always be solved.
 
+- The ``CostCentreId`` type and ``currentCallStackIds :: IO [CostCentreId]``
+  function for getting the IDs of the cost centers on the current stack are now
+  exported from ``GHC.Exts``. In addition to those, the ``ccId`` and
+  ``ccsToIds`` functions for getting ``CostCentreId``\s are also exported from
+  ``GHC.Stack``.
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

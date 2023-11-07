@@ -103,6 +103,8 @@ module GHC.Internal.Exts
 
         -- ** The call stack
         currentCallStack,
+        currentCallStackIds,
+        CostCentreId,
 
         -- * Ids with special behaviour
         inline, noinline, lazy, oneShot, considerAccessible,
