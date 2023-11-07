@@ -23,6 +23,7 @@ module GHC.Stack (
 
     -- * Profiling call stacks
     currentCallStack,
+    currentCallStackIds,
     whoCreated,
 
     -- * HasCallStack call stacks
