@@ -178,16 +178,25 @@ test('T7060', [], makefile_test, [])
 test('T7130', normal, compile_fail, ['-fflul-laziness'])
 test('T7563', when(unregisterised(), skip), makefile_test, [])
 test('T6037',
-     # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
-     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail)],
+     # The testsuite doesn't know how to set a non-Unicode locale on Windows or MacOS < Sonoma.
+     # Because in previous version of MacOS the test is still broken, we mark it as fragile.
+     [when(opsys('mingw32'), expect_fail),
+      when(opsys('darwin'), fragile(24161))
+     ],
      makefile_test, [])
 test('T2507',
-     # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
-     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail)],
+     # The testsuite doesn't know how to set a non-Unicode locale on Windows or MacOS < Sonoma
+     # Because in previous version of MacOS the test is still broken, we mark it as fragile.
+     [when(opsys('mingw32'), expect_fail),
+      when(opsys('darwin'), fragile(24161))
+     ],
      makefile_test, [])
 test('T8959a',
-     # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
-     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail)],
+     # The testsuite doesn't know how to set a non-Unicode locale on Windows or MacOS < Sonoma
+     # Because in previous version of MacOS the test is still broken, we mark it as fragile.
+     [when(opsys('mingw32'), expect_fail),
+      when(opsys('darwin'), fragile(24161))
+     ],
      makefile_test, [])
 
 # Requires readelf
