@@ -440,6 +440,7 @@ generateSettings = do
         , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
         , ("ld supports response files", expr $ lookupSystemConfig "ld-supports-response-files")
         , ("ld is GNU ld", expr $ lookupSystemConfig "ld-is-gnu-ld")
+        , ("ld supports single module", expr $ lookupSystemConfig "ld-supports-single-module")
         , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
         , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)

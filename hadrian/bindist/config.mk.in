@@ -240,6 +240,7 @@ LdHasBuildId = @LdHasBuildId@
 LdHasFilelist = @LdHasFilelist@
 LdIsGNULd = @LdIsGNULd@
 LdHasNoCompactUnwind = @LdHasNoCompactUnwind@
+LdHasSingleModule = @LdHasSingleModule@
 ArArgs = @ArArgs@
 ArSupportsAtFile = @ArSupportsAtFile@
 ArSupportsDashL  = @ArSupportsDashL@

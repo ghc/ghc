@@ -493,6 +493,7 @@ AC_SUBST([LdCmd])
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_NO_COMPACT_UNWIND
 FP_PROG_LD_FILELIST
+FP_PROG_LD_SINGLE_MODULE
 
 dnl ** Which nm to use?
 dnl --------------------------------------------------------------
