@@ -11,6 +11,7 @@ where
 import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
+import GHC.Settings (ToolSettings(toolSettings_ldSupportsSingleModule))
 
 import GHC.Driver.Config.Linker
 import GHC.Driver.Session
@@ -152,6 +153,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
             --   dynamic binding nonsense when referring to symbols from
             --   within the library. The NCG assumes that this option is
             --   specified (on i386, at least).
+            --   In XCode 15, -single_module is the default and passing the
+            --   flag is now obsolete and raises a warning (#24168). We encode
+            --   this information into the toolchain field ...SupportsSingleModule.
             -- -install_name
             --   Mac OS/X stores the path where a dynamic library is (to
             --   be) installed in the library itself.  It's called the
@@ -177,8 +181,11 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                     ]
                  ++ map Option o_files
                  ++ [ Option "-undefined",
-                      Option "dynamic_lookup",
-                      Option "-single_module" ]
+                      Option "dynamic_lookup"
+                    ]
+                 ++ (if toolSettings_ldSupportsSingleModule (toolSettings dflags)
+                        then [ Option "-single_module" ]
+                        else [ ])
                  ++ (if platformArch platform `elem` [ ArchX86_64, ArchAArch64 ]
                      then [ ]
                      else [ Option "-Wl,-read_only_relocs,suppress" ])

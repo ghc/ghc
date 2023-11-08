@@ -21,6 +21,7 @@ Target
 , ccLinkSupportsNoPie = @CONF_GCC_SUPPORTS_NO_PIEBool@
 , ccLinkSupportsCompactUnwind = @LdHasNoCompactUnwindBool@
 , ccLinkSupportsFilelist = @LdHasFilelistBool@
+, ccLinkSupportsSingleModule = @LdHasSingleModuleBool@
 , ccLinkIsGnu = @LdIsGNULdBool@
 }
 

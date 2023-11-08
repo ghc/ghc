@@ -22,6 +22,7 @@ data CcLink = CcLink { ccLinkProgram :: Program
                      , ccLinkSupportsNoPie :: Bool -- See Note [No PIE when linking] in GHC.Driver.Session
                      , ccLinkSupportsCompactUnwind :: Bool
                      , ccLinkSupportsFilelist :: Bool
+                     , ccLinkSupportsSingleModule :: Bool
                      , ccLinkIsGnu :: Bool
                      }
     deriving (Read, Eq, Ord)
@@ -34,6 +35,7 @@ instance Show CcLink where
     , ", ccLinkSupportsNoPie = " ++ show ccLinkSupportsNoPie
     , ", ccLinkSupportsCompactUnwind = " ++ show ccLinkSupportsCompactUnwind
     , ", ccLinkSupportsFilelist = " ++ show ccLinkSupportsFilelist
+    , ", ccLinkSupportsSingleModule = " ++ show ccLinkSupportsSingleModule
     , ", ccLinkIsGnu = " ++ show ccLinkIsGnu
     , "}"
     ]
@@ -66,12 +68,13 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
   ccLinkSupportsNoPie         <- checkSupportsNoPie  cc ccLinkProgram
   ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
   ccLinkSupportsFilelist      <- checkSupportsFilelist cc ccLinkProgram
+  ccLinkSupportsSingleModule  <- checkSupportsSingleModule archOs cc ccLinkProgram
   ccLinkIsGnu                 <- checkLinkIsGnu archOs ccLinkProgram
   checkBfdCopyBug archOs cc readelf ccLinkProgram
   ccLinkProgram <- addPlatformDepLinkFlags archOs cc ccLinkProgram
   let ccLink = CcLink {ccLinkProgram, ccLinkSupportsNoPie,
                        ccLinkSupportsCompactUnwind, ccLinkSupportsFilelist,
-                       ccLinkIsGnu}
+                       ccLinkSupportsSingleModule, ccLinkIsGnu}
   ccLink <- linkRequiresNoFixupChains archOs cc ccLink
   ccLink <- linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
   return ccLink
@@ -163,6 +166,34 @@ checkSupportsFilelist cc ccLink = checking "whether the cc linker understands -f
     exitCode <- runProgram ccLink ["-r", "-Wl,-filelist", test_ofiles, "-o", test_o]
 
     return (isSuccess exitCode)
+
+-- | Check that the (darwin) linker supports @-single_module@.
+--
+-- In XCode 15, the linker warns when @-single_module@ is passed as the flag
+-- became the default and is now obsolete to pass.
+--
+-- We assume non-darwin linkers don't support this flag.
+checkSupportsSingleModule :: ArchOS -> Cc -> Program -> M Bool
+checkSupportsSingleModule archOs cc link
+  | ArchOS _ OSDarwin <- archOs
+  = checking "whether the darwin linker supports -single_module" $ do
+      withTempDir $ \dir -> do
+        let test_dylib = dir </> "test.dylib"
+            test_c     = dir </> "test.c"
+            testmain_o = dir </> "testmain.o"
+
+        -- Main
+        compileC cc testmain_o "extern int foo(int); int main() { return foo(5); }"
+
+        -- Dynamic library
+        writeFile test_c "int foo(int x) { return x*x; }"
+        _ <- runProgram (ccProgram cc) ["-shared", "-o", test_dylib, test_c]
+
+        (_, out, err) <- readProgram link ["-Wl,-single_module", "-o", "testmain", test_dylib, testmain_o]
+
+        return $ not $ "obsolete" `isInfixOf` err || "obsolete" `isInfixOf` out
+  | otherwise
+  = return False
 
 -- | Check whether linking works.
 checkLinkWorks :: Cc -> Program -> M ()

@@ -104,6 +104,7 @@ lib/settings : config.mk
 	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
 	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
+	@echo ',("ld supports single module", "$(LdHasSingleModule)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
 	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
 	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
