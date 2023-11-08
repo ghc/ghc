@@ -430,6 +430,7 @@ generateSettings = do
         , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")
         , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
         , ("ld is GNU ld", expr $ lookupSystemConfig "ld-is-gnu-ld")
+        , ("ld supports single module", expr $ lookupSystemConfig "ld-supports-single-module")
         , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
         , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)

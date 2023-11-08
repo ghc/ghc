@@ -87,6 +87,7 @@ data Settings = Settings
 data ToolSettings = ToolSettings
   { toolSettings_ldSupportsCompactUnwind :: Bool
   , toolSettings_ldSupportsFilelist      :: Bool
+  , toolSettings_ldSupportsSingleModule  :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
   , toolSettings_useInplaceMinGW         :: Bool

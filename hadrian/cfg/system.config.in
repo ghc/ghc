@@ -141,6 +141,7 @@ gcc-extra-via-c-opts = @GccExtraViaCOpts@
 ld-has-no-compact-unwind = @LdHasNoCompactUnwind@
 ld-has-filelist = @LdHasFilelist@
 ld-is-gnu-ld = @LdIsGNULd@
+ld-supports-single-module = @LdHasSingleModule@
 ar-args = @ArArgs@
 
 settings-c-compiler-command = @SettingsCCompilerCommand@
