@@ -552,8 +552,8 @@ T7563:
 	-"$(TEST_HC)" $(TEST_HC_OPTS) -C T7563.hs
 
 # Below we set LC_ALL=C to request standard ASCII output in the resulting error
-# messages. Unfortunately, Mac OS X and Windows still use a Unicode encoding
-# even with LC_ALL=C, so we expect these tests to fail there.
+# messages. Unfortunately, versions of MacOS prior to Sonoma and Windows still
+# use a Unicode encoding even with LC_ALL=C, so we expect these tests to fail there.
 
 .PHONY: T6037
 T6037:
