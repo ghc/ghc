@@ -373,6 +373,7 @@ generateSettings = do
         , ("Haskell CPP flags",   queryTarget hsCppFlags)
         , ("ld supports compact unwind", queryTarget linkSupportsCompactUnwind)
         , ("ld supports filelist",       queryTarget linkSupportsFilelist)
+        , ("ld supports single module",       queryTarget linkSupportsSingleModule)
         , ("ld is GNU ld",               queryTarget linkIsGnu)
         , ("Merge objects command", queryTarget mergeObjsPath)
         , ("Merge objects flags", queryTarget mergeObjsFlags)
@@ -431,6 +432,7 @@ generateSettings = do
     hsCppFlags = unwords . prgFlags . hsCppProgram . tgtHsCPreprocessor
     mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) . tgtMergeObjs
     mergeObjsFlags = maybe "" (unwords . prgFlags . mergeObjsProgram) . tgtMergeObjs
+    linkSupportsSingleModule    = yesNo . ccLinkSupportsSingleModule . tgtCCompilerLink
     linkSupportsFilelist        = yesNo . ccLinkSupportsFilelist . tgtCCompilerLink
     linkSupportsCompactUnwind   = yesNo . ccLinkSupportsCompactUnwind . tgtCCompilerLink
     linkIsGnu                   = yesNo . ccLinkIsGnu . tgtCCompilerLink

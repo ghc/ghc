@@ -21,6 +21,7 @@ Target
 , ccLinkSupportsNoPie = False
 , ccLinkSupportsCompactUnwind = False
 , ccLinkSupportsFilelist = False
+, ccLinkSupportsSingleModule = True
 , ccLinkIsGnu = False
 }
 

@@ -131,6 +131,7 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_BOOLEAN([TargetHasIdentDirective])
     PREP_BOOLEAN([CONF_GCC_SUPPORTS_NO_PIE])
     PREP_BOOLEAN([LdHasFilelist])
+    PREP_BOOLEAN([LdHasSingleModule])
     PREP_BOOLEAN([LdIsGNULd])
     PREP_BOOLEAN([LdHasNoCompactUnwind])
     PREP_BOOLEAN([TargetHasSubsectionsViaSymbols])
