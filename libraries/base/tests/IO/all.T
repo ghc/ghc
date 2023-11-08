@@ -136,7 +136,11 @@ test('encoding004', [extra_files(['encoded-data/']), js_broken(22374),
 # and
 # https://gitlab.haskell.org/ghc/wasi-libc/-/blob/main/libc-top-half/musl/src/locale/codepages.h
 # for locales supported by wasi-libc's iconv implementation
-when(arch('wasm32'), skip)], compile_and_run, [''])
+when(arch('wasm32'), skip),
+# MacOS Sonoma iconv() has a regression that causes this test to fail on the
+# CP936 roundtrip. See the ticket for related issues in other projects.
+when(opsys('darwin'), fragile(24161))
+], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])
