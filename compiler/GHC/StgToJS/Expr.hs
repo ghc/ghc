@@ -232,10 +232,10 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
               (L.find ((==i) . fst . snd) (zip [0..] vars))
       mk_bh :: G JStgStat
       mk_bh | isUpdatable update =
-              do x <- Var <$> freshIdent
+              do x <- freshIdent
                  return $ mconcat
-                   [ x |= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
-                   , IfStat x (ReturnStat x) mempty
+                   [ x ||= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
+                   , IfStat (Var x) (ReturnStat (Var x)) mempty
                    ]
             | otherwise = pure mempty
   blk_hl <- mk_bh
@@ -913,11 +913,11 @@ loadParams from args = do
                             [ loadIfUsed (from .^ closureField1_) x1 u1
                             , loadIfUsed (from .^ closureField2_) x2 u2
                             ]
-    ((x,u):xs)         -> do d <- Var <$> freshIdent
+    ((x,u):xs)         -> do d <- freshIdent
                              return $ mconcat
                                [ loadIfUsed (from .^ closureField1_) x u
-                               , mconcat [ d |= from .^ closureField2_
-                                         , loadConVarsIfUsed d xs
+                               , mconcat [ d ||= from .^ closureField2_
+                                         , loadConVarsIfUsed (Var d) xs
                                          ]
                                ]
   where
