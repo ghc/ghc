@@ -16,7 +16,6 @@ other dynamic, non-language, flag settings:
   -fprefer-byte-code
   -fbreak-points
 warning settings:
-  -Wsemigroup
   -Wcompat-unqualified-imports
   -Wtype-equality-out-of-scope
   -Wimplicit-rhs-quantification

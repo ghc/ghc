@@ -2,8 +2,6 @@ module WCompatWarningsOnOff where
 
 import qualified Data.Semigroup as Semi
 
-(<>) = undefined -- Semigroup warnings
-
 -- -fwarn-noncanonical-monoid-instances
 newtype S = S Int
 

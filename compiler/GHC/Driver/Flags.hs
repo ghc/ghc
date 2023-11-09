@@ -622,7 +622,7 @@ data WarningFlag =
    | Opt_WarnRedundantRecordWildcards
    | Opt_WarnDeprecatedFlags
    | Opt_WarnMissingMonadFailInstances               -- since 8.0, has no effect since 8.8
-   | Opt_WarnSemigroup                               -- since 8.0
+   | Opt_WarnSemigroup                               -- since 8.0, has no effect since 9.8
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -1001,8 +1001,7 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnSemigroup
-      , Opt_WarnNonCanonicalMonoidInstances
+    = [ Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnNonCanonicalMonadInstances
       , Opt_WarnCompatUnqualifiedImports
       , Opt_WarnTypeEqualityOutOfScope

@@ -1,12 +1,12 @@
 
-Template.hs:11:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
+Template.hs:9:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘(<>) = mappend’ definition detected
     in the instance declaration for ‘Semigroup S’.
     Suggested fix:
       Move definition from ‘mappend’ to ‘(<>)’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
 
-Template.hs:14:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
+Template.hs:12:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘mappend’ definition detected
     in the instance declaration for ‘Monoid S’.
     ‘mappend’ will eventually be removed in favour of ‘(<>)’
@@ -14,21 +14,21 @@ Template.hs:14:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wde
       Either remove definition for ‘mappend’ (recommended) or define as ‘mappend = (<>)’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
 
-Template.hs:24:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
+Template.hs:22:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘pure = return’ definition detected
     in the instance declaration for ‘Applicative M’.
     Suggested fix:
       Move definition from ‘return’ to ‘pure’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
 
-Template.hs:25:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
+Template.hs:23:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘(*>) = (>>)’ definition detected
     in the instance declaration for ‘Applicative M’.
     Suggested fix:
       Move definition from ‘(>>)’ to ‘(*>)’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
 
-Template.hs:28:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
+Template.hs:26:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘return’ definition detected
     in the instance declaration for ‘Monad M’.
     ‘return’ will eventually be removed in favour of ‘pure’
@@ -36,7 +36,7 @@ Template.hs:28:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdef
       Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
 
-Template.hs:30:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
+Template.hs:28:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘(>>)’ definition detected
     in the instance declaration for ‘Monad M’.
     ‘(>>)’ will eventually be removed in favour of ‘(*>)’
