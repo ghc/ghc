@@ -2215,7 +2215,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnMissingMethods -> warnSpec x
   Opt_WarnMissingMonadFailInstances
     -> depWarnSpec x "fail is no longer a method of Monad"
-  Opt_WarnSemigroup -> warnSpec x
+  Opt_WarnSemigroup -> depWarnSpec x "Semigroup is now a superclass of Monoid"
   Opt_WarnMissingSignatures -> warnSpec x
   Opt_WarnMissingKindSignatures -> warnSpec x
   Opt_WarnMissingPolyKindSignatures -> warnSpec x

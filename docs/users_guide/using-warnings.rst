@@ -165,7 +165,6 @@ as ``-Wno-...`` for every individual warning in the group.
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wcompat-unqualified-imports`
@@ -654,8 +653,9 @@ of ``-W(no-)*``.
     a ``MonadFail`` instance.
 
 .. ghc-flag:: -Wsemigroup
-    :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-
-        ``Semigroup`` definitions of ``(<>)``?
+    :shortdesc: *(deprecated)*
+        Warn when a ``Monoid`` is not ``Semigroup``, and on non-``Semigroup``
+        definitions of ``(<>)``
     :type: dynamic
     :reverse: -Wno-semigroup
     :category:
@@ -665,15 +665,11 @@ of ``-W(no-)*``.
     .. index::
        single: semigroup; warning
 
-    Warn when definitions are in conflict with the future inclusion of
-    ``Semigroup`` into the standard typeclasses.
-
-     1. Instances of ``Monoid`` should also be instances of ``Semigroup``
-     2. The ``Semigroup`` operator ``(<>)`` will be in ``Prelude``, which
-        clashes with custom local definitions of such an operator
-
-    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
-    default, but will be switched on in a future GHC release.
+    This warning is deprecated. It no longer has any effect since GHC 9.8.
+    It was used during the transition period of the semigroup proposal,
+    to warn when an instance of ``Monoid`` was not an instance of ``Semigroup``,
+    or when a custom local operator ``(<>)`` could clash with `(<>)`,
+    now exported from ``Prelude``.
 
 .. ghc-flag:: -Wdeprecated-flags
     :shortdesc: warn about uses of commandline flags that are deprecated
