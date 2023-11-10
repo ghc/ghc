@@ -277,7 +277,8 @@ data Instr
 
         -- | FMA3 fused multiply-add operations.
         | FMA3         Format FMASign FMAPermutation Operand Reg Reg
-          -- src1 (r/m), src2 (r), dst (r)
+          -- src3 (r/m), src2 (r), dst/src1 (r)
+          -- The is exactly reversed from how intel lists the arguments.
 
         -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
@@ -358,6 +359,7 @@ data Operand
         | OpImm  Imm            -- immediate value
         | OpAddr AddrMode       -- memory reference
 
+-- NB: As of 2023 we only use the FMA213 permutation.
 data FMAPermutation = FMA132 | FMA213 | FMA231
 
 -- | Returns which registers are read and written as a (read, written)
@@ -447,7 +449,7 @@ regUsageOfInstr platform instr
     PDEP   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
     PEXT   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
 
-    FMA3 _ _ _ src1 src2 dst -> usageFMA src1 src2 dst
+    FMA3 _ _ _ src3 src2 dst -> usageFMA src3 src2 dst
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
