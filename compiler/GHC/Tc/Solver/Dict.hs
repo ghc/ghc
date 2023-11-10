@@ -98,7 +98,6 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
 
        ; doTopFunDepImprovement dict_ct
 
-       ; tryLastResortProhibitedSuperClass dict_ct
        ; simpleStage (updInertDicts dict_ct)
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
 
@@ -1366,38 +1365,6 @@ Historical note: a previous solution was to instead pick the local instance
 with the least superclass depth (see Note [Replacement vs keeping]),
 but that doesn't work for the example from #22216.
 -}
-
-{- *******************************************************************
-*                                                                    *
-         Last resort prohibited superclass
-*                                                                    *
-**********************************************************************-}
-
-tryLastResortProhibitedSuperClass :: DictCt -> SolverStage ()
--- ^ As a last resort, we TEMPORARILY allow a prohibited superclass solve,
--- emitting a loud warning when doing so: we might be creating non-terminating
--- evidence (as we are in T22912 for example).
---
--- See Note [Migrating away from loopy superclass solving] in GHC.Tc.TyCl.Instance.
-tryLastResortProhibitedSuperClass dict_ct
-  = Stage $ do { inerts <- getInertCans
-               ; last_resort inerts dict_ct }
-
-last_resort :: InertCans -> DictCt -> TcS (StopOrContinue ())
-last_resort inerts (DictCt { di_ev = ev_w, di_cls = cls, di_tys = xis })
-  | let loc_w  = ctEvLoc ev_w
-        orig_w = ctLocOrigin loc_w
-  , ScOrigin _ NakedSc <- orig_w   -- work_item is definitely Wanted
-  , Just ct_i <- lookupInertDict inerts loc_w cls xis
-  , let ev_i = dictCtEvidence ct_i
-  , isGiven ev_i
-  = do { setEvBindIfWanted ev_w True (ctEvTerm ev_i)
-       ; ctLocWarnTcS loc_w $
-         TcRnLoopySuperclassSolve loc_w (ctEvPred ev_w)
-       ; return $ Stop ev_w (text "Loopy superclass") }
-  | otherwise
-  = continueWith ()
-
 
 {- *********************************************************************
 *                                                                      *

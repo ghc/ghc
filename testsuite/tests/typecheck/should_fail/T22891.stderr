@@ -1,0 +1,9 @@
+
+T22891.hs:9:10: error: [GHC-39999]
+    • Could not deduce ‘Foo f’
+        arising from the superclasses of an instance declaration
+      from the context: Bar f f
+        bound by the instance declaration at T22891.hs:9:10-31
+      Possible fix:
+        add (Foo f) to the context of the instance declaration
+    • In the instance declaration for ‘Bar f (h k3)’

@@ -16,7 +16,6 @@ import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep     ( mkVisFunTyMany )
 import GHC.Hs.Expr ()   -- instance Outputable
-import GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
@@ -217,14 +216,6 @@ instance Outputable GhcHint where
            mod = nameModule name
     SuggestRenameTypeVariable
       -> text "Consider renaming the type variable."
-    LoopySuperclassSolveHint pty cls_or_qc
-      -> vcat [ text "Add the constraint" <+> quotes (ppr pty) <+> text "to the" <+> what <> comma
-              , text "even though it seems logically implied by other constraints in the context." ]
-        where
-          what :: SDoc
-          what = case cls_or_qc of
-            IsClsInst -> text "instance context"
-            IsQC {}   -> text "context of the quantified constraint"
     SuggestExplicitBidiPatSyn name pat args
       -> hang (text "Instead use an explicitly bidirectional"
                <+> text "pattern synonym, e.g.")

@@ -1,20 +1,20 @@
 
-T20666.hs:13:10: warning: [GHC-36038] [-Wloopy-superclass-solve (in -Wdefault)]
-    I am solving the constraint ‘Show (T c)’,
-      arising from the superclasses of an instance declaration,
-    in a way that might turn out to loop at runtime.
-    Starting from GHC 9.10, this warning will turn into an error.
-    See the user manual, § Undecidable instances and loopy superclasses.
-    Suggested fix:
-      Add the constraint ‘Show (T c)’ to the instance context,
-      even though it seems logically implied by other constraints in the context.
+T20666.hs:13:10: error: [GHC-39999]
+    • Could not deduce ‘Show (T c)’
+        arising from the superclasses of an instance declaration
+      from the context: (D d, c ~ S d)
+        bound by the instance declaration at T20666.hs:13:10-31
+      Possible fix:
+        If the constraint looks soluble from a superclass of the instance context,
+        read 'Undecidable instances and loopy superclasses' in the user manual
+    • In the instance declaration for ‘C1 c’
 
-T20666.hs:17:10: warning: [GHC-36038] [-Wloopy-superclass-solve (in -Wdefault)]
-    I am solving the constraint ‘Show (T c)’,
-      arising from the superclasses of an instance declaration,
-    in a way that might turn out to loop at runtime.
-    Starting from GHC 9.10, this warning will turn into an error.
-    See the user manual, § Undecidable instances and loopy superclasses.
-    Suggested fix:
-      Add the constraint ‘Show (T c)’ to the instance context,
-      even though it seems logically implied by other constraints in the context.
+T20666.hs:17:10: error: [GHC-39999]
+    • Could not deduce ‘Show (T c)’
+        arising from the superclasses of an instance declaration
+      from the context: (D d, c ~ S d, c' ~ c)
+        bound by the instance declaration at T20666.hs:17:10-40
+      Possible fix:
+        If the constraint looks soluble from a superclass of the instance context,
+        read 'Undecidable instances and loopy superclasses' in the user manual
+    • In the instance declaration for ‘C2 c'’

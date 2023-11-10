@@ -2198,7 +2198,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnInconsistentFlags -> warnSpec x
   Opt_WarnInlineRuleShadowing -> warnSpec x
   Opt_WarnIdentities -> warnSpec x
-  Opt_WarnLoopySuperclassSolve -> warnSpec x
+  Opt_WarnLoopySuperclassSolve -> depWarnSpec x "it is now an error"
   Opt_WarnMissingFields -> warnSpec x
   Opt_WarnMissingImportList -> warnSpec x
   Opt_WarnMissingExportList -> warnSpec x

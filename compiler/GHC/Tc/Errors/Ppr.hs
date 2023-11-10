@@ -1349,18 +1349,6 @@ instance Diagnostic TcRnMessage where
            , text "Combine alternative minimal complete definitions with `|'" ]
       where
         sigs = sig1 : sig2 : otherSigs
-    TcRnLoopySuperclassSolve wtd_loc wtd_pty ->
-      mkSimpleDecorated $ vcat [ header, warning, user_manual ]
-      where
-        header, warning, user_manual :: SDoc
-        header
-          = vcat [ text "I am solving the constraint" <+> quotes (ppr wtd_pty) <> comma
-                 , nest 2 $ pprCtOrigin (ctLocOrigin wtd_loc) <> comma
-                 , text "in a way that might turn out to loop at runtime." ]
-        warning
-          = vcat [ text "Starting from GHC 9.10, this warning will turn into an error." ]
-        user_manual =
-          vcat [ text "See the user manual, § Undecidable instances and loopy superclasses." ]
     TcRnUnexpectedStandaloneDerivingDecl -> mkSimpleDecorated $
       text "Illegal standalone deriving declaration"
     TcRnUnusedVariableInRuleDecl name var -> mkSimpleDecorated $
@@ -2311,8 +2299,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDuplicateMinimalSig{}
       -> ErrorWithoutFlag
-    TcRnLoopySuperclassSolve{}
-      -> WarningWithFlag Opt_WarnLoopySuperclassSolve
     TcRnUnexpectedStandaloneDerivingDecl{}
       -> ErrorWithoutFlag
     TcRnUnusedVariableInRuleDecl{}
@@ -2962,13 +2948,6 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.DefaultSignatures]
     TcRnDuplicateMinimalSig{}
       -> noHints
-    TcRnLoopySuperclassSolve wtd_loc wtd_pty
-      -> [LoopySuperclassSolveHint wtd_pty cls_or_qc]
-      where
-        cls_or_qc :: ClsInstOrQC
-        cls_or_qc = case ctLocOrigin wtd_loc of
-          ScOrigin c_or_q _ -> c_or_q
-          _                 -> IsClsInst -- shouldn't happen
     TcRnUnexpectedStandaloneDerivingDecl{}
       -> [suggestExtension LangExt.StandaloneDeriving]
     TcRnUnusedVariableInRuleDecl{}

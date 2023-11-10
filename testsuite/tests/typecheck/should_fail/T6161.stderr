@@ -1,10 +1,7 @@
 
-T6161.hs:19:10: warning: [GHC-36038] [-Wloopy-superclass-solve (in -Wdefault)]
-    I am solving the constraint ‘Super (Fam a)’,
-      arising from the superclasses of an instance declaration,
-    in a way that might turn out to loop at runtime.
-    Starting from GHC 9.10, this warning will turn into an error.
-    See the user manual, § Undecidable instances and loopy superclasses.
-    Suggested fix:
-      Add the constraint ‘Super (Fam a)’ to the instance context,
-      even though it seems logically implied by other constraints in the context.
+T6161.hs:19:10: error: [GHC-39999]
+    • Could not deduce ‘Super (Fam a)’
+        arising from the superclasses of an instance declaration
+      from the context: Foo a
+        bound by the instance declaration at T6161.hs:19:10-31
+    • In the instance declaration for ‘Duper (Fam a)’

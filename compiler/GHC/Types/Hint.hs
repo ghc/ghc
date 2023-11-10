@@ -35,13 +35,12 @@ import GHC.Hs.Extension (GhcTc, GhcRn)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.TyCon (TyCon)
-import GHC.Core.Type (PredType, Type)
+import GHC.Core.Type (Type)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
 import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
-import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit, FastString)
@@ -432,8 +431,6 @@ data GhcHint
         captures a term's name.
     -}
   | SuggestRenameTypeVariable
-
-  | LoopySuperclassSolveHint PredType ClsInstOrQC
 
   | SuggestExplicitBidiPatSyn Name (LPat GhcRn) [LIdP GhcRn]
 
