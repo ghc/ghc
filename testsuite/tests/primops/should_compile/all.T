@@ -8,3 +8,8 @@ test('UnliftedStableName', normal, compile, [''])
 test('KeepAliveWrapper', normal, compile, ['-O'])
 test('T22152', normal, compile, [''])
 test('T22152b', normal, compile, [''])
+test('T24160_FMA'
+    , [ js_skip # JS backend doesn't have an FMA implementation ]
+      # , omit_ghci # fails during compilation phase, remove after !10563
+      ]
+    , compile, ['-O'])
