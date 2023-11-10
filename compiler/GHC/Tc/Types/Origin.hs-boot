@@ -16,8 +16,4 @@ data FixedRuntimeRepOrigin
 mkFRRUnboxedTuple :: Int -> FixedRuntimeRepContext
 mkFRRUnboxedSum :: Maybe Int -> FixedRuntimeRepContext
 
-data CtOrigin
-data ClsInstOrQC = IsClsInst
-                 | IsQC CtOrigin
-
 unkSkol :: HasCallStack => SkolemInfo

@@ -688,7 +688,7 @@ data WarningFlag =
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
-   | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
+   | Opt_WarnLoopySuperclassSolve                    -- Since 9.6, has no effect since 9.10
    | Opt_WarnTermVariableCapture                     -- Since 9.8
    | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
@@ -948,7 +948,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnForallIdentifier,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
-        Opt_WarnLoopySuperclassSolve,
         Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,

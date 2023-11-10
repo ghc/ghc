@@ -3134,23 +3134,6 @@ data TcRnMessage where
   TcRnDeprecatedInvisTyArgInConPat
     :: TcRnMessage
 
-  {-| TcRnLoopySuperclassSolve is a warning, controlled by @-Wloopy-superclass-solve@,
-      that is triggered when GHC solves a constraint in a possibly-loopy way,
-      violating the class instance termination rules described in the section
-      "Undecidable instances and loopy superclasses" of the user's guide.
-
-      Example:
-
-        class Foo f
-        class Foo f => Bar f g
-        instance Bar f f => Bar f (h k)
-
-      Test cases: T20666, T20666{a,b}, T22891, T22912.
-  -}
-  TcRnLoopySuperclassSolve :: CtLoc    -- ^ Wanted 'CtLoc'
-                           -> PredType -- ^ Wanted 'PredType'
-                           -> TcRnMessage
-
   {-| TcRnUnexpectedStandaloneDerivingDecl is an error thrown when a user uses
       standalone deriving without enabling the StandaloneDeriving extension.
 

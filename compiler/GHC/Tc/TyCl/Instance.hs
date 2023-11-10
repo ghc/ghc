@@ -1696,20 +1696,6 @@ Answer:
     superclass selection, except at a smaller type.  This test is
     implemented by GHC.Tc.Solver.InertSet.prohibitedSuperClassSolve
 
-Note [Migrating away from loopy superclass solving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The logic from Note [Solving superclass constraints] was implemented in GHC 9.6.
-However, we want to provide a migration strategy for users, to avoid suddenly
-breaking their code going when upgrading to GHC 9.6. To this effect, we temporarily
-continue to allow the constraint solver to create these potentially non-terminating
-solutions, but emit a loud warning when doing so: see
-GHC.Tc.Solver.Dict.tryLastResortProhibitedSuperclass.
-
-Users can silence the warning by manually adding the necessary constraint to the
-context. GHC will then keep this user-written Given, dropping the Given arising
-from superclass expansion which has greater SC depth, as explained in
-Note [Replacement vs keeping] in GHC.Tc.Solver.Dict.
-
 Note [Silent superclass arguments] (historical interest only)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 NB1: this note describes our *old* solution to the
