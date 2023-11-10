@@ -3230,32 +3230,9 @@ genFMA3Code w signs x y z = do
   (y_reg, y_code) <- getNonClobberedReg y
   (z_reg, z_code) <- getNonClobberedReg z
   x_code <- getAnyReg x
-  y_tmp <- getNewRegNat rep
-  z_tmp <- getNewRegNat rep
   let
      fma213 = FMA3 rep signs FMA213
      code dst
-         | dst == y_reg
-         , dst == z_reg
-         = y_code `appOL`
-           unitOL (MOV rep (OpReg y_reg) (OpReg y_tmp)) `appOL`
-           z_code `appOL`
-           unitOL (MOV rep (OpReg z_reg) (OpReg z_tmp)) `appOL`
-           x_code dst `snocOL`
-           fma213 (OpReg z_tmp) y_tmp dst
-        | dst == y_reg
-        = y_code `appOL`
-          unitOL (MOV rep (OpReg y_reg) (OpReg z_tmp)) `appOL`
-          z_code `appOL`
-          x_code dst `snocOL`
-          fma213 (OpReg z_reg) y_tmp dst
-        | dst == z_reg
-        = y_code `appOL`
-          z_code `appOL`
-          unitOL (MOV rep (OpReg z_reg) (OpReg z_tmp)) `appOL`
-          x_code dst `snocOL`
-          fma213 (OpReg z_tmp) y_reg dst
-        | otherwise
         = y_code `appOL`
           z_code `appOL`
           x_code dst `snocOL`
