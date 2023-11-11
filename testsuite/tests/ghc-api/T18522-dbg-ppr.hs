@@ -5,6 +5,7 @@ module Main where
 import Language.Haskell.TH (runQ)
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Name.Occurrence
 import GHC.ThToHs
 import GHC.Driver.Session
 import GHC.Core.TyCo.Ppr
@@ -44,7 +45,7 @@ main = do
                        forall (a :: k) (b :: j) ->
                        () |]
       let hs_t = fromRight (error "convertToHsType") $
-                 convertToHsType (Generated OtherExpansion SkipPmc) noSrcSpan th_t
+                 convertToHsType (Generated OtherExpansion SkipPmc) noSrcSpan tvName th_t
       (messages, mres) <-
         tcRnType hsc_env SkolemiseFlexi True hs_t
       let (warnings, errors) = partitionMessages messages

@@ -530,7 +530,7 @@ rnHsTyKi env (HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                 , fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
-  = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
+  = do { when (isRnKindLevel env && isRdrVar rdr_name) $
          unlessXOptM LangExt.PolyKinds $ addErr $
          TcRnWithHsDocContext (rtke_ctxt env) $
          TcRnUnexpectedKindVar rdr_name
@@ -1823,77 +1823,45 @@ type checking. While viable, this would mean we'd end up accepting this:
 -- Note [Ordering of implicit variables].
 type FreeKiTyVars = [LocatedN RdrName]
 
--- When renaming a type, do we want to capture or ignore term variables?
--- Suppose we have a variable binding `a` and we are renaming a type signature
--- that mentions `a`:
---
---    f :: forall t -> ...
---    f a = ...
---      where g :: a -> Bool
---
--- Does the `a` in the signature for `g` refer to the term variable or is it
--- implicitly quantified, as if the user wrote `g :: forall a. a -> Bool`?
--- `CaptureTermVars` selects the former behavior, `DontCaptureTermVars` the latter.
-data TermVariableCapture =
-    CaptureTermVars
-  | DontCaptureTermVars
-
-getTermVariableCapture :: RnM TermVariableCapture
-getTermVariableCapture
-  = do { required_type_arguments <- xoptM LangExt.RequiredTypeArguments
-       ; let tvc | required_type_arguments = CaptureTermVars
-                 | otherwise               = DontCaptureTermVars
-       ; return tvc }
-
 -- | Filter out any type and kind variables that are already in scope in the
 -- the supplied LocalRdrEnv. Note that this includes named wildcards, which
 -- look like perfectly ordinary type variables at this point.
-filterInScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
-filterInScope tvc envs = filterOut (inScope tvc envs . unLoc)
+filterInScope :: (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
+filterInScope envs = filterOut (inScope envs . unLoc)
 
 -- | Like 'filterInScope', but keep parent class variables intact.
 -- Used with associated types. See Note [Class variables and filterInScope]
-filterInScopeNonClass :: [Name] -> TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
-filterInScopeNonClass cls_tvs tvc envs = filterOut (in_scope_non_class . unLoc)
+filterInScopeNonClass :: [Name] -> (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
+filterInScopeNonClass cls_tvs envs = filterOut (in_scope_non_class . unLoc)
   where
     in_scope_non_class :: RdrName -> Bool
     in_scope_non_class rdr
       | occName rdr `elemOccSet` cls_tvs_set = False
-      | otherwise = inScope tvc envs rdr
+      | otherwise = inScope envs rdr
 
     cls_tvs_set :: OccSet
     cls_tvs_set = mkOccSet (map nameOccName cls_tvs)
 
 -- | Filter out any type and kind variables that are already in scope in the
--- the environment's LocalRdrEnv. Note that this includes named wildcards,
--- which look like perfectly ordinary type variables at this point.
+-- environment's (GlobalRdrEnv, LocalRdrEnv). Note that this includes named
+-- wildcards, which look like perfectly ordinary type variables at this point.
 filterInScopeM :: FreeKiTyVars -> RnM FreeKiTyVars
 filterInScopeM vars
-  = do { tvc <- getTermVariableCapture
-       ; envs <- getRdrEnvs
-       ; return (filterInScope tvc envs vars) }
+  = do { envs <- getRdrEnvs
+       ; return (filterInScope envs vars) }
 
 -- | Like 'filterInScopeM', but keep parent class variables intact.
 -- Used with associated types. See Note [Class variables and filterInScope]
 filterInScopeNonClassM :: [Name] -> FreeKiTyVars -> RnM FreeKiTyVars
 filterInScopeNonClassM cls_tvs vars
-  = do { tvc <- getTermVariableCapture
-       ; envs <- getRdrEnvs
-       ; return (filterInScopeNonClass cls_tvs tvc envs vars) }
+  = do { envs <- getRdrEnvs
+       ; return (filterInScopeNonClass cls_tvs envs vars) }
 
-inScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Bool
-inScope tvc (gbl, lcl) rdr =
-  case tvc of
-    DontCaptureTermVars -> rdr_in_scope
-    CaptureTermVars     -> rdr_in_scope || demoted_rdr_in_scope
+inScope :: (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Bool
+inScope (gbl, lcl) rdr = elem_lcl || elem_gbl
   where
-    rdr_in_scope, demoted_rdr_in_scope :: Bool
-    rdr_in_scope         = elem_lcl rdr
-    demoted_rdr_in_scope = maybe False (elem_lcl <||> elem_gbl) (demoteRdrNameTv rdr)
-
-    elem_lcl, elem_gbl :: RdrName -> Bool
-    elem_lcl name = elemLocalRdrEnv name lcl
-    elem_gbl name = (not . null) (lookupGRE gbl (LookupRdrName name (RelevantGREsFOS WantBoth)))
+    elem_lcl = elemLocalRdrEnv rdr lcl
+    elem_gbl = (not . null) (lookupGRE gbl (LookupRdrName rdr (RelevantGREsFOS WantBoth)))
 
 {- Note [Class variables and filterInScope]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2152,8 +2120,8 @@ extract_hs_tv_bndrs_kvs tv_bndrs =
           [k | L _ (KindedTyVar _ _ _ k) <- tv_bndrs]
 
 extract_tv :: LocatedN RdrName -> FreeKiTyVars -> FreeKiTyVars
-extract_tv tv acc =
-  if isRdrTyVar (unLoc tv) && (not . isQual) (unLoc tv) then tv:acc else acc
+extract_tv tv acc = if unqual_var (unLoc tv) then tv:acc else acc
+  where unqual_var rdr = isRdrVar rdr && not (isQual rdr)
 
 -- Deletes duplicates in a list of Located things. This is used to:
 --

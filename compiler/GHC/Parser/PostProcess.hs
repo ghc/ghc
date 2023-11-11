@@ -956,7 +956,7 @@ checkTyVars pp_what equals_or_where tc tparms
         -- Check that the name space is correct!
     chk :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
     chk ops cps cs bvis (L l (HsKindSig annk (L annt (HsTyVar ann _ (L lv tv))) k))
-        | isRdrTyVar tv
+        | isRdrVar tv
             = let
                 an = (reverse ops) ++ cps
               in
@@ -964,7 +964,7 @@ checkTyVars pp_what equals_or_where tc tparms
                        (KindedTyVar (addAnns (annk Semi.<> ann Semi.<> for_widening_ann bvis) an cs)
                                     bvis (L lv tv) k))
     chk ops cps cs bvis (L l (HsTyVar ann _ (L ltv tv)))
-        | isRdrTyVar tv
+        | isRdrVar tv
             = let
                 an = (reverse ops) ++ cps
               in
@@ -2865,8 +2865,7 @@ mkModuleImpExp warning anns (L l specname) subs = do
   let ann = EpAnn (spanAsAnchor $ maybe (locA l) getLocA warning) anns cs
   case subs of
     ImpExpAbs
-      | isVarNameSpace (rdrNameSpace name)
-                       -> return $ IEVar warning
+      | isRdrVar name  -> return $ IEVar warning
                            (L l (ieNameFromSpec specname))
       | otherwise      -> IEThingAbs (warning, ann) . L l <$> nameT
     ImpExpAll          -> IEThingAll (warning, ann) . L l <$> nameT
@@ -2890,7 +2889,7 @@ mkModuleImpExp warning anns (L l specname) subs = do
   where
     name = ieNameVal specname
     nameT =
-      if isVarNameSpace (rdrNameSpace name)
+      if isRdrVar name
         then addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
                (PsErrVarForTyCon name)
         else return $ ieNameFromSpec specname

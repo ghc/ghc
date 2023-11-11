@@ -22,8 +22,8 @@ boolVal (type b) =
     SFalse -> False
     STrue  -> True
 
-f :: forall x -> x -> ()
-f (type (x :: Type)) x = ()
+f :: forall a -> a -> ()
+f (type (a :: Type)) x = ()
 
 g :: forall b -> KnownBool b => If b Integer String
 g (type (b :: Bool)) =

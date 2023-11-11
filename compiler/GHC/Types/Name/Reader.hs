@@ -38,7 +38,7 @@ module GHC.Types.Name.Reader (
 
         -- ** Destruction
         rdrNameOcc, rdrNameSpace, demoteRdrName, demoteRdrNameTv, promoteRdrName,
-        isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
+        isRdrDataCon, isRdrTyVar, isRdrVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
@@ -291,10 +291,12 @@ nukeExact n
 
 isRdrDataCon :: RdrName -> Bool
 isRdrTyVar   :: RdrName -> Bool
+isRdrVar     :: RdrName -> Bool
 isRdrTc      :: RdrName -> Bool
 
 isRdrDataCon rn = isDataOcc (rdrNameOcc rn)
 isRdrTyVar   rn = isTvOcc   (rdrNameOcc rn)
+isRdrVar     rn = isVarNameSpace (rdrNameSpace rn)
 isRdrTc      rn = isTcOcc   (rdrNameOcc rn)
 
 isSrcRdrName :: RdrName -> Bool

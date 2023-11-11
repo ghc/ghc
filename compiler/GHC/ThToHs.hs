@@ -69,30 +69,36 @@ import System.IO.Unsafe
 -------------------------------------------------------------------
 --              The external interface
 
-convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either RunSpliceFailReason [LHsDecl GhcPs]
-convertToHsDecls origin loc ds =
-  initCvt origin loc $ fmap catMaybes (mapM cvt_dec ds)
+convertToHsDecls :: Origin -> SrcSpan -> TvNameSpace -> [TH.Dec] -> Either RunSpliceFailReason [LHsDecl GhcPs]
+convertToHsDecls origin loc tvns ds =
+  initCvt origin loc tvns $ fmap catMaybes (mapM cvt_dec ds)
   where
     cvt_dec d =
       wrapMsg (ConvDec d) $ cvtDec d
 
-convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either RunSpliceFailReason (LHsExpr GhcPs)
-convertToHsExpr origin loc e
-  = initCvt origin loc $ wrapMsg (ConvExp e) $ cvtl e
+convertToHsExpr :: Origin -> SrcSpan -> TvNameSpace -> TH.Exp -> Either RunSpliceFailReason (LHsExpr GhcPs)
+convertToHsExpr origin loc tvns e
+  = initCvt origin loc tvns $ wrapMsg (ConvExp e) $ cvtl e
 
-convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either RunSpliceFailReason (LPat GhcPs)
-convertToPat origin loc p
-  = initCvt origin loc $ wrapMsg (ConvPat p) $ cvtPat p
+convertToPat :: Origin -> SrcSpan -> TvNameSpace -> TH.Pat -> Either RunSpliceFailReason (LPat GhcPs)
+convertToPat origin loc tvns p
+  = initCvt origin loc tvns $ wrapMsg (ConvPat p) $ cvtPat p
 
-convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either RunSpliceFailReason (LHsType GhcPs)
-convertToHsType origin loc t
-  = initCvt origin loc $ wrapMsg (ConvType t) $ cvtType t
+convertToHsType :: Origin -> SrcSpan -> TvNameSpace -> TH.Type -> Either RunSpliceFailReason (LHsType GhcPs)
+convertToHsType origin loc tvns t
+  = initCvt origin loc tvns $ wrapMsg (ConvType t) $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM' err a = CvtM { unCvtM :: Origin -> SrcSpan -> Either err (SrcSpan, a) }
+type TvNameSpace = OccName.NameSpace
+    -- NameSpace used for type variables, either tvName or varName
+    -- depending on whether RequiredTypeArguments is on.
+
+newtype CvtM' err a = CvtM { unCvtM :: Origin -> SrcSpan -> TvNameSpace -> Either err (SrcSpan, a) }
     deriving (Functor)
-        -- Push down the Origin (that is configurable by
-        -- -fenable-th-splice-warnings) and source location;
+        -- Push down:
+        --   * origin (configurable by -fenable-th-splice-warnings)
+        --   * source location
+        --   * namespace for type variables
         -- Can fail, with a single error message
 
 type CvtM = CvtM' ConversionFailReason
@@ -106,61 +112,61 @@ type CvtM = CvtM' ConversionFailReason
 -- See Note [Source locations within TH splices].
 
 instance Applicative (CvtM' err) where
-    pure x = CvtM $ \_ loc -> Right (loc,x)
+    pure x = CvtM $ \_ loc _ -> Right (loc,x)
     (<*>) = ap
 
 instance Monad (CvtM' err) where
-  (CvtM m) >>= k = CvtM $ \origin loc -> case m origin loc of
+  (CvtM m) >>= k = CvtM $ \origin loc tvns -> case m origin loc tvns of
     Left err -> Left err
-    Right (loc',v) -> unCvtM (k v) origin loc'
+    Right (loc',v) -> unCvtM (k v) origin loc' tvns
 
 mapCvtMError :: (err1 -> err2) -> CvtM' err1 a -> CvtM' err2 a
-mapCvtMError f (CvtM m) = CvtM $ \origin loc -> first f $ m origin loc
+mapCvtMError f (CvtM m) = CvtM $ \origin loc tvns -> first f $ m origin loc tvns
 
-initCvt :: Origin -> SrcSpan -> CvtM' err a -> Either err a
-initCvt origin loc (CvtM m) = fmap snd (m origin loc)
+initCvt :: Origin -> SrcSpan -> TvNameSpace -> CvtM' err a -> Either err a
+initCvt origin loc tvns (CvtM m) = fmap snd (m origin loc tvns)
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
 
 failWith :: ConversionFailReason -> CvtM a
-failWith m = CvtM (\_ _ -> Left m)
+failWith m = CvtM (\_ _ _ -> Left m)
 
 getOrigin :: CvtM Origin
-getOrigin = CvtM (\origin loc -> Right (loc,origin))
+getOrigin = CvtM (\origin loc _ -> Right (loc,origin))
 
 getL :: CvtM SrcSpan
-getL = CvtM (\_ loc -> Right (loc,loc))
+getL = CvtM (\_ loc _ -> Right (loc,loc))
 
 -- NB: This is only used in conjunction with LineP pragmas.
 -- See Note [Source locations within TH splices].
 setL :: SrcSpan -> CvtM ()
-setL loc = CvtM (\_ _ -> Right (loc, ()))
+setL loc = CvtM (\_ _ _ -> Right (loc, ()))
 
 returnLA :: (NoAnn ann) => e -> CvtM (LocatedAn ann e)
-returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
+returnLA x = CvtM (\_ loc _ -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnJustLA :: a -> CvtM (Maybe (LocatedA a))
 returnJustLA = fmap Just . returnLA
 
 wrapParLA :: (NoAnn ann) => (LocatedAn ann a -> b) -> a -> CvtM b
-wrapParLA add_par x = CvtM (\_ loc -> Right (loc, add_par (L (noAnnSrcSpan loc) x)))
+wrapParLA add_par x = CvtM (\_ loc _ -> Right (loc, add_par (L (noAnnSrcSpan loc) x)))
 
 wrapMsg :: ThingBeingConverted -> CvtM' ConversionFailReason a -> CvtM' RunSpliceFailReason a
 wrapMsg what = mapCvtMError (ConversionFail what)
 
 wrapL :: CvtM a -> CvtM (Located a)
-wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of
+wrapL (CvtM m) = CvtM $ \origin loc tvns -> case m origin loc tvns of
   Left err -> Left err
   Right (loc', v) -> Right (loc', L loc v)
 
 wrapLN :: CvtM a -> CvtM (LocatedN a)
-wrapLN (CvtM m) = CvtM $ \origin loc -> case m origin loc of
+wrapLN (CvtM m) = CvtM $ \origin loc tvns -> case m origin loc tvns of
   Left err -> Left err
   Right (loc', v) -> Right (loc', L (noAnnSrcSpan loc) v)
 
 wrapLA :: CvtM a -> CvtM (LocatedA a)
-wrapLA (CvtM m) = CvtM $ \origin loc -> case m origin loc of
+wrapLA (CvtM m) = CvtM $ \origin loc tvns -> case m origin loc tvns of
   Left err -> Left err
   Right (loc', v) -> Right (loc', L (noAnnSrcSpan loc) v)
 
@@ -2091,7 +2097,9 @@ vcName n = if isVarName n then vName n else cName n
 
 -- Type variable names
 tNameN n = wrapLN (tName n)
-tName n = cvtName OccName.tvName n
+tName n = do
+  tvns <- CvtM (\_ loc tvns -> Right (loc, tvns))
+  cvtName tvns n
 
 -- Type Constructor names
 tconNameN n = wrapLN (tconName n)

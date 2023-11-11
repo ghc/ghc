@@ -1249,7 +1249,7 @@ rn_lty_pat (L l hs_ty) = do
 rn_ty_pat_var :: LocatedN RdrName -> TPRnM (LocatedN Name)
 rn_ty_pat_var lrdr@(L l rdr) = do
   locals <- askLocals
-  if isRdrTyVar rdr
+  if isRdrVar rdr
     && not (elemOccSet (occName rdr) locals) -- See Note [Locally bound names in type patterns]
 
     then do -- binder

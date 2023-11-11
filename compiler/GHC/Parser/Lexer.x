@@ -3038,6 +3038,7 @@ data ExtBits
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
   | ExtendedLiteralsBit
+  | RequiredTypeArgumentsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -3118,6 +3119,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
       .|. ExtendedLiteralsBit         `xoptBit` LangExt.ExtendedLiterals
+      .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

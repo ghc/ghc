@@ -39,7 +39,7 @@ module GHC.Parser
 where
 
 -- base
-import Control.Monad    ( unless, liftM, when, (<=<) )
+import Control.Monad    ( unless, liftM, when, (<=<), (<$!>) )
 import GHC.Exts
 import Data.Maybe       ( maybeToList )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -67,7 +67,7 @@ import GHC.Prelude
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
+import GHC.Types.Name.Occurrence ( NameSpace, varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -2296,7 +2296,8 @@ atype :: { LHsType GhcPs }
         | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
-        | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
+        | QVARID                      {% getTvNameSpace >>= \ns ->
+                                         let qname = mkQual ns (getQVARID $1)
                                          in  acsA (\cs -> sL1 $1 (HsTyVar (EpAnn (glEE $1 $>) [] cs) NotPromoted (sL1n $1 $ qname)))}
 
 -- An inst_type is what occurs in the head of an instance decl
@@ -3790,11 +3791,11 @@ tyvarop : '`' tyvarid '`'       {% amsrn (sLL $1 $> (unLoc $2))
                                            (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
 
 tyvarid :: { LocatedN RdrName }
-        : VARID            { sL1n $1 $! mkUnqual tvName (getVARID $1) }
-        | special_id       { sL1n $1 $! mkUnqual tvName (unLoc $1) }
-        | 'unsafe'         { sL1n $1 $! mkUnqual tvName (fsLit "unsafe") }
-        | 'safe'           { sL1n $1 $! mkUnqual tvName (fsLit "safe") }
-        | 'interruptible'  { sL1n $1 $! mkUnqual tvName (fsLit "interruptible") }
+        : VARID            {% sL1n $1 <$!> mkUnqualTv (getVARID $1) }
+        | special_id       {% sL1n $1 <$!> mkUnqualTv (unLoc $1) }
+        | 'unsafe'         {% sL1n $1 <$!> mkUnqualTv (fsLit "unsafe") }
+        | 'safe'           {% sL1n $1 <$!> mkUnqualTv (fsLit "safe") }
+        | 'interruptible'  {% sL1n $1 <$!> mkUnqualTv (fsLit "interruptible") }
         -- If this changes relative to varid, update 'checkRuleTyVarBndrNames'
         -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
@@ -4117,6 +4118,19 @@ getSCC lt = do let s = getSTRING lt
 
 stringLiteralToHsDocWst :: Located StringLiteral -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
 stringLiteralToHsDocWst  = lexStringLiteral parseIdentifier
+
+-- See also: getTvNameSpace in GHC/Tc/Gen/Splice.hs
+getTvNameSpace :: MonadP m => m NameSpace
+getTvNameSpace = do
+  rta <- getBit RequiredTypeArgumentsBit
+  let ns | rta       = varName  -- RequiredTypeArguments:   a single namespace for term variables and type variables
+         | otherwise = tvName   -- NoRequiredTypeArguments: type variables have a dedicated namespace
+  return ns
+
+mkUnqualTv :: MonadP m => FastString -> m RdrName
+mkUnqualTv s = do
+  ns <- getTvNameSpace
+  return (mkUnqual ns s)
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan

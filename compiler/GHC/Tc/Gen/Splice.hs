@@ -131,6 +131,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
 
+import qualified GHC.LanguageExtensions as LangExt
+
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
@@ -1081,7 +1083,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
 
 runQResult
   :: (a -> String)
-  -> (Origin -> SrcSpan -> a -> b)
+  -> (Origin -> SrcSpan -> NameSpace -> a -> b)
   -> (ForeignHValue -> TcM a)
   -> SrcSpan
   -> ForeignHValue {- TH.Q a -}
@@ -1089,8 +1091,9 @@ runQResult
 runQResult show_th f runQ expr_span hval
   = do { th_result <- runQ hval
        ; th_origin <- getThSpliceOrigin
+       ; tvns <- getTvNameSpace
        ; traceTc "Got TH result:" (text (show_th th_result))
-       ; return (f th_origin expr_span th_result) }
+       ; return (f th_origin expr_span tvns th_result) }
 
 
 -----------------
@@ -1437,7 +1440,8 @@ instance TH.Quasi TcM where
   qAddTopDecls thds = do
       l <- getSrcSpanM
       th_origin <- getThSpliceOrigin
-      let either_hval = convertToHsDecls th_origin l thds
+      tvns <- getTvNameSpace
+      let either_hval = convertToHsDecls th_origin l tvns thds
       ds <- case either_hval of
               Left exn -> failWithTc $ TcRnTHError $ AddTopDeclsError $
                 AddTopDeclsRunSpliceFailure exn
@@ -1928,9 +1932,19 @@ reifyInstances' th_nm th_tys
     bale_out msg = failWithTc msg
 
     cvt :: Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
-    cvt origin loc th_ty = case convertToHsType origin loc th_ty of
-      Left msg -> failWithTc (TcRnTHError $ THSpliceFailed $ RunSpliceFailure msg)
-      Right ty -> return ty
+    cvt origin loc th_ty = do
+      tvns <- getTvNameSpace
+      case convertToHsType origin loc tvns th_ty of
+        Left msg -> failWithTc (TcRnTHError $ THSpliceFailed $ RunSpliceFailure msg)
+        Right ty -> return ty
+
+-- See also: getTvNameSpace in Parser.y
+getTvNameSpace :: TcM NameSpace
+getTvNameSpace = do
+  rta <- xoptM LangExt.RequiredTypeArguments
+  let ns | rta       = GHC.Types.Name.varName  -- RequiredTypeArguments:   a single namespace for term variables and type variables
+         | otherwise = GHC.Types.Name.tvName   -- NoRequiredTypeArguments: type variables have a dedicated namespace
+  return ns
 
 {-
 ************************************************************************
