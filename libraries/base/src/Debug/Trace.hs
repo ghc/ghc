@@ -143,12 +143,14 @@ traceId a = trace a a
 Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 
 This makes it convenient for printing the values of interesting variables or
-expressions inside a function. For example here we print the value of the
+expressions inside a function. For example, here we print the values of the
 variables @x@ and @y@:
 
->>> let f x y = traceShow (x,y) (x + y) in f (1+2) 5
-(3,5)
+>>> let f x y = traceShow ("x", x, "y", y) (x + y) in f (1+2) 5
+("x",3,"y",5)
 8
+
+Note in this example we also create simple labels just by including some strings.
 
 -}
 traceShow :: Show a => a -> b -> b
