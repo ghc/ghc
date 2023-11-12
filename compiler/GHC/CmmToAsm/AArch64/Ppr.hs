@@ -370,7 +370,6 @@ pprInstr platform instr = case instr of
   ADD  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
-  CMN  o1 o2    -> op2 (text "\tcmn") o1 o2
   CMP  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
     | otherwise -> op2 (text "\tcmp") o1 o2
@@ -405,11 +404,7 @@ pprInstr platform instr = case instr of
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3  -> op3 (text "\tand") o1 o2 o3
-  ANDS o1 o2 o3 -> op3 (text "\tands") o1 o2 o3
   ASR o1 o2 o3  -> op3 (text "\tasr") o1 o2 o3
-  BIC o1 o2 o3  -> op3 (text "\tbic") o1 o2 o3
-  BICS o1 o2 o3 -> op3 (text "\tbics") o1 o2 o3
-  EON o1 o2 o3  -> op3 (text "\teon") o1 o2 o3
   EOR o1 o2 o3  -> op3 (text "\teor") o1 o2 o3
   LSL o1 o2 o3  -> op3 (text "\tlsl") o1 o2 o3
   LSR o1 o2 o3  -> op3 (text "\tlsr") o1 o2 o3
@@ -419,10 +414,7 @@ pprInstr platform instr = case instr of
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
   MOVZ o1 o2    -> op2 (text "\tmovz") o1 o2
   MVN o1 o2     -> op2 (text "\tmvn") o1 o2
-  ORN o1 o2 o3  -> op3 (text "\torn") o1 o2 o3
   ORR o1 o2 o3  -> op3 (text "\torr") o1 o2 o3
-  ROR o1 o2 o3  -> op3 (text "\tror") o1 o2 o3
-  TST o1 o2     -> op2 (text "\ttst") o1 o2
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t            -> pprInstr platform (B t)
@@ -526,12 +518,9 @@ pprInstr platform instr = case instr of
   LDR _f o1 o2 -> op2 (text "\tldr") o1 o2
   LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
-  STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
-  LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
-
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY -> line $ text "\tdmb sy"
   DMBISH -> line $ text "\tdmb ish"
+
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
