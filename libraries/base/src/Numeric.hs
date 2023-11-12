@@ -243,6 +243,8 @@ similar to the @%a@ specifier in C's printf.
   "-0x1.9851ecp3"
   >>> showHFloat (-0 :: Double) ""
   "-0x0p+0"
+
+@since 4.11.0.0
 -}
 showHFloat :: RealFloat a => a -> ShowS
 showHFloat = showString . fmt
