@@ -79,7 +79,6 @@ regUsageOfInstr platform instr = case instr of
 
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  CMN l r                  -> usage (regOp l ++ regOp r, [])
   CMP l r                  -> usage (regOp l ++ regOp r, [])
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -102,9 +101,6 @@ regUsageOfInstr platform instr = case instr of
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  EON dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   EOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -113,8 +109,6 @@ regUsageOfInstr platform instr = case instr of
   MOVZ dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
   ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  TST src1 src2            -> usage (regOp src1 ++ regOp src2, [])
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
@@ -131,12 +125,8 @@ regUsageOfInstr platform instr = case instr of
   STLR _ src dst           -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
   LDAR _ dst src           -> usage (regOp src, regOp dst)
-  -- TODO is this right? see STR, which I'm only partial about being right?
-  STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
-  LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY                    -> usage ([], [])
   DMBISH                   -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
@@ -219,7 +209,6 @@ patchRegsOfInstr instr env = case instr of
     DELTA{}             -> instr
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
-    CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
@@ -242,11 +231,7 @@ patchRegsOfInstr instr env = case instr of
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
-    ANDS o1 o2 o3  -> ANDS (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
-    BIC o1 o2 o3   -> BIC  (patchOp o1) (patchOp o2) (patchOp o3)
-    BICS o1 o2 o3  -> BICS (patchOp o1) (patchOp o2) (patchOp o3)
-    EON o1 o2 o3   -> EON  (patchOp o1) (patchOp o2) (patchOp o3)
     EOR o1 o2 o3   -> EOR  (patchOp o1) (patchOp o2) (patchOp o3)
     LSL o1 o2 o3   -> LSL  (patchOp o1) (patchOp o2) (patchOp o3)
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -255,8 +240,6 @@ patchRegsOfInstr instr env = case instr of
     MOVZ o1 o2     -> MOVZ (patchOp o1) (patchOp o2)
     MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
     ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
-    ROR o1 o2 o3   -> ROR  (patchOp o1) (patchOp o2) (patchOp o3)
-    TST o1 o2      -> TST  (patchOp o1) (patchOp o2)
 
     -- 4. Branch Instructions --------------------------------------------------
     J t            -> J (patchTarget t)
@@ -274,11 +257,8 @@ patchRegsOfInstr instr env = case instr of
     STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
     LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
-    STP f o1 o2 o3 -> STP f (patchOp o1) (patchOp o2) (patchOp o3)
-    LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 8. Synchronization Instructions -----------------------------------------
-    DMBSY          -> DMBSY
     DMBISH         -> DMBISH
 
     -- 9. Floating Point Instructions ------------------------------------------
@@ -560,7 +540,6 @@ data Instr
     -- | ADDS Operand Operand Operand -- rd = rn + rm
     -- | ADR ...
     -- | ADRP ...
-    | CMN Operand Operand -- rd + op2
     | CMP Operand Operand -- rd - op2
     -- | MADD ...
     -- | MNEG ...
@@ -601,11 +580,7 @@ data Instr
 
     -- 3. Logical and Move Instructions ----------------------------------------
     | AND Operand Operand Operand -- rd = rn & op2
-    | ANDS Operand Operand Operand -- rd = rn & op2
     | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    | BIC Operand Operand Operand -- rd = rn & ~op2
-    | BICS Operand Operand Operand -- rd = rn & ~op2
-    | EON Operand Operand Operand -- rd = rn ⊕ ~op2
     | EOR Operand Operand Operand -- rd = rn ⊕ op2
     | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
@@ -614,18 +589,13 @@ data Instr
     -- | MOVN Operand Operand
     | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
-    | ORN Operand Operand Operand -- rd = rn | ~op2
     | ORR Operand Operand Operand -- rd = rn | op2
-    | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    | TST Operand Operand -- rn & op2
     -- Load and stores.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
     | STLR Format Operand Operand -- stlr Xn, address-mode // Xn -> *addr
     | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
     | LDAR Format Operand Operand -- ldar Xn, address-mode // Xn <- *addr
-    | STP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn -> *addr, Xm -> *(addr + 8)
-    | LDP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn <- *addr, Xm <- *(addr + 8)
 
     -- Conditional instructions
     | CSET Operand Cond   -- if(cond) op <- 1 else op <- 0
@@ -639,7 +609,6 @@ data Instr
     | BCOND Cond Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
-    | DMBSY
     | DMBISH
     -- 9. Floating Point Instructions
     -- Float ConVerT
@@ -675,7 +644,6 @@ instrCon i =
       PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
       ADD{} -> "ADD"
-      CMN{} -> "CMN"
       CMP{} -> "CMP"
       MSUB{} -> "MSUB"
       MUL{} -> "MUL"
@@ -690,11 +658,7 @@ instrCon i =
       SBFX{} -> "SBFX"
       UBFX{} -> "UBFX"
       AND{} -> "AND"
-      ANDS{} -> "ANDS"
       ASR{} -> "ASR"
-      BIC{} -> "BIC"
-      BICS{} -> "BICS"
-      EON{} -> "EON"
       EOR{} -> "EOR"
       LSL{} -> "LSL"
       LSR{} -> "LSR"
@@ -702,16 +666,11 @@ instrCon i =
       MOVK{} -> "MOVK"
       MOVZ{} -> "MOVZ"
       MVN{} -> "MVN"
-      ORN{} -> "ORN"
       ORR{} -> "ORR"
-      ROR{} -> "ROR"
-      TST{} -> "TST"
       STR{} -> "STR"
       STLR{} -> "STLR"
       LDR{} -> "LDR"
       LDAR{} -> "LDAR"
-      STP{} -> "STP"
-      LDP{} -> "LDP"
       CSET{} -> "CSET"
       CBZ{} -> "CBZ"
       CBNZ{} -> "CBNZ"
@@ -719,7 +678,6 @@ instrCon i =
       B{} -> "B"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
-      DMBSY{} -> "DMBSY"
       DMBISH{} -> "DMBISH"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"

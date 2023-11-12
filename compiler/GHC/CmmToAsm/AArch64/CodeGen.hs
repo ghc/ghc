@@ -434,7 +434,7 @@ getMovWideImm n w
 
 -- | Arithmetic(immediate)
 --  Allows for 12bit immediates which can be shifted by 0 or 12 bits.
--- Used with ADD, ADDS, SUB, SUBS, CMP, CMN
+-- Used with ADD, ADDS, SUB, SUBS, CMP
 -- See Note [Aarch64 immediates]
 getArithImm :: Integer -> Width -> Maybe Operand
 getArithImm n w
@@ -459,7 +459,7 @@ getArithImm n w
 
 -- |  Logical (immediate)
 -- Allows encoding of some repeated bitpatterns
--- Used with AND, ANDS, EOR, ORR, TST
+-- Used with AND, EOR, ORR
 -- and their aliases which includes at least MOV (bitmask immediate)
 -- See Note [Aarch64 immediates]
 getBitmaskImm :: Integer -> Width -> Maybe Operand
