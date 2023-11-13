@@ -2577,7 +2577,7 @@ of ``-W(no-)*``.
     Introduced in GHC 9.10.1, this warns when an illegal use of a type or kind
     (without having enabled the :extension:`DataKinds` extension) is caught in
     the typechecker (hence the ``-tc`` suffix). These warnings complement the
-    existing :extensions:`DataKinds` checks (that have existed since
+    existing :extension:`DataKinds` checks (that have existed since
     :extension:`DataKinds` was first introduced), which result in errors
     instead of warnings.
 

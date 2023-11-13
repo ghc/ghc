@@ -1,3 +1,5 @@
+.. _linear-types:
+
 Linear types
 ============
 
@@ -58,7 +60,8 @@ partially. See, however :ref:`linear-types-limitations`.
 Linear and multiplicity-polymorphic arrows are *always declared*,
 never inferred. That is, if you don't give an appropriate type
 signature to a function, it will be inferred as being a regular
-function of type ``a -> b``.
+function of type ``a -> b``. The same principle holds for
+representation polymorphism (see :ref:`representation-polymorphism-defaulting`).
 
 Data types
 ----------

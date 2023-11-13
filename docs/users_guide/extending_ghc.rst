@@ -1383,6 +1383,7 @@ The plugin has type ``WantedConstraints -> [DefaultingProposal]``.
 * It is given the currently unsolved constraints.
 * It returns a list of independent "defaulting proposals".
 * Each proposal of type ``DefaultingProposal`` specifies:
+
   * ``deProposals``: specifies a list,
     in priority order, of sets of type variable assignments
   * ``deProposalCts :: [Ct]`` gives a set of constraints (always a
