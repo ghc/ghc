@@ -108,6 +108,35 @@ These functions do not bind a representation-polymorphic variable, and
 so are accepted. Their polymorphism allows users to use these to conveniently
 stub out functions that return unboxed types.
 
+.. _representation-polymorphism-defaulting:
+
+Inference and defaulting
+------------------------
+
+GHC does not infer representation-polymorphic types.
+If the representation of a variable is not specified, it will be assumed
+to be ``LiftedRep``.
+For example, if you write ``f a b = a b``, the inferred type of ``f``
+will be ::
+
+  f :: forall {a :: Type} {b :: Type}. (a -> b) -> a -> b
+
+even though ::
+
+  f :: forall {rep} {a :: Type} {b :: TYPE rep}. (a -> b) -> a -> b
+
+would also be legal, as described above.
+
+Likewise, in a user-written signature ``f :: forall a b. (a -> b) -> a -> b``
+GHC will assume that both ``a`` and ``b`` have kind ``Type``. To use
+a different representation, you have to specify the kinds of ``a`` and ``b``.
+
+During type inference, GHC does not quantify over variables of kind
+``RuntimeRep`` nor ``Levity``.
+Instead, they are defaulted to ``LiftedRep`` and ``Lifted`` respectively.
+Likewise, ``Multiplicity`` variables (:ref:`linear-types`) are defaulted
+to ``Many``.
+
 .. _printing-representation-polymorphic-types:
 
 Printing representation-polymorphic types

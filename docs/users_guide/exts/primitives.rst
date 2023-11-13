@@ -438,7 +438,7 @@ You may even declare levity-polymorphic data types: ::
 While ``f`` above could reasonably be levity-polymorphic (as it evaluates its
 argument either way), GHC currently disallows the more general type
 ``PEither @l Int Bool -> Bool``. This is a consequence of the
-`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__,
+`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__.
 
 Pattern matching against an unlifted data type work just like that for lifted
 types; but see :ref:`recursive-and-polymorphic-let-bindings` for the semantics of

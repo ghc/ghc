@@ -100,13 +100,13 @@ The following kinds and promoted data constructors can be used even when
 :extension:`DataKinds` is not enabled:
 
 - ``Type``
-- ``TYPE`` (see :ref:`_runtime-rep`)
+- ``TYPE`` (see :ref:`runtime-rep`)
 - ``Constraint`` (see :ref:`constraint-kind`)
 - ``CONSTRAINT``
 - ``Multiplicity`` and its promoted data constructors (see :extension:`LinearTypes`)
-- ``LiftedRep`` (see :ref:`_runtime-rep`)
-- ``RuntimeRep`` and its promoted data constructors (see :ref:`_runtime-rep`)
-- ``Levity`` and its promoted data constructors (see :ref:`_runtime-rep`)
+- ``LiftedRep`` (see :ref:`runtime-rep`)
+- ``RuntimeRep`` and its promoted data constructors (see :ref:`runtime-rep`)
+- ``Levity`` and its promoted data constructors (see :ref:`runtime-rep`)
 - ``VecCount`` and its promoted data constructors
 - ``VecElem`` and its promoted data constructors
 
@@ -231,7 +231,7 @@ See also :ghc-ticket:`7347`.
 :extension:`DataKinds` and type synonyms
 ----------------------------------------
 
-The :extensions:`DataKinds` extension interacts with type synonyms in the
+The :extension:`DataKinds` extension interacts with type synonyms in the
 following ways:
 
 1. In a *type* context: :extension:`DataKinds` is not required to use a type
