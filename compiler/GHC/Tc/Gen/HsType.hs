@@ -2569,23 +2569,19 @@ kcCheckDeclHeader_sig sig_kind name flav
                    -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
                    --
                    -- Also see Note [Arity of type families and type synonyms]
-                 ; ctx_k <- kc_res_ki
+                 ; res_kind :: ContextKind <- kc_res_ki
 
                  ; let sig_res_kind' = mkTyConKind excess_sig_tcbs sig_res_kind
 
                  ; traceTc "kcCheckDeclHeader_sig 2" $
                     vcat [ text "excess_sig_tcbs" <+> ppr excess_sig_tcbs
-                         , text "ctx_k" <+> ppr ctx_k
+                         , text "res_kind" <+> ppr res_kind
                          , text "sig_res_kind'" <+> ppr sig_res_kind'
                          ]
 
-                 -- Unify res_ki (from the type declaration) with the residual kind from
-                 -- the kind signature. Don't forget to apply the skolemising 'subst' first.
-                 ; case ctx_k of
-                      AnyKind -> return ()   -- No signature
-                      _ -> do
-                        res_ki <- newExpectedKind ctx_k
-                        check_exp_res_ki sig_res_kind' res_ki
+                 -- Unify res_ki (from the type declaration) with
+                 -- sig_res_kind', the residual kind from the kind signature.
+                 ; checkExpectedResKind sig_res_kind' res_kind
 
                  -- Add more binders for data/newtype, so the result kind has no arrows
                  -- See Note [Datatype return kinds]
@@ -2608,7 +2604,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
         ; checkForDuplicateScopedTyVars implicit_prs
-        ; checkForDisconnectedScopedTyVars all_tcbs implicit_prs
+        ; checkForDisconnectedScopedTyVars flav all_tcbs implicit_prs
 
         -- Swizzle the Names so that the TyCon uses the user-declared implicit names
         -- E.g  type T :: k -> Type
@@ -2650,18 +2646,23 @@ kcCheckDeclHeader_sig sig_kind name flav
 -- | Check the result kind annotation on a type constructor against
 -- the corresponding section of the standalone kind signature.
 -- Drops invisible binders that interfere with unification.
-check_exp_res_ki :: TcKind    -- ^ the actual kind
-                 -> TcKind    -- ^ the expected kind
-                 -> TcM ()
-check_exp_res_ki act_kind exp_kind
-  = discardResult $ unifyKind Nothing act_kind' exp_kind
-    where
-      (_, act_kind') = splitInvisPiTysN n_to_inst act_kind
+checkExpectedResKind :: TcKind       -- ^ the result kind from the separate kind signature
+                     -> ContextKind  -- ^ the result kind from the declaration header
+                     -> TcM ()
+checkExpectedResKind _ AnyKind
+  = return ()  -- No signature in the declaration header
+checkExpectedResKind sig_kind res_ki
+  = do { actual_res_ki <- newExpectedKind res_ki
 
-      -- by analogy with checkExpectedKind
-      n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
-      n_act_invis_bndrs = invisibleTyBndrCount act_kind
-      n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
+       ; let -- Drop invisible binders from sig_kind until they match up
+             -- with res_ki.  By analogy with checkExpectedKind.
+             n_res_invis_bndrs = invisibleTyBndrCount actual_res_ki
+             n_sig_invis_bndrs = invisibleTyBndrCount sig_kind
+             n_to_inst         = n_sig_invis_bndrs - n_res_invis_bndrs
+
+             (_, sig_kind') = splitInvisPiTysN n_to_inst sig_kind
+
+       ; discardResult $ unifyKind Nothing sig_kind' actual_res_ki }
 
 matchUpSigWithDecl
   :: Name                        -- Name of the type constructor for error messages
@@ -2964,13 +2965,16 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
-checkForDisconnectedScopedTyVars :: [TcTyConBinder] -> [(Name,TcTyVar)] -> TcM ()
+checkForDisconnectedScopedTyVars :: TyConFlavour TyCon -> [TcTyConBinder]
+                                 -> [(Name,TcTyVar)] -> TcM ()
 -- See Note [Disconnected type variables]
 -- `scoped_prs` is the mapping gotten by unifying
 --    - the standalone kind signature for T, with
 --    - the header of the type/class declaration for T
-checkForDisconnectedScopedTyVars sig_tcbs scoped_prs
-  = mapM_ report_disconnected (filterOut ok scoped_prs)
+checkForDisconnectedScopedTyVars flav sig_tcbs scoped_prs
+  = when (needsEtaExpansion flav) $
+         -- needsEtaExpansion: see wrinkle (DTV1) in Note [Disconnected type variables]
+    mapM_ report_disconnected (filterOut ok scoped_prs)
   where
     sig_tvs = mkVarSet (binderVars sig_tcbs)
     ok (_, tc_tv) = tc_tv `elemVarSet` sig_tvs
@@ -3047,6 +3051,25 @@ phantom synonym that just discards its argument.  So our plan is this:
 See #24083 for dicussion of alternatives, none satisfactory.  Also the fix is
 easy: just add an explicit `@kk` parameter to the declaration, to bind `kk`
 explicitly, rather than binding it implicitly via unification.
+
+(DTV1) We only want to make this check when there /are/ scoped type variables; and
+  that is determined by needsEtaExpansion.  Examples:
+
+     type C :: x -> y -> Constraint
+     class C a :: b -> Constraint where { ... }
+     -- The a,b scope over the "..."
+
+     type D :: forall k. k -> Type
+     data family D :: kk -> Type
+     -- Nothing for `kk` to scope over!
+
+  In the latter data-family case, the match-up stuff in kcCheckDeclHeader_sig will
+  return [] for `extra_tcbs`, and in fact `all_tcbs` will be empty.  So if we do
+  the check-for-disconnected-tyvars check we'll complain that `kk` is not bound
+  to one of `all_tcbs` (see #24083, comments about the `singletons` package).
+
+  The scoped-tyvar stuff is needed precisely for data/class/newtype declarations,
+  where needsEtaExpansion is True.
 -}
 
 {- *********************************************************************
