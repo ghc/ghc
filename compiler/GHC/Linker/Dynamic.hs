@@ -220,7 +220,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
+                 ++ [ Option "-Wl,--whole-archive" ]
                  ++ map Option o_files
+                 ++ [ Option "-Wl,--no-whole-archive" ]
                  ++ [ Option "-shared" ]
                  ++ map Option bsymbolicFlag
                     -- Set the library soname. We use -h rather than -soname as
