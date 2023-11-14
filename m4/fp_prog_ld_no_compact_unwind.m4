@@ -6,7 +6,7 @@ AC_DEFUN([FP_PROG_LD_NO_COMPACT_UNWIND],
 [
 AC_CACHE_CHECK([whether ld understands -no_compact_unwind], [fp_cv_ld_no_compact_unwind],
 [
-case $build in
+case $target in
   *-darwin)
     echo 'int foo() { return 0; }' > conftest.c
     "${CC-cc}" -c conftest.c
