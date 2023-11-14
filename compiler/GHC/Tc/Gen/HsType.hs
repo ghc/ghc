@@ -2562,13 +2562,14 @@ kcCheckDeclHeader_sig sig_kind name flav
                    --               ^^^^^^^^^
                    -- We do it here because at this point the environment has been
                    -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
-                 ; ctx_k <- kc_res_ki
+                 ; res_kind :: ContextKind <- kc_res_ki
+
 
                  -- Work out extra_arity, the number of extra invisible binders from
                  -- the kind signature that should be part of the TyCon's arity.
                  -- See Note [Arity inference in kcCheckDeclHeader_sig]
                  ; let n_invis_tcbs = countWhile isInvisibleTyConBinder excess_sig_tcbs
-                       invis_arity = case ctx_k of
+                       invis_arity = case res_kind of
                           AnyKind    -> n_invis_tcbs -- No kind signature, so make all the invisible binders
                                                      -- the signature into part of the arity of the TyCon
                           OpenKind   -> n_invis_tcbs -- Result kind is (TYPE rr), so again make all the
@@ -2582,12 +2583,9 @@ kcCheckDeclHeader_sig sig_kind name flav
                                                             , ppr invis_arity, ppr invis_tcbs
                                                             , ppr n_invis_tcbs ]
 
-                 -- Unify res_ki (from the type declaration) with the residual kind from
-                 -- the kind signature. Don't forget to apply the skolemising 'subst' first.
-                 ; case ctx_k of
-                      AnyKind -> return ()   -- No signature
-                      _ -> do { res_ki <- newExpectedKind ctx_k
-                              ; discardResult (unifyKind Nothing sig_res_kind' res_ki) }
+                 -- Unify res_ki (from the type declaration) with
+                 -- sig_res_kind', the residual kind from the kind signature.
+                 ; checkExpectedResKind sig_res_kind' res_kind
 
                  -- Add more binders for data/newtype, so the result kind has no arrows
                  -- See Note [Datatype return kinds]
@@ -2610,7 +2608,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
         ; checkForDuplicateScopedTyVars implicit_prs
-        ; checkForDisconnectedScopedTyVars all_tcbs implicit_prs
+        ; checkForDisconnectedScopedTyVars flav all_tcbs implicit_prs
 
         -- Swizzle the Names so that the TyCon uses the user-declared implicit names
         -- E.g  type T :: k -> Type
@@ -2648,6 +2646,27 @@ kcCheckDeclHeader_sig sig_kind name flav
           , text "tyConResKind" <+> debugPprType (tyConResKind tc)
           ]
         ; return tc }
+
+-- | Check the result kind annotation on a type constructor against
+-- the corresponding section of the standalone kind signature.
+-- Drops invisible binders that interfere with unification.
+checkExpectedResKind :: TcKind       -- ^ the result kind from the separate kind signature
+                     -> ContextKind  -- ^ the result kind from the declaration header
+                     -> TcM ()
+checkExpectedResKind _ AnyKind
+  = return ()  -- No signature in the declaration header
+checkExpectedResKind sig_kind res_ki
+  = do { actual_res_ki <- newExpectedKind res_ki
+
+       ; let -- Drop invisible binders from sig_kind until they match up
+             -- with res_ki.  By analogy with checkExpectedKind.
+             n_res_invis_bndrs = invisibleTyBndrCount actual_res_ki
+             n_sig_invis_bndrs = invisibleTyBndrCount sig_kind
+             n_to_inst         = n_sig_invis_bndrs - n_res_invis_bndrs
+
+             (_, sig_kind') = splitInvisPiTysN n_to_inst sig_kind
+
+       ; discardResult $ unifyKind Nothing sig_kind' actual_res_ki }
 
 matchUpSigWithDecl
   :: Name                        -- Name of the type constructor for error messages
@@ -2986,13 +3005,16 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
-checkForDisconnectedScopedTyVars :: [TcTyConBinder] -> [(Name,TcTyVar)] -> TcM ()
+checkForDisconnectedScopedTyVars :: TyConFlavour TyCon -> [TcTyConBinder]
+                                 -> [(Name,TcTyVar)] -> TcM ()
 -- See Note [Disconnected type variables]
 -- `scoped_prs` is the mapping gotten by unifying
 --    - the standalone kind signature for T, with
 --    - the header of the type/class declaration for T
-checkForDisconnectedScopedTyVars sig_tcbs scoped_prs
-  = mapM_ report_disconnected (filterOut ok scoped_prs)
+checkForDisconnectedScopedTyVars flav sig_tcbs scoped_prs
+  = when (needsEtaExpansion flav) $
+         -- needsEtaExpansion: see wrinkle (DTV1) in Note [Disconnected type variables]
+    mapM_ report_disconnected (filterOut ok scoped_prs)
   where
     sig_tvs = mkVarSet (binderVars sig_tcbs)
     ok (_, tc_tv) = tc_tv `elemVarSet` sig_tvs
@@ -3069,6 +3091,25 @@ phantom synonym that just discards its argument.  So our plan is this:
 See #24083 for dicussion of alternatives, none satisfactory.  Also the fix is
 easy: just add an explicit `@kk` parameter to the declaration, to bind `kk`
 explicitly, rather than binding it implicitly via unification.
+
+(DTV1) We only want to make this check when there /are/ scoped type variables; and
+  that is determined by needsEtaExpansion.  Examples:
+
+     type C :: x -> y -> Constraint
+     class C a :: b -> Constraint where { ... }
+     -- The a,b scope over the "..."
+
+     type D :: forall k. k -> Type
+     data family D :: kk -> Type
+     -- Nothing for `kk` to scope over!
+
+  In the latter data-family case, the match-up stuff in kcCheckDeclHeader_sig will
+  return [] for `extra_tcbs`, and in fact `all_tcbs` will be empty.  So if we do
+  the check-for-disconnected-tyvars check we'll complain that `kk` is not bound
+  to one of `all_tcbs` (see #24083, comments about the `singletons` package).
+
+  The scoped-tyvar stuff is needed precisely for data/class/newtype declarations,
+  where needsEtaExpansion is True.
 -}
 
 {- *********************************************************************
