@@ -9,6 +9,7 @@ test('driver014', [extra_files(['A014.hs'])], makefile_test, ['test014'])
 test('driver015', [extra_files(['A015.hs'])], makefile_test, ['test015'])
 
 test('driver016', [req_ffi_exports, extra_files(['F016.hs'])], makefile_test, ['test016']) # JS backend doesn't support foreign export yet
+test('driver016a', [req_ffi_exports, extra_files(['f016.c', 'F016.hs'])], makefile_test, ['testForeignExportSharedLibrary']) # JS backend doesn't support foreign export yet
 
 test('driver017', [req_ffi_exports, extra_files(['F017.hs'])], makefile_test, ['test017']) # JS backend doesn't support foreign export yet
 

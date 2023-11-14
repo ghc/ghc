@@ -64,6 +64,13 @@ test016:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c F016.hs
 	test -f F016_stub.h
 
+testForeignExportSharedLibrary:
+	$(RM) F016.hi F016$(dllext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -shared -dynamic -fPIC F016.hs -flink-rts -o libfoo$(dllext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -dynamic -no-hs-main f016.c -lfoo -L.
+	"$(TEST_HC)" $(TEST_HC_OPTS) -dynamic -no-hs-main f016.o -lfoo -L. -optl-Wl,-rpath,'$ORIGIN' -o f016$(exeext)
+	./f016$(exeext)
+
 # test -stubdir (filename differs from module name)
 test017:
 	$(RM) F017.hi F017$(OBJSUFFIX)
