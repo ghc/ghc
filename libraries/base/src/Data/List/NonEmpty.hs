@@ -45,6 +45,7 @@ module Data.List.NonEmpty (
    , uncons      -- :: NonEmpty a -> (a, Maybe (NonEmpty a))
    , unfoldr     -- :: (a -> (b, Maybe a)) -> a -> NonEmpty b
    , sort        -- :: Ord a => NonEmpty a -> NonEmpty a
+   , sortOn      -- :: Ord b => (a -> b) -> NonEmpty a -> NonEmpty a
    , reverse     -- :: NonEmpty a -> NonEmpty a
    , inits       -- :: Foldable f => f a -> NonEmpty [a]
    , inits1      -- :: NonEmpty a -> NonEmpty (NonEmpty a)
@@ -195,6 +196,39 @@ cons = (<|)
 -- | Sort a stream.
 sort :: Ord a => NonEmpty a -> NonEmpty a
 sort = lift List.sort
+
+-- | Sort a 'NonEmpty' on a user-supplied projection of its elements.
+-- See 'List.sortOn' for more detailed information.
+--
+-- ==== __Examples__
+--
+-- >>> sortOn fst $ (2, "world") :| [(4, "!"), (1, "Hello")]
+-- (1,"Hello") :| [(2,"world"),(4,"!")]
+--
+-- >>> sortOn length $ "jim" :| ["creed", "pam", "michael", "dwight", "kevin"]
+-- "jim" :| ["pam","creed","kevin","dwight","michael"]
+--
+-- ==== __Performance notes__
+--
+-- This function minimises the projections performed, by materialising
+-- the projections in an intermediate list.
+--
+-- For trivial projections, you should prefer using 'sortBy' with
+-- 'comparing', for example:
+--
+-- >>> sortBy (comparing fst) $ (3, 1) :| [(2, 2), (1, 3)]
+-- (1,3) :| [(2,2),(3,1)]
+--
+-- Or, for the exact same API as 'sortOn', you can use `sortBy . comparing`:
+--
+-- >>> (sortBy . comparing) fst $ (3, 1) :| [(2, 2), (1, 3)]
+-- (1,3) :| [(2,2),(3,1)]
+--
+-- 'sortWith' is an alias for `sortBy . comparing`.
+--
+-- @since 4.20.0.0
+sortOn :: Ord b => (a -> b) -> NonEmpty a -> NonEmpty a
+sortOn f = lift (List.sortOn f)
 
 -- | Converts a normal list to a 'NonEmpty' stream.
 --

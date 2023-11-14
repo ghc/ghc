@@ -1798,6 +1798,22 @@ rqpart cmp x (y:ys) rle rgt r =
 -- >>> sortOn length ["jim", "creed", "pam", "michael", "dwight", "kevin"]
 -- ["jim","pam","creed","kevin","dwight","michael"]
 --
+-- ==== __Performance notes__
+--
+-- This function minimises the projections performed, by materialising
+-- the projections in an intermediate list.
+--
+-- For trivial projections, you should prefer using 'sortBy' with
+-- 'comparing', for example:
+--
+-- >>> sortBy (comparing fst) [(3, 1), (2, 2), (1, 3)]
+-- [(1,3),(2,2),(3,1)]
+--
+-- Or, for the exact same API as 'sortOn', you can use `sortBy . comparing`:
+--
+-- >>> (sortBy . comparing) fst [(3, 1), (2, 2), (1, 3)]
+-- [(1,3),(2,2),(3,1)]
+--
 -- @since 4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =

@@ -33,6 +33,8 @@
     then the constraint `DataToTag t` can always be solved.
 
     ([CLC proposal #104](https://github.com/haskell/core-libraries-committee/issues/104))
+  * Add `sortOn` to `Data.List.NonEmpty`
+    ([CLC proposal #227](https://github.com/haskell/core-libraries-committee/issues/227))
 
   * Add more instances for `Compose`: `Fractional`, `RealFrac`, `Floating`, `RealFloat` ([CLC proposal #226](https://github.com/haskell/core-libraries-committee/issues/226))
 

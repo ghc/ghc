@@ -1423,6 +1423,7 @@ module Data.List.NonEmpty where
   some1 :: forall (f :: * -> *) a. GHC.Base.Alternative f => f a -> f (NonEmpty a)
   sort :: forall a. GHC.Classes.Ord a => NonEmpty a -> NonEmpty a
   sortBy :: forall a. (a -> a -> GHC.Types.Ordering) -> NonEmpty a -> NonEmpty a
+  sortOn :: forall b a. GHC.Classes.Ord b => (a -> b) -> NonEmpty a -> NonEmpty a
   sortWith :: forall o a. GHC.Classes.Ord o => (a -> o) -> NonEmpty a -> NonEmpty a
   span :: forall a. (a -> GHC.Types.Bool) -> NonEmpty a -> ([a], [a])
   splitAt :: forall a. GHC.Types.Int -> NonEmpty a -> ([a], [a])
