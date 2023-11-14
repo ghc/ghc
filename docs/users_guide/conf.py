@@ -225,7 +225,7 @@ def haddock_role(lib):
       # for the template_haskell.rst example this will be '..'
       current_doc_to_topdir = os.path.relpath(topdir, os.path.dirname(current_doc))
 
-      relative_path = '%s/%s/%s-%s' % (current_doc_to_topdir, libs_base_uri, lib, lib_version)
+      relative_path = '%s/%s/%s' % (current_doc_to_topdir, libs_base_uri, lib_version)
 
       uri = '%s/%s.html%s' % (relative_path, module, anchor)
 
