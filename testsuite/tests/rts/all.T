@@ -215,10 +215,6 @@ test('EventlogOutput_IPE',
      ],
      makefile_test, ['EventlogOutput_IPE'])
 
-# Remove the capability prefix from IPE event log lines.
-def noCapabilityOutputFilter(s):
-     return re.sub(r'[a-f0-9]+: IPE:', 'IPE:', s)
-
 test('T4059', req_c, makefile_test, ['T4059'])
 
 # Test for #4274
