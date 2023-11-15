@@ -663,21 +663,10 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
         do { type_abs   <- xoptM LangExt.TypeAbstractions
            ; type_app   <- xoptM LangExt.TypeApplications
            ; scoped_tvs <- xoptM LangExt.ScopedTypeVariables
-           ; if | type_abs
-                -> return ()
-
-                -- As per [GHC Proposal 604](https://github.com/ghc-proposals/ghc-proposals/pull/604/),
-                -- we allow type applications in constructor patterns when -XTypeApplications and
-                -- -XScopedTypeVariables are both enabled, but we emit a warning when doing so.
-                --
-                -- This warning is scheduled to become an error in GHC 9.12, in
-                -- which case we will get the usual error (below),
-                -- which suggests enabling -XTypeAbstractions.
-                | type_app && scoped_tvs
-                -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
-
-                | otherwise
-                -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
+           -- See Note [Deprecated type abstractions in constructor patterns]
+           ; if | type_abs -> return ()
+                | type_app && scoped_tvs -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
+                | otherwise -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
            }
 
     rnConPatTyArg (HsConPatTyArg at t) = do
@@ -700,6 +689,29 @@ rnConPatAndThen mk con (RecCon rpats)
             , pat_args = RecCon rpats'
             }
         }
+
+{- Note [Deprecated type abstractions in constructor patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type abstractions in constructor patterns allow the user to bind
+existential type variables:
+
+    import Type.Reflection (Typeable, typeRep)
+    data Ex = forall e. (Typeable e, Show e) => MkEx e
+    showEx (MkEx @e a) = show a ++ " :: " ++ show (typeRep @e)
+
+Note the pattern `MkEx @e a`, and specifically the `@e` binder.
+
+For historical reasons, using this feature only required TypeApplications
+and ScopedTypeVariables to be enabled. As per GHC Proposal #448 (and especially
+its amendment #604) we are now transitioning towards guarding this feature
+behind TypeAbstractions instead.
+
+As a compatibility measure, we continue to support old programs that use
+TypeApplications with ScopedTypeVariables instead of TypeAbstractions,
+but emit the appropriate compatibility warning, -Wdeprecated-type-abstractions.
+This warning is scheduled to become an error in GHC 9.14, at which point
+we can simply require TypeAbstractions.
+-}
 
 checkUnusedRecordWildcardCps :: SrcSpan
                              -> Maybe [ImplicitFieldBinders]

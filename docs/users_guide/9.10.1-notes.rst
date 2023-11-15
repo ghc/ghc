@@ -83,6 +83,10 @@ Compiler
   This makes core optimizations more consistent between 32bit and 64bit platforms
   at the cost of slightly worse 32bit performance in edge cases.
 
+- Type abstractions in constructor patterns that were previously admitted without enabling the :extension:`TypeAbstractions`
+  extension now trigger a warning, :ghc-flag:`-Wdeprecated-type-abstractions`.
+  This new warning is part of the :ghc-flag:`-Wcompat` warning group and will become an error in a future GHC release.
+
 GHCi
 ~~~~
 

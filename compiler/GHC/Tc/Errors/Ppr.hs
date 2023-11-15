@@ -1865,7 +1865,7 @@ instance Diagnostic TcRnMessage where
     TcRnDeprecatedInvisTyArgInConPat ->
       mkSimpleDecorated $
         cat [ text "Type applications in constructor patterns will require"
-            , text "the TypeAbstractions extension starting from GHC 9.12." ]
+            , text "the TypeAbstractions extension starting from GHC 9.14." ]
 
     TcRnInvisBndrWithoutSig _ hs_bndr ->
       mkSimpleDecorated $
@@ -2502,7 +2502,7 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalInvisTyVarBndr{}
       -> ErrorWithoutFlag
     TcRnDeprecatedInvisTyArgInConPat {}
-      -> WarningWithoutFlag
+      -> WarningWithFlag Opt_WarnDeprecatedTypeAbstractions
     TcRnInvalidInvisTyVarBndr{}
       -> ErrorWithoutFlag
     TcRnInvisBndrWithoutSig{}

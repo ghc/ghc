@@ -706,7 +706,7 @@ test('VisFlag5', normal, compile_fail, [''])
 test('T22684', normal, compile_fail, [''])
 test('T23514a', normal, compile_fail, [''])
 test('T22478c', normal, compile_fail, [''])
-test('T23776', normal, compile, ['']) # to become an error in GHC 9.12
+test('T23776', normal, compile_fail, ['']) # error due to -Werror=compat, scheduled to become an actual error in GHC 9.14
 test('T17940', normal, compile_fail, [''])
 test('ErrorIndexLinks', normal, compile_fail, ['-fprint-error-index-links=always'])
 test('T24064', normal, compile_fail, [''])

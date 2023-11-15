@@ -20,6 +20,7 @@ warning settings:
   -Wcompat-unqualified-imports
   -Wtype-equality-out-of-scope
   -Wimplicit-rhs-quantification
+  -Wdeprecated-type-abstractions
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: GHC2021
