@@ -28,7 +28,7 @@ from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
-from perf_notes import MetricChange, PerfStat, MetricOracles
+from perf_notes import MetricChange, PerfStat, StatsException
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
@@ -98,6 +98,10 @@ def isCross() -> bool:
 def isCompilerStatsTest() -> bool:
     opts = getTestOpts()
     return bool(opts.is_compiler_stats_test)
+
+def isGenericStatsTest() -> bool:
+    opts = getTestOpts()
+    return bool(opts.generic_stats_test)
 
 def isStatsTest() -> bool:
     opts = getTestOpts()
@@ -599,6 +603,44 @@ def extra_files(files):
 def _extra_files(name, opts, files):
     opts.extra_files.extend(files)
 
+# Record the size of a specific file
+def collect_size ( deviation, path ):
+    return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path)) )
+
+# Read a number from a specific file
+def stat_from_file ( metric, deviation, path ):
+    def read_file (way):
+        with open(in_testdir(path)) as f:
+            return int(f.read())
+    return collect_generic_stat ( metric, deviation, read_file )
+
+
+# Define a set of generic stat tests
+def collect_generic_stats ( metric_info ):
+    def f(name, opts, f=metric_info):
+        return _collect_generic_stat(name, opts, metric_info)
+    return f
+
+# Define the a generic stat test, which computes the statistic by calling the function
+# given as the third argument.
+def collect_generic_stat ( metric, deviation, get_stat ):
+    return collect_generic_stats ( { metric: { 'deviation': deviation, 'current': get_stat } } )
+
+def _collect_generic_stat(name : TestName, opts, metric_infos):
+
+
+    # Add new stats to the stat list
+    opts.generic_stats_test.update(metric_infos)
+
+    # Add the way to determine the baseline
+    for (metric, info) in metric_infos.items():
+        def baselineByWay(way, target_commit, metric=metric):
+            return Perf.baseline_metric( \
+                              target_commit, name, config.test_env, metric, way, \
+                              config.baseline_commit )
+        opts.generic_stats_test[metric]["baseline"] = baselineByWay
+
+
 # -----
 
 # Defaults to "test everything, and only break on extreme cases"
@@ -619,11 +661,14 @@ def _extra_files(name, opts, files):
 def collect_compiler_stats(metric='all',deviation=20):
     def f(name, opts, m=metric, d=deviation):
         no_lint(name, opts)
-        return _collect_stats(name, opts, m, d, True)
+        return _collect_stats(name, opts, m, d, None, True)
     return f
 
-def collect_stats(metric='all', deviation=20):
-    return lambda name, opts, m=metric, d=deviation: _collect_stats(name, opts, m, d)
+def collect_stats(metric='all', deviation=20, static_stats_file=None):
+    return lambda name, opts, m=metric, d=deviation, s=static_stats_file: _collect_stats(name, opts, m, d, s)
+
+def statsFile(comp_test: bool, name: str) -> str:
+    return name + ('.comp' if comp_test else '') + '.stats'
 
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
@@ -631,7 +676,7 @@ def collect_stats(metric='all', deviation=20):
 # measures the performance numbers of the compiler.
 # As this is a fairly rare case in the testsuite, it defaults to false to
 # indicate that it is a 'normal' performance test.
-def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_test=False):
+def _collect_stats(name: TestName, opts, metrics, deviation, static_stats_file, is_compiler_stats_test=False):
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         failBecause('This test has an invalid name.')
 
@@ -664,15 +709,41 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         # The nonmoving collector does not support -G1
         _omit_ways(name, opts, [WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
 
-    for metric_name in metrics:
-        metric = '{}/{}'.format(tag, metric_name)
-        def baselineByWay(way, target_commit, metric=metric):
-            return Perf.baseline_metric( \
-                              target_commit, name, config.test_env, metric, way, \
-                              config.baseline_commit )
+    # How to read the result of the performance test
+    def read_stats_file(way, metric_name):
+        # Confusingly compile time ghci tests are actually runtime tests, so we have
+        # to go and look for the name.stats file rather than name.comp.stats file.
+        compiler_stats_test = is_compiler_stats_test and not (way == "ghci" or way == "ghci-opt")
 
-        opts.stats_range_fields[metric] = MetricOracles(baseline=baselineByWay,
-                                                        deviation=deviation)
+        if static_stats_file:
+            stats_file = in_statsdir(static_stats_file)
+        else:
+            stats_file = Path(in_testdir(statsFile(compiler_stats_test, name)))
+
+
+        try:
+            stats_file_contents = stats_file.read_text()
+        except IOError as e:
+            raise StatsException(str(e))
+        field_match = re.search('\\("' + metric_name + '", "([0-9]+)"\\)', stats_file_contents)
+        if field_match is None:
+            print('Failed to find metric: ', metric_name)
+            raise StatsException("No such metric")
+        else:
+            val = field_match.group(1)
+            assert val is not None
+            return int(val)
+
+
+    collect_stat = {}
+    for metric_name in metrics:
+        def action_generator(mn):
+            return lambda way: read_stats_file(way, mn)
+        metric = '{}/{}'.format(tag, metric_name)
+        collect_stat[metric] = { "deviation": deviation
+                                , "current": action_generator(metric_name) }
+
+    _collect_generic_stat(name, opts, collect_stat)
 
 # -----
 
@@ -1581,6 +1652,11 @@ async def do_compile(name: TestName,
         diff_file_name.unlink()
         return failBecause('stderr mismatch', stderr=stderr)
 
+    opts = getTestOpts()
+    if isGenericStatsTest():
+        statsResult = check_generic_stats(TestName(name), way, opts.generic_stats_test)
+        if badResult(statsResult):
+            return statsResult
 
     # no problems found, this test passed
     return passed()
@@ -1717,13 +1793,9 @@ async def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts )
 async def warn_and_run( name, way, extra_hc_opts ):
     return await compile_and_run__( name, way, None, [], extra_hc_opts, compile_stderr = True)
 
-def stats( name, way, stats_file ):
+async def static_stats( name, way ):
     opts = getTestOpts()
-    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
-
-async def static_stats( name, way, stats_file ):
-    opts = getTestOpts()
-    return check_stats(name, way, in_statsdir(stats_file), opts.stats_range_fields)
+    return check_generic_stats(name, way, opts.generic_stats_test)
 
 def metric_dict(name, way, metric, value) -> PerfStat:
     return Perf.PerfStat(
@@ -1733,75 +1805,57 @@ def metric_dict(name, way, metric, value) -> PerfStat:
         metric   = metric,
         value    = value)
 
-# -----------------------------------------------------------------------------
-# Check test stats. This prints the results for the user.
-# name: name of the test.
-# way: the way.
-# stats_file: the path of the stats_file containing the stats for the test.
-# range_fields: see TestOptions.stats_range_fields
-# Returns a pass/fail object. Passes if the stats are within the expected value ranges.
-# This prints the results for the user.
-def check_stats(name: TestName,
-                way: WayName,
-                stats_file: Path,
-                range_fields: Dict[MetricName, MetricOracles]
-                ) -> PassFail:
+
+
+def check_generic_stats(name, way, get_stats):
+    for (metric, gen_stat) in get_stats.items():
+        res = report_stats(name, way, metric, gen_stat)
+        print(res)
+        if badResult(res):
+            return res
+    return passed()
+
+def report_stats(name, way, metric, gen_stat):
+    try:
+        actual_val = gen_stat['current'](way)
+    # Metrics can exit early by throwing a StatsException with the failure string.
+    except StatsException as e:
+        return failBecause(e.args[0])
+
     head_commit = Perf.commit_hash(GitRef('HEAD')) if Perf.inside_git_repo() else None
     if head_commit is None:
         return passed()
 
     result = passed()
-    if range_fields:
-        try:
-            stats_file_contents = stats_file.read_text()
-        except IOError as e:
-            return failBecause(str(e))
+    # Store the metric so it can later be stored in a git note.
+    perf_stat = metric_dict(name, way, metric, actual_val)
 
-        for (metric, baseline_and_dev) in range_fields.items():
-            # Remove any metric prefix e.g. "runtime/" and "compile_time/"
-            stat_file_metric = metric.split("/")[-1]
-            perf_change = None
+    # If this is the first time running the benchmark, then pass.
+    baseline = gen_stat['baseline'](way, head_commit) \
+        if Perf.inside_git_repo() else None
+    if baseline is None:
+        metric_result = passed()
+        perf_change = MetricChange.NewMetric
+    else:
+        (perf_change, metric_result) = Perf.check_stats_change(
+            perf_stat,
+            baseline,
+            gen_stat["deviation"],
+            config.allowed_perf_changes,
+            config.verbose >= 4)
 
-            field_match = re.search('\\("' + stat_file_metric + '", "([0-9]+)"\\)', stats_file_contents)
-            if field_match is None:
-                print('Failed to find metric: ', stat_file_metric)
-                result = failBecause('no such stats metric')
-            else:
-                val = field_match.group(1)
-                assert val is not None
-                actual_val = int(val)
+    t.metrics.append(PerfMetric(change=perf_change, stat=perf_stat, baseline=baseline))
 
-                # Store the metric so it can later be stored in a git note.
-                perf_stat = metric_dict(name, way, metric, actual_val)
+    # If any metric fails then the test fails.
+    # Note, the remaining metrics are still run so that
+    # a complete list of changes can be presented to the user.
+    if not metric_result.passed:
+        if config.ignore_perf_increases and perf_change == MetricChange.Increase:
+            metric_result = passed()
+        elif config.ignore_perf_decreases and perf_change == MetricChange.Decrease:
+            metric_result = passed()
 
-                # If this is the first time running the benchmark, then pass.
-                baseline = baseline_and_dev.baseline(way, head_commit) \
-                    if Perf.inside_git_repo() else None
-                if baseline is None:
-                    metric_result = passed()
-                    perf_change = MetricChange.NewMetric
-                else:
-                    tolerance_dev = baseline_and_dev.deviation
-                    (perf_change, metric_result) = Perf.check_stats_change(
-                        perf_stat,
-                        baseline,
-                        tolerance_dev,
-                        config.allowed_perf_changes,
-                        config.verbose >= 4)
-
-                t.metrics.append(PerfMetric(change=perf_change, stat=perf_stat, baseline=baseline))
-
-                # If any metric fails then the test fails.
-                # Note, the remaining metrics are still run so that
-                # a complete list of changes can be presented to the user.
-                if not metric_result.passed:
-                    if config.ignore_perf_increases and perf_change == MetricChange.Increase:
-                        metric_result = passed()
-                    elif config.ignore_perf_decreases and perf_change == MetricChange.Decrease:
-                        metric_result = passed()
-
-                    result = metric_result
-
+        result = metric_result
     return result
 
 # -----------------------------------------------------------------------------
@@ -1863,8 +1917,8 @@ async def simple_build(name: Union[TestName, str],
     else:
         to_do = '-c' # just compile
 
-    stats_file = name + '.comp.stats'
     if isCompilerStatsTest():
+        stats_file = statsFile(True, name)
         # Set a bigger chunk size to reduce variation due to additional under/overflowing
         # The tests are attempting to test how much work the compiler is doing by proxy of
         # bytes allocated. The additional allocations caused by stack overflow can cause
@@ -1913,10 +1967,6 @@ async def simple_build(name: Union[TestName, str],
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecause('exit code non-0', stderr=stderr_contents)
 
-    if isCompilerStatsTest():
-        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
-        if badResult(statsResult):
-            return statsResult
 
     return passed()
 
@@ -1953,7 +2003,7 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
     #   assume we are running a program via ghci. Collect stats
     stats_file = None # type: Optional[str]
     if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci' or way == 'ghci-opt'):
-        stats_file = name + '.stats'
+        stats_file = statsFile(False, name)
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
@@ -1999,11 +2049,13 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
     if check_prof and not await check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    # Check runtime stats if desired.
-    if stats_file is not None:
-        return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
-    else:
-        return passed()
+    # Check the results of stats tests
+    if isGenericStatsTest():
+        statsResult = check_generic_stats(TestName(name), way, opts.generic_stats_test)
+        if badResult(statsResult):
+            return statsResult
+
+    return passed()
 
 def rts_flags(way: WayName) -> str:
     args = config.way_rts_flags.get(way, [])

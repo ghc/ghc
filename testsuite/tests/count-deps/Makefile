@@ -16,8 +16,10 @@ LIBDIR := "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: count-deps-parser
 count-deps-parser:
-	$(COUNT_DEPS) $(LIBDIR) "GHC.Parser"
+	$(COUNT_DEPS) $(LIBDIR) "GHC.Parser" | tee out
+	cat out | tail -n +2 | wc -l > SIZE
 
 .PHONY: count-deps-ast
 count-deps-ast:
-	$(COUNT_DEPS) $(LIBDIR) "Language.Haskell.Syntax"
+	$(COUNT_DEPS) $(LIBDIR) "Language.Haskell.Syntax" | tee out
+	cat out | tail -n +2 | wc -l > SIZE
