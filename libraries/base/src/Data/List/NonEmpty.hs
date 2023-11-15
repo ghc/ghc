@@ -444,6 +444,8 @@ groupAllWith1 :: (Ord b) => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
 groupAllWith1 f = groupWith1 f . sortWith f
 
 -- | The 'permutations' function returns the list of all permutations of the argument.
+--
+-- @since 4.20.0.0
 permutations            :: [a] -> NonEmpty [a]
 permutations xs0        =  xs0 :| perms xs0 []
   where
@@ -453,9 +455,15 @@ permutations xs0        =  xs0 :| perms xs0 []
             interleave' _ []     r = (ts, r)
             interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
                                      in  (y:us, f (t:y:us) : zs)
+-- The implementation of 'permutations' is adopted from 'Data.List.permutations',
+-- see there for discussion and explanations.
 
 -- | 'permutations1' operates like 'permutations', but uses the knowledge that its input is
--- non-empty to produce output which every element is non-empty.
+-- non-empty to produce output where every element is non-empty.
+--
+-- > permutations1 = fmap fromList . permutations . toList
+--
+-- @since 4.20.0.0
 permutations1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 permutations1 xs = fromList <$> permutations (toList xs)
 

@@ -1410,6 +1410,8 @@ module Data.List.NonEmpty where
   nub :: forall a. GHC.Classes.Eq a => NonEmpty a -> NonEmpty a
   nubBy :: forall a. (a -> a -> GHC.Types.Bool) -> NonEmpty a -> NonEmpty a
   partition :: forall a. (a -> GHC.Types.Bool) -> NonEmpty a -> ([a], [a])
+  permutations :: forall a. [a] -> NonEmpty [a]
+  permutations1 :: forall a. NonEmpty a -> NonEmpty (NonEmpty a)
   prependList :: forall a. [a] -> NonEmpty a -> NonEmpty a
   repeat :: forall a. a -> NonEmpty a
   reverse :: forall a. NonEmpty a -> NonEmpty a
