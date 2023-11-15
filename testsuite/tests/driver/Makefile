@@ -65,11 +65,10 @@ test016:
 	test -f F016_stub.h
 
 testForeignExportSharedLibrary:
-	$(RM) F016.hi F016$(dllext)
-	"$(TEST_HC)" $(TEST_HC_OPTS) -shared -dynamic -fPIC F016.hs -flink-rts -o libfoo$(dllext)
-	"$(TEST_HC)" $(TEST_HC_OPTS) -dynamic -no-hs-main f016.c -lfoo -L.
-	"$(TEST_HC)" $(TEST_HC_OPTS) -dynamic -no-hs-main f016.o -lfoo -L. -optl-Wl,-rpath,'$ORIGIN' -o f016$(exeext)
-	./f016$(exeext)
+	$(RM) F016.hi libfoo$(dllext) f016$(exeext)
+	"$(TEST_HC)"  $(filter-out -rtsopts, $(TEST_HC_OPTS)) -shared -dynamic -fPIC F016.hs -flink-rts -o libfoo$(dllext)
+	LD_LIBRARY_PATH=".:$(LD_LIBRARY_PATH)" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) -dynamic -no-hs-main f016.c -lfoo -o f016$(exeext)
+	LD_LIBRARY_PATH=".:$(LD_LIBRARY_PATH)"  ./f016$(exeext)
 
 # test -stubdir (filename differs from module name)
 test017:
