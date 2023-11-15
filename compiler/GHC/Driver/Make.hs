@@ -732,6 +732,7 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
 
     let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
     setSession $ discardIC $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
+    hsc_env <- getSession
 
     -- Unload everything
     liftIO $ unload interp hsc_env
@@ -743,7 +744,6 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
                     Nothing -> liftIO getNumProcessors
                     Just n  -> return n
 
-    setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
       liftIO $ upsweep n_jobs hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
