@@ -19,21 +19,21 @@
 
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
-     ,collect_stats('bytes allocated',5)
+     ,collect_stats('bytes allocated',5, static_stats_file='base.t')
       ],
      static_stats,
-     ['base.t'])
+     [])
 
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
-     ,collect_stats('bytes allocated',5)
+     ,collect_stats('bytes allocated',5, static_stats_file='Cabal.t')
       ],
      static_stats,
-     ['Cabal.t'])
+     [])
 
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
-     ,collect_stats('bytes allocated',10)
+     ,collect_stats('bytes allocated',10, static_stats_file='ghc.t')
       ],
      static_stats,
-     ['ghc.t'])
+     [])

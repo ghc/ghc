@@ -86,6 +86,11 @@ PerfStat = NamedTuple('PerfStat', [('test_env', TestEnv),
 Baseline = NamedTuple('Baseline', [('perfStat', PerfStat),
                                    ('commit', GitHash)])
 
+# The type of exceptions which are thrown when computing the current stat value
+# fails.
+class StatsException(Exception):
+    pass
+
 class MetricChange(Enum):
     # The metric appears to have no baseline and is presumably a new test.
     NewMetric = 'NewMetric'
@@ -122,11 +127,6 @@ AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                 ('metrics', List[str]),
                                 ('opts', Dict[str, str])
                                 ])
-
-MetricBaselineOracle = Callable[[WayName, GitHash], Baseline]
-MetricDeviationOracle = Callable[[WayName, GitHash], Optional[float]]
-MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
-                                             ("deviation", MetricDeviationOracle)])
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')

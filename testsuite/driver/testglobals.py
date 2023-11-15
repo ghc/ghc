@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles, GitRef
+from perf_notes import MetricChange, PerfStat, Baseline, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -378,23 +378,19 @@ class TestOptions:
        # extra files to copy to the testdir
        self.extra_files = [] # type: List[str]
 
-       # Map from metric to (function from way and commit to baseline value, allowed percentage deviation) e.g.
-       #     { 'bytes allocated': (
-       #              lambda way commit:
-       #                    ...
-       #                    if way1: return None ...
-       #                    elif way2:return 9300000000 ...
-       #                    ...
-       #              , 10) }
-       # This means no baseline is available for way1. For way 2, allow a 10%
-       # deviation from 9300000000.
-       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
-
        # Is the test testing performance?
        self.is_stats_test = False
 
        # Does this test the compiler's performance as opposed to the generated code.
        self.is_compiler_stats_test = False
+
+       # Map from metric to information about that metric
+       #    { metric: { "deviation": <int>
+       #                The action to run to get the current value of the test
+       #              , "current": lambda way: <Int>
+       #                The action to run to get the baseline value of the test
+       #              , "baseline": lambda way, commit: baseline value } }
+       self.generic_stats_test: Dict  = {} # Dict
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
