@@ -772,6 +772,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
 
     let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
     setSession $ discardIC $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
+    hsc_env <- getSession
 
     -- Unload everything
     liftIO $ unload interp hsc_env
@@ -781,7 +782,6 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
 
     worker_limit <- liftIO $ mkWorkerLimit dflags
 
-    setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
       liftIO $ upsweep worker_limit hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
