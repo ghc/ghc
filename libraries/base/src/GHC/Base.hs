@@ -139,7 +139,12 @@ module GHC.Base
     ) where
 
 import GHC.Internal.Base
-import GHC.Prim hiding (dataToTagLarge#, dataToTagSmall#)
+import GHC.Prim hiding (dataToTagLarge#, dataToTagSmall#, whereFrom#)
+   -- Hide dataToTagLarge# because it is expected to break for
+   -- GHC-internal reasons in the near future, and shouldn't
+   -- be exposed from base (not even GHC.Exts)
+   -- whereFrom# is similarly internal.
+
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Internal.Err
