@@ -163,14 +163,23 @@ textFileOracle = do
         putVerbose $ "| TargetFile oracle: reading " ++ quote file ++ "..."
         mtarget <- readMaybe <$> readFile' file
         case mtarget of
-          Nothing -> error $ "Failed to read a Toolchain.Target from " ++ quote file
+          Nothing -> error $ unlines ["Error parsing a Toolchain.Target from " ++ quote file,
+                                      "Perhaps the `.target` file is out of date.",
+                                      "Try re-running `./configure`."
+                                     ]
+
           Just target -> return (target :: Toolchain.Target)
     void $ addOracleCache $ \(TargetFile file) -> tf file
 
 -- Orphan instances for (ShakeValue Toolchain.Target)
 instance Binary Toolchain.Target where
-  put = put  . show
-  get = read <$> get
+  put = put . show
+  get = fromMaybe (error $ unlines ["Error parsing a toolchain `.target` file from its binary representation in hadrian.",
+                                    "This is likely caused by a stale hadrian/shake cache",
+                                    "which has saved an old `.target` file that can't be parsed",
+                                    "into a more recent `Toolchain.Target`. It is recommended to reset",
+                                    "by running `./hadrian/build clean`."
+                                   ]) . readMaybe <$> get
 
 instance Hashable Toolchain.Target where
   hashWithSalt s = hashWithSalt s . show
