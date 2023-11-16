@@ -2159,8 +2159,9 @@ addModule files = do
     checkTargetFile :: GhciMonad m => String -> m Bool
     checkTargetFile f = do
       exists <- liftIO (doesFileExist f)
-      unless exists $ liftIO $ hPutStrLn stderr $ "File " ++ f ++ " not found"
-      failIfExprEvalMode
+      unless exists $ do
+        liftIO $ hPutStrLn stderr $ "File " ++ f ++ " not found"
+        failIfExprEvalMode
       return exists
 
 -- | @:unadd@ command
