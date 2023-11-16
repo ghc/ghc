@@ -136,12 +136,12 @@ static void postBlockMarker(EventsBuf *eb);
 static void closeBlockMarker(EventsBuf *ebuf);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
-static StgBool hasRoomForVariableEvent(EventsBuf *eb, uint32_t payload_bytes);
+static StgBool hasRoomForVariableEvent(EventsBuf *eb, StgWord payload_bytes);
 
 static void freeEventLoggingBuffer(void);
 
 static void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag);
-static int ensureRoomForVariableEvent(EventsBuf *eb, StgWord16 size);
+static int ensureRoomForVariableEvent(EventsBuf *eb, StgWord size);
 
 static inline void postWord8(EventsBuf *eb, StgWord8 i)
 {
@@ -1509,9 +1509,9 @@ StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
 }
 
 STG_WARN_UNUSED_RESULT
-StgBool hasRoomForVariableEvent(EventsBuf *eb, uint32_t payload_bytes)
+StgBool hasRoomForVariableEvent(EventsBuf *eb, StgWord payload_bytes)
 {
-  uint32_t size = sizeof(EventTypeNum) + sizeof(EventTimestamp) +
+  StgWord size = sizeof(EventTypeNum) + sizeof(EventTimestamp) +
       sizeof(EventPayloadSize) + payload_bytes;
 
   if (eb->pos + size > eb->begin + eb->size) {
@@ -1526,17 +1526,19 @@ void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag)
     if (!hasRoomForEvent(eb, tag)) {
         // Flush event buffer to make room for new event.
         printAndClearEventBuf(eb);
+        ASSERT(hasRoomForEvent(eb, tag));
     }
 }
 
 STG_WARN_UNUSED_RESULT
-int ensureRoomForVariableEvent(EventsBuf *eb, StgWord16 size)
+int ensureRoomForVariableEvent(EventsBuf *eb, StgWord size)
 {
     if (!hasRoomForVariableEvent(eb, size)) {
         // Flush event buffer to make room for new event.
         printAndClearEventBuf(eb);
-        if (!hasRoomForVariableEvent(eb, size))
+        if (!hasRoomForVariableEvent(eb, size)) {
             return 1; // Not enough space
+        }
     }
     return 0;
 }
