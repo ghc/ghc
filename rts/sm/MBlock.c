@@ -15,6 +15,7 @@
 #include "BlockAlloc.h"
 #include "Trace.h"
 #include "OSMem.h"
+#include "ASAN.h"
 
 #include <string.h>
 
@@ -217,6 +218,8 @@ static void *getCommittedMBlocks(uint32_t n)
     }
 
     ASSERT(p != NULL && p != (void*)-1);
+
+    poisonMemoryRegion(p, MBLOCK_SIZE * n);
     return p;
 }
 
@@ -539,6 +542,7 @@ static void *getCommittedMBlocks(uint32_t n)
         markHeapAlloced( (StgWord8*)ret + i * MBLOCK_SIZE );
     }
 
+    poisonMemoryRegion(ret, MBLOCK_SIZE * n);
     return ret;
 }
 

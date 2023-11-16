@@ -32,6 +32,7 @@
 #include "Stats.h"
 #include "BlockAlloc.h"
 #include "Weak.h"
+#include "ASAN.h"
 #include "Sanity.h"
 #include "Arena.h"
 #include "Capability.h"
@@ -1376,6 +1377,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
             bd->free += n;
             ASSERT(bd->free <= bd->start + bd->blocks * BLOCK_SIZE_W);
             accountAllocation(cap, n);
+            unpoisonMemoryRegion(p, n * sizeof(W_))
             return p;
         }
     }
@@ -1394,6 +1396,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         MEMSET_SLOP_W(p, 0, off_w);
         p += off_w;
         MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
+        unpoisonMemoryRegion(p, n * sizeof(W_))
         return p;
     }
 }
