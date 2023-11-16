@@ -180,7 +180,7 @@ static inline void postString(EventsBuf *eb, const char *buf)
 {
     if (buf) {
         const int len = strlen(buf);
-        ASSERT(eb->begin + eb->size > eb->pos + len);
+        ASSERT(eb->begin + eb->size > eb->pos + len + 1);
         memcpy(eb->pos, buf, len);
         eb->pos += len;
     }
