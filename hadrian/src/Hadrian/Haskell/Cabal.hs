@@ -75,5 +75,6 @@ cabalOsString :: String -> String
 cabalOsString "mingw32"  = "windows"
 cabalOsString "darwin"   = "osx"
 cabalOsString "solaris2" = "solaris"
+cabalOsString "gnu"      = "hurd"
 cabalOsString other      = other
 
