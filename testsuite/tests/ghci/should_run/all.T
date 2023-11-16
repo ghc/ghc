@@ -89,3 +89,4 @@ test('SizedLiterals', [req_interp, extra_files(["SizedLiteralsA.hs"]),extra_hc_o
 
 test('T22958a', just_ghci, compile_and_run, [''])
 test('T22958b', just_ghci, compile_and_run, [''])
+test('T24115', just_ghci + [extra_run_opts("-e ':add T24115.hs'")], ghci_script, ['T24115.script'])
