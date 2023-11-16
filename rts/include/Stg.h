@@ -221,6 +221,7 @@
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
 #define STG_USED      GNUC3_ATTRIBUTE(__used__)
+#define STG_WARN_UNUSED_RESULT GNUC3_ATTRIBUTE(warn_unused_result)
 
 /* Prevent functions from being optimized.
    See Note [Windows Stack allocations] */
