@@ -1649,6 +1649,7 @@ emitPrimOp cfg primop =
   WhereFromOp   -> alwaysExternal
   GetApStackValOp -> alwaysExternal
   ClearCCSOp -> alwaysExternal
+  TimeProfileTickOp -> alwaysExternal
   TraceEventOp -> alwaysExternal
   TraceEventBinaryOp -> alwaysExternal
   TraceMarkerOp -> alwaysExternal

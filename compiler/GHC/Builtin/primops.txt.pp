@@ -3799,6 +3799,12 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
    with
    out_of_line = True
 
+primop TimeProfileTickOp "timeProfileTick#" GenPrimOp
+   State# s -> State# s
+   { Register a time profile tick. }
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "Info Table Origin"
 ------------------------------------------------------------------------

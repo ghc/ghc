@@ -979,6 +979,8 @@ genPrim prof bound ty op = case op of
 
   ClearCCSOp -> \[_r] [x] -> PRPrimCall $ ReturnStat (app "h$clearCCS" [x])
 
+  TimeProfileTickOp -> \[] [] ->  PrimInline $ appS "h$timeProfTick" []
+
 ------------------------------ Eventlog -------------------
 
   TraceEventOp       -> \[] [ed,eo]     -> PrimInline $ appS "h$traceEvent" [ed,eo]

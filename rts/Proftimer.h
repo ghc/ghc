@@ -10,10 +10,11 @@
 
 #include "BeginPrivate.h"
 
-void initProfTimer      ( void );
-void handleProfTick     ( void );
+void initProfTimer       ( void );
+void handleProfTick      ( void );
 void pauseHeapProfTimer  ( void );
 void resumeHeapProfTimer ( void );
+void timeProfTick        ( Capability *cap );
 
 extern bool performHeapProfile;
 extern bool performTickySample;

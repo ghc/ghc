@@ -2957,3 +2957,11 @@ INFO_TABLE_RET(stg_keepAlive_frame, RET_SMALL, KEEP_ALIVE_FRAME_FIELDS(W_,P_, in
 {
     return (ret);
 }
+
+// timeProfileTick# :: IO ()
+stg_timeProfileTickzh ()
+{
+#if defined(PROFILING)
+    ccall timeProfTick(MyCapability());
+#endif
+}

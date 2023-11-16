@@ -116,6 +116,16 @@ initProfTimer( void )
 uint32_t total_ticks = 0;
 
 void
+timeProfTick(Capability *cap STG_UNUSED)
+{
+#if defined(PROFILING)
+    CostCentreStack *cccs = RELAXED_LOAD(&cap->r.rCCCS);
+    cccs->time_ticks++;
+    traceProfSampleCostCentre(cap, cccs, total_ticks);
+#endif
+}
+
+void
 handleProfTick(void)
 {
 #if defined(PROFILING)
@@ -124,8 +134,7 @@ handleProfTick(void)
         uint32_t n;
         for (n=0; n < getNumCapabilities(); n++) {
             Capability *cap = getCapability(n);
-            cap->r.rCCCS->time_ticks++;
-            traceProfSampleCostCentre(cap, cap->r.rCCCS, total_ticks);
+            timeProfTick(cap);
         }
     }
 #endif
