@@ -1220,7 +1220,7 @@ void postHeapProfBegin(StgWord8 profile_id)
         1+8+4 + modSelector_len + descrSelector_len +
         typeSelector_len + ccSelector_len + ccsSelector_len +
         retainerSelector_len + bioSelector_len + 7;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_BEGIN);
     postPayloadSize(&eventBuf, len);
     postWord8(&eventBuf, profile_id);
@@ -1272,7 +1272,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
     ACQUIRE_LOCK(&eventBufMutex);
     StgWord label_len = strlen(label);
     StgWord len = 1+8+label_len+1;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_STRING);
     postPayloadSize(&eventBuf, len);
     postWord8(&eventBuf, profile_id);
@@ -1293,7 +1293,7 @@ void postHeapProfCostCentre(StgWord32 ccID,
     StgWord module_len = strlen(module);
     StgWord srcloc_len = strlen(srcloc);
     StgWord len = 4+label_len+module_len+srcloc_len+3+1;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_COST_CENTRE);
     postPayloadSize(&eventBuf, len);
     postWord32(&eventBuf, ccID);
@@ -1316,7 +1316,7 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
     if (depth > 0xff) depth = 0xff;
 
     StgWord len = 1+8+1+depth*4;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_COST_CENTRE);
     postPayloadSize(&eventBuf, len);
     postWord8(&eventBuf, profile_id);
@@ -1342,7 +1342,7 @@ void postProfSampleCostCentre(Capability *cap,
     if (depth > 0xff) depth = 0xff;
 
     StgWord len = 4+8+1+depth*4;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE);
     postPayloadSize(&eventBuf, len);
     postWord32(&eventBuf, cap->no);
@@ -1372,7 +1372,7 @@ void postProfBegin(void)
 static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
 {
     StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->str)+1 + 8 + strlen(p->ticky_json)+1;
-    ensureRoomForVariableEvent(eb, len);
+    CHECK(!ensureRoomForVariableEvent(eb, len));
     postEventHeader(eb, EVENT_TICKY_COUNTER_DEF);
     postPayloadSize(eb, len);
 
@@ -1439,7 +1439,7 @@ void postIPE(const InfoProvEnt *ipe)
     // 1 null after each string
     // 1 colon between src_file and src_span
     StgWord len = 8+table_name_len+1+closure_desc_len+1+ty_desc_len+1+label_len+1+module_len+1+src_file_len+1+src_span_len+1;
-    ensureRoomForVariableEvent(&eventBuf, len);
+    CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
     postWord64(&eventBuf, (StgWord) INFO_PTR_TO_STRUCT(ipe->info));
@@ -1496,6 +1496,7 @@ void resetEventsBuf(EventsBuf* eb)
     eb->marker = NULL;
 }
 
+STG_WARN_UNUSED_RESULT
 StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
 {
   uint32_t size = sizeof(EventTypeNum) + sizeof(EventTimestamp) + eventTypes[eNum].size;
@@ -1507,6 +1508,7 @@ StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
   }
 }
 
+STG_WARN_UNUSED_RESULT
 StgBool hasRoomForVariableEvent(EventsBuf *eb, uint32_t payload_bytes)
 {
   uint32_t size = sizeof(EventTypeNum) + sizeof(EventTimestamp) +
@@ -1527,6 +1529,7 @@ void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag)
     }
 }
 
+STG_WARN_UNUSED_RESULT
 int ensureRoomForVariableEvent(EventsBuf *eb, StgWord16 size)
 {
     if (!hasRoomForVariableEvent(eb, size)) {
