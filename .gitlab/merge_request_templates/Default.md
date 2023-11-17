@@ -30,7 +30,7 @@ label can be applied to perform additional validation checks if your MR affects 
 unusual configuration.
 
 Once your change is ready please remove the `WIP:` tag and wait for review. If
-no one has offerred review in a few days then please leave a comment mentioning
+no one has offered a review in a few days then please leave a comment mentioning
 @triagers and apply the ~"Blocked on Review" label.
 
 [notes]: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#comments-in-the-source-code
