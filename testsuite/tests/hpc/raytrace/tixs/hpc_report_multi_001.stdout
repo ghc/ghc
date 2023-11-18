@@ -1,0 +1,9 @@
+-----<module Geometry>-----
+ 70% expressions used (300/427)
+ 10% boolean coverage (1/10)
+      10% guards (1/10), 3 always True, 1 always False, 5 unevaluated
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+ 40% alternatives used (4/10)
+ 66% local declarations used (2/3)
+ 58% top-level declarations used (42/72)

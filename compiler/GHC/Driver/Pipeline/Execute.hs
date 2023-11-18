@@ -602,7 +602,7 @@ runUnlitPhase hsc_env input_fn output_fn = do
        -- GHC.HsToCore.Ticks.isGoodTickSrcSpan where we check that the filename in
        -- a SrcLoc is the same as the source filename, the two will
        -- look bogusly different. See test:
-       -- libraries/hpc/tests/function/subdir/tough2.hs
+       -- testsuite/tests/hpc/function/subdir/tough2.hs
        escape ('\\':cs) = '\\':'\\': escape cs
        escape ('\"':cs) = '\\':'\"': escape cs
        escape ('\'':cs) = '\\':'\'': escape cs
