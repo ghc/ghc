@@ -1,0 +1,20 @@
+.hpc*/
+*.o
+*.hi
+*.comp.std*
+*.run.std*
+*.eventlog
+*.genscript
+*.exe
+*.hs.html
+hpc_index*.html
+
+# all *.tix except hpc_sample.tix
+*.tix
+!hpc_sample.tix
+
+# specific files
+/fork/hpc_fork
+/function/tough
+/function2/tough2
+/simple/hpc001

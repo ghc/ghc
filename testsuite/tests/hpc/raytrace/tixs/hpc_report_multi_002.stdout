@@ -1,0 +1,108 @@
+-----<module CSG>-----
+100% expressions used (0/0)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (0/0)
+-----<module Construct>-----
+ 60% expressions used (381/635)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+ 41% alternatives used (5/12)
+100% local declarations used (5/5)
+ 41% top-level declarations used (17/41)
+-----<module Data>-----
+ 39% expressions used (254/646)
+  0% boolean coverage (0/4)
+       0% guards (0/4), 1 always True, 3 unevaluated
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+  3% alternatives used (2/51)
+100% local declarations used (0/0)
+ 18% top-level declarations used (10/53)
+-----<module Eval>-----
+ 57% expressions used (361/628)
+ 20% boolean coverage (1/5)
+     100% guards (0/0)
+      20% 'if' conditions (1/5), 1 always False, 3 unevaluated
+     100% qualifiers (0/0)
+ 59% alternatives used (40/67)
+ 36% local declarations used (4/11)
+ 62% top-level declarations used (22/35)
+-----<module Illumination>-----
+ 44% expressions used (299/678)
+ 18% boolean coverage (3/16)
+      16% guards (2/12), 2 always True, 1 always False, 7 unevaluated
+      33% 'if' conditions (1/3), 1 always True, 1 always False
+       0% qualifiers (0/1), 1 unevaluated
+ 38% alternatives used (16/42)
+ 57% local declarations used (27/47)
+ 45% top-level declarations used (11/24)
+-----<module Intersections>-----
+ 38% expressions used (382/1001)
+ 33% boolean coverage (11/33)
+      40% guards (8/20), 8 always True, 3 always False, 1 unevaluated
+      23% 'if' conditions (3/13), 10 unevaluated
+     100% qualifiers (0/0)
+ 42% alternatives used (35/83)
+ 36% local declarations used (44/120)
+ 63% top-level declarations used (14/22)
+-----<module Interval>-----
+ 41% expressions used (69/165)
+  8% boolean coverage (1/12)
+      11% guards (1/9), 3 always True, 3 always False, 2 unevaluated
+       0% 'if' conditions (0/3), 2 always True, 1 unevaluated
+     100% qualifiers (0/0)
+ 39% alternatives used (9/23)
+ 25% local declarations used (1/4)
+ 47% top-level declarations used (8/17)
+-----<module Main>-----
+100% expressions used (6/6)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (1/1)
+-----<module Misc>-----
+  0% expressions used (0/10)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+  0% top-level declarations used (0/1)
+-----<module Parse>-----
+ 72% expressions used (191/264)
+ 50% boolean coverage (1/2)
+     100% guards (0/0)
+      50% 'if' conditions (1/2), 1 always False
+     100% qualifiers (0/0)
+ 42% alternatives used (6/14)
+100% local declarations used (2/2)
+ 80% top-level declarations used (16/20)
+-----<module Primitives>-----
+ 20% expressions used (5/24)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+ 16% top-level declarations used (1/6)
+-----<module Surface>-----
+ 18% expressions used (43/231)
+  0% boolean coverage (0/1)
+     100% guards (0/0)
+       0% 'if' conditions (0/1), 1 unevaluated
+     100% qualifiers (0/0)
+ 35% alternatives used (7/20)
+ 16% local declarations used (4/24)
+ 36% top-level declarations used (4/11)

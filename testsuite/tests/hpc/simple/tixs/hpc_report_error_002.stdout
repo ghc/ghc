@@ -1,0 +1,21 @@
+Error: unable to find tix file for:hpc001.hs
+Usage: hpc report [OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]
+Output textual report about program coverage
+
+
+Options:
+
+    --per-module                  show module level detail
+    --decl-list                   show unused decls
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  append sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
+    --xml-output                  show output in XML
+    --verbosity=[0-2]             verbosity level, 0-2
+                                  default 1
+
