@@ -495,10 +495,9 @@ occurrence of `x` and `y` to record whether it is evaluated and
 properly tagged. For the vast majority of primops that's a waste of
 time: the argument is an `Int#` or something.
 
-But code generation for `seq#` and `dataToTagLarge#` /does/ consult that
-tag, to statically avoid generating an eval:
-* `seq#`: uses `getCallMethod` on its first argument, which looks at the `tagSig`
-* `dataToTagLarge#`: checks `tagSig` directly in the `DataToTagOp` case of `cgExpr`.
+But code generation for `seq#` and the `dataToTag#` ops /does/ consult that
+tag, to statically avoid generating an eval.  All three do so via `cgIdApp`,
+which in turn uses `getCallMethod` which looks at the `tagSig`.
 
 So for these we should call `rewriteArgs`.
 
@@ -507,7 +506,7 @@ So for these we should call `rewriteArgs`.
 rewriteOpApp :: InferStgExpr -> RM TgStgExpr
 rewriteOpApp (StgOpApp op args res_ty) = case op of
   op@(StgPrimOp primOp)
-    | primOp == SeqOp || primOp == DataToTagOp
+    | primOp == SeqOp || primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
     -- see Note [Rewriting primop arguments]
     -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
   _ -> pure $! StgOpApp op args res_ty

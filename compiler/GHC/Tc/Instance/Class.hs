@@ -50,6 +50,8 @@ import GHC.Core.Class
 
 import GHC.Core ( Expr(..) )
 
+import GHC.StgToCmm.Closure ( isSmallFamily )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
@@ -671,15 +673,17 @@ But, to avoid all this boilerplate code, and improve optimisation opportunities,
 GHC generates instances like this:
 
    instance DataToTag [a] where
-     dataToTag# = dataToTagLarge#
+     dataToTag# = dataToTagSmall#
 
-using a (temporarily strangely-named) primop `dataToTagLarge#`. The
-primop has the following over-polymorphic type
+using one of two dedicated primops: `dataToTagSmall#` and `dataToTagLarge#`.
+(Why two primops? What's the difference? See wrinkles DTW4 and DTW5.)
+Both primops have the following over-polymorphic type:
 
   dataToTagLarge# :: forall {l::levity} (a::TYPE (BoxedRep l)). a -> Int#
 
-Every call to (dataToTagLarge# @{lev} @ty) that we generate should
-satisfy these conditions:
+Every call to either primop that we generate should look like
+(dataToTagSmall# @{lev} @ty) with two type arguments that satisfy
+these conditions:
 
 (DTT1) `lev` is concrete (either lifted or unlifted), not polymorphic.
    This is an invariant--we must satisfy this or Core Lint will complain.
@@ -698,25 +702,36 @@ satisfy these conditions:
    GHC.Rename.Module.  See Note [caseRules for dataToTag] in
    GHC.Core.Opt.ConstantFold for why this matters.
 
-   While the dataToTagLarge# primop remains exposed from GHC.Prim
-   (and abused in GHC.PrimopWrappers), this cannot be a true invariant.
-   But with a little effort we can ensure that every `dataToTagLarge#`
+   While wrinkle DTW7 is unresolved, this cannot be a true invariant.
+   But with a little effort we can ensure that every primop
    call we generate in a DataToTag instance satisfies this condition.
 
-The `dataToTagLarge#` primop has special handling in several parts of
+(DTT3) If the TyCon in wrinkle DTT2 is a "large data type" with more
+   constructors than fit in pointer tags on the target, then the
+   primop must be dataToTagLarge# and not dataToTagSmall#.
+   Otherwise, the primop must be dataToTagSmall# and not dataToTagLarge#.
+   (See wrinkles DTW4 and DTW5.)
+
+These two primops have special handling in several parts of
 the compiler:
 
-- It has a couple of built-in rewrite rules, implemented in
-  GHC.Core.Opt.ConstantFold.dataToTagRule
+H1. They have a couple of built-in rewrite rules, implemented in
+    GHC.Core.Opt.ConstantFold.dataToTagRule
 
-- The simplifier rewrites most case expressions scrutinizing its result.
-  See Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold.
+H2. The simplifier rewrites most case expressions scrutinizing their results.
+    See Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold.
 
-- It evaluates its argument; this is implemented via a special case in
-  GHC.StgToCmm.Expr.cgExpr.
+H3. Each evaluates its argument.  But we want to omit this eval when the
+    actual argument is already evaluated and properly tagged.  To do this,
 
-- Additionally, a special case in GHC.Stg.InferTags.Rewrite.rewriteExpr ensures
-  that that any inferred tag information on the argument is retained until then.
+    * We have a special case in GHC.Stg.InferTags.Rewrite.rewriteOpApp
+      ensuring that any inferred tag information on the argument is
+      retained until code generation.
+
+    * We generate code via special cases in GHC.StgToCmm.Expr.cgExpr
+      instead of with the other primops in GHC.StgToCmm.Prim.emitPrimOp;
+      tag info is not readily available in the latter function.
+      (Wrinkle DTW4 describes what we generate after the eval.)
 
 Wrinkles:
 
@@ -727,12 +742,12 @@ Wrinkles:
      [W] DataToTag (D (Either t1 t2))
   GHC uses the built-in instance
      instance DataToTag (D (Either p q)) where
-        dataToTag# x = dataToTagLarge# @Lifted @(R:DEither p q)
+        dataToTag# x = dataToTagSmall# @Lifted @(R:DEither p q)
                                        (x |> sym (ax:DEither p q))
   where `ax:DEither` is the axiom arising from the `data instance`:
     ax:DEither p q :: D (Either p q) ~ R:DEither p q
 
-  Notice that we cast `x` before giving it to `dataToTagLarge#`, so
+  Notice that we cast `x` before giving it to `dataToTagSmall#`, so
   that (DTT2) is satisfied.
 
 (DTW2) Suppose we have module A (T(..)) where { data T = TCon }
@@ -747,7 +762,7 @@ Wrinkles:
 (DTW3) Similar to DTW2, consider this example:
 
     {-# LANGUAGE MagicHash #-}
-    module A (X(X2, X3), f) where
+    module A (X(X2, X3), g) where
     -- see also testsuite/tests/warnings/should_compile/DataToTagWarnings.hs
     import GHC.Exts (dataToTag#, Int#)
     data X = X1 | X2 | X3 | X4
@@ -774,23 +789,93 @@ Wrinkles:
   keepAlive on the constructor names.
   (Contrast with Note [Unused name reporting and HasField].)
 
-(DTW4) It is expected that in the future some instances may select more
-  efficient specialised implementations; for example we may use a
-  separate `dataToTagSmall#` primop for a type with only a few
-  constructors; see #17079 and #21710.
+(DTW4) Why have two primops, `dataToTagSmall#` and `dataToTagLarge#`?
+  The way tag information is stored at runtime is described in
+  Note [Tagging big families] in GHC.StgToCmm.Expr.  In particular,
+  for "big data types" we must consult the heap object's info table at
+  least in the mAX_PTR_TAG case, while for "small data types" we can
+  always just examine the tag bits on the pointer itself. So:
 
-(DTW5) We make no promises about the primops used to implement
+  * dataToTagSmall# consults the tag bits in the pointer, ignoring the
+    info table.  It should, therefore, be used only for data type with
+    few enough contructors that the tag always fits in the pointer.
+
+  * dataToTagLarge# also consults the tag bits in the pointer, but
+    must fall back to examining the info table whenever those tag
+    bits are equal to mAX_PTR_TAG.
+
+  One could imagine having one primop with a small/large tag, or just
+  the data type width, but the PrimOp data type is not currently set
+  up for that.  Looking at the type information on the argument during
+  code generation is also possible, but would be less reliable.
+  Remember: type information is not always preserved in STG.
+
+(DTW5) How do the two primops differ in their semantics?  We consider
+  a call `dataToTagSmall# x` to result in undefined behavior whenever
+  the target supports pointer tagging but the actual constructor index
+  for `x` is too large to fit in the pointer's tag bits.  Otherwise,
+  `dataToTagSmall#` behaves identically to `dataToTagLarge#`.
+
+  This allows the rewrites performed in GHC.Core.Opt.ConstantFold to
+  safely treat `dataToTagSmall#` identically to `dataToTagLarge#`:
+  the allowed program behaviors for the former is always a superset of
+  the allowed program behaviors for the latter.
+
+  This undefined behavior is only observable if a user writes a
+  wrongly-sized primop call.  The calls we generate are properly-sized
+  (condition DTT3 above) so that the type system protects us.
+
+(DTW6) We make no promises about the primops used to implement
   DataToTag instances.  Changes to GHC's representation of algebraic
   data types at runtime may force us to redesign these primops.
   Indeed, accommodating such changes without breaking users of the
   original (no longer existing) "dataToTag#" primop is one of the
   main reasons the DataToTag class exists!
 
-  We can currently get away with using the same primop for every
-  DataToTag instance because every Haskell-land data constructor use
-  gets translated to its own "real" heap or static data object at
-  runtime and the index of that constructor is always exposed via
-  pointer tagging and via the object's info table.
+  In particular, our current two primop implementations (as described
+  in wrinkle DTW4) are adequate for every DataToTag instance only
+  because every Haskell-land data constructor use gets translated to
+  its own "real" heap or static data object at runtime and the index
+  of that constructor is always exposed via pointer tagging and via
+  the object's info table.
+
+(DTW7) Currently, the generated module GHC.PrimopWrappers in ghc-prim
+  contains the following non-sense definitions:
+
+    {-# NOINLINE dataToTagSmall# #-}
+    dataToTagSmall# :: a_levpoly -> Int#
+    dataToTagSmall# a1 = GHC.Prim.dataToTagSmall# a1
+    {-# NOINLINE dataToTagLarge# #-}
+    dataToTagLarge# :: a_levpoly -> Int#
+    dataToTagLarge# a1 = GHC.Prim.dataToTagLarge# a1
+
+  Why do these exist? GHCi uses these symbols for... something.  There
+  is on-going work to get rid of them.  See also #24169, #20155, and !6245.
+  Their continued existence makes it difficult to do several nice things:
+
+   * As explained in DTW6, the dataToTag# primops are very internal.
+     We would like to hide them from GHC.Prim entirely to prevent
+     their mis-use, but doing so would cause GHC.PrimopWrappers to
+     fail to compile.
+
+   * The primops are applied at the (confusingly monomorphic) type
+     variable `a_levpoly` in the above definitions.  In particular,
+     they do not satisfy conditions DTT2 and DTT3 above.  We would
+     very much like these conditions to be invariants, but while
+     GHC.PrimopWrappers breaks them we cannot do so.  (The code that
+     would check these invariants in Core Lint exists but remains
+     commented out for now.)
+
+   * This in turn means that `GHC.Core.Opt.ConstantFold.caseRules`
+     must check for condition DTT2 before doing the work described in
+     Note [caseRules for dataToTag].
+
+   * Likewise, wrinkle DTW5 is only necessary because condition DTT3
+     is not an invariant.  Otherwise, invoking the currently-specified
+     undefined behavior of `dataToTagSmall# @ty` would require passing it
+     an argument which will not really have type `ty` at runtime.  And
+     evaluating such an expression is always undefined behavior anyway!
+
 
 
 Historical note:
@@ -816,6 +901,7 @@ matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
 matchDataToTag dataToTagClass [levity, dty] = do
   famEnvs <- tcGetFamInstEnvs
   (gbl_env, _lcl_env) <- getEnvs
+  platform <- getPlatform
   if | isConcreteType levity -- condition C3
      , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
      , let (repTyCon, repArgs, repCo)
@@ -828,13 +914,14 @@ matchDataToTag dataToTagClass [levity, dty] = do
      , let  rdr_env = tcg_rdr_env gbl_env
             inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
      , all inScope constrs -- condition C2
+
      , let  repTy = mkTyConApp repTyCon repArgs
-            whichOp
-              -- TODO: More optimized implementations for:
-              --    * small constructor families
-              --    * Bool/Int/Float/etc. on JS backend
+            numConstrs = tyConFamilySize repTyCon
+            !whichOp -- see wrinkle DTW4
+              | isSmallFamily platform numConstrs
+                = primOpId DataToTagSmallOp
               | otherwise
-                = primOpId DataToTagOp
+                = primOpId DataToTagLargeOp
 
             -- See wrinkle DTW1; we must apply the underlying
             -- operation at the representation type and cast it

@@ -1640,7 +1640,8 @@ emitPrimOp cfg primop =
   SeqOp -> alwaysExternal
   GetSparkOp -> alwaysExternal
   NumSparks -> alwaysExternal
-  DataToTagOp -> alwaysExternal
+  DataToTagSmallOp -> alwaysExternal
+  DataToTagLargeOp -> alwaysExternal
   MkApUpd0_Op -> alwaysExternal
   NewBCOOp -> alwaysExternal
   UnpackClosureOp -> alwaysExternal

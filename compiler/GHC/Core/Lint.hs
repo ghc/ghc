@@ -1131,23 +1131,29 @@ checkTypeDataConOcc what dc
     (text "type data constructor found in a" <+> text what <> colon <+> ppr dc)
 
 {-
--- | Check that a use of dataToTagLarge# satisfies condition DTT2
--- from Note [DataToTag overview] in GHC.Tc.Instance.Class
+-- | Check that a use of a dataToTag# primop satisfies conditions DTT2
+-- and DTT3 from Note [DataToTag overview] in GHC.Tc.Instance.Class
 --
--- Ignores applications not headed by dataToTagLarge#.
+-- Ignores applications not headed by dataToTag# primops.
 
 -- Commented out because GHC.PrimopWrappers doesn't respect this condition yet.
+-- See wrinkle DTW7 in Note [DataToTag overview].
 checkDataToTagPrimOpTyCon
   :: CoreExpr   -- ^ the function (head of the application) we are checking
   -> [CoreArg]  -- ^ The arguments to the application
   -> LintM ()
 checkDataToTagPrimOpTyCon (Var fun_id) args
-  | Just DataToTagOp <- isPrimOpId_maybe fun_id
+  | Just op <- isPrimOpId_maybe fun_id
+  , op == DataToTagSmallOp || op == DataToTagLargeOp
   = case args of
       Type _levity : Type dty : _rest
         | Just (tc, _) <- splitTyConApp_maybe dty
         , isValidDTT2TyCon tc
-          -> pure ()
+          -> do  platform <- getPlatform
+                 let  numConstrs = tyConFamilySize tc
+                      isSmallOp = op == DataToTagSmallOp
+                 checkL (isSmallFamily platform numConstrs == isSmallOp) $
+                   text "dataToTag# primop-size/tycon-family-size mismatch"
         | otherwise -> failWithL $ text "dataToTagLarge# used at non-ADT type:"
                                    <+> ppr dty
       _ -> failWithL $ text "dataToTagLarge# needs two type arguments but has args:"

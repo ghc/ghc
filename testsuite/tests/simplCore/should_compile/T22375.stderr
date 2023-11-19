@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 76, types: 41, coercions: 0, joins: 0/0}
+  = {terms: 96, types: 41, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 14, types: 9, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c== :: X -> X -> Bool
@@ -50,22 +50,27 @@ T22375.$fEqX [InlPrag=CONLIKE] :: Eq X
 T22375.$fEqX
   = GHC.Classes.C:Eq @X T22375.$fEqX_$c== T22375.$fEqX_$c/=
 
--- RHS size: {terms: 24, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 44, types: 3, coercions: 0, joins: 0/0}
 T22375.$wf [InlPrag=[2]] :: X -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!])],
  Arity=2,
  Str=<1L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [64 0] 55 0}]
+         Guidance=IF_ARGS [119 0] 110 0}]
 T22375.$wf
   = \ (x :: X) (ww :: GHC.Prim.Int#) ->
       case x of {
-        A -> GHC.Prim.+# 1# ww;
-        B -> GHC.Prim.+# 2# ww;
-        C -> GHC.Prim.+# 3# ww;
-        D -> GHC.Prim.+# 4# ww;
-        E -> GHC.Prim.+# 5# ww
+        A -> GHC.Prim.+# ww 1#;
+        B -> GHC.Prim.+# ww 2#;
+        C -> GHC.Prim.+# ww 3#;
+        D -> GHC.Prim.+# ww 4#;
+        E -> GHC.Prim.+# ww 5#;
+        F -> GHC.Prim.+# ww 6#;
+        G -> GHC.Prim.+# ww 7#;
+        H -> GHC.Prim.+# ww 8#;
+        I -> GHC.Prim.+# ww 9#;
+        J -> GHC.Prim.+# ww 10#
       }
 
 -- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}

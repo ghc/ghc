@@ -967,7 +967,11 @@ genPrim prof bound ty op = case op of
 
 ------------------------------ Tag to enum stuff --------------------------------
 
-  DataToTagOp -> \[_r] [d] -> pure $ PRPrimCall $ mconcat
+  DataToTagSmallOp -> \[_r] [d] -> pure $ PRPrimCall $ mconcat
+      [ stack .! PreInc sp |= var "h$dataToTag_e"
+      , returnS (app "h$e" [d])
+      ]
+  DataToTagLargeOp -> \[_r] [d] -> pure $ PRPrimCall $ mconcat
       [ stack .! PreInc sp |= var "h$dataToTag_e"
       , returnS (app "h$e" [d])
       ]

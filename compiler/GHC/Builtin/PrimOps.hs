@@ -921,5 +921,6 @@ instance Outputable PrimCall where
 primOpIsReallyInline :: PrimOp -> Bool
 primOpIsReallyInline = \case
   SeqOp       -> False
-  DataToTagOp -> False
+  DataToTagSmallOp -> False
+  DataToTagLargeOp -> False
   p           -> not (primOpOutOfLine p)
