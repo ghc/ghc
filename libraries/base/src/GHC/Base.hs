@@ -117,8 +117,8 @@ import GHC.Classes
 import GHC.CString
 import GHC.Magic
 import GHC.Magic.Dict
-import GHC.Prim hiding (dataToTagLarge#)
-  -- Hide dataToTagLarge# because it is expected to break for
+import GHC.Prim hiding (dataToTagSmall#, dataToTagLarge#)
+  -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
 

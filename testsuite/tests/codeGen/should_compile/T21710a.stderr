@@ -1,117 +1,44 @@
 
 ==================== Output Cmm ====================
-[section ""cstring" . M.$tc'E2_bytes" {
-     M.$tc'E2_bytes:
-         I8[] "'E"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$tc'D2_bytes" {
-     M.$tc'D2_bytes:
-         I8[] "'D"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$tc'C2_bytes" {
-     M.$tc'C2_bytes:
-         I8[] "'C"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$tc'B2_bytes" {
-     M.$tc'B2_bytes:
-         I8[] "'B"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$tc'A3_bytes" {
-     M.$tc'A3_bytes:
-         I8[] "'A"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$tcE2_bytes" {
-     M.$tcE2_bytes:
-         I8[] "E"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$trModule2_bytes" {
-     M.$trModule2_bytes:
-         I8[] "M"
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""cstring" . M.$trModule4_bytes" {
-     M.$trModule4_bytes:
-         I8[] "main"
- }]
-
-
-
-==================== Output Cmm ====================
 [M.foo_entry() { //  [R2]
-         { info_tbls: [(cBa,
-                        label: block_cBa_info
+         { info_tbls: [(cCU,
+                        label: block_cCU_info
                         rep: StackRep []
                         srt: Nothing),
-                       (cBi,
+                       (cD2,
                         label: M.foo_info
                         rep: HeapRep static { Fun {arity: 1 fun_type: ArgSpec 5} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cBi: // global
-           if ((Sp + -8) < SpLim) (likely: False) goto cBj; else goto cBk;   // CmmCondBranch
-       cBj: // global
+       cD2: // global
+           if ((Sp + -8) < SpLim) (likely: False) goto cD3; else goto cD4;   // CmmCondBranch
+       cD3: // global
            R1 = M.foo_closure;   // CmmAssign
            call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cBk: // global
-           I64[Sp - 8] = cBa;   // CmmStore
+       cD4: // global
+           I64[Sp - 8] = cCU;   // CmmStore
            R1 = R2;   // CmmAssign
            Sp = Sp - 8;   // CmmAssign
-           if (R1 & 7 != 0) goto cBa; else goto cBb;   // CmmCondBranch
-       cBb: // global
-           call (I64[R1])(R1) returns to cBa, args: 8, res: 8, upd: 8;   // CmmCall
-       cBa: // global
-           _cBh::P64 = R1 & 7;   // CmmAssign
-           if (_cBh::P64 != 1) goto uBz; else goto cBf;   // CmmCondBranch
-       uBz: // global
-           if (_cBh::P64 != 2) goto cBe; else goto cBg;   // CmmCondBranch
-       cBe: // global
-           // dataToTag#
-           _cBn::P64 = R1 & 7;   // CmmAssign
-           if (_cBn::P64 == 7) (likely: False) goto cBs; else goto cBr;   // CmmCondBranch
-       cBs: // global
-           _cBo::I64 = %MO_UU_Conv_W32_W64(I32[I64[R1 & (-8)] - 4]);   // CmmAssign
-           goto cBq;   // CmmBranch
-       cBr: // global
-           _cBo::I64 = _cBn::P64 - 1;   // CmmAssign
-           goto cBq;   // CmmBranch
-       cBq: // global
-           R1 = _cBo::I64;   // CmmAssign
+           if (R1 & 7 != 0) goto cCU; else goto cCV;   // CmmCondBranch
+       cCV: // global
+           call (I64[R1])(R1) returns to cCU, args: 8, res: 8, upd: 8;   // CmmCall
+       cCU: // global
+           _cD1::P64 = R1 & 7;   // CmmAssign
+           if (_cD1::P64 != 1) goto uDf; else goto cCZ;   // CmmCondBranch
+       uDf: // global
+           if (_cD1::P64 != 2) goto cCY; else goto cD0;   // CmmCondBranch
+       cCY: // global
+           // dataToTagSmall#
+           R1 = R1 & 7 - 1;   // CmmAssign
            Sp = Sp + 8;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cBg: // global
+       cD0: // global
            R1 = 42;   // CmmAssign
            Sp = Sp + 8;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cBf: // global
+       cCZ: // global
            R1 = 2;   // CmmAssign
            Sp = Sp + 8;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
@@ -120,190 +47,6 @@
  section ""data" . M.foo_closure" {
      M.foo_closure:
          const M.foo_info;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$trModule3_closure" {
-     M.$trModule3_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$trModule4_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$trModule1_closure" {
-     M.$trModule1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$trModule2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$trModule_closure" {
-     M.$trModule_closure:
-         const GHC.Types.Module_con_info;
-         const M.$trModule3_closure+1;
-         const M.$trModule1_closure+1;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tcE1_closure" {
-     M.$tcE1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tcE2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tcE_closure" {
-     M.$tcE_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tcE1_closure+1;
-         const GHC.Types.krep$*_closure+5;
-         const 10475418246443540865;
-         const 12461417314693222409;
-         const 0;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'A1_closure" {
-     M.$tc'A1_closure:
-         const GHC.Types.KindRepTyConApp_con_info;
-         const M.$tcE_closure+1;
-         const GHC.Types.[]_closure+1;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'A2_closure" {
-     M.$tc'A2_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tc'A3_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'A_closure" {
-     M.$tc'A_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tc'A2_closure+1;
-         const M.$tc'A1_closure+1;
-         const 10991425535368257265;
-         const 3459663971500179679;
-         const 0;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'B1_closure" {
-     M.$tc'B1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tc'B2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'B_closure" {
-     M.$tc'B_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tc'B1_closure+1;
-         const M.$tc'A1_closure+1;
-         const 13038863156169552918;
-         const 13430333535161531545;
-         const 0;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'C1_closure" {
-     M.$tc'C1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tc'C2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'C_closure" {
-     M.$tc'C_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tc'C1_closure+1;
-         const M.$tc'A1_closure+1;
-         const 8482817676735632621;
-         const 8146597712321241387;
-         const 0;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'D1_closure" {
-     M.$tc'D1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tc'D2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'D_closure" {
-     M.$tc'D_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tc'D1_closure+1;
-         const M.$tc'A1_closure+1;
-         const 7525207739284160575;
-         const 13746130127476219356;
-         const 0;
-         const 3;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'E1_closure" {
-     M.$tc'E1_closure:
-         const GHC.Types.TrNameS_con_info;
-         const M.$tc'E2_bytes;
- }]
-
-
-
-==================== Output Cmm ====================
-[section ""data" . M.$tc'E_closure" {
-     M.$tc'E_closure:
-         const GHC.Types.TyCon_con_info;
-         const M.$trModule_closure+1;
-         const M.$tc'E1_closure+1;
-         const M.$tc'A1_closure+1;
-         const 6748545530683684316;
-         const 10193016702094081137;
-         const 0;
-         const 3;
  }]
 
 
@@ -362,14 +105,14 @@
 
 ==================== Output Cmm ====================
 [M.A_con_entry() { //  []
-         { info_tbls: [(cC5,
+         { info_tbls: [(cDt,
                         label: M.A_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 0 descr:"main:M.A"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cC5: // global
+       cDt: // global
            R1 = R1 + 1;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
      }
@@ -379,14 +122,14 @@
 
 ==================== Output Cmm ====================
 [M.B_con_entry() { //  []
-         { info_tbls: [(cCa,
+         { info_tbls: [(cDy,
                         label: M.B_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 1 descr:"main:M.B"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cCa: // global
+       cDy: // global
            R1 = R1 + 2;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
      }
@@ -396,14 +139,14 @@
 
 ==================== Output Cmm ====================
 [M.C_con_entry() { //  []
-         { info_tbls: [(cCf,
+         { info_tbls: [(cDD,
                         label: M.C_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 2 descr:"main:M.C"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cCf: // global
+       cDD: // global
            R1 = R1 + 3;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
      }
@@ -413,14 +156,14 @@
 
 ==================== Output Cmm ====================
 [M.D_con_entry() { //  []
-         { info_tbls: [(cCk,
+         { info_tbls: [(cDI,
                         label: M.D_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 3 descr:"main:M.D"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cCk: // global
+       cDI: // global
            R1 = R1 + 4;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
      }
@@ -430,14 +173,14 @@
 
 ==================== Output Cmm ====================
 [M.E_con_entry() { //  []
-         { info_tbls: [(cCp,
+         { info_tbls: [(cDN,
                         label: M.E_con_info
                         rep: HeapRep 1 nonptrs { Con {tag: 4 descr:"main:M.E"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cCp: // global
+       cDN: // global
            R1 = R1 + 5;   // CmmAssign
            call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
      }

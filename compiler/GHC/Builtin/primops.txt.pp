@@ -3689,7 +3689,27 @@ section "Tag to enum stuff"
         and small integers.}
 ------------------------------------------------------------------------
 
-primop  DataToTagOp "dataToTagLarge#" GenPrimOp
+primop  DataToTagSmallOp "dataToTagSmall#" GenPrimOp
+   a_levpoly -> Int#
+   { Used internally to implement @dataToTag#@: Use that function instead!
+     This one normally offers /no advantage/ and comes with no stability
+     guarantees: it may change its type, its name, or its behavior
+     with /no warning/ between compiler releases.
+
+     It is expected that this function will be un-exposed in a future
+     release of ghc.
+
+     For more details, look at @Note [DataToTag overview]@
+     in GHC.Tc.Instance.Class in the source code for
+     /the specific compiler version you are using./
+   }
+   with
+   deprecated_msg = { Use dataToTag# from \"GHC.Magic\" instead. }
+   strictness = { \ _arity -> mkClosedDmdSig [evalDmd] topDiv }
+   effect = ThrowsException
+   cheap = True
+
+primop  DataToTagLargeOp "dataToTagLarge#" GenPrimOp
    a_levpoly -> Int#
    { Used internally to implement @dataToTag#@: Use that function instead!
      This one offers /no advantage/ and comes with no stability
