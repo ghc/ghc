@@ -876,6 +876,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 
 
 -- Note [alg-alt heap check]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- In an algebraic case with more than one alternative, we will have
 -- code like
