@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 86, types: 65, coercions: 15, joins: 0/0}
+  = {terms: 116, types: 75, coercions: 25, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
 T22375DataFamily.$WA [InlPrag=INLINE[final] CONLIKE] :: X ()
@@ -55,6 +55,61 @@ T22375DataFamily.$WE [InlPrag=INLINE[final] CONLIKE] :: X ()
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
 T22375DataFamily.$WE
   = T22375DataFamily.E
+    `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
+            :: T22375DataFamily.R:XUnit ~R# X ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
+T22375DataFamily.$WF [InlPrag=INLINE[final] CONLIKE] :: X ()
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+T22375DataFamily.$WF
+  = T22375DataFamily.F
+    `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
+            :: T22375DataFamily.R:XUnit ~R# X ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
+T22375DataFamily.$WG [InlPrag=INLINE[final] CONLIKE] :: X ()
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+T22375DataFamily.$WG
+  = T22375DataFamily.G
+    `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
+            :: T22375DataFamily.R:XUnit ~R# X ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
+T22375DataFamily.$WH [InlPrag=INLINE[final] CONLIKE] :: X ()
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+T22375DataFamily.$WH
+  = T22375DataFamily.H
+    `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
+            :: T22375DataFamily.R:XUnit ~R# X ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
+T22375DataFamily.$WI [InlPrag=INLINE[final] CONLIKE] :: X ()
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+T22375DataFamily.$WI
+  = T22375DataFamily.I
+    `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
+            :: T22375DataFamily.R:XUnit ~R# X ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
+T22375DataFamily.$WJ [InlPrag=INLINE[final] CONLIKE] :: X ()
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+T22375DataFamily.$WJ
+  = T22375DataFamily.J
     `cast` (Sym (T22375DataFamily.D:R:XUnit0[0])
             :: T22375DataFamily.R:XUnit ~R# X ())
 
@@ -133,7 +188,7 @@ T22375DataFamily.$fEqX
   = GHC.Classes.C:Eq
       @(X ()) T22375DataFamily.$fEqX_$c== T22375DataFamily.$fEqX_$c/=
 
--- RHS size: {terms: 24, types: 4, coercions: 1, joins: 0/0}
+-- RHS size: {terms: 44, types: 4, coercions: 1, joins: 0/0}
 T22375DataFamily.$wf [InlPrag=[2]]
   :: X () -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!])],
@@ -141,18 +196,23 @@ T22375DataFamily.$wf [InlPrag=[2]]
  Str=<1L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [64 0] 55 0}]
+         Guidance=IF_ARGS [119 0] 110 0}]
 T22375DataFamily.$wf
   = \ (x :: X ()) (ww :: GHC.Prim.Int#) ->
       case x
            `cast` (T22375DataFamily.D:R:XUnit0[0]
                    :: X () ~R# T22375DataFamily.R:XUnit)
       of {
-        A -> GHC.Prim.+# 1# ww;
-        B -> GHC.Prim.+# 2# ww;
-        C -> GHC.Prim.+# 3# ww;
-        D -> GHC.Prim.+# 4# ww;
-        E -> GHC.Prim.+# 5# ww
+        A -> GHC.Prim.+# ww 1#;
+        B -> GHC.Prim.+# ww 2#;
+        C -> GHC.Prim.+# ww 3#;
+        D -> GHC.Prim.+# ww 4#;
+        E -> GHC.Prim.+# ww 5#;
+        F -> GHC.Prim.+# ww 6#;
+        G -> GHC.Prim.+# ww 7#;
+        H -> GHC.Prim.+# ww 8#;
+        I -> GHC.Prim.+# ww 9#;
+        J -> GHC.Prim.+# ww 10#
       }
 
 -- RHS size: {terms: 12, types: 6, coercions: 0, joins: 0/0}

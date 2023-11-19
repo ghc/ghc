@@ -37,7 +37,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
+import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit, mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -73,55 +73,51 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
+-- dataToTagSmall# :: a_levpoly -> Int#
+-- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
+-- particularly wrinkles H3 and DTW4
+cgExpr (StgOpApp (StgPrimOp DataToTagSmallOp) [StgVarArg a] _res_ty) = do
+  platform <- getPlatform
+  emitComment (mkFastString "dataToTagSmall#")
+
+  a_eval_reg <- newTemp (bWord platform)
+  _ <- withSequel (AssignTo [a_eval_reg] False) (cgIdApp a [])
+  let a_eval_expr = CmmReg (CmmLocal a_eval_reg)
+      tag1 = cmmConstrTag1 platform a_eval_expr
+
+  -- subtract 1 because we need to return a zero-indexed tag
+  emitReturn [cmmSubWord platform tag1 (CmmLit $ mkWordCLit platform 1)]
+
 -- dataToTagLarge# :: a_levpoly -> Int#
--- See Note [DataToTag overview] in GHC.Tc.Instance.Class
--- TODO: There are some more optimization ideas for this code path
--- in #21710
-cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
+-- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
+-- particularly wrinkles H3 and DTW4
+cgExpr (StgOpApp (StgPrimOp DataToTagLargeOp) [StgVarArg a] _res_ty) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTagLarge#")
-  info <- getCgIdInfo a
-  let amode = idInfoToAmode info
-  tag_reg <- assignTemp $ cmmConstrTag1 platform amode
+
+  a_eval_reg <- newTemp (bWord platform)
+  _ <- withSequel (AssignTo [a_eval_reg] False) (cgIdApp a [])
+  let a_eval_expr = CmmReg (CmmLocal a_eval_reg)
+
+  tag1_reg <- assignTemp $ cmmConstrTag1 platform a_eval_expr
   result_reg <- newTemp (bWord platform)
-  let tag = CmmReg $ CmmLocal tag_reg
-      is_tagged = cmmNeWord platform tag (zeroExpr platform)
-      is_too_big_tag = cmmEqWord platform tag (cmmTagMask platform)
-  -- Here we will first check the tag bits of the pointer we were given;
-  -- if this doesn't work then enter the closure and use the info table
-  -- to determine the constructor. Note that all tag bits set means that
-  -- the constructor index is too large to fit in the pointer and therefore
-  -- we must look in the info table. See Note [Tagging big families].
+  let tag1_expr = CmmReg $ CmmLocal tag1_reg
+      is_too_big_tag = cmmEqWord platform tag1_expr (cmmTagMask platform)
 
-  (fast_path :: CmmAGraph) <- getCode $ do
-      -- Return the constructor index from the pointer tag
-      return_ptr_tag <- getCode $ do
-          emitAssign (CmmLocal result_reg)
-            $ cmmSubWord platform tag (CmmLit $ mkWordCLit platform 1)
-      -- Return the constructor index recorded in the info table
-      return_info_tag <- getCode $ do
-          profile     <- getProfile
-          align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
-          emitAssign (CmmLocal result_reg)
-            $ getConstrTag profile align_check (cmmUntag platform amode)
+  -- Return the constructor index from the pointer tag
+  -- (Used if pointer tag is small enough to be unambiguous)
+  return_ptr_tag <- getCode $ do
+    emitAssign (CmmLocal result_reg)
+      $ cmmSubWord platform tag1_expr (CmmLit $ mkWordCLit platform 1)
 
-      emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
-  -- If we know the argument is already tagged there is no need to generate code to evaluate it
-  -- so we skip straight to the fast path. If we don't know if there is a tag we take the slow
-  -- path which evaluates the argument before fetching the tag.
-  case (idTagSig_maybe a) of
-    Just sig
-      | isTaggedSig sig
-      -> emit fast_path
-    _ -> do
-          slow_path <- getCode $ do
-              tmp <- newTemp (bWord platform)
-              _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-              profile     <- getProfile
-              align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
-              emitAssign (CmmLocal result_reg)
-                $ getConstrTag profile align_check (cmmUntag platform (CmmReg (CmmLocal tmp)))
-          emit =<< mkCmmIfThenElse' is_tagged fast_path slow_path (Just True)
+  -- Return the constructor index recorded in the info table
+  return_info_tag <- getCode $ do
+    profile     <- getProfile
+    align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
+    emitAssign (CmmLocal result_reg)
+      $ getConstrTag profile align_check (cmmUntag platform a_eval_expr)
+
+  emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
   emitReturn [CmmReg $ CmmLocal result_reg]
 
 
@@ -666,9 +662,10 @@ isSimpleScrut _                    _         = return False
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
--- dataToTagLarge# evaluates its argument;
+-- dataToTagSmall#/dataToTagLarge# evaluate an argument;
 -- see Note [DataToTag overview] in GHC.Tc.Instance.Class
-isSimpleOp (StgPrimOp DataToTagOp) _ = return False
+isSimpleOp (StgPrimOp DataToTagSmallOp) _ = return False
+isSimpleOp (StgPrimOp DataToTagLargeOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args
     cfg       <- getStgToCmmConfig

@@ -102,7 +102,8 @@ That is why these rules are built in here.
 primOpRules ::  Name -> PrimOp -> Maybe CoreRule
 primOpRules nm = \case
    TagToEnumOp -> mkPrimOpRule nm 2 [ tagToEnumRule ]
-   DataToTagOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
+   DataToTagSmallOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
+   DataToTagLargeOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
 
    -- Int8 operations
    Int8AddOp   -> mkPrimOpRule nm 2 [ binaryLit (int8Op2 (+))
@@ -1985,7 +1986,9 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- See Note [DataToTag overview] in GHC.Tc.Instance.Class.
+-- Used for both dataToTagSmall# and dataToTagLarge#.
+-- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
+-- particularly wrinkle DTW5.
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
@@ -3374,7 +3377,8 @@ caseRules platform (App (App (Var f) type_arg) v)
 
 -- See Note [caseRules for dataToTag]
 caseRules _ (Var f `App` Type lev `App` Type ty `App` v) -- dataToTag x
-  | Just DataToTagOp <- isPrimOpId_maybe f
+  | Just op <- isPrimOpId_maybe f
+  , op == DataToTagSmallOp || op == DataToTagLargeOp
   = case splitTyConApp_maybe ty of
       Just (tc, _) | isValidDTT2TyCon tc
         -> Just (v, tx_con_dtt tc
@@ -3382,9 +3386,9 @@ caseRules _ (Var f `App` Type lev `App` Type ty `App` v) -- dataToTag x
       _ -> pprTraceUserWarning warnMsg Nothing
   where
     warnMsg = vcat $ map text
-      [ "Found dataToTag primop applied to a non-ADT type. This"
-      , "could be a future bug in GHC, or it may be caused by an"
-      , "unsupported use of the ghc-internal primop dataToTagLarge#."
+      [ "Found dataToTag primop applied to a non-ADT type. This could"
+      , "be a future bug in GHC, or it may be caused by an unsupported"
+      , "use of the ghc-internal primops dataToTagSmall# and dataToTagLarge#."
       , "In either case, the GHC developers would like to know about it!"
       , "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug"
       ]
@@ -3554,7 +3558,7 @@ Note [caseRules for dataToTag]
 See also Note [DataToTag overview] in GHC.Tc.Instance.Class.
 
 We want to transform
-  case dataToTagLarge# x of
+  case dataToTagSmall# x of
     DEFAULT -> e1
     1# -> e2
 into
@@ -3569,11 +3573,16 @@ case-flattening and case-of-known-constructor and can be very
 important for code using derived Eq instances.
 
 We can apply this transformation only when we can easily get the
-constructors from the type at which dataToTagLarge# is used.  And we
+constructors from the type at which dataToTagSmall# is used.  And we
 cannot apply this transformation at "type data"-related types without
 breaking invariant I1 from Note [Type data declarations] in
 GHC.Rename.Module.  That leaves exactly the types satisfying condition
 DTT2 from Note [DataToTag overview] in GHC.Tc.Instance.Class.
+
+All of the above applies identically for `dataToTagLarge#`.  And
+thanks to wrinkle DTW5, there is no need to worry about large-tag
+arguments for `dataToTagSmall#`; those cause undefined behavior anyway.
+
 
 Note [Unreachable caseRules alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
