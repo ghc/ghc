@@ -89,8 +89,11 @@ import GHC.Core.Opt.Pipeline.Types ( CoreToDo )
 import GHC.Hs
 import GHC.Types.Error (Messages)
 import GHC.Linker.Types
+import GHC.Types.CostCentre.State
+import GHC.Types.CostCentre
 import GHC.Types.Unique.DFM
 
+import GHC.Unit.Module.ModGuts (CgGuts)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -156,6 +159,11 @@ data Plugin = Plugin {
     -- doing actual work on a module.
     --
     --   @since 8.10.1
+
+  , latePlugin :: LatePlugin
+    -- ^ A plugin that runs after interface creation and after late cost centre
+    -- insertion. Useful for transformations that should not impact interfaces
+    -- or optimization at all.
 
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
@@ -260,6 +268,7 @@ type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe GHC.Tc.Types.TcPlugin
 type DefaultingPlugin = [CommandLineOption] -> Maybe GHC.Tc.Types.DefaultingPlugin
 type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
+type LatePlugin = HscEnv -> [CommandLineOption] -> (CgGuts, CostCentreState) -> IO (CgGuts, CostCentreState)
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile
@@ -280,6 +289,7 @@ defaultPlugin = Plugin {
       , defaultingPlugin      = const Nothing
       , holeFitPlugin         = const Nothing
       , driverPlugin          = const return
+      , latePlugin            = \_ -> const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
