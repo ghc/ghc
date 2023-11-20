@@ -71,34 +71,32 @@ addLateCostCentresMG guts = do
   let env :: Env
       env = Env
         { thisModule = mg_module guts
-        , ccState = newCostCentreState
         , countEntries = gopt Opt_ProfCountEntries dflags
         , collectCCs = False -- See Note [Collecting late cost centres]
         }
-  let guts' = guts { mg_binds = fst (addLateCostCentres env (mg_binds guts))
+  let guts' = guts { mg_binds = fstOf3 (addLateCostCentres env (mg_binds guts))
                    }
   return guts'
 
-addLateCostCentresPgm :: DynFlags -> Logger -> Module -> CoreProgram -> IO (CoreProgram, S.Set CostCentre)
+addLateCostCentresPgm :: DynFlags -> Logger -> Module -> CoreProgram -> IO (CoreProgram, S.Set CostCentre, CostCentreState)
 addLateCostCentresPgm dflags logger mod binds =
   withTiming logger
                (text "LateCC"<+>brackets (ppr mod))
-               (\(a,b) -> a `seqList` (b `seq` ())) $ do
+               (\(a,b,c) -> a `seqList` (b `seq` (c `seq` ()))) $ do
   let env = Env
         { thisModule = mod
-        , ccState = newCostCentreState
         , countEntries = gopt Opt_ProfCountEntries dflags
         , collectCCs = True -- See Note [Collecting late cost centres]
         }
-      (binds', ccs) = addLateCostCentres env binds
+      (binds', ccs, cc_state) = addLateCostCentres env binds
   when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
     putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr binds'))
-  return (binds', ccs)
+  return (binds', ccs, cc_state)
 
-addLateCostCentres :: Env -> CoreProgram -> (CoreProgram,S.Set CostCentre)
+addLateCostCentres :: Env -> CoreProgram -> (CoreProgram, S.Set CostCentre, CostCentreState)
 addLateCostCentres env binds =
   let (binds', state) = runState (mapM (doBind env) binds) initLateCCState
-  in (binds',lcs_ccs state)
+  in (binds', lcs_ccs state, lcs_state state)
 
 
 doBind :: Env -> CoreBind -> M CoreBind
@@ -161,7 +159,6 @@ addCC !env cc = do
 data Env = Env
   { thisModule  :: !Module
   , countEntries:: !Bool
-  , ccState     :: !CostCentreState
   , collectCCs  :: !Bool
   }
 
