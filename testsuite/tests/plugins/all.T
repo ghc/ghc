@@ -331,3 +331,8 @@ test('test-log-hooks-plugin',
       pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-log-hooks-plugin TOP={top}')],
      compile_fail,
      ['-package-db hooks-plugin/pkg.test-log-hooks-plugin/local.package.conf -fplugin Hooks.LogPlugin -package hooks-plugin ' + config.plugin_way_flags])
+
+test('test-late-plugin',
+     [extra_files(['late-plugin/LatePlugin.hs']), ignore_stdout],
+     makefile_test,
+     [])

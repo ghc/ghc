@@ -298,6 +298,7 @@ import GHC.Iface.Env ( trace_if )
 import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
+import GHC.Types.CostCentre.State (newCostCentreState)
 
 
 {- **********************************************************************
@@ -1812,40 +1813,70 @@ hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
-        let CgGuts{ -- This is the last use of the ModGuts in a compilation.
-                    -- From now on, we just use the bits we need.
-                    cg_module   = this_mod,
+        let CgGuts{ cg_module   = this_mod,
                     cg_binds    = core_binds,
-                    cg_ccs      = local_ccs,
-                    cg_tycons   = tycons,
-                    cg_foreign  = foreign_stubs0,
-                    cg_foreign_files = foreign_files,
-                    cg_dep_pkgs = dependencies,
-                    cg_hpc_info = hpc_info,
-                    cg_spt_entries = spt_entries
+                    cg_ccs      = local_ccs
                     } = cgguts
             dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
-            hooks  = hsc_hooks hsc_env
-            tmpfs  = hsc_tmpfs hsc_env
-            llvm_config = hsc_llvm_config hsc_env
-            profile = targetProfile dflags
-            data_tycons = filter isDataTyCon tycons
-            -- cg_tycons includes newtypes, for the benefit of External Core,
-            -- but we don't generate any code for newtypes
+
 
         -------------------
         -- Insert late cost centres if enabled.
         -- If `-fprof-late-inline` is enabled we can skip this, as it will have added
         -- a superset of cost centres we would add here already.
 
-        (late_cc_binds, late_local_ccs) <-
+        (late_cc_binds, late_local_ccs, cc_state) <-
               if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
-                  then  {-# SCC lateCC #-} do
-                    (binds,late_ccs) <- addLateCostCentresPgm dflags logger this_mod core_binds
-                    return ( binds, (S.toList late_ccs `mappend` local_ccs ))
+                  then
+                    withTiming
+                      logger
+                      (text "LateCCs"<+>brackets (ppr this_mod))
+                      (const ())
+                      $ {-# SCC lateCC #-} do
+                        (binds, late_ccs, cc_state) <- addLateCostCentresPgm dflags logger this_mod core_binds
+                        return ( binds, (S.toList late_ccs `mappend` local_ccs ), cc_state)
                   else
-                    return (core_binds, local_ccs)
+                    return (core_binds, local_ccs, newCostCentreState)
+
+        -------------------
+        -- Run late plugins
+        -- This is the last use of the ModGuts in a compilation.
+        -- From now on, we just use the bits we need.
+        ( CgGuts
+            { cg_tycons        = tycons,
+              cg_foreign       = foreign_stubs0,
+              cg_foreign_files = foreign_files,
+              cg_dep_pkgs      = dependencies,
+              cg_hpc_info      = hpc_info,
+              cg_spt_entries   = spt_entries,
+              cg_binds         = late_binds,
+              cg_ccs           = late_local_ccs'
+            }
+          , _
+          ) <-
+          {-# SCC latePlugins #-}
+          withTiming
+            logger
+            (text "LatePlugins"<+>brackets (ppr this_mod))
+            (const ()) $
+            withPlugins (hsc_plugins hsc_env)
+              (($ hsc_env) . latePlugin)
+                ( cgguts
+                    { cg_binds = late_cc_binds
+                    , cg_ccs = late_local_ccs
+                    }
+                , cc_state
+                )
+
+        let
+          hooks  = hsc_hooks hsc_env
+          tmpfs  = hsc_tmpfs hsc_env
+          llvm_config = hsc_llvm_config hsc_env
+          profile = targetProfile dflags
+          data_tycons = filter isDataTyCon tycons
+          -- cg_tycons includes newtypes, for the benefit of External Core,
+          -- but we don't generate any code for newtypes
 
 
 
@@ -1858,7 +1889,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             (hsc_logger hsc_env)
             cp_cfg
             (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
-            this_mod location late_cc_binds data_tycons
+            this_mod location late_binds data_tycons
 
         -----------------  Convert to STG ------------------
         (stg_binds_with_deps, denv, (caf_ccs, caf_cc_stacks), stg_cg_infos)
@@ -1876,7 +1907,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
         let cost_centre_info =
-              (late_local_ccs ++ caf_ccs, caf_cc_stacks)
+              (late_local_ccs' ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info

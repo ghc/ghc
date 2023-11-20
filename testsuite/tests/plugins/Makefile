@@ -224,3 +224,13 @@ plugins-external:
 	cp shared-plugin/pkg.plugins01/dist/build/$(call DLL,HSsimple-plugin*) $(call DLL,HSsimple-plugin)
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -fplugin-library "$(PWD)/$(call DLL,HSsimple-plugin);simple-plugin-1234;Simple.Plugin;[\"Plugin\",\"loaded\",\"from\",\"a shared lib\"]" plugins-external.hs
 	./plugins-external
+
+# Runs a plugin that is both a core plugin and a late plugin, then makes sure
+# only the changes from the core plugin end up in the interface files.
+test-late-plugin:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -O -package ghc $@.hs
+	SHOW_IFACE="$$($(TEST_HC) --show-iface $@.hi)" ; \
+	ContainsEarlyBinding=$$(echo $$SHOW_IFACE | grep -o 111111) ; \
+	ContainsLateBinding=$$(echo $$SHOW_IFACE | grep -o 222222) ; \
+	echo "$$ContainsLateBinding" ; \
+	[ "$$ContainsEarlyBinding" = "111111" ] && [ "$$ContainLateBinding" = "" ]
