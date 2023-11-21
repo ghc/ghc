@@ -6,6 +6,7 @@ Quantified constraints
 .. extension:: QuantifiedConstraints
     :shortdesc: Allow ``forall`` quantifiers in constraints.
 
+    :implies: :extension:`ExplicitForAll`
     :since: 8.6.1
 
     Allow constraints to quantify over types.
