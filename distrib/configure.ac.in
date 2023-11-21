@@ -202,6 +202,18 @@ dnl Identify C++ standard library flavour and location
 FP_FIND_CXX_STD_LIB
 AC_CONFIG_FILES([mk/system-cxx-std-lib-1.0.conf])
 
+dnl ** Which otool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([OTOOL], [otool])
+OtoolCmd="$OTOOL"
+AC_SUBST(OtoolCmd)
+
+dnl ** Which install_name_tool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool])
+InstallNameToolCmd="$INSTALL_NAME_TOOL"
+AC_SUBST(InstallNameToolCmd)
+
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
