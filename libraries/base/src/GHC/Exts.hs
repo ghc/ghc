@@ -130,7 +130,7 @@ module GHC.Exts
         maxTupleSize,
        ) where
 
-import GHC.Prim hiding ( coerce )
+import GHC.Prim hiding ( coerce, timeProfileTick# )
 import GHC.Types
   hiding ( IO   -- Exported from "GHC.IO"
          , Type -- Exported from "Data.Kind"

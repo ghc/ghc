@@ -117,7 +117,7 @@ import GHC.Classes
 import GHC.CString
 import GHC.Magic
 import GHC.Magic.Dict
-import GHC.Prim
+import GHC.Prim hiding ( timeProfileTick# )
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Err
