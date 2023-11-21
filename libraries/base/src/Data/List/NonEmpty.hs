@@ -44,11 +44,11 @@ module Data.List.NonEmpty (
    , (<|), cons  -- :: a -> NonEmpty a -> NonEmpty a
    , uncons      -- :: NonEmpty a -> (a, Maybe (NonEmpty a))
    , unfoldr     -- :: (a -> (b, Maybe a)) -> a -> NonEmpty b
-   , sort        -- :: NonEmpty a -> NonEmpty a
+   , sort        -- :: Ord a => NonEmpty a -> NonEmpty a
    , reverse     -- :: NonEmpty a -> NonEmpty a
-   , inits       -- :: Foldable f => f a -> NonEmpty a
+   , inits       -- :: Foldable f => f a -> NonEmpty [a]
    , inits1      -- :: NonEmpty a -> NonEmpty (NonEmpty a)
-   , tails       -- :: Foldable f => f a -> NonEmpty a
+   , tails       -- :: Foldable f => f a -> NonEmpty [a]
    , tails1      -- :: NonEmpty a -> NonEmpty (NonEmpty a)
    , append      -- :: NonEmpty a -> NonEmpty a -> NonEmpty a
    , appendList  -- :: NonEmpty a -> [a] -> NonEmpty a
@@ -57,31 +57,31 @@ module Data.List.NonEmpty (
    , iterate     -- :: (a -> a) -> a -> NonEmpty a
    , repeat      -- :: a -> NonEmpty a
    , cycle       -- :: NonEmpty a -> NonEmpty a
-   , unfold      -- :: (a -> (b, Maybe a) -> a -> NonEmpty b
+   , unfold      -- :: (a -> (b, Maybe a)) -> a -> NonEmpty b
    , insert      -- :: (Foldable f, Ord a) => a -> f a -> NonEmpty a
    , some1       -- :: Alternative f => f a -> f (NonEmpty a)
    -- * Extracting sublists
    , take        -- :: Int -> NonEmpty a -> [a]
    , drop        -- :: Int -> NonEmpty a -> [a]
    , splitAt     -- :: Int -> NonEmpty a -> ([a], [a])
-   , takeWhile   -- :: Int -> NonEmpty a -> [a]
-   , dropWhile   -- :: Int -> NonEmpty a -> [a]
-   , span        -- :: Int -> NonEmpty a -> ([a],[a])
-   , break       -- :: Int -> NonEmpty a -> ([a],[a])
+   , takeWhile   -- :: (a -> Bool) -> NonEmpty a -> [a]
+   , dropWhile   -- :: (a -> Bool) -> NonEmpty a -> [a]
+   , span        -- :: (a -> Bool) -> NonEmpty a -> ([a], [a])
+   , break       -- :: (a -> Bool) -> NonEmpty a -> ([a], [a])
    , filter      -- :: (a -> Bool) -> NonEmpty a -> [a]
    , partition   -- :: (a -> Bool) -> NonEmpty a -> ([a],[a])
-   , group       -- :: Foldable f => Eq a => f a -> [NonEmpty a]
+   , group       -- :: (Foldable f, Eq a) => f a -> [NonEmpty a]
    , groupBy     -- :: Foldable f => (a -> a -> Bool) -> f a -> [NonEmpty a]
    , groupWith     -- :: (Foldable f, Eq b) => (a -> b) -> f a -> [NonEmpty a]
-   , groupAllWith  -- :: (Foldable f, Ord b) => (a -> b) -> f a -> [NonEmpty a]
+   , groupAllWith  -- :: Ord b => (a -> b) -> [a] -> [NonEmpty a]
    , group1      -- :: Eq a => NonEmpty a -> NonEmpty (NonEmpty a)
    , groupBy1    -- :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty (NonEmpty a)
-   , groupWith1     -- :: (Foldable f, Eq b) => (a -> b) -> f a -> NonEmpty (NonEmpty a)
-   , groupAllWith1  -- :: (Foldable f, Ord b) => (a -> b) -> f a -> NonEmpty (NonEmpty a)
-   , permutations
-   , permutations1
+   , groupWith1     -- :: Eq b => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
+   , groupAllWith1  -- :: Ord b => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
+   , permutations   -- :: [a] -> NonEmpty [a]
+   , permutations1  -- :: NonEmpty a -> NonEmpty (NonEmpty a)
    -- * Sublist predicates
-   , isPrefixOf  -- :: Foldable f => f a -> NonEmpty a -> Bool
+   , isPrefixOf  -- :: Eq a => [a] -> NonEmpty a -> Bool
    -- * \"Set\" operations
    , nub         -- :: Eq a => NonEmpty a -> NonEmpty a
    , nubBy       -- :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty a
@@ -90,12 +90,12 @@ module Data.List.NonEmpty (
    -- * Zipping and unzipping streams
    , zip         -- :: NonEmpty a -> NonEmpty b -> NonEmpty (a,b)
    , zipWith     -- :: (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c
-   , unzip       -- :: NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
+   , unzip       -- :: Functor f => f (a,b) -> (f a, f b)
    -- * Converting to and from a list
    , fromList    -- :: [a] -> NonEmpty a
    , toList      -- :: NonEmpty a -> [a]
    , nonEmpty    -- :: [a] -> Maybe (NonEmpty a)
-   , xor         -- :: NonEmpty a -> Bool
+   , xor         -- :: NonEmpty Bool -> Bool
    ) where
 
 
