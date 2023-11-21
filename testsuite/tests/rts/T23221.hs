@@ -10,6 +10,7 @@ import Debug.Trace
 import Control.Monad
 import GHC.Stats
 import Data.Word
+import GHC.Stack (HasCallStack)
 
 -- This test is for checking the memory return behaviour of blocks which will be
 -- copied and blocks which are not copied (#23221)
@@ -25,6 +26,7 @@ main = do
 
 -- The upper_bound is the upper bound on how much total memory should be live at the end
 -- of the test as a factor of the expected live bytes.
+loop :: HasCallStack => (Int -> IO a) -> Double -> Double -> Int -> IO ()
 loop f lower_bound upper_bound n = do
   ba <- mapM (\_ -> f 128) [0..n]
   traceMarkerIO "Allocated_all"
@@ -39,7 +41,7 @@ loop f lower_bound upper_bound n = do
   evaluate (length (reverse ba'))
   return total_mem
 
-checkStats :: Double -> Double -> Int -> IO ()
+checkStats :: HasCallStack => Double -> Double -> Int -> IO ()
 checkStats lower_bound upper_bound n = do
   stats <- getRTSStats
   let expected_live_memory = fromIntegral n -- How many objects
