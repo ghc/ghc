@@ -161,14 +161,14 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CXX_OPTS_STAGE0])
     PREP_LIST([CONF_GCC_LINKER_OPTS_STAGE0])
 
-    if test -z "$OtoolCmd"; then
+    if test "$OtoolCmd" = "false"; then
       OtoolCmdMaybe=Nothing
     else
       OtoolCmdMaybe="Just (Otool {otoolProgram = Program{prgPath = \"$OtoolCmd\", prgFlags = @<:@@:>@)"
     fi
     AC_SUBST([OtoolCmdMaybe])
 
-    if test -z "$InstallNameToolCmd"; then
+    if test "$InstallNameToolCmd" = "false"; then
       InstallNameToolCmdMaybe=Nothing
     else
       InstallNameToolCmdMaybe="Just (InstallNameTool {installNameToolProgram = Program{prgPath = \"$InstallNameToolCmd\", prgFlags = @<:@@:>@)"

@@ -489,13 +489,13 @@ AC_SUBST([StripCmd])
 
 dnl ** Which otool to use on macOS
 dnl --------------------------------------------------------------
-AC_CHECK_TARGET_TOOL([OTOOL], [otool])
+AC_CHECK_TARGET_TOOL([OTOOL], [otool], [false])
 OtoolCmd="$OTOOL"
 AC_SUBST(OtoolCmd)
 
 dnl ** Which install_name_tool to use on macOS
 dnl --------------------------------------------------------------
-AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool])
+AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool], [false])
 InstallNameToolCmd="$INSTALL_NAME_TOOL"
 AC_SUBST(InstallNameToolCmd)
 
