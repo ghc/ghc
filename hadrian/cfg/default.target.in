@@ -35,6 +35,8 @@ Target
 
 , tgtRanlib = Just (Ranlib {ranlibProgram = Program {prgPath = "@RanlibCmd@", prgFlags = []}})
 , tgtNm = Nm {nmProgram = Program {prgPath = "@NmCmd@", prgFlags = []}}
+, tgtOtool = @OtoolCmdMaybe@
+, tgtInstallNameTool = @InstallNameToolCmdMaybe@
 , tgtMergeObjs = @MergeObjsCmdMaybe@
 , tgtWindres = @WindresCmdMaybeProg@
 }

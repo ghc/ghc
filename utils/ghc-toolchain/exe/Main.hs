@@ -29,6 +29,8 @@ import GHC.Toolchain.Tools.Link
 import GHC.Toolchain.Tools.Ar
 import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Nm
+import GHC.Toolchain.Tools.Otool
+import GHC.Toolchain.Tools.InstallNameTool
 import GHC.Toolchain.Tools.MergeObjs
 import GHC.Toolchain.Tools.Readelf
 import GHC.Toolchain.NormaliseTriple (normaliseTriple)
@@ -47,6 +49,8 @@ data Opts = Opts
     , optAr        :: ProgOpt
     , optRanlib    :: ProgOpt
     , optNm        :: ProgOpt
+    , optOtool     :: ProgOpt
+    , optInstallNameTool :: ProgOpt
     , optReadelf   :: ProgOpt
     , optMergeObjs :: ProgOpt
     , optWindres   :: ProgOpt
@@ -92,6 +96,8 @@ emptyOpts = Opts
     , optAr        = po0
     , optRanlib    = po0
     , optNm        = po0
+    , optOtool     = po0
+    , optInstallNameTool = po0
     , optReadelf   = po0
     , optMergeObjs = po0
     , optWindres   = po0
@@ -107,7 +113,8 @@ emptyOpts = Opts
     po0 = emptyProgOpt
 
 _optCc, _optCxx, _optCpp, _optHsCpp, _optCcLink, _optAr, _optRanlib, _optNm,
-    _optReadelf, _optMergeObjs, _optWindres, _optLd
+    _optOtool, _optInstallNameTool, _optReadelf, _optMergeObjs, _optWindres,
+    _optLd
     :: Lens Opts ProgOpt
 _optCc      = Lens optCc      (\x o -> o {optCc=x})
 _optCxx     = Lens optCxx     (\x o -> o {optCxx=x})
@@ -117,6 +124,8 @@ _optCcLink  = Lens optCcLink  (\x o -> o {optCcLink=x})
 _optAr      = Lens optAr      (\x o -> o {optAr=x})
 _optRanlib  = Lens optRanlib  (\x o -> o {optRanlib=x})
 _optNm      = Lens optNm      (\x o -> o {optNm=x})
+_optOtool   = Lens optOtool  (\x o -> o {optOtool=x})
+_optInstallNameTool = Lens optInstallNameTool  (\x o -> o {optInstallNameTool=x})
 _optReadelf = Lens optReadelf (\x o -> o {optReadelf=x})
 _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
@@ -172,6 +181,8 @@ options =
     , progOpts "ar" "ar archiver" _optAr
     , progOpts "ranlib" "ranlib utility" _optRanlib
     , progOpts "nm" "nm archiver" _optNm
+    , progOpts "otool" "otool utility" _optOtool
+    , progOpts "install-name-tool" "install_name_tool utility" _optInstallNameTool
     , progOpts "readelf" "readelf utility" _optReadelf
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
@@ -407,6 +418,15 @@ mkTarget opts = do
     when (isNothing mergeObjs && not (arSupportsDashL ar)) $
       throwE "Neither a object-merging tool (e.g. ld -r) nor an ar that supports -L is available"
 
+    -- Darwin-specific utilities
+    (otool, installNameTool) <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            otool <- findOtool (optOtool opts)
+            installNameTool <- findInstallNameTool (optInstallNameTool opts)
+            return (Just otool, Just installNameTool)
+          _ -> return (Nothing, Nothing)
+
     -- Windows-specific utilities
     windres <-
         case archOS_OS archOs of
@@ -448,6 +468,8 @@ mkTarget opts = do
                    , tgtCCompilerLink = ccLink
                    , tgtRanlib = ranlib
                    , tgtNm = nm
+                   , tgtOtool = otool
+                   , tgtInstallNameTool = installNameTool
                    , tgtMergeObjs = mergeObjs
                    , tgtWindres = windres
                    , tgtWordSize

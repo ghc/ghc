@@ -25,6 +25,8 @@ library
                       GHC.Toolchain.Tools.Cxx,
                       GHC.Toolchain.Tools.Cpp,
                       GHC.Toolchain.Tools.Link,
+                      GHC.Toolchain.Tools.Otool,
+                      GHC.Toolchain.Tools.InstallNameTool,
                       GHC.Toolchain.Tools.Nm,
                       GHC.Toolchain.Tools.Ranlib,
                       GHC.Toolchain.Tools.Readelf,

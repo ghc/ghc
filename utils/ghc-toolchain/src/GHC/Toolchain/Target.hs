@@ -14,6 +14,8 @@ import GHC.Toolchain.Tools.Ar
 import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Link
 import GHC.Toolchain.Tools.Nm
+import GHC.Toolchain.Tools.Otool
+import GHC.Toolchain.Tools.InstallNameTool
 import GHC.Toolchain.Tools.MergeObjs
 
 data WordSize = WS4 | WS8
@@ -25,8 +27,6 @@ data Endianness = LittleEndian | BigEndian
 -- TODO(#23674): Move the remaining relevant `settings-xxx` to Target:
 -- * llc command
 -- * opt command
--- * install_name_tool
--- * otool command
 --
 -- Those are all things that are put into GHC's settings, and that might be
 -- different across targets
@@ -66,6 +66,8 @@ data Target = Target
     , tgtRanlib :: Maybe Ranlib
     -- ^ N.B. Most @ar@ implementations will add an index by default without @ranlib@ so this is often optional
     , tgtNm :: Nm
+    , tgtOtool :: Maybe Otool
+    , tgtInstallNameTool :: Maybe InstallNameTool
     , tgtMergeObjs :: Maybe MergeObjs
     -- ^ We don't need a merge objects tool if we @Ar@ supports @-L@
 
@@ -115,6 +117,8 @@ instance Show Target where
     , ", tgtAr = " ++ show tgtAr
     , ", tgtRanlib = " ++ show tgtRanlib
     , ", tgtNm = " ++ show tgtNm
+    , ", tgtOtool = " ++ show tgtOtool
+    , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , ", tgtMergeObjs = " ++ show tgtMergeObjs
     , ", tgtWindres = " ++ show tgtWindres
     , "}"
