@@ -728,30 +728,41 @@ performance.
     .. index::
        single: idle GC
 
-    Set the amount of idle time which must pass before a idle GC is
-    performed. Setting ``-I0`` disables the idle GC.
+    Set the amount of idle time which must pass before an idle GC is performed.
+    Setting ``-I0`` disables the idle GC.
 
-    In the threaded and SMP versions of the RTS (see :ghc-flag:`-threaded`,
-    :ref:`options-linker`), a major GC is automatically performed if the
-    runtime has been idle (no Haskell computation has been running) for a
-    period of time.
+    The idle GC is one of three ways to trigger a major GC. The other two are
+    heap overflow—where GHC will perform a GC if necessary—and manually by the
+    programmer via the interface in System.Mem (FIXME: link)
 
-    For an interactive application, it is probably a good idea to use
-    the idle GC, because this will allow finalizers to run and
-    deadlocked threads to be detected in the idle time when no Haskell
-    computation is happening. Also, it will mean that a GC is less
-    likely to happen when the application is busy, and so responsiveness
-    may be improved. However, if the amount of live data in the heap is
-    particularly large, then the idle GC can cause a significant delay,
-    and too small an interval could adversely affect interactive
-    responsiveness.
+    The idle GC only affects the threaded and SMP versions of the RTS (see
+    :ghc-flag:`-threaded`, :ref:`options-linker`). When the idle GC is enabled,
+    a major GC is automatically performed if the runtime has been idle for the
+    specified period of time.
 
-    The idle period timer only resets after some activity
-    by a Haskell thread. If your program is doing literally nothing then
-    after the first idle collection is triggered then no more future collections
-    will be scheduled until more work is performed.
+    If idle GC is disabled, GCs will only happen via the other two mechanisms
+    mentioned.
 
-    This is an experimental feature, please let us know if it causes
+    For an interactive application, it is probably a good idea to use the idle
+    GC, because it will allow GCs to run in the idle time when no Haskell
+    computation is happening. The other two mechanisms for triggering a GC only
+    occur when the program is actually doing work, which means the GC will
+    interrupt that work and reduce the program's responsiveness. With more
+    frequent GCs, the program will also be prompter to run finalizers and detect
+    deadlocked threads.
+
+    Idle GCs are not a free lunch, however. They may trigger at precisely the
+    wrong time and interrupt new work unnecessarily. Setting ``-I`` to a low
+    value makes this more likely. Plus, setting it to a low value means the idle
+    GC could fire *too* often, resulting in GCs that don't even free much
+    memory. Thus you may need to find the sweet spot for your application to
+    maximize the value the idle GC can bring.
+
+    The idle period timer only resets after some activity by a Haskell thread.
+    Therefore, once an idle GC is triggered, another one won't be scheduled
+    until more work is performed.
+
+    This is an experimental feature. Please let us know if it causes
     problems and/or could benefit from further tuning.
 
 .. rts-flag:: -Iw ⟨seconds⟩
