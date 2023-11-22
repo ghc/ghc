@@ -37,6 +37,7 @@
 /compiler/GHC/Types/               @simonpj @rae
 /compiler/GHC/HsToCore/            @simonpj @rae
 /compiler/GHC/HsToCore/Pmc*        @sgraf
+/compiler/GHC/HsToCore/Foreign/Wasm.hs @TerrorJack
 /compiler/GHC/Tc/Deriv/            @RyanGlScott
 /compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
 /compiler/GHC/CmmToAsm/Wasm/       @TerrorJack

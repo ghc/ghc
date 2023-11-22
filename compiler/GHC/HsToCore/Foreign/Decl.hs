@@ -20,6 +20,7 @@ import GHC.Tc.Utils.Monad        -- temp
 
 import GHC.HsToCore.Foreign.C
 import GHC.HsToCore.Foreign.JavaScript
+import GHC.HsToCore.Foreign.Wasm
 import GHC.HsToCore.Foreign.Utils
 import GHC.HsToCore.Monad
 
@@ -86,16 +87,16 @@ dsForeigns' fos = do
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
       let id' = unLoc id
-      (bs, h, c) <- dsFImport id' co spec
+      (bs, h, c, ids) <- dsFImport id' co spec
       traceIf (text "fi end" <+> ppr id)
-      return (h, c, [], bs)
+      return (h, c, ids, bs)
 
    do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
                           , fd_fe = CExport _
                               (L _ (CExportStatic _ ext_nm cconv)) }) = do
-      (h, c, _, _) <- dsFExport id co ext_nm cconv False
-      return (h, c, [id], [])
+      (h, c, _, _, ids, bs) <- dsFExport id co ext_nm cconv False
+      return (h, c, ids, bs)
 
 {-
 ************************************************************************
@@ -126,12 +127,20 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
           -> Coercion
           -> ForeignImport (GhcPass p)
-          -> DsM ([Binding], CHeader, CStub)
+          -> DsM ([Binding], CHeader, CStub, [Id])
 dsFImport id co (CImport _ cconv safety mHeader spec) = do
   platform <- getPlatform
-  case platformArch platform of
-    ArchJavaScript -> dsJsImport id co spec (unLoc cconv) (unLoc safety) mHeader
-    _              -> dsCImport  id co spec (unLoc cconv) (unLoc safety) mHeader
+  let cconv' = unLoc cconv
+      safety' = unLoc safety
+  case (platformArch platform, cconv') of
+    (ArchJavaScript, _) -> do
+      (bs, h, c) <- dsJsImport id co spec cconv' safety' mHeader
+      pure (bs, h, c, [])
+    (ArchWasm32, JavaScriptCallConv) ->
+      dsWasmJSImport id co spec safety'
+    _ -> do
+      (bs, h, c) <- dsCImport id co spec cconv' safety' mHeader
+      pure (bs, h, c, [])
 
 {-
 ************************************************************************
@@ -165,12 +174,20 @@ dsFExport :: Id                 -- Either the exported Id,
                  , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
                  , Int          -- size of args to stub function
+                 , [Id]         -- function closures to be registered as GC roots
+                 , [Binding]    -- additional bindings used by desugared foreign export
                  )
 dsFExport fn_id co ext_name cconv is_dyn = do
   platform <- getPlatform
-  case platformArch platform of
-    ArchJavaScript -> dsJsFExport fn_id co ext_name cconv is_dyn
-    _              -> dsCFExport  fn_id co ext_name cconv is_dyn
+  case (platformArch platform, cconv) of
+    (ArchJavaScript, _) -> do
+      (h, c, ts, args) <- dsJsFExport fn_id co ext_name cconv is_dyn
+      pure (h, c, ts, args, [fn_id], [])
+    (ArchWasm32, JavaScriptCallConv) ->
+      dsWasmJSExport fn_id co ext_name
+    _ -> do
+      (h, c, ts, args) <- dsCFExport fn_id co ext_name cconv is_dyn
+      pure (h, c, ts, args, [fn_id], [])
 
 
 foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub
@@ -202,4 +219,3 @@ foreignExportsInitialiser platform mod hs_fns =
 
     closure_ptr :: Id -> SDoc
     closure_ptr fn = text "(StgPtr) &" <> ppr fn <> text "_closure"
-

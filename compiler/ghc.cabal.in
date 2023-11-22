@@ -530,6 +530,7 @@ Library
         GHC.HsToCore.Foreign.JavaScript
         GHC.HsToCore.Foreign.Prim
         GHC.HsToCore.Foreign.Utils
+        GHC.HsToCore.Foreign.Wasm
         GHC.HsToCore.GuardedRHSs
         GHC.HsToCore.ListComp
         GHC.HsToCore.Match
