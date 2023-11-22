@@ -1020,12 +1020,6 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
         if (!r) {
             return NULL;
         }
-
-#if defined(PROFILING)
-        // collect any new cost centres & CCSs
-        // that were defined during runInit
-        refreshProfilingCCSs();
-#endif
     }
 
     return pinfo->value;
@@ -1774,6 +1768,12 @@ int runPendingInitializers (void)
             return r;
         }
     }
+
+#if defined(PROFILING)
+    // collect any new cost centres & CCSs that were defined during runInit
+    refreshProfilingCCSs();
+#endif
+
     return 1;
 }
 
@@ -1799,11 +1799,6 @@ static HsInt resolveObjs_ (void)
     if (!runPendingInitializers()) {
         return 0;
     }
-
-#if defined(PROFILING)
-    // collect any new cost centres & CCSs that were defined during runInit
-    refreshProfilingCCSs();
-#endif
 
     IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
     return 1;
