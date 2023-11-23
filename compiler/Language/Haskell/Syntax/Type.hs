@@ -1146,35 +1146,61 @@ I don't know if this is a good idea, but there it is.
 
 {- Note [hsScopedTvs and visible foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--XScopedTypeVariables can be defined in terms of a desugaring to
--XTypeAbstractions (GHC Proposal #50):
+ScopedTypeVariables can be defined in terms of a desugaring to TypeAbstractions
+(GHC Proposals #155 and #448):
 
     fn :: forall a b c. tau(a,b,c)            fn :: forall a b c. tau(a,b,c)
     fn = defn(a,b,c)                   ==>    fn @x @y @z = defn(x,y,z)
 
-That is, for every type variable of the leading 'forall' in the type signature,
-we add an invisible binder at term level.
+That is, for every type variable of the leading `forall` in the type signature,
+we add an invisible binder at the term level.
 
-This model does not extend to visible forall, as discussed here:
+This model does not extend to visible forall. (Visible forall is the one written
+with an arrow instead of a dot, i.e. `forall a ->`. See GHC Proposal #281 and
+the RequiredTypeArguments extension).  Here is an example that demonstrates the
+issue:
 
-* https://gitlab.haskell.org/ghc/ghc/issues/16734#note_203412
-* https://github.com/ghc-proposals/ghc-proposals/pull/238
+  vfn :: forall a b -> tau(a, b)
+  vfn = case <scrutinee> of (p,q) -> \x y -> ...
 
-The conclusion of these discussions can be summarized as follows:
+The `a` and `b` cannot scope over the equations of `vfn`.  In particular,
+`a` and `b` cannot be in scope in <scrutinee> because those type variables
+are bound by the `\x y ->`.
 
-  > Assuming support for visible 'forall' in terms, consider this example:
-  >
-  >     vfn :: forall x y -> tau(x,y)
-  >     vfn = \a b -> ...
-  >
-  > The user has written their own binders 'a' and 'b' to stand for 'x' and
-  > 'y', and we definitely should not desugar this into:
-  >
-  >     vfn :: forall x y -> tau(x,y)
-  >     vfn x y = \a b -> ...         -- bad!
+Our solution is simple: ScopedTypeVariables has no effect on visible forall.
+It follows naturally from the fact that ScopedTypeVariables is already subject
+to several restrictions:
 
-This design choice is reflected in the design of HsOuterSigTyVarBndrs, which are
-used in every place that ScopedTypeVariables takes effect:
+  1. The type signature must be headed by an /explicit/ forall
+      * `f :: forall a. a -> blah` brings `a` into scope in the body
+      * `f ::           a -> blah` does not
+
+  2. The forall is /not nested/
+      * `f :: forall a b. blah`         brings `a` and `b` into scope in the body
+      * `f :: forall a. forall b. blah` brings `a` but not `b` into scope in the body
+
+With the introduction of visible forall, we also introduce a third condition:
+
+  3. The forall has to be /invisible/
+      * `f :: forall a b.   blah` brings `a` and `b` into scope in the body
+      * `f :: forall a b -> blah` does not
+
+For example:
+
+   f1 :: forall a. a -> a
+   f1 x = (x::a)          -- OK: `a` is in scope in the body
+
+   f2 :: forall a b. a -> b -> (a, b)
+   f2 x y = (x::a, y::b)  -- OK: both `a` and `b` are in scope in the body
+
+   f3 :: forall a. forall b. a -> b -> (a, b)
+   f3 x y = (x::a, y::b)  -- Wrong: the `forall b.` is not the outermost forall
+
+   f4 :: forall a -> a -> a
+   f4 t (x::t) = (x::a)   -- Wrong: the `forall a ->` does not bring `a` into scope
+
+This design choice is reflected in the definition of HsOuterSigTyVarBndrs, which are
+used in every place where ScopedTypeVariables takes effect:
 
   data HsOuterTyVarBndrs flag pass
     = HsOuterImplicit { ... }
@@ -1189,21 +1215,6 @@ which type variables to bring into scope over the body of a function
 (in hsScopedTvs), we /only/ bring the type variables bound by the hso_bndrs in
 an HsOuterExplicit into scope. If we have an HsOuterImplicit instead, then we
 do not bring any type variables into scope over the body of a function at all.
-
-At the moment, GHC does not support visible 'forall' in terms. Nevertheless,
-it is still possible to write erroneous programs that use visible 'forall's in
-terms, such as this example:
-
-    x :: forall a -> a -> a
-    x = x
-
-Previous versions of GHC would bring `a` into scope over the body of `x` in the
-hopes that the typechecker would error out later
-(see `GHC.Tc.Validity.vdqAllowed`). However, this can wreak havoc in the
-renamer before GHC gets to that point (see #17687 for an example of this).
-Bottom line: nip problems in the bud by refraining from bringing any type
-variables in an HsOuterImplicit into scope over the body of a function, even
-if they correspond to a visible 'forall'.
 -}
 
 {-
