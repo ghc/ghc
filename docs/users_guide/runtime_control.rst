@@ -723,7 +723,7 @@ performance.
 
 .. rts-flag:: -I ⟨seconds⟩
 
-    :default: 0.3 seconds in the threaded runtime, 0 in the non-threaded runtime
+    :default: 0.3 seconds
 
     .. index::
        single: idle GC
