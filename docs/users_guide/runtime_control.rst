@@ -731,17 +731,16 @@ performance.
     Set the amount of idle time which must pass before an idle GC is performed.
     Setting ``-I0`` disables the idle GC.
 
-    The idle GC is one of three ways to trigger a major GC. The other two are
-    heap overflow—where GHC will perform a GC if necessary—and manually by the
-    programmer via the interface in System.Mem (FIXME: link)
+    The idle GC only affects the threaded version of the RTS (see
+    :ghc-flag:`-threaded`).
 
-    The idle GC only affects the threaded and SMP versions of the RTS (see
-    :ghc-flag:`-threaded`, :ref:`options-linker`). When the idle GC is enabled,
-    a major GC is automatically performed if the runtime has been idle for the
-    specified period of time.
+    When the idle GC is enabled, a major GC is automatically performed when the
+    runtime has been idle for the specified period of time.
 
-    If idle GC is disabled, GCs will only happen via the other two mechanisms
-    mentioned.
+    When idle GC is not enabled, GCs will only happen via the other two
+    available mechanisms: a heap overflow—where GHC will perform a GC if
+    necessary—and manually by the programmer via the interface in
+    :base-ref:`System.Mem`.
 
     For an interactive application, it is probably a good idea to use the idle
     GC, because it will allow GCs to run in the idle time when no Haskell
@@ -751,12 +750,17 @@ performance.
     frequent GCs, the program will also be prompter to run finalizers and detect
     deadlocked threads.
 
-    Idle GCs are not a free lunch, however. They may trigger at precisely the
-    wrong time and interrupt new work unnecessarily. Setting ``-I`` to a low
-    value makes this more likely. Plus, setting it to a low value means the idle
-    GC could fire *too* often, resulting in GCs that don't even free much
-    memory. Thus you may need to find the sweet spot for your application to
-    maximize the value the idle GC can bring.
+    With the advent of the non-moving collector (see
+    :rts-flag:`--nonmoving-gc`), the responsiveness gains of the idle GC became
+    less important. But prompter finalization and deadlock detection are still
+    valuable.
+
+    Idle GCs are not a free lunch. They may trigger at precisely the wrong time
+    and interrupt new work unnecessarily. Setting ``-I`` to a low value makes
+    this more likely. Plus, setting it to a low value means the idle GC could
+    fire *too* often, resulting in GCs that don't even free much memory. Thus
+    you may need to find the sweet spot for your application to maximize the
+    value the idle GC can bring.
 
     The idle period timer only resets after some activity by a Haskell thread.
     Therefore, once an idle GC is triggered, another one won't be scheduled
