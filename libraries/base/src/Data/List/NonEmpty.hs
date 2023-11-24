@@ -401,8 +401,7 @@ partition p = List.partition p . toList
 -- contains only equal elements.  For example, in list notation:
 --
 -- >>> group "Mississippi"
--- "M" : "i" : "ss" : "i" : "ss" : "i" : "pp" : "i" : []
->>>>>>> 5864ddbab5 (docs(NonEmpty/group): Use repl haddock syntax in group docs)
+-- ["M", "i", "ss", "i", "ss", "i", "pp", "i"]
 group :: (Foldable f, Eq a) => f a -> [NonEmpty a]
 group = groupBy (==)
 
