@@ -398,7 +398,9 @@ partition p = List.partition p . toList
 -- | The 'group' function takes a stream and returns a list of
 -- streams such that flattening the resulting list is equal to the
 -- argument.  Moreover, each stream in the resulting list
--- contains only equal elements.  For example, in list notation:
+-- contains only equal elements, and consecutive equal elements
+-- of the input end up in the same stream of the output list.
+-- For example, in list notation:
 --
 -- >>> group "Mississippi"
 -- ["M", "i", "ss", "i", "ss", "i", "pp", "i"]
