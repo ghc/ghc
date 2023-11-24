@@ -400,8 +400,8 @@ partition p = List.partition p . toList
 -- argument.  Moreover, each stream in the resulting list
 -- contains only equal elements.  For example, in list notation:
 --
--- > group $ cycle "Mississippi"
--- >   = "M" : "i" : "ss" : "i" : "ss" : "i" : "pp" : "i" : "M" : "i" : ...
+-- > group "Mississippi"
+-- >   = "M" : "i" : "ss" : "i" : "ss" : "i" : "pp" : "i" : []
 group :: (Foldable f, Eq a) => f a -> [NonEmpty a]
 group = groupBy (==)
 
