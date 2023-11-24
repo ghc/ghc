@@ -1358,7 +1358,7 @@ internal names. <type> is one of the following:
          con_entry              Dynamic Constructor entry code
          con_info               Dynamic Constructor info table
          static_entry           Static Constructor entry code
-         static_info            Static Constructor info table
+         static_info            Static Constructor info table (unused?)
          sel_info               Selector info table
          sel_entry              Selector entry code
          cc                     Cost centre
@@ -1371,15 +1371,17 @@ entry.
 
 Note [Closure and info labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a function 'foo, we have:
+For a function 'foo', we have:
    foo_info    : Points to the info table describing foo's closure
                  (and entry code for foo with tables next to code)
    foo_closure : Static (no-free-var) closure only:
                  points to the statically-allocated closure
 
-For a data constructor (such as Just or Nothing), we have:
-    Just_con_info: Info table for the data constructor itself
-                   the first word of a heap-allocated Just
+For a data constructor (such as Just or Nothing), we also have:
+    Just_con_info: Info table for objects built with the data constructor;
+                   the first word of such a heap-allocated Just object
+
+  The *worker function* for a data constructor also gets code:
     Just_info:     Info table for the *worker function*, an
                    ordinary Haskell function of arity 1 that
                    allocates a (Just x) box:
@@ -1387,15 +1389,22 @@ For a data constructor (such as Just or Nothing), we have:
     Just_entry:    The entry code for the worker function
     Just_closure:  The closure for this worker
 
-    Nothing_closure: a statically allocated closure for Nothing
-    Nothing_static_info: info table for Nothing_closure
+  But since the worker for Nothing has arity zero, it is a static
+  data object rather than a proper function, and its info table is
+  Nothing_con_info instead of Nothng_info.
 
-All these must be exported symbol, EXCEPT Just_info.  We don't need to
+All of the above must be exported symbols, EXCEPT Just_info.  We don't need to
 export this because in other modules we either have
        * A reference to 'Just'; use Just_closure
        * A saturated call 'Just x'; allocate using Just_con_info
 Not exporting these Just_info labels reduces the number of symbols
-somewhat.
+somewhat. (TODO: Point to the code for exporting/not-exporting these.)
+
+What about a data constructor wrapper like $WCon?  They are ordinary
+functions as far as code generation is concerned.  In particular,
+$WCon_info should be an exported symbol (if it exists).
+
+
 
 Note [Bytes label]
 ~~~~~~~~~~~~~~~~~~

@@ -234,7 +234,9 @@ cgEnumerationTyCon tycon
 
 
 -- | Generate the entry code and associated info table for a constructor.
--- Where are generating the static closure at all?
+-- More specifically, this generates the "..._con_info" and corresponding
+-- "..._con_entry" for a DataCon as described in GHC.Cmm.CLabel's
+-- Note [Closure and info labels].
 cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
 cgDataCon mn data_con
   = do  { massert (not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con))

@@ -321,69 +321,65 @@ because they don't support cross package data references well.
 
 Note [Precomputed static closures of nullary constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We can easily create a precomputed static closure for all data constructors
-that don't take runtime-relevant arguments since their closure is always just
-the constructor info.
-
-Instead of allocating a closure with just the constructor info every time it is
-used, we can instead use the precomputed static closure!
+If a data constructor worker takes only zero-width arguments, then
+every object created with that constructor is effectively identical at
+run-time.  So, if possible we would like to create just one such
+object at compile-time, and re-use that object whenever we would
+ordinarily allocate a new object with that constructor at run-time.
 
 For example, to return from a function the constructor `Nothing`, instead of
 allocating on the heap a word for `Nothing_con_info` and returning the pointer
-to it tagged `+1`, we can simply return `Nothing_closure+1`
+to it tagged `+1`, we can simply return `Nothing_closure+1`.
 
 We must consider three distinct situations of saturated applications of
 constructors that take no runtime-relevant arguments in which we can use a
 precomputed static closure:
 
-(1) For a data con /worker/ `TCon1` application to no arguments whatsoever we
-can trivially use the static closure of the worker, `TCon1_closure`.
-  Recall that for a worker such as `TCon1`, `TCon1_closure` is just the
-  `TCon1_con_info`:
-        section ""data" . M.TCon1_closure" {
-            M.TCon1_closure:
-                const M.TCon1_con_info;
-        }
-  Invariant: These workers don't have wrappers.
+Conveniently, if either the worker or the wrapper for a given data
+constructor takes no arguments whatsoever, it will become piece of
+static data that we can use for this purpose.
 
-(2) For a data con /wrapper/ `$WTCon2` that takes no arguments whatsoever, we
-can also trivially return the static closure of the wrapper, `$WTCon2_closure`.
-It might be surprising to see a nullary data con /wrapper/ -- they come into
-existence when the worker only takes zero-width arguments. See the example below.
-  As in (1), `$WTCon2_closure` simply points to a `TCon2_con_info`.
-      section ""data" . M.$WTCon2_closure" {
-        M.$WTCon2_closure:
-            const M.TCon2_con_info;
-      }
+Examples:
 
-(3) For a data con /worker/ `TCon2` that takes zero-width arguments only (and
-whose wrapper is `$WTCon2`): because the arguments aren't relevant at runtime,
-closures for it still only have the constructor info -- we can use a
-precomputed static closure instead of allocating them on the heap, nonetheless.
-  However, unlike the worker in (1), `TCon2`, in taking arguments (regardless
-of runtime representation), is unambiguously a function! Therefore, its
-`TCon2_closure` actually contains the info of the function (`TCon2_info`) that returns the
-constructor when called -- and as so it must remain -- if `TCon2` is ever used as
-a function instead of in a saturated data con application, it better be one.
-  To generate in place of a saturated data con application of `TCon2`, we would
-  need something close to:
-      section ""data" . M.TCon2_some_sort_of_closure" {
-        M.TCon2_some_sort_of_closure:
-            const M.TCon2_con_info; -- Must be TCon2_con_info rather than TCon2_info which we have in TCon2_closure
-      }
-  But this turns out to be exactly the definition of this worker's wrapper's
-  static closure (see `$WTCon2_closure`). So, for the kind of worker in (3),
-  the precomputed static closure is the same as the one for the wrapper.
-  Invariant: These workers always have a wrapper of type (2)
+  > data  Maybe a  =  Nothing | Just a
 
-The solution that handles all of these cases turns out to be surprisingly
-simple: A data con applied to an empty list of non-void arguments has a
-precomputed static closure which is the tagged closure label of the var name of
-the `dataConWrapId`, both for workers and wrappers.
-  For (1), `dataConWrapId` will return the Id of the worker because the wrapper
-  doesn't exist (i.e. `Wrk_closure+tag`).
-  For (2), `dataConWrapId` will return the Id of the wrapper for the wrapper (i.e. `$Wrp_closure+tag`).
-  For (3), `dataConWrapId` will return the Id of the wrapper, which must exist (i.e. `$Wrp_closure+tag`).
+  Here the Nothing constructor takes no arguments whatsoever.  Thus,
+  we can use the worker Nothing itself as a precomputed static
+  closure.
+
+
+  > data a :~: b where
+  >   Refl :: a :~: a
+
+  This will produce a worker `Refl` with type `forall a b. a ~# b => a :~: b`,
+  which is thus a /function/ taking a single (zero-width) coercion
+  argument.  But the wrapper `$WRefl` has type `forall a. a :~: a` and
+  is thus (unlike the worker) an arity-zero data object that we can
+  safely substitute for allocated Refl-constructed objects.
+
+
+  > data Example3 = Example3Con {-# UNPACK #-} !()
+
+  When optimisations are on, after unpacking, the worker `Example3Con`
+  will take no arguments whatsoever but the wrapper `$WExample3Con`
+  will be a function taking a boxed unit as its argument.  So we
+  should use the worker for the precomputed static closure even though
+  a separate wrapper exists.
+
+
+  > data Example4 = NoWrapper (# #)
+
+  The worker function `NoWrapper` takes one zero-width arg, an empty
+  unboxed tuple.  Since all of its args are zero-width, we could in
+  principle apply the precomputed-static-closure optimization to it,
+  but we would have to create a dedicated closure specifically for this
+  purpose: We cannot use the worker (it is a function with arity one)
+  and no separate wrapper even exists.
+
+  Creating such a dedicated closure is left as future work.
+
+
+TODO: decide how much of the below examples to retain
 
 As an example, since (2) and (3) might be hard to visualise, consider the datatype:
 
@@ -424,11 +420,16 @@ tagging of its pointer.
 -- See Note [Precomputed static closures]
 precomputedStaticConInfo_maybe :: StgToCmmConfig -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
 precomputedStaticConInfo_maybe cfg binder con []
-  -- Nullary constructors (list of nonvoid args is null)
   -- See Note [Precomputed static closures of nullary constructors]
-  = assert (hasNoNonZeroWidthArgs con) $
-      Just $ litIdInfo (stgToCmmPlatform cfg) binder (mkConLFInfo con)
-                (CmmLabel (mkClosureLabel (varName $ dataConWrapId con) NoCafRefs))
+  | isNullaryRepDataCon con
+  = use_name (dataConName con)
+  | Just wrapper <- dataConWrapId_maybe con
+  , idArity wrapper == 0 -- This might be pre-unarise arity, but that's OK
+  = use_name (varName wrapper)
+  where
+    use_name name
+      = Just $ litIdInfo (stgToCmmPlatform cfg) binder (mkConLFInfo con)
+          (CmmLabel (mkClosureLabel name NoCafRefs))
 precomputedStaticConInfo_maybe cfg binder con [arg]
   -- Int/Char values with existing closures in the RTS
   | intClosure || charClosure
