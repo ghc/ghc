@@ -1360,8 +1360,9 @@ deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
--- each sublist in the result is non-empty and all elements are equal
--- to the first one.
+-- each sublist in the result is non-empty, all elements are equal to the
+-- first one, and consecutive equal elements of the input end up in the
+-- same element of the output list.
 --
 -- 'group' is a special case of 'groupBy', which allows the programmer to supply
 -- their own equality test.
