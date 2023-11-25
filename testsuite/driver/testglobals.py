@@ -436,8 +436,10 @@ class TestOptions:
        # Keep profiling callstacks.
        self.keep_prof_callstacks = False
 
-       # The directory the test is in
-       self.testdir = Path('.')
+       # The directory the test is run.
+       # Usually you should check the self.testdir property instead,
+       # which crashes when this is not initialised.
+       self.testdir_raw = None # type: Optional[Path]
 
        # Should we redirect stdout and stderr to a single file?
        self.combined_output = False
@@ -461,6 +463,12 @@ class TestOptions:
 
        # The extra hadrian dependencies we need for this particular test
        self.hadrian_deps = set(["test:ghc"]) # type: Set[str]
+
+   @property
+   def testdir(self) -> Path:
+       if self.testdir_raw is None:
+           raise Exception('testdir not initialized')
+       return self.testdir_raw
 
 # The default set of options
 global default_testopts

@@ -1175,7 +1175,7 @@ testdir_suffix = '.run'
 def _newTestDir(name: TestName, opts: TestOptions, tempdir, dir):
     testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
     opts.srcdir = Path.cwd() / dir
-    opts.testdir = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
+    opts.testdir_raw = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
@@ -2952,7 +2952,9 @@ def find_expected_file(name: TestName, suff: str) -> Path:
 if config.msys:
     import stat
     def cleanup() -> None:
-        testdir = getTestOpts().testdir # type: Path
+        testdir = getTestOpts().testdir_raw # type: Optional[Path]
+        if testdir is None:
+            return
         max_attempts = 5
         retries = max_attempts
         def on_error(function, path: str, excinfo):
@@ -2992,8 +2994,8 @@ if config.msys:
                             % (testdir, exception))
 else:
     def cleanup() -> None:
-        testdir = getTestOpts().testdir
-        if testdir.exists():
+        testdir = getTestOpts().testdir_raw
+        if testdir is not None and testdir.exists():
             shutil.rmtree(str(testdir), ignore_errors=False)
 
 
