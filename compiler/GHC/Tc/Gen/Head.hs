@@ -83,6 +83,7 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic.Plain
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import Control.Monad
@@ -1161,13 +1162,15 @@ tc_infer_id id_name
           pprov = case lookupGRE_Name gre nm of
                       Just gre -> nest 2 (pprNameProvenance gre)
                       Nothing  -> empty
-      fail_with_msg dataName nm pprov
+          err | isClassTyCon tc = ClassTE
+              | otherwise       = TyConTE
+      fail_with_msg dataName nm pprov err
 
     fail_tyvar nm =
       let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
-      in fail_with_msg varName nm pprov
+      in fail_with_msg varName nm pprov TyVarTE
 
-    fail_with_msg whatName nm pprov = do
+    fail_with_msg whatName nm pprov err = do
       (import_errs, hints) <- get_suggestions whatName
       unit_state <- hsc_units <$> getTopEnv
       let
@@ -1177,14 +1180,63 @@ tc_infer_id id_name
         import_err_msg = vcat $ map ppr import_errs
         info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
       failWithTc $ TcRnMessageWithInfo unit_state (
-              mkDetailedMessage info (TcRnIncorrectNameSpace nm False))
+              mkDetailedMessage info (TcRnIllegalTermLevelUse nm err))
 
     get_suggestions ns = do
-       let occ = mkOccNameFS ns (occNameFS (occName id_name))
-       lcl_env <- getLocalRdrEnv
-       unknownNameSuggestions lcl_env WL_Anything (mkRdrUnqual occ)
+      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+      if required_type_arguments && isVarNameSpace ns
+      then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
+      else do
+        let occ = mkOccNameFS ns (occNameFS (occName id_name))
+        lcl_env <- getLocalRdrEnv
+        unknownNameSuggestions lcl_env WL_Anything (mkRdrUnqual occ)
 
     return_id id = return (HsVar noExtField (noLocA id), idType id)
+
+{- Note [Suppress hints with RequiredTypeArguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a type variable is used at the term level, GHC assumes the user might
+have made a typo and suggests a term variable with a similar name.
+
+For example, if the user writes
+  f (Proxy :: Proxy nap) (Proxy :: Proxy gap) = nap (+1) [1,2,3]
+then GHC will helpfully suggest `map` instead of `nap`
+  • Illegal term-level use of the type variable ‘nap’
+  • Perhaps use ‘map’ (imported from Prelude)
+
+Importantly, GHC does /not/ suggest `gap`, which is in scope.
+Question: How does GHC know not to suggest `gap`?  After all, the edit distance
+          between `map`, `nap`, and `gap` is equally short.
+Answer: GHC takes the namespace into consideration. `gap` is a `tvName`, and GHC
+        would only suggest a `varName` at the term level.
+
+In other words, the current hint infrastructure assumes that the namespace of an
+entity is a reliable indicator of its level
+   term-level name <=> term-level entity
+   type-level name <=> type-level entity
+
+With RequiredTypeArguments, this assumption does not hold. Consider
+  bad :: forall a b -> ...
+  bad nap gap = nap
+
+This use of `nap` on the RHS is illegal because `nap` stands for a type
+variable. It cannot be returned as the result of a function. At the same time,
+it is bound as a `varName`, i.e. in the term-level namespace.
+
+Unless we suppress hints, GHC gets awfully confused
+    • Illegal term-level use of the variable ‘nap’
+    • Perhaps use one of these:
+        ‘nap’ (line 2), ‘gap’ (line 2), ‘map’ (imported from Prelude)
+
+GHC shouldn't suggest `gap`, which is also a type variable; using it would
+result in the same error. And it especially shouldn't suggest using `nap`
+instead of `nap`, which is absurd.
+
+The proper solution is to overhaul the hint system to consider what a name
+stands for instead of looking at its namespace alone. This is tracked in #24231.
+As a temporary measure, we avoid those potentially misleading hints by
+suppressing them entirely if RequiredTypeArguments is in effect.
+-}
 
 check_local_id :: Id -> TcM ()
 check_local_id id

@@ -1386,15 +1386,17 @@ repTy (HsTyVar _ _ (L _ n))
   | n `hasKey` constraintKindTyConKey  = repTConstraint
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
   | n `hasKey` fUNTyConKey             = repMulArrowTyCon
-  | isTvOcc occ   = do tv1 <- lookupOcc n
-                       repTvar tv1
-  | isDataOcc occ = do tc1 <- lookupOcc n
-                       repPromotedDataCon tc1
-  | n == eqTyConName = repTequality
-  | otherwise     = do tc1 <- lookupOcc n
-                       repNamedTyCon tc1
+  | n `hasKey` eqTyConKey              = repTequality
+  | isVarNameSpace     ns = do tv1 <- lookupOcc n
+                               repTvar tv1
+  | isDataConNameSpace ns = do dc1 <- lookupOcc n
+                               repPromotedDataCon dc1
+  | isTcClsNameSpace   ns = do tc1 <- lookupOcc n
+                               repNamedTyCon tc1
+  | otherwise = panic "repTy: HsTyVar: unknown namespace"
   where
     occ = nameOccName n
+    ns  = occNameSpace occ
 
 repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f

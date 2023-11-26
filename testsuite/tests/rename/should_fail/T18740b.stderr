@@ -1,5 +1,5 @@
 
-T18740b.hs:6:24: error: [GHC-31891]
+T18740b.hs:6:24: error: [GHC-01928]
     • Illegal term-level use of the type variable ‘a’
     • bound at T18740b.hs:6:4
     • In the expression: a

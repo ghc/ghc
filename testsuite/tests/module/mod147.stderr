@@ -1,6 +1,6 @@
 
-mod147.hs:6:5: error: [GHC-31891]
-    • Illegal term-level use of the type constructor or class ‘D’
+mod147.hs:6:5: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘D’
     • imported from ‘Mod147_A’ at mod147.hs:4:1-15
       (and originally defined at Mod147_A.hs:3:1-14)
     • In the expression: D 4
