@@ -992,13 +992,13 @@ setInGeneratedCode :: TcRn a -> TcRn a
 setInGeneratedCode thing_inside =
   updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
 
-setSrcSpanA :: SrcSpanAnn' ann -> TcRn a -> TcRn a
+setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
-addLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcM b
+addLocMA :: (a -> TcM b) -> GenLocated (EpAnn ann) a -> TcM b
 addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
@@ -1008,7 +1008,7 @@ wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
 wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
 wrapLocAM fn a = wrapLocM fn (reLoc a)
 
-wrapLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcRn (GenLocated (SrcSpanAnn' ann) b)
+wrapLocMA :: (a -> TcM b) -> GenLocated (EpAnn ann) a -> TcRn (GenLocated (EpAnn ann) b)
 wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
                                               ; return (L loc b) }
 
@@ -1023,7 +1023,7 @@ wrapLocFstM fn (L loc a) =
 --    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedN    a -> TcM (LocatedN    b, c)
 --    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAn t a -> TcM (LocatedAn t b, c)
 -- and so on.
-wrapLocFstMA :: (a -> TcM (b,c)) -> GenLocated (SrcSpanAnn' ann) a -> TcM (GenLocated (SrcSpanAnn' ann) b, c)
+wrapLocFstMA :: (a -> TcM (b,c)) -> GenLocated (EpAnn ann) a -> TcM (GenLocated (EpAnn ann) b, c)
 wrapLocFstMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a
@@ -1040,7 +1040,7 @@ wrapLocSndM fn (L loc a) =
 --    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedN    a -> TcM (b, LocatedN    c)
 --    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedAn t a -> TcM (b, LocatedAn t c)
 -- and so on.
-wrapLocSndMA :: (a -> TcM (b, c)) -> GenLocated (SrcSpanAnn' ann) a -> TcM (b, GenLocated (SrcSpanAnn' ann) c)
+wrapLocSndMA :: (a -> TcM (b, c)) -> GenLocated (EpAnn ann) a -> TcM (b, GenLocated (EpAnn ann) c)
 wrapLocSndMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a

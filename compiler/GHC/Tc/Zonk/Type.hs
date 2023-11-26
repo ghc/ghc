@@ -329,15 +329,15 @@ type ZonkTcM = ZonkT TcM
 -- See Note [Zonking to Type].
 type ZonkBndrTcM = ZonkBndrT TcM
 
-wrapLocZonkMA :: (a -> ZonkTcM b) -> GenLocated (SrcSpanAnn' ann) a
-              -> ZonkTcM (GenLocated (SrcSpanAnn' ann) b)
+wrapLocZonkMA :: (a -> ZonkTcM b) -> GenLocated (EpAnn ann) a
+              -> ZonkTcM (GenLocated (EpAnn ann) b)
 wrapLocZonkMA fn (L loc a) = ZonkT $ \ ze ->
   setSrcSpanA loc $
   do { b <- runZonkT (fn a) ze
      ; return (L loc b) }
 
-wrapLocZonkBndrMA :: (a -> ZonkBndrTcM b) -> GenLocated (SrcSpanAnn' ann) a
-                  -> ZonkBndrTcM (GenLocated (SrcSpanAnn' ann) b)
+wrapLocZonkBndrMA :: (a -> ZonkBndrTcM b) -> GenLocated (EpAnn ann) a
+                  -> ZonkBndrTcM (GenLocated (EpAnn ann) b)
 wrapLocZonkBndrMA fn (L loc a) = ZonkBndrT $ \ k -> ZonkT $ \ ze ->
   setSrcSpanA loc $
   runZonkT ( runZonkBndrT (fn a) $ \ b -> k (L loc b) ) ze
@@ -850,7 +850,7 @@ zonkLTcSpecPrags ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
                => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
                -> MatchGroup GhcTc (LocatedA (body GhcTc))
                -> ZonkTcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -864,7 +864,7 @@ zonkMatchGroup zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty' origin
                      }) }
 
-zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (LMatch GhcTc (LocatedA (body GhcTc)))
@@ -875,7 +875,7 @@ zonkMatch zBody (L loc match@(Match { m_pats = pats
       ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (GRHSs GhcTc (LocatedA (body GhcTc)))

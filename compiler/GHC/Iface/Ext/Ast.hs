@@ -399,14 +399,14 @@ processGrp grp = concatM
       , toHie $ hs_docs grp
       ]
 
-getRealSpanA :: SrcSpanAnn' ann -> Maybe Span
+getRealSpanA :: EpAnn ann -> Maybe Span
 getRealSpanA la = getRealSpan (locA la)
 
 getRealSpan :: SrcSpan -> Maybe Span
 getRealSpan (RealSrcSpan sp _) = Just sp
 getRealSpan _ = Nothing
 
-grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcAnn NoEpAnns)
+grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
            => GRHSs (GhcPass p) (LocatedA (body (GhcPass p))) -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (spanHsLocaLBinds bs) (map getLocA xs)
 
@@ -594,7 +594,7 @@ instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
 instance ToHie (IEContext (LocatedA ModuleName)) where
-  toHie (IEC c (L (SrcSpanAnn _ (RealSrcSpan span _)) mname)) = do
+  toHie (IEC c (L (EpAnn (EpaSpan (RealSrcSpan span _)) _ _) mname)) = do
       org <- ask
       pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
@@ -823,7 +823,7 @@ type AnnoBody p body
     , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                    ~ SrcSpanAnnL
     , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                   ~ SrcAnn NoEpAnns
+                   ~ EpAnn NoEpAnns
     , Anno (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
 
     , Data (body (GhcPass p))

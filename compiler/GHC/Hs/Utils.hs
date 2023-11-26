@@ -184,7 +184,7 @@ mkHsPar e = L (getLoc e) (gHsPar e)
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                        ~ SrcAnn NoEpAnns)
+                        ~ EpAnn NoEpAnns)
               => HsMatchContext (GhcPass p)
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
@@ -198,14 +198,14 @@ mkSimpleMatch ctxt pats rhs
                 (pat:_) -> combineSrcSpansA (getLoc pat) (getLoc rhs)
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns
+                     ~ EpAnn NoEpAnns
                => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
   = GRHSs emptyComments (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns
+                     ~ EpAnn NoEpAnns
              => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
 unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
@@ -233,7 +233,7 @@ mkLamCaseMatchGroup origin lam_variant (L l matches)
   where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
 
 mkLocatedList :: (Semigroup a, NoAnn an)
-  => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
+  => [GenLocated (EpAnn a) e2] -> LocatedAn an [GenLocated (EpAnn a) e2]
 mkLocatedList ms = case nonEmpty ms of
     Nothing -> noLocA []
     Just ms1 -> L (noAnnSrcSpan $ locA $ combineLocsA (NE.head ms1) (NE.last ms1)) ms
@@ -296,7 +296,7 @@ mkHsSyntaxApps _ NoSyntaxExprTc args = pprPanic "mkHsSyntaxApps" (ppr args)
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
 mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns,
+                     ~ EpAnn NoEpAnns,
                  Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA)
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
