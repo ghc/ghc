@@ -405,15 +405,15 @@ mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
 mkSpliceDecl lexpr@(L loc expr)
   | HsUntypedSplice _ splice@(HsUntypedSpliceExpr {}) <- expr = do
     cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToSrcAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
 
   | HsUntypedSplice _ splice@(HsQuasiQuote {}) <- expr = do
     cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToSrcAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
 
   | otherwise = do
     cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToSrcAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField
+    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField
                                  (L loc (HsUntypedSpliceExpr noAnn lexpr))
                                        BareSplice)
 
@@ -815,16 +815,16 @@ mkGadtDecl loc names dcol ty = do
 
   (args, res_ty, annsa, csa) <-
     case body_ty of
-     L ll (HsFunTy af hsArr (L loc' (HsRecTy an rf)) res_ty) -> do
-       let an' = addCommentsToEpAnn (locA loc') an (comments af)
+     L ll (HsFunTy af hsArr (L _loc' (HsRecTy an rf)) res_ty) -> do
+       let an' = addCommentsToEpAnn an (comments af)
        arr <- case hsArr of
          HsUnrestrictedArrow arr -> return arr
          _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
                                  (PsErrIllegalGadtRecordMultiplicity hsArr)
                  return noHsUniTok
 
-       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf) arr, res_ty
-              , [], epAnnComments (ann ll))
+       return ( RecConGADT (L an' rf) arr, res_ty
+              , [], epAnnComments ll)
      _ -> do
        let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
        return (PrefixConGADT arg_types, res_type, anns, cs)
@@ -833,7 +833,7 @@ mkGadtDecl loc names dcol ty = do
 
   let bndrs_loc = case outer_bndrs of
         HsOuterImplicit{} -> getLoc ty
-        HsOuterExplicit an' _ -> SrcSpanAnn (EpAnn (entry an') noAnn emptyComments) (spanFromAnchor (entry an'))
+        HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = an
@@ -1103,11 +1103,11 @@ checkTyClHdr is_cls ty
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
     newAnns :: SrcSpanAnnA -> EpAnn AnnParen -> SrcSpanAnnN
-    newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
+    newAnns (EpAnn ap (AnnListItem ta) csp) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = RealSrcSpan (combineRealSrcSpans (anchor ap) (anchor as)) Strict.Nothing
-        an = EpAnn (EpaSpan lr) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs)
-      in SrcSpanAnn an lr
+      in
+        EpAnn (EpaSpan lr) (NameAnn NameParens o ap c ta) (csp Semi.<> cs)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1150,7 +1150,7 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 --     (((Eq a)))           -->  [Eq a]
 -- @
 checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
-checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
+checkContext orig_t@(L (EpAnn l _ _) _orig_t) =
   check ([],[],emptyComments) orig_t
  where
   check :: ([EpaLocation],[EpaLocation],EpAnnComments)
@@ -1162,9 +1162,9 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
     = do
         let (op,cp,cs') = case ann' of
               EpAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
-        return (L (SrcSpanAnn (EpAnn (spanAsAnchor l)
-                              -- Append parens so that the original order in the source is maintained
-                               (AnnContext Nothing (oparens ++ op) (cp ++ cparens)) (cs Semi.<> cs')) l) ts)
+        return (L (EpAnn l
+                          -- Append parens so that the original order in the source is maintained
+                           (AnnContext Nothing (oparens ++ op) (cp ++ cparens)) (cs Semi.<> cs')) ts)
 
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1175,7 +1175,7 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
 
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t =
-                 return (L (SrcSpanAnn (EpAnn (spanAsAnchor l) (AnnContext Nothing [] []) emptyComments) l) [orig_t])
+                 return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
 
 checkImportDecl :: Maybe EpaLocation
                 -> Maybe EpaLocation
@@ -1262,7 +1262,7 @@ checkAPat loc e0 = do
            (EpAnn anc _ cs)
                      | nPlusKPatterns && (plus == plus_RDR)
                      -> return (mkNPlusKPat (L nloc n) (L (l2l lloc) lit)
-                                (EpAnn anc (epaLocationFromSrcAnn l) cs))
+                                (EpAnn anc (entry l) cs))
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
    PatBuilderOpApp _ op _ _ | opIsAt (unLoc op) -> do
@@ -1533,7 +1533,7 @@ instance DisambInfixOp RdrName where
   mkHsInfixHolePV l _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrInvalidInfixHole
 
 type AnnoBody b
-  = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcAnn NoEpAnns
+  = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ EpAnn NoEpAnns
     , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
@@ -2037,8 +2037,8 @@ dataConBuilderDetails :: DataConBuilder -> HsConDeclH98Details GhcPs
 -- Detect when the record syntax is used:
 --   data T = MkT { ... }
 dataConBuilderDetails (PrefixDataConBuilder flds _)
-  | [L l_t (HsRecTy an fields)] <- toList flds
-  = RecCon (L (SrcSpanAnn an (locA l_t)) fields)
+  | [L _ (HsRecTy an fields)] <- toList flds
+  = RecCon (L an fields)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (PrefixDataConBuilder flds _)
@@ -2922,7 +2922,7 @@ checkImportSpec ie@(L _ specs) =
 mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ([AddEpAnn], ImpExpSubSpec)
 mkImpExpSubSpec [] = return ([], ImpExpList [])
 mkImpExpSubSpec [L la ImpExpQcWildcard] =
-  return ([AddEpAnn AnnDotdot (la2e la)], ImpExpAll)
+  return ([AddEpAnn AnnDotdot (entry la)], ImpExpAll)
 mkImpExpSubSpec xs =
   if (any (isImpExpQcWildcard . unLoc) xs)
     then return $ ([], ImpExpAllWith xs)

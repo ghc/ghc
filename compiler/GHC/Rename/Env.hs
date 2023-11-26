@@ -987,20 +987,20 @@ we'll miss the fact that the qualified import is redundant.
 -}
 
 
-lookupLocatedOccRn :: GenLocated (SrcSpanAnn' ann) RdrName
-                   -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRn :: GenLocated (EpAnn ann) RdrName
+                   -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRn = wrapLocMA lookupOccRn
 
-lookupLocatedOccRnConstr :: GenLocated (SrcSpanAnn' ann) RdrName
-                         -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnConstr :: GenLocated (EpAnn ann) RdrName
+                         -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
 
-lookupLocatedOccRnRecField :: GenLocated (SrcSpanAnn' ann) RdrName
-                           -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnRecField :: GenLocated (EpAnn ann) RdrName
+                           -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
 
-lookupLocatedOccRnNone :: GenLocated (SrcSpanAnn' ann) RdrName
-                       -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnNone :: GenLocated (EpAnn ann) RdrName
+                       -> TcRn (GenLocated (EpAnn ann) Name)
 lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
@@ -1990,8 +1990,8 @@ lookupSigOccRnN ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 lookupSigCtxtOccRn :: HsSigCtxt
                    -> SDoc         -- ^ description of thing we're looking up,
                                    -- like "type family"
-                   -> GenLocated (SrcSpanAnn' ann) RdrName
-                   -> RnM (GenLocated (SrcSpanAnn' ann) Name)
+                   -> GenLocated (EpAnn ann) RdrName
+                   -> RnM (GenLocated (EpAnn ann) Name)
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { let also_try_tycons = False

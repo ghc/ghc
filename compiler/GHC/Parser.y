@@ -4382,8 +4382,7 @@ amsrp a@(L l _) bs = do
 amsrn :: MonadP m => Located a -> NameAnn -> m (LocatedN a)
 amsrn (L l a) an = do
   cs <- getCommentsFor l
-  let ann = (EpAnn (spanAsAnchor l) an cs)
-  return (L (SrcSpanAnn ann l) a)
+  return (L (EpAnn (spanAsAnchor l) an cs) a)
 
 -- |Synonyms for AddEpAnn versions of AnnOpen and AnnClose
 mo,mc :: Located Token -> AddEpAnn
@@ -4441,8 +4440,8 @@ parseModule = parseModuleNoHaddock >>= addHaddockToModule
 parseSignature :: P (Located (HsModule GhcPs))
 parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
-commentsA :: (NoAnn ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
-commentsA loc cs = SrcSpanAnn (EpAnn (EpaSpan loc) noAnn cs) loc
+commentsA :: (NoAnn ann) => SrcSpan -> EpAnnComments -> EpAnn ann
+commentsA loc cs = EpAnn (EpaSpan loc) noAnn cs
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
@@ -4450,7 +4449,7 @@ commentsA loc cs = SrcSpanAnn (EpAnn (EpaSpan loc) noAnn cs) loc
 commentsPA :: (NoAnn ann) => LocatedAn ann a -> P (LocatedAn ann a)
 commentsPA la@(L l a) = do
   cs <- getPriorCommentsFor (getLocA la)
-  return (L (addCommentsToSrcAnn l cs) a)
+  return (L (addCommentsToEpAnn l cs) a)
 
 rs :: SrcSpan -> RealSrcSpan
 rs (RealSrcSpan l _) = l
@@ -4501,15 +4500,14 @@ addTrailingCommaA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
 addTrailingCommaA  la span = addTrailingAnnA la span AddCommaAnn
 
 addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (EpaLocation -> TrailingAnn) -> m (LocatedA a)
-addTrailingAnnA (L (SrcSpanAnn anns l) a) ss ta = do
-  -- cs <- getCommentsFor l
+addTrailingAnnA (L anns a) ss ta = do
   let cs = emptyComments
   -- AZ:TODO: generalise updating comments into an annotation
   let
     anns' = if isZeroWidthSpan ss
               then anns
-              else addTrailingAnnToA l (ta (srcSpan2e ss)) cs anns
-  return (L (SrcSpanAnn anns' l) a)
+              else addTrailingAnnToA (ta (srcSpan2e ss)) cs anns
+  return (L anns' a)
 
 -- -------------------------------------
 
@@ -4520,22 +4518,22 @@ addTrailingCommaL :: MonadP m => LocatedL a -> SrcSpan -> m (LocatedL a)
 addTrailingCommaL  la span = addTrailingAnnL la (AddCommaAnn (srcSpan2e span))
 
 addTrailingAnnL :: MonadP m => LocatedL a -> TrailingAnn -> m (LocatedL a)
-addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
-  cs <- getCommentsFor l
-  let anns' = addTrailingAnnToL l ta cs anns
-  return (L (SrcSpanAnn anns' l) a)
+addTrailingAnnL (L anns a) ta = do
+  cs <- getCommentsFor (locA anns)
+  let anns' = addTrailingAnnToL ta cs anns
+  return (L anns' a)
 
 -- -------------------------------------
 
 -- Mostly use to add AnnComma, special case it to NOP if adding a zero-width annotation
 addTrailingCommaN :: MonadP m => LocatedN a -> SrcSpan -> m (LocatedN a)
-addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
+addTrailingCommaN (L anns a) span = do
   let cs = emptyComments
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
                 then anns
-                else addTrailingCommaToN l anns (srcSpan2e span)
-  return (L (SrcSpanAnn anns' l) a)
+                else addTrailingCommaToN anns (srcSpan2e span)
+  return (L anns' a)
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
 addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaLocationRealSrcSpan span) })
@@ -4543,10 +4541,10 @@ addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaLocationRealSrcSpan
 -- -------------------------------------
 
 addTrailingDarrowC :: LocatedC a -> Located Token -> EpAnnComments -> LocatedC a
-addTrailingDarrowC (L (SrcSpanAnn (EpAnn lr (AnnContext _ o c) csc) l) a) lt cs =
+addTrailingDarrowC (L (EpAnn lr (AnnContext _ o c) csc) a) lt cs =
   let
     u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
-  in L (SrcSpanAnn (EpAnn lr (AnnContext (Just (u,glAA lt)) o c) (cs Semi.<> csc)) l) a
+  in L (EpAnn lr (AnnContext (Just (u,glAA lt)) o c) (cs Semi.<> csc)) a
 
 -- -------------------------------------
 
@@ -4562,6 +4560,6 @@ combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
 
 fromTrailingN :: SrcSpanAnnN -> SrcSpanAnnA
-fromTrailingN (SrcSpanAnn (EpAnn anc ann cs) l)
-    = SrcSpanAnn (EpAnn anc (AnnListItem (nann_trailing ann)) cs) l
+fromTrailingN (EpAnn anc ann cs)
+    = EpAnn anc (AnnListItem (nann_trailing ann)) cs
 }

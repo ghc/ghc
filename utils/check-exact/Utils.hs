@@ -381,14 +381,7 @@ name2String = showPprUnsafe
 -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
-
--- ---------------------------------------------------------------------
-
--- |Version of l2l that preserves the anchor, immportant if it has an
--- updated AnchorOperation
-moveAnchor :: NoAnn b => SrcAnn a -> SrcAnn b
-moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc noAnn cs) l
+locatedAnAnchor (L (EpAnn a _ _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
@@ -448,7 +441,6 @@ hackSrcSpanToAnchor (RealSrcSpan r mb)
       if s <= 0 && e <= 0
       then EpaDelta (deltaPos (-s) (-e)) []
         `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-      -- else Anchor r UnchangedAnchor
       else EpaSpan (RealSrcSpan r mb)
     _ -> EpaSpan (RealSrcSpan r mb)
 
@@ -489,7 +481,7 @@ hsDeclsClassDecl dec = case dec of
               tcdATs = ats, tcdATDefs = at_defs
             } -> map snd decls
     where
-      srs :: SrcAnn a -> RealSrcSpan
+      srs :: (HasLoc a) => a -> RealSrcSpan
       srs a = realSrcSpan $ locA a
       decls
           = orderedDecls sortKey $ Map.fromList

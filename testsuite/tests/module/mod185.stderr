@@ -24,12 +24,12 @@
   (Nothing)
   (Nothing)
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { mod185.hs:3:1-24 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { mod185.hs:3:1-24 })
+    (EpAnn
+     (EpaSpan { mod185.hs:3:1-24 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     (ImportDecl
      (XImportDeclPass
       (EpAnn
@@ -47,12 +47,12 @@
       (NoSourceText)
       (False))
      (L
-      (SrcSpanAnn (EpAnn
-                   (EpaSpan { mod185.hs:3:8-14 })
-                   (AnnListItem
-                    [])
-                   (EpaComments
-                    [])) { mod185.hs:3:8-14 })
+      (EpAnn
+       (EpaSpan { mod185.hs:3:8-14 })
+       (AnnListItem
+        [])
+       (EpaComments
+        []))
       {ModuleName: Prelude})
      (NoRawPkgQual)
      (NotBoot)
@@ -61,45 +61,45 @@
      (Nothing)
      (Nothing)))]
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { mod185.hs:5:1-24 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { mod185.hs:5:1-24 })
+    (EpAnn
+     (EpaSpan { mod185.hs:5:1-24 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnn
-                    (EpaSpan { mod185.hs:5:1-4 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     [])) { mod185.hs:5:1-4 })
+       (EpAnn
+        (EpaSpan { mod185.hs:5:1-4 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
        (Unqual
         {OccName: main}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnn
-                     (EpaSpan { mod185.hs:5:1-24 })
-                     (AnnList
-                      (Nothing)
-                      (Nothing)
-                      (Nothing)
-                      []
-                      [])
-                     (EpaComments
-                      [])) { mod185.hs:5:1-24 })
+        (EpAnn
+         (EpaSpan { mod185.hs:5:1-24 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
         [(L
-          (SrcSpanAnn (EpAnn
-                       (EpaSpan { mod185.hs:5:1-24 })
-                       (AnnListItem
-                        [])
-                       (EpaComments
-                        [])) { mod185.hs:5:1-24 })
+          (EpAnn
+           (EpaSpan { mod185.hs:5:1-24 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
           (Match
            (EpAnn
             (EpaSpan { mod185.hs:5:1-24 })
@@ -108,12 +108,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnn
-                          (EpaSpan { mod185.hs:5:1-4 })
-                          (NameAnnTrailing
-                           [])
-                          (EpaComments
-                           [])) { mod185.hs:5:1-4 })
+             (EpAnn
+              (EpaSpan { mod185.hs:5:1-4 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
              (Unqual
               {OccName: main}))
             (Prefix)
@@ -123,13 +123,11 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnn
-                (EpaSpan { mod185.hs:5:6-24 })
-                (NoEpAnns)
-                (EpaComments
-                 []))
-               { mod185.hs:5:6-24 })
+              (EpAnn
+               (EpaSpan { mod185.hs:5:6-24 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
                 (EpaSpan { mod185.hs:5:6-24 })
@@ -140,23 +138,25 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnn
-                             (EpaSpan { mod185.hs:5:8-24 })
-                             (AnnListItem
-                              [])
-                             (EpaComments
-                              [])) { mod185.hs:5:8-24 })
+                (EpAnn
+                 (EpaSpan { mod185.hs:5:8-24 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
                 (HsVar
                  (NoExtField)
                  (L
-                  (SrcSpanAnn (EpAnn
-                               (EpaSpan { mod185.hs:5:8-24 })
-                               (NameAnnTrailing
-                                [])
-                               (EpaComments
-                                [])) { mod185.hs:5:8-24 })
+                  (EpAnn
+                   (EpaSpan { mod185.hs:5:8-24 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
                   (Qual
                    {ModuleName: Prelude}
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

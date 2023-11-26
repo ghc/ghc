@@ -850,7 +850,7 @@ collectEvVarsPat pat =
 -}
 
 type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
-type instance Anno (HsOverLit (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (HsOverLit (GhcPass p)) = EpAnn NoEpAnns
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
 type instance Anno RecFieldsDotDot = SrcSpan

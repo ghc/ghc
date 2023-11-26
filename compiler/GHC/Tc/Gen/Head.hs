@@ -341,11 +341,11 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     go e ctxt args = pure ((e,ctxt), args)
 
-    set :: SrcAnn ann -> AppCtxt -> AppCtxt
+    set :: EpAnn ann -> AppCtxt -> AppCtxt
     set l (VACall f n _)        = VACall f n (locA l)
     set l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 
-    dec :: SrcAnn ann -> AppCtxt -> AppCtxt
+    dec :: EpAnn ann -> AppCtxt -> AppCtxt
     dec l (VACall f n _)        = VACall f (n-1) (locA l)
     dec l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 

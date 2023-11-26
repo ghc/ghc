@@ -255,7 +255,7 @@ mkMaps env instances decls =
              -> ( [(Name, [HsDoc GhcRn])]
                 , [(Name, IntMap (HsDoc GhcRn))]
                 )
-    mappings (L (SrcSpanAnn _ (RealSrcSpan l _)) decl, doc) =
+    mappings (L (EpAnn (EpaSpan (RealSrcSpan l _)) _ _) decl, doc) =
            (dm, am)
       where
         args = declTypeDocs decl
@@ -269,7 +269,7 @@ mkMaps env instances decls =
         ns = names l decl
         dm = [(n, d) | (n, d) <- zip ns (repeat doc) ++ zip subNs subDocs, not $ all (isEmptyDocString . hsDocString) d]
         am = [(n, args) | n <- ns] ++ zip subNs subArgs
-    mappings (L (SrcSpanAnn _ (UnhelpfulSpan _)) _, _) = ([], [])
+    mappings (L (EpAnn _ _ _) _, _) = ([], [])
 
     instanceMap :: Map RealSrcSpan Name
     instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
