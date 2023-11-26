@@ -819,18 +819,12 @@ instance Diagnostic TcRnMessage where
             fsep [ text "Pattern matching on GADTs without MonoLocalBinds"
                  , text "is fragile." ]
     TcRnIncorrectNameSpace name _
-      -> mkSimpleDecorated $ msg
+      -> mkSimpleDecorated $
+           text "The" <+> what <+> text "does not live in" <+> other_ns
         where
-          msg
-            -- We are in a type-level namespace,
-            -- and the name is incorrectly at the term-level.
-            | isValNameSpace ns
-            = text "The" <+> what <+> text "does not live in the type-level namespace"
-
-            -- We are in a term-level namespace,
-            -- and the name is incorrectly at the type-level.
-            | otherwise
-            = text "Illegal term-level use of the" <+> what
+          -- the other (opposite) namespace
+          other_ns | isValNameSpace ns = text "the type-level namespace"
+                   | otherwise         = text "the term-level namespace"
           ns = nameNameSpace name
           what = pprNameSpace ns <+> quotes (ppr name)
     TcRnNotInScope err name imp_errs _
@@ -1046,6 +1040,10 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
+    TcRnIllegalTermLevelUse name err
+      -> mkSimpleDecorated $
+           text "Illegal term-level use of the" <+>
+             text (teCategory err) <+> quotes (ppr name)
     TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $
            (vcat [ pprMatchContextNouns argsContext <+>
@@ -1258,9 +1256,7 @@ instance Diagnostic TcRnMessage where
 
     TcRnIllformedTypePattern p
       -> mkSimpleDecorated $
-          hang (text "Ill-formed type pattern:") 2 (ppr p) $$
-          text "Expected a type pattern introduced with the"
-            <+> quotes (text "type") <+> text "keyword."
+          hang (text "Ill-formed type pattern:") 2 (ppr p)
     TcRnIllegalTypePattern
       -> mkSimpleDecorated $
           text "Illegal type pattern." $$
@@ -2203,6 +2199,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
+    TcRnIllegalTermLevelUse{}
+      -> ErrorWithoutFlag
     TcRnMatchesHaveDiffNumArgs{}
       -> ErrorWithoutFlag
     TcRnCannotBindScopedTyVarInPatSig{}
@@ -2846,6 +2844,8 @@ instance Diagnostic TcRnMessage where
     TcRnClassKindNotConstraint{}
       -> noHints
     TcRnUnpromotableThing{}
+      -> noHints
+    TcRnIllegalTermLevelUse{}
       -> noHints
     TcRnMatchesHaveDiffNumArgs{}
       -> noHints
