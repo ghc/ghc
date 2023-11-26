@@ -94,8 +94,6 @@ then
     AC_MSG_ERROR([find is required.])
 fi
 
-XCODE_VERSION()
-
 AC_ARG_ENABLE(distro-toolchain,
 [AS_HELP_STRING([--enable-distro-toolchain],
                 [Do not use bundled Windows toolchain binaries.])],
