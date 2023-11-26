@@ -2341,13 +2341,15 @@ checkVecCompatibility cfg vcat l w =
       ArchX86 -> True
       _ -> False
     checkX86 :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
-    checkX86 W128 FloatVec 4 W32 | not (isSseEnabled platform) =
+    checkX86 W128 FloatVec 4 W32 | isSseEnabled platform = return ()
+                                 | otherwise =
         sorry $ "128-bit wide single-precision floating point " ++
                 "SIMD vector instructions require at least -msse."
     checkX86 W128 _ _ _ | not (isSse2Enabled platform) =
         sorry $ "128-bit wide integer and double precision " ++
                 "SIMD vector instructions require at least -msse2."
-    checkX86 W256 FloatVec _ _ | not (stgToCmmAvx cfg) =
+    checkX86 W256 FloatVec _ _ | stgToCmmAvx cfg = return ()
+                               | otherwise =
         sorry $ "256-bit wide floating point " ++
                 "SIMD vector instructions require at least -mavx."
     checkX86 W256 _ _ _ | not (stgToCmmAvx2 cfg) =
