@@ -342,9 +342,6 @@ then
   GMP_FORCE_INTREE="YES"
 fi
 
-XCODE_VERSION()
-
-
 dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
