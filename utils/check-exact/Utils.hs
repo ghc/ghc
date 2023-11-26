@@ -256,7 +256,7 @@ tokComment t@(L lt c) =
     (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments (noCommentsToEpaLocation lt) pt dc
     _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
 
-hsDocStringComments :: Anchor -> RealSrcSpan -> GHC.HsDocString -> [Comment]
+hsDocStringComments :: EpaLocation -> RealSrcSpan -> GHC.HsDocString -> [Comment]
 hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
   let
     decStr = printDecorator dec
@@ -343,7 +343,7 @@ isKWComment c = isJust (commentOrigin c)
 noKWComments :: [Comment] -> [Comment]
 noKWComments = filter (\c -> not (isKWComment c))
 
-sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 -- | Calculates the distance from the start of a string to the end of
@@ -403,12 +403,6 @@ addEpAnnLoc :: AddEpAnn -> EpaLocation
 addEpAnnLoc (AddEpAnn _ l) = l
 
 -- ---------------------------------------------------------------------
-
--- TODO: get rid of this identity function
-anchorToEpaLocation :: Anchor -> EpaLocation
-anchorToEpaLocation a = a
-
--- ---------------------------------------------------------------------
 -- Horrible hack for dealing with some things still having a SrcSpan,
 -- not an Anchor.
 
@@ -433,7 +427,7 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 -}
 
-hackSrcSpanToAnchor :: SrcSpan -> Anchor
+hackSrcSpanToAnchor :: SrcSpan -> EpaLocation
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
 hackSrcSpanToAnchor (RealSrcSpan r mb)
   = case mb of
@@ -444,7 +438,7 @@ hackSrcSpanToAnchor (RealSrcSpan r mb)
       else EpaSpan (RealSrcSpan r mb)
     _ -> EpaSpan (RealSrcSpan r mb)
 
-hackAnchorToSrcSpan :: Anchor -> SrcSpan
+hackAnchorToSrcSpan :: EpaLocation -> SrcSpan
 hackAnchorToSrcSpan (EpaSpan s) = s
 hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 

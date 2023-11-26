@@ -17,9 +17,8 @@ module GHC.Parser.Annotation (
   TokenLocation(..),
   getTokenSrcSpan,
   DeltaPos(..), deltaPos, getDeltaLine,
-
-  EpAnn(..), Anchor,
   anchor,
+  EpAnn(..),
   spanAsAnchor, realSpanAsAnchor,
   noSpanAnchor,
   NoAnn(..),
@@ -394,15 +393,15 @@ instance Outputable EpaComment where
 -- annotation.
 data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 
--- | The anchor for an @'AnnKeywordId'@. The Parser inserts the
--- @'EpaSpan'@ variant, giving the exact location of the original item
--- in the parsed source.  This can be replaced by the @'EpaDelta'@
--- version, to provide a position for the item relative to the end of
--- the previous item in the source.  This is useful when editing an
--- AST prior to exact printing the changed one. The list of comments
--- in the @'EpaDelta'@ variant captures any comments between the prior
--- output and the thing being marked here, since we cannot otherwise
--- sort the relative order.
+-- | The anchor for an item that can be exact printed. The Parser
+-- inserts the @'EpaSpan'@ variant, giving the exact location of the
+-- original item in the parsed source. This can be replaced by the
+-- @'EpaDelta'@ version, to provide a position for the item relative
+-- to the end of the previous item in the source. This is useful when
+-- editing an AST prior to exact printing the changed one. The list of
+-- comments in the @'EpaDelta'@ variant captures any comments between
+-- the prior output and the thing being marked here, since we cannot
+-- otherwise sort the relative order.
 
 data EpaLocation' a = EpaSpan !SrcSpan
                     | EpaDelta !DeltaPos !a
@@ -518,7 +517,7 @@ instance Outputable AddEpAnn where
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
 data EpAnn ann
-  = EpAnn { entry   :: !Anchor
+  = EpAnn { entry   :: !EpaLocation
            -- ^ Base location for the start of the syntactic element
            -- holding the annotations.
            , anns     :: !ann -- ^ Annotations added by the Parser
@@ -529,14 +528,6 @@ data EpAnn ann
         deriving (Data, Eq, Functor)
 -- See Note [XRec and Anno in the AST]
 
--- | An 'Anchor' records the base location for the start of the
--- syntactic element holding the annotations, and is used as the point
--- of reference for calculating delta positions for contained
--- annotations.
--- It is also normally used as the reference point for the spacing of
--- the element relative to its container. If the AST element is moved,
--- that relationship is tracked in the 'anchor_op' instead.
-type Anchor = EpaLocation -- Transitional
 
 anchor :: (EpaLocation' a) -> RealSrcSpan
 anchor (EpaSpan (RealSrcSpan r _)) = r
@@ -664,7 +655,7 @@ data AnnListItem
 -- keywords such as 'where'.
 data AnnList
   = AnnList {
-      al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
+      al_anchor    :: Maybe EpaLocation, -- ^ start point of a list having layout
       al_open      :: Maybe AddEpAnn,
       al_close     :: Maybe AddEpAnn,
       al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
@@ -1109,7 +1100,7 @@ bufSpanFromAnns as =  go Strict.Nothing as
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
     go acc (AddEpAnn _ _:rest) = go acc rest
 
-widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
+widenAnchor :: EpaLocation -> [AddEpAnn] -> EpaLocation
 widenAnchor (EpaSpan (RealSrcSpan s mb)) as
   = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
 widenAnchor (EpaSpan us) _ = EpaSpan us
@@ -1117,7 +1108,7 @@ widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
-widenAnchorS :: Anchor -> SrcSpan -> Anchor
+widenAnchorS :: EpaLocation -> SrcSpan -> EpaLocation
 widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
   = EpaSpan (RealSrcSpan (combineRealSrcSpans s r) (liftA2 combineBufSpans mbe mbr))
 widenAnchorS (EpaSpan us) _ = EpaSpan us
