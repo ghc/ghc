@@ -24,22 +24,22 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T20846.hs:1:8-13 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20846.hs:1:8-13 })
+    (EpAnn
+     (EpaSpan { T20846.hs:1:8-13 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     {ModuleName: T20846}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T20846.hs:3:1-11 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20846.hs:3:1-11 })
+    (EpAnn
+     (EpaSpan { T20846.hs:3:1-11 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     (SigD
      (NoExtField)
      (FixSig
@@ -51,59 +51,59 @@
       (FixitySig
        (NoExtField)
        [(L
-         (SrcSpanAnn (EpAnn
-                      (EpaSpan { T20846.hs:3:8-11 })
-                      (NameAnnTrailing
-                       [])
-                      (EpaComments
-                       [])) { T20846.hs:3:8-11 })
+         (EpAnn
+          (EpaSpan { T20846.hs:3:8-11 })
+          (NameAnnTrailing
+           [])
+          (EpaComments
+           []))
          (Unqual
           {OccName: ++++}))]
        {Fixity: infixr 9}))))
   ,(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T20846.hs:4:1-18 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20846.hs:4:1-18 })
+    (EpAnn
+     (EpaSpan { T20846.hs:4:1-18 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnn
-                    (EpaSpan { T20846.hs:4:1-6 })
-                    (NameAnn
-                     (NameParens)
-                     (EpaSpan { T20846.hs:4:1 })
-                     (EpaSpan { T20846.hs:4:2-5 })
-                     (EpaSpan { T20846.hs:4:6 })
-                     [])
-                    (EpaComments
-                     [])) { T20846.hs:4:1-6 })
+       (EpAnn
+        (EpaSpan { T20846.hs:4:1-6 })
+        (NameAnn
+         (NameParens)
+         (EpaSpan { T20846.hs:4:1 })
+         (EpaSpan { T20846.hs:4:2-5 })
+         (EpaSpan { T20846.hs:4:6 })
+         [])
+        (EpaComments
+         []))
        (Unqual
         {OccName: ++++}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnn
-                     (EpaSpan { T20846.hs:4:1-18 })
-                     (AnnList
-                      (Nothing)
-                      (Nothing)
-                      (Nothing)
-                      []
-                      [])
-                     (EpaComments
-                      [])) { T20846.hs:4:1-18 })
+        (EpAnn
+         (EpaSpan { T20846.hs:4:1-18 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
         [(L
-          (SrcSpanAnn (EpAnn
-                       (EpaSpan { T20846.hs:4:1-18 })
-                       (AnnListItem
-                        [])
-                       (EpaComments
-                        [])) { T20846.hs:4:1-18 })
+          (EpAnn
+           (EpaSpan { T20846.hs:4:1-18 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
           (Match
            (EpAnn
             (EpaSpan { T20846.hs:4:1-18 })
@@ -112,16 +112,16 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnn
-                          (EpaSpan { T20846.hs:4:1-6 })
-                          (NameAnn
-                           (NameParens)
-                           (EpaSpan { T20846.hs:4:1 })
-                           (EpaSpan { T20846.hs:4:2-5 })
-                           (EpaSpan { T20846.hs:4:6 })
-                           [])
-                          (EpaComments
-                           [])) { T20846.hs:4:1-6 })
+             (EpAnn
+              (EpaSpan { T20846.hs:4:1-6 })
+              (NameAnn
+               (NameParens)
+               (EpaSpan { T20846.hs:4:1 })
+               (EpaSpan { T20846.hs:4:2-5 })
+               (EpaSpan { T20846.hs:4:6 })
+               [])
+              (EpaComments
+               []))
              (Unqual
               {OccName: ++++}))
             (Prefix)
@@ -131,13 +131,11 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnn
-                (EpaSpan { T20846.hs:4:8-18 })
-                (NoEpAnns)
-                (EpaComments
-                 []))
-               { T20846.hs:4:8-18 })
+              (EpAnn
+               (EpaSpan { T20846.hs:4:8-18 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
                 (EpaSpan { T20846.hs:4:8-18 })
@@ -148,21 +146,21 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnn
-                             (EpaSpan { T20846.hs:4:10-18 })
-                             (AnnListItem
-                              [])
-                             (EpaComments
-                              [])) { T20846.hs:4:10-18 })
+                (EpAnn
+                 (EpaSpan { T20846.hs:4:10-18 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
                 (HsVar
                  (NoExtField)
                  (L
-                  (SrcSpanAnn (EpAnn
-                               (EpaSpan { T20846.hs:4:10-18 })
-                               (NameAnnTrailing
-                                [])
-                               (EpaComments
-                                [])) { T20846.hs:4:10-18 })
+                  (EpAnn
+                   (EpaSpan { T20846.hs:4:10-18 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds

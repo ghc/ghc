@@ -876,7 +876,7 @@ type instance Anno [LocatedN Id]      = SrcSpan
 
 type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno StringLiteral = SrcAnn NoEpAnns
+type instance Anno StringLiteral = EpAnn NoEpAnns
 type instance Anno (LocatedN RdrName) = SrcSpan
 type instance Anno (LocatedN Name) = SrcSpan
 type instance Anno (LocatedN Id) = SrcSpan

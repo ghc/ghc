@@ -641,12 +641,18 @@ def onlyHsParLocs(x):
     We only want to check that all the parentheses are present with the correct location,
     not compare the entire typechecked AST.
     Located (HsPar GhcTc) are pretty printed with the form
-    ({ <location info>
+      (EpaSpan { T15242.hs:6:5-41 })
+      (AnnListItem
+       [])
+      (EpaComments
+       []))
      (HsPar
     This function tries to extract all such location infos from the typechecked AST.
+    Note: It is applied to the expected result too, so it also needs the "(HsPar" and
+    appropriate spacing.
     """
     ls = x.split("\n")
-    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[1:])
+    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[5:])
                       if hspar.strip().startswith("(HsPar")
                         and not "<no location info>" in loc)
     return '\n'.join(filteredLines)

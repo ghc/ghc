@@ -29,55 +29,55 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T22919.hs:1:8-13 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T22919.hs:1:8-13 })
+    (EpAnn
+     (EpaSpan { T22919.hs:1:8-13 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     {ModuleName: T22919}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T22919.hs:2:1-9 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T22919.hs:2:1-9 })
+    (EpAnn
+     (EpaSpan { T22919.hs:2:1-9 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnn
-                    (EpaSpan { T22919.hs:2:1-3 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     [])) { T22919.hs:2:1-3 })
+       (EpAnn
+        (EpaSpan { T22919.hs:2:1-3 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
        (Unqual
         {OccName: foo}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnn
-                     (EpaSpan { T22919.hs:2:1-9 })
-                     (AnnList
-                      (Nothing)
-                      (Nothing)
-                      (Nothing)
-                      []
-                      [])
-                     (EpaComments
-                      [])) { T22919.hs:2:1-9 })
+        (EpAnn
+         (EpaSpan { T22919.hs:2:1-9 })
+         (AnnList
+          (Nothing)
+          (Nothing)
+          (Nothing)
+          []
+          [])
+         (EpaComments
+          []))
         [(L
-          (SrcSpanAnn (EpAnn
-                       (EpaSpan { T22919.hs:2:1-9 })
-                       (AnnListItem
-                        [])
-                       (EpaComments
-                        [])) { T22919.hs:2:1-9 })
+          (EpAnn
+           (EpaSpan { T22919.hs:2:1-9 })
+           (AnnListItem
+            [])
+           (EpaComments
+            []))
           (Match
            (EpAnn
             (EpaSpan { T22919.hs:2:1-9 })
@@ -86,12 +86,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnn
-                          (EpaSpan { T22919.hs:2:1-3 })
-                          (NameAnnTrailing
-                           [])
-                          (EpaComments
-                           [])) { T22919.hs:2:1-3 })
+             (EpAnn
+              (EpaSpan { T22919.hs:2:1-3 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
              (Unqual
               {OccName: foo}))
             (Prefix)
@@ -101,13 +101,11 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnn
-                (EpaSpan { T22919.hs:2:5-9 })
-                (NoEpAnns)
-                (EpaComments
-                 []))
-               { T22919.hs:2:5-9 })
+              (EpAnn
+               (EpaSpan { T22919.hs:2:5-9 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
                 (EpaSpan { T22919.hs:2:5-9 })
@@ -118,12 +116,12 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnn
-                             (EpaSpan { T22919.hs:2:7-9 })
-                             (AnnListItem
-                              [])
-                             (EpaComments
-                              [])) { T22919.hs:2:7-9 })
+                (EpAnn
+                 (EpaSpan { T22919.hs:2:7-9 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
                 (HsLit
                  (EpAnn
                   (EpaSpan { T22919.hs:2:7-9 })
@@ -135,3 +133,5 @@
                   ('s'))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

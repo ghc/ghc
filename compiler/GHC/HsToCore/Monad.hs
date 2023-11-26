@@ -445,7 +445,7 @@ putSrcSpanDs (UnhelpfulSpan {}) thing_inside
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
 
-putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
+putSrcSpanDsA :: EpAnn ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
 
 -- | Emit a diagnostic for the current source location. In case the diagnostic is a warning,

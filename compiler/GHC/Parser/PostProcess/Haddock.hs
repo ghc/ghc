@@ -1155,7 +1155,7 @@ registerLocHdkA l = HdkA (getBufSpan l) (pure ())
 -- A small wrapper over registerLocHdkA.
 --
 -- See Note [Adding Haddock comments to the syntax tree].
-registerHdkA :: GenLocated (SrcSpanAnn' a) e -> HdkA ()
+registerHdkA :: GenLocated (EpAnn a) e -> HdkA ()
 registerHdkA a = registerLocHdkA (getLocA a)
 
 -- Modify the action of a HdkA computation.
@@ -1517,7 +1517,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
     mapLL (\d -> DocD noExtField d) all_docs
   ]
 
-cmpBufSpanA :: GenLocated (SrcSpanAnn' a1) a2 -> GenLocated (SrcSpanAnn' a3) a2 -> Ordering
+cmpBufSpanA :: GenLocated (EpAnn a1) a2 -> GenLocated (EpAnn a3) a2 -> Ordering
 cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 
 {- *********************************************************************

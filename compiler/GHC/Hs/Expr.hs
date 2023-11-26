@@ -2189,27 +2189,27 @@ type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
   = SrcSpanAnnL
-type instance Anno (HsCmdTop (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (HsCmdTop (GhcPass p)) = EpAnn NoEpAnns
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcAnn NoEpAnns
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcAnn NoEpAnns
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = EpAnn NoEpAnns
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = EpAnn NoEpAnns
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA
 
 type instance Anno (HsUntypedSplice (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr))))] = SrcSpanAnnL
 
-type instance Anno (FieldLabelStrings (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (FieldLabelStrings (GhcPass p)) = EpAnn NoEpAnns
 type instance Anno FieldLabelString                = SrcSpanAnnN
 
-type instance Anno FastString                      = SrcAnn NoEpAnns
+type instance Anno FastString                      = EpAnn NoEpAnns
   -- Used in HsQuasiQuote and perhaps elsewhere
 
-type instance Anno (DotFieldOcc (GhcPass p))       = SrcAnn NoEpAnns
+type instance Anno (DotFieldOcc (GhcPass p))       = EpAnn NoEpAnns
 
-instance (Anno a ~ SrcSpanAnn' (EpAnn an), NoAnn an)
+instance (HasAnnotation (Anno a))
    => WrapXRec (GhcPass p) a where
   wrapXRec = noLocA
