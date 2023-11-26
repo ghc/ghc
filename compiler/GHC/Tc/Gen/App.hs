@@ -1100,13 +1100,13 @@ At definition sites we may have type /patterns/ to abstract over type variables
    fs           x       = rhs   -- Specified: type pattern omitted
    fs @a       (x :: a) = rhs   -- Specified: type pattern supplied (NB: not implemented)
    fr (type a) (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier used
-   fr a        (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier omitted (NB: not implemented)
+   fr a        (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier omitted
 
 Type patterns in lambdas work the same way as they do in a function LHS
    fs = \           x       -> rhs   -- Specified: type pattern omitted
    fs = \ @a       (x :: a) -> rhs   -- Specified: type pattern supplied (NB: not implemented)
    fr = \ (type a) (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier used
-   fr = \ a        (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier omitted (NB: not implemented)
+   fr = \ a        (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier omitted
 
 Type patterns may also occur in a constructor pattern. Consider the following data declaration
    data T where
@@ -1177,7 +1177,7 @@ Syntax of abstractions in Pat
 * Examples:
       \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and HsConPatTyArg (c.o. HsConPatTyArg)
       \ (type a) (x :: a)  -> rhs    -- EmbTyPat (c.o. Pat)
-      \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)   (NB. not implemented)
+      \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)
       \ @a       (x :: a)  -> rhs    -- to be decided       (NB. not implemented)
 
 * A HsTyPat is not necessarily a plain variable. At the very least,
@@ -1230,7 +1230,7 @@ variable.  Only later (in the type checker) will we find out that it stands for
 the forall-bound type variable `a`.  So when RequiredTypeArguments is in effect,
 we change implicit quantification to take term variables into account; that is,
 we do not implicitly quantify the signature of `g` to `g :: forall t. t->t`
-because of the term-level `t` that is in scope. (NB. not implemented)
+because of the term-level `t` that is in scope.
 See Note [Term variable capture and implicit quantification].
 
 Typechecking type applications
@@ -1294,9 +1294,9 @@ and ordinary patterns:
   * tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
 
 tc_forall_pat unwraps the EmbTyPat and uses the type pattern contained
-within it. This is another spot where the "T2T-Mapping" can take place.
-This would allow us to support
-  f a (x :: a) = rhs    -- no EmbTyPat    (NB. not implemented)
+within it. This is another spot where the "T2T-Mapping" can take place,
+allowing us to support
+  f a (x :: a) = rhs    -- no EmbTyPat
 
 Type patterns in constructor patterns are handled in with tcConTyArg.
 Both tc_forall_pat and tcConTyArg delegate most of the work to tcHsTyPat.

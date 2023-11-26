@@ -75,6 +75,7 @@ module GHC.Tc.Errors.Types (
   , HoleFitDispConfig(..)
   , RelevantBindings(..), pprRelevantBindings
   , PromotionErr(..), pprPECategory, peCategory
+  , TermLevelUseErr(..), teCategory
   , NotInScopeError(..), mkTcRnNotInScope
   , ImportError(..)
   , HoleError(..)
@@ -2054,9 +2055,11 @@ data TcRnMessage where
 
       Example:
 
-        f x = Int
+        list2 = $( conE ''(:) `appE` litE (IntegerL 5) `appE` conE '[] )
+        --              ^^^^^
+        --              should use a single quotation tick, i.e. '(:)
 
-      Test cases: T18740a, T20884.
+      Test cases: T20884.
   -}
   TcRnIncorrectNameSpace :: Name
                          -> Bool -- ^ whether the error is happening
@@ -2378,6 +2381,27 @@ data TcRnMessage where
                 rename/should_fail/T16635c
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
+
+  {- | TcRnIllegalTermLevelUse is an error that occurs when the user attempts to
+       use a type-level entity at the term-level.
+
+       Examples:
+          f x = Int                 -- illegal use of a type constructor
+          g (Proxy :: Proxy a) = a  -- illegal use of a type variable
+
+       Note that the namespace cannot be used to determine if a name refers to a
+       type-level entity:
+
+          {-# LANGUAGE RequiredTypeArguments #-}
+          bad :: forall (a :: k) -> k
+          bad t = t
+
+      The name `t` is assigned the `varName` namespace but stands for a type
+      variable that cannot be used at the term level.
+
+      Test cases: T18740a, T18740b, T23739_fail_ret, T23739_fail_case
+  -}
+  TcRnIllegalTermLevelUse :: !Name -> !TermLevelUseErr -> TcRnMessage
 
   {-| TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
      that have different numbers of arguments

@@ -2,6 +2,8 @@
 module GHC.Tc.Errors.Types.PromotionErr ( PromotionErr(..)
                                         , pprPECategory
                                         , peCategory
+                                        , TermLevelUseErr(..)
+                                        , teCategory
                                         ) where
 
 import GHC.Prelude
@@ -52,6 +54,17 @@ peCategory RecDataConPE         = "data constructor"
 peCategory TermVariablePE       = "term variable"
 peCategory TypeVariablePE       = "type variable"
 
+-- The opposite of a promotion error (a demotion error, in a sense).
+data TermLevelUseErr
+  = TyConTE   -- Type constructor used at the term level, e.g. x = Int
+  | ClassTE   -- Class used at the term level,            e.g. x = Functor
+  | TyVarTE   -- Type variable used at the term level,    e.g. f (Proxy :: Proxy a) = a
+  deriving (Generic)
+
+teCategory :: TermLevelUseErr -> String
+teCategory ClassTE = "class"
+teCategory TyConTE = "type constructor"
+teCategory TyVarTE = "type variable"
 
 {- Note [Type variable scoping errors during typechecking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

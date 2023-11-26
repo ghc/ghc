@@ -390,13 +390,78 @@ tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, 
 
 tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
 tc_forall_pat _ (EmbTyPat _ toktype tp, tv) thing_inside
+  -- The entire type pattern is guarded with the `type` herald:
+  --    f (type t) (x :: t) = ...
+  -- This special case is not necessary for correctness but avoids
+  -- a redundant `ExpansionPat` node.
+  = do { (arg_ty, result) <- tc_ty_pat tp tv thing_inside
+       ; return (EmbTyPat arg_ty toktype tp, result) }
+tc_forall_pat _ (pat, tv) thing_inside
+  -- The type pattern is not guarded with the `type` herald, or perhaps
+  -- only parts of it are, e.g.
+  --    f (t :: Type)        (x :: t) = ...    -- no `type` herald
+  --    f ((type t) :: Type) (x :: t) = ...    -- nested `type` herald
+  -- Apply a recursive T2T transformation.
+  = do { tp <- pat_to_type_pat pat
+       ; (arg_ty, result) <- tc_ty_pat tp tv thing_inside
+       ; let pat' = XPat $ ExpansionPat pat (EmbTyPat arg_ty noHsTok tp)
+       ; return (pat', result) }
+
+-- Convert a Pat into the equivalent HsTyPat.
+-- See `expr_to_type` (GHC.Tc.Gen.App) for the HsExpr counterpart.
+-- The `TcM` monad is only used to fail on ill-formed type patterns.
+pat_to_type_pat :: Pat GhcRn -> TcM (HsTyPat GhcRn)
+pat_to_type_pat (EmbTyPat _ _ tp) = return tp
+pat_to_type_pat (VarPat _ lname)  = return (HsTP x b)
+  where b = noLocA (HsTyVar noAnn NotPromoted lname)
+        x = HsTPRn { hstp_nwcs    = []
+                   , hstp_imp_tvs = []
+                   , hstp_exp_tvs = [unLoc lname] }
+pat_to_type_pat (WildPat _) = return (HsTP x b)
+  where b = noLocA (HsWildCardTy noExtField)
+        x = HsTPRn { hstp_nwcs    = []
+                   , hstp_imp_tvs = []
+                   , hstp_exp_tvs = [] }
+pat_to_type_pat (SigPat _ pat sig_ty)
+  = do { HsTP x_hstp t <- pat_to_type_pat (unLoc pat)
+       ; let { !(HsPS x_hsps k) = sig_ty
+             ; x = append_hstp_hsps x_hstp x_hsps
+             ; b = noLocA (HsKindSig noAnn t k) }
+       ; return (HsTP x b) }
+  where
+    -- Quadratic for nested signatures ((p :: t1) :: t2)
+    -- but those are unlikely to occur in practice.
+    append_hstp_hsps :: HsTyPatRn -> HsPSRn -> HsTyPatRn
+    append_hstp_hsps t p
+      = HsTPRn { hstp_nwcs     = hstp_nwcs    t ++ hsps_nwcs    p
+               , hstp_imp_tvs  = hstp_imp_tvs t ++ hsps_imp_tvs p
+               , hstp_exp_tvs  = hstp_exp_tvs t }
+pat_to_type_pat (ParPat _ _ pat _)
+  = do { HsTP x t <- pat_to_type_pat (unLoc pat)
+       ; return (HsTP x (noLocA (HsParTy noAnn t))) }
+pat_to_type_pat pat =
+  -- There are other cases to handle (ConPat, ListPat, TuplePat, etc), but these
+  -- would always be rejected by the unification in `tcHsTyPat`, so it's fine to
+  -- skip them here. This won't continue to be the case when visible forall is
+  -- permitted in data constructors:
+  --
+  --   data T a where { Typed :: forall a -> a -> T a }
+  --   g :: T Int -> Int
+  --   g (Typed Int x) = x   -- Note the `Int` type pattern
+  --
+  -- See ticket #18389. When this feature lands, it would be best to extend
+  -- `pat_to_type_pat` to handle as many pattern forms as possible.
+  failWith $ TcRnIllformedTypePattern pat
+  -- This failure is the only use of the TcM monad in `pat_to_type_pat`
+
+tc_ty_pat :: HsTyPat GhcRn -> TcTyVar -> TcM r -> TcM (TcType, r)
+tc_ty_pat tp tv thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat tp (varType tv)
        ; _ <- unifyType Nothing arg_ty (mkTyVarTy tv)
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $
                    thing_inside
-       ; return (EmbTyPat arg_ty toktype tp, result) }
-tc_forall_pat _ (pat, _) _ = failWith $ TcRnIllformedTypePattern pat
+       ; return (arg_ty, result) }
 
 tc_pat  :: Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type
