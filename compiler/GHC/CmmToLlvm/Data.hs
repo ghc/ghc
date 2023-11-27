@@ -89,6 +89,7 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
         align          = case sec of
                             Section CString _ -> if (platformArch platform == ArchS390X)
                                                     then Just 2 else Just 1
+                            Section Data _    -> Just $ platformWordSizeInBytes platform
                             _                 -> Nothing
         const          = if sectionProtection sec == ReadOnlySection
                             then Constant else Global
