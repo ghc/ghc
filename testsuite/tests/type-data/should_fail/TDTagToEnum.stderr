@@ -1,6 +1,6 @@
-
-TDTagToEnum.hs:10:5: error: [GHC-96189]
-    • Bad call to tagToEnum# at type Letter
-        Result type cannot be headed by a `type data` type
+TDTagToEnum.hs:10:5: error: [GHC-39999]
+    • No instance for ‘GHC.Internal.Magic.TagToEnum.TagToEnum Letter’
+        arising from a use of ‘tagToEnum#’
     • In the expression: tagToEnum# 0#
       In an equation for ‘f’: f = tagToEnum# 0#
+

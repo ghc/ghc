@@ -240,7 +240,7 @@ sense of them in interface pragmas. It's cool, though they all have
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
  = map (Avail . idName) ghcPrimIds ++
-   map (Avail . idName) allThePrimOpIds ++
+   map (Avail . idName) allExposedPrimOpIds ++
    [ AvailTC n [n]
    | tc <- exposedPrimTyCons, let n = tyConName tc ]
 

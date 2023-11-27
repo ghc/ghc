@@ -3439,6 +3439,10 @@ module GHC.Base where
   type role TYPE nominal
   type TYPE :: RuntimeRep -> *
   data TYPE a
+  type TagToEnum :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
+  class TagToEnum a where
+    tagToEnum# :: Int# -> a
+    {-# MINIMAL tagToEnum# #-}
   type ThreadId# :: UnliftedType
   data ThreadId#
   type TrName :: *
@@ -4640,7 +4644,6 @@ module GHC.Base where
   subWord64# :: Word64# -> Word64# -> Word64#
   subWord8# :: Word8# -> Word8# -> Word8#
   subWordC# :: Word# -> Word# -> (# Word#, Int# #)
-  tagToEnum# :: forall a. Int# -> a
   takeMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, a #)
   tanDouble# :: Double# -> Double#
   tanFloat# :: Float# -> Float#
@@ -5738,6 +5741,10 @@ module GHC.Exts where
   type role TYPE nominal
   type TYPE :: RuntimeRep -> *
   data TYPE a
+  type TagToEnum :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
+  class TagToEnum a where
+    tagToEnum# :: Int# -> a
+    {-# MINIMAL tagToEnum# #-}
   type ThreadId# :: UnliftedType
   data ThreadId#
   TrNameD :: [Char] -> GHC.Internal.Types.TrName
@@ -6882,7 +6889,6 @@ module GHC.Exts where
   subWord64# :: Word64# -> Word64# -> Word64#
   subWord8# :: Word8# -> Word8# -> Word8#
   subWordC# :: Word# -> Word# -> (# Word#, Int# #)
-  tagToEnum# :: forall a. Int# -> a
   takeMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, a #)
   tanDouble# :: Double# -> Double#
   tanFloat# :: Float# -> Float#

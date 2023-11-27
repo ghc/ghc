@@ -158,7 +158,8 @@ module GHC.Internal.Exts
         --   @since base-4.17.0.0
         WithDict(..),
 
-        -- * Converting ADTs to constructor tags
+        -- * Converting ADTs to and from constructor tags
+        TagToEnum(..),
         DataToTag(..),
 
         -- * The maximum tuple size

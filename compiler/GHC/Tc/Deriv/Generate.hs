@@ -746,7 +746,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
 gen_Bounded_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Bounded_binds loc (DerivInstTys{dit_rep_tc = tycon})
-  | isEnumerationTyCon tycon
+  | NormalEnum <- tyConEnumSort tycon
   = ([ min_bound_enum, max_bound_enum ], emptyBag)
   | otherwise
   = assert (isSingleton data_cons)
@@ -837,7 +837,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     -- See Note [Auxiliary binders]
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
 
-    return $ if isEnumerationTyCon tycon
+    return $ if tyConEnumSort tycon == NormalEnum
       then (enum_ixes tag2con_RDR, listToBag
                    [ DerivTag2Con tycon tag2con_RDR
                    ])
@@ -2583,9 +2583,8 @@ d_Pat           = nlVarPat d_RDR
 k_Pat           = nlVarPat k_RDR
 z_Pat           = nlVarPat z_RDR
 
-minusInt_RDR, tagToEnum_RDR :: RdrName
+minusInt_RDR :: RdrName
 minusInt_RDR  = getRdrName (primOpId IntSubOp   )
-tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
 
 new_tag2con_rdr_name, new_maxtag_rdr_name
   :: SrcSpan -> TyCon -> TcM RdrName
