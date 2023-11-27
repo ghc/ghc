@@ -14,6 +14,7 @@ genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
     , output "//primop-commutable.hs-incl"         ? arg "--commutable"
     , output "//primop-code-size.hs-incl"          ? arg "--code-size"
     , output "//primop-strictness.hs-incl"         ? arg "--strictness"
+    , output "//primop-is-exposed.hs-incl"         ? arg "--is-exposed"
     , output "//primop-is-work-free.hs-incl"       ? arg "--is-work-free"
     , output "//primop-is-cheap.hs-incl"           ? arg "--is-cheap"
     , output "//primop-fixity.hs-incl"             ? arg "--fixity"

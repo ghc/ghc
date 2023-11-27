@@ -1,14 +1,12 @@
 
-tcfail164.hs:11:5: error: [GHC-08522]
-    • Bad call to tagToEnum# at type a
-        Specify the type by giving a type signature
-        e.g. (tagToEnum# x) :: Bool
+tcfail164.hs:11:5: error: [GHC-39999]
+    • No instance for ‘TagToEnum a’ arising from a use of ‘tagToEnum#’
     • In the expression: tagToEnum# 0#
       In an equation for ‘f’: f = tagToEnum# 0#
 
-tcfail164.hs:17:34: error: [GHC-49356]
-    • Bad call to tagToEnum# at type Int
-        Result type must be an enumeration type
+tcfail164.hs:17:34: error: [GHC-39999]
+    • No instance for ‘TagToEnum Int’
+        arising from a use of ‘tagToEnum#’
     • In the expression: tagToEnum# value#
       In an equation for ‘readUnboxable’:
           readUnboxable (I# value#) = tagToEnum# value#

@@ -909,6 +909,6 @@ showTypeCategory ty
         | isUnboxedTupleTyCon tycon -> 't'
         | isTupleTyCon tycon       -> 'T'
         | isPrimTyCon tycon        -> 'P'
-        | isEnumerationTyCon tycon -> 'E'
+        | NormalEnum <- tyConEnumSort tycon -> 'E'
         | isJust (tyConSingleDataCon_maybe tycon) -> 'S'
         | otherwise -> 'M' -- oh, well...

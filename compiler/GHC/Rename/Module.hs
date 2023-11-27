@@ -1999,7 +1999,7 @@ Wrinkles:
        f :: Letter
        f = tagToEnum# 0#
 
-     See `GHC.Tc.Gen.App.checkTagToEnum`, specifically `check_enumeration`.
+     See Note [TagToEnum overview] in GHC.Tc.Instance.Class.
 
 (W2) Although `type data` data constructors do not exist at the value level,
      it is still possible to match on a value whose type is headed by a `type data`

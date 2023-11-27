@@ -2807,7 +2807,7 @@ Since the case is exhaustive (all cases are) we can convert it to
 This may generate slightly better code (although it should not, since
 all cases are exhaustive) and/or optimise better.  I'm not certain that
 it's necessary, but currently we do make this change.  We do it here,
-NOT in the TagToEnum rules (see "Beware" in Note [caseRules for tagToEnum]
+NOT in the TagToEnum rules (see "Beware" in Note [caseRules for tagToEnumPrim#]
 in GHC.Core.Opt.ConstantFold)
 -}
 

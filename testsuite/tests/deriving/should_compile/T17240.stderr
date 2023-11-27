@@ -6,7 +6,9 @@ Derived class instances:
       = case (GHC.Internal.Magic.dataToTag# a) of
           a#
             -> case (GHC.Internal.Magic.dataToTag# b) of
-                 b# -> (GHC.Internal.Prim.tagToEnum# (a# GHC.Internal.Prim.==# b#))
+                 b#
+                   -> (GHC.Internal.Magic.TagToEnum.tagToEnum#
+                         (a# GHC.Internal.Prim.==# b#))
   
   instance GHC.Internal.Classes.Eq T17240.T where
     (GHC.Internal.Classes.==) a b

@@ -56,7 +56,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
    ( TyCon, tyConDataCons_maybe, tyConDataCons, tyConSingleDataCon, tyConFamilySize
-   , isEnumerationTyCon, isValidDTT2TyCon, isNewTyCon )
+   , TyConEnumSort(..), tyConEnumSort, isValidDTT2TyCon, isNewTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
@@ -102,7 +102,7 @@ That is why these rules are built in here.
 
 primOpRules ::  Name -> PrimOp -> Maybe CoreRule
 primOpRules nm = \case
-   TagToEnumOp -> mkPrimOpRule nm 2 [ tagToEnumRule ]
+   TagToEnumOp -> mkPrimOpRule nm 3 [ tagToEnumRule ]
    DataToTagSmallOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
    DataToTagLargeOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
 
@@ -1976,45 +1976,32 @@ matchPrimOpId op id = do
 \subsection{Special rules for seq, tagToEnum, dataToTag}
 *                                                                      *
 ************************************************************************
-
-Note [tagToEnum#]
-~~~~~~~~~~~~~~~~~
-Nasty check to ensure that tagToEnum# is applied to a type that is an
-enumeration TyCon.  Unification may refine the type later, but this
-check won't see that, alas.  It's crude but it works.
-
-Here's are two cases that should fail
-        f :: forall a. a
-        f = tagToEnum# 0        -- Can't do tagToEnum# at a type variable
-
-        g :: Int
-        g = tagToEnum# 0        -- Int is not an enumeration
-
-We used to make this check in the type inference engine, but it's quite
-ugly to do so, because the delayed constraint solving means that we don't
-really know what's going on until the end. It's very much a corner case
-because we don't expect the user to call tagToEnum# at all; we merely
-generate calls in derived instances of Enum.  So we compromise: a
-rewrite rule rewrites a bad instance of tagToEnum# to an error call,
-and emits a warning.
 -}
 
 tagToEnumRule :: RuleM CoreExpr
 -- If     data T a = A | B | C
--- then   tagToEnum# (T ty) 2# -->  B ty
+-- then   tagToEnumPrim# lev (T ty) 1# ==> B ty
+-- See Note [TagToEnum overview] in GHC.Tc.Instance.Class
 tagToEnumRule = do
-  [Type ty, Lit (LitNumber LitNumInt i)] <- getArgs
+  [_lev, Type ty, Lit (LitNumber LitNumInt i)] <- getArgs
   case splitTyConApp_maybe ty of
-    Just (tycon, tc_args) | isEnumerationTyCon tycon -> do
-      let tag = fromInteger i
-          correct_tag dc = (dataConTagZ dc) == tag
-      (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      massert (null rest)
-      return $ mkTyApps (Var (dataConWorkId dc)) tc_args
+    Just (tycon, tc_args) -> case tyConEnumSort tycon of
+      VacuouslyEnum -> pprPanic "tagToEnumPrim# used at empty enumeration type" (ppr ty)
+                       -- TODO: point to invariant in the Note
+      ExoticEnum -> mzero -- We would need to fabricate existentials
+                          -- and equality evidence to rewrite here.
+      NormalEnum -> do
+        let tag = fromInteger i
+            correct_tag dc = (dataConTagZ dc) == tag
+        (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
+        massert (null rest)
+        return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
-    -- See Note [tagToEnum#]
-    _ -> warnPprTrace True "tagToEnum# on non-enumeration type" (ppr ty) $
-         return $ mkImpossibleExpr ty "tagToEnum# on non-enumeration type"
+      NotAnEnum -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
+                   -- TODO: point to invariant in the Note
+
+    _ -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
+         -- TODO: point to invariant in the Note
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
@@ -2025,7 +2012,7 @@ dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
     a = do
-      [Type _lev, Type ty1, Var tag_to_enum `App` Type ty2 `App` tag] <- getArgs
+      [_lev1, Type ty1, Var tag_to_enum `App` _lev2 `App` Type ty2 `App` tag] <- getArgs
       guard $ tag_to_enum `hasKey` tagToEnumKey
       guard $ ty1 `eqType` ty2
       return tag
@@ -3390,11 +3377,12 @@ caseRules platform (App (Var f) v              )   -- op v
   = Just (v, tx_lit_con platform adjust_lit
            , \v -> App (Var f) (Var v))
 
--- See Note [caseRules for tagToEnum]
-caseRules platform (App (App (Var f) type_arg) v)
+-- See Note [caseRules for tagToEnumPrim#]
+caseRules platform (Var f `App` lev_arg `App` type_arg `App` val_arg)
+  -- TODO: Look into being careful for ExoticEnums.
   | Just TagToEnumOp <- isPrimOpId_maybe f
-  = Just (v, tx_con_tte platform
-           , \v -> (App (App (Var f) type_arg) (Var v)))
+  = Just (val_arg, tx_con_tte platform
+           , \v -> Var f `App` lev_arg `App` type_arg `App` Var v)
 
 -- See Note [caseRules for dataToTag]
 caseRules _ (Var f `App` Type lev `App` Type ty `App` v) -- dataToTag x
@@ -3517,7 +3505,7 @@ adjustUnary op
 tx_con_tte :: Platform -> AltCon -> Maybe AltCon
 tx_con_tte _        DEFAULT         = Just DEFAULT
 tx_con_tte _        alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
-tx_con_tte platform (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+tx_con_tte platform (DataAlt dc)  -- See Note [caseRules for tagToEnumPrim#]
   = Just $ LitAlt $ mkLitInt platform $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: TyCon -> AltCon -> Maybe AltCon
@@ -3536,10 +3524,10 @@ tx_con_dtt tc (LitAlt (LitNumber LitNumInt i))
 tx_con_dtt _ alt = pprPanic "caseRules/dataToTag: bad alt" (ppr alt)
 
 
-{- Note [caseRules for tagToEnum]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [caseRules for tagToEnumPrim#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to transform
-   case tagToEnum# x of
+   case tagToEnumPrim# x of
      False -> e1
      True  -> e2
 into
@@ -3550,7 +3538,7 @@ into
 See #8317.   This rule eliminates a lot of boilerplate. For
   if (x>y) then e2 else e1
 we generate
-  case tagToEnum# (x ># y) of
+  case tagToEnumPrim# (x ># y) of
     False -> e1
     True  -> e2
 and it is nice to then get rid of the tagToEnum#.

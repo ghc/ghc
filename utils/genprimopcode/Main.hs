@@ -146,6 +146,11 @@ main = getArgs >>= \args ->
                                        "code_size"
                                        "primOpCodeSize" p_o_specs)
 
+                      "--is-exposed"
+                         -> putStr (gen_switch_from_attribs
+                                       "exposed"
+                                       "primOpIsExposed" p_o_specs)
+
                       "--is-work-free"
                          -> putStr (gen_switch_from_attribs
                                        "work_free"
@@ -213,6 +218,7 @@ known_args
        "--out-of-line",
        "--commutable",
        "--code-size",
+       "--is-exposed",
        "--is-work-free",
        "--is-cheap",
        "--strictness",
@@ -297,7 +303,7 @@ gen_hs_source (Info defaults entries) =
        -- Now the main payload
     ++ "\n" ++ unlines (concatMap ent entries') ++ "\n\n\n"
 
-     where entries' = concatMap desugarVectorSpec entries
+     where entries' = concatMap desugarVectorSpec $ filter (isExposed defaults) entries
 
            opt (OptionFalse n)    = n ++ " = False"
            opt (OptionTrue n)     = n ++ " = True"
@@ -370,11 +376,8 @@ gen_hs_source (Info defaults entries) =
                 | OptionFixity (Just (Fixity i d)) <- options ]
 
            prim_func n t = [ wrapOp n ++ " :: " ++ pprTy t,
-                             wrapOp n ++ " = " ++ funcRhs n ]
-
-           funcRhs "tagToEnum#" = "let x = x in x"
-           funcRhs nm           = wrapOp nm
-              -- Special case for tagToEnum#: see Note [Placeholder declarations]
+                             wrapOp n ++ " = " ++ wrapOp n ]
+                           -- see Note [Placeholder declarations]
 
            prim_data t = [ "data " ++ pprTy t ]
 
@@ -387,6 +390,14 @@ getName PrimTypeSpec{ ty = TyApp tc _ } = Just (show tc)
 getName PrimVecTypeSpec{ ty = TyApp tc _ } = Just (show tc)
 getName _ = Nothing
 
+-- | Given the list of default options, determine if an entry is exposed.
+isExposed :: [Option] -> Entry -> Bool
+isExposed _ Section{} = True
+isExposed defaults entry = case lookup_attrib "exposed" (opts entry ++ defaults) of
+  Just (OptionTrue _) -> True
+  Just (OptionFalse _) -> False
+  _ -> error "expected boolean property 'exposed'"
+
 {- Note [Placeholder declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We are generating fake declarations for things in GHC.Internal.Prim, just to
@@ -395,15 +406,8 @@ needs.  Our main plan is to say
         foo :: <type>
         foo = foo
 
-That works for all the primitive functions except tagToEnum#.
-If we generate the binding
-        tagToEnum# = tagToEnum#
-GHC will complain about "tagToEnum# must appear applied to one argument".
-We could hack GHC to silence this complaint when compiling GHC.Internal.Prim,
-but it seems easier to generate
-        tagToEnum# = let x = x in x
-We don't do this for *all* bindings because for ones with an unboxed
-RHS we would get other complaints (e.g.can't unify "*" with "#").
+We used to need a special case for tagToEnum#,
+but that isn't exposed anymore anyway.
 -}
 
 -- | "Pretty"-print a type
@@ -462,7 +466,7 @@ In PrimopWrappers we set some crucial GHC options
 -}
 
 gen_wrappers :: Info -> String
-gen_wrappers (Info _ entries)
+gen_wrappers (Info defaults entries)
    =    "-- | Users should not import this module.  It is GHC internal only.\n"
      ++ "-- Use \"GHC.Exts\" instead.\n"
      ++ "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
@@ -497,7 +501,7 @@ gen_wrappers (Info _ entries)
         want_wrapper entry =
           and
             [ is_primop entry
-            , not $ name entry `elem` magical_primops
+            , isExposed defaults entry
             , not $ is_vector entry
                 -- We currently don't generate wrappers for vector primops.
                 --
@@ -505,14 +509,6 @@ gen_wrappers (Info _ entries)
                 -- were LLVM only; but now that this is no longer the case I
                 -- suppose this choice can be revisited?
             ]
-
-        magical_primops :: [String]
-        magical_primops =
-          [ "tagToEnum#"
-              -- tagToEnum# is really magical, and can't have
-              -- a wrapper since its implementation depends on
-              -- the type of its result
-          ]
 
 gen_primop_list :: Info -> String
 gen_primop_list (Info _ entries)

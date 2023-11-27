@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf         #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -61,7 +61,7 @@ module GHC.Core.TyCon(
 
         isDataTyCon,
         isTypeDataTyCon,
-        isEnumerationTyCon,
+        TyConEnumSort(..), tyConEnumSort,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
@@ -1053,8 +1053,9 @@ data AlgTyConRhs
                           -- tag (see the tag assignment in mkTyConTagMap)
         data_cons_size :: Int,
                           -- ^ Cached value: length data_cons
-        is_enum :: Bool,  -- ^ Cached value: is this an enumeration type?
-                          --   See Note [Enumeration types]
+        enum_sort :: TyConEnumSort,
+          -- ^ Cached value: is this an enumeration type?
+          --   See Note [Enumeration types]
         is_type_data :: Bool,
                         -- from a "type data" declaration
                         -- See Note [Type data declarations] in GHC.Rename.Module
@@ -1147,16 +1148,25 @@ mkLevPolyDataTyConRhs fixed_lev type_data cons
   = DataTyCon {
         data_cons = cons,
         data_cons_size = length cons,
-        is_enum = not (null cons) && all is_enum_con cons,
-                  -- See Note [Enumeration types] in GHC.Core.TyCon
+        enum_sort = if
+          -- See Note [Enumeration types] in GHC.Core.TyCon
+          | null cons -> VacuouslyEnum
+          | all is_normal_enum_con cons -> NormalEnum
+          | all is_exotic_enum_con cons -> ExoticEnum
+          | otherwise -> NotAnEnum
+        ,
         is_type_data = type_data,
         data_fixed_lev = fixed_lev
     }
   where
-    is_enum_con con
+    is_normal_enum_con con
        | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
            <- dataConFullSig con
        = null ex_tvs && null eq_spec && null theta && null arg_tys
+    is_exotic_enum_con con
+       | (_univ_tvs, _ex_tvs, _eq_spec, theta, arg_tys, _res)
+           <- dataConFullSig con
+       = null theta && null arg_tys
 
 -- | Create an 'AlgTyConRhs' from the data constructors.
 --
@@ -1360,7 +1370,7 @@ We define datatypes with no constructors to *not* be
 enumerations; this fixes #2578,  Otherwise we
 end up generating an empty table for
   <mod>_<type>_closure_tbl
-which is used by tagToEnum# to map Int# to constructors
+which is used by tagToEnumPrim# to map Int# to constructors
 in an enumeration. The empty table apparently upset
 the linker.
 
@@ -2196,16 +2206,26 @@ isGadtSyntaxTyCon (TyCon { tyConDetails = details })
   | AlgTyCon { algTcGadtSyntax = res } <- details = res
   | otherwise                                     = False
 
+-- | See also @Note [Enumeration types]@.
+data TyConEnumSort
+  = NotAnEnum
+  | ExoticEnum -- ^ TyCon is an enum, but has at least one constructor
+               -- with an existential tyvar or GADT equality evidence
+  | NormalEnum
+  | VacuouslyEnum -- ^ TyCon is an enumeration because it has no @DataCon@s
+  deriving Eq
+
 -- | Is this an algebraic 'TyCon' which is just an enumeration of values?
-isEnumerationTyCon :: TyCon -> Bool
+tyConEnumSort :: TyCon -> TyConEnumSort
 -- See Note [Enumeration types] in GHC.Core.TyCon
-isEnumerationTyCon (TyCon { tyConArity = arity, tyConDetails = details })
+tyConEnumSort (TyCon { tyConArity = arity, tyConDetails = details })
   | AlgTyCon { algTcRhs = rhs } <- details
   = case rhs of
-       DataTyCon { is_enum = res } -> res
-       TupleTyCon {}               -> arity == 0
-       _                           -> False
-  | otherwise = False
+       DataTyCon { enum_sort = res } -> res
+       TupleTyCon { tup_sort = BoxedTuple }
+         | arity == 0 -> NormalEnum
+       _ -> NotAnEnum
+  | otherwise = NotAnEnum
 
 -- | Is this a 'TyCon', synonym or otherwise, that defines a family?
 isFamilyTyCon :: TyCon -> Bool

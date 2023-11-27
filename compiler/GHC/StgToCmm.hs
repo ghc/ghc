@@ -41,6 +41,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.RepType
 import GHC.Types.Basic
+import GHC.Types.Var ( varName )
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
@@ -60,7 +61,7 @@ import GHC.Utils.TmpFs
 import GHC.Data.Stream
 import GHC.Data.OrdList
 
-import Control.Monad (when,void, forM_)
+import Control.Monad (void, forM_)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
@@ -125,7 +126,12 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
                 -- Generate a table of static closures for an
                 -- enumeration type Note that the closure pointers are
                 -- tagged.
-                 when (isEnumerationTyCon tycon) $ cg (cgEnumerationTyCon tycon)
+                 let cg_enum_table = cg (cgEnumerationTyCon tycon)
+                 case tyConEnumSort tycon of
+                   NotAnEnum -> pure ()
+                   ExoticEnum -> cg_enum_table
+                   NormalEnum -> cg_enum_table
+                   VacuouslyEnum -> pure ()
                  -- Emit normal info_tables, for data constructors defined in this module.
                  mapM_ (cg . cgDataCon DefinitionSite) (tyConDataCons tycon)
 
@@ -293,9 +299,10 @@ cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
   = do platform <- getPlatform
        emitRODataLits (mkClosureTableLabel (tyConName tycon) NoCafRefs)
-             [ CmmLabelOff (mkClosureLabel (dataConName con) NoCafRefs)
+             [ CmmLabelOff (mkClosureLabel (varName wrapper) NoCafRefs)
                            (tagForCon platform con)
-             | con <- tyConDataCons tycon]
+             | con <- tyConDataCons tycon
+             , let wrapper = dataConWrapId con ]
 
 
 cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()

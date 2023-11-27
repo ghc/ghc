@@ -47,8 +47,8 @@ module GHC.Base
     , unpackNBytes#
 
       -- * Magic combinators
-    , inline, noinline, lazy, oneShot, runRW#, seq#, DataToTag(..)
-    , WithDict(withDict)
+    , inline, noinline, lazy, oneShot, runRW#, seq#
+    , DataToTag(..), TagToEnum(..), WithDict(withDict)
 
       -- * Functions over 'Bool'
     , (&&), (||), not

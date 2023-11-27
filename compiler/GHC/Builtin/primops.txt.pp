@@ -136,6 +136,7 @@
 -- Int64X2#, SCALAR expands to Int64#, and VECTUPLE expands to (# Int64#, Int64# #).
 
 defaults
+   exposed          = True -- Is the primop exported from GHC.Prim?
    effect           = NoEffect -- See Note [Classifying primop effects] in GHC.Builtin.PrimOps
    can_fail_warning = WarnIfEffectIsCanFail
    out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
@@ -3827,9 +3828,11 @@ primop  DataToTagLargeOp "dataToTagLarge#" GenPrimOp
    effect = ThrowsException
    cheap = True
 
-primop  TagToEnumOp "tagToEnum#" GenPrimOp
-   Int# -> a
+primop  TagToEnumOp "tagToEnumPrim#" GenPrimOp
+   -- See Note [TagToEnum overview] in GHC.Tc.Instance.Class
+   Int# -> a_levpoly
    with
+   exposed = False
    effect = CanFail
 
 ------------------------------------------------------------------------

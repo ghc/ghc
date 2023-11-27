@@ -37,6 +37,10 @@ data ImportDeclQualifiedStyle
   | QualifiedPost -- ^ 'qualified' appears in postpositive position.
   | NotQualified  -- ^ Not qualified.
   deriving (Eq, Data)
+   -- This ^^ Eq instance doesn't type-check if we insist that all
+   -- constructors must be in scope for TagToEnum's magic to kick in.
+   -- Reason: Not all constructors of Bool are in scope in this module.
+   -- Seems sketchy. TODO: Think about this.
 
 -- | Indicates whether a module name is referring to a boot interface (hs-boot
 -- file) or regular module (hs file). We need to treat boot modules specially

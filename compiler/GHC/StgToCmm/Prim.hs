@@ -1652,16 +1652,12 @@ emitPrimOp cfg primop =
     then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
-  -- tagToEnum# is special: we need to pull the constructor
+  -- tagToEnumPrim# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
   TagToEnumOp -> \[amode] -> PrimopCmmEmit_Internal $ \res_ty -> do
-    -- If you're reading this code in the attempt to figure
-    -- out why the compiler panic'ed here, it is probably because
-    -- you used tagToEnum# in a non-monomorphic setting, e.g.,
-    --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
-    -- That won't work.
-    let tycon = fromMaybe (pprPanic "tagToEnum#: Applied to non-concrete type" (ppr res_ty)) (tyConAppTyCon_maybe res_ty)
-    massert (isEnumerationTyCon tycon)
+    -- See Note [TagToEnum overview] in GHC.Tc.Instance.Class
+    let tycon = fromMaybe (pprPanic "tagToEnumPrim#: Applied to non-concrete type" (ppr res_ty)) (tyConAppTyCon_maybe res_ty)
+    massert (tyConEnumSort tycon `elem` [ExoticEnum, NormalEnum])
     platform <- getPlatform
     pure [tagToClosure platform tycon amode]
 

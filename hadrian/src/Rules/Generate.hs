@@ -92,6 +92,7 @@ compilerDependencies = do
                   , "primop-out-of-line.hs-incl"
                   , "primop-primop-info.hs-incl"
                   , "primop-strictness.hs-incl"
+                  , "primop-is-exposed.hs-incl"
                   , "primop-is-work-free.hs-incl"
                   , "primop-is-cheap.hs-incl"
                   , "primop-tag.hs-incl"

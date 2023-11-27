@@ -113,7 +113,8 @@ module GHC.Exts
      unsafeCoerce#,
      -- **  Casting class dictionaries with single methods
      WithDict(..),
-     -- *  Converting ADTs to constructor tags
+     -- * Converting ADTs to and from constructor tags
+     TagToEnum(..),
      DataToTag(..),
      -- *  The maximum tuple size
      maxTupleSize

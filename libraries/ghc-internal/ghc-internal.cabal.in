@@ -334,6 +334,7 @@ Library
         GHC.Internal.Debug
         GHC.Internal.Magic
         GHC.Internal.Magic.Dict
+        GHC.Internal.Magic.TagToEnum
         GHC.Internal.Prim
         GHC.Internal.Prim.Ext
         GHC.Internal.Prim.Panic

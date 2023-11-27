@@ -7,6 +7,7 @@
 module GHC.Builtin.PrimOps.Ids
   ( primOpId
   , allThePrimOpIds
+  , allExposedPrimOpIds
   )
 where
 
@@ -173,3 +174,7 @@ primOpId op = indexSmallArray primOpIds (primOpTag op)
 allThePrimOpIds :: [Id]
 {-# INLINE allThePrimOpIds #-}
 allThePrimOpIds = map (indexSmallArray primOpIds) [0..maxPrimOpTag]
+
+-- | All the Ids for primops that are exposed from GHC.Prim, as a list.
+allExposedPrimOpIds :: [Id]
+allExposedPrimOpIds = map primOpId $ filter primOpIsExposed allThePrimOps
