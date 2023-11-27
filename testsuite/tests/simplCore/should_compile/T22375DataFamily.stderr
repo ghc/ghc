@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 116, types: 75, coercions: 25, joins: 0/0}
+  = {terms: 116, types: 76, coercions: 25, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
 T22375DataFamily.$WA [InlPrag=INLINE[final] CONLIKE] :: X ()
@@ -113,7 +113,7 @@ T22375DataFamily.$WJ
     `cast` (Sym T22375DataFamily.D:R:XUnit0
             :: T22375DataFamily.R:XUnit ~R# X ())
 
--- RHS size: {terms: 14, types: 11, coercions: 2, joins: 0/0}
+-- RHS size: {terms: 14, types: 12, coercions: 2, joins: 0/0}
 T22375DataFamily.$fEqX_$c== :: X () -> X () -> Bool
 [GblId,
  Arity=2,
@@ -139,7 +139,8 @@ T22375DataFamily.$fEqX_$c==
                       :: X () ~R# T22375DataFamily.R:XUnit))
       of b#
       { __DEFAULT ->
-      GHC.Internal.Prim.tagToEnum# @Bool (GHC.Internal.Prim.==# a# b#)
+      GHC.Internal.Prim.tagToEnumPrim#
+        @GHC.Internal.Types.Lifted @Bool (GHC.Internal.Prim.==# a# b#)
       }
       }
 

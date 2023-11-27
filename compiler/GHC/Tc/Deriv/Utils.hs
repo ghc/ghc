@@ -1088,7 +1088,7 @@ cond_args cls _ dit@(DerivInstTys{dit_rep_tc = rep_tc})
 
 cond_isEnumeration :: Condition
 cond_isEnumeration _ (DerivInstTys{dit_rep_tc = rep_tc})
-  | isEnumerationTyCon rep_tc = IsValid
+  | NormalEnum <- tyConEnumSort rep_tc = IsValid
   | otherwise                 = NotValid $ DerivErrMustBeEnumType rep_tc
 
 cond_isProduct :: Condition

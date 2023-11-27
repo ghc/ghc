@@ -150,6 +150,7 @@ matchGlobalInst dflags short_cut clas tys mb_loc
   | isCTupleClass clas                 = matchCTuple                       clas tys
   | cls_name == typeableClassName      = matchTypeable                     clas tys
   | cls_name == withDictClassName      = matchWithDict                          tys
+  | cls_name == tagToEnumClassName     = matchTagToEnum                    clas tys
   | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
   | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys mb_loc
   | cls_name == unsatisfiableClassName = matchUnsatisfiable
@@ -625,6 +626,79 @@ Some further observations about `withDict`:
 
 
 
+Note [TagToEnum overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The class `TagToEnum` is defined as follows, in GHC.Magic.TagToEnum:
+
+type TagToEnum :: forall {lev :: Levity}.
+                  TYPE (BoxedRep lev) -> Constraint
+class TagToEnum a where
+   tagToEnum# :: Int# -> a
+
+Users cannot define instances for `TagToEnum`; see
+`GHC.Tc.Validity.check_special_inst_head`.
+Instead, GHC's constraint solver has built-in solving behaviour,
+ implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
+
+(#20441: This common handling of special typeclasses is a bit of a
+mess and could use some love, and a dedicated Note.)
+
+GHC solves a wanted constraint `TagToEnum @{lev} dty`
+when all of the following conditions are met:
+
+C1: `dty` is an algebraic data type, i.e. `dty` matches any of:
+       * a "data" declaration,
+       * a "data instance" declaration,
+       * a boxed tuple type
+      "type data" declarations are NOT included; see also wrinkle W1
+      of Note [Type data declarations] in GHC.Rename.Module.
+
+C2: That declaration has at least one data constructor.
+    (In principle we could lift this restriction.)
+
+C3: Every data constructor in that declaration has a nullary wrapper.
+    Equivalently, it has no ordinary fields and no
+    ExistentialQuantification constraints ("theta").
+     * GADT "eq_spec" evidence is OK: only the worker takes such evidence
+     * DatatypeContexts "stupid theta" is also OK: any stupid theta on
+       the declaration is ignored by each constructor because they
+       have no fields.
+
+Every instance looks like this:
+
+   instance TagToEnum Bool where
+     tagToEnum# = tagToEnumPrim#
+
+The primop `tagToEnumPrim#` claims to have the following type:
+
+  tagToEnumPrim# :: forall {l::levity} (a::TYPE (BoxedRep l)). Int# -> a
+
+But this is a lie.  In fact it is not polymorphic at all.
+To generate code for `tagToEnumPrim#`:
+  * If a declaration satisfies conditions C2 and C3, we emit a
+    static array containing pointers to each data constructor
+    worker in that declaration.  See GHC.StgToCmm.cgEnumerationTyCon
+  * For a call `tagToEnumPrim# x :: ty` we can just read the x'th
+    element of the static array we emitted for the declaration ty
+    matches.
+  * But to do that we need to know which TyCon's closure
+    table to read from!  So we insist on this invariant:
+
+INVARIANT:
+ (TTE) Every occurrence of `tagToEnumPrim#` has two type arguments:
+       `tagToEnumPrim# @{lev} @ty`, and the second type argument `ty`
+       must match an enumeration TyCon with constructors satisfying
+       conditions C1-C3 above.
+
+This is checked in Core Lint: see checkSpecialPrimOpTypeArg.
+The `tagToEnumPrim#` primop is not exported from GHC.Prim,
+which keeps users from easily breaking this invariant by mis-using it.
+(Test case: ...)
+
+...more stuff goes here...
+
+
+
 Note [DataToTag overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Class `DataToTag` is defined like this, in GHC.Magic:
@@ -896,6 +970,57 @@ GHC.Stg.EnforceEpt.  See also #15696.
 
 -}
 
+{- ********************************************************************
+*                                                                     *
+                   Class lookup for TagToEnum
+*                                                                     *
+***********************************************************************-}
+
+matchTagToEnum :: Class -> [Type] -> TcM ClsInstResult
+-- See Note [TagToEnum overview]
+matchTagToEnum tagToEnumClass [levity, dty] = do
+  famEnvs <- tcGetFamInstEnvs
+--  (gbl_env, _lcl_env) <- getEnvs
+  if | Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
+     , let (repTyCon, repArgs, repCo)
+             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
+
+     , not (isTypeDataTyCon repTyCon)
+     , case tyConEnumSort repTyCon of
+         NotAnEnum -> False
+         ExoticEnum -> True
+         NormalEnum -> True
+         VacuouslyEnum -> False
+     , Just _constrs <- tyConAlgDataCons_maybe repTyCon
+
+--     , let  rdr_env = tcg_rdr_env gbl_env
+--            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
+--     , all inScope constrs
+
+     , let  !repTy = mkTyConApp repTyCon repArgs
+            !ttePrimOp = primOpId TagToEnumOp
+            methodRep = Var ttePrimOp `App` Type levity `App` Type repTy
+            methodCo = mkFunCo Representational
+                               FTF_T_T
+                               (mkNomReflCo ManyTy)
+                               (mkReflCo Representational intPrimTy)
+                               (mkSymCo repCo)
+            !method
+              | isReflCo repCo = methodRep
+              | otherwise      = methodRep `Cast` methodCo
+            tagToEnumDataCon = tyConSingleDataCon (classTyCon tagToEnumClass)
+            mk_ev _ = evDataConApp tagToEnumDataCon [levity, dty] [method]
+
+     -> pure () --addUsedDataCons rdr_env repTyCon
+          $> OneInst { cir_new_theta = []
+                     , cir_mk_ev = mk_ev
+                     , cir_canonical = EvCanonical
+                     , cir_what = BuiltinInstance
+                     }
+     | otherwise -> pure NoInstance
+
+matchTagToEnum _ _ = pure NoInstance
+
 
 {- ********************************************************************
 *                                                                     *
@@ -951,7 +1076,6 @@ matchDataToTag dataToTagClass [levity, dty] = do
      | otherwise -> pure NoInstance
 
 matchDataToTag _ _ = pure NoInstance
-
 
 
 {- ********************************************************************

@@ -16,7 +16,7 @@ module GHC.Builtin.PrimOps (
 
         tagToEnumKey,
 
-        primOpOutOfLine, primOpCodeSize,
+        primOpIsExposed, primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkToDiscard,
         primOpIsWorkFree, primOpIsCheap, primOpFixity, primOpDocs, primOpDeprecations,
         primOpIsDiv, primOpIsReallyInline,
@@ -127,6 +127,9 @@ mkCompare str ty = Compare (mkVarOccFS str) ty
 
 mkGenPrimOp :: FastString -> [TyVarBinder] -> [Type] -> Type -> PrimOpInfo
 mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
+
+primOpIsExposed :: PrimOp -> Bool
+#include "primop-is-exposed.hs-incl"
 
 {-
 ************************************************************************
@@ -288,13 +291,6 @@ Invariants:
         (c) stableNameToInt always returns the same Int for a given
             stable name.
 
-
-These primops are pretty weird.
-
-        tagToEnum# :: Int -> a    (result type must be an enumerated type)
-
-The constraints aren't currently checked by the front end, but the
-code generator will fall over if they aren't satisfied.
 
 ************************************************************************
 *                                                                      *

@@ -110,6 +110,7 @@ module GHC.Internal.Base
         module GHC.Internal.CString,
         module GHC.Internal.Magic,
         module GHC.Internal.Magic.Dict,
+        module GHC.Internal.Magic.TagToEnum,
         module GHC.Internal.Types,
         module GHC.Internal.Prim,         -- Re-export GHC.Internal.Prim, GHC.Internal.Prim.Ext,
         module GHC.Internal.Prim.Ext,     -- GHC.Internal.Prim.PtrEq and [boot] GHC.Internal.Err
@@ -322,6 +323,7 @@ import GHC.Internal.Classes hiding (
 import GHC.Internal.CString
 import GHC.Internal.Magic
 import GHC.Internal.Magic.Dict
+import GHC.Internal.Magic.TagToEnum
 import GHC.Internal.Prim hiding (dataToTagSmall#, dataToTagLarge#, whereFrom#)
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
