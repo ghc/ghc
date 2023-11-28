@@ -53,27 +53,23 @@ import GHC.Prelude hiding (head, init, last, mod, tail)
 import GHC.Hs
 
 import GHC.Types.SrcLoc
-import GHC.Utils.Panic
 import GHC.Data.Bag
 
 import Data.Semigroup
 import Data.Foldable
 import Data.Traversable
-import Data.Maybe
-import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Writer
 import Data.Functor.Identity
-import qualified Data.Monoid
 
 import {-# SOURCE #-} GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer
 import GHC.Parser.HaddockLex
 import GHC.Parser.Errors.Types
-import GHC.Utils.Misc (mergeListsBy, filterOut, mapLastM, (<&&>))
+import GHC.Utils.Misc (mergeListsBy, filterOut, (<&&>))
 import qualified GHC.Data.Strict as Strict
 
 {- Note [Adding Haddock comments to the syntax tree]
@@ -699,14 +695,12 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
     extendHdkA (locA l_con_decl) $
     case con_decl of
       ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
-        -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-        con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (NE.head con_names))
+        con_doc' <- getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
             PrefixConGADT x ts -> PrefixConGADT x <$> addHaddock ts
             RecConGADT arr (L l_rec flds) -> do
-              -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-              flds' <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
+              flds' <- traverse addHaddockConDeclField flds
               pure $ RecConGADT arr (L l_rec flds')
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
@@ -715,185 +709,99 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }
       ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args } ->
-        addConTrailingDoc (srcSpanEnd $ locA l_con_decl) $
-        case con_args of
-          PrefixCon _ ts -> do
-            con_doc' <- getConDoc (getLocA con_name)
-            ts' <- traverse addHaddockConDeclFieldTy ts
-            pure $ L l_con_decl $
-              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
-                           con_doc = lexLHsDocString <$> con_doc',
-                           con_args = PrefixCon noTypeArgs ts' }
-          InfixCon t1 t2 -> do
-            t1' <- addHaddockConDeclFieldTy t1
-            con_doc' <- getConDoc (getLocA con_name)
-            t2' <- addHaddockConDeclFieldTy t2
-            pure $ L l_con_decl $
-              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
-                           con_doc = lexLHsDocString <$> con_doc',
-                           con_args = InfixCon t1' t2' }
-          RecCon (L l_rec flds) -> do
-            con_doc' <- getConDoc (getLocA con_name)
-            flds' <- traverse addHaddockConDeclField flds
-            pure $ L l_con_decl $
-              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
-                           con_doc = lexLHsDocString <$> con_doc',
-                           con_args = RecCon (L l_rec flds') }
+        let
+          -- See Note [Leading and trailing comments on H98 constructors]
+          getTrailingLeading :: HdkM (LocatedA (ConDecl GhcPs))
+          getTrailingLeading = do
+            con_doc' <- getPrevNextDoc (locA l_con_decl)
+            return $ L l_con_decl $
+              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args
+                         , con_doc = lexLHsDocString <$> con_doc' }
 
--- Keep track of documentation comments on the data constructor or any of its
--- fields.
---
--- See Note [Trailing comment on constructor declaration]
-type ConHdkA = WriterT HasInnerDocs HdkA
+          -- See Note [Leading and trailing comments on H98 constructors]
+          getMixed :: HdkA (LocatedA (ConDecl GhcPs))
+          getMixed =
+            case con_args of
+              PrefixCon _ ts -> do
+                con_doc' <- getConDoc (getLocA con_name)
+                ts' <- traverse addHaddockConDeclFieldTy ts
+                pure $ L l_con_decl $
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                               con_doc = lexLHsDocString <$> con_doc',
+                               con_args = PrefixCon noTypeArgs ts' }
+              InfixCon t1 t2 -> do
+                t1' <- addHaddockConDeclFieldTy t1
+                con_doc' <- getConDoc (getLocA con_name)
+                t2' <- addHaddockConDeclFieldTy t2
+                pure $ L l_con_decl $
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                               con_doc = lexLHsDocString <$> con_doc',
+                               con_args = InfixCon t1' t2' }
+              RecCon (L l_rec flds) -> do
+                con_doc' <- getConDoc (getLocA con_name)
+                flds' <- traverse addHaddockConDeclField flds
+                pure $ L l_con_decl $
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                               con_doc = lexLHsDocString <$> con_doc',
+                               con_args = RecCon (L l_rec flds') }
+        in
+          hoistHdkA
+            (\m -> do { a <- onlyTrailingOrLeading (locA l_con_decl)
+                      ; if a then getTrailingLeading else m })
+            getMixed
 
--- Does the data constructor declaration have any inner (non-trailing)
--- documentation comments?
---
--- Example when HasInnerDocs is True:
---
---   data X =
---      MkX       -- ^ inner comment
---        Field1  -- ^ inner comment
---        Field2  -- ^ inner comment
---        Field3  -- ^ trailing comment
---
--- Example when HasInnerDocs is False:
---
---   data Y = MkY Field1 Field2 Field3  -- ^ trailing comment
---
--- See Note [Trailing comment on constructor declaration]
-newtype HasInnerDocs = HasInnerDocs Bool
-  deriving (Semigroup, Monoid) via Data.Monoid.Any
-
--- Run ConHdkA by discarding the HasInnerDocs info when we have no use for it.
---
--- We only do this when processing data declarations that use GADT syntax,
--- because only the H98 syntax declarations have special treatment for the
--- trailing documentation comment.
---
--- See Note [Trailing comment on constructor declaration]
-discardHasInnerDocs :: ConHdkA a -> HdkA a
-discardHasInnerDocs = fmap fst . runWriterT
+-- See Note [Leading and trailing comments on H98 constructors]
+onlyTrailingOrLeading :: SrcSpan -> HdkM Bool
+onlyTrailingOrLeading l = peekHdkM $ do
+  leading <-
+    inLocRange (locRangeTo (getBufPos (srcSpanStart l))) $
+    takeHdkComments mkDocNext
+  inner <-
+    inLocRange (locRangeIn (getBufSpan l)) $
+    takeHdkComments (\x -> mkDocNext x <|> mkDocPrev x)
+  trailing <-
+    inLocRange (locRangeFrom (getBufPos (srcSpanEnd l))) $
+    takeHdkComments mkDocPrev
+  return $ case (leading, inner, trailing) of
+    (_:_, [], []) -> True  -- leading comment only
+    ([], [], _:_) -> True  -- trailing comment only
+    _             -> False
 
 -- Get the documentation comment associated with the data constructor in a
 -- data/newtype declaration.
 getConDoc
   :: SrcSpan  -- Location of the data constructor
-  -> ConHdkA (Maybe (Located HsDocString))
-getConDoc l =
-  WriterT $ extendHdkA l $ liftHdkA $ do
-    mDoc <- getPrevNextDoc l
-    return (mDoc, HasInnerDocs (isJust mDoc))
+  -> HdkA (Maybe (Located HsDocString))
+getConDoc l = extendHdkA l $ liftHdkA $ getPrevNextDoc l
 
 -- Add documentation comment to a data constructor field.
 -- Used for PrefixCon and InfixCon.
 addHaddockConDeclFieldTy
   :: HsScaled GhcPs (LHsType GhcPs)
-  -> ConHdkA (HsScaled GhcPs (LHsType GhcPs))
+  -> HdkA (HsScaled GhcPs (LHsType GhcPs))
 addHaddockConDeclFieldTy (HsScaled mult (L l t)) =
-  WriterT $ extendHdkA (locA l) $ liftHdkA $ do
+  extendHdkA (locA l) $ liftHdkA $ do
     mDoc <- getPrevNextDoc (locA l)
-    return (HsScaled mult (mkLHsDocTy (L l t) mDoc),
-            HasInnerDocs (isJust mDoc))
+    return (HsScaled mult (mkLHsDocTy (L l t) mDoc))
 
 -- Add documentation comment to a data constructor field.
 -- Used for RecCon.
 addHaddockConDeclField
   :: LConDeclField GhcPs
-  -> ConHdkA (LConDeclField GhcPs)
+  -> HdkA (LConDeclField GhcPs)
 addHaddockConDeclField (L l_fld fld) =
-  WriterT $ extendHdkA (locA l_fld) $ liftHdkA $ do
+  extendHdkA (locA l_fld) $ liftHdkA $ do
     cd_fld_doc <- fmap lexLHsDocString <$> getPrevNextDoc (locA l_fld)
-    return (L l_fld (fld { cd_fld_doc }),
-            HasInnerDocs (isJust cd_fld_doc))
+    return (L l_fld (fld { cd_fld_doc }))
 
--- 1. Process a H98-syntax data constructor declaration in a context with no
---    access to the trailing documentation comment (by running the provided
---    ConHdkA computation).
---
--- 2. Then grab the trailing comment (if it exists) and attach it where
---    appropriate: either to the data constructor itself or to its last field,
---    depending on HasInnerDocs.
---
--- See Note [Trailing comment on constructor declaration]
-addConTrailingDoc
-  :: SrcLoc  -- The end of a data constructor declaration.
-             -- Any docprev comment past this point is considered trailing.
-  -> ConHdkA (LConDecl GhcPs)
-  -> HdkA (LConDecl GhcPs)
-addConTrailingDoc l_sep =
-    hoistHdkA add_trailing_doc . runWriterT
-  where
-    add_trailing_doc
-      :: HdkM (LConDecl GhcPs, HasInnerDocs)
-      -> HdkM (LConDecl GhcPs)
-    add_trailing_doc m = do
-      (L l con_decl, HasInnerDocs has_inner_docs) <-
-        inLocRange (locRangeTo (getBufPos l_sep)) m
-          -- inLocRange delimits the context so that the inner computation
-          -- will not consume the trailing documentation comment.
-      case con_decl of
-        ConDeclH98{} -> do
-          trailingDocs <-
-            inLocRange (locRangeFrom (getBufPos l_sep)) $
-            takeHdkComments mkDocPrev
-          if null trailingDocs
-          then return (L l con_decl)
-          else do
-            if has_inner_docs then do
-              let mk_doc_ty ::       HsScaled GhcPs (LHsType GhcPs)
-                            -> HdkM (HsScaled GhcPs (LHsType GhcPs))
-                  mk_doc_ty x@(HsScaled _ (L _ HsDocTy{})) =
-                    -- Happens in the following case:
-                    --
-                    --    data T =
-                    --      MkT
-                    --        -- | Comment on SomeField
-                    --        SomeField
-                    --        -- ^ Another comment on SomeField? (rejected)
-                    --
-                    -- See tests/.../haddockExtraDocs.hs
-                    x <$ reportExtraDocs trailingDocs
-                  mk_doc_ty (HsScaled mult (L l' t)) = do
-                    doc <- selectDocString trailingDocs
-                    return $ HsScaled mult (mkLHsDocTy (L l' t) doc)
-              let mk_doc_fld ::       LConDeclField GhcPs
-                             -> HdkM (LConDeclField GhcPs)
-                  mk_doc_fld x@(L _ (ConDeclField { cd_fld_doc = Just _ })) =
-                    -- Happens in the following case:
-                    --
-                    --    data T =
-                    --      MkT {
-                    --        -- | Comment on SomeField
-                    --        someField :: SomeField
-                    --      } -- ^ Another comment on SomeField? (rejected)
-                    --
-                    -- See tests/.../haddockExtraDocs.hs
-                    x <$ reportExtraDocs trailingDocs
-                  mk_doc_fld (L l' con_fld) = do
-                    doc <- selectDocString trailingDocs
-                    return $ L l' (con_fld { cd_fld_doc = fmap lexLHsDocString doc })
-              con_args' <- case con_args con_decl of
-                x@(PrefixCon _ ts) -> case nonEmpty ts of
-                    Nothing -> x <$ reportExtraDocs trailingDocs
-                    Just ts -> PrefixCon noTypeArgs . toList <$> mapLastM mk_doc_ty ts
-                x@(RecCon (L l_rec flds)) -> case nonEmpty flds of
-                    Nothing -> x <$ reportExtraDocs trailingDocs
-                    Just flds -> RecCon . L l_rec . toList <$> mapLastM mk_doc_fld flds
-                InfixCon t1 t2 -> InfixCon t1 <$> mk_doc_ty t2
-              return $ L l (con_decl{ con_args = con_args' })
-            else do
-              con_doc' <- selectDoc (con_doc con_decl `mcons` (map lexLHsDocString trailingDocs))
-              return $ L l (con_decl{ con_doc = con_doc' })
-        _ -> panic "addConTrailingDoc: non-H98 ConDecl"
-
-{- Note [Trailing comment on constructor declaration]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Leading and trailing comments on H98 constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The trailing comment after a constructor declaration is associated with the
-constructor itself when there are no other comments inside the declaration:
+constructor itself when it is the only comment:
 
    data T = MkT A B        -- ^ Comment on MkT
    data T = MkT { x :: A } -- ^ Comment on MkT
+   data T = A `MkT` B      -- ^ Comment on MkT
 
 When there are other comments, the trailing comment applies to the last field:
 
@@ -906,7 +814,58 @@ When there are other comments, the trailing comment applies to the last field:
          , b :: B   -- ^ Comment on b
          , c :: C } -- ^ Comment on c
 
-This makes the trailing comment context-sensitive. Example:
+   data T =
+       A      -- ^ Comment on A
+      `MkT`   -- ^ Comment on MkT
+       B      -- ^ Comment on B
+
+When it comes to the leading comment, there is no such ambiguity in /prefix/
+constructor declarations (plain or record syntax):
+
+   data T =
+    -- | Comment on MkT
+    MkT A B
+
+   data T =
+    -- | Comment on MkT
+    MkT
+      -- | Comment on A
+      A
+      -- | Comment on B
+      B
+
+   data T =
+    -- | Comment on MkT
+    MkT { x :: A }
+
+   data T =
+     -- | Comment on MkT
+     MkT {
+      -- | Comment on a
+      a :: A,
+      -- | Comment on b
+      b :: B,
+      -- | Comment on c
+      c :: C
+    }
+
+However, in /infix/ constructor declarations the leading comment is associated
+with the constructor itself if it is the only comment, and with the first
+field if there are other comments:
+
+   data T =
+    -- | Comment on MkT
+    A `MkT` B
+
+   data T =
+    -- | Comment on A
+    A
+    -- | Comment on MkT
+    `MkT`
+    -- | Comment on B
+    B
+
+This makes the leading and trailing comments context-sensitive. Example:
       data T =
         -- | comment 1
         MkT Int Bool -- ^ comment 2
@@ -920,17 +879,20 @@ GADTSyntax data constructors don't have any special treatment for the trailing c
 
 We implement this in two steps:
 
-  1. Process the data constructor declaration in a delimited context where the
-     trailing documentation comment is not visible. Delimiting the context is done
-     in addConTrailingDoc.
+  1. Gather information about available comments using `onlyTrailingOrLeading`.
+     It inspects available comments but does not consume them, and returns a
+     boolean that tells us what algorithm we should use
+        True  <=>  expect a single leading/trailing comment
+        False <=>  expect inner comments or more than one comment
 
-     When processing the declaration, track whether the constructor or any of
-     its fields have a documentation comment associated with them.
-     This is done using WriterT HasInnerDocs, see ConHdkA.
+  2. Collect the comments using the algorithm determined in the previous step
 
-  2. Depending on whether HasInnerDocs is True or False, attach the
-     trailing documentation comment to the data constructor itself
-     or to its last field.
+     a) `getTrailingLeading`:
+            a single leading/trailing comment is applied to the entire
+            constructor declaration as a whole; see the `con_doc` field
+     b) `getMixed`:
+            comments apply to individual parts of a constructor declaration,
+            including its field types
 -}
 
 instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
@@ -1266,6 +1228,13 @@ takeHdkComments f =
         Just item -> (item : items, other_hdk_comments)
         Nothing -> (items, hdk_comment : other_hdk_comments)
 
+-- Run a HdkM action and restore the original state.
+peekHdkM :: HdkM a -> HdkM a
+peekHdkM m =
+  HdkM $ \r s ->
+    case unHdkM m r s of
+      (a, _) -> (a, s)
+
 -- Get the docnext or docprev comment for an AST node at the given source span.
 getPrevNextDoc :: SrcSpan -> HdkM (Maybe (Located HsDocString))
 getPrevNextDoc l = do
@@ -1288,15 +1257,6 @@ selectDocString = select . filterOut (isEmptyDocString . unLoc)
     select [doc] = return (Just doc)
     select (doc : extra_docs) = do
       reportExtraDocs extra_docs
-      return (Just doc)
-
-selectDoc :: forall a. [LHsDoc a] -> HdkM (Maybe (LHsDoc a))
-selectDoc = select . filterOut (isEmptyDocString . hsDocString . unLoc)
-  where
-    select [] = return Nothing
-    select [doc] = return (Just doc)
-    select (doc : extra_docs) = do
-      reportExtraDocs $ map (\(L l d) -> L l $ hsDocString d) extra_docs
       return (Just doc)
 
 reportExtraDocs :: [Located HsDocString] -> HdkM ()
@@ -1397,6 +1357,13 @@ locRangeFrom Strict.Nothing = mempty
 locRangeTo :: Strict.Maybe BufPos -> LocRange
 locRangeTo (Strict.Just l) = mempty { loc_range_to = EndLoc l }
 locRangeTo Strict.Nothing = mempty
+
+-- The location range within the specified span.
+locRangeIn :: Strict.Maybe BufSpan -> LocRange
+locRangeIn (Strict.Just l) =
+  mempty { loc_range_from = StartLoc (bufSpanStart l)
+         , loc_range_to   = EndLoc (bufSpanEnd l) }
+locRangeIn Strict.Nothing = mempty
 
 -- Represents a predicate on BufPos:
 --
@@ -1525,10 +1492,6 @@ cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 *                   General purpose utilities                          *
 *                                                                      *
 ********************************************************************* -}
-
--- Cons an element to a list, if exists.
-mcons :: Maybe a -> [a] -> [a]
-mcons = maybe id (:)
 
 -- Map a function over a list of located items.
 mapLL :: (a -> b) -> [GenLocated l a] -> [GenLocated l b]
