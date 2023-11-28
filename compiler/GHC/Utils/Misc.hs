@@ -36,7 +36,6 @@ module GHC.Utils.Misc (
         holes,
 
         changeLast,
-        mapLastM,
 
         whenNonEmpty,
 
@@ -126,7 +125,6 @@ import GHC.Utils.Fingerprint
 import Data.Data
 import qualified Data.List as List
 import Data.List.NonEmpty  ( NonEmpty(..), last, nonEmpty )
-import qualified Data.List.NonEmpty as NE
 
 import GHC.Exts
 import GHC.Stack (HasCallStack)
@@ -521,11 +519,6 @@ expectNonEmpty msg []     = expectNonEmptyPanic msg
 expectNonEmptyPanic :: String -> a
 expectNonEmptyPanic msg = panic ("expectNonEmpty: " ++ msg)
 {-# NOINLINE expectNonEmptyPanic #-}
-
--- | Apply an effectful function to the last list element.
-mapLastM :: Functor f => (a -> f a) -> NonEmpty a -> f (NonEmpty a)
-mapLastM f (x:|[]) = NE.singleton <$> f x
-mapLastM f (x0:|x1:xs) = (x0 NE.<|) <$> mapLastM f (x1:|xs)
 
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()

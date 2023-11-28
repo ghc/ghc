@@ -64,3 +64,4 @@ test('haddockTySyn', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed
 test('T8944', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
 test('T17652', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
 test('haddockLinear', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
+test('T24221', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed-ast'])
