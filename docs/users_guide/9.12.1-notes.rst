@@ -91,6 +91,11 @@ Runtime system
 
 - Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
 
+- Memory return logic now uses live bytes rather than live blocks to measure the size of the heap.
+  This primarily affects the non-moving GC, which should now be more willing to return memory to the OS.
+  Users who have fine-tuned the :rts-flag:`-F ⟨factor⟩`, :rts-flag:`-Fd ⟨factor⟩`, or :rts-flag:`-O ⟨size⟩` flags,
+  and use the non-moving GC, should see if adjustments are needed in light of this change.
+
 - The new runtime flag :rts-flag:`--read-tix-file=\<yes|no\>` allows to modify whether a preexisting .tix file is read in at the beginning of a program run.
   The default is currently ``--read-tix-file=yes`` but will change to ``--read-tix-file=no`` in a future version of GHC.
   For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
