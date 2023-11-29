@@ -1643,11 +1643,36 @@ W_ countOccupied (bdescr *bd)
     return words;
 }
 
-// Returns the total number of live blocks
+// Returns the total number of live words
 W_ genLiveWords (generation *gen)
 {
-    return (gen->live_estimate ? gen->live_estimate : gen->n_words) +
-        gen->n_large_words + gen->n_compact_blocks * BLOCK_SIZE_W;
+    return genLiveCopiedWords(gen) + genLiveUncopiedWords(gen);
+}
+
+// The number of live words which will be copied by the copying collector.
+W_ genLiveCopiedWords (generation *gen)
+{
+  if (gen == oldest_gen && RtsFlags.GcFlags.useNonmoving){
+    // the non-moving generation doesn't contain any copied data
+    return 0;
+  } else {
+    return gen->live_estimate ? gen->live_estimate : gen->n_words;
+  }
+}
+
+// The number of live words which will not be copied by the copying collector
+// This includes data living in non-moving collector segments, compact blocks and large/pinned blocks.
+W_ genLiveUncopiedWords(generation *gen)
+{
+  W_ nonmoving_blocks = 0;
+  // The nonmoving heap contains some blocks that live outside the regular generation structure.
+  if (gen == oldest_gen && RtsFlags.GcFlags.useNonmoving){
+    nonmoving_blocks =
+        (gen->live_estimate ? gen->live_estimate : gen->n_words)
+      + nonmoving_large_words
+      + nonmoving_compact_words;
+  }
+  return gen->n_large_words + gen->n_compact_blocks * BLOCK_SIZE_W + nonmoving_blocks;
 }
 
 // The number of live blocks which will be copied by the copying collector.

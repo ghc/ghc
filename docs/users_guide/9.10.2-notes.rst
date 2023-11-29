@@ -1,0 +1,70 @@
+.. _release-9-10-1:
+
+Version 9.10.2
+==============
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.10>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Language
+~~~~~~~~
+
+
+
+Compiler
+~~~~~~~~
+
+
+
+JavaScript backend
+~~~~~~~~~~~~~~~~~~
+
+
+
+WebAssembly backend
+~~~~~~~~~~~~~~~~~~~
+
+
+GHCi
+~~~~
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- Memory return logic now uses live bytes rather than live blocks to measure the size of the heap.
+  This primarily affects the non-moving GC, which should now be more willing to return memory to the OS.
+  Users who have fine-tuned the :rts-flag:`-F ⟨factor⟩`, :rts-flag:`-Fd ⟨factor⟩`, or :rts-flag:`-O ⟨size⟩` flags,
+  and use the non-moving GC, should see if adjustments are needed in light of this change.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+
+
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.

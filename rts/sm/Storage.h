@@ -111,6 +111,8 @@ StgWord gcThreadLiveWords  (uint32_t i, uint32_t g);
 StgWord gcThreadLiveBlocks (uint32_t i, uint32_t g);
 
 StgWord genLiveWords  (generation *gen);
+StgWord genLiveCopiedWords (generation *gen);
+StgWord genLiveUncopiedWords (generation *gen);
 StgWord genLiveBlocks (generation *gen);
 StgWord genLiveCopiedBlocks (generation *gen);
 StgWord genLiveUncopiedBlocks (generation *gen);

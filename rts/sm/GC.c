@@ -1004,9 +1004,14 @@ GarbageCollect (struct GcConfig config,
       need_copied_live = 0;
       need_uncopied_live = 0;
       for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
-          need_copied_live += genLiveCopiedBlocks(&generations[i]);
-          need_uncopied_live += genLiveUncopiedBlocks(&generations[i]);
+          need_copied_live += genLiveCopiedWords(&generations[i]);
+          need_uncopied_live += genLiveUncopiedWords(&generations[i]);
       }
+
+      // Convert the live words into live blocks
+      // See Note [Statistics for retaining memory]
+      need_copied_live = BLOCK_ROUND_UP(need_copied_live) / BLOCK_SIZE_W;
+      need_uncopied_live = BLOCK_ROUND_UP(need_uncopied_live) / BLOCK_SIZE_W;
 
       debugTrace(DEBUG_gc, "(before) copied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
 
@@ -1031,7 +1036,7 @@ GarbageCollect (struct GcConfig config,
 
       ASSERT(need_uncopied_live + need_copied_live >= RtsFlags.GcFlags.minOldGenSize );
 
-      debugTrace(DEBUG_gc, "(after) copyied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
+      debugTrace(DEBUG_gc, "(after) copied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
 
       need_prealloc = 0;
       for (i = 0; i < n_nurseries; i++) {
@@ -1069,7 +1074,7 @@ GarbageCollect (struct GcConfig config,
 
       W_ scaled_needed = ((scaled_factor + unavoidable_copied_need_factor) * need_copied_live)
                        + ((scaled_factor + unavoidable_uncopied_need_factor) * need_uncopied_live);
-      debugTrace(DEBUG_gc, "factors_2: %f %d", ((scaled_factor + unavoidable_copied_need_factor) * need_copied_live), ((scaled_factor + unavoidable_uncopied_need_factor) * need_uncopied_live));
+      debugTrace(DEBUG_gc, "factors_2: %f %f", ((scaled_factor + unavoidable_copied_need_factor) * need_copied_live), ((scaled_factor + unavoidable_uncopied_need_factor) * need_uncopied_live));
       need = need_prealloc + scaled_needed;
 
       /* Also, if user set heap size, do not drop below it.
@@ -2423,4 +2428,40 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * of "idleness".
  *
 
+*/
+
+/* Note [Statistics for retaining memory]
+*  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*
+* At the end of GC, we want to determine the size of the heap in order to
+* determine the amount of memory we wish to return to the OS, or if we want
+* to increase the heap size to the minimum.
+*
+* There's two promising candidates for this metric: live words, and live blocks.
+*
+* Measuring live blocks is promising because blocks are the smallest unit
+* that the storage manager can (de)allocate.
+* Most of the time live words and live blocks are very similar.
+*
+* But the two metrics can come apart when the heap is dominated
+* by small pinned objects, or when using the non-moving collector.
+*
+* In both cases, this happens because objects cannot be copied, so
+* block occupancy can fall as objects in a block become garbage.
+* In situations like this, using live blocks to determine memory
+* retention behaviour can lead to us being overly conservative.
+*
+* Instead we use live words rounded up to the block size to measure
+* heap size. This gives us a more accurate picture of the heap.
+*
+* This works particularly well with the nonmoving collector as we
+* can reuse the space taken up by dead heap objects. This choice is less good
+* for fragmentation caused by a few pinned objects retaining blocks.
+* In that case, the block can only be reused if it is deallocated in its entirety.
+* And therefore using live blocks would be more accurate in this case.
+* We assume that this is relatively rare and when it does happen,
+* this fragmentation is a problem that should be addressed in its own right.
+*
+* See: #23397
+*
 */
