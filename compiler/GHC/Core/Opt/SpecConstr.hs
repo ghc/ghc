@@ -81,8 +81,8 @@ import GHC.Builtin.Names ( specTyConKey )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )
 
-import Control.Monad    ( zipWithM )
-import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
+import Control.Monad
+import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
 import Data.Tuple
@@ -2381,19 +2381,23 @@ callsToNewPats :: ScEnv -> Id
 -- The "New" in the name means "patterns that are not already covered
 -- by an existing specialisation"
 callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
-  = do  { mb_pats <- mapM (callToPats env bndr_occs) calls
+  = do  { mb_pats <- mapM (callToPat env bndr_occs) calls
 
         ; let have_boring_call = any isNothing mb_pats
 
               good_pats :: [CallPat]
               good_pats = catMaybes mb_pats
 
+              in_scope = getSubstInScope (sc_subst env)
+
               -- Remove patterns we have already done
               new_pats = filterOut is_done good_pats
-              is_done p = any (samePat p . os_pat) done_specs
+              is_done p = any is_better done_specs
+                 where
+                   is_better done = betterPat in_scope (os_pat done) p
 
               -- Remove duplicates
-              non_dups = nubBy samePat new_pats
+              non_dups = subsumePats in_scope new_pats
 
               -- Remove ones that have too many worker variables
               small_pats = filterOut too_many_worker_args non_dups
@@ -2410,6 +2414,10 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               (pats_were_discarded, trimmed_pats) = trim_pats env fn spec_info small_pats
 
 --        ; pprTraceM "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+--                                        , text "good_pats:" <+> ppr good_pats
+--                                        , text "new_pats:" <+> ppr new_pats
+--                                        , text "non_dups:" <+> ppr non_dups
+--                                        , text "small_pats:" <+> ppr small_pats
 --                                        , text "done_specs:" <+> ppr (map os_pat done_specs)
 --                                        , text "trimmed_pats:" <+> ppr trimmed_pats ])
 
@@ -2790,40 +2798,69 @@ valueIsWorkFree :: Value -> Bool
 valueIsWorkFree LambdaVal       = True
 valueIsWorkFree (ConVal _ args) = all exprIsWorkFree args
 
-samePat :: CallPat -> CallPat -> Bool
-samePat (CP { cp_qvars = vs1, cp_args = as1 })
-        (CP { cp_qvars = vs2, cp_args = as2 })
-  = all2 same as1 as2
+betterPat :: InScopeSet -> CallPat -> CallPat -> Bool
+-- pat1    f @a   (Just @a   (x::a))
+--      is better than
+-- pat2    f @Int (Just @Int (x::Int))
+-- That is, we can instantiate pat1 to get pat2
+-- See Note [Pattern duplicate elimination]
+betterPat is (CP { cp_qvars = vs1, cp_args = as1 })
+             (CP { cp_qvars = vs2, cp_args = as2 })
+  = case matchExprs ise vs1 as1 as2 of
+      Just (_, ms) -> all exprIsTrivial ms
+      Nothing      -> False
   where
-    -- If the args are the same, their strictness marks will be too so we don't compare those.
-    same (Var v1) (Var v2)
-        | v1 `elem` vs1 = v2 `elem` vs2
-        | v2 `elem` vs2 = False
-        | otherwise     = v1 == v2
+    ise = ISE (is `extendInScopeSetList` vs2) (const noUnfolding)
 
-    same (Lit l1)    (Lit l2)    = l1==l2
-    same (App f1 a1) (App f2 a2) = same f1 f2 && same a1 a2
-
-    same (Type {}) (Type {}) = True     -- Note [Ignore type differences]
-    same (Coercion {}) (Coercion {}) = True
-    same (Tick _ e1) e2 = same e1 e2  -- Ignore casts and notes
-    same (Cast e1 _) e2 = same e1 e2
-    same e1 (Tick _ e2) = same e1 e2
-    same e1 (Cast e2 _) = same e1 e2
-
-    same e1 e2 = warnPprTrace (bad e1 || bad e2) "samePat" (ppr e1 $$ ppr e2) $
-                 False  -- Let, lambda, case should not occur
-    bad (Case {}) = True
-    bad (Let {})  = True
-    bad (Lam {})  = True
-    bad _other    = False
+subsumePats :: InScopeSet -> [CallPat] -> [CallPat]
+-- Remove any patterns subsumed by others
+-- See Note [Pattern duplicate elimination]
+subsumePats is pats = foldr add [] pats
+  where
+    add :: CallPat -> [CallPat] -> [CallPat]
+    add ci [] = [ci]
+    add ci1 (ci2:cis) | betterPat is ci2 ci1 = ci2:cis
+                      | betterPat is ci1 ci2 = ci1:cis
+                      | otherwise             = ci2 : add ci1 cis
 
 {-
-Note [Ignore type differences]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not want to generate specialisations where the call patterns
-differ only in their type arguments!  Not only is it utterly useless,
-but it also means that (with polymorphic recursion) we can generate
-an infinite number of specialisations. Example is Data.Sequence.adjustTree,
-I think.
+Note [Pattern duplicate elimination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider f :: (a,a) -> blah, and two calls
+   f @Int  (x,y)
+   f @Bool (p,q)
+
+The danger is that we'll generate two *essentially identical* specialisations,
+both for pairs, but with different types instantiating `a` (see #24229).
+
+But we'll only make a `CallPat` for an argument (a,b) if `foo` scrutinises
+that argument.  So SpecConstr should never need to specialise f's polymorphic
+type arguments.  Even with only one of these calls we should be able to
+generalise to the `CallPat`
+
+  cp_qvars = [a, r::a, s::a], cp_args = [@a (r,s)]
+
+Doing so isn't trivial, though.
+
+For now we content ourselves with a simpler plan: eliminate a call pattern
+if another pattern subsumes it; this is done by `subsumePats`.
+For example here are two patterns
+
+  cp_qvars = [a, r::a, s::a],  cp_args = [@a (r,s)]
+  cp_qvars = [x::Int, y::Int], cp_args = [@Int (x,y)]
+
+The first can be instantiated to the second, /by instantiating types only/.
+This subsumption relationship is checked by `betterPat`.  Note that if
+we have
+
+  cp_qvars = [a, r::a, s::a], cp_args = [@a (r,s)]
+  cp_qvars = [],              cp_args = [@Bool (True,False)]
+
+the first does *not* subsume the second; the second is more specific.
+
+In our initial example with `f @Int` and `f @Bool` neither subsumes the other,
+so we will get two essentially-identical specialisations. Boo.  We rely on our
+crude throttling mechanisms to stop this getting out of control -- with
+polymorphic recursion we can generate an infinite number of specialisations.
+Example is Data.Sequence.adjustTree, I think.
 -}

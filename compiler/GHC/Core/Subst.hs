@@ -19,7 +19,7 @@ module GHC.Core.Subst (
         substTickish, substDVarSet, substIdInfo,
 
         -- ** Operations on substitutions
-        emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, isEmptySubst,
+        emptySubst, mkEmptySubst, mkTCvSubst, mkOpenSubst, isEmptySubst,
         extendIdSubst, extendIdSubstList, extendTCvSubst, extendTvSubstList,
         extendIdSubstWithClone,
         extendSubst, extendSubstList, extendSubstWithVar,
