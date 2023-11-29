@@ -1823,7 +1823,6 @@ def metric_dict(name, way, metric, value) -> PerfStat:
 def check_generic_stats(name, way, get_stats):
     for (metric, gen_stat) in get_stats.items():
         res = report_stats(name, way, metric, gen_stat)
-        print(res)
         if badResult(res):
             return res
     return passed()
