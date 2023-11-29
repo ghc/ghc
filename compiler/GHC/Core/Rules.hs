@@ -9,7 +9,7 @@
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module GHC.Core.Rules (
         -- ** Looking up rules
-        lookupRule,
+        lookupRule, matchExprs,
 
         -- ** RuleBase, RuleEnv
         RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
@@ -720,15 +720,23 @@ matchN  :: InScopeEnv
 -- trailing ones, returning the result of applying the rule to a prefix
 -- of the actual arguments.
 
-matchN (ISE in_scope id_unf) rule_name tmpl_vars tmpl_es target_es rhs
+matchN ise _rule_name tmpl_vars tmpl_es target_es rhs
+  = do { (bind_wrapper, matched_es) <- matchExprs ise tmpl_vars tmpl_es target_es
+       ; return (bind_wrapper $
+                 mkLams tmpl_vars rhs `mkApps` matched_es) }
+
+matchExprs :: InScopeEnv -> [Var] -> [CoreExpr] -> [CoreExpr]
+           -> Maybe (BindWrapper, [CoreExpr])  -- 1-1 with the [Var]
+matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptySubst in_scope) $
                                 tmpl_vars `zip` tmpl_vars1
-              bind_wrapper = rs_binds rule_subst
+
+        ; let bind_wrapper = rs_binds rule_subst
                              -- Floated bindings; see Note [Matching lets]
-       ; return (bind_wrapper $
-                 mkLams tmpl_vars rhs `mkApps` matched_es) }
+
+        ; return (bind_wrapper, matched_es) }
   where
     (init_rn_env, tmpl_vars1) = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
                   -- See Note [Cloning the template binders]
@@ -739,7 +747,7 @@ matchN (ISE in_scope id_unf) rule_name tmpl_vars tmpl_es target_es rhs
                    , rv_unf   = id_unf }
 
     lookup_tmpl :: RuleSubst -> Subst -> (InVar,OutVar) -> (Subst, CoreExpr)
-                   -- Need to return a RuleSubst solely for the benefit of mk_fake_ty
+                   -- Need to return a RuleSubst solely for the benefit of fake_ty
     lookup_tmpl (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
                 tcv_subst (tmpl_var, tmpl_var1)
         | isId tmpl_var1
@@ -768,7 +776,6 @@ matchN (ISE in_scope id_unf) rule_name tmpl_vars tmpl_es target_es rhs
     unbound tmpl_var
        = pprPanic "Template variable unbound in rewrite rule" $
          vcat [ text "Variable:" <+> ppr tmpl_var <+> dcolon <+> ppr (varType tmpl_var)
-              , text "Rule" <+> pprRuleName rule_name
               , text "Rule bndrs:" <+> ppr tmpl_vars
               , text "LHS args:" <+> ppr tmpl_es
               , text "Actual args:" <+> ppr target_es ]
