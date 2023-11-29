@@ -14,6 +14,7 @@
     ([CLC proposal #166](https://github.com/haskell/core-libraries-committee/issues/166))
   * Export List from Data.List ([CLC proposal #182](https://github.com/haskell/core-libraries-committee/issues/182)).
   * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Add `System.Mem.performMajorGC` ([CLC proposal #230](https://github.com/haskell/core-libraries-committee/issues/230))
   * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
   * Implement `many` and `some` methods of `instance Alternative (Compose f g)` explicitly. ([CLC proposal #181](https://github.com/haskell/core-libraries-committee/issues/181))
 
