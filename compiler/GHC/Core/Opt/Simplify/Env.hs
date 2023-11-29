@@ -1237,9 +1237,8 @@ See also Note [Return type for join points] and Note [Join points and case-of-ca
 -}
 
 getSubst :: SimplEnv -> Subst
-getSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
-                      , seCvSubst = cv_env })
-  = mkSubst in_scope tv_env cv_env emptyIdSubstEnv
+getSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env })
+  = mkTCvSubst in_scope tv_env cv_env
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getSubst env) ty

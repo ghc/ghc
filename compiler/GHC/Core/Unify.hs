@@ -1481,7 +1481,7 @@ getSubst :: UMEnv -> UM Subst
 getSubst env = do { tv_env <- getTvSubstEnv
                   ; cv_env <- getCvSubstEnv
                   ; let in_scope = rnInScopeSet (um_rn_env env)
-                  ; return (mkSubst in_scope tv_env cv_env emptyIdSubstEnv) }
+                  ; return (mkTCvSubst in_scope tv_env cv_env) }
 
 extendTvEnv :: TyVar -> Type -> UM ()
 extendTvEnv tv ty = UM $ \state ->

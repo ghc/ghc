@@ -198,7 +198,7 @@ module GHC.Core.Type (
         -- ** Manipulating type substitutions
         emptyTvSubstEnv, emptySubst, mkEmptySubst,
 
-        mkSubst, zipTvSubst, mkTvSubstPrs,
+        mkTCvSubst, zipTvSubst, mkTvSubstPrs,
         zipTCvSubst,
         notElemSubst,
         getTvSubstEnv,
