@@ -10369,6 +10369,7 @@ module System.Mem where
   disableAllocationLimit :: GHC.Types.IO ()
   enableAllocationLimit :: GHC.Types.IO ()
   getAllocationCounter :: GHC.Types.IO GHC.Int.Int64
+  performBlockingMajorGC :: GHC.Types.IO ()
   performGC :: GHC.Types.IO ()
   performMajorGC :: GHC.Types.IO ()
   performMinorGC :: GHC.Types.IO ()

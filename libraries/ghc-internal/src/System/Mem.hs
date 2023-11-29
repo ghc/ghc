@@ -20,6 +20,7 @@ module System.Mem
        -- * Garbage collection
          performGC
        , performMajorGC
+       , performBlockingMajorGC
        , performMinorGC
 
         -- * Allocation counter and limits
@@ -40,6 +41,12 @@ performGC = performMajorGC
 --
 -- @since 4.7.0.0
 foreign import ccall "performMajorGC" performMajorGC :: IO ()
+
+-- | Triggers an immediate major garbage collection, ensuring that collection
+-- finishes before returning.
+--
+-- @since 4.20.0.0
+foreign import ccall "performBlockingMajorGC" performBlockingMajorGC :: IO ()
 
 -- | Triggers an immediate minor garbage collection.
 --
