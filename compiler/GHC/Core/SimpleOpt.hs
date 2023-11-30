@@ -818,35 +818,40 @@ The naive core produced for this is
 
 This matches literal uses of `map coerce` in code, but that's not what we
 want. We want it to match, say, `map MkAge` (where newtype Age = MkAge Int)
-too. Some of this is addressed by compulsorily unfolding coerce on the LHS,
-yielding
+too.  Achieving all this is surprisingly tricky:
 
-  forall a b (dict :: Coercible * a b).
-    map @a @b (\(x :: a) -> case dict of
-      MkCoercible (co :: a ~R# b) -> x |> co) = ...
+(MC1) We must compulsorily unfold MkAge to a cast.
+      See Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
 
-Getting better. But this isn't exactly what gets produced. This is because
-Coercible essentially has ~R# as a superclass, and superclasses get eagerly
-extracted during solving. So we get this:
+(MC2) We must compulsorily unfolding coerce on the rule LHS, yielding
+        forall a b (dict :: Coercible * a b).
+          map @a @b (\(x :: a) -> case dict of
+            MkCoercible (co :: a ~R# b) -> x |> co) = ...
 
-  forall a b (dict :: Coercible * a b).
-    case Coercible_SCSel @* @a @b dict of
-      _ [Dead] -> map @a @b (\(x :: a) -> case dict of
-                               MkCoercible (co :: a ~R# b) -> x |> co) = ...
+  Getting better. But this isn't exactly what gets produced. This is because
+  Coercible essentially has ~R# as a superclass, and superclasses get eagerly
+  extracted during solving. So we get this:
 
-Unfortunately, this still abstracts over a Coercible dictionary. We really
-want it to abstract over the ~R# evidence. So, we have Desugar.unfold_coerce,
-which transforms the above to (see also Note [Desugaring coerce as cast] in
-Desugar)
+    forall a b (dict :: Coercible * a b).
+      case Coercible_SCSel @* @a @b dict of
+        _ [Dead] -> map @a @b (\(x :: a) -> case dict of
+                                 MkCoercible (co :: a ~R# b) -> x |> co) = ...
 
-  forall a b (co :: a ~R# b).
-    let dict = MkCoercible @* @a @b co in
-    case Coercible_SCSel @* @a @b dict of
-      _ [Dead] -> map @a @b (\(x :: a) -> case dict of
-         MkCoercible (co :: a ~R# b) -> x |> co) = let dict = ... in ...
+  Unfortunately, this still abstracts over a Coercible dictionary. We really
+  want it to abstract over the ~R# evidence. So, we have Desugar.unfold_coerce,
+  which transforms the above to
+  Desugar)
 
-Now, we need simpleOptExpr to fix this up. It does so by taking three
-separate actions:
+    forall a b (co :: a ~R# b).
+      let dict = MkCoercible @* @a @b co in
+      case Coercible_SCSel @* @a @b dict of
+        _ [Dead] -> map @a @b (\(x :: a) -> case dict of
+           MkCoercible (co :: a ~R# b) -> x |> co) = let dict = ... in ...
+
+  See Note [Desugaring coerce as cast] in GHC.HsToCore
+
+(MC3) Now, we need simpleOptExpr to fix this up. It does so by taking three
+  separate actions:
   1. Inline certain non-recursive bindings. The choice whether to inline
      is made in simple_bind_pair. Note the rather specific check for
      MkCoercible in there.
@@ -857,6 +862,10 @@ separate actions:
   3. Look for case expressions that unpack something that was
      just packed and inline them. This is also done in simple_opt_expr's
      `go` function.
+
+(MC4) The map/coerce rule is the only compelling reason for having a RULE that
+  quantifies over a coercion variable, something that is otherwise Very Deeply
+  Suspicous.  See Note [Casts in the template] in GHC.Core.Rules. Ugh!
 
 This is all a fair amount of special-purpose hackery, but it's for
 a good cause. And it won't hurt other RULES and such that it comes across.
