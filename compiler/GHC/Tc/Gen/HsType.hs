@@ -1178,17 +1178,30 @@ tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
-tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
-  = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
-                            tc_lhs_type mode ty exp_kind
+tc_hs_type mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
+  | HsForAllInvis{} <- tele
+  = tc_hs_forall_ty tele ty exp_kind
+                 -- For an invisible forall, we allow the body to have
+                 -- an arbitrary kind (hence exp_kind above).
+                 -- See Note [Body kind of a HsForAllTy]
+
+  | HsForAllVis{} <- tele
+  = do { ek <- newOpenTypeKind
+       ; r <- tc_hs_forall_ty tele ty ek
+       ; checkExpectedKind t r ek exp_kind }
+                 -- For a visible forall, we require that the body is of kind TYPE r.
+                 -- See Note [Body kind of a HsForAllTy]
+
+  where
+    tc_hs_forall_ty tele ty ek
+      = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
+                                tc_lhs_type mode ty ek
                  -- Pass on the mode from the type, to any wildcards
                  -- in kind signatures on the forall'd variables
                  -- e.g.      f :: _ -> Int -> forall (a :: _). blah
-                 -- Why exp_kind?  See Note [Body kind of a HsForAllTy]
 
-       -- Do not kind-generalise here!  See Note [Kind generalisation]
-
-       ; return (mkForAllTys tv_bndrs ty') }
+             -- Do not kind-generalise here!  See Note [Kind generalisation]
+           ; return (mkForAllTys tv_bndrs ty') }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
@@ -2042,25 +2055,23 @@ examples.
 
 Note [Body kind of a HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The body of a forall is usually a type, but in principle
-there's no reason to prohibit *unlifted* types.
-In fact, GHC can itself construct a function with an
-unboxed tuple inside a for-all (via CPR analysis; see
+The body of a forall is usually a type.
+Because of representation polymorphism, it can be a TYPE r, for any r.
+(In fact, GHC can itself construct a function with an
+unboxed tuple inside a for-all via CPR analysis; see
 typecheck/should_compile/tc170).
 
-Moreover in instance heads we get forall-types with
-kind Constraint.
+A forall can also be used in an instance head, then the body should
+be a constraint.
 
-It's tempting to check that the body kind is (TYPE _). But this is
-wrong. For example:
+Right now, we do not have any easy way to enforce that a type is
+either a TYPE something or CONSTRAINT something, so we accept any kind.
+This is unsound (#22063). We could fix this by implementing a TypeLike
+predicate, see #20000.
 
-  class C a b
-  newtype N = Mk Foo deriving (C a)
-
-We're doing newtype-deriving for C. But notice how `a` isn't in scope in
-the predicate `C a`. So we quantify, yielding `forall a. C a` even though
-`C a` has kind `* -> Constraint`. The `forall a. C a` is a bit cheeky, but
-convenient. Bottom line: don't check for (TYPE _) here.
+For a forall with a required argument, we do not allow constraints;
+e.g. forall a -> Eq a is invalid. Therefore, we can enforce that the body
+is a TYPE something in this case (#24176).
 
 Note [Body kind of a HsQualTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
