@@ -607,6 +607,19 @@ def _extra_files(name, opts, files):
 def collect_size ( deviation, path ):
     return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path)) )
 
+def get_dir_size(path):
+    total = 0
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += get_dir_size(entry.path)
+    return total
+
+def collect_size_dir ( deviation, path ):
+    return collect_generic_stat ( 'size', deviation, lambda way: get_dir_size(path) )
+
 # Read a number from a specific file
 def stat_from_file ( metric, deviation, path ):
     def read_file (way):
