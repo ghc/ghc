@@ -1348,23 +1348,27 @@ write_boff_addr a i r o = mconcat
 
 read_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 read_stableptr a i r o = mconcat
-  [ r |= var "h$stablePtrBuf" -- stable pointers are always in this array
-  , o |= read_i32 a i
+  [ o |= read_i32 a i
+  , ifS (o .===. zero_)
+      (r |= null_)
+      (r |= var "h$stablePtrBuf")
   ]
 
 read_boff_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 read_boff_stableptr a i r o = mconcat
-  [ r |= var "h$stablePtrBuf" -- stable pointers are always in this array
-  , o |= read_boff_i32 a i
+  [ o |= read_boff_i32 a i
+  , ifS (o .===. zero_)
+      (r |= null_)
+      (r |= var "h$stablePtrBuf")
   ]
 
 write_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_stableptr a i _r o = write_i32 a i o
-  -- don't store "r" as it must be h$stablePtrBuf
+  -- don't store "r" as it must be h$stablePtrBuf or null
 
 write_boff_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_boff_stableptr a i _r o = write_boff_i32 a i o
-  -- don't store "r" as it must be h$stablePtrBuf
+  -- don't store "r" as it must be h$stablePtrBuf or null
 
 write_u8 :: JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_u8 a i v = idx_u8 a i |= v

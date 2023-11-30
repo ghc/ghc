@@ -18,6 +18,13 @@ var h$stablePtrData = [null];
 var h$stablePtrBuf  = h$newByteArray(8);
 var h$stablePtrN    = 1;
 var h$stablePtrFree = [];
+// Slot 0 isn't used as offset 0 is reserved for the null pointer. In
+// particular, when we store a StablePtr in an array, we don't store the array
+// part. When we read it back, we only have the offset. Some codes initialize
+// these stored StablePtr with NULL (hence offset 0) and if we were creating a
+// StablePtr from it (i.e. [$stablePtrBuf,0]) then we can't compare them to
+// nullPtr (castStablePtrToPtr [$stablePtrBuf,0] /= [null,0]).
+// This happens in direct-sqlite package for example.
 
 function h$makeStablePtr(v) {
   TRACE_STABLEPTR("makeStablePtr")
