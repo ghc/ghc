@@ -508,4 +508,6 @@ test('T24014', normal, compile, ['-dcore-lint'])
 test('T24029', normal, compile, [''])
 test('T21348', normal, compile, ['-O'])
 test('T21917', normal, compile, ['-O -fkeep-auto-rules -ddump-rules'])
-
+test('T23209', [extra_files(['T23209_Aux.hs'])], multimod_compile, ['T23209', '-v0 -O'])
+test('T24229a', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques -dppr-cols=99999'])
+test('T24229b', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques -dppr-cols=99999'])

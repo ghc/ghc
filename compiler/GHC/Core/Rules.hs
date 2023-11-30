@@ -86,6 +86,7 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Data.List.SetOps( hasNoDups )
 
+import GHC.Utils.FV( filterFV, fvVarSet )
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -967,9 +968,69 @@ where 'co' is non-reflexive, we simply fail.  You might wonder about
 but the Simplifer pushes the casts in an application to to the
 right, if it can, so this doesn't really arise.
 
+Note [Casts in the template]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note concerns `matchTemplateCast`.  Consider the definition
+  f x = e,
+and SpecConstr on call pattern
+  f ((e1,e2) |> co)
+
+The danger is that We'll make a RULE
+   RULE forall a,b,g.  f ((a,b)|> g) = $sf a b g
+   $sf a b g = e[ ((a,b)|> g) / x ]
+
+This requires the rule-matcher to bind the coercion variable `g`.
+That is Very Deeply Suspicious:
+
+* It would be unreasonable to match on a structured coercion in a pattern,
+  such as    RULE   forall g.  f (x |> Sym g) = ...
+  because the strucure of a coercion is arbitrary and may change -- it's their
+  /type/ that matters.
+
+* We considered insisting that in a template, in a cast (e |> co), the the cast
+  `co` is always a /variable/ cv.  That looks a bit more plausible, but #23209
+  (and related tickets) shows that it's very fragile.  For example suppose `e`
+  is a variable `f`, and the simplifier has an unconditional substitution
+     [f :-> g |> co2]
+  Now the rule LHS becomes (f |> (co2 ; cv)); not a coercion variable any more!
+
+In short, it is Very Deeply Suspicious for a rule to quantify over a coercion
+variable.  And SpecConstr no longer does so: see Note [SpecConstr and casts] in
+SpecConstr.
+
+It is, however, OK for a cast to appear in a template.  For example
+    newtype N a = MkN (a,a)    -- Axiom ax:N a :: (a,a) ~R N a
+    f :: N a -> bah
+    RULE forall b x:b y:b. f @b ((x,y) |> (axN @b)) = ...
+
+When matching we can just move these casts to the other side:
+    match (tmpl |> co) tgt  -->   match tmpl (tgt |> sym co)
+See matchTemplateCast.
+
+Wrinkles:
+
+(CT1) We need to be careful about scoping, and to match left-to-right, so that we
+  know the substitution [a :-> b] before we meet (co :: (a,a) ~R N a), and so we
+  can apply that substitition
+
+(CT2) Annoyingly, we still want support one case in which the RULE quantifies
+  over a coercion variable: the dreaded map/coerce RULE.
+  See Note [Getting the map/coerce RULE to work] in GHC.Core.SimpleOpt.
+
+  Since that can happen, matchTemplateCast laboriously checks whether the
+  coercion mentions a template coercion variable; and if so does the Very Deeply
+  Suspicious `match_co` instead.  It works fine for map/coerce, where the
+  coercion is always a variable and will (robustly) remain so.
+
+See also
+* Note [Coercion arguments]
+* Note [Matching coercion variables] in GHC.Core.Unify.
+* Note [Cast swizzling on rule LHSs] in GHC.Core.Opt.Simplify.Utils:
+  sm_cast_swizzle is switched off in the template of a RULE
+
 Note [Coercion arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-What if we have (f co) in the template, where the 'co' is a coercion
+What if we have (f (Coercion co)) in the template, where the 'co' is a coercion
 argument to f?  Right now we have nothing in place to ensure that a
 coercion /argument/ in the template is a variable.  We really should,
 perhaps by abstracting over that variable.
@@ -979,33 +1040,6 @@ C.f. the treatment of dictionaries in GHC.HsToCore.Binds.decompseRuleLhs.
 For now, though, we simply behave badly, by failing in match_co.
 We really should never rely on matching the structure of a coercion
 (which is just a proof).
-
-Note [Casts in the template]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the definition
-  f x = e,
-and SpecConstr on call pattern
-  f ((e1,e2) |> co)
-
-We'll make a RULE
-   RULE forall a,b,g.  f ((a,b)|> g) = $sf a b g
-   $sf a b g = e[ ((a,b)|> g) / x ]
-
-So here is the invariant:
-
-  In the template, in a cast (e |> co),
-  the cast `co` is always a /variable/.
-
-Matching should bind that variable to an actual coercion, so that we
-can use it in $sf.  So a Cast on the LHS (the template) calls
-match_co, which succeeds when the template cast is a variable -- which
-it always is.  That is why match_co has so few cases.
-
-See also
-* Note [Coercion arguments]
-* Note [Matching coercion variables] in GHC.Core.Unify.
-* Note [Cast swizzling on rule LHSs] in GHC.Core.Opt.Simplify.Utils:
-  sm_cast_swizzle is switched off in the template of a RULE
 -}
 
 ----------------------
@@ -1067,14 +1101,7 @@ match renv subst e1 (Cast e2 co2) mco
     -- This is important: see Note [Cancel reflexive casts]
 
 match renv subst (Cast e1 co1) e2 mco
-  = -- See Note [Casts in the template]
-    do { let co2 = case mco of
-                     MRefl   -> mkRepReflCo (exprType e2)
-                     MCo co2 -> co2
-       ; subst1 <- match_co renv subst co1 co2
-         -- If match_co succeeds, then (exprType e1) = (exprType e2)
-         -- Hence the MRefl in the next line
-       ; match renv subst1 e1 e2 MRefl }
+  = matchTemplateCast renv subst e1 co1 e2 mco
 
 ------------------------ Literals ---------------------
 match _ subst (Lit lit1) (Lit lit2) mco
@@ -1297,7 +1324,7 @@ match renv subst (Lam x1 e1) e2 mco
         in_scope_env = ISE in_scope (rv_unf renv)
         -- extendInScopeSetSet: The InScopeSet of rn_env is not necessarily
         -- a superset of the free vars of e2; it is only guaranteed a superset of
-        -- applyng the (rnEnvR rn_env) substitution to e2. But exprIsLambda_maybe
+        -- applying the (rnEnvR rn_env) substitution to e2. But exprIsLambda_maybe
         -- wants an in-scope set that includes all the free vars of its argument.
         -- Hence adding adding (exprFreeVars casted_e2) to the in-scope set (#23630)
   , Just (x2, e2', ts) <- exprIsLambda_maybe in_scope_env casted_e2
@@ -1456,6 +1483,40 @@ Hence
 -}
 
 -------------
+matchTemplateCast
+    :: RuleMatchEnv -> RuleSubst
+    -> CoreExpr -> Coercion
+    -> CoreExpr -> MCoercion
+    -> Maybe RuleSubst
+matchTemplateCast renv subst e1 co1 e2 mco
+  | isEmptyVarSet $ fvVarSet $
+    filterFV (`elemVarSet` rv_tmpls renv) $    -- Check that the coercion does not
+    tyCoFVsOfCo substed_co                     -- mention any of the template variables
+  = -- This is the good path
+    -- See Note [Casts in the template]
+    match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoL mco (mkSymCo substed_co)))
+
+  | otherwise
+  = -- This is the Deeply Suspicious Path
+    do { let co2 = case mco of
+                     MRefl   -> mkRepReflCo (exprType e2)
+                     MCo co2 -> co2
+       ; subst1 <- match_co renv subst co1 co2
+         -- If match_co succeeds, then (exprType e1) = (exprType e2)
+         -- Hence the MRefl in the next line
+       ; match renv subst1 e1 e2 MRefl }
+  where
+    substed_co = substCo current_subst co1
+
+    current_subst :: Subst
+    current_subst = mkTCvSubst (rnInScopeSet (rv_lcl renv))
+                               (rs_tv_subst subst)
+                               emptyCvSubstEnv
+       -- emptyCvSubstEnv: ugh!
+       -- If there were any CoVar substitutions they would be in
+       -- rs_id_subst; but we don't expect there to be any; see
+       -- Note [Casts in the template]
+
 match_co :: RuleMatchEnv
          -> RuleSubst
          -> Coercion

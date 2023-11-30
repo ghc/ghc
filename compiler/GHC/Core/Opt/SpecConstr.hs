@@ -67,7 +67,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique( hasKey )
 
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
-import GHC.Data.Pair
 import GHC.Data.FastString
 
 import GHC.Utils.Misc
@@ -2246,7 +2245,7 @@ Wrinkles:
 
 * The list of argument patterns, cp_args, is no longer than the
   visible lambdas of the binding, ri_arg_occs.  This is done via
-  the zipWithM in callToPats.
+  the zipWithM in callToPat.
 
 * The list of argument patterns can certainly be shorter than the
   lambdas in the function definition (under-saturated).  For example
@@ -2256,7 +2255,7 @@ Wrinkles:
 
 * In fact we deliberately shrink the list of argument patterns,
   cp_args, by trimming off all the boring ones at the end (see
-  `dropWhileEnd is_boring` in callToPats).  Since the RULE only
+  `dropWhileEnd is_boring` in callToPat).  Since the RULE only
   applies when it is saturated, this shrinking makes the RULE more
   applicable.  But it does mean that the argument patterns do not
   necessarily saturate the lambdas of the function.
@@ -2299,63 +2298,48 @@ Note [SpecConstr and casts]
 Consider (#14270) a call like
 
     let f = e
-    in ... f (K @(a |> co)) ...
+    in ... f (K @(a |> cv)) ...
 
-where 'co' is a coercion variable not in scope at f's definition site.
+where 'cv' is a coercion variable not in scope at f's definition site.
 If we aren't careful we'll get
 
-    let $sf a co = e (K @(a |> co))
-        RULE "SC:f" forall a co.  f (K @(a |> co)) = $sf a co
+    let $sf a cv = e (K @(a |> cv))
+        RULE "SC:f" forall a cv.  f (K @(a |> cv)) = $sf a co
         f = e
     in ...
 
-But alas, when we match the call we won't bind 'co', because type-matching
-(for good reasons) discards casts).
+But alas, when we match the call we may fail to bind 'co', because the rule
+matcher in GHC.Core.Rules cannot reliably bind coercion variables that appear
+in casts (see Note [Casts in the template] in GHC.Core.Rules).
 
-I don't know how to solve this, so for now I'm just discarding any
-call patterns that
-  * Mentions a coercion variable in a type argument
-  * That is not in scope at the binding of the function
+This seems intractable (see #23209). So:
 
-I think this is very rare.
+* Key point: we /never/ quantify over coercion variables in a SpecConstr rule.
+  If we would need to quantify over a coercion variable, we just discard the
+  call pattern. See the test for `bad_covars` in callToPat.
 
-It is important (e.g. #14936) that this /only/ applies to
-coercions mentioned in casts.  We don't want to be discombobulated
-by casts in terms!  For example, consider
-   f ((e1,e2) |> sym co)
-where, say,
-   f  :: Foo -> blah
-   co :: Foo ~R (Int,Int)
+* However (#14936) we /do/ still allow casts in call patterns. For example
+     f ((e1,e2) |> sym co)
+  where, say,
+     f  :: Foo -> blah   -- Foo is a newtype
+     f = f_rhs
+     co :: Foo ~R (Int,Int)
+  We want to specialise on that pair!
 
-Here we definitely do want to specialise for that pair!  We do not
-match on the structure of the coercion; instead we just match on a
-coercion variable, so the RULE looks like
+So for our function f, we might generate
+  RULE forall x y.  f ((x,y) |> co) = $sf x y
+  $sf x y = f_rhs ((x,y) |> co)
 
-   forall (x::Int, y::Int, co :: (Int,Int) ~R Foo)
-     f ((x,y) |> co) = $sf x y co
+This works provided the free vars of `co` are either in-scope at the
+definition of `f`, or quantified. For the latter, suppose `f` was polymorphic:
 
-Often the body of f looks like
-   f arg = ...(case arg |> co' of
-                (x,y) -> blah)...
+     f2  :: Foo2 a -> blah   -- Foo is a newtype
+     f2 = f2_rhs
+     co2 :: Foo a ~R (a,a)
 
-so that the specialised f will turn into
-   $sf x y co = let arg = (x,y) |> co
-                in ...(case arg>| co' of
-                         (x,y) -> blah)....
-
-which will simplify to not use 'co' at all.  But we can't guarantee
-that co will end up unused, so we still pass it.  Absence analysis
-may remove it later.
-
-Note that this /also/ discards the call pattern if we have a cast in a
-/term/, although in fact Rules.match does make a very flaky and
-fragile attempt to match coercions.  e.g. a call like
-    f (Maybe Age) (Nothing |> co) blah
-    where co :: Maybe Int ~ Maybe Age
-will be discarded.  It's extremely fragile to match on the form of a
-coercion, so I think it's better just not to try.  A more complicated
-alternative would be to discard calls that mention coercion variables
-only in kind-casts, but I'm doing the simple thing for now.
+Then it's fine for `co2` to mention `a`.  We'll get
+  RULE forall a (x::a) (y::a).  f2 @a ((x,y) |> co2) = $sf2 a x y
+  $sf2 @a x y = f2_rhs ((x,y) |> co2)
 -}
 
 data CallPat = CP { cp_qvars :: [Var]           -- Quantified variables
@@ -2485,12 +2469,12 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
                , text "Discarding:" <+> ppr (drop n_remaining sorted_pats) ]
 
 
-callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
+callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         -- The [Var] is the variables to quantify over in the rule
         --      Type variables come first, since they may scope
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
-callToPats env bndr_occs call@(Call fn args con_env)
+callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = getSubstInScope (sc_subst env)
 
         ; arg_tripples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
@@ -2521,32 +2505,25 @@ callToPats env bndr_occs call@(Call fn args con_env)
                 -- See Note [Free type variables of the qvar types]
                 -- See Note [Shadowing] at the top
 
-              (ktvs, ids)   = partition isTyVar qvars
-              qvars'        = scopedSort ktvs ++ map sanitise ids
+              (qktvs, qids) = partition isTyVar qvars
+              qvars'        = scopedSort qktvs ++ map sanitise qids
                 -- Order into kind variables, type variables, term variables
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
 
-              sanitise id   = updateIdTypeAndMult expandTypeSynonyms id
+              sanitise id = updateIdTypeAndMult expandTypeSynonyms id
                 -- See Note [Free type variables of the qvar types]
 
-
         -- Check for bad coercion variables: see Note [SpecConstr and casts]
-        ; let bad_covars :: CoVarSet
-              bad_covars = mapUnionVarSet get_bad_covars pats
-              get_bad_covars :: CoreArg -> CoVarSet
-              get_bad_covars (Type ty) = filterVarSet bad_covar (tyCoVarsOfType ty)
-              get_bad_covars _         = emptyVarSet
-              bad_covar v = isId v && not (is_in_scope v)
-
-        ; warnPprTrace (not (isEmptyVarSet bad_covars))
+        ; let bad_covars = filter isCoVar qids
+        ; warnPprTrace (not (null bad_covars))
               "SpecConstr: bad covars"
               (ppr bad_covars $$ ppr call) $
 
-          if interesting && isEmptyVarSet bad_covars
+          if interesting && null bad_covars
           then do { let cp_res = CP { cp_qvars = qvars', cp_args = pats
                                     , cp_strict_args = concat cbv_ids }
---                  ; pprTraceM "callToPatsOut" $
+--                  ; pprTraceM "callToPatOut" $
 --                    vcat [ text "fn:" <+> ppr fn
 --                         , text "args:" <+> ppr args
 --                         , text "bndr_occs:" <+> ppr bndr_occs
@@ -2614,39 +2591,16 @@ argToPat1 env in_scope val_env (Let _ arg) arg_occ arg_str
         -- Here we can specialise for f (v,w)
         -- because the rule-matcher will look through the let.
 
-{- Disabled; see Note [Matching cases] in "GHC.Core.Rules"
-argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
-  | exprOkForSpeculation scrut  -- See Note [Matching cases] in "GHC.Core.Rules"
-  = argToPat env in_scope val_env rhs arg_occ
--}
-
+   -- Casts: see Note [SpecConstr and casts]
 argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
   | not (ignoreType env ty2)
   = do  { (interesting, arg', strict_args) <- argToPat env in_scope val_env arg arg_occ arg_str
         ; if not interesting then
                 wildCardPat ty2 arg_str
-          else do
-        { -- Make a wild-card pattern for the coercion
-          uniq <- getUniqueM
-        ; let co_name = mkSysTvName uniq (fsLit "sg")
-              co_var  = mkCoVar co_name (mkCoercionType Representational ty1 ty2)
-        ; return (interesting, Cast arg' (mkCoVarCo co_var), strict_args) } }
+          else
+                return (interesting, Cast arg' co, strict_args) }
   where
-    Pair ty1 ty2 = coercionKind co
-
-
-
-{-      Disabling lambda specialisation for now
-        It's fragile, and the spec_loop can be infinite
-argToPat in_scope val_env arg arg_occ
-  | is_value_lam arg
-  = return (True, arg)
-  where
-    is_value_lam (Lam v e)         -- Spot a value lambda, even if
-        | isId v       = True      -- it is inside a type lambda
-        | otherwise    = is_value_lam e
-    is_value_lam other = False
--}
+    ty2 = coercionRKind co
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
@@ -2734,6 +2688,25 @@ argToPat1 env in_scope val_env (Var v) arg_occ arg_str
         -- from the body of the let
         --       f x y = letrec g z = ... in g (x,y)
         -- We don't want to specialise for that *particular* x,y
+
+
+{- Disabled; see Note [Matching cases] in "GHC.Core.Rules"
+argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
+  | exprOkForSpeculation scrut  -- See Note [Matching cases] in "GHC.Core.Rules"
+  = argToPat env in_scope val_env rhs arg_occ
+-}
+
+{-      Disabling lambda specialisation for now
+        It's fragile, and the spec_loop can be infinite
+argToPat in_scope val_env arg arg_occ
+  | is_value_lam arg
+  = return (True, arg)
+  where
+    is_value_lam (Lam v e)         -- Spot a value lambda, even if
+        | isId v       = True      -- it is inside a type lambda
+        | otherwise    = is_value_lam e
+    is_value_lam other = False
+-}
 
   -- The default case: make a wild-card
   -- We use this for coercions too
