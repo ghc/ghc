@@ -1145,33 +1145,37 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
-      let build_action =
-            withCurrentUnit (moduleGraphNodeUnitId mod) $ do
-            (hug, deps) <- wait_deps_hug hug_var build_deps
+      let !build_action =
             case mod of
               InstantiationNode uid iu -> do
-                executeInstantiationNode mod_idx n_mods hug uid iu
-                return (Nothing, deps)
-              ModuleNode _build_deps ms -> do
+                withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                  (hug, deps) <- wait_deps_hug hug_var build_deps
+                  executeInstantiationNode mod_idx n_mods hug uid iu
+                  return (Nothing, deps)
+              ModuleNode _build_deps ms ->
                 let !old_hmi = M.lookup (msKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
-                hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
-                -- Write the HMI to an external cache (if one exists)
-                -- See Note [Caching HomeModInfo]
-                liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
-                -- This global MVar is incrementally modified in order to avoid having to
-                -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
-                liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
-                return (Just hmi, addToModuleNameSet (moduleGraphNodeUnitId mod) (ms_mod_name ms) deps )
+                in withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                     (hug, deps) <- wait_deps_hug hug_var build_deps
+                     hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
+                     -- Write the HMI to an external cache (if one exists)
+                     -- See Note [Caching HomeModInfo]
+                     liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
+                     -- This global MVar is incrementally modified in order to avoid having to
+                     -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
+                     liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
+                     return (Just hmi, addToModuleNameSet (moduleGraphNodeUnitId mod) (ms_mod_name ms) deps )
               LinkNode _nks uid -> do
-                  executeLinkNode hug (mod_idx, n_mods) uid direct_deps
-                  return (Nothing, deps)
+                  withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                    (hug, deps) <- wait_deps_hug hug_var build_deps
+                    executeLinkNode hug (mod_idx, n_mods) uid direct_deps
+                    return (Nothing, deps)
 
 
       res_var <- liftIO newEmptyMVar
       let result_var = mkResultVar res_var
       setModulePipeline (mkNodeKey mod) (mkBuildResult origin result_var)
-      return $ (MakeAction build_action res_var)
+      return $! (MakeAction build_action res_var)
 
 
     buildOneLoopyModule :: ModuleGraphNodeWithBootFile -> BuildM [MakeAction]
@@ -2986,7 +2990,7 @@ runLoop fork_thread env (MakeAction act res_var :acts) = do
       run_pipeline :: RunMakeM a -> IO (Maybe a)
       run_pipeline p = runMaybeT (runReaderT p env)
 
-data MakeAction = forall a . MakeAction (RunMakeM a) (MVar (Maybe a))
+data MakeAction = forall a . MakeAction !(RunMakeM a) !(MVar (Maybe a))
 
 waitMakeAction :: MakeAction -> IO ()
 waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
