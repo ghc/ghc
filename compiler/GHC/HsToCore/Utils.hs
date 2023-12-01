@@ -597,7 +597,12 @@ mkSelectorBinds is used to desugar a pattern binding {p = e},
 in a binding group:
   let { ...; p = e; ... } in body
 where p binds x,y (this list of binders can be empty).
-There are two cases.
+
+mkSelectorBinds is also used to desugar irrefutable patterns, which is the
+pattern syntax equivalent of a lazy pattern binding:
+   f (~(a:as)) = rhs    ==>    f x = let (a:as) = x in rhs
+
+There are three cases.
 
 ------ Special case (A) -------
   For a pattern that is just a variable,
@@ -634,7 +639,7 @@ There are two cases.
   Note that (C) /includes/ the situation where
 
    * The pattern binds exactly one variable
-        let !(Just (Just x) = e in body
+        let !(Just (Just x)) = e in body
      ==>
        let { t = case e of Just (Just v) -> Solo v
            ; v = case t of Solo v -> v }
@@ -726,15 +731,16 @@ work out well:
 -}
 -- Remark: pattern selectors only occur in unrestricted patterns so we are free
 -- to select Many as the multiplicity of every let-expression introduced.
-mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
-                -> LPat GhcTc      -- ^ The pattern
-                -> CoreExpr        -- ^ Expression to which the pattern is bound
+mkSelectorBinds :: [[CoreTickish]]       -- ^ ticks to add, possibly
+                -> LPat GhcTc            -- ^ The pattern
+                -> HsMatchContext GhcTc  -- ^ Where the pattern occurs
+                -> CoreExpr              -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
                 -- ^ Id the rhs is bound to, for desugaring strict
                 -- binds (see Note [Desugar Strict binds] in "GHC.HsToCore.Binds")
                 -- and all the desugared binds
 
-mkSelectorBinds ticks pat val_expr
+mkSelectorBinds ticks pat ctx val_expr
   | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
@@ -745,7 +751,7 @@ mkSelectorBinds ticks pat val_expr
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var val_var) PatBindRhs pat'
+               = do { rhs_expr <- matchSimply (Var val_var) ctx pat'
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
@@ -760,7 +766,7 @@ mkSelectorBinds ticks pat val_expr
   | otherwise                          -- General case (C)
   = do { tuple_var  <- newSysLocalDs ManyTy tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
-       ; tuple_expr <- matchSimply val_expr PatBindRhs pat
+       ; tuple_expr <- matchSimply val_expr ctx pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
                = (binder, mkOptTickBox tick $

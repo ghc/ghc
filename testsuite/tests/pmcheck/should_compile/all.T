@@ -120,6 +120,7 @@ test('T19271', [],  compile, [overlapping_incomplete])
 test('T21761', [],  compile, [overlapping_incomplete])
 test('T22964', [], compile, [overlapping_incomplete])
 test('T23445', [], compile, [overlapping_incomplete])
+test('T24234', [], compile, [overlapping_incomplete+'-Wincomplete-uni-patterns'])
 
 # Series (inspired) by Luke Maranget
 
