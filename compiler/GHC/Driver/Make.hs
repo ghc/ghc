@@ -609,7 +609,7 @@ createBuildPlan mod_graph maybe_top_mod =
               -- Now perform another toposort but just with these nodes and relevant hs-boot files.
               -- The result should be acyclic, if it's not, then there's an unresolved cycle in the graph.
               mresolved_cycle = collapseSCC (topSortWithBoot nodes)
-          in acyclic ++ [maybe (UnresolvedCycle nodes) ResolvedCycle mresolved_cycle] ++ toBuildPlan sccs []
+          in acyclic ++ [either UnresolvedCycle ResolvedCycle mresolved_cycle] ++ toBuildPlan sccs []
 
         (mg, lookup_node) = moduleGraphNodes False (mgModSummaries' mod_graph)
         trans_deps_map = allReachable mg (mkNodeKey . node_payload)
@@ -640,12 +640,12 @@ createBuildPlan mod_graph maybe_top_mod =
         get_boot_module m = case m of ModuleNode _ ms | HsSrcFile <- ms_hsc_src ms -> lookupModuleEnv boot_modules (ms_mod ms); _ -> Nothing
 
         -- Any cycles should be resolved now
-        collapseSCC :: [SCC ModuleGraphNode] -> Maybe [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
+        collapseSCC :: [SCC ModuleGraphNode] -> Either [ModuleGraphNode] [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
         -- Must be at least two nodes, as we were in a cycle
-        collapseSCC [AcyclicSCC node1, AcyclicSCC node2] = Just [toNodeWithBoot node1, toNodeWithBoot node2]
+        collapseSCC [AcyclicSCC node1, AcyclicSCC node2] = Right [toNodeWithBoot node1, toNodeWithBoot node2]
         collapseSCC (AcyclicSCC node : nodes) = (toNodeWithBoot node :) <$> collapseSCC nodes
         -- Cyclic
-        collapseSCC _ = Nothing
+        collapseSCC nodes = Left (flattenSCCs nodes)
 
         toNodeWithBoot :: ModuleGraphNode -> Either ModuleGraphNode ModuleGraphNodeWithBootFile
         toNodeWithBoot mn =
