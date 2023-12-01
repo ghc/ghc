@@ -118,6 +118,7 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
         then id
         else discardWarningsDs
     want_pmc PatBindRhs = True
+    want_pmc LazyPatCtx = True
     want_pmc (StmtCtxt stmt_ctxt) =
       case stmt_ctxt of
         PatGuard {} -> False
