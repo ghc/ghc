@@ -384,6 +384,19 @@ test('MultiLayerModulesDefsGhci',
      ghci_script,
      ['MultiLayerModulesDefsGhci.script'])
 
+test('MultiLayerModulesDefsGhciReload',
+     [ collect_compiler_residency(15),
+       pre_cmd('./genMultiLayerModulesDefs'),
+       extra_files(['genMultiLayerModulesDefs']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     ghci_script,
+     ['MultiLayerModulesDefsGhciReload.script'])
+
 test('InstanceMatching',
      [ collect_compiler_stats('bytes allocated',3),
        pre_cmd('$MAKE -s --no-print-directory InstanceMatching'),
