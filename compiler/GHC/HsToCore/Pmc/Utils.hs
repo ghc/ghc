@@ -91,6 +91,7 @@ exhaustiveWarningFlag PatBindRhs         = Just Opt_WarnIncompleteUniPatterns
 exhaustiveWarningFlag PatBindGuards      = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag (ArrowMatchCtxt c) = arrowMatchContextExhaustiveWarningFlag c
 exhaustiveWarningFlag RecUpd             = Just Opt_WarnIncompletePatternsRecUpd
+exhaustiveWarningFlag LazyPatCtx         = Just Opt_WarnIncompleteUniPatterns
 exhaustiveWarningFlag ThPatSplice        = Nothing
 exhaustiveWarningFlag PatSyn             = Nothing
 exhaustiveWarningFlag ThPatQuote         = Nothing

@@ -451,13 +451,13 @@ tidy1 v _ (LazyPat _ pat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
-  = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
+  = putSrcSpanDs (getLocA pat) $
+    do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
             -- NB: the binders can't be representation-polymorphic, so we're OK to call isUnliftedType
         ; unless (null unlifted_bndrs) $
-          putSrcSpanDs (getLocA pat) $
           diagnosticDs (DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs)
 
-        ; (_,sel_prs) <- mkSelectorBinds [] pat (Var v)
+        ; (_,sel_prs) <- mkSelectorBinds [] pat LazyPatCtx (Var v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 

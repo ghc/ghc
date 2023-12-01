@@ -1576,6 +1576,7 @@ data HsMatchContext p
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
+  | LazyPatCtx             -- ^An irrefutable pattern
 
 {-
 Note [mc_fun field of FunRhs]

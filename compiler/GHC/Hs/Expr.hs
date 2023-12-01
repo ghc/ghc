@@ -1469,6 +1469,21 @@ pprGRHS ctxt (GRHS _ guards body)
 pp_rhs :: Outputable body => HsMatchContext passL -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 
+matchSeparator :: HsMatchContext p -> SDoc
+matchSeparator FunRhs{}         = text "="
+matchSeparator CaseAlt          = text "->"
+matchSeparator LamAlt{}         = text "->"
+matchSeparator IfAlt            = text "->"
+matchSeparator ArrowMatchCtxt{} = text "->"
+matchSeparator PatBindRhs       = text "="
+matchSeparator PatBindGuards    = text "="
+matchSeparator StmtCtxt{}       = text "<-"
+matchSeparator RecUpd           = text "="  -- This can be printed by the pattern
+matchSeparator PatSyn           = text "<-" -- match checker trace
+matchSeparator LazyPatCtx       = panic "unused"
+matchSeparator ThPatSplice      = panic "unused"
+matchSeparator ThPatQuote       = panic "unused"
+
 instance Outputable GrhsAnn where
   ppr (GrhsAnn v s) = text "GrhsAnn" <+> ppr v <+> ppr s
 
@@ -1931,6 +1946,7 @@ instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
   ppr ThPatSplice             = text "ThPatSplice"
   ppr ThPatQuote              = text "ThPatQuote"
   ppr PatSyn                  = text "PatSyn"
+  ppr LazyPatCtx              = text "LazyPatCtx"
 
 instance Outputable HsLamVariant where
   ppr = text . \case
@@ -1981,6 +1997,7 @@ matchContextErrString (StmtCtxt (TransStmtCtxt c))  = matchContextErrString (Stm
 matchContextErrString (StmtCtxt (PatGuard _))       = text "pattern guard"
 matchContextErrString (StmtCtxt (ArrowExpr))        = text "'do' block"
 matchContextErrString (StmtCtxt (HsDoStmt flavour)) = matchDoContextErrString flavour
+matchContextErrString LazyPatCtx                    = text "irrefutable pattern"
 
 matchArrowContextErrString :: HsArrowMatchContext -> SDoc
 matchArrowContextErrString ProcExpr                  = text "proc"
@@ -2022,20 +2039,6 @@ pprStmtInCtxt ctxt stmt
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
 
-matchSeparator :: HsMatchContext p -> SDoc
-matchSeparator FunRhs{}         = text "="
-matchSeparator CaseAlt          = text "->"
-matchSeparator LamAlt{}         = text "->"
-matchSeparator IfAlt            = text "->"
-matchSeparator ArrowMatchCtxt{} = text "->"
-matchSeparator PatBindRhs       = text "="
-matchSeparator PatBindGuards    = text "="
-matchSeparator StmtCtxt{}       = text "<-"
-matchSeparator RecUpd           = text "="  -- This can be printed by the pattern
-matchSeparator PatSyn           = text "<-" -- match checker trace
-matchSeparator ThPatSplice  = panic "unused"
-matchSeparator ThPatQuote   = panic "unused"
-
 pprMatchContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
@@ -2045,6 +2048,7 @@ pprMatchContext ctxt
     want_an (FunRhs {})                              = True  -- Use "an" in front
     want_an (ArrowMatchCtxt ProcExpr)                = True
     want_an (ArrowMatchCtxt (ArrowLamAlt LamSingle)) = True
+    want_an LazyPatCtx                               = True
     want_an _                                        = False
 
 pprMatchContextNoun :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
@@ -2065,6 +2069,7 @@ pprMatchContextNoun (ArrowMatchCtxt c)      = pprArrowMatchContextNoun c
 pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
                                               $$ pprAStmtContext ctxt
 pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
+pprMatchContextNoun LazyPatCtx              = text "irrefutable pattern"
 
 pprMatchContextNouns :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                      => HsMatchContext p -> SDoc
