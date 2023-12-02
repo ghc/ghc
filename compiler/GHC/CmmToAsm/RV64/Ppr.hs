@@ -690,8 +690,8 @@ pprInstr platform instr = case instr of
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
 
   SCVTF o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.w") o1 o2
   SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
   SCVTF o1 o2 -> pprPanic "RV64.pprInstr - impossible integer to float conversion" $
                   line (pprOp platform o1 <> text "->" <> pprOp platform o2)
