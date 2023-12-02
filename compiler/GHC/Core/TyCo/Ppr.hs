@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Pretty-printing types and coercions.
 module GHC.Core.TyCo.Ppr
@@ -27,7 +28,7 @@ module GHC.Core.TyCo.Ppr
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CoreToIface
-   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndrs
+   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
    , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -161,13 +162,13 @@ pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 pprSigmaType :: Type -> SDoc
 pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 
-pprForAll :: [ForAllTyBinder] -> SDoc
-pprForAll tvs = pprIfaceForAll (toIfaceForAllBndrs tvs)
+pprForAll :: [(Erasure, ForAllTyBinder)] -> SDoc
+pprForAll = pprIfaceForAll . (map . fmap) toIfaceForAllBndr
 
 -- | Print a user-level forall; see @Note [When to print foralls]@ in
 -- "GHC.Iface.Type".
-pprUserForAll :: [ForAllTyBinder] -> SDoc
-pprUserForAll = pprUserIfaceForAll . toIfaceForAllBndrs
+pprUserForAll :: [(Erasure, ForAllTyBinder)] -> SDoc
+pprUserForAll = pprUserIfaceForAll . (map . fmap) toIfaceForAllBndr
 
 pprTCvBndrs :: [ForAllTyBinder] -> SDoc
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)
@@ -318,7 +319,7 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
   where
     (_univ_tvs, _ex_tvs, _eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
     user_bndrs = tyVarSpecToBinders $ dataConUserTyVarBinders dc
-    forAllDoc  = pprUserForAll user_bndrs
+    forAllDoc  = pprUserForAll $ map (Erased,) user_bndrs
     thetaDoc   = pprThetaArrowTy theta
     argsDoc    = hsep (fmap pprParendType (map scaledThing arg_tys))
 

@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TupleSections #-}
+
 
 module GHC.Types.TyThing.Ppr (
         pprTyThing,
@@ -20,6 +22,7 @@ import GHC.Prelude
 
 import GHC.Types.TyThing ( TyThing(..), tyThingParent_maybe )
 import GHC.Types.Name
+import GHC.Types.Var ( Erasure(..) )
 
 import GHC.Core.Type    ( ForAllTyFlag(..), mkTyVarBinders )
 import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
@@ -120,7 +123,7 @@ pprFamInst (FamInst { fi_flavor = SynFamilyInst, fi_axiom = axiom
                     , fi_tvs = tvs, fi_tys = lhs_tys, fi_rhs = rhs })
   = showWithLoc (pprDefinedAt (getName axiom)) $
     hang (text "type instance"
-            <+> pprUserForAll (mkTyVarBinders Specified tvs)
+            <+> pprUserForAll (map (Erased,) $ mkTyVarBinders Specified tvs)
                 -- See Note [Printing foralls in type family instances]
                 -- in GHC.Iface.Type
             <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)

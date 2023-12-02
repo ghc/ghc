@@ -6,6 +6,7 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,
@@ -72,7 +73,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Data.BooleanFormula ( BooleanFormula(..), pprBooleanFormula, isTrue )
-import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
+import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike, Erasure(..) )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
@@ -738,7 +739,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
   where
     -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     ppr_binders = maybe_index <+>
-      pprUserIfaceForAll (map (mkIfaceForAllTvBndr Specified) tvs)
+      pprUserIfaceForAll (map ((Erased,) . mkIfaceForAllTvBndr Specified) tvs)
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
 
     -- See Note [Displaying axiom incompatibilities]
@@ -917,7 +918,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     is_data_instance = isIfaceDataInstance parent
     -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     pp_data_inst_forall :: SDoc
-    pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
+    pp_data_inst_forall = pprUserIfaceForAll $ map (Erased,) forall_bndrs
 
     forall_bndrs :: [IfaceForAllBndr]
     forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
@@ -1133,8 +1134,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike many_ty)
                                                      pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
-        univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
-        ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
+        univ_msg = pprUserIfaceForAll $ map (Erased,) $ tyVarSpecToBinders univ_bndrs
+        ex_msg   = pprUserIfaceForAll $ map (Erased,) $ tyVarSpecToBinders ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
@@ -1262,9 +1263,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- the visibilities of the existential tyvar binders, we can simply drop
     -- the universal tyvar binders from user_tvbs.
     ex_tvbs = dropList tc_binders user_tvbs
-    ppr_ex_quant = pprIfaceForAllPartMust (ifaceForAllSpecToBndrs ex_tvbs) ctxt
+    ppr_ex_quant = pprIfaceForAllPartMust (map (Erased,) $ ifaceForAllSpecToBndrs ex_tvbs) ctxt
     pp_gadt_res_ty = mk_user_con_res_ty eq_spec
-    ppr_gadt_ty = pprIfaceForAllPart (ifaceForAllSpecToBndrs user_tvbs) ctxt pp_tau
+    ppr_gadt_ty = pprIfaceForAllPart (map (Erased,) $ ifaceForAllSpecToBndrs user_tvbs) ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -252,7 +253,7 @@ ppr_co_ax_branch :: (TidyEnv -> Type -> SDoc)
                  -> TyCon -> CoAxBranch -> SDoc
 ppr_co_ax_branch ppr_rhs fam_tc branch
   = foldr1 (flip hangNotEmpty 2)
-    [ pprUserForAll (mkForAllTyBinders Inferred bndrs')
+    [ pprUserForAll (map (Erased,) $ mkForAllTyBinders Inferred bndrs')
          -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     , pp_lhs <+> ppr_rhs tidy_env ee_rhs
     , vcat [ text "-- Defined" <+> pp_loc

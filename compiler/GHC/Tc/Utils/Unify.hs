@@ -403,6 +403,10 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
     go acc_arg_tys n ty
       | Just ty' <- coreView ty = go acc_arg_tys n ty'
+    -- XXX JB these actually aren't here I just need to put this somewhere
+    -- XXX JB HERE HERE: right now \x -> x (or undefined) :: foreach x -> x results in a stack overflow :thinking:
+    -- XXX JB HERE HERE: foo :: foreach x -> Int; foo x = 4 right now has type `forall (x :: k) -> k -> Int`. Should be foreach I guess
+    -- XXX JB HERE HERE: :t undefined :: foreach x -> x results in Couldn't match expected type forall x -> * -> x with actual type a0
 
     -- Decompose /visible/ (forall a -> blah), to give an ExpForAllPat
     -- NB: invisible binders are handled by tcSplitSigmaTy/tcTopSkolemise above
@@ -410,7 +414,6 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     --     to syntactically visible patterns in the source program
     -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
     go acc_arg_tys n ty
-    -- XXX JB HERE Maybe this should use the tc version of splitForAllTys (and then splitForAllTys can stop removing the function type)
       | Just (eras, Bndr tv vis, ty') <- tcSplitForAllTyVarBinder_maybe ty
       , Required <- vis
       = let init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))

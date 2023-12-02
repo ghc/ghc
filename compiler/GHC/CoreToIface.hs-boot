@@ -11,6 +11,7 @@ import GHC.Types.Var.Set( VarSet )
 -- For GHC.Core.TyCo.Rep
 toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTyLit :: TyLit -> IfaceTyLit
+toIfaceForAllBndr :: VarBndr TyCoVar flag -> VarBndr IfaceBndr flag
 toIfaceForAllBndrs :: [VarBndr TyCoVar flag] -> [VarBndr IfaceBndr flag]
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs

@@ -1,10 +1,11 @@
+{-# LANGUAGE TupleSections #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1998
 
 \section[PatSyn]{@PatSyn@: Pattern synonyms}
 -}
-
 
 
 module GHC.Core.PatSyn (
@@ -502,7 +503,7 @@ pprPatSynType :: PatSyn -> SDoc
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
                         , psArgs       = orig_args, psResultTy = orig_res_ty })
-  = sep [ pprForAll $ tyVarSpecToBinders univ_tvs
+  = sep [ pprForAll $ map (Erased,) $ tyVarSpecToBinders univ_tvs
         , pprThetaArrowTy req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]

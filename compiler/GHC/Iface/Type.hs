@@ -476,7 +476,7 @@ isIfaceLifted (IfaceTyConApp tc args)
   = True
 isIfaceLifted _ = False
 
-splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
+splitIfaceSigmaTy :: IfaceType -> ([(Erasure, IfaceForAllBndr)], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
 --
 -- Here we split nested IfaceSigmaTy properly.
@@ -500,9 +500,9 @@ splitIfaceSigmaTy ty
     (theta, tau)   = split_rho rho
 
     -- XXX JB Iface do we need to check the erasure here?
-    split_foralls (IfaceForAllTy _ bndr ty)
+    split_foralls (IfaceForAllTy eras bndr ty)
         | isInvisibleForAllTyFlag (binderFlag bndr)
-        = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+        = case split_foralls ty of { (bndrs, rho) -> ((eras, bndr):bndrs, rho) }
     split_foralls rho = ([], rho)
 
     split_rho (IfaceFunTy af _ ty1 ty2)
@@ -510,11 +510,10 @@ splitIfaceSigmaTy ty
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
-splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
--- XXX JB Iface do we need to check the erasure here?
-splitIfaceReqForallTy (IfaceForAllTy _ bndr ty)
+splitIfaceReqForallTy :: IfaceType -> ([(Erasure, IfaceForAllBndr)], IfaceType)
+splitIfaceReqForallTy (IfaceForAllTy eras bndr ty)
   | isVisibleForAllTyFlag (binderFlag bndr)
-  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> ((eras, bndr):bndrs, rho) }
 splitIfaceReqForallTy rho = ([], rho)
 
 suppressIfaceInvisibles :: PrintExplicitKinds -> [IfaceTyConBinder] -> [a] -> [a]
@@ -1275,12 +1274,12 @@ ppr_app_arg ctx_prec (t, argf) =
        _         -> empty
 
 -------------------
-pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPart :: [(Erasure, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
 
 -- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
-pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust :: [(Erasure, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
@@ -1289,9 +1288,8 @@ pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)]
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
--- XXX JB HERE printing this needs to be fixed
 ppr_iface_forall_part :: ShowForAllFlag
-                      -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+                      -> [(Erasure, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 ppr_iface_forall_part show_forall tvs ctxt sdoc
   = sep [ case show_forall of
             ShowForAllMust -> pprIfaceForAll tvs
@@ -1300,13 +1298,13 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
         , sdoc]
 
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
-pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
+pprIfaceForAll :: [(Erasure, IfaceForAllBndr)] -> SDoc
 pprIfaceForAll [] = empty
-pprIfaceForAll bndrs@(Bndr _ vis : _)
-  = sep [ add_separator (forAllLit <+> fsep docs)
+pprIfaceForAll bndrs@((eras, Bndr _ vis) : _)
+  = sep [ add_separator ((if eras == Erased then forAllLit else forEachLit) <+> fsep docs)
         , pprIfaceForAll bndrs' ]
   where
-    (bndrs', docs) = ppr_itv_bndrs bndrs vis
+    (bndrs', docs) = ppr_itv_bndrs bndrs eras vis
 
     add_separator stuff = case vis of
                             Required -> stuff <+> arrow
@@ -1316,14 +1314,16 @@ pprIfaceForAll bndrs@(Bndr _ vis : _)
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
 -- No anonymous binders here!
-ppr_itv_bndrs :: [IfaceForAllBndr]
+ppr_itv_bndrs :: [(Erasure, IfaceForAllBndr)]
+             -> Erasure -- ^ erasure of the first binder in the list
              -> ForAllTyFlag  -- ^ visibility of the first binder in the list
-             -> ([IfaceForAllBndr], [SDoc])
-ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
-  | vis `eqForAllVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
+             -> ([(Erasure, IfaceForAllBndr)], [SDoc])
+ppr_itv_bndrs all_bndrs@((eras, bndr@(Bndr _ vis)) : bndrs) eras1 vis1
+  | eras == eras1
+  , vis `eqForAllVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs eras1 vis1 in
                              (bndrs', pprIfaceForAllBndr bndr : doc)
   | otherwise              = (all_bndrs, [])
-ppr_itv_bndrs [] _ = ([], [])
+ppr_itv_bndrs [] _ _ = ([], [])
 
 pprIfaceForAllCo :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCo []  = empty
@@ -1409,14 +1409,15 @@ ppr_sigma show_forall ctxt_prec iface_ty
     in ppr_iface_forall_part show_forall invis_tvs theta $
        sep [pprIfaceForAll req_tvs, ppr_ty_nested tau']
 
-pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
-pprUserIfaceForAll tvs
+pprUserIfaceForAll :: [(Erasure, IfaceForAllBndr)] -> SDoc
+pprUserIfaceForAll etvs
+   | let tvs = map snd etvs
    = sdocOption sdocPrintExplicitForalls $ \print_foralls ->
      -- See Note [When to print foralls] in this module.
      ppWhen (any tv_has_kind_var tvs
              || any tv_is_required tvs
              || print_foralls) $
-     pprIfaceForAll tvs
+     pprIfaceForAll etvs
    where
      tv_has_kind_var (Bndr (IfaceTvBndr (_,kind)) _)
        = not (ifTypeIsVarFree kind)
