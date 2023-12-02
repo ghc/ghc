@@ -111,17 +111,18 @@ import GHC.Types.Error
 import System.Console.Haskeline as Haskeline
 
 import Control.Applicative hiding (empty)
-import Control.DeepSeq (deepseq)
+import Control.DeepSeq (deepseq, force)
 import Control.Monad as Monad
 import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
-
+import Control.Exception as E (evaluate) 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
+import Data.Functor (($>))
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
@@ -152,6 +153,7 @@ import System.IO
 import System.IO.Error
 import System.IO.Unsafe ( unsafePerformIO )
 import System.Process
+import System.Timeout (timeout)
 import Text.Printf
 import Text.Read ( readMaybe )
 import Text.Read.Lex (isSymbolChar)
@@ -245,8 +247,8 @@ ghciCommands = map mkCmd [
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
-  ("timeout",   keepGoing timeoutCmd,           noCompletion),
   ("type",      keepGoingMulti' typeOfExpr,          completeExpression),
+  ("timeout",   keepGoing timeoutCmd,           noCompletion),
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("unadd",     keepGoingPaths unAddModule,     completeFilename),
   ("undef",     keepGoing undefineMacro,        completeMacro),
@@ -570,7 +572,7 @@ interactiveUI config srcs maybe_exprs = do
                    editor             = default_editor,
                    options            = [],
                    multiMode          = in_multi,
-                   timelimit          = Nothing,
+                   time_limit          = Nothing,
                    localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is
@@ -1082,12 +1084,25 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (unmask $ runOneCommand eh gCmd)
+            (unmask $ withTimeLimit $ runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
       Just success -> do
         unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
+
+-- | Wraps a single run input action into a timout action, if the timelimit field has been set.
+-- | Otherwise it just runs the action without doing anything. 
+withTimeLimit :: InputT GHCi (Maybe Bool) -> InputT GHCi (Maybe Bool)
+withTimeLimit cmd = do 
+  maybe_limit <- time_limit <$> getGHCiState
+  case maybe_limit of 
+    Nothing -> cmd 
+    Just limit  -> do 
+      result_or_timeout <- liftIO . timeout limit . E.evaluate . force =<< cmd
+      case result_or_timeout of 
+        Just fin  -> pure fin
+        Nothing   -> printForUser (text "GhciTimedOut.") $> pure False
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
@@ -2329,9 +2344,9 @@ timeoutCmd :: GhciMonad m => String -> m ()
 timeoutCmd str = handleSourceError printErrAndMaybeExit $ do 
   case (str, readMaybe str) of 
     ("", _)       -> printForUser (text "no input argument, resetting the timeout to nothing") 
-      *> modifyGHCiState (\st -> st{ timelimit = Nothing } )
+      *> modifyGHCiState (\st -> st{ time_limit = Nothing } )
     (_, Just t_lim) -> printForUser (text "setting timeout length to" <+> text (show t_lim) <+> text "seconds") 
-      *> modifyGHCiState (\st -> st{ timelimit = if t_lim > 0 then Just t_lim else Nothing})
+      *> modifyGHCiState (\st -> st{ time_limit = if t_lim > 0 then Just t_lim else Nothing})
     _             -> printForUser (text "The argument for timeout: " <+> text (show str) <+> "should be an Int, but it couldn't be read as one") 
   return ()
 
@@ -2537,7 +2552,7 @@ runScript filename = do
       new_st <- getGHCiState
       setGHCiState new_st{progname=prog,line_number=line}
   where scriptLoop script = do
-          res <- runOneCommand handler $ fileLoop script
+          res <- withTimeLimit $ runOneCommand handler $ fileLoop script
           case res of
             Nothing -> return ()
             Just s  -> if s
