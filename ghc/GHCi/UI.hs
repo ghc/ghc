@@ -568,6 +568,7 @@ interactiveUI config srcs maybe_exprs = do
                    editor             = default_editor,
                    options            = [],
                    multiMode          = in_multi,
+                   timelimit          = Nothing,
                    localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is

@@ -95,6 +95,7 @@ data GHCiState = GHCiState
         editor         :: String,
         stop           :: String,
         multiMode      :: Bool,
+        timelimit      :: Maybe Int,    -- ^ terminate cmds that exceed some assigned number of seconds
         localConfig    :: LocalConfigBehaviour,
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line
