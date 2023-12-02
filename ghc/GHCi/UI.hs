@@ -245,6 +245,7 @@ ghciCommands = map mkCmd [
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
+  ("timeout",   keepGoing timeoutCmd,           noCompletion),
   ("type",      keepGoingMulti' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("unadd",     keepGoingPaths unAddModule,     completeFilename),
@@ -377,6 +378,7 @@ defFullHelpText =
   "                               (!: defer type errors)\n" ++
   "   :run function [<arguments> ...] run the function with the given arguments\n" ++
   "   :script <file>              run the script <file>\n" ++
+  "   :timeout <int>              set a maximum allowed time input lines are allowed to take before failing\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
   "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
   "   :unadd <module> ...         remove module(s) from the current target set\n" ++
@@ -2320,6 +2322,18 @@ runExceptGhciMonad act = handleSourceError printGhciException $
 -- (c.f. 'except' for 'Except')
 exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
+
+-----------------------------------------------------------------------------
+-- | @:timeout@ command.
+timeoutCmd :: GhciMonad m => String -> m ()
+timeoutCmd str = handleSourceError printErrAndMaybeExit $ do 
+  case (str, readMaybe str) of 
+    ("", _)       -> printForUser (text "no input argument, resetting the timeout to nothing") 
+      *> modifyGHCiState (\st -> st{ timelimit = Nothing } )
+    (_, Just t_lim) -> printForUser (text "setting timeout length to" <+> text (show t_lim) <+> text "seconds") 
+      *> modifyGHCiState (\st -> st{ timelimit = if t_lim > 0 then Just t_lim else Nothing})
+    _             -> printForUser (text "The argument for timeout: " <+> text (show str) <+> "should be an Int, but it couldn't be read as one") 
+  return ()
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
