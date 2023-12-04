@@ -470,6 +470,7 @@ data Specificity = InferredSpec
   deriving (Eq, Ord, Data)
 
 -- | Whether a dependent argument is erased at runtime
+-- XXX JB maybe this should be added to ForAllTyFlag?
 data Erasure = Erased | Retained
   deriving (Eq, Ord, Data)
 

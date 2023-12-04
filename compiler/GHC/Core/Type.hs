@@ -1437,6 +1437,8 @@ piResultTy ty arg = case piResultTy_maybe ty arg of
 piResultTy_maybe :: Type -> Type -> Maybe Type
 -- We don't need a 'tc' version, because
 -- this function behaves the same for Type and Constraint
+-- XXX JB actually we probably do need a separate tc thing, since foreach is handled differently in tc and core (check if this is still used for tc)
+-- XXX JB same applies to piResultTys below
 piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 
@@ -1761,7 +1763,7 @@ tyConBindersPiTyBinders :: [TyConBinder] -> [PiTyBinder]
 -- Return the tyConBinders in PiTyBinder form
 tyConBindersPiTyBinders = map to_tyb
   where
-    to_tyb (Bndr tv (NamedTCB vis)) = Named Erased (Bndr tv vis) -- XXX JB TyConBinder is this really always Erased?
+    to_tyb (Bndr tv (NamedTCB vis)) = Named Erased (Bndr tv vis) -- XXX JB is this really always Erased? I think since we're dealing with type constructors the answer is yes (this is also never used)
     to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv)) FTF_T_T
 
 -- | Make a dependent forall over a TyCoVar

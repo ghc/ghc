@@ -388,6 +388,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
   where
     -- Skolemise any /invisible/ foralls /before/ the zero-arg case
     -- so that we guarantee to return a rho-type
+    -- XXX JB do we need to do something different here for foreach? E.g. should tcSplitSigma return Erasure for each tv?
     go acc_arg_tys n ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty  -- Invisible binders only!
       , not (null tvs && null theta)          -- Visible ones handled below
@@ -407,6 +408,9 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     -- XXX JB HERE HERE: right now \x -> x (or undefined) :: foreach x -> x results in a stack overflow :thinking:
     -- XXX JB HERE HERE: foo :: foreach x -> Int; foo x = 4 right now has type `forall (x :: k) -> k -> Int`. Should be foreach I guess
     -- XXX JB HERE HERE: :t undefined :: foreach x -> x results in Couldn't match expected type forall x -> * -> x with actual type a0
+    -- XXX JB HERE example of core lint failure: let foo :: foreach x -> Int; foo (type x) = 4
+    -- XXX JB HERE the above works without -dlint, except when you run `:t foo (type True)", it then says "Bool -> Int"
+    -- XXX JB "foo :: foreach x . Int; foo = 4" fails - and that makes sense, we're not stripping the foreach anywhere, so also not stripping the function type - uhh though actually I guess I see no reason why tcSplitForAllTyVarBinder or some variant wouldn't be called when checking the type, now that I think about it (seems like it might not be useful to have a retained arg on which you don't match, but what if you use pointfree style?)
 
     -- Decompose /visible/ (forall a -> blah), to give an ExpForAllPat
     -- NB: invisible binders are handled by tcSplitSigmaTy/tcTopSkolemise above

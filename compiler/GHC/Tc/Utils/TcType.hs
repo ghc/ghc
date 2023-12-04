@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -893,7 +895,7 @@ tcTyFamInstsAndVisX = go
       | otherwise
       = tcTyConAppTyFamInstsAndVisX is_invis_arg tc tys
     go _            (LitTy {})         = []
-    go is_invis_arg (ForAllTy _ bndr ty) = go is_invis_arg (binderType bndr)
+    go is_invis_arg (ForAllTyWithFun _ bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
     go is_invis_arg (FunTy _ w ty1 ty2)  = go is_invis_arg w
                                          ++ go is_invis_arg ty1
@@ -972,7 +974,7 @@ any_rewritable role tv_pred tc_pred should_expand
                                      go rl bvs arg || go rl bvs res || go NomEq bvs w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
-    go rl bvs (ForAllTy _ tv ty) = go rl (bvs `extendVarSet` binderVar tv) ty
+    go rl bvs (ForAllTyWithFun _ tv ty) = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty _)      = go rl bvs ty
     go _  _   (CoercionTy _)     = False
 
@@ -1328,7 +1330,7 @@ getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
 getDFunTyKey (FunTy { ft_af = af })  = getOccName (funTyFlagTyCon af)
-getDFunTyKey (ForAllTy _ _ t)        = getDFunTyKey t
+getDFunTyKey (ForAllTyWithFun _ _ t) = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
 
@@ -1345,13 +1347,35 @@ getDFunTyLitKey (CharTyLit n) = mkOccName Name.varName (show n)
 ************************************************************************
 -}
 
+-- | Attempts to take a ForAllTy apart, returning the full ForAllTyBinder, but assumes that any coreView stuff is already done
+tcSplitForAllForAllTyBinderNoView_maybe :: Type -> Maybe (Erasure, ForAllTyBinder, Type)
+tcSplitForAllForAllTyBinderNoView_maybe (ForAllTy Erased bndr inner_ty) = Just (Erased, bndr, inner_ty)
+tcSplitForAllForAllTyBinderNoView_maybe (ForAllTy Retained bndr (FunTy FTF_T_T mult arg_ty inner_ty)) =
+  assert (eqType (binderType bndr) arg_ty) . assert (eqType mult manyDataConTy) $
+  Just (Retained, bndr, inner_ty)
+tcSplitForAllForAllTyBinderNoView_maybe (ForAllTy Retained _ _) =
+  panic "tcSplitForAllForAllTyBinderNoView_maybe: Retained binder without matching FunTy"
+tcSplitForAllForAllTyBinderNoView_maybe _ = Nothing
+
+-- | Acts like ForAllTy, but for retained binders additionally removes the function type that is added in Core
+pattern ForAllTyWithFun :: Erasure -> ForAllTyBinder -> Type -> Type
+pattern ForAllTyWithFun eras bndr ty <- (tcSplitForAllForAllTyBinderNoView_maybe -> Just (eras, bndr, ty))
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTyWithFun, FunTy, LitTy, CastTy, CoercionTy #-}
+
 -- | Splits a forall type into a list of 'PiTyVarBinder's and the inner type.
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([PiTyVarBinder], Type)
 tcSplitPiTys ty
   = assert (all isTyBinder (fst sty))   -- No CoVar binders here
     sty
-  where sty = splitPiTys ty
+  where
+    sty = split ty ty []
+
+    split _       (ForAllTyWithFun eras b res) bs = split res res (Named eras b  : bs)
+    split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res }) bs
+                                        = split res res (Anon (Scaled w arg) af : bs)
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split orig_ty _                  bs = (reverse bs, orig_ty)
 
 -- | Splits a type into a PiTyVarBinder and a body, if possible.
 tcSplitPiTy_maybe :: Type -> Maybe (PiTyVarBinder, Type)
@@ -1359,18 +1383,20 @@ tcSplitPiTy_maybe ty
   = assert (isMaybeTyBinder sty)  -- No CoVar binders here
     sty
   where
-    sty = splitPiTy_maybe ty
+    sty = tc_split_pi_ty_maybe ty
     isMaybeTyBinder (Just (t,_)) = isTyBinder t
     isMaybeTyBinder _            = True
 
+    tc_split_pi_ty_maybe :: Type -> Maybe (PiTyBinder, Type)
+    tc_split_pi_ty_maybe ty = case coreFullView ty of
+      ForAllTyWithFun eras bndr ty -> Just (Named eras bndr, ty)
+      FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
+                         -> Just (Anon (mkScaled w arg) af, res)
+      _                  -> Nothing
+
 tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (Erasure, TyVarBinder, Type)
 tcSplitForAllTyVarBinder_maybe ty | Just ty' <- coreView ty = tcSplitForAllTyVarBinder_maybe ty'
-tcSplitForAllTyVarBinder_maybe (ForAllTy Retained tv (FunTy FTF_T_T mult arg_ty ty)) =
-  assert (isTyVarBinder tv) . assert (eqType (binderType tv) arg_ty) . assert (eqType mult manyDataConTy) $
-  Just (Retained, tv, ty)
-tcSplitForAllTyVarBinder_maybe (ForAllTy Retained _ _) =
-  panic "tcSplitForAllTyVarBinder_maybe: Retained binder without matching FunTy"
-tcSplitForAllTyVarBinder_maybe (ForAllTy Erased tv ty) = assert (isTyVarBinder tv ) Just (Erased, tv, ty)
+tcSplitForAllTyVarBinder_maybe (ForAllTyWithFun eras tv ty) = assert (isTyVarBinder tv ) Just (eras, tv, ty)
 tcSplitForAllTyVarBinder_maybe _ = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
@@ -1378,7 +1404,12 @@ tcSplitForAllTyVarBinder_maybe _ = Nothing
 tcSplitForAllTyVars :: Type -> ([TyVar], Type)
 tcSplitForAllTyVars ty
   = assert (all isTyVar (fst sty)) sty
-  where sty = splitForAllTyCoVars ty
+  where
+    sty = split ty ty []
+
+    split _       (ForAllTyWithFun _ (Bndr tv _) ty)  tvs = split ty ty (tv:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
+    split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible'
 -- type variable binders.
@@ -1393,7 +1424,7 @@ tcSplitSomeForAllTyVars :: (ForAllTyFlag -> Bool) -> Type -> ([TyVar], Type)
 tcSplitSomeForAllTyVars argf_pred ty
   = split ty ty []
   where
-    split _ (ForAllTy _ (Bndr tv argf) ty) tvs
+    split _ (ForAllTyWithFun _ (Bndr tv argf) ty) tvs
       | argf_pred argf                             = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
@@ -1402,18 +1433,33 @@ tcSplitSomeForAllTyVars argf_pred ty
 -- variable binders. All split tyvars are annotated with '()'.
 tcSplitForAllReqTVBinders :: Type -> ([TcReqTVBinder], Type)
 tcSplitForAllReqTVBinders ty = assert (all isTyVarBinder (fst sty) ) sty
-  where sty = splitForAllReqTyBinders ty
+  where
+    sty = split ty ty []
+
+    split _ (ForAllTyWithFun _ (Bndr tv Required) ty) tvs = split ty ty (Bndr tv ():tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
+    split orig_ty _                   tvs          = (reverse tvs, orig_ty)
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. All split tyvars are annotated with their 'Specificity'.
 tcSplitForAllInvisTVBinders :: Type -> ([TcInvisTVBinder], Type)
 tcSplitForAllInvisTVBinders ty = assert (all (isTyVar . binderVar) (fst sty)) sty
-  where sty = splitForAllInvisTyBinders ty
+  where
+    sty = split ty ty []
+
+    split _ (ForAllTyWithFun _ (Bndr tv (Invisible spec)) ty) tvs = split ty ty (Bndr tv spec:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty         = split orig_ty ty' tvs
+    split orig_ty _                   tvs                  = (reverse tvs, orig_ty)
 
 -- | Like 'tcSplitForAllTyVars', but splits off only named binders.
 tcSplitForAllTyVarBinders :: Type -> ([TyVarBinder], Type)
 tcSplitForAllTyVarBinders ty = assert (all isTyVarBinder (fst sty)) sty
-  where sty = splitForAllForAllTyBinders ty
+  where
+    sty = split ty ty []
+
+    split _ (ForAllTyWithFun _ b res) bs          = split res res (b:bs)
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split orig_ty _                bs             = (reverse bs, orig_ty)
 
 tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
@@ -1892,7 +1938,7 @@ isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing
 -- Used only by bindLocalMethods
 isOverloadedTy ty | Just ty' <- coreView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy _ _ ty)            = isOverloadedTy ty
+isOverloadedTy (ForAllTyWithFun _ _ ty)     = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = af })       = isInvisibleFunArg af
 isOverloadedTy _                            = False
 
@@ -2232,7 +2278,7 @@ pSizeTypeX bvs (TyConApp tc tys)           = pSizeTyConAppX bvs tc tys
 pSizeTypeX bvs (AppTy fun arg)             = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
 pSizeTypeX bvs (FunTy _ w arg res)         = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
                                              pSizeTypeX bvs res
-pSizeTypeX bvs (ForAllTy _ (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
+pSizeTypeX bvs (ForAllTyWithFun _ (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
                                              pSizeTypeX (bvs `extendVarSet` tv) ty
 pSizeTypeX bvs (CastTy ty _)               = pSizeTypeX bvs ty
 pSizeTypeX _   (CoercionTy {})             = pSizeOne

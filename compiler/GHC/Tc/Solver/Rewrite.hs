@@ -1100,7 +1100,7 @@ ty_con_binders_ty_binders' :: [TyConBinder] -> ([PiTyBinder], Bool)
 ty_con_binders_ty_binders' = foldr go ([], False)
   where
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
-      = (Named Erased (Bndr tv vis) : bndrs, True) -- XXX JB Named is it really always Erased?
+      = (Named Erased (Bndr tv vis) : bndrs, True) -- XXX JB Named is it really always Erased? I think since we're dealing with type constructors the answer is yes
     go (Bndr tv AnonTCB)   (bndrs, n)
       = (Anon (tymult (tyVarKind tv)) FTF_T_T : bndrs, n)
     {-# INLINE go #-}

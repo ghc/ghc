@@ -637,8 +637,15 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule ITVDQ from the GHC Proposal #281
     go1 delta acc so_far fun_ty ((EValArg { eva_arg = ValArg arg }) : rest_args)
-      | Just (eras, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty -- XXX JB HERE
+      | Just (Erased, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
       , binderFlag tvb == Required
+      = do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
+           ; let wrap = mkWpTyApps [ty_arg]
+           ; go delta (addArgWrap wrap acc) so_far inst_body rest_args }
+
+    go1 delta acc so_far fun_ty ((EValArg { eva_arg = ValArg arg }) : rest_args)
+      | Just (Retained, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty -- XXX JB HERE
+      , binderFlag tvb == Required -- XXX JB what if it's not required? How is regular forall handled in that case?
       = do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
            ; let wrap = mkWpTyApps [ty_arg]
            ; go delta (addArgWrap wrap acc) so_far inst_body rest_args }
@@ -983,6 +990,7 @@ Syntax of applications in HsExpr
   This nesting makes `type` rather different from `@`. Remember, the HsEmbTy mainly just
   switches namespace, and is subject to the term-to-type transformation.
 
+-- XXX JB note update
 Syntax of abstractions in Pat
 -----------------------------
 * Type patterns are represented in Pat roughly like this

@@ -221,6 +221,8 @@ data Pat p
 
   -- Embed the syntax of types into patterns.
   -- Used with RequiredTypeArguments or Foreach, e.g. fn (type t) = rhs
+  -- XXX JB Once we allow type patterns without the type herald, we'll probably have to add to the Tc extension point of some other constructor here whether that pattern is retained in some way.
+  -- XXX JB ...and somehow we also need to handle invisible foreach, like... we need to add an extra pattern for it for the retained type argument, even though there's no existing pattern as in `foreach x . 4
   | EmbTyPat        (XEmbTyPat p)
                    !(LHsToken "type" p)
                     (HsTyPat (NoGhcTc p))
