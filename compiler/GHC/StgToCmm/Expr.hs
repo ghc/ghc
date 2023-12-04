@@ -446,21 +446,49 @@ calls to nonVoidIds in various places.  So we must not look up
 
 Note [Dead-binder optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A case-binder, or data-constructor argument, may be marked as dead,
-because we preserve occurrence-info on binders in GHC.Core.Tidy (see
+Consider:
+
+   case x of (y, z<dead>) -> rhs
+
+where `z` is unused in `rhs`.  When we return form the eval of `x`,
+GHC.StgToCmm.DataCon.bindConArgs will generate some loads, assuming the the
+value of `x` is returned in R1:
+   y := R1[1]
+   z := R1[2]
+
+If `z` is never used, the load `z := R1[2]` is a waste of a memory operation.
+CmmSink (which sinks loads to their usage sites, if any) will eliminate the dead
+load; but
+  1. CmmSink only runs with -O
+  2. It would save CmmSink work if we simply did not generate the load in the
+  first place.
+
+Hence STG uses dead-binder information, in `bindConArgs` to drop dead loads.
+That's why we preserve occurrence-info on binders in GHC.Core.Tidy (see
 GHC.Core.Tidy.tidyIdBndr).
 
-If the binder is dead, we can sometimes eliminate a load.  While
-CmmSink will eliminate that load, it's very easy to kill it at source
-(giving CmmSink less work to do), and in any case CmmSink only runs
-with -O. Since the majority of case binders are dead, this
-optimisation probably still has a great benefit-cost ratio and we want
-to keep it for -O0. See also Phab:D5358.
+So it's important that deadness is accurate.  But StgCse can invalidate it
+(#14895 #24233).  Here is an example:
 
-This probably also was the reason for occurrence hack in Phab:D5339 to
-exist, perhaps because the occurrence information preserved by
-'GHC.Core.Tidy.tidyIdBndr' was insufficient.  But now that CmmSink does the
-job we deleted the hacks.
+  map_either :: (a -> b) -> Either String a -> Either String b
+  map_either = \f e -> case e of b<dead> {
+    Right x -> Right (f x)
+    Left  x -> Left x
+  }
+
+  The case-binder "b" is dead (not used in the rhss of the alternatives).
+  StgCse notices that `Left x` doesn't need to be allocated as we can reuse `b`,
+  and we get:
+
+  map_either :: (a -> b) -> Either String a -> Either String b
+  map_either = \f e -> case e of b { -- b no longer dead!
+    Right x -> Right (f x)
+    Left  x -> b
+  }
+
+For now StgCse simply zaps occurrence information on case binders. A more
+accurate update would complexify the implementation and doesn't seem worth it.
+
 -}
 
 cgCase (StgApp v []) _ (PrimAlt _) alts

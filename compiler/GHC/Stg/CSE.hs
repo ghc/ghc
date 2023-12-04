@@ -71,6 +71,11 @@ and nothing stops us from transforming that to
                           , Right [x] -> b}
 
 
+Note that this can revive dead case binders (e.g. "b" above), hence we zap
+occurrence information on all case binders during STG CSE.
+See Note [Dead-binder optimisation] in GHC.StgToCmm.Expr.
+
+
 Note [StgCse after unarisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -344,16 +349,20 @@ stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body
       in StgTick tick body'
 stgCseExpr env (StgCase scrut bndr ty alts)
-    = mkStgCase scrut' bndr' ty alts'
+    = mkStgCase scrut' bndr'' ty alts'
   where
     scrut' = stgCseExpr env scrut
     (env1, bndr') = substBndr env bndr
+    -- we must zap occurrence information on the case binder
+    -- because CSE might revive it.
+    -- See Note [Dead-binder optimisation] in GHC.StgToCmm.Expr
+    bndr'' = zapIdOccInfo bndr'
     env2 | StgApp trivial_scrut [] <- scrut'
          = addTrivCaseBndr bndr trivial_scrut env1
                  -- See Note [Trivial case scrutinee]
          | otherwise
          = env1
-    alts' = map (stgCseAlt env2 ty bndr') alts
+    alts' = map (stgCseAlt env2 ty bndr'') alts
 
 
 -- A constructor application.

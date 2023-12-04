@@ -1,0 +1,20 @@
+
+==================== Final STG: ====================
+T14895.go
+  :: forall a b.
+     (a -> b)
+     -> Data.Either.Either GHC.Base.String a
+     -> Data.Either.Either GHC.Base.String b
+[GblId, Arity=2, Str=<MC(1,L)><1L>, Unf=OtherCon []] =
+    {} \r [f ds]
+        case ds of wild {
+          Data.Either.Left e [Occ=Once1] -> wild<TagProper>;
+          Data.Either.Right a1 [Occ=Once1] ->
+              let {
+                sat [Occ=Once1] :: b
+                [LclId] =
+                    {a1, f} \u [] f a1;
+              } in  Data.Either.Right [sat];
+        };
+
+
