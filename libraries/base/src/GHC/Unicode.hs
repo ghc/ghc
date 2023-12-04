@@ -208,6 +208,17 @@ isControl c = case generalCategory c of
 
 -- | Selects printable Unicode characters
 -- (letters, numbers, marks, punctuation, symbols and spaces).
+--
+-- This function returns 'False' if its argument has one of the
+-- following 'GeneralCategory's, or 'True' otherwise:
+--
+-- * 'LineSeparator'
+-- * 'ParagraphSeparator'
+-- * 'Control'
+-- * 'Format'
+-- * 'Surrogate'
+-- * 'PrivateUse'
+-- * 'NotAssigned'
 isPrint                 :: Char -> Bool
 isPrint c = case generalCategory c of
         LineSeparator      -> False
@@ -302,6 +313,20 @@ isLowerCase = DCP.isLowercase
 -- | Selects alphabetic Unicode characters (lower-case, upper-case and
 -- title-case letters, plus letters of caseless scripts and modifiers letters).
 -- This function is equivalent to 'Data.Char.isLetter'.
+--
+-- This function returns 'True' if its argument has one of the
+-- following 'GeneralCategory's, or 'False' otherwise:
+--
+-- * 'UppercaseLetter'
+-- * 'LowercaseLetter'
+-- * 'TitlecaseLetter'
+-- * 'ModifierLetter'
+-- * 'OtherLetter'
+--
+-- These classes are defined in the
+-- <http://www.unicode.org/reports/tr44/tr44-14.html#GC_Values_Table Unicode Character Database>,
+-- part of the Unicode standard. The same document defines what is
+-- and is not a \"Letter\".
 isAlpha                 :: Char -> Bool
 isAlpha c = case generalCategory c of
         UppercaseLetter -> True
@@ -316,7 +341,20 @@ isAlpha c = case generalCategory c of
 -- Note that numeric digits outside the ASCII range, as well as numeric
 -- characters which aren't digits, are selected by this function but not by
 -- 'isDigit'. Such characters may be part of identifiers but are not used by
--- the printer and reader to represent numbers.
+-- the printer and reader to represent numbers, e.g., Roman numerals like @'V'@,
+-- full-width digits like @'１'@ (aka @'\65297'@).
+--
+-- This function returns 'True' if its argument has one of the
+-- following 'GeneralCategory's, or 'False' otherwise:
+--
+-- * 'UppercaseLetter'
+-- * 'LowercaseLetter'
+-- * 'TitlecaseLetter'
+-- * 'ModifierLetter'
+-- * 'OtherLetter'
+-- * 'DecimalNumber'
+-- * 'LetterNumber'
+-- * 'OtherNumber'
 isAlphaNum              :: Char -> Bool
 isAlphaNum c = case generalCategory c of
         UppercaseLetter -> True
