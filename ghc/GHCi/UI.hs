@@ -111,7 +111,7 @@ import GHC.Types.Error
 import System.Console.Haskeline as Haskeline
 
 import Control.Applicative hiding (empty)
-import Control.DeepSeq (deepseq, force)
+import Control.DeepSeq (NFData, deepseq, force)
 import Control.Monad as Monad
 import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
@@ -1084,7 +1084,7 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (unmask $ withTimeLimit $ runOneCommand eh gCmd)
+            (unmask $ withTimeLimit (Just False) $ runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
       Just success -> do
@@ -1093,8 +1093,8 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
 
 -- | Wraps a single run input action into a timout action, if the timelimit field has been set.
 -- | Otherwise it just runs the action without doing anything. 
-withTimeLimit :: InputT GHCi (Maybe Bool) -> InputT GHCi (Maybe Bool)
-withTimeLimit cmd = do 
+withTimeLimit :: (MonadIO m, GhciMonad m, NFData a) => a -> m (a) -> m (a) 
+withTimeLimit time_out_value cmd = do 
   maybe_limit <- time_limit <$> getGHCiState
   case maybe_limit of 
     Nothing -> cmd 
@@ -1102,7 +1102,7 @@ withTimeLimit cmd = do
       result_or_timeout <- liftIO . timeout limit . E.evaluate . force =<< cmd
       case result_or_timeout of 
         Just fin  -> pure fin
-        Nothing   -> printForUser (text "GhciTimedOut.") $> pure False
+        Nothing   -> printForUser (text "GhciTimedOut.") $> time_out_value
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
@@ -2552,7 +2552,7 @@ runScript filename = do
       new_st <- getGHCiState
       setGHCiState new_st{progname=prog,line_number=line}
   where scriptLoop script = do
-          res <- withTimeLimit $ runOneCommand handler $ fileLoop script
+          res <- withTimeLimit (Just False) $ runOneCommand handler $ fileLoop script
           case res of
             Nothing -> return ()
             Just s  -> if s
