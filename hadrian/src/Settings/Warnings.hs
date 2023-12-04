@@ -35,7 +35,9 @@ ghcWarningsArgs = do
         , package binary       ? pure [ "-Wno-deprecations" ]
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
         , package compiler     ? pure [ "-Wcpp-undef" ]
-        , package directory    ? pure [ "-Wno-unused-imports" ]
+        , package directory    ? pure [ "-Wno-unused-imports"
+                                      , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
+                                      ]
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
@@ -60,5 +62,7 @@ ghcWarningsArgs = do
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-orphans" ]
         , package unix         ? pure [ "-Wno-deprecations" ]
-        , package win32        ? pure [ "-Wno-trustworthy-safe" ]
+        , package win32        ? pure [ "-Wno-trustworthy-safe"
+                                      , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
+                                      ]
         , package xhtml        ? pure [ "-Wno-unused-imports" ] ] ]
