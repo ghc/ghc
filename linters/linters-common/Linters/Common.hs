@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -104,6 +105,10 @@ gitBranchesContain d ref = do
         fail "gitBranchesContain: internal error"
 
     return $!! map (T.drop 2) tmp
+
+gitIsTagged :: FilePath -> GitRef -> Sh [Text]
+gitIsTagged d ref =
+  T.lines <$> runGit d "tag" ["--points-at", ref]
 
 -- | returns @[(path, (url, key))]@
 --
