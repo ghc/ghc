@@ -85,6 +85,38 @@ checkForTemplateHaskellQuotes e =
   unlessXOptM LangExt.TemplateHaskellQuotes $
     failWith $ thSyntaxError $ IllegalTHQuotes e
 
+{-
+
+Note [Untyped quotes in typed splices and vice versa]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this typed splice
+   $$(f [| x |])
+
+Is there anything wrong with that /typed/ splice containing an /untyped/
+quote [| x |]?   One could ask the same about an /untyped/ slice containing a
+/typed/ quote.
+
+In fact, both are fine (#24190). Presumably f's type looks something like:
+   f :: Q Expr -> Code Q Int
+
+It is pretty hard for `f` to use its (untyped code) argument to build a typed
+syntax tree, but not impossible:
+* `f` could use `unsafeCodeCoerce :: Q Exp -> Code Q a`
+* `f` could just perform case analysis on the tree
+
+But in the end all that matters is that in $$( e ), the expression `e` has the
+right type.  It doesn't matter how `e` is built.  To put it another way, the
+untyped quote `[| x |]` could also be written `varE 'x`, which is an ordinary
+expression.
+
+Moreover the ticked variable, 'x :: Name, is itself treated as an untyped quote;
+but it is a perfectly fine sub-expression to have in a typed splice.
+
+(Historical note: GHC used to unnecessarily  check that a typed quote only
+occurred in a typed splice: #24190.)
+
+-}
+
 rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedBracket e br_body
   = addErrCtxt (typedQuotationCtxtDoc br_body) $
@@ -93,9 +125,8 @@ rnTypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice Typed   -> return ()
-           ; Splice Untyped -> failWithTc $ thSyntaxError
-                                          $ MismatchedSpliceType Untyped IsBracket
+           { Splice _       -> return ()
+               -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnTypedBracket: Renaming typed bracket when running a splice"
@@ -123,9 +154,8 @@ rnUntypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice Typed   -> failWithTc $ thSyntaxError
-                                          $ MismatchedSpliceType Typed IsBracket
-           ; Splice Untyped -> return ()
+           { Splice _       -> return ()
+               -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnUntypedBracket: Renaming untyped bracket when running a splice"

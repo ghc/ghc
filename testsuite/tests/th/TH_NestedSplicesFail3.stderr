@@ -1,5 +1,8 @@
 
-TH_NestedSplicesFail3.hs:4:12: error: [GHC-45108]
-    • Untyped brackets may not appear in typed splices.
-    • In the Template Haskell quotation [| 'x' |]
-      In the typed splice: $$([| 'x' |])
+TH_NestedSplicesFail3.hs:4:12: error: [GHC-39999]
+    • No instance for ‘Language.Haskell.TH.Syntax.Quote
+                         (Language.Haskell.TH.Syntax.Code Language.Haskell.TH.Syntax.Q)’
+        arising from a quotation bracket
+    • In the expression: [| 'x' |]
+      In the Template Haskell splice $$([| 'x' |])
+      In the expression: $$([| 'x' |])
