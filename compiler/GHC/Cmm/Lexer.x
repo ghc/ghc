@@ -62,7 +62,7 @@ $namechar  = [$namebegin $digit]
 @hexadecimal = $hexit+
 @exponent    = [eE] [\-\+]? @decimal
 
-@floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
+@floating_point = [\-]? (@decimal \. @decimal @exponent? | @decimal @exponent)
 
 @escape      = \\ ([abfnrt\\\'\"\?] | x $hexit{1,2} | $octit{1,3})
 @strchar     = ($printable # [\"\\]) | @escape
