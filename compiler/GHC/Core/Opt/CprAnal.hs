@@ -35,7 +35,6 @@ import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
 
 import Data.List ( mapAccumL )
@@ -271,11 +270,11 @@ cprAnalAlt
 cprAnalAlt env scrut_ty (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
+    ids = filter isId bndrs
     env_alt
       | DataAlt dc <- con
-      , let ids = filter isId bndrs
       , CprType arity cpr <- scrut_ty
-      , assert (arity == 0 ) True
+      , arity == 0 -- See Note [Dead code may contain type confusions]
       = case unpackConFieldsCpr dc cpr of
           AllFieldsSame field_cpr
             | let sig = mkCprSig 0 field_cpr
@@ -284,7 +283,7 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
             | let sigs = zipWith (mkCprSig . idArity) ids field_cprs
             -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
       | otherwise
-      = env
+      = extendSigEnvAllSame env ids topCprSig
     (rhs_ty, rhs') = cprAnal env_alt rhs
 
 --
@@ -431,6 +430,43 @@ cprFix orig_env orig_pairs
             (id', rhs', env') = cprAnalBind env id rhs
 
 {-
+Note [Dead code may contain type confusions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In T23862, we have a nested case match that looks like this
+
+  data CheckSingleton (check :: Bool) where
+    Checked :: CheckSingleton True
+    Unchecked :: CheckSingleton False
+  data family Result (check :: Bool) a
+  data instance Result True a = CheckedResult a
+  newtype instance Result True a = UncheckedResult a
+
+  case m () of Checked co1 ->
+    case m () of Unchecked co2 ->
+      case ((\_ -> True)
+             |> .. UncheckedResult ..
+             |> sym co2
+             |> co1) :: Result True (Bool -> Bool) of
+        CheckedResult f -> CheckedResult (f True)
+
+Clearly, the innermost case is dead code, because the `Checked` and `Unchecked`
+cases are apart.
+However, both constructors introduce mutually contradictory coercions `co1` and
+`co2` along which GHC generates a type confusion:
+
+  1. (\_ -> True) :: Bool -> Bool
+  2. newtype coercion UncheckedResult (\_ -> True) :: Result False (Bool -> Bool)
+  3. |> ... sym co1 ... :: Result check (Bool -> Bool)
+  4. |> ... co2 ... :: Result True (Bool -> Bool)
+
+Note that we started with a function, injected into `Result` via a newtype
+instance and then match on it with a datatype instance.
+
+We have to handle this case gracefully in `cprAnalAlt`, where for the innermost
+case we see a `DataAlt` for `CheckedResult`, yet have a scrutinee type that
+abstracts the function `(\_ -> True)` with arity 1.
+In this case, don't pretend we know anything about the fields of `CheckedResult`!
+
 Note [The OPAQUE pragma and avoiding the reboxing of results]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider:
