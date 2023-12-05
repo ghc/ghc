@@ -22,3 +22,5 @@ test('T18401', [ grep_errmsg(r'^T18401\.\S+ ::') ], compile, ['-ddump-simpl -dsu
 test('T18824', [ grep_errmsg(r'JoinId[^\n]*Cpr') ], compile, ['-ddump-exitify -dppr-cols=1000 -dsuppress-uniques'])
 
 test('T20539', [], compile, ['']) # simply should not crash
+
+test('T23862', [], compile, ['']) # simply should not crash
