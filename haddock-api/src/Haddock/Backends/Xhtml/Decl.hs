@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
@@ -398,7 +399,7 @@ ppAppNameTypes n ts unicode qual =
     ppTypeApp n ts (\p -> ppDocName qual p True) (ppParendType unicode qual HideEmptyContexts)
 
 ppAppNameTypeArgs :: DocName -> [LHsTypeArg DocNameI] -> Unicode -> Qualification -> Html
-ppAppNameTypeArgs n args@(HsValArg _:HsValArg _:_) u q
+ppAppNameTypeArgs n args@(HsValArg _ _:HsValArg _ _:_) u q
   = ppTypeApp n args (\p -> ppDocName q p True) (ppLHsTypeArg u q HideEmptyContexts)
 ppAppNameTypeArgs n args u q
   = (ppDocName q Prefix True n) <+> hsep (map (ppLHsTypeArg u q HideEmptyContexts) args)
@@ -964,7 +965,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
           -- GADT record declarations
           RecConGADT _ _                  -> [ doConstrArgsWithDocs [] ]
           -- GADT prefix data constructors
-          PrefixConGADT args | hasArgDocs -> [ doConstrArgsWithDocs args ]
+          PrefixConGADT _ args | hasArgDocs -> [ doConstrArgsWithDocs args ]
           _                               -> []
 
         ConDeclH98{con_args = con_args'} -> case con_args' of
@@ -1142,7 +1143,7 @@ ppSigType ::  Unicode -> Qualification -> HideEmptyContexts -> HsSigType DocName
 ppSigType unicode qual emptyCtxts sig_ty = ppr_sig_ty (reparenSigType sig_ty) unicode qual emptyCtxts
 
 ppLHsTypeArg :: Unicode -> Qualification -> HideEmptyContexts -> LHsTypeArg DocNameI -> Html
-ppLHsTypeArg unicode qual emptyCtxts (HsValArg ty) = ppLParendType unicode qual emptyCtxts ty
+ppLHsTypeArg unicode qual emptyCtxts (HsValArg _ ty) = ppLParendType unicode qual emptyCtxts ty
 ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign <> ppLParendType unicode qual emptyCtxts ki
 ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ""
 
@@ -1168,7 +1169,7 @@ instance RenderableBndrFlag Specificity where
       braces (ppDocName qual Raw False (unL name) <+> dcolon unicode <+>
               ppLKind unicode qual kind)
 
-instance RenderableBndrFlag (HsBndrVis pass) where
+instance RenderableBndrFlag (HsBndrVis DocNameI) where
   ppHsTyVarBndr _ qual (UserTyVar _ bvis (L _ name)) =
       ppHsBndrVis bvis $
       ppDocName qual Raw False name
@@ -1177,8 +1178,8 @@ instance RenderableBndrFlag (HsBndrVis pass) where
       parens (ppDocName qual Raw False (unL name) <+> dcolon unicode <+>
               ppLKind unicode qual kind)
 
-ppHsBndrVis :: HsBndrVis pass -> Html -> Html
-ppHsBndrVis HsBndrRequired d = d
+ppHsBndrVis :: HsBndrVis DocNameI -> Html -> Html
+ppHsBndrVis (HsBndrRequired _) d = d
 ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
@@ -1261,7 +1262,7 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
    where arr = case mult of
                  HsLinearArrow _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ m _ -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
+                 HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
 
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
@@ -1286,7 +1287,7 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode qual _
   = hsep [ ppr_mono_lty fun_ty unicode qual HideEmptyContexts
          , ppr_mono_lty arg_ty unicode qual HideEmptyContexts ]
 
-ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode qual _
+ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode qual _
   = hsep [ppr_mono_lty fun_ty unicode qual HideEmptyContexts
          , atSign <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts]
 

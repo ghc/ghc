@@ -199,11 +199,11 @@ getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
 
 --  tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecConGADT flds _ -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
-              PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
+              RecConGADT _ flds -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
+              PrefixConGADT _ pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
    mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
+   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noExtField) a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
@@ -258,7 +258,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs
-  = [ HsValArg $ noLocA (HsTyVar noAnn NotPromoted (noLocA (hsLTyVarName tv)))
+  = [ HsValArg noExtField $ noLocA (HsTyVar noAnn NotPromoted (noLocA (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 
@@ -303,9 +303,9 @@ restrictCons names decls = [ L p d | L p (Just d) <- fmap keep <$> decls ]
 
           ConDeclGADT { con_g_args = con_args' } -> case con_args' of
             PrefixConGADT {} -> Just d
-            RecConGADT fields _
+            RecConGADT _ fields
               | all field_avail (unLoc fields) -> Just d
-              | otherwise -> Just (d { con_g_args = PrefixConGADT (field_types $ unLoc fields) })
+              | otherwise -> Just (d { con_g_args = PrefixConGADT noExtField (field_types $ unLoc fields) })
               -- see above
       where
         field_avail :: LConDeclField GhcRn -> Bool
@@ -381,8 +381,8 @@ reparenTypePrec = go
     = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
     = paren p PREC_CON $ HsAppTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ty)
-  go p (HsAppKindTy x fun_ty at arg_ki)
-    = paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) at (goL PREC_CON arg_ki)
+  go p (HsAppKindTy x fun_ty arg_ki)
+    = paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ki)
   go p (HsOpTy x prom ty1 op ty2)
     = paren p PREC_FUN $ HsOpTy x prom (goL PREC_OP ty1) op (goL PREC_OP ty2)
   go p (HsParTy _ t) = unXRec @a $ goL p t -- pretend the paren doesn't exist - it will be added back if needed

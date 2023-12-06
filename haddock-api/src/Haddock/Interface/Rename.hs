@@ -296,11 +296,11 @@ renameLType :: LHsType GhcRn -> RnM (LHsType DocNameI)
 renameLType = mapM renameType
 
 renameLTypeArg :: LHsTypeArg GhcRn -> RnM (LHsTypeArg DocNameI)
-renameLTypeArg (HsValArg ty) = do { ty' <- renameLType ty
-                                     ; return $ HsValArg ty' }
-renameLTypeArg (HsTypeArg l ki) = do { ki' <- renameLKind ki
-                                     ; return $ HsTypeArg l ki' }
-renameLTypeArg (HsArgPar sp) = return $ HsArgPar sp
+renameLTypeArg (HsValArg _ ty)  = do { ty' <- renameLType ty
+                                     ; return $ HsValArg noExtField ty' }
+renameLTypeArg (HsTypeArg _ ki) = do { ki' <- renameLKind ki
+                                     ; return $ HsTypeArg noExtField ki' }
+renameLTypeArg (HsArgPar _) = return $ HsArgPar noExtField
 
 renameLSigType :: LHsSigType GhcRn -> RnM (LHsSigType DocNameI)
 renameLSigType = mapM renameSigType
@@ -335,10 +335,9 @@ renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr)
-renameArrow (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr))
-renameArrow (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr))
-renameArrow (HsExplicitMult pct p arr) = (\p' -> HsExplicitMult pct p' arr) <$> renameLType p
+renameArrow (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField)
+renameArrow (HsLinearArrow _) = return (HsLinearArrow noExtField)
+renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -363,10 +362,10 @@ renameType t = case t of
     b' <- renameLType b
     return (HsAppTy noAnn a' b')
 
-  HsAppKindTy _ a at b -> do
+  HsAppKindTy _ a b -> do
     a' <- renameLType a
     b' <- renameLKind b
-    return (HsAppKindTy noAnn a' at b')
+    return (HsAppKindTy noAnn a' b')
 
   HsFunTy _ w a b -> do
     a' <- renameLType a
@@ -444,7 +443,7 @@ renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })
                         , hsq_explicit = tvs' }) }
 
 renameHsBndrVis :: HsBndrVis GhcRn -> RnM (HsBndrVis DocNameI)
-renameHsBndrVis HsBndrRequired = return HsBndrRequired
+renameHsBndrVis (HsBndrRequired _) = return (HsBndrRequired noExtField)
 renameHsBndrVis (HsBndrInvisible at) = return (HsBndrInvisible at)
 
 renameHsForAllTelescope :: HsForAllTelescope GhcRn -> RnM (HsForAllTelescope DocNameI)
@@ -540,8 +539,7 @@ renameTyClD d = case d of
     return (DataDecl { tcdDExt = noExtField, tcdLName = lname', tcdTyVars = tyvars'
                      , tcdFixity = fixity, tcdDataDefn = defn' })
 
-  ClassDecl { tcdLayout = layout
-            , tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
+  ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
     lcontext' <- traverse renameLContext lcontext
     lname'    <- renameNameL lname
@@ -552,7 +550,6 @@ renameTyClD d = case d of
     at_defs'  <- mapM (mapM renameTyFamDefltD) at_defs
     -- we don't need the default methods or the already collected doc entities
     return (ClassDecl { tcdCExt = noExtField
-                      , tcdLayout = renameLayoutInfo layout
                       , tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
                       , tcdFixity = fixity
                       , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
@@ -566,11 +563,6 @@ renameTyClD d = case d of
       return (L (locA loc) (FunDep noExtField (map noLocA xs') (map noLocA ys')))
 
     renameLSig (L loc sig) = return . L (locA loc) =<< renameSig sig
-
-renameLayoutInfo :: LayoutInfo GhcRn -> LayoutInfo DocNameI
-renameLayoutInfo (ExplicitBraces ob cb) = ExplicitBraces ob cb
-renameLayoutInfo (VirtualBraces n) = VirtualBraces n
-renameLayoutInfo NoLayoutInfo = NoLayoutInfo
 
 renameFamilyDecl :: FamilyDecl GhcRn -> RnM (FamilyDecl DocNameI)
 renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
@@ -626,7 +618,6 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                    , con_args = details', con_doc = mbldoc' })
 
 renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
-                            , con_dcolon = dcol
                             , con_mb_cxt = lcontext, con_g_args = details
                             , con_res_ty = res_ty
                             , con_doc = mbldoc } = do
@@ -638,7 +629,7 @@ renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (ConDeclGADT
                    { con_g_ext = noExtField, con_names = lnames'
-                   , con_dcolon = dcol, con_bndrs = bndrs'
+                   , con_bndrs = bndrs'
                    , con_mb_cxt = lcontext', con_g_args = details'
                    , con_res_ty = res_ty', con_doc = mbldoc' })
 
@@ -659,10 +650,10 @@ renameH98Details (InfixCon a b) = do
 
 renameGADTDetails :: HsConDeclGADTDetails GhcRn
                   -> RnM (HsConDeclGADTDetails DocNameI)
-renameGADTDetails (RecConGADT (L l fields) arr) = do
+renameGADTDetails (RecConGADT _ (L l fields)) = do
   fields' <- mapM renameConDeclFieldField fields
-  return (RecConGADT (L (locA l) fields') arr)
-renameGADTDetails (PrefixConGADT ps) = PrefixConGADT <$> mapM renameHsScaled ps
+  return (RecConGADT noExtField (L (locA l) fields'))
+renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renameHsScaled ps
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
 renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do

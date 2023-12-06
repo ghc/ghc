@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -868,7 +869,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
           -- GADT record declarations
           RecConGADT _ _                  -> doConstrArgsWithDocs []
           -- GADT prefix data constructors
-          PrefixConGADT args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
+          PrefixConGADT _ args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
           _                               -> empty
 
         ConDeclH98{con_args = con_args'} -> case con_args' of
@@ -982,7 +983,7 @@ ppAppNameTypes :: DocName -> [HsType DocNameI] -> Bool -> LaTeX
 ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 
 ppAppNameTypeArgs :: DocName -> [LHsTypeArg DocNameI] -> Bool -> LaTeX
-ppAppNameTypeArgs n args@(HsValArg _:HsValArg _:_) unicode
+ppAppNameTypeArgs n args@(HsValArg _ _:HsValArg _ _:_) unicode
   = ppTypeApp n args ppDocName (ppLHsTypeArg unicode)
 ppAppNameTypeArgs n args unicode
   = ppDocName n <+> hsep (map (ppLHsTypeArg unicode) args)
@@ -1084,7 +1085,7 @@ ppSigType :: Bool -> HsSigType DocNameI -> LaTeX
 ppSigType unicode sig_ty = ppr_sig_ty (reparenSigType sig_ty) unicode
 
 ppLHsTypeArg :: Bool -> LHsTypeArg DocNameI -> LaTeX
-ppLHsTypeArg unicode (HsValArg ty) = ppLParendType unicode ty
+ppLHsTypeArg unicode (HsValArg _ ty) = ppLParendType unicode ty
 ppLHsTypeArg unicode (HsTypeArg _ ki) = atSign <> ppLParendType unicode ki
 ppLHsTypeArg _ (HsArgPar _) = text ""
 
@@ -1104,15 +1105,15 @@ instance RenderableBndrFlag Specificity where
   ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
     braces (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
-instance RenderableBndrFlag (HsBndrVis pass) where
+instance RenderableBndrFlag (HsBndrVis DocNameI) where
   ppHsTyVarBndr _ (UserTyVar _ bvis (L _ name)) =
     ppHsBndrVis bvis $ ppDocName name
   ppHsTyVarBndr unicode (KindedTyVar _ bvis (L _ name) kind) =
     ppHsBndrVis bvis $
     parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
-ppHsBndrVis :: HsBndrVis pass -> LaTeX -> LaTeX
-ppHsBndrVis HsBndrRequired d = d
+ppHsBndrVis :: HsBndrVis DocNameI -> LaTeX -> LaTeX
+ppHsBndrVis (HsBndrRequired _) d = d
 ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
@@ -1146,7 +1147,7 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
    where arr = case mult of
                  HsLinearArrow _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ m _ -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+                 HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 
 ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
@@ -1166,7 +1167,7 @@ ppr_mono_ty (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLTyp
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
   = hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 
-ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode
+ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode
   = hsep [ppr_mono_lty fun_ty unicode, atSign <> ppr_mono_lty arg_ki unicode]
 
 ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode

@@ -841,6 +841,20 @@ type XRecCond a
     , WrapXRec a (HsType a)
     )
 
+type instance XValArg  DocNameI = NoExtField
+type instance XTypeArg DocNameI = NoExtField
+type instance XArgPar  DocNameI = NoExtField
+type instance XXArg    DocNameI = DataConCantHappen
+
+type instance XBndrRequired    DocNameI = NoExtField
+type instance XBndrInvisible   DocNameI = NoExtField
+type instance XXBndrVis        DocNameI = DataConCantHappen
+
+type instance XUnrestrictedArrow DocNameI = NoExtField
+type instance XLinearArrow       DocNameI = NoExtField
+type instance XExplicitMult      DocNameI = NoExtField
+type instance XXArrow            DocNameI = DataConCantHappen
+
 type instance XForAllTy        DocNameI = EpAnn [AddEpAnn]
 type instance XQualTy          DocNameI = EpAnn [AddEpAnn]
 type instance XTyVar           DocNameI = EpAnn [AddEpAnn]
@@ -900,6 +914,10 @@ type instance XXForeignExport DocNameI = DataConCantHappen
 type instance XConDeclGADT    DocNameI = NoExtField
 type instance XConDeclH98     DocNameI = NoExtField
 type instance XXConDecl       DocNameI = DataConCantHappen
+
+type instance XPrefixConGADT       DocNameI = NoExtField
+type instance XRecConGADT          DocNameI = NoExtField
+type instance XXConDeclGADTDetails DocNameI = DataConCantHappen
 
 type instance XDerivD     DocNameI = NoExtField
 type instance XInstD      DocNameI = NoExtField

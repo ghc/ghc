@@ -117,7 +117,7 @@ tyThingToLHsDecl prr t = case t of
              { feqn_ext = noAnn
              , feqn_tycon = fdLName fd
              , feqn_bndrs = HsOuterImplicit{hso_ximplicit = hsq_ext (fdTyVars fd)}
-             , feqn_pats = map (HsValArg . hsLTyVarBndrToType) $
+             , feqn_pats = map (HsValArg noExtField . hsLTyVarBndrToType) $
                            hsq_explicit $ fdTyVars fd
              , feqn_fixity = fdFixity fd
              , feqn_rhs = synifyType WithinType [] rhs }
@@ -144,7 +144,6 @@ tyThingToLHsDecl prr t = case t of
                 [] -> Nothing
                 th -> Just $ synifyCtx th
 
-          , tcdLayout = NoLayoutInfo
           , tcdLName = synifyNameN cl
           , tcdTyVars = synifyTyVars vs
           , tcdFixity = synifyFixity cl
@@ -191,7 +190,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
     in FamEqn { feqn_ext    = noAnn
               , feqn_tycon  = name
               , feqn_bndrs  = outer_bndrs
-              , feqn_pats   = map HsValArg annot_typats
+              , feqn_pats   = map (HsValArg noExtField) annot_typats
               , feqn_fixity = synifyFixity name
               , feqn_rhs    = hs_rhs }
   where
@@ -242,8 +241,8 @@ synifyTyCon prr _coax tc
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
     mk_hs_tv realKind fakeTyVar
-      | isLiftedTypeKind realKind = noLocA $ UserTyVar noAnn HsBndrRequired (noLocA (getName fakeTyVar))
-      | otherwise = noLocA $ KindedTyVar noAnn HsBndrRequired (noLocA (getName fakeTyVar)) (synifyKindSig realKind)
+      | isLiftedTypeKind realKind = noLocA $ UserTyVar noAnn (HsBndrRequired noExtField) (noLocA (getName fakeTyVar))
+      | otherwise = noLocA $ KindedTyVar noAnn (HsBndrRequired noExtField) (noLocA (getName fakeTyVar)) (synifyKindSig realKind)
 
     conKind = defaultType prr (tyConKind tc)
     tyVarKinds = fst . splitFunTys . snd . splitInvisPiTys $ conKind
@@ -447,17 +446,16 @@ synifyDataCon use_gadt_syntax dc =
 
   mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
   mk_gadt_arg_tys
-    | use_named_field_syntax = RecConGADT (noLocA field_tys) noHsUniTok
-    | otherwise              = PrefixConGADT (map hsUnrestricted linear_tys)
+    | use_named_field_syntax = RecConGADT noExtField (noLocA field_tys)
+    | otherwise              = PrefixConGADT noExtField (map hsUnrestricted linear_tys)
 
  -- finally we get synifyDataCon's result!
  in if use_gadt_syntax
        then do
          let hat = mk_gadt_arg_tys
          return $ noLocA $ ConDeclGADT
-           { con_g_ext  = noAnn
+           { con_g_ext  = noExtField
            , con_names  = pure name
-           , con_dcolon = noHsUniTok
            , con_bndrs  = noLocA outer_bndrs
            , con_mb_cxt = ctx
            , con_g_args = hat
@@ -466,7 +464,7 @@ synifyDataCon use_gadt_syntax dc =
        else do
          hat <- mk_h98_arg_tys
          return $ noLocA $ ConDeclH98
-           { con_ext    = noAnn
+           { con_ext    = noExtField
            , con_name   = name
            , con_forall = False
            , con_ex_tvs = map (synifyTyVarBndr . (mkForAllTyBinder InferredSpec)) ex_tvs
@@ -519,7 +517,7 @@ synifyTyVars ktvs = HsQTvs { hsq_ext = []
                            , hsq_explicit = map synifyTyVar ktvs }
 
 synifyTyVar :: TyVar -> LHsTyVarBndr (HsBndrVis GhcRn) GhcRn
-synifyTyVar = synify_ty_var emptyVarSet HsBndrRequired
+synifyTyVar = synify_ty_var emptyVarSet (HsBndrRequired noExtField)
 
 synifyTyVarBndr :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcRn
 synifyTyVarBndr = synifyTyVarBndr' emptyVarSet
@@ -862,9 +860,9 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-                    OneTy  -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
-                    ManyTy -> HsUnrestrictedArrow noHsUniTok
-                    ty -> HsExplicitMult noHsTok (synifyType WithinType vs ty) noHsUniTok
+                    OneTy  -> HsLinearArrow noExtField
+                    ManyTy -> HsUnrestrictedArrow noExtField
+                    ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)
 
 
 
