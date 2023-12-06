@@ -138,9 +138,6 @@ def no_deps( name, opts):
 def skip( name, opts ):
     opts.skip = True
 
-def js_arch() -> bool:
-    return arch("javascript");
-
 # disable test on JS arch
 def js_skip( name, opts ):
     if js_arch():
@@ -378,6 +375,18 @@ def ignore_stdout(name, opts):
 
 def ignore_stderr(name, opts):
     opts.ignore_stderr = True
+
+def ignore_extension(name, opts):
+    """
+    Some tests generate files that are not expected to be suffixed with an
+    extension type, such as .exe on windows. This option allows these tests to
+    have finer-grained control over the filename that the testsuite will look
+    for. Examples of such tests are hpc tests which expect a .tix extension and
+    hp2ps tests which expect .hp. For these tests, on windows and without
+    ignoring the extension, the testsuite will look for, e.g., 'foo.exe.tix'
+    instead of 'foo.tix'.
+    """
+    opts.ignore_extension = True
 
 def combined_output( name, opts ):
     opts.combined_output = True
@@ -792,6 +801,8 @@ KNOWN_OPERATING_SYSTEMS = set([
 def exe_extension() -> str:
     if config.arch == 'wasm32':
         return '.wasm'
+    elif config.os == "mingw32":
+        return '.exe'
     return ''
 
 def opsys( os: str ) -> bool:
@@ -809,6 +820,9 @@ def msys( ) -> bool:
 
 def cygwin( ) -> bool:
     return config.cygwin
+
+def js_arch() -> bool:
+    return arch("javascript");
 
 def have_vanilla( ) -> bool:
     return config.have_vanilla
@@ -1577,6 +1591,10 @@ async def ghci_script( name, way, script):
 async def compile( name, way, extra_hc_opts ):
     return await do_compile( name, way, False, None, [],  [], extra_hc_opts )
 
+async def compile_artifact( name, way, extra_hc_opts ):
+    # We suppress stderr so that the link output isn't compared
+    return await do_compile( name, way, False, None, [], [], extra_hc_opts, should_link=True, compare_stderr=False )
+
 async def compile_fail( name, way, extra_hc_opts ):
     return await do_compile( name, way, True, None, [], [], extra_hc_opts )
 
@@ -1591,9 +1609,6 @@ async def backpack_compile( name, way, extra_hc_opts ):
 
 async def backpack_compile_fail( name, way, extra_hc_opts ):
     return await do_compile( name, way, True, None, [], [], extra_hc_opts, backpack=True )
-
-async def backpack_run( name, way, extra_hc_opts ):
-    return await compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 async def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return await do_compile( name, way, False, top_mod, [], [], extra_hc_opts )
@@ -1623,6 +1638,8 @@ async def do_compile(name: TestName,
                extra_mods: List[str],
                units: List[str],
                extra_hc_opts: str,
+               should_link=False,
+               compare_stderr=True,
                **kwargs
                ) -> PassFail:
     # print 'Compile only, extra args = ', extra_hc_opts
@@ -1632,7 +1649,7 @@ async def do_compile(name: TestName,
        return result
     extra_hc_opts = result.hc_opts
 
-    result = await simple_build(name, way, extra_hc_opts, should_fail, top_mod, units, False, True, **kwargs)
+    result = await simple_build(name, way, extra_hc_opts, should_fail, top_mod, units, should_link, True, **kwargs)
 
     if badResult(result):
         return result
@@ -1645,7 +1662,7 @@ async def do_compile(name: TestName,
     actual_stderr_file = add_suffix(name, 'comp.stderr')
     diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
-    if not await compare_outputs(way, 'stderr',
+    if compare_stderr and not await compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
@@ -1747,7 +1764,8 @@ async def compile_and_run__(name: TestName,
                       extra_mods: List[str],
                       extra_hc_opts: str,
                       backpack: bool=False,
-                      compile_stderr: bool=False
+                      compile_stderr: bool=False,
+                      use_extension: bool=True
                       ) -> PassFail:
     # print 'Compile and run, extra args = ', extra_hc_opts
 
@@ -1780,14 +1798,20 @@ async def compile_and_run__(name: TestName,
              stderr = diff_file_name.read_text()
              diff_file_name.unlink()
              return failBecause('ghc.stderr mismatch', stderr=stderr)
-#
-        cmd = './' + name + exe_extension()
+
+        opts = getTestOpts()
+        extension = exe_extension() if not opts.ignore_extension else ""
+
+        cmd = './' + name + extension
 
         # we don't check the compiler's stderr for a compile-and-run test
         return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 async def compile_and_run( name, way, extra_hc_opts ):
     return await compile_and_run__( name, way, None, [], extra_hc_opts)
+
+async def backpack_run( name, way, extra_hc_opts ):
+    return await compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 async def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return await compile_and_run__( name, way, top_mod, [], extra_hc_opts)
@@ -2296,8 +2320,8 @@ def write_file(f: Path, s: str) -> None:
 # operate on bytes.
 
 async def check_hp_ok(name: TestName) -> bool:
-    actual_name = name + exe_extension()
     opts = getTestOpts()
+    actual_name = name + exe_extension() if not opts.ignore_extension else name
 
     # do not qualify for hp2ps because we should be in the right directory
     hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {actual_name}'.format(**locals())

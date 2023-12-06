@@ -352,6 +352,9 @@ class TestOptions:
        self.ignore_stdout = False
        self.ignore_stderr = False
 
+       # don't use the executable extension
+       self.ignore_extension = False
+
        # Backpack test
        self.compile_backpack = False
 

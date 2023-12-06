@@ -10,6 +10,7 @@ test('tough2',
      [extra_files(['../hpcrun.pl', 'subdir/']),
        literate,
        cmd_prefix(hpc_prefix),
+       ignore_extension,
        omit_ways(ghci_ways + prof_ways), # profile goes in the wrong place
        when(arch('wasm32'), fragile(23243)) ],
      multimod_compile_and_run, ['subdir/tough2.lhs', '-fhpc'])
