@@ -53,8 +53,8 @@ So we carry an extra var->var substitution which we apply *before* looking up in
 reverse mapping.
 
 
-Note [Shadowing]
-~~~~~~~~~~~~~~~~
+Note [Shadowing in CSE]
+~~~~~~~~~~~~~~~~~~~~~~~
 We have to be careful about shadowing.
 For example, consider
         f = \x -> let y = x+x in
@@ -900,7 +900,7 @@ extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
 extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
 
 -- | Add clones to the substitution to deal with shadowing.  See
--- Note [Shadowing] for more details.  You should call this whenever
+-- Note [Shadowing in CSE] for more details.  You should call this whenever
 -- you go under a binder.
 addBinder :: CSEnv -> Var -> (CSEnv, Var)
 addBinder cse v = (cse { cs_subst = sub' }, v')

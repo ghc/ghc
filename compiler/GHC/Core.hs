@@ -154,7 +154,7 @@ These data types are the heart of the compiler
 --      f_1 x_2 = let f_3 x_4 = x_4 + 1
 --                in f_3 (x_2 - 2)
 -- @
---    But see Note [Shadowing] below.
+--    But see Note [Shadowing in Core] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
 --    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'GHC.Types.Id.Id' as it's names.
@@ -312,26 +312,6 @@ data Bind b = NonRec b (Expr b)
   deriving Data
 
 {-
-Note [Shadowing]
-~~~~~~~~~~~~~~~~
-While various passes attempt to rename on-the-fly in a manner that
-avoids "shadowing" (thereby simplifying downstream optimizations),
-neither the simplifier nor any other pass GUARANTEES that shadowing is
-avoided. Thus, all passes SHOULD work fine even in the presence of
-arbitrary shadowing in their inputs.
-
-In particular, scrutinee variables `x` in expressions of the form
-`Case e x t` are often renamed to variables with a prefix
-"wild_". These "wild" variables may appear in the body of the
-case-expression, and further, may be shadowed within the body.
-
-So the Unique in a Var is not really unique at all.  Still, it's very
-useful to give a constant-time equality/ordering for Vars, and to give
-a key that can be used to make sets of Vars (VarSet), or mappings from
-Vars to other things (VarEnv).   Moreover, if you do want to eliminate
-shadowing, you can give a new Unique to an Id without changing its
-printable name, which makes debugging easier.
-
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Literal alternatives (LitAlt lit) are always for *un-lifted* literals.
@@ -362,6 +342,39 @@ For example
   \(c :: Age~#Int) (d::Int). d |> (sym c)
 Here 'c' is a CoVar, which is lambda-bound, but it /occurs/ in
 a Coercion, (sym c).
+
+Note [Shadowing in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~
+You might wonder if there is an invariant that a Core expression has no
+"shadowing".  For example, is this illegal?
+     \x. \x. blah     -- x is shadowed
+Answer; no!  Core does /not/ have a no-shadowing invariant.
+
+Neither the simplifier nor any other pass GUARANTEES that shadowing is
+avoided. Thus, all passes SHOULD work fine even in the presence of
+arbitrary shadowing in their inputs.
+
+So the Unique in a Var is not really unique at all.  Still, it's very
+useful to give a constant-time equality/ordering for Vars, and to give
+a key that can be used to make sets of Vars (VarSet), or mappings from
+Vars to other things (VarEnv).   Moreover, if you do want to eliminate
+shadowing, you can give a new Unique to an Id without changing its
+printable name, which makes debugging easier.
+
+It would in many ways be easier to have a no-shadowing invariant.  And the
+Simplifier does its best to clone variables that are shadowed.  But it is
+extremely difficult to GUARANTEE it:
+
+* We use `GHC.Types.Id.mkTemplateLocal` to make up local binders, with uniques
+  that are locally-unique (enough for the purpose) but not globally unique.
+  It is convenient not to have to plumb a unique supply to these functions.
+
+* It is very difficult for the Simplifier to gurantee a no-shadowing result.
+  See Note [Shadowing in the Simplifier] in GHC.Core.Opt.Simplify.Iteration.
+
+* See Note [Shadowing in CSE] in GHC.Core.Opt.CSE
+
+* See Note [Shadowing in SpecConstr] in GHC.Core.Opt.SpecContr
 
 Note [Core letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
