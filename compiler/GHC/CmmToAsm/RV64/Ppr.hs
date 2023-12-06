@@ -584,7 +584,8 @@ pprInstr platform instr = case instr of
                   , text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o]
     --    feq.s   a0,fa0,fa1
     --    xori    a0,a0,1
-    NE | isFloatOp l && isFloatOp r -> lines_ [binOp "\tfeq.s", text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
+    NE | isFloatOp l && isFloatOp r -> lines_ [binOp ("\tfeq." ++ floatOpPrecision platform l r)
+                                              , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
     SLT -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r ]
     SLE -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
@@ -717,8 +718,8 @@ pprInstr platform instr = case instr of
        pprDmbType DmbReadWrite = text "rw"
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String
-floatOpPrecision p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
-floatOpPrecision p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
+floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
+floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
 floatOpPrecision p l r = pprPanic "Cannot determine floating point precission" (text "op1" <+> pprOp p l <+> text "op2" <+> pprOp p r)
 
 pprBcond :: IsLine doc => Cond -> doc
