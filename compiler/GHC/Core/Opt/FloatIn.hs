@@ -306,7 +306,7 @@ It is obviously bogus for FloatIn to transform to
        (y:ys) -> ...(let x = y+1 in x)...
        [] -> blah
 because the y is captured.  This doesn't happen much, because shadowing is
-rare, but it did happen in #22662.
+rare (see Note [Shadowing in Core]), but it did happen in #22662.
 
 One solution would be to clone as we go.  But a simpler one is this:
 

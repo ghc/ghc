@@ -191,10 +191,11 @@ data SimplCont
   | StrictBind          -- (StrictBind x b K)[e] = let x = e in K[b]
                         --       or, equivalently,  = K[ (\x.b) e ]
       { sc_dup   :: DupFlag        -- See Note [DupFlag invariants]
-      , sc_bndr  :: InId
       , sc_from  :: FromWhat
+      , sc_bndr  :: InId
       , sc_body  :: InExpr
-      , sc_env   :: StaticEnv      -- See Note [StaticEnv invariant]
+      , sc_env   :: StaticEnv      -- Static env for both sc_bndr (stable unfolding thereof)
+                                   -- and sc_body.  Also see Note [StaticEnv invariant]
       , sc_cont  :: SimplCont }
 
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
@@ -2279,7 +2280,7 @@ Note [Shadowing in prepareAlts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note that we pass case_bndr::InId to prepareAlts; an /InId/, not an
 /OutId/.  This is vital, because `refineDefaultAlt` uses `tys` to build
-a new /InAlt/.  If you pass an OutId, we'll end up appling the
+a new /InAlt/.  If you pass an OutId, we'll end up applying the
 substitution twice: disaster (#23012).
 
 However this does mean that filling in the default alt might be

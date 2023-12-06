@@ -119,14 +119,6 @@ The general shape of the simplifier is this:
    The returned floats and env both have an in-scope set, and they are
    guaranteed to be the same.
 
-
-Note [Shadowing]
-~~~~~~~~~~~~~~~~
-The simplifier used to guarantee that the output had no shadowing, but
-it does not do so any more.   (Actually, it never did!)  The reason is
-documented with simplifyArgs.
-
-
 Eta expansion
 ~~~~~~~~~~~~~~
 For eta expansion, we want to catch things like
@@ -262,7 +254,7 @@ simplRecBind env0 bind_cxt pairs0
   = do  { (env1, triples) <- mapAccumLM add_rules env0 pairs0
         ; let new_bndrs = map sndOf3 triples
         ; (rec_floats, env2) <- enterRecGroupRHSs env1 new_bndrs $ \env ->
-            go env triples
+                                go env triples
         ; return (mkRecFloats rec_floats, env2) }
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
@@ -303,10 +295,12 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | otherwise
   = case bind_cxt of
       BC_Join is_rec cont -> simplTrace "SimplBind:join" (ppr old_bndr) $
-                             simplJoinBind env is_rec cont old_bndr new_bndr rhs env
+                             simplJoinBind is_rec cont
+                                           (old_bndr,env) (new_bndr,env) (rhs,env)
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
-                               simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
+                               simplLazyBind top_lvl is_rec
+                                             (old_bndr,env) (new_bndr,env) (rhs,env)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
 simplTrace herald doc thing_inside = do
@@ -316,19 +310,16 @@ simplTrace herald doc thing_inside = do
     else thing_inside
 
 --------------------------
-simplLazyBind :: SimplEnv
-              -> TopLevelFlag -> RecFlag
-              -> InId -> OutId          -- Binder, both pre-and post simpl
-                                        -- Not a JoinId
+simplLazyBind :: TopLevelFlag -> RecFlag
+              -> (InId, SimplEnv)       -- InBinder, and static env for its unfolding (if any)
+              -> (OutId, SimplEnv)      -- OutBinder, and SimplEnv after simplifying that binder
                                         -- The OutId has IdInfo (notably RULES),
                                         -- except arity, unfolding
-                                        -- Ids only, no TyVars
-              -> InExpr -> SimplEnv     -- The RHS and its environment
+              -> (InExpr, SimplEnv)     -- The RHS and its static environment
               -> SimplM (SimplFloats, SimplEnv)
--- Precondition: the OutId is already in the InScopeSet of the incoming 'env'
--- Precondition: not a JoinId
+-- Precondition: Ids only, no TyVars; not a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
-simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
+simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
   = assert (isId bndr )
     assertPpr (not (isJoinId bndr)) (ppr bndr) $
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
@@ -379,24 +370,23 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; return (poly_floats, body3) }
 
-        ; let env' = env `setInScopeFromF` rhs_floats
-        ; rhs' <- rebuildLam env' tvs' body3 rhs_cont
-        ; (bind_float, env2) <- completeBind env' (BC_Let top_lvl is_rec) bndr bndr1 rhs'
+        ; let env1 = env `setInScopeFromF` rhs_floats
+        ; rhs' <- rebuildLam env1 tvs' body3 rhs_cont
+        ; (bind_float, env2) <- completeBind (BC_Let top_lvl is_rec) (bndr,unf_se) (bndr1,rhs',env1)
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
-simplJoinBind :: SimplEnv
-              -> RecFlag
+simplJoinBind :: RecFlag
               -> SimplCont
-              -> InId -> OutId          -- Binder, both pre-and post simpl
-                                        -- The OutId has IdInfo, except arity,
-                                        --   unfolding
-              -> InExpr -> SimplEnv     -- The right hand side and its env
+              -> (InId, SimplEnv)       -- InBinder, with static env for its unfolding
+              -> (OutId, SimplEnv)      -- OutBinder; SimplEnv has the binder in scope
+                                        -- The OutId has IdInfo, except arity, unfolding
+              -> (InExpr, SimplEnv)     -- The right hand side and its env
               -> SimplM (SimplFloats, SimplEnv)
-simplJoinBind env is_rec cont old_bndr new_bndr rhs rhs_se
+simplJoinBind is_rec cont (old_bndr, unf_se) (new_bndr, env) (rhs, rhs_se)
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind env (BC_Join is_rec cont) old_bndr new_bndr rhs' }
+        ; completeBind (BC_Join is_rec cont) (old_bndr, unf_se) (new_bndr, rhs', env) }
 
 --------------------------
 simplAuxBind :: SimplEnv
@@ -407,7 +397,7 @@ simplAuxBind :: SimplEnv
 -- auxiliary bindings, notably in knownCon.
 --
 -- The binder comes from a case expression (case binder or alternative)
--- and so does not have rules, inline pragmas etc.
+-- and so does not have rules, unfolding, inline pragmas etc.
 --
 -- Precondition: rhs satisfies the let-can-float invariant
 
@@ -436,8 +426,8 @@ simplAuxBind env bndr new_rhs
 
           -- Simplify the binder and complete the binding
         ; (env1, new_bndr) <- simplBinder (env `setInScopeFromF` rhs_floats) bndr
-        ; (bind_float, env2) <- completeBind env1 (BC_Let NotTopLevel NonRecursive)
-                                             bndr new_bndr rhs1
+        ; (bind_float, env2) <- completeBind (BC_Let NotTopLevel NonRecursive)
+                                             (bndr,env) (new_bndr, rhs1, env1)
 
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
@@ -843,7 +833,7 @@ makeTrivial env top_lvl dmd occ_fs expr
         ; (arity_type, expr2) <- tryEtaExpandRhs env (BC_Let top_lvl NonRecursive) var expr1
           -- Technically we should extend the in-scope set in 'env' with
           -- the 'floats' from prepareRHS; but they are all fresh, so there is
-          -- no danger of introducing name shadowig in eta expansion
+          -- no danger of introducing name shadowing in eta expansion
 
         ; unf <- mkLetUnfolding uf_opts top_lvl VanillaSrc var expr2
 
@@ -917,11 +907,11 @@ It does *not* attempt to do let-to-case.  Why?  Because it is used for
 Nor does it do the atomic-argument thing
 -}
 
-completeBind :: SimplEnv
-             -> BindContext
-             -> InId           -- Old binder
-             -> OutId          -- New binder; can be a JoinId
-             -> OutExpr        -- New RHS
+completeBind :: BindContext
+             -> (InId, SimplEnv)           -- Old binder, and the static envt in which to simplify
+                                           --   its stable unfolding (if any)
+             -> (OutId, OutExpr, SimplEnv) -- New binder and rhs; can be a JoinId.
+                                           -- And the SimplEnv with that OutId in scope.
              -> SimplM (SimplFloats, SimplEnv)
 -- completeBind may choose to do its work
 --      * by extending the substitution (e.g. let x = y in ...)
@@ -929,7 +919,7 @@ completeBind :: SimplEnv
 --
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
-completeBind env bind_cxt old_bndr new_bndr new_rhs
+completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
@@ -945,9 +935,10 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
       ; (new_arity, eta_rhs) <- tryEtaExpandRhs env bind_cxt new_bndr new_rhs
 
-        -- Simplify the unfolding
-      ; new_unfolding <- simplLetUnfolding env bind_cxt old_bndr
-                         eta_rhs (idType new_bndr) new_arity old_unf
+        -- Simplify the unfolding; see Note [Environment for simplLetUnfolding]
+      ; new_unfolding <- simplLetUnfolding (unf_se `setInScopeFromE` env)
+                            bind_cxt old_bndr
+                            eta_rhs (idType new_bndr) new_arity old_unf
 
       ; let new_bndr_w_info = addLetBndrInfo new_bndr new_arity new_unfolding
         -- See Note [In-scope set as a substitution]
@@ -1064,6 +1055,36 @@ postInlineUnconditionally will return True, but we may not have an
 unfolding because it's too big. Hence the belt-and-braces `orElse`
 in the defn of unf_rhs.  The Nothing case probably never happens.
 
+Note [Environment for simplLetUnfolding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to be rather careful about the static environment in which
+we simplify a stable unfolding.  Consider (#24242):
+
+  f x = let y_Xb = ... in
+        let step1_Xb {Stable unfolding = ....y_Xb...} = rhs in
+         ...
+
+Note that `y_Xb` and `step1_Xb` have the same unique (`Xb`). This can happen;
+see Note [Shadowing in Core] in GHC.Core, and Note [Shadowing in the Simplifier].
+This is perfectly fine. The `y_Xb` in the stable unfolding of the non-
+recursive binding for `step1` refers, of course, to `let y_Xb = ....`.
+When simplifying the binder `step1_Xb` we'll give it a new unique, and
+extend the static environment with [Xb :-> step1_Xc], say.
+
+But when simplifying step1's stable unfolding, we must use static environment
+/before/ simplifying the binder `step1_Xb`; that is, a static envt that maps
+[Xb :-> y_Xb], /not/ [Xb :-> step1_Xc].
+
+That is why we pass around a pair `(InId, SimplEnv)` for the binder, keeping
+track of the right environment for the unfolding of that InId.  See the type
+of `simplLazyBind`, `simplJoinBind`, `completeBind`.
+
+This only matters when we have
+  - A non-recursive binding for f
+  - has a stable unfolding
+  - and that unfolding mentions a variable y
+  - that has the same unique as f.
+So triggering  a bug here is really hard!
 
 ************************************************************************
 *                                                                      *
@@ -1524,7 +1545,7 @@ rebuild env expr cont
 
 completeBindX :: SimplEnv
               -> FromWhat
-              -> InId -> OutExpr   -- Bind this Id to this (simplified) expression
+              -> InId -> OutExpr   -- Non-recursively bind this Id to this (simplified) expression
                                    -- (the let-can-float invariant may not be satisfied)
               -> InExpr            -- In this body
               -> SimplCont         -- Consumed by this continuation
@@ -1554,14 +1575,14 @@ completeBindX env from_what bndr rhs body cont
               -- in T9630) to pass 'env' rather than 'env1'.  It's fine to pass 'env',
               -- because this is simplNonRecX, so bndr is not in scope in the RHS.
 
-        ; (bind_float, env2) <- completeBind (env2 `setInScopeFromF` rhs_floats)
-                                             (BC_Let NotTopLevel NonRecursive)
-                                             bndr bndr2 rhs1
+        ; let env3 = env2 `setInScopeFromF` rhs_floats
+        ; (bind_float, env4) <- completeBind (BC_Let NotTopLevel NonRecursive)
+                                             (bndr,env) (bndr2, rhs1, env3)
               -- Must pass env1 to completeBind in case simplBinder had to clone,
               -- and extended the substitution with [bndr :-> new_bndr]
 
         -- Simplify the body
-        ; (body_floats, body') <- simplNonRecBody env2 from_what body cont
+        ; (body_floats, body') <- simplNonRecBody env4 from_what body cont
 
         ; let all_floats = rhs_floats `addFloats` bind_float `addFloats` body_floats
         ; return ( all_floats, body' ) }
@@ -1776,10 +1797,11 @@ simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 ------------------
 simplNonRecE :: SimplEnv
              -> FromWhat
-             -> InId                    -- The binder, always an Id
-                                        -- Never a join point
-             -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
-             -> InExpr                  -- Body of the let/lambda
+             -> InId               -- The binder, always an Id
+                                   -- Never a join point
+                                   -- The static env for its unfolding (if any) is the first parameter
+             -> (InExpr, SimplEnv) -- Rhs of binding (or arg of lambda)
+             -> InExpr             -- Body of the let/lambda
              -> SimplCont
              -> SimplM (SimplFloats, OutExpr)
 
@@ -1808,8 +1830,8 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | otherwise  -- Evaluate RHS lazily
   = do { (env1, bndr1)    <- simplNonRecBndr env bndr
        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
-       ; (floats1, env3)  <- simplLazyBind env2 NotTopLevel NonRecursive
-                                           bndr bndr2 rhs rhs_se
+       ; (floats1, env3)  <- simplLazyBind NotTopLevel NonRecursive
+                                           (bndr,env) (bndr2,env2) (rhs,rhs_se)
        ; (floats2, expr') <- simplNonRecBody env3 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
 
@@ -1935,7 +1957,7 @@ simplNonRecJoinPoint env bndr rhs body cont
               res_ty = contResultType cont
         ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
         ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join NonRecursive cont)
-        ; (floats1, env3)  <- simplJoinBind env2 NonRecursive cont bndr bndr2 rhs env
+        ; (floats1, env3)  <- simplJoinBind NonRecursive cont (bndr,env) (bndr2,env2) (rhs,env)
         ; (floats2, body') <- simplExprF env3 body cont
         ; return (floats1 `addFloats` floats2, body') }
 
@@ -2275,7 +2297,7 @@ rebuildCall env fun_info
                (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
                           , sc_dup = Simplified
                           , sc_cont = cont })
-                -- Note [Shadowing]
+                -- Note [Shadowing in the Simplifier]
 
   -- Lazy arguments
   | otherwise
@@ -2408,10 +2430,10 @@ Here e1, e2 are simplified before the rule is applied, but don't really
 participate in the rule firing. So we mark them as Simplified to avoid
 re-simplifying them.
 
-Note [Shadowing]
-~~~~~~~~~~~~~~~~
-This part of the simplifier may break the no-shadowing invariant
-Consider
+Note [Shadowing in the Simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This part of the simplifier may return an expression that has shadowing.
+(See Note [Shadowing in Core] in GHC.Core.hs.) Consider
         f (...(\a -> e)...) (case y of (a,b) -> e')
 where f is strict in its second arg
 If we simplify the innermost one first we get (...(\a -> e)...)
@@ -2431,6 +2453,8 @@ continuations.  We have to keep the right in-scope set around; AND we have
 to get the effect that finding (error "foo") in a strict arg position will
 discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
+
+See also Note [Shadowing in prepareAlts] in GHC.Core.Opt.Simplify.Utils.
 
 Note [No eta-expansion in runRW#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -309,7 +309,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
            [ CoreLiberateCase, simplify "post-liberate-case" ],
            -- Run the simplifier after LiberateCase to vastly
            -- reduce the possibility of shadowing
-           -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
+           -- Reason: see Note [Shadowing in SpecConstr] in GHC.Core.Opt.SpecConstr
 
         runWhen spec_constr $ CoreDoPasses
            [ CoreDoSpecConstr, simplify "post-spec-constr"],
