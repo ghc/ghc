@@ -170,8 +170,8 @@ data CseEnv = CseEnv
         -- ^ This substitution is applied to the code as we traverse it.
         --   Entries have one of two reasons:
         --
-        --   * The input might have shadowing (see Note [Shadowing]), so we have
-        --     to rename some binders as we traverse the tree.
+        --   * The input might have shadowing (see Note [Shadowing in Core]),
+        --     so we have to rename some binders as we traverse the tree.
         --   * If we remove `let x = Con z` because  `let y = Con z` is in scope,
         --     we note this here as x ↦ y.
     , ce_bndrMap     :: IdEnv OutId

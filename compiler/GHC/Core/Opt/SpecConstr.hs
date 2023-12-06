@@ -254,7 +254,7 @@ So the grand plan is:
         * Find the free variables of the abstracted pattern
 
         * Pass these variables, less any that are in scope at
-          the fn defn.  But see Note [Shadowing] below.
+          the fn defn.  But see Note [Shadowing in SpecConstr] below.
 
 
 NOTICE that we only abstract over variables that are not in scope,
@@ -262,8 +262,8 @@ so we're in no danger of shadowing variables used in "higher up"
 in f_spec's RHS.
 
 
-Note [Shadowing]
-~~~~~~~~~~~~~~~~
+Note [Shadowing in SpecConstr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In this pass we gather up usage information that may mention variables
 that are bound between the usage site and the definition site; or (more
 seriously) may be bound to something different at the definition site.
@@ -2503,7 +2503,7 @@ callToPat env bndr_occs call@(Call fn args con_env)
                 -- Quantify over variables that are not in scope
                 -- at the call site
                 -- See Note [Free type variables of the qvar types]
-                -- See Note [Shadowing] at the top
+                -- See Note [Shadowing in SpecConstr] at the top
 
               (qktvs, qids) = partition isTyVar qvars
               qvars'        = scopedSort qktvs ++ map sanitise qids
