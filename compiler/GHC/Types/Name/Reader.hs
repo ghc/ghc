@@ -1190,9 +1190,12 @@ shadowNames = minusOccEnv_C (\gres _ -> Just (mapMaybe shadow gres))
 --
 -- The 'ImportSpec' of something says how it came to be imported
 -- It's quite elaborate so that we can give accurate unused-name warnings.
-data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
-                            is_item :: ImpItemSpec }
+data ImportSpec = ImpSpec { is_decl :: !ImpDeclSpec,
+                            is_item :: !ImpItemSpec }
                 deriving( Eq, Data )
+
+instance NFData ImportSpec where
+  rnf = rwhnf -- All fields are strict, so we don't need to do anything
 
 -- | Import Declaration Specification
 --
@@ -1200,15 +1203,15 @@ data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
 -- shared among all the 'Provenance's for that decl
 data ImpDeclSpec
   = ImpDeclSpec {
-        is_mod      :: ModuleName, -- ^ Module imported, e.g. @import Muggle@
+        is_mod      :: !ModuleName, -- ^ Module imported, e.g. @import Muggle@
                                    -- Note the @Muggle@ may well not be
                                    -- the defining module for this thing!
 
                                    -- TODO: either should be Module, or there
                                    -- should be a Maybe UnitId here too.
-        is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
-        is_qual     :: Bool,       -- ^ Was this import qualified?
-        is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
+        is_as       :: !ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
+        is_qual     :: !Bool,       -- ^ Was this import qualified?
+        is_dloc     :: !SrcSpan     -- ^ The location of the entire import declaration
     } deriving (Eq, Data)
 
 -- | Import Item Specification
@@ -1219,8 +1222,8 @@ data ImpItemSpec
                         -- or had a hiding list
 
   | ImpSome {
-        is_explicit :: Bool,
-        is_iloc     :: SrcSpan  -- Location of the import item
+        is_explicit :: !Bool,
+        is_iloc     :: !SrcSpan  -- Location of the import item
     }   -- ^ The import had an import list.
         -- The 'is_explicit' field is @True@ iff the thing was named
         -- /explicitly/ in the import specs rather
