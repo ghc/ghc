@@ -49,7 +49,7 @@ module GHC.Internal.TypeLits
   , OrderingI(..)
   , N.cmpNat, cmpSymbol, cmpChar
     -- ** Singleton values
-  , N.SNat, SSymbol, SChar
+  , N.SNat (..), SSymbol (..), SChar (..)
   , pattern N.SNat, pattern SSymbol, pattern SChar
   , fromSNat, fromSSymbol, fromSChar
   , withSomeSNat, withSomeSSymbol, withSomeSChar

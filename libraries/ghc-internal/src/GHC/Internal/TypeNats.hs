@@ -36,7 +36,7 @@ module GHC.Internal.TypeNats
   , sameNat
   , decideNat
     -- ** Singleton values
-  , SNat
+  , SNat (..)
   , pattern SNat
   , fromSNat
   , withSomeSNat
