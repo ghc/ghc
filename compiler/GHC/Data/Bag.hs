@@ -39,6 +39,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup ( (<>) )
 import Control.Applicative( Alternative( (<|>) ) )
+import Control.DeepSeq
 
 infixr 3 `consBag`
 infixl 3 `snocBag`
@@ -49,6 +50,12 @@ data Bag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag (NonEmpty a)
   deriving (Foldable, Functor, Traversable)
+
+instance NFData a => NFData (Bag a) where
+  rnf EmptyBag = ()
+  rnf (UnitBag a) = rnf a
+  rnf (TwoBags a b) = rnf a `seq` rnf b
+  rnf (ListBag a) = rnf a
 
 emptyBag :: Bag a
 emptyBag = EmptyBag
