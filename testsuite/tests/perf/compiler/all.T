@@ -365,7 +365,10 @@ test('MultiLayerModulesTH_OneShot',
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_OneShot_Prep'),
        extra_files(['genMultiLayerModulesTH']),
        unless(have_dynamic(),skip),
-       compile_timeout_multiplier(5)
+       compile_timeout_multiplier(5),
+       # We skip the test on darwin due to recent regression due to toolchain
+       # upgrade (tracked in #24177)
+       when(opsys('darwin'), skip)
      ],
      compile_fail,
      ['-v0'])
