@@ -574,6 +574,9 @@ data GlobalRdrEltX info
             -- Note [Retrieving the GREInfo from interfaces] in GHC.Types.GREInfo.
     } deriving (Data)
 
+instance NFData a => NFData (GlobalRdrEltX a) where
+  rnf (GRE name par _ imp info) = rnf name `seq` rnf par `seq` rnf imp `seq` rnf info
+
 
 {- Note [IfGlobalRdrEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -620,17 +623,18 @@ greParent = gre_par
 greInfo :: GlobalRdrElt -> GREInfo
 greInfo = gre_info
 
-instance NFData IfGlobalRdrElt where
-  rnf !_ = ()
-
 -- | See Note [Parents]
 data Parent = NoParent
-            | ParentIs  { par_is :: Name }
+            | ParentIs  { par_is :: !Name }
             deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty
    ppr (ParentIs n)    = text "parent:" <> ppr n
+
+instance NFData Parent where
+  rnf NoParent = ()
+  rnf (ParentIs n) = rnf n
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
@@ -934,11 +938,10 @@ globalRdrEnvElts env = nonDetFoldOccEnv (++) [] env
 
 -- | Drop all 'GREInfo' fields in a 'GlobalRdrEnv' in order to
 -- avoid space leaks.
--- Also forces the bag in gre_imp.
 -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
 forceGlobalRdrEnv :: GlobalRdrEnvX info -> IfGlobalRdrEnv
 forceGlobalRdrEnv rdrs =
-  strictMapOccEnv (strictMap (\ gre -> rnf (gre_imp gre) `seq` gre { gre_info = ()})) rdrs
+  strictMapOccEnv (strictMap (\ gre -> gre { gre_info = ()})) rdrs
 
 -- | Hydrate a previously dehydrated 'GlobalRdrEnv',
 -- by (lazily!) looking up the 'GREInfo' using the provided function.

@@ -575,11 +575,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_anns
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
-    `seq`     mi_globals
-    -- NB: we already removed any potential space leaks in 'mi_globals' by
-    -- dehydrating, that is, by turning the 'GlobalRdrEnv' into a 'IfGlobalRdrEnv'.
-    -- This means we don't need to use 'rnf' here.
-    -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+    `seq` rnf mi_globals
     `seq` rnf mi_insts
     `seq` rnf mi_fam_insts
     `seq` rnf mi_rules
