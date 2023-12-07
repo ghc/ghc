@@ -1948,6 +1948,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                              `asJoinId_maybe` spec_join_arity
 
         -- Conditionally use result of new worker-wrapper transform
+        -- mkSeqs: see Note [SpecConstr and strict fields]
               spec_rhs = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
               rule_rhs = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
@@ -2345,6 +2346,8 @@ Then it's fine for `co2` to mention `a`.  We'll get
 data CallPat = CP { cp_qvars :: [Var]           -- Quantified variables
                   , cp_args  :: [CoreExpr]      -- Arguments
                   , cp_strict_args :: [Var] }   -- Arguments we want to pass unlifted even if they are boxed
+                                                -- See Note [SpecConstr and strict fields]
+
      -- See Note [SpecConstr call patterns]
 
 instance Outputable CallPat where
