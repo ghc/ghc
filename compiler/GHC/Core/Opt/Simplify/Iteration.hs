@@ -57,6 +57,9 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var.Env ( getInScopeVars )
+import GHC.Types.Var.Set ( nonDetStrictFoldVarSet )
+
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
@@ -3486,12 +3489,12 @@ simplAlt env scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
 
-
-{- -------- Debugging only -------------
-
-ppr_in_scope :: SimplEnv -> SDoc
+_ppr_in_scope :: SimplEnv -> SDoc
+-- Show the in-scope set with the unfolding stored in each Id.
+--
+-- Debugging only, may not be called, hence "_" in its name
 -- Show only in-scope thing with unfoldings
-ppr_in_scope env
+_ppr_in_scope env
   = text "InScope(unf)" <+> braces (nonDetStrictFoldVarSet do_one empty (getInScopeVars (seInScope env)))
   where
     do_one v d | isId v
@@ -3500,7 +3503,6 @@ ppr_in_scope env
                | otherwise = d
     my_ppr (Lam {}) = text "<lambda>"
     my_ppr e        = ppr e
----------------------------------------- -}
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

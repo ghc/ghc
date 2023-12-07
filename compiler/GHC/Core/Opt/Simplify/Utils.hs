@@ -510,7 +510,7 @@ contHasRules cont
   where
     go (ApplyToVal { sc_cont = cont }) = go cont
     go (ApplyToTy  { sc_cont = cont }) = go cont
-    go (CastIt _ cont)                 = go cont
+    go (CastIt     { sc_cont = cont }) = go cont
     go (StrictArg { sc_fun = fun })    = ai_encl fun
     go (Stop _ RuleArgCtxt _)          = True
     go (TickIt _ c)                    = go c
