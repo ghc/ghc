@@ -98,6 +98,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Data.Data
 import Data.List( sortBy )
 import qualified Data.Semigroup as S
+import Control.DeepSeq
 import GHC.Data.Bag
 
 {-
@@ -494,14 +495,22 @@ data GlobalRdrElt
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
 
+instance NFData GlobalRdrElt where
+  rnf (GRE name par _ imp) = rnf name `seq` rnf par `seq` rnf imp
+
+
 -- | See Note [Parents]
 data Parent = NoParent
-            | ParentIs  { par_is :: Name }
+            | ParentIs  { par_is :: !Name }
             deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty
    ppr (ParentIs n)    = text "parent:" <> ppr n
+
+instance NFData Parent where
+  rnf NoParent = ()
+  rnf (ParentIs n) = rnf n
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]

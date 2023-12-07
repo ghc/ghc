@@ -429,6 +429,13 @@ instance Outputable a => Outputable (OccEnv a) where
 pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
 pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
 
+instance NFData a => NFData (OccEnv a) where
+  rnf = forceOccEnv rnf
+
+-- | Force an 'OccEnv' with the provided function.
+forceOccEnv :: (a -> ()) -> OccEnv a -> ()
+forceOccEnv nf (A fs) = seqEltsUFM nf fs
+
 type OccSet = UniqSet OccName
 
 emptyOccSet       :: OccSet
