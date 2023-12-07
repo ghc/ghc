@@ -23,9 +23,11 @@ common warnings
 library
     import:           warnings
     exposed-modules:
-      GHC.Profiling.Eras
-      Data.Tuple.Experimental
       Data.Sum.Experimental
+      Data.Tuple.Experimental
+      GHC.Profiling.Eras
+      GHC.TypeLits.Experimental
+      GHC.TypeNats.Experimental
       Prelude.Experimental
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim
