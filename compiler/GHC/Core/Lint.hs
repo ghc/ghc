@@ -1045,6 +1045,9 @@ lintCoreExpr (Case scrut var alt_ty alts)
 lintCoreExpr (Type ty)
   = failWithL (text "Type found as expression" <+> ppr ty)
 
+-- ToDo: is (Coercion co) OK in a term in places other
+--       than as the argument of an App?
+-- It is certainly needed for coercible_sel in ghc-prim:GHC.Types
 lintCoreExpr (Coercion co)
   -- See Note [Coercions in terms]
   = do { addLoc (InCo co) $ lintCoercion co

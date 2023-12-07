@@ -706,7 +706,7 @@ primOpIsDiv op = case op of
 primOpCodeSize
 ~~~~~~~~~~~~~~
 Gives an indication of the code size of a primop, for the purposes of
-calculating unfolding sizes; see GHC.Core.Unfold.exprTree
+calculating unfolding sizes; see GHC.Core.Unfold.mkExprTree
 -}
 
 primOpCodeSize :: PrimOp -> Int
