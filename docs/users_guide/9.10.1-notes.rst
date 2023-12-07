@@ -6,17 +6,34 @@ Version 9.10.1
 Language
 ~~~~~~~~
 
-- Part 1 of GHC Proposal `#281
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
-  "Visible forall in types of terms" has been implemented.
+- GHC Proposal `#281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  "Visible forall in types of terms" has been partially implemented.
   The following code is now accepted by GHC::
 
-    idv :: forall a -> a -> a
-    idv (type a) (x :: a) = x
+    {-# LANGUAGE RequiredTypeArguments #-}
 
-    x = idv (type Int) 42
+    vshow :: forall a -> Show a => a -> String
+    vshow t x = show (x :: t)
 
-  This feature is guarded behind :extension:`RequiredTypeArguments` and :extension:`ExplicitNamespaces`.
+    s1 = vshow Int    42      -- "42"
+    s2 = vshow Double 42      -- "42.0"
+
+  The use of ``forall a ->`` instead of ``forall a.`` indicates a *required* type
+  argument. A required type argument is visually indistinguishable from a value
+  argument but does not exist at runtime.
+
+  This feature is guarded behind :extension:`RequiredTypeArguments`.
+
+- The :extension:`ExplicitNamespaces` extension can now be used in conjunction
+  with :extension:`RequiredTypeArguments` to select the type namespace in a
+  required type argument::
+
+    data T = T               -- the name `T` is ambiguous
+    f :: forall a -> ...     -- `f` expects a required type argument
+
+    x1 = f T         -- refers to the /data/ constructor `T`
+    x2 = f (type T)  -- refers to the /type/ constructor `T`
+
 - With :extension:`LinearTypes`, ``let`` and ``where`` bindings can
   now be linear. So the following now typechecks::
 
@@ -27,7 +44,6 @@ Language
     h x = g y
       where
         y = f x
-
 
 - Due to an oversight, previous GHC releases (starting from 9.4) allowed the use
   of promoted data types in kinds, even when :extension:`DataKinds` was not

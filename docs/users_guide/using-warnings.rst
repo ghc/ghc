@@ -2440,8 +2440,8 @@ of ``-W(no-)*``.
     For example: ::
 
        a = 15
-       f :: a -> a    -- Does ‘a’ refer to the term-level binding
-                      -- or is it implicitly quantified?
+       f :: a -> a    -- NoRequiredTypeArguments: The ‘a’ is implicitly quantified
+                      -- RequiredTypeArguments:   The ‘a’ refers to the term-level binding
 
     When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
     that would stop working under :extension:`RequiredTypeArguments`.
