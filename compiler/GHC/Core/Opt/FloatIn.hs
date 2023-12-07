@@ -234,6 +234,29 @@ Every jump must be exact, so the jump to j must have three arguments. Hence
 we're careful not to float into the target of a jump (though we can float into
 the arguments just fine).
 
+Floating in can /enhance/ join points.  Consider this (#3458)
+    f2 x = let g :: Int -> Int
+               g y = if y==0 then y+x else g (y-1)
+           in case g x of
+                0 -> True
+                _ -> False
+
+Here `g` is not a join point. But if we float inwards it becomes one!  We
+float in; the occurrence analyser identifies `g` as a join point; the Simplifier
+retains that property, so we get
+    f2 x = case (joinrec
+                    g y = if y==0 then y+x else g (y-1)
+                 in jump g x) of
+              0 -> True
+              _ -> False
+
+Now that outer case gets pushed into the RHS of the joinrec, giving
+    f2 x = joinrec g y = if y==0
+                         then case y+x of { 0 -> True; _ -> False }
+                         else jump g (y-1)
+           in jump g x
+Nice!
+
 Note [Floating in past a lambda group]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * We must be careful about floating inside a value lambda.
