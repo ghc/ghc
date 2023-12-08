@@ -24,6 +24,7 @@ makeinfo       = @MAKEINFO@
 bourne-shell   = @SH@
 git            = @GIT@
 cabal          = @CABAL@
+dtrace         = @DtraceCmd@
 
 # Python 3 is required to run test driver.
 # See: https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk#L220
@@ -116,6 +117,8 @@ libnuma-lib-dir       = @LibNumaLibDir@
 libzstd-include-dir   = @LibZstdIncludeDir@
 libzstd-lib-dir       = @LibZstdLibDir@
 
+libsystemtap-include-dir = @LibsystemtapIncludeDir@
+
 # Optional Dependencies:
 #=======================
 
@@ -129,3 +132,4 @@ use-lib-dl        = @UseLibdl@
 use-lib-bfd       = @UseLibbfd@
 use-lib-pthread   = @UseLibpthread@
 need-libatomic    = @NeedLibatomic@
+use-dtrace        = @HaveDtrace@

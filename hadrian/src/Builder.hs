@@ -4,6 +4,7 @@ module Builder (
     ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
     GhcMode (..), GhcPkgMode (..), HaddockMode (..), TestMode(..), SphinxMode (..),
     TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..),
+    DtraceMode (..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilders,
@@ -149,7 +150,23 @@ instance Binary   Win32TarballsMode
 instance Hashable Win32TarballsMode
 instance NFData   Win32TarballsMode
 
+-- | Note [Dtrace probes]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We use Dtrace to define "User statically defined tracepoints" (USDTs) for
+-- the RTS. (See @rts/RtsProbes.d@ for the probe declarations.)
+--
+-- The Dtrace compiler reads the probe declaration and produces:
+--
+-- * A header file. Contains function like C-macros that you use to place the tracepoints.
+-- * A stub object. An object file containing implementation details
+--    for the probes, must be linked with the final executable or object. Not needed for the
+--    Macos implementation of dtrace.
+data DtraceMode = DtraceHeader | DtraceStub deriving (Eq, Generic, Show)
 
+instance Binary   DtraceMode
+instance Hashable DtraceMode
+instance NFData   DtraceMode
 
 -- | A 'Builder' is a (usually external) command invoked in a separate process
 -- via 'cmd'. Here are some examples:
@@ -166,6 +183,7 @@ data Builder = Alex
              | Cc CcMode Stage
              | Configure FilePath
              | DeriveConstants
+             | Dtrace DtraceMode
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
@@ -385,6 +403,12 @@ instance H.Builder Builder where
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
 
+                Dtrace mode -> do
+                    let modeFlag = case mode of
+                            DtraceHeader -> "-h"
+                            DtraceStub -> "-G"
+                    cmd' [path] buildArgs modeFlag [ "-o", output ] [ "-s", input ]
+
                 _  -> cmd' [path] buildArgs buildOptions
 
 -- | Invoke @haddock@ given a path to it and a list of arguments. The arguments
@@ -425,6 +449,7 @@ systemBuilderPath builder = case builder of
     Configure _     -> return "configure"
     Ghc _  (Stage0 {})   -> fromKey "system-ghc"
     GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
+    Dtrace _        -> fromKey "dtrace"
     Happy           -> fromKey "happy"
     HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
     Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)

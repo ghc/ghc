@@ -11,6 +11,7 @@ import Expression hiding (way, package, stage)
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
+import Rules.Rts (rtsDtraceProbes)
 import Rules.Register
 import Settings
 import Target
@@ -208,6 +209,8 @@ extraObjects context
          interpretInContext context getBignumBackend >>= \case
             "gmp" -> gmpObjects (stage context)
             _     -> return []
+
+    | package context == rts = rtsDtraceProbes (stage context)
 
     | otherwise = return []
 

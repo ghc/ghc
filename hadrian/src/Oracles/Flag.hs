@@ -28,6 +28,7 @@ data Flag = CrossCompiling
           | UseSystemFfi
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
+          | UseDtrace
           | UseLibdw
           | UseLibnuma
           | UseLibzstd
@@ -52,6 +53,7 @@ flag f = do
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
+            UseDtrace            -> "use-dtrace"
             UseLibdw             -> "use-lib-dw"
             UseLibnuma           -> "use-lib-numa"
             UseLibzstd           -> "use-lib-zstd"

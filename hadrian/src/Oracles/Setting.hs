@@ -55,6 +55,7 @@ data Setting = CursesIncludeDir
              | GmpLibDir
              | IconvIncludeDir
              | IconvLibDir
+             | LibsystemtapIncludeDir
              | LibdwIncludeDir
              | LibdwLibDir
              | LibnumaIncludeDir
@@ -111,6 +112,7 @@ setting key = lookupSystemConfig $ case key of
     GmpLibDir          -> "gmp-lib-dir"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
+    LibsystemtapIncludeDir  -> "libsystemtap-include-dir"
     LibdwIncludeDir    -> "libdw-include-dir"
     LibdwLibDir        -> "libdw-lib-dir"
     LibnumaIncludeDir  -> "libnuma-include-dir"
