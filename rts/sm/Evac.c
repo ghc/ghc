@@ -16,6 +16,7 @@
 
 #include "rts/PosixSource.h"
 #include "Rts.h"
+#include "RtsFlags.h"
 
 #include "Evac.h"
 #include "Storage.h"
@@ -260,7 +261,9 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
             // profiler when it encounters this closure in
             // processHeapClosureForDead.  So we reset the LDVW field
             // here.
-            LDVW(to) = 0;
+            if (doingLDVProfiling()){
+              LDVW(to) = 0;
+            }
 #endif
             return evacuate(p); // does the failed_to_evac stuff
         } else {
@@ -1213,9 +1216,13 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
             SET_INFO_RELEASE((StgClosure *)p, &stg_IND_info);
         }
 
+#if defined(PROFILING)
         // For the purposes of LDV profiling, we have created an
         // indirection.
-        LDV_RECORD_CREATE(p);
+        if (doingLDVProfiling()){
+          LDV_RECORD_CREATE(p);
+        }
+#endif
 
         p = prev;
     }

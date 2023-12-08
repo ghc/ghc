@@ -8,6 +8,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "RtsFlags.h"
 #include "rts/Bytecodes.h"
 
 // internal headers

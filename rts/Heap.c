@@ -9,6 +9,7 @@
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 
 #include "Capability.h"
 #include "Printer.h"

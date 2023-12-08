@@ -23,7 +23,7 @@ module GHC.StgToCmm.Prof (
         saveCurrentCostCentre, restoreCurrentCostCentre,
 
         -- Lag/drag/void stuff
-        ldvEnter, ldvEnterClosure, ldvRecordCreate
+        ldvEnter, ldvEnterClosure, profHeaderCreate
   ) where
 
 import GHC.Prelude
@@ -88,14 +88,14 @@ costCentreFrom platform cl = CmmLoad (cmmOffsetB platform cl (pc_OFFSET_StgHeade
 -- | The profiling header words in a static closure
 staticProfHdr :: Profile -> CostCentreStack -> [CmmLit]
 staticProfHdr profile ccs
-  | profileIsProfiling profile = [mkCCostCentreStack ccs, staticLdvInit platform]
+  | profileIsProfiling profile = [mkCCostCentreStack ccs, staticProfHeaderInit platform]
   | otherwise                  = []
   where platform = profilePlatform profile
 
 -- | Profiling header words in a dynamic closure
 dynProfHdr :: Profile -> CmmExpr -> [CmmExpr]
 dynProfHdr profile ccs
-  | profileIsProfiling profile = [ccs, dynLdvInit (profilePlatform profile)]
+  | profileIsProfiling profile = [ccs, dynProfInit (profilePlatform profile)]
   | otherwise                  = []
 
 -- | Initialise the profiling field of an update frame
@@ -322,33 +322,63 @@ bumpSccCount platform ccs
 
 -----------------------------------------------------------------------------
 --
---                Lag/drag/void stuff
+--                Profiling header stuff
 --
 -----------------------------------------------------------------------------
 
---
--- Initial value for the LDV field in a static closure
---
-staticLdvInit :: Platform -> CmmLit
-staticLdvInit = zeroCLit
 
---
--- Initial value of the LDV field in a dynamic closure
---
+-- Header initialisation for static objects happens to coicincide for the
+-- three uses of the header
+--  * LDV profiling = 0 (era = 0, LDV_STATE_CREATE)
+--  * Eras profiling = 0 (user_era = 0, ignored by profiler)
+--  * Retainer profiling = 0
+
+staticProfHeaderInit :: Platform -> CmmLit
+staticProfHeaderInit plat = zeroCLit plat
+
+
+-- Dynamic initialisation
+
+dynErasInit :: Platform -> CmmExpr
+dynErasInit platform = loadUserEra platform
+
 dynLdvInit :: Platform -> CmmExpr
-dynLdvInit platform =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
+dynLdvInit platform =
+-- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr platform) [
       CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform))],
       CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform)))
   ]
 
---
--- Initialise the LDV word of a new closure
---
-ldvRecordCreate :: CmmExpr -> FCode ()
-ldvRecordCreate closure = do
+
+-- | If LDV profiling the user_era = 0
+-- , if eras profiling then (ldv)era = 0, so we can initialise correctly by OR the two expressions.
+dynProfInit :: Platform -> CmmExpr
+dynProfInit platform = CmmMachOp (mo_wordOr platform) [(dynLdvInit platform), dynErasInit platform]
+
+
+-- |  Initialise the profiling word of a new dynamic closure
+-- * When LDV profiling is enabled (era > 0) - Initialise to the LDV word
+-- * When eras profiling is enabled (user_era > 0) - Initialise to current user_era
+-- TODO: Why is this not the same code as dynProfInit?
+profHeaderCreate :: CmmExpr -> FCode ()
+profHeaderCreate closure = do
   platform <- getPlatform
-  emit $ mkStore (ldvWord platform closure) (dynLdvInit platform)
+  let prof_header_wd = profHeaderWord platform closure
+
+  let check_ldv = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
+  let check_eras = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadUserEra platform, CmmLit (zeroCLit platform)])
+  -- Case 2: user_era > 0, eras profiling is enabled
+  check_1 <- check_eras (mkStore prof_header_wd (dynErasInit platform)) mkNop
+  -- Case 1: era > 0, LDV profiling is enabled
+  check_2 <- check_ldv (mkStore prof_header_wd (dynLdvInit platform)) check_1
+  emit check_2
+
+
+
+
+
+
 
 --
 -- | Called when a closure is entered, marks the closure as having
@@ -368,18 +398,20 @@ ldvEnter cl_ptr = do
     platform <- getPlatform
     let constants = platformConstants platform
         -- don't forget to subtract node's tag
-        ldv_wd = ldvWord platform cl_ptr
+        ldv_wd = profHeaderWord platform cl_ptr
         new_ldv_wd = cmmOrWord platform
                         (cmmAndWord platform (cmmLoadBWord platform ldv_wd)
                                              (CmmLit (mkWordCLit platform (pc_ILDV_CREATE_MASK constants))))
                         (cmmOrWord platform (loadEra platform) (CmmLit (mkWordCLit platform (pc_ILDV_STATE_USE constants))))
-    ifProfiling $
-         -- if (era > 0) {
+    ifProfiling $ do
+       -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
          --                era | LDV_STATE_USE }
         emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
                      (mkStore ldv_wd new_ldv_wd)
                      mkNop
+
+
 
 loadEra :: Platform -> CmmExpr
 loadEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platform))
@@ -387,8 +419,15 @@ loadEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platfor
              (cInt platform)
              NaturallyAligned]
 
+loadUserEra :: Platform -> CmmExpr
+loadUserEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platform))
+    [CmmLoad (mkLblExpr (mkRtsCmmDataLabel (fsLit "user_era")))
+             (bWord platform)
+             NaturallyAligned]
+
 -- | Takes the address of a closure, and returns
--- the address of the LDV word in the closure
-ldvWord :: Platform -> CmmExpr -> CmmExpr
-ldvWord platform closure_ptr
+-- the address of the prof header word in the closure (this is used to store LDV info,
+-- retainer profiling info and eras profiling info).
+profHeaderWord :: Platform -> CmmExpr -> CmmExpr
+profHeaderWord platform closure_ptr
     = cmmOffsetB platform closure_ptr (pc_OFFSET_StgHeader_ldvw (platformConstants platform))

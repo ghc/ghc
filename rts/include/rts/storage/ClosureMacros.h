@@ -158,9 +158,33 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 
  [1]: Technically we should set 'rs' to `NULL | flip`.
  */
-#define SET_PROF_HDR(c,ccs_)            \
+/* #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
+        setHeaderBits((c))
         LDV_RECORD_CREATE((c)))
+*/
+/*
+  MP: Various other places use the check era > 0 to check whether LDV profiling
+  is enabled. The use of these predicates here is the reason for including RtsFlags.h in
+  a lot of places. Is that bad?
+
+  We could also check user_era > 0 for eras profiling?
+*/
+#define SET_PROF_HDR(c, ccs_) \
+  { \
+  (c)->header.prof.ccs = ccs_; \
+  if (doingLDVProfiling()) { \
+    LDV_RECORD_CREATE((c)); \
+  } \
+\
+  if (doingRetainerProfiling()) { \
+    LDV_RECORD_CREATE((c)); \
+  }; \
+  if (doingErasProfiling()){ \
+    ERA_RECORD_CREATE((c)); \
+  }; \
+  }
+
 #else
 #define SET_PROF_HDR(c,ccs)
 #endif
@@ -185,6 +209,7 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 #define OVERWRITE_INFO(c, new_info)                             \
     OVERWRITING_CLOSURE((StgClosure *)(c));                     \
     SET_INFO((StgClosure *)(c), (new_info));                    \
+    /* MP: Should this be SET_PROF_HEADER?  */ \
     LDV_RECORD_CREATE(c);
 
 /* -----------------------------------------------------------------------------

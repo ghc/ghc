@@ -464,7 +464,8 @@ extern char **environ;
       SymI_HasProto(mkCostCentre)               \
       SymI_HasProto(registerCcList)             \
       SymI_HasProto(registerCcsList)            \
-      SymI_HasProto(era)
+      SymI_HasProto(era)                        \
+      SymI_HasProto(user_era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
 #endif
@@ -921,6 +922,7 @@ extern char **environ;
       SymI_HasProto(stopProfTimer)                                      \
       SymI_HasProto(startHeapProfTimer)                                 \
       SymI_HasProto(stopHeapProfTimer)                                  \
+      SymI_HasProto(setUserEra)                                         \
       SymI_HasProto(requestHeapCensus)                                  \
       SymI_HasProto(atomic_inc)                                         \
       SymI_HasProto(atomic_inc64)                                       \

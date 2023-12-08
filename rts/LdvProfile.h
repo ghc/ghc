@@ -33,6 +33,8 @@ RTS_PRIVATE void LdvCensusKillAll ( void );
 // Evacuated objects are no longer needed, so we just store its original size in
 // the LDV field.
 #define SET_EVACUAEE_FOR_LDV(c, size)   \
-    LDVW((c)) = (size)
+    if (doingLDVProfiling()){ \
+      LDVW((c)) = (size); \
+    }
 
 #endif /* PROFILING */

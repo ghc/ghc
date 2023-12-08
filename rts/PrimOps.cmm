@@ -227,7 +227,7 @@ stg_isMutableByteArrayPinnedzh ( gcptr mba )
  * means we don't track their time of use and eventual destruction. We just
  * assume they get used.
  *
- * Thus it is not necessary to call LDV_RECORD_CREATE when resizing them as we
+ * Thus it is not necessary to call PROF_HEADER_CREATE when resizing them as we
  * used to as the LDV profiler will essentially ignore arrays anyways.
  */
 
@@ -240,7 +240,7 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
    OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                      ROUNDUP_BYTES_TO_WDS(new_size)));
    StgArrBytes_bytes(mba) = new_size;
-   // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
+   // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
 
    return ();
 }
@@ -264,7 +264,7 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
       OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                         new_size_wds));
       StgArrBytes_bytes(mba) = new_size;
-      // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
+      // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
 
       return (mba);
    } else {
@@ -308,7 +308,7 @@ again:
    OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
                                      new_size));
    StgSmallMutArrPtrs_ptrs(mba) = new_size;
-   // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
+   // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
 
    return ();
 }
@@ -758,14 +758,14 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
     CCCS_ALLOC(THUNK_2_SIZE);
     z = Hp - THUNK_2_SIZE + WDS(1);
     SET_HDR(z, stg_ap_2_upd_info, CCCS);
-    LDV_RECORD_CREATE(z);
+    PROF_HEADER_CREATE(z);
     StgThunk_payload(z,0) = f;
 
     TICK_ALLOC_THUNK_1();
     CCCS_ALLOC(THUNK_1_SIZE);
     y = z - THUNK_1_SIZE;
     SET_HDR(y, stg_sel_0_upd_info, CCCS);
-    LDV_RECORD_CREATE(y);
+    PROF_HEADER_CREATE(y);
     StgThunk_payload(y,0) = z;
 
   retry:
@@ -814,7 +814,7 @@ stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
     CCCS_ALLOC(THUNK_SIZE);
     z = Hp - THUNK_SIZE + WDS(1);
     SET_HDR(z, stg_ap_2_upd_info, CCCS);
-    LDV_RECORD_CREATE(z);
+    PROF_HEADER_CREATE(z);
     StgThunk_payload(z,0) = f;
 
   retry:
@@ -947,7 +947,7 @@ stg_finalizzeWeakzh ( gcptr w )
     //
     unlockClosure(w, stg_DEAD_WEAK_info);
 
-    LDV_RECORD_CREATE(w);
+    PROF_HEADER_CREATE(w);
 
     if (list != stg_NO_FINALIZER_closure) {
       ccall runCFinalizers(list);

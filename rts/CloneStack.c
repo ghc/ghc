@@ -7,6 +7,7 @@
  *---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "RtsFlags.h"
 #include "rts/Messages.h"
 #include "Messages.h"
 #include "rts/Types.h"

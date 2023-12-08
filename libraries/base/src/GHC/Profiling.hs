@@ -9,6 +9,7 @@ module GHC.Profiling ( -- * Cost Centre Profiling
                      , startHeapProfTimer
                      , stopHeapProfTimer
                      , requestHeapCensus
+                     , setUserEra
                      )where
 
 import GHC.Base
@@ -50,3 +51,8 @@ foreign import ccall startHeapProfTimer :: IO ()
 --
 -- @since 4.16.0.0
 foreign import ccall stopHeapProfTimer :: IO ()
+
+-- Set the heap profiling era, setting the era to 0 will stop closures being
+-- counted. TODO: Move this into ghc-experimental to avoid CLC.
+foreign import ccall setUserEra :: Word -> IO ()
+

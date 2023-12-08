@@ -216,8 +216,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = false;
     RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
     RtsFlags.ProfFlags.startHeapProfileAtStartup = true;
+    RtsFlags.ProfFlags.incrementUserEra = true;
 
 #if defined(PROFILING)
+    RtsFlags.ProfFlags.segmentByEra = false;
     RtsFlags.ProfFlags.showCCSOnException = false;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
     RtsFlags.ProfFlags.ccsLength          = 25;
@@ -228,6 +230,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.ccsSelector        = NULL;
     RtsFlags.ProfFlags.retainerSelector   = NULL;
     RtsFlags.ProfFlags.bioSelector        = NULL;
+    RtsFlags.ProfFlags.eraSelector        = NULL;
 #endif
 
 #if defined(TRACING)
@@ -1152,6 +1155,12 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
                       RtsFlags.ProfFlags.startHeapProfileAtStartup = false;
+                      break;
+                  }
+                  else if (strequal("no-automatic-user-era",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.ProfFlags.incrementUserEra = false;
                       break;
                   }
                   else {
@@ -2263,6 +2272,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'r':
     case 'B':
     case 'b':
+    case 'e':
     case 'T':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
@@ -2352,6 +2362,9 @@ static bool read_heap_profiling_flag(const char *arg)
             break;
         case 'T':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
+            break;
+        case 'e':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ERA;
             break;
         }
         break;
@@ -2691,3 +2704,27 @@ bool is_io_mng_native_p (void)
   return false;
 #endif
 }
+
+
+#if defined(PROFILING)
+bool
+doingLDVProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
+            || RtsFlags.ProfFlags.bioSelector != NULL);
+}
+
+bool
+doingRetainerProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
+            || RtsFlags.ProfFlags.retainerSelector != NULL);
+}
+bool
+doingErasProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ERA
+            || RtsFlags.ProfFlags.eraSelector != NULL);
+}
+#endif /* PROFILING */
+

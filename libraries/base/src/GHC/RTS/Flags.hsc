@@ -272,6 +272,7 @@ data DoHeapProfile
     | HeapByLDV
     | HeapByClosureType
     | HeapByInfoTable
+    | HeapByEra
     deriving ( Show -- ^ @since 4.8.0.0
              , Generic -- ^ @since 4.15.0.0
              )
@@ -287,6 +288,7 @@ instance Enum DoHeapProfile where
     fromEnum HeapByLDV         = #{const HEAP_BY_LDV}
     fromEnum HeapByClosureType = #{const HEAP_BY_CLOSURE_TYPE}
     fromEnum HeapByInfoTable   = #{const HEAP_BY_INFO_TABLE}
+    fromEnum HeapByEra         = #{const HEAP_BY_ERA}
 
     toEnum #{const NO_HEAP_PROFILING}    = NoHeapProfiling
     toEnum #{const HEAP_BY_CCS}          = HeapByCCS
@@ -297,6 +299,7 @@ instance Enum DoHeapProfile where
     toEnum #{const HEAP_BY_LDV}          = HeapByLDV
     toEnum #{const HEAP_BY_CLOSURE_TYPE} = HeapByClosureType
     toEnum #{const HEAP_BY_INFO_TABLE}   = HeapByInfoTable
+    toEnum #{const HEAP_BY_ERA}          = HeapByEra
     toEnum e = errorWithoutStackTrace ("invalid enum for DoHeapProfile: " ++ show e)
 
 -- | Parameters of the cost-center profiler

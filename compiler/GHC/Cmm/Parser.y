@@ -1262,7 +1262,7 @@ stmtMacros = listToUFM [
   ( fsLit "POP_ARG_REGS",          \[live_regs] -> emitPopArgRegs live_regs ),
 
   ( fsLit "LDV_ENTER",             \[e] -> ldvEnter e ),
-  ( fsLit "LDV_RECORD_CREATE",     \[e] -> ldvRecordCreate e ),
+  ( fsLit "PROF_HEADER_CREATE",     \[e] -> profHeaderCreate e ),
 
   ( fsLit "PUSH_UPD_FRAME",        \[sp,e] -> emitPushUpdateFrame sp e ),
   ( fsLit "SET_HDR",               \[ptr,info,ccs] ->

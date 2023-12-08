@@ -142,6 +142,14 @@ restore_locale( void )
 unsigned int era;
 static uint32_t max_era;
 
+StgWord user_era;
+
+void
+setUserEra (StgWord w){
+  // TODO: Atomic write etc
+  user_era = w;
+}
+
 inline void
 initLDVCtr( counter *ctr )
 {
@@ -180,6 +188,13 @@ closureIdentity( const StgClosure *p )
         return p->header.prof.ccs->cc->module;
     case HEAP_BY_DESCR:
         return GET_PROF_DESC(get_itbl(p));
+    case HEAP_BY_ERA:
+        // Static objects should have user_era = 0
+        // TODO: MP, if user uses setUserEra = 0 then this assertion will fail.
+        // MP: If user_era == 0 then closureIdentity returns the NULL pointer, and
+        // the closure is not counted to the census (is this a feature or bug)
+//        ASSERT(HEAP_ALLOCED(p) && p->header.prof.hp.era != 0);
+        return (void *)p->header.prof.hp.era;
     case HEAP_BY_TYPE:
         return GET_PROF_TYPE(get_itbl(p));
     case HEAP_BY_RETAINER:
@@ -220,21 +235,6 @@ closureIdentity( const StgClosure *p )
 /* --------------------------------------------------------------------------
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
-#if defined(PROFILING)
-STATIC_INLINE bool
-doingLDVProfiling( void )
-{
-    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
-            || RtsFlags.ProfFlags.bioSelector != NULL);
-}
-
-bool
-doingRetainerProfiling( void )
-{
-    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
-            || RtsFlags.ProfFlags.retainerSelector != NULL);
-}
-#endif /* PROFILING */
 
 // Processes a closure 'c' being destroyed whose size is 'size'.
 // Make sure that LDV_recordDead() is not invoked on 'inherently used' closures
@@ -356,6 +356,10 @@ freeEra(Census *census)
 static void
 nextEra( void )
 {
+    if (user_era > 0 && RtsFlags.ProfFlags.incrementUserEra){
+      user_era++;
+    }
+
 #if defined(PROFILING)
     if (doingLDVProfiling()) {
         era++;
@@ -481,6 +485,14 @@ initHeapProfiling(void)
         stg_exit(EXIT_FAILURE);
     }
 #endif
+#endif
+
+#if defined(PROFILING)
+    if (doingErasProfiling()){
+      user_era = 1;
+    }
+#else
+    user_era = 0;
 #endif
 
     // we only count eras if we're doing LDV profiling.  Otherwise era
@@ -938,6 +950,12 @@ dumpCensus( Census *census )
                        RtsFlags.ProfFlags.ccsLength);
             traceHeapProfSampleCostCentre(0, (CostCentreStack *)ctr->identity,
                                           count * sizeof(W_));
+            break;
+        case HEAP_BY_ERA:
+            fprintf(hp_file, "%lu", (StgWord)ctr->identity);
+            char str_era[100];
+            sprintf(str_era, "%lu", (StgWord)ctr->identity);
+            traceHeapProfSampleString(0, str_era, count * sizeof(W_));
             break;
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:

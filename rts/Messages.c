@@ -7,6 +7,7 @@
  * --------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "RtsFlags.h"
 #include "Messages.h"
 #include "Trace.h"
 #include "Capability.h"
