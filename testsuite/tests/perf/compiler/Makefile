@@ -26,6 +26,7 @@ MultiLayerModulesTH_Make_Prep:
 	"$(TEST_HC)" $(TEST_HC_OPTS) MultiLayerModulesPrep -dynamic-too -v0
 
 MultiLayerModulesTH_OneShot_Prep: MultiLayerModulesTH_Make_Prep
+	env
 	$(CP) MultiLayerModules.hs MultiLayerModulesTH_OneShot.hs
 
 # Type family skolems

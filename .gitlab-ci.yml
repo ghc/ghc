@@ -483,45 +483,9 @@ stack-hadrian-build:
 # Testing reinstallable ghc codepath
 ####################################
 
-test-cabal-reinstall-x86_64-linux-deb10:
-  extends: nightly-x86_64-linux-deb10-validate
-  stage: full-build
-  variables:
-    REINSTALL_GHC: "yes"
-    BUILD_FLAVOUR: validate
-    TEST_ENV: "x86_64-linux-deb10-cabal-install"
-  rules:
-    - if: $NIGHTLY
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
-
 ########################################
 # Testing ABI is invariant across builds
 ########################################
-
-abi-test-nightly:
-  stage: full-build
-  needs:
-    - job: nightly-x86_64-linux-fedora33-release-hackage
-    - job: nightly-x86_64-linux-fedora33-release
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  dependencies: null
-  before_script:
-    - mkdir -p normal
-    - mkdir -p hackage
-    - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C normal/
-    - tar -xf ghc-x86_64-linux-fedora33-release-hackage_docs.tar.xz -C hackage/
-  script:
-    - .gitlab/ci.sh compare_interfaces_of "normal/ghc-*" "hackage/ghc-*"
-  artifacts:
-    paths:
-      - out
-  rules:
-    # This job is broken. Disabling it until some kind soul can finish its
-    # implementation. #23269
-    - when: never
-    - if: $NIGHTLY
 
 ############################################################
 # Packaging
@@ -844,54 +808,6 @@ release-hackage-lint:
 # Testing via test-primops
 ############################################################
 
-# Triggering jobs in the ghc/test-primops project
-
-.test-primops:
-  stage: testing
-  variables:
-    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
-    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
-    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
-  trigger:
-    project: "ghc/test-primops"
-    branch: "upstream-testing"
-    strategy: "depend"
-
-.test-primops-validate-template:
-  needs:
-    - job: x86_64-linux-deb10-validate+debug_info
-      artifacts: false
-    - job: aarch64-linux-deb10-validate
-      artifacts: false
-    - job: aarch64-darwin-validate
-      artifacts: false
-    - job: x86_64-darwin-validate
-      artifacts: false
-  extends: .test-primops
-
-test-primops-label:
-  extends: .test-primops-validate-template
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/'
-
-test-primops-nightly:
-  extends: .test-primops
-  needs:
-    - job: nightly-x86_64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-aarch64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-aarch64-darwin-validate
-      artifacts: false
-    - job: nightly-x86_64-darwin-validate
-      artifacts: false
-  rules:
-    - if: $NIGHTLY
-
-test-primops-release:
-  extends: .test-primops
-  rules:
-    - if: '$RELEASE_JOB == "yes"'
 
 ############################################################
 # Nofib testing
@@ -1108,84 +1024,6 @@ project-version:
       - metadata_test.yaml
       - version.sh
 
-ghcup-metadata-nightly:
-  extends: .ghcup-metadata
-  # Explicit needs for validate pipeline because we only need certain bindists
-  needs:
-    - job: nightly-x86_64-linux-fedora33-release
-      artifacts: false
-    - job: nightly-x86_64-linux-centos7-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-ubuntu20_04-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-ubuntu18_04-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-rocky8-validate
-      artifacts: false
-    - job: nightly-x86_64-darwin-validate
-      artifacts: false
-    - job: nightly-aarch64-darwin-validate
-      artifacts: false
-    - job: nightly-x86_64-windows-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-alpine3_12-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-deb9-validate
-      artifacts: false
-    - job: nightly-i386-linux-deb10-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-aarch64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-deb11-validate
-      artifacts: false
-    - job: source-tarball
-      artifacts: false
-    - job: project-version
-  script:
-    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
-  rules:
-    - if: $NIGHTLY
-
-# Update the ghcup metadata with information about this nightly pipeline
-ghcup-metadata-nightly-push:
-  stage: deploy
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  dependencies: null
-  tags:
-    - x86_64-linux
-  variables:
-    BUILD_FLAVOUR: default
-    GIT_SUBMODULE_STRATEGY: "none"
-  needs:
-    - job: ghcup-metadata-nightly
-      artifacts: true
-  script:
-    - git clone https://gitlab.haskell.org/ghc/ghcup-metadata.git
-    - PipelineYear="$(date -d $CI_PIPELINE_CREATED_AT +%Y)"
-    - cp metadata_test.yaml "ghcup-metadata/ghcup-nightlies-$PipelineYear-0.0.7.yaml"
-    - cp metadata_test.yaml "ghcup-metadata/ghcup-nightlies-0.0.7.yaml"
-    - cd ghcup-metadata
-    - git config user.email "ghc-ci@gitlab-haskell.org"
-    - git config user.name "GHC GitLab CI"
-    - git remote add gitlab_origin https://oauth2:$PROJECT_PUSH_TOKEN@gitlab.haskell.org/ghc/ghcup-metadata.git
-    - git add .
-    - git commit -m "Update metadata"
-    - git push gitlab_origin HEAD:updates
-  rules:
-    # Only run the update on scheduled nightly pipelines, ie once a day
-    - if: $NIGHTLY && $CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == "master"
-
-
-ghcup-metadata-release:
-  # No explicit needs for release pipeline as we assume we need everything and everything will pass.
-  extends: .ghcup-metadata
-  script:
-    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
-  rules:
-    - if: '$RELEASE_JOB == "yes"'
-
 .ghcup-metadata-testing:
   stage: deploy
   variables:
@@ -1198,24 +1036,3 @@ ghcup-metadata-release:
     branch: "upstream-testing"
     strategy: "depend"
 
-ghcup-metadata-testing-nightly:
-  needs:
-    - job: ghcup-metadata-nightly
-      artifacts: false
-  extends: .ghcup-metadata-testing
-  variables:
-      NIGHTLY: "$NIGHTLY"
-      UPSTREAM_JOB_NAME: "ghcup-metadata-nightly"
-  rules:
-    - if: '$NIGHTLY == "1"'
-
-ghcup-metadata-testing-release:
-  needs:
-    - job: ghcup-metadata-release
-      artifacts: false
-  extends: .ghcup-metadata-testing
-  variables:
-      UPSTREAM_JOB_NAME: "ghcup-metadata-release"
-  rules:
-    - if: '$RELEASE_JOB == "yes"'
-  when: manual

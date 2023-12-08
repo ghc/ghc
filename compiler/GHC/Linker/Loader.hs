@@ -1061,7 +1061,8 @@ loadPackages' interp hsc_env new_pks pls = do
         = return pkgs
 
         | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
-        = do { let deps = unitDepends pkg_cfg
+        = do { pprTraceM "loadPackage - cache miss" (ppr new_pkg)
+             ; let deps = unitDepends pkg_cfg
                -- Link dependents first
              ; pkgs' <- link pkgs deps
                 -- Now link the package itself
