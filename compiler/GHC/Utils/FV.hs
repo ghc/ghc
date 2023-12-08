@@ -3,8 +3,6 @@
 
 -}
 
-{-# LANGUAGE BangPatterns #-}
-
 -- | Utilities for efficiently and deterministically computing free variables.
 module GHC.Utils.FV (
         -- * Deterministic free vars computations

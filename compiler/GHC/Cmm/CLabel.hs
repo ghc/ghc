@@ -6,11 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-
-
 module GHC.Cmm.CLabel (
         CLabel, -- abstract type
         NeedExternDecl (..),

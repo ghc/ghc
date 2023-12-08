@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, DerivingVia, RankNTypes #-}
+{-# LANGUAGE DerivingVia, NoPolyKinds #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --

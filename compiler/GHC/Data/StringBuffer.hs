@@ -6,7 +6,6 @@
 Buffers for scanning string input stored in external arrays.
 -}
 
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}

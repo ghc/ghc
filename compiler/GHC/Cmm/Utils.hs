@@ -1,5 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

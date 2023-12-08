@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 --
 -- (c) The University of Glasgow 2003-2006
 --

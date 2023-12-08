@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE BangPatterns #-}
 module GHC.Cmm.ContFlowOpt
     ( cmmCfgOpts
     , cmmCfgOptsProc

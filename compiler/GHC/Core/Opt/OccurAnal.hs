@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -cpp -Wno-incomplete-record-updates #-}

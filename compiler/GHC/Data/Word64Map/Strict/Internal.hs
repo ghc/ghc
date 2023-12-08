@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE PatternGuards #-}
 
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 

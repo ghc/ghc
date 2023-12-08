@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 
 module GHC.Cmm.Pipeline (
   cmmPipeline

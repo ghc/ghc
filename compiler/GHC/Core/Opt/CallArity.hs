@@ -2,7 +2,6 @@
 -- Copyright (c) 2014 Joachim Breitner
 --
 
-{-# LANGUAGE BangPatterns #-}
 
 module GHC.Core.Opt.CallArity
     ( callArityAnalProgram

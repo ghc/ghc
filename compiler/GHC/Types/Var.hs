@@ -5,8 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE MultiWayIf, PatternSynonyms #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |

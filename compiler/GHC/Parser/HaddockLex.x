@@ -1,6 +1,4 @@
 {
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module GHC.Parser.HaddockLex (lexHsDoc, lexStringLiteral) where

@@ -16,7 +16,7 @@ build-type: Simple
 cabal-version: >=1.10
 
 Executable ghc-pkg
-    Default-Language: Haskell2010
+    Default-Language: GHC2021
     Main-Is: Main.hs
     Other-Extensions: CPP
 

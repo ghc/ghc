@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 --
