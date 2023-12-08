@@ -25,6 +25,7 @@
 
 #include "rts/PosixSource.h"
 #include "Rts.h"
+#include "RtsFlags.h"
 
 #include "Storage.h"
 #include "GCThread.h"

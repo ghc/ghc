@@ -12,6 +12,7 @@
 
 #include "ThreadLabels.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 #include "Hash.h"
 #include "Trace.h"
 

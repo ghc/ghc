@@ -50,3 +50,4 @@ foreign import ccall startHeapProfTimer :: IO ()
 --
 -- @since 4.16.0.0
 foreign import ccall stopHeapProfTimer :: IO ()
+

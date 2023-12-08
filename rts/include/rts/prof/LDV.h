@@ -18,6 +18,8 @@
 /* retrieves the LDV word from closure c */
 #define LDVW(c)                 (((StgClosure *)(c))->header.prof.hp.ldvw)
 
+#define ERAW(c)                 (((StgClosure *)(c))->header.prof.hp.era)
+
 /*
  * Stores the creation time for closure c.
  * This macro is called at the very moment of closure creation.
@@ -33,7 +35,12 @@
 #else
 
 #define LDV_RECORD_CREATE(c)   \
-  LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
+  if (doingLDVProfiling()){ \
+    LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE; \
+  }
+
+#define ERA_RECORD_CREATE(c)   \
+  ERAW((c)) = (StgWord)RTS_DEREF(user_era);
 
 #endif
 

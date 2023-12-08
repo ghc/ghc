@@ -168,6 +168,7 @@ extern CostCentreStack CCS_IDLE[];       // capability is idle
 #endif /* IN_STG_CODE */
 
 extern unsigned int RTS_VAR(era);
+extern StgWord RTS_VAR(user_era);
 
 /* -----------------------------------------------------------------------------
  * Functions

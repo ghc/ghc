@@ -13,6 +13,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 
 #include "Capability.h"
 #include "GC.h"

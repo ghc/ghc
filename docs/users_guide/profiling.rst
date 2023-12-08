@@ -898,6 +898,17 @@ following RTS options select which break-down to use:
     which have function type or unknown/polymorphic type, the string will
     represent an approximation to the actual type.
 
+.. rts-flag:: -he
+
+    :since: 9.10.1
+
+    *Requires* :ghc-flag:`-prof`. Break down the graph by era.
+
+    Each closure is tagged with the era in which it is created. Eras start at 1
+    and can be set in your program to domain specific values using functions from
+    ``GHC.Profiling.Eras`` or incremented automatically by the
+    :rts-flag:`--automatic-era-increment`.
+
 .. rts-flag:: -hr
 
     *Requires* :ghc-flag:`-prof`. Break down the graph by retainer set. Retainer
@@ -965,6 +976,11 @@ follows:
 
     Restrict the profile to closures with the specified types.
 
+.. rts-flag:: -he ⟨era⟩
+    :noindex:
+
+    Restrict the profile to the specified era.
+
 .. rts-flag:: -hr ⟨cc⟩
     :noindex:
 
@@ -1016,6 +1032,13 @@ There are three more options which relate to heap profiling:
     Don't start time profiling from the start of program execution. If this
     option is enabled, it's expected that the user will manually start time
     profiling or request specific samples using functions from ``GHC.Profiling``.
+
+.. rts-flag:: --automatic-era-increment
+
+    :since: 9.10.1
+
+    Increment the era by 1 on each major garbage collection. This is used
+    in conjunction with :rts-flag:`-he`.
 
 .. rts-flag:: --null-eventlog-writer
 

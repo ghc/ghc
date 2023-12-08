@@ -29,6 +29,7 @@ typedef struct {
   union {
     StgWord trav;             /* Heap traversal */
     StgWord ldvw;             /* Lag/Drag/Void Word */
+    StgWord era;              /* User-era */
   } hp;
     // Heap profiling header. This field is shared among the various heap
     // profiling modes. Currently it is used by ProfHeap.c for Lag/Drag/Void
