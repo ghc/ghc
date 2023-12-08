@@ -9,6 +9,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "RtsFlags.h"
 #include "HsFFI.h"
 
 #include "RtsUtils.h"

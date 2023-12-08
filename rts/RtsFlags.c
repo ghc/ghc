@@ -217,6 +217,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
     RtsFlags.ProfFlags.startHeapProfileAtStartup = true;
     RtsFlags.ProfFlags.startTimeProfileAtStartup = true;
+    RtsFlags.ProfFlags.incrementUserEra = false;
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.showCCSOnException = false;
@@ -229,6 +230,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.ccsSelector        = NULL;
     RtsFlags.ProfFlags.retainerSelector   = NULL;
     RtsFlags.ProfFlags.bioSelector        = NULL;
+    RtsFlags.ProfFlags.eraSelector        = 0;
 #endif
 
 #if defined(TRACING)
@@ -384,6 +386,7 @@ usage_text[] = {
 "                 d = closure description",
 "                 y = type description",
 "                 i = info table",
+"                 e = era",
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
 "  A subset of closures may be selected thusly:",
@@ -394,6 +397,7 @@ usage_text[] = {
 "    -hy<typ>...  closures with specified type descriptions",
 "    -hr<cc>...   closures with specified retainers",
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
+"    -he<era>...  closures with specified era",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
@@ -401,6 +405,8 @@ usage_text[] = {
 "                 (default: 25)",
 "",
 "  -xt            Include threads (TSOs) in a heap profile",
+"",
+"  --automatic-era-increment Increment the era on each major garbage collection",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 #else /* PROFILING */
@@ -1159,6 +1165,13 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
                       RtsFlags.ProfFlags.startTimeProfileAtStartup = false;
+                      break;
+                  }
+
+                  else if (strequal("automatic-era-increment",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.ProfFlags.incrementUserEra = true;
                       break;
                   }
                   else {
@@ -2270,6 +2283,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'r':
     case 'B':
     case 'b':
+    case 'e':
     case 'T':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
@@ -2315,6 +2329,10 @@ static bool read_heap_profiling_flag(const char *arg)
                 case 'b': // biography select
                     RtsFlags.ProfFlags.bioSelector = selector;
                     break;
+                case 'E':
+                case 'e': // era select
+                    RtsFlags.ProfFlags.eraSelector = strtoul(selector, (char **) NULL, 10);
+                    break;
                 default:
                     stgFree(selector);
                 }
@@ -2359,6 +2377,9 @@ static bool read_heap_profiling_flag(const char *arg)
             break;
         case 'T':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
+            break;
+        case 'e':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ERA;
             break;
         }
         break;
@@ -2698,3 +2719,27 @@ bool is_io_mng_native_p (void)
   return false;
 #endif
 }
+
+
+#if defined(PROFILING)
+bool
+doingLDVProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
+            || RtsFlags.ProfFlags.bioSelector != NULL);
+}
+
+bool
+doingRetainerProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
+            || RtsFlags.ProfFlags.retainerSelector != NULL);
+}
+bool
+doingErasProfiling( void )
+{
+    return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ERA
+            || RtsFlags.ProfFlags.eraSelector != 0);
+}
+#endif /* PROFILING */
+

@@ -1,3 +1,9 @@
 
+module GHC.Profiling.Eras where
+  -- Safety: Trustworthy
+  getUserEra :: GHC.Types.IO GHC.Types.Word
+  incrementUserEra :: GHC.Types.Word -> GHC.Types.IO GHC.Types.Word
+  setUserEra :: GHC.Types.Word -> GHC.Types.IO ()
+
 
 -- Instances:

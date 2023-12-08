@@ -10,7 +10,9 @@
 
 #if !defined(CMINUSMINUS)
 #include "BeginPrivate.h"
+#include "RtsFlags.h"
 #endif
+
 
 /* Note [Thunks, blackholes, and indirections]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -418,10 +420,10 @@
    -------------------------------------------------------------------------- */
 
 /* LDV profiling:
- *   After all, we do *NOT* need to call LDV_RECORD_CREATE() for IND
+ *   After all, we do *NOT* need to call PROF_HEADER_CREATE() for IND
  *   closures because they are inherently used. But, it corrupts
  *   the invariants that every closure keeps its creation time in the profiling
- *  field. So, we call LDV_RECORD_CREATE().
+ *  field. So, we call PROF_HEADER_CREATE().
  */
 
 /*
@@ -462,7 +464,7 @@
     OVERWRITING_CLOSURE(p1);                                    \
     %release StgInd_indirectee(p1) = p2;                        \
     %release SET_INFO(p1, stg_BLACKHOLE_info);                  \
-    LDV_RECORD_CREATE(p1);                                      \
+    PROF_HEADER_CREATE(p1);                                     \
     and_then;
 
 #else /* !CMINUSMINUS */

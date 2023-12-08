@@ -9,6 +9,7 @@
 #include "rts/PosixSource.h"
 #define KEEP_LOCKCLOSURE
 #include "Rts.h"
+#include "RtsFlags.h"
 
 #include "sm/Storage.h"
 #include "RtsUtils.h"

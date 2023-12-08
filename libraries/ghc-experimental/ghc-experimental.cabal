@@ -22,8 +22,7 @@ common warnings
 
 library
     import:           warnings
-    exposed-modules:
-    other-modules:    Dummy
+    exposed-modules:  GHC.Profiling.Eras
     other-extensions:
     build-depends:    base ^>=4.19,
                       ghc-internal >= 0.1 && < 0.2
