@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 -- |An efficient implementation of 'Data.Graph.Inductive.Graph.Graph'
 -- using big-endian patricia tree (i.e. "Data.IntMap").

@@ -5,7 +5,6 @@ Type and Coercion - friends' interface
 -}
 
 
-{-# LANGUAGE BangPatterns #-}
 
 -- | Substitution into types and coercions.
 module GHC.Core.TyCo.Subst

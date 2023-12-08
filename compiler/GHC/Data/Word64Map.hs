@@ -1,13 +1,6 @@
 {-# LANGUAGE CPP #-}
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
-{-# LANGUAGE Safe #-}
-#endif
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
-#endif
-
 
 -----------------------------------------------------------------------------
 -- |

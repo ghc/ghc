@@ -1,7 +1,3 @@
-{-# LANGUAGE BangPatterns  #-}
-
-{-# LANGUAGE DeriveFunctor #-}
-
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom,
    rewriteType

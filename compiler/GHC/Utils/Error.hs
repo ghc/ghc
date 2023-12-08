@@ -1,8 +1,4 @@
-{-# LANGUAGE BangPatterns    #-}
-{-# LANGUAGE DeriveFunctor   #-}
-{-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE ViewPatterns    #-}
-{-# LANGUAGE TypeApplications #-}
 
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998

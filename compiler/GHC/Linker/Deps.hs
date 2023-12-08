@@ -4,10 +4,8 @@
 {-# OPTIONS_GHC -fspec-constr-threshold=10000 #-}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections, RecordWildCards #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
 
 module GHC.Linker.Deps
   ( LinkDepsOpts (..)

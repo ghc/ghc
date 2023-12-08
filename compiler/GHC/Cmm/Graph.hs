@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module GHC.Cmm.Graph
   ( CmmAGraph, CmmAGraphScoped, CgStmt(..)

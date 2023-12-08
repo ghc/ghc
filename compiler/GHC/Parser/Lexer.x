@@ -41,7 +41,6 @@
 -- Alex "Haskell code fragment top"
 
 {
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}

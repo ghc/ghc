@@ -1,8 +1,4 @@
 {-# LANGUAGE CPP #-}
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
-{-# LANGUAGE Safe #-}
-#endif
-
 
 -----------------------------------------------------------------------------
 -- |

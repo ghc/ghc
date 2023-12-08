@@ -16,7 +16,6 @@ find, unsurprisingly, a Core expression.
 -}
 
 
-{-# LANGUAGE BangPatterns #-}
 
 module GHC.Core.Unfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types

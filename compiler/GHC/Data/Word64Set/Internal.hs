@@ -1,14 +1,6 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE PatternGuards #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-#endif
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
-{-# LANGUAGE Trustworthy #-}
-#endif
 
 {-# OPTIONS_HADDOCK not-home #-}
 

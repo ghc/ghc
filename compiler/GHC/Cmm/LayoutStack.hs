@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, RecordWildCards, GADTs #-}
+{-# LANGUAGE RecordWildCards, GADTs #-}
 module GHC.Cmm.LayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where

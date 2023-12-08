@@ -18,7 +18,7 @@ Haskell).
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 
 module GHC.Types.Unique (
         -- * Main data types

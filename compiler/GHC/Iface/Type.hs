@@ -7,11 +7,7 @@ This module defines interface types and binders
 -}
 
 
-{-# LANGUAGE FlexibleInstances #-}
-  -- FlexibleInstances for Binary (DefMethSpec IfaceType)
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Iface.Type (

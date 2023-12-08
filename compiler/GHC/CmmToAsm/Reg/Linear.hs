@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

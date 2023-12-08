@@ -1,3 +1,4 @@
+{-# LANGUAGE NoPolyKinds #-}
 module GHC.Core where
 import {-# SOURCE #-} GHC.Types.Var
 

@@ -1,6 +1,5 @@
 
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------

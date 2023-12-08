@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, BangPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
 module GHC.Cmm.CommonBlockElim
   ( elimCommonBlocks

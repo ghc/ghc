@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE BangPatterns #-}
-
 -- | 'RoughMap' is an approximate finite map data structure keyed on
 -- @['RoughMatchTc']@. This is useful when keying maps on lists of 'Type's
 -- (e.g. an instance head).

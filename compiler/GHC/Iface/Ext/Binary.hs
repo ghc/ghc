@@ -1,8 +1,6 @@
 {-
 Binary serialization for .hie files.
 -}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE BangPatterns #-}
 
 module GHC.Iface.Ext.Binary
    ( readHieFile

@@ -5,10 +5,6 @@
 \section[NameEnv]{@NameEnv@: name environments}
 -}
 
-
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module GHC.Types.Name.Env (
         -- * Var, Id and TyVar environments (maps)
         NameEnv,

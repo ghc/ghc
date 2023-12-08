@@ -1,8 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (

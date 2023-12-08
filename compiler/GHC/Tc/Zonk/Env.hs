@@ -1,6 +1,6 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE NoPolyKinds #-}
 
 -- | The 'ZonkEnv' zonking environment, and the 'ZonkT' and 'ZonkBndrT'
 -- monad transformers, for the final zonking to type in "GHC.Tc.Zonk.Type".

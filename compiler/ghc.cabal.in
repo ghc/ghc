@@ -84,7 +84,7 @@ Flag hadrian-stage0
     Manual: True
 
 Library
-    Default-Language: Haskell2010
+    Default-Language: GHC2021
     Exposed: False
     Includes: Unique.h
               -- CodeGen.Platform.h -- invalid as C, skip
@@ -193,10 +193,7 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
-       ,BangPatterns
-       ,ScopedTypeVariables
        ,MonoLocalBinds
-       ,TypeOperators
 
     Exposed-Modules:
         GHC

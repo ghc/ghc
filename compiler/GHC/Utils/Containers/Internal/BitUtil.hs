@@ -1,10 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}
-#endif
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
-{-# LANGUAGE Safe #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |

@@ -28,7 +28,7 @@ Flag threaded
     Manual: True
 
 Executable ghc
-    Default-Language: Haskell2010
+    Default-Language: GHC2021
 
     Main-Is: Main.hs
     Build-Depends: base       >= 4   && < 5,
