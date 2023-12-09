@@ -285,7 +285,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
                            [out dflags (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy noAnn (HsUnrestrictedArrow noExtField) x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnrestrictedArrow noExtField) x y)
         apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
         typeSig nm flds = operator nm ++ " :: " ++
@@ -319,7 +319,7 @@ ppCtor dflags _dat subdocs (ConDeclGADT { con_names = names
           tau_ty = foldr mkFunTy res_ty $
             case args of PrefixConGADT _ pos_args -> map hsScaledThing pos_args
                          RecConGADT _ (L _ flds) -> map (cd_fld_type . unL) flds
-          mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noExtField) a b)
+          mkFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) a b)
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
 ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExtField [noLocA name] fixity) :: FixitySig GhcRn)]

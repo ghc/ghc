@@ -834,7 +834,7 @@ type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI)                     = SrcSpanAnnA
 
 type XRecCond a
-  = ( XParTy a           ~ EpAnn AnnParen
+  = ( XParTy a ~ AnnParen
     , NoGhcTc a ~ a
     , MapXRec a
     , UnXRec a
@@ -866,7 +866,7 @@ type instance XListTy          DocNameI = EpAnn AnnParen
 type instance XTupleTy         DocNameI = EpAnn AnnParen
 type instance XSumTy           DocNameI = EpAnn AnnParen
 type instance XOpTy            DocNameI = EpAnn [AddEpAnn]
-type instance XParTy           DocNameI = EpAnn AnnParen
+type instance XParTy           DocNameI = AnnParen
 type instance XIParamTy        DocNameI = EpAnn [AddEpAnn]
 type instance XKindSig         DocNameI = EpAnn [AddEpAnn]
 type instance XSpliceTy        DocNameI = DataConCantHappen

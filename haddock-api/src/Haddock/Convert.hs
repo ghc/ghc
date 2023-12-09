@@ -721,7 +721,7 @@ synifyType _ vs ty@(AppTy {}) = let
 
 synifyType s vs funty@(FunTy af w t1 t2)
   | isInvisibleFunArg af = synifySigmaType s vs funty
-  | otherwise            = noLocA $ HsFunTy noAnn w' s1 s2
+  | otherwise            = noLocA $ HsFunTy noExtField w' s1 s2
   where
     s1 = synifyType WithinType vs t1
     s2 = synifyType WithinType vs t2
