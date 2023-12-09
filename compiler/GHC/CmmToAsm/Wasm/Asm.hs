@@ -12,6 +12,7 @@ import Control.Monad.Trans.Reader
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder
+import qualified Data.ByteString.Char8 as BS8
 import Data.Coerce
 import Data.Foldable
 import qualified GHC.Data.Word64Set as WS
@@ -25,6 +26,7 @@ import GHC.CmmToAsm.Wasm.Utils
 import GHC.Data.FastString
 import GHC.Float
 import GHC.Prelude
+import GHC.Settings.Config (cProjectVersion)
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Types.Unique.Map
@@ -485,7 +487,7 @@ asmTellProducers = do
         asmTellVec
           [ do
               asmTellBS "ghc"
-              asmTellBS "9.6"
+              asmTellBS $ BS8.pack cProjectVersion
           ]
     ]
 
