@@ -23,7 +23,7 @@ module Language.Haskell.Syntax.Pat (
         ConLikeP,
 
         HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
-        HsConPatTyArg(..),
+        HsConPatTyArg(..), XConPatTyArg,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
@@ -36,7 +36,6 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsUntyp
 -- friends:
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Lit
-import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
@@ -79,16 +78,13 @@ data Pat p
 
   | AsPat       (XAsPat p)
                 (LIdP p)
-               !(LHsToken "@" p)
                 (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
-               !(LHsToken "(" p)
                 (LPat p)                -- ^ Parenthesised pattern
-               !(LHsToken ")" p)
                                         -- See Note [Parens in HsSyn] in GHC.Hs.Expr
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --                                    'GHC.Parser.Annotation.AnnClose' @')'@
@@ -222,7 +218,6 @@ data Pat p
   -- Embed the syntax of types into patterns.
   -- Used with RequiredTypeArguments, e.g. fn (type t) = rhs
   | EmbTyPat        (XEmbTyPat p)
-                   !(LHsToken "type" p)
                     (HsTyPat (NoGhcTc p))
 
   -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -236,10 +231,9 @@ type family ConLikeP x
 
 -- | Type argument in a data constructor pattern,
 --   e.g. the @\@a@ in @f (Just \@a x) = ...@.
-data HsConPatTyArg p =
-  HsConPatTyArg
-    !(LHsToken "@" p)
-     (HsTyPat p)
+data HsConPatTyArg p = HsConPatTyArg !(XConPatTyArg p) (HsTyPat p)
+
+type family XConPatTyArg p
 
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (HsConPatTyArg (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))

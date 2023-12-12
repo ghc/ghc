@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -77,11 +77,15 @@
            (EpaComments
             []))
           (ConDeclGADT
-           (EpAnn
-            (EpaSpan { T18791.hs:5:3-17 })
-            []
-            (EpaComments
-             []))
+           ((,)
+            (EpUniTok
+             (EpaSpan { T18791.hs:5:7-8 })
+             (NormalSyntax))
+            (EpAnn
+             (EpaSpan { T18791.hs:5:3-17 })
+             []
+             (EpaComments
+              [])))
            (:|
             (L
              (EpAnn
@@ -94,10 +98,6 @@
               {OccName: MkT}))
             [])
            (L
-            (TokenLoc
-             (EpaSpan { T18791.hs:5:7-8 }))
-            (HsNormalTok))
-           (L
             (EpAnn
              (EpaSpan { T18791.hs:5:10-17 })
              (AnnListItem
@@ -108,12 +108,12 @@
              (NoExtField)))
            (Nothing)
            (PrefixConGADT
+            (NoExtField)
             [(HsScaled
               (HsUnrestrictedArrow
-               (L
-                (TokenLoc
-                 (EpaSpan { T18791.hs:5:14-15 }))
-                (HsNormalTok)))
+               (EpUniTok
+                (EpaSpan { T18791.hs:5:14-15 })
+                (NormalSyntax)))
               (L
                (EpAnn
                 (EpaSpan { T18791.hs:5:10-12 })

@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -95,11 +96,13 @@ type instance XLazyPat GhcPs = EpAnn [AddEpAnn] -- For '~'
 type instance XLazyPat GhcRn = NoExtField
 type instance XLazyPat GhcTc = NoExtField
 
-type instance XAsPat   GhcPs = EpAnnCO
+type instance XAsPat   GhcPs = EpToken "@"
 type instance XAsPat   GhcRn = NoExtField
 type instance XAsPat   GhcTc = NoExtField
 
-type instance XParPat (GhcPass _) = EpAnnCO
+type instance XParPat  GhcPs = (EpToken "(", EpToken ")")
+type instance XParPat  GhcRn = NoExtField
+type instance XParPat  GhcTc = NoExtField
 
 type instance XBangPat GhcPs = EpAnn [AddEpAnn] -- For '!'
 type instance XBangPat GhcRn = NoExtField
@@ -155,7 +158,7 @@ type instance XSigPat GhcPs = EpAnn [AddEpAnn]
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
-type instance XEmbTyPat GhcPs = NoExtField
+type instance XEmbTyPat GhcPs = EpToken "type"
 type instance XEmbTyPat GhcRn = NoExtField
 type instance XEmbTyPat GhcTc = Type
 
@@ -171,6 +174,10 @@ type instance XXPat GhcTc = XXPatGhcTc
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
+
+type instance XConPatTyArg GhcPs = EpToken "@"
+type instance XConPatTyArg GhcRn = NoExtField
+type instance XConPatTyArg GhcTc = NoExtField
 
 type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
@@ -333,10 +340,10 @@ pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
-pprPat (AsPat _ name _ pat)     = hcat [pprPrefixOcc (unLoc name), char '@',
+pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
                                         pprParendLPat appPrec pat]
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
-pprPat (ParPat _ _ pat _)      = parens (ppr pat)
+pprPat (ParPat _ pat)           = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
 pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
@@ -383,7 +390,7 @@ pprPat (ConPat { pat_con = con
                        , cpt_dicts = dicts
                        , cpt_binds = binds
                        } = ext
-pprPat (EmbTyPat _ toktype tp) = ppr toktype <+> ppr tp
+pprPat (EmbTyPat _ tp) = text "type" <+> ppr tp
 
 pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of
@@ -477,7 +484,7 @@ isBangedLPat :: LPat (GhcPass p) -> Bool
 isBangedLPat = isBangedPat . unLoc
 
 isBangedPat :: Pat (GhcPass p) -> Bool
-isBangedPat (ParPat _ _ p _) = isBangedLPat p
+isBangedPat (ParPat _ p) = isBangedLPat p
 isBangedPat (BangPat {}) = True
 isBangedPat _            = False
 
@@ -498,8 +505,8 @@ looksLazyLPat :: LPat (GhcPass p) -> Bool
 looksLazyLPat = looksLazyPat . unLoc
 
 looksLazyPat :: Pat (GhcPass p) -> Bool
-looksLazyPat (ParPat _ _ p _)  = looksLazyLPat p
-looksLazyPat (AsPat _ _ _ p)   = looksLazyLPat p
+looksLazyPat (ParPat _ p)  = looksLazyLPat p
+looksLazyPat (AsPat _ _ p) = looksLazyLPat p
 looksLazyPat (BangPat {})  = False
 looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
@@ -560,8 +567,8 @@ isIrrefutableHsPat is_strict = goL
       = isIrrefutableHsPat False p'
       | otherwise          = True
     go (BangPat _ pat)     = goL pat
-    go (ParPat _ _ pat _)  = goL pat
-    go (AsPat _ _ _ pat)   = goL pat
+    go (ParPat _ pat)      = goL pat
+    go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
     go (TuplePat _ pats _) = all goL pats
@@ -608,7 +615,7 @@ isIrrefutableHsPat is_strict = goL
 -- - x (variable)
 isSimplePat :: LPat (GhcPass x) -> Maybe (IdP (GhcPass x))
 isSimplePat p = case unLoc p of
-  ParPat _ _ x _ -> isSimplePat x
+  ParPat _ x -> isSimplePat x
   SigPat _ x _ -> isSimplePat x
   LazyPat _ x -> isSimplePat x
   BangPat _ x -> isSimplePat x
@@ -634,7 +641,7 @@ isBoringHsPat = goL
       VarPat  {} -> True
       LazyPat {} -> True
       BangPat _ pat     -> goL pat
-      ParPat _ _ pat _  -> goL pat
+      ParPat _ pat      -> goL pat
       AsPat {} -> False -- the pattern x@y links x and y together,
                         -- which is a nontrivial piece of information
       ViewPat _ _ pat   -> goL pat
@@ -791,8 +798,13 @@ conPatNeedsParens p = go
 
 
 -- | Parenthesize a pattern without token information
-gParPat :: LPat (GhcPass pass) -> Pat (GhcPass pass)
-gParPat p = ParPat noAnn noHsTok p noHsTok
+gParPat :: forall p. IsPass p => LPat (GhcPass p) -> Pat (GhcPass p)
+gParPat pat = ParPat x pat
+  where
+    x = case ghcPass @p of
+      GhcPs -> noAnn
+      GhcRn -> noExtField
+      GhcTc -> noExtField
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
@@ -819,8 +831,8 @@ collectEvVarsPat :: Pat GhcTc -> Bag EvVar
 collectEvVarsPat pat =
   case pat of
     LazyPat _ p      -> collectEvVarsLPat p
-    AsPat _ _ _ p    -> collectEvVarsLPat p
-    ParPat  _ _ p _  -> collectEvVarsLPat p
+    AsPat _ _ p      -> collectEvVarsLPat p
+    ParPat  _ p      -> collectEvVarsLPat p
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps

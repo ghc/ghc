@@ -912,15 +912,15 @@ implicit_top :: { () }
 
 body    :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
-             ,LayoutInfo GhcPs) }
-        :  '{'            top '}'      { (fst $2, snd $2, explicitBraces $1 $3) }
-        |      vocurly    top close    { (fst $2, snd $2, VirtualBraces (getVOCURLY $1)) }
+             ,EpLayout) }
+        :  '{'            top '}'      { (fst $2, snd $2, epExplicitBraces $1 $3) }
+        |      vocurly    top close    { (fst $2, snd $2, EpVirtualBraces (getVOCURLY $1)) }
 
 body2   :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
-             ,LayoutInfo GhcPs) }
-        :  '{' top '}'                          { (fst $2, snd $2, explicitBraces $1 $3) }
-        |  missing_module_keyword top close     { ([], snd $2, VirtualBraces leftmostColumn) }
+             ,EpLayout) }
+        :  '{' top '}'                          { (fst $2, snd $2, epExplicitBraces $1 $3) }
+        |  missing_module_keyword top close     { ([], snd $2, EpVirtualBraces leftmostColumn) }
 
 
 top     :: { ([TrailingAnn]
@@ -940,19 +940,19 @@ header  :: { Located (HsModule GhcPs) }
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
-                                                   NoLayoutInfo $3 Nothing)
+                                                   EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
-                                                   NoLayoutInfo $3 Nothing)
+                                                   EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
-                   return (L loc (HsModule (XModulePs noAnn NoLayoutInfo Nothing Nothing) Nothing Nothing $1 [])) }
+                   return (L loc (HsModule (XModulePs noAnn EpNoLayout Nothing Nothing) Nothing Nothing $1 [])) }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -1730,22 +1730,22 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
 decllist_cls
         :: { Located ([AddEpAnn]
                      , OrdList (LHsDecl GhcPs)
-                     , LayoutInfo GhcPs) }      -- Reversed
+                     , EpLayout) }      -- Reversed
         : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
-                                             ,snd $ unLoc $2, explicitBraces $1 $3) }
+                                             ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l (anns, decls, VirtualBraces (getVOCURLY $1)) }
+                                           in L l (anns, decls, EpVirtualBraces (getVOCURLY $1)) }
 
 -- Class body
 --
 where_cls :: { Located ([AddEpAnn]
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
-                       ,LayoutInfo GhcPs) }
+                       ,EpLayout) }
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
                                              ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],nilOL,NoLayoutInfo) }
+        | {- empty -}                   { noLoc ([],nilOL,EpNoLayout) }
 
 -- Declarations in instance bodies
 --
@@ -1963,7 +1963,7 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
         |  {- empty -}      { Nothing }
 
 warning_category :: { Maybe (Located InWarningCategory) }
-        : 'in' STRING                  { Just (sLL $1 $> $ InWarningCategory (hsTok' $1) (getSTRINGs $2)
+        : 'in' STRING                  { Just (sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
                                                                              (sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
@@ -2191,20 +2191,20 @@ type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
         | btype '->' ctype             {% acsA (\cs -> sLL $1 $>
-                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
+                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsUnrestrictedArrow (epUniTok $2)) $1 $3) }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> let arr = (unLoc $2) (hsUniTok $3)
+                                       >> let arr = (unLoc $2) (epUniTok $3)
                                           in acsA (\cs -> sLL $1 $>
                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) arr $1 $4) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
                                           acsA (\cs -> sLL $1 $>
-                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
+                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsLinearArrow (EpLolly (epTok $2))) $1 $3) }
                                               -- [mu AnnLollyU $2] }
 
-mult :: { Located (LHsUniToken "->" "\8594" GhcPs -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (hsTok $1) $2) }
+mult :: { Located (EpUniToken "->" "\8594" -> HsArrow GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (epTok $1) $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
@@ -2226,7 +2226,7 @@ ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
         | ftype PREFIX_AT atype         { $1 >>= \ $1 ->
-                                          mkHsAppKindTyPV $1 (hsTok $2) $3 }
+                                          mkHsAppKindTyPV $1 (epTok $2) $3 }
 
 tyarg :: { LHsType GhcPs }
         : atype                         { $1 }
@@ -2420,7 +2420,7 @@ gadt_constr :: { LConDecl GhcPs }
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
         : optSemi con_list '::' sigtype
-                {% mkGadtDecl (comb2 $2 $>) (unLoc $2) (hsUniTok $3) $4 }
+                {% mkGadtDecl (comb2 $2 $>) (unLoc $2) (epUniTok $3) $4 }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2553,7 +2553,7 @@ decl_no_th :: { LHsDecl GhcPs }
 
         | infixexp     opt_sig rhs  {% runPV (unECP $1) >>= \ $1 ->
                                        do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $1 (HsNoMultAnn, $2) $3;
+                                          ; r <- checkValDef l $1 (HsNoMultAnn noExtField, $2) $3;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
@@ -2561,7 +2561,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | PREFIX_PERCENT atype infixexp     opt_sig rhs  {% runPV (unECP $3) >>= \ $3 ->
                                        do { let { l = comb2 $3 $> }
-                                          ; r <- checkValDef l $3 (mkMultAnn (hsTok $1) $2, $4) $5;
+                                          ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2, $4) $5;
                                         -- parses bindings of the form %p x or
                                         -- %p x :: sig
                                         --
@@ -2731,7 +2731,7 @@ exp   :: { ECP }
         -- Embed types into expressions and patterns for required type arguments
         | 'type' atype
                 {% do { requireExplicitNamespaces (getLoc $1)
-                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 $>) (hsTok $1) $2 } }
+                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 $>) (epTok $1) $2 } }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -2836,7 +2836,7 @@ fexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | fexp PREFIX_AT atype       { ECP $
                                         unECP $1 >>= \ $1 ->
-                                        mkHsAppTypePV (noAnnSrcSpan $ comb2 $1 $>) $1 (hsTok $2) $3 }
+                                        mkHsAppTypePV (noAnnSrcSpan $ comb2 $1 $>) $1 (epTok $2) $3 }
 
         | 'static' aexp              {% runPV (unECP $2) >>= \ $2 ->
                                         fmap ecpFromExp $
@@ -2849,7 +2849,7 @@ aexp    :: { ECP }
         : qvar TIGHT_INFIX_AT aexp
                                 { ECP $
                                    unECP $3 >>= \ $3 ->
-                                     mkHsAsPatPV (comb2 $1 $>) $1 (hsTok $2) $3 }
+                                     mkHsAsPatPV (comb2 $1 $>) $1 (epTok $2) $3 }
 
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -2864,7 +2864,7 @@ aexp    :: { ECP }
                                    mkHsNegAppPV (comb2 $1 $>) $2 [mj AnnMinus $1] }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
-                                           mkHsLetPV (comb2 $1 $>) (hsTok $1) (unLoc $2) (hsTok $3) $4 }
+                                           mkHsLetPV (comb2 $1 $>) (epTok $1) (unLoc $2) (epTok $3) $4 }
         | '\\' apats '->' exp
                    {  ECP $
                       unECP $4 >>= \ $4 ->
@@ -2968,7 +2968,7 @@ aexp2   :: { ECP }
         -- but the less cluttered version fell out of having texps.
         | '(' texp ')'                  { ECP $
                                            unECP $2 >>= \ $2 ->
-                                           mkHsParPV (comb2 $1 $>) (hsTok $1) $2 (hsTok $3) }
+                                           mkHsParPV (comb2 $1 $>) (epTok $1) $2 (epTok $3) }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
@@ -4465,19 +4465,16 @@ listAsAnchorM (L l _:_) =
     RealSrcSpan ll _ -> Just $ realSpanAsAnchor ll
     _                -> Nothing
 
-hsTok :: Located Token -> LHsToken tok GhcPs
-hsTok (L l _) = L (mkTokenLocation l) HsTok
+epTok :: Located Token -> EpToken tok
+epTok (L l _) = EpTok (EpaSpan l)
 
-hsTok' :: Located Token -> Located (HsToken tok)
-hsTok' (L l _) = L l HsTok
+epUniTok :: Located Token -> EpUniToken tok utok
+epUniTok t@(L l _) = EpUniTok (EpaSpan l) u
+  where
+    u = if isUnicode t then UnicodeSyntax else NormalSyntax
 
-hsUniTok :: Located Token -> LHsUniToken tok utok GhcPs
-hsUniTok t@(L l _) =
-  L (mkTokenLocation l)
-    (if isUnicode t then HsUnicodeTok else HsNormalTok)
-
-explicitBraces :: Located Token -> Located Token -> LayoutInfo GhcPs
-explicitBraces t1 t2 = ExplicitBraces (hsTok t1) (hsTok t2)
+epExplicitBraces :: Located Token -> Located Token -> EpLayout
+epExplicitBraces t1 t2 = EpExplicitBraces (epTok t1) (epTok t2)
 
 -- -------------------------------------
 

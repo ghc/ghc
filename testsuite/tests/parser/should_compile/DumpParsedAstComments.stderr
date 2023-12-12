@@ -18,19 +18,21 @@
        { DumpParsedAstComments.hs:19:17-23 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan { DumpParsedAstComments.hs:1:1-28 })
+       (EpaSpan
+        { DumpParsedAstComments.hs:1:1-28 })
        (EpaComment
         (EpaBlockComment
          "{-# LANGUAGE Haskell2010 #-}")
         { DumpParsedAstComments.hs:1:1 }))
      ,(L
-       (EpaSpan { DumpParsedAstComments.hs:(2,1)-(4,4) })
+       (EpaSpan
+        { DumpParsedAstComments.hs:(2,1)-(4,4) })
        (EpaComment
         (EpaBlockComment
          "{-\n  Block comment at the beginning\n  -}")
         { DumpParsedAstComments.hs:1:1-28 }))]
      []))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -52,13 +54,15 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { DumpParsedAstComments.hs:7:1-20 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:7:1-20 })
         (EpaComment
          (EpaLineComment
           "-- comment 1 for bar")
          { DumpParsedAstComments.hs:5:30-34 }))
       ,(L
-        (EpaSpan { DumpParsedAstComments.hs:8:1-20 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:8:1-20 })
         (EpaComment
          (EpaLineComment
           "-- comment 2 for bar")
@@ -162,19 +166,22 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { DumpParsedAstComments.hs:10:1-16 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:10:1-16 })
         (EpaComment
          (EpaLineComment
           "-- Other comment")
          { DumpParsedAstComments.hs:9:7 }))
       ,(L
-        (EpaSpan { DumpParsedAstComments.hs:12:1-20 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:12:1-20 })
         (EpaComment
          (EpaLineComment
           "-- comment 1 for foo")
          { DumpParsedAstComments.hs:10:1-16 }))
       ,(L
-        (EpaSpan { DumpParsedAstComments.hs:13:1-20 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:13:1-20 })
         (EpaComment
          (EpaLineComment
           "-- comment 2 for foo")
@@ -268,7 +275,8 @@
                    [])
                   (EpaComments
                    [(L
-                     (EpaSpan { DumpParsedAstComments.hs:15:3-19 })
+                     (EpaSpan
+                      { DumpParsedAstComments.hs:15:3-19 })
                      (EpaComment
                       (EpaLineComment
                        "-- normal comment")
@@ -327,7 +335,8 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { DumpParsedAstComments.hs:18:1-20 })
+        (EpaSpan
+         { DumpParsedAstComments.hs:18:1-20 })
         (EpaComment
          (EpaLineComment
           "-- | Haddock comment")

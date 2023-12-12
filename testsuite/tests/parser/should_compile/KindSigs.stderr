@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -114,6 +114,7 @@
             (HsOuterImplicit
              (NoExtField))
             [(HsValArg
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { KindSigs.hs:12:7 })
@@ -222,7 +223,8 @@
             []
             (EpaComments
              []))
-           (HsBndrRequired)
+           (HsBndrRequired
+            (NoExtField))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:11:17 })
@@ -282,7 +284,8 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired)
+          (HsBndrRequired
+           (NoExtField))
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:15:10 })
@@ -525,7 +528,8 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired)
+          (HsBndrRequired
+           (NoExtField))
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:16:11 })
@@ -885,10 +889,9 @@
             (EpaComments
              []))
            (HsUnrestrictedArrow
-            (L
-             (TokenLoc
-              (EpaSpan { KindSigs.hs:22:22-23 }))
-             (HsNormalTok)))
+            (EpUniTok
+             (EpaSpan { KindSigs.hs:22:22-23 })
+             (NormalSyntax)))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:22:8-20 })
@@ -978,10 +981,9 @@
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (L
-               (TokenLoc
-                (EpaSpan { KindSigs.hs:22:30-31 }))
-               (HsNormalTok)))
+              (EpUniTok
+               (EpaSpan { KindSigs.hs:22:30-31 })
+               (NormalSyntax)))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:25-28 })
@@ -1499,7 +1501,8 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired)
+          (HsBndrRequired
+           (NoExtField))
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:28:12 })
