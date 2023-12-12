@@ -108,10 +108,6 @@ deriving instance Data (HsPatSynDir GhcPs)
 deriving instance Data (HsPatSynDir GhcRn)
 deriving instance Data (HsPatSynDir GhcTc)
 
-deriving instance Data (MultAnn GhcPs)
-deriving instance Data (MultAnn GhcRn)
-deriving instance Data (MultAnn GhcTc)
-
 deriving instance Data (HsMultAnn GhcPs)
 deriving instance Data (HsMultAnn GhcRn)
 deriving instance Data (HsMultAnn GhcTc)
@@ -519,11 +515,6 @@ deriving instance Data (HsType GhcTc)
 deriving instance Data (HsTyLit GhcPs)
 deriving instance Data (HsTyLit GhcRn)
 deriving instance Data (HsTyLit GhcTc)
-
--- deriving instance Data (HsLinearArrowTokens p)
-deriving instance Data (HsLinearArrowTokens GhcPs)
-deriving instance Data (HsLinearArrowTokens GhcRn)
-deriving instance Data (HsLinearArrowTokens GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsArrow p)
 deriving instance Data (HsArrow GhcPs)

@@ -46,7 +46,7 @@ testOneFile libdir fileName = do
        let
          origAst = showPprUnsafe
                      $ showAstData BlankSrcSpan BlankEpAnnotations
-                     $ eraseLayoutInfo (pm_parsed_source p)
+                     $ eraseEpLayout (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          pragmas = getPragmas (pm_parsed_source p)
 
@@ -62,7 +62,7 @@ testOneFile libdir fileName = do
        let newAstStr :: String
            newAstStr = showPprUnsafe
                          $ showAstData BlankSrcSpan BlankEpAnnotations
-                         $ eraseLayoutInfo (pm_parsed_source p')
+                         $ eraseEpLayout (pm_parsed_source p')
        writeBinFile newAstFile newAstStr
 
        if origAst == newAstStr
@@ -105,14 +105,14 @@ getPragmas (L _ (HsModule { hsmodExt = XModulePs { hsmodAnn = anns' } })) = prag
 pp :: (Outputable a) => a -> String
 pp a = showPprUnsafe a
 
-eraseLayoutInfo :: ParsedSource -> ParsedSource
-eraseLayoutInfo = everywhere go
+eraseEpLayout :: ParsedSource -> ParsedSource
+eraseEpLayout = everywhere go
   where
     go :: forall a. Typeable a => a -> a
     go x =
-      case eqT @a @(LayoutInfo GhcPs) of
+      case eqT @a @EpLayout of
         Nothing -> x
-        Just Refl -> NoLayoutInfo
+        Just Refl -> EpNoLayout
 
 -- ---------------------------------------------------------------------
 

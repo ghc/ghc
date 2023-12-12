@@ -1031,7 +1031,7 @@ tcPatToExpr args pat = go pat
         = return $ HsVar noExtField (L l var)
         | otherwise
         = Left (PatSynUnboundVar var)
-    go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
+    go1 (ParPat _ pat) = fmap (HsPar noExtField) (go pat)
     go1 (ListPat _ pats)
       = do { exprs <- mapM go pats
            ; return $ ExplicitList noExtField exprs }
@@ -1050,7 +1050,7 @@ tcPatToExpr args pat = go pat
         | otherwise                 = return $ HsOverLit noAnn n
     go1 (SplicePat (HsUntypedSpliceTop _ pat) _) = go1 pat
     go1 (SplicePat (HsUntypedSpliceNested _) _)  = panic "tcPatToExpr: invalid nested splice"
-    go1 (EmbTyPat _ toktype tp) = return $ HsEmbTy noExtField toktype (hstp_to_hswc tp)
+    go1 (EmbTyPat _ tp) = return $ HsEmbTy noExtField (hstp_to_hswc tp)
       where hstp_to_hswc :: HsTyPat GhcRn -> LHsWcType GhcRn
             hstp_to_hswc (HsTP { hstp_ext = HsTPRn { hstp_nwcs = wcs }, hstp_body = hs_ty })
                         = HsWC { hswc_ext = wcs, hswc_body = hs_ty }
@@ -1223,8 +1223,8 @@ tcCollectEx pat = go pat
 
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
     go1 (LazyPat _ p)      = go p
-    go1 (AsPat _ _ _ p)    = go p
-    go1 (ParPat _ _ p _)   = go p
+    go1 (AsPat _ _ p)      = go p
+    go1 (ParPat _ p)       = go p
     go1 (BangPat _ p)      = go p
     go1 (ListPat _ ps)     = mergeMany . map go $ ps
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps

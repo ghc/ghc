@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -351,9 +352,11 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey DeclTag)
+type instance XClassDecl    GhcPs =
+  ( EpAnn [AddEpAnn]
+  , EpLayout              -- See Note [Class EpLayout]
+  , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
 
-  -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
@@ -662,10 +665,23 @@ type instance XXStandaloneKindSig (GhcPass p) = DataConCantHappen
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
 
-type instance XConDeclGADT (GhcPass _) = EpAnn [AddEpAnn]
-type instance XConDeclH98  (GhcPass _) = EpAnn [AddEpAnn]
+type instance XConDeclGADT GhcPs = (EpUniToken "::" "∷", EpAnn [AddEpAnn])
+type instance XConDeclGADT GhcRn = NoExtField
+type instance XConDeclGADT GhcTc = NoExtField
+
+type instance XConDeclH98  GhcPs = EpAnn [AddEpAnn]
+type instance XConDeclH98  GhcRn = NoExtField
+type instance XConDeclH98  GhcTc = NoExtField
 
 type instance XXConDecl (GhcPass _) = DataConCantHappen
+
+type instance XPrefixConGADT       (GhcPass _) = NoExtField
+
+type instance XRecConGADT          GhcPs = EpUniToken "->" "→"
+type instance XRecConGADT          GhcRn = NoExtField
+type instance XRecConGADT          GhcTc = NoExtField
+
+type instance XXConDeclGADTDetails (GhcPass _) = DataConCantHappen
 
 -- Codomain could be 'NonEmpty', but at the moment all users need a list.
 getConNames :: ConDecl GhcRn -> [LocatedN Name]
@@ -682,7 +698,7 @@ getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   InfixCon{}  -> Nothing
 getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
   PrefixConGADT{} -> Nothing
-  RecConGADT flds _ -> Just flds
+  RecConGADT _ flds -> Just flds
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
@@ -771,8 +787,8 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
-    ppr_args (PrefixConGADT args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
-    ppr_args (RecConGADT fields _) = [pprConDeclFields (unLoc fields) <+> arrow]
+    ppr_args (PrefixConGADT _ args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
+    ppr_args (RecConGADT _ fields) = [pprConDeclFields (unLoc fields) <+> arrow]
 
     -- Display linear arrows as unrestricted with -XNoLinearTypes
     -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)

@@ -68,9 +68,9 @@ import Data.Data hiding ( Fixity )
 data XModulePs
   = XModulePs {
       hsmodAnn :: EpAnn AnnsModule,
-      hsmodLayout :: LayoutInfo GhcPs,
+      hsmodLayout :: EpLayout,
         -- ^ Layout info for the module.
-        -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
+        -- For incomplete modules (e.g. the output of parseHeader), it is EpNoLayout.
       hsmodDeprecMessage :: Maybe (LWarningTxt GhcPs),
         -- ^ reason\/explanation for warning/deprecation of this module
         --

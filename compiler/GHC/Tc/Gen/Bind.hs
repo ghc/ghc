@@ -630,7 +630,7 @@ tcPolyCheck prag_fn
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
        ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
-       ; mult <- tcMultAnn HsNoMultAnn
+       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; (wrap_gen, (wrap_res, matches'))
              <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
                 tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
@@ -806,8 +806,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
   where
     manyIfPat bind@(L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
       = return bind
-    manyIfPat (L loc pat@(PatBind {pat_mult=MultAnn{mult_ext=pat_mult}, pat_lhs=lhs, pat_ext =(pat_ty,_)}))
-      = do { mult_co_wrap <- tcSubMult NonLinearPatternOrigin ManyTy pat_mult
+    manyIfPat (L loc pat@(PatBind {pat_mult=mult_ann, pat_lhs=lhs, pat_ext =(pat_ty,_)}))
+      = do { mult_co_wrap <- tcSubMult NonLinearPatternOrigin ManyTy (getTcMultAnn mult_ann)
            -- The wrapper checks for correct multiplicities.
            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
            ; let lhs' = mkLHsWrapPat mult_co_wrap lhs pat_ty
@@ -1366,7 +1366,7 @@ tcMonoBinds is_rec sig_fn no_gen
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
   = setSrcSpanA b_loc    $
-    do  { mult <- tcMultAnn HsNoMultAnn
+    do  { mult <- tcMultAnn (HsNoMultAnn noExtField)
 
         ; ((co_fn, matches'), rhs_ty')
             <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
@@ -1390,7 +1390,7 @@ tcMonoBinds is_rec sig_fn no_gen
 
 -- SPECIAL CASE 2: see Note [Special case for non-recursive pattern bindings]
 tcMonoBinds is_rec sig_fn no_gen
-           [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = MultAnn{mult_ann=mult_ann} })]
+           [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann })]
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , all (isNothing . sig_fn) bndrs
   = addErrCtxt (patMonoBindsCtxt pat grhss) $
@@ -1433,7 +1433,7 @@ tcMonoBinds is_rec sig_fn no_gen
        ; return ( unitBag $ L b_loc $
                      PatBind { pat_lhs = pat', pat_rhs = grhss'
                              , pat_ext = (pat_ty, ([],[]))
-                             , pat_mult = MultAnn {mult_ext=mult, mult_ann=mult_ann} }
+                             , pat_mult = setTcMultAnn mult mult_ann }
 
                 , mbis ) }
   where
@@ -1561,12 +1561,12 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
     --           Just g = ...f...
     -- Hence always typechecked with InferGen
     do { mono_info <- tcLhsSigId no_gen (name, sig)
-       ; mult <- tcMultAnn HsNoMultAnn
+       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; return (TcFunBind mono_info (locA nm_loc) mult matches) }
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mult <- tcMultAnn HsNoMultAnn
+       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; mono_id <- newLetBndr no_gen name mult mono_ty
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
@@ -1574,7 +1574,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
                              , mbi_mono_mult = mult}
        ; return (TcFunBind mono_info (locA nm_loc) mult matches) }
 
-tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = MultAnn{mult_ann=mult_ann} })
+tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann })
   = -- See Note [Typechecking pattern bindings]
     do  { sig_mbis <- mapM (tcLhsSigId no_gen) sig_names
 
@@ -1671,7 +1671,7 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
 
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
                            , pat_ext = (pat_ty, ([],[]))
-                           , pat_mult = MultAnn{mult_ext=mult, mult_ann=mult_ann} } )}
+                           , pat_mult = setTcMultAnn mult mult_ann } )}
 
 
 -- | @'tcMultAnn' ann@ takes an optional multiplicity annotation. If
@@ -1680,7 +1680,7 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
 tcMultAnn :: HsMultAnn GhcRn -> TcM Mult
 tcMultAnn (HsPct1Ann _) = return oneDataConTy
 tcMultAnn (HsMultAnn _ p) = tcCheckLHsType p (TheKind multiplicityTy)
-tcMultAnn HsNoMultAnn = newFlexiTyVarTy multiplicityTy
+tcMultAnn (HsNoMultAnn _) = newFlexiTyVarTy multiplicityTy
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvForRhs Nothing thing_inside
@@ -1899,7 +1899,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
       Just (TcIdSig (PartialSig {})) -> True
       _                              -> False
     has_mult_anns_and_pats = any has_mult_ann_and_pat lbinds
-    has_mult_ann_and_pat (L _ (PatBind{pat_mult=MultAnn{mult_ann=HsNoMultAnn}})) = False
+    has_mult_ann_and_pat (L _ (PatBind{pat_mult=HsNoMultAnn{}})) = False
     has_mult_ann_and_pat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))})) = False
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False
