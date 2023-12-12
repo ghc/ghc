@@ -420,7 +420,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v g (ParPat _ _ pat _)  = tidy1 v g (unLoc pat)
+tidy1 v g (ParPat _ pat)      = tidy1 v g (unLoc pat)
 tidy1 v g (SigPat _ pat _)    = tidy1 v g (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v g (BangPat _ (L l p)) = tidy_bang_pat v g l p
@@ -432,7 +432,7 @@ tidy1 v _ (VarPat _ (L _ var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v g (AsPat _ (L _ var) _ pat)
+tidy1 v g (AsPat _ (L _ var) pat)
   = do  { (wrap, pat') <- tidy1 v g (unLoc pat)
         ; return (wrapBind var v . wrap, pat') }
 
@@ -514,13 +514,13 @@ tidy_bang_pat :: Id -> Bool -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v g _ (ParPat _ _ (L l p) _) = tidy_bang_pat v g l p
+tidy_bang_pat v g _ (ParPat _ (L l p))   = tidy_bang_pat v g l p
 tidy_bang_pat v g _ (SigPat _ (L l p) _) = tidy_bang_pat v g l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v g l (AsPat x v' at p)
-  = tidy1 v g (AsPat x v' at (L l (BangPat noExtField p)))
+tidy_bang_pat v g l (AsPat x v' p)
+  = tidy1 v g (AsPat x v' (L l (BangPat noExtField p)))
 tidy_bang_pat v g l (XPat (CoPat w p t))
   = tidy1 v g (XPat $ CoPat w (BangPat noExtField (L l p)) t)
 
@@ -1139,8 +1139,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
-    exp (HsPar _ _ (L _ e) _) e' = exp e e'
-    exp e (HsPar _ _ (L _ e') _) = exp e e'
+    exp (HsPar _ (L _ e)) e' = exp e e'
+    exp e (HsPar _ (L _ e')) = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
     exp (XExpr (WrapExpr (HsWrap h e))) (XExpr (WrapExpr (HsWrap  h' e'))) =

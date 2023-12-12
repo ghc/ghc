@@ -155,14 +155,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -203,10 +196,7 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "T")))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
+                 "T")))))))))
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -391,14 +381,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -439,10 +422,7 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'MkT")))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
+                 "'MkT")))))))))
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -627,14 +607,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -675,10 +648,7 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "Peano")))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
+                 "Peano")))))))))
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -863,14 +833,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -911,10 +874,7 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'Zero")))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
+                 "'Zero")))))))))
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1099,14 +1059,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -1147,10 +1100,7 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'Succ")))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
+                 "'Succ")))))))))
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1827,14 +1777,7 @@
         (EpaComments
          []))
        (HsPar
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
-        (L
-         (NoTokenLoc)
-         (HsTok))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1905,14 +1848,7 @@
             (EpaComments
              []))
            (HsPar
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
-            (L
-             (NoTokenLoc)
-             (HsTok))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -1983,14 +1919,7 @@
                 (EpaComments
                  []))
                (HsPar
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
-                (L
-                 (NoTokenLoc)
-                 (HsTok))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -2071,16 +2000,7 @@
                        (ConLikeTc
                         ({abstract:ConLike})
                         []
-                        []))))))))
-                (L
-                 (NoTokenLoc)
-                 (HsTok))))))
-            (L
-             (NoTokenLoc)
-             (HsTok))))))
-        (L
-         (NoTokenLoc)
-         (HsTok))))))))
+                        []))))))))))))))))))))))
  ,(L
    (EpAnn
     (EpaSpan { <no location info> })
@@ -2221,14 +2141,7 @@
           (EpaComments
            []))
          (HsPar
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
-          (L
-           (NoTokenLoc)
-           (HsTok))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -2269,10 +2182,7 @@
                 []))
               (HsStringPrim
                (NoSourceText)
-               "main")))))
-          (L
-           (NoTokenLoc)
-           (HsTok))))))
+               "main")))))))))
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -2281,14 +2191,7 @@
         (EpaComments
          []))
        (HsPar
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
-        (L
-         (NoTokenLoc)
-         (HsTok))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -2329,10 +2232,7 @@
               []))
             (HsStringPrim
              (NoSourceText)
-             "DumpTypecheckedAst")))))
-        (L
-         (NoTokenLoc)
-         (HsTok))))))))
+             "DumpTypecheckedAst")))))))))))
  ,(L
    (EpAnn
     (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })

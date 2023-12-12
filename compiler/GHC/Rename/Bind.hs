@@ -570,8 +570,8 @@ isOkNoBindPattern (L _ pat) =
           -- Recursive cases
           BangPat _ lp -> lpatternContainsSplice lp
           LazyPat _ lp -> lpatternContainsSplice lp
-          AsPat _ _ _ lp  -> lpatternContainsSplice lp
-          ParPat _ _ lp _ -> lpatternContainsSplice lp
+          AsPat _ _ lp  -> lpatternContainsSplice lp
+          ParPat _ lp -> lpatternContainsSplice lp
           ViewPat _ _ lp -> lpatternContainsSplice lp
           SigPat _ lp _  -> lpatternContainsSplice lp
           ListPat _ lps  -> any lpatternContainsSplice lps

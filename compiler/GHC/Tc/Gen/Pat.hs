@@ -382,20 +382,20 @@ tc_tt_pat
         -- ^ Fully refined result type
         -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern
-tc_tt_pat pat_ty penv (ParPat x lpar pat rpar) thing_inside = do
+tc_tt_pat pat_ty penv (ParPat x pat) thing_inside = do
         { (pat', res) <- tc_tt_lpat pat_ty penv pat thing_inside
-        ; return (ParPat x lpar pat' rpar, res) }
+        ; return (ParPat x pat', res) }
 tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
 tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
 
 tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
-tc_forall_pat _ (EmbTyPat _ toktype tp, tv) thing_inside
+tc_forall_pat _ (EmbTyPat _ tp, tv) thing_inside
   -- The entire type pattern is guarded with the `type` herald:
   --    f (type t) (x :: t) = ...
   -- This special case is not necessary for correctness but avoids
   -- a redundant `ExpansionPat` node.
   = do { (arg_ty, result) <- tc_ty_pat tp tv thing_inside
-       ; return (EmbTyPat arg_ty toktype tp, result) }
+       ; return (EmbTyPat arg_ty tp, result) }
 tc_forall_pat _ (pat, tv) thing_inside
   -- The type pattern is not guarded with the `type` herald, or perhaps
   -- only parts of it are, e.g.
@@ -404,14 +404,14 @@ tc_forall_pat _ (pat, tv) thing_inside
   -- Apply a recursive T2T transformation.
   = do { tp <- pat_to_type_pat pat
        ; (arg_ty, result) <- tc_ty_pat tp tv thing_inside
-       ; let pat' = XPat $ ExpansionPat pat (EmbTyPat arg_ty noHsTok tp)
+       ; let pat' = XPat $ ExpansionPat pat (EmbTyPat arg_ty tp)
        ; return (pat', result) }
 
 -- Convert a Pat into the equivalent HsTyPat.
 -- See `expr_to_type` (GHC.Tc.Gen.App) for the HsExpr counterpart.
 -- The `TcM` monad is only used to fail on ill-formed type patterns.
 pat_to_type_pat :: Pat GhcRn -> TcM (HsTyPat GhcRn)
-pat_to_type_pat (EmbTyPat _ _ tp) = return tp
+pat_to_type_pat (EmbTyPat _ tp) = return tp
 pat_to_type_pat (VarPat _ lname)  = return (HsTP x b)
   where b = noLocA (HsTyVar noAnn NotPromoted lname)
         x = HsTPRn { hstp_nwcs    = []
@@ -436,7 +436,7 @@ pat_to_type_pat (SigPat _ pat sig_ty)
       = HsTPRn { hstp_nwcs     = hstp_nwcs    t ++ hsps_nwcs    p
                , hstp_imp_tvs  = hstp_imp_tvs t ++ hsps_imp_tvs p
                , hstp_exp_tvs  = hstp_exp_tvs t }
-pat_to_type_pat (ParPat _ _ pat _)
+pat_to_type_pat (ParPat _ pat)
   = do { HsTP x t <- pat_to_type_pat (unLoc pat)
        ; return (HsTP x (noLocA (HsParTy noAnn t))) }
 pat_to_type_pat pat =
@@ -478,9 +478,9 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
 
-  ParPat x lpar pat rpar -> do
+  ParPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
-        ; return (ParPat x lpar pat' rpar, res) }
+        ; return (ParPat x pat', res) }
 
   BangPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
@@ -511,7 +511,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
         ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
 
-  AsPat x (L nm_loc name) at pat -> do
+  AsPat x (L nm_loc name) pat -> do
         { mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
@@ -526,7 +526,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) at pat') pat_ty, res) }
+        ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
   ViewPat _ expr pat -> do
         { mult_wrap <- checkManyPattern pat_ty
@@ -802,7 +802,7 @@ AST is used for the subtraction operation.
 
   SplicePat (HsUntypedSpliceNested _) _ -> panic "tc_pat: nested splice in splice pat"
 
-  EmbTyPat _ _ _ -> failWith TcRnIllegalTypePattern
+  EmbTyPat _ _ -> failWith TcRnIllegalTypePattern
 
   XPat (HsPatExpanded lpat rpat) -> do
     { (rpat', res) <- tc_pat pat_ty penv rpat thing_inside

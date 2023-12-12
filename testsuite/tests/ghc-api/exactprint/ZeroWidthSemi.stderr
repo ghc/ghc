@@ -17,18 +17,20 @@
        { ZeroWidthSemi.hs:8:1-58 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan { ZeroWidthSemi.hs:3:1-19 })
+       (EpaSpan
+        { ZeroWidthSemi.hs:3:1-19 })
        (EpaComment
         (EpaLineComment
          "-- leading comments")
         { ZeroWidthSemi.hs:1:22-26 }))]
      [(L
-       (EpaSpan { ZeroWidthSemi.hs:8:1-58 })
+       (EpaSpan
+        { ZeroWidthSemi.hs:8:1-58 })
        (EpaComment
         (EpaLineComment
          "-- Trailing comment, should be in HsModule extension point")
         { ZeroWidthSemi.hs:6:5 }))]))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -50,7 +52,8 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { ZeroWidthSemi.hs:5:1-19 })
+        (EpaSpan
+         { ZeroWidthSemi.hs:5:1-19 })
         (EpaComment
          (EpaLineComment
           "-- Function comment")

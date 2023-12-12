@@ -63,7 +63,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Unicode
 
-import Language.Haskell.Syntax.Concrete (HsToken (HsTok))
 import Language.Haskell.Syntax.Extension
 
 import Data.Data
@@ -120,13 +119,13 @@ the possibility of them being infinite.
 
 data InWarningCategory
   = InWarningCategory
-    { iwc_in :: !(Located (HsToken "in")),
+    { iwc_in :: !(EpToken "in"),
       iwc_st :: !SourceText,
       iwc_wc :: (Located WarningCategory)
     } deriving Data
 
 fromWarningCategory :: WarningCategory -> InWarningCategory
-fromWarningCategory wc = InWarningCategory (noLoc HsTok) NoSourceText (noLoc wc)
+fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLoc wc)
 
 
 -- See Note [Warning categories]
@@ -238,7 +237,7 @@ warningTxtSame w1 w2
 
 deriving instance Eq InWarningCategory
 
-deriving instance (Eq (HsToken "in"), Eq (IdP pass)) => Eq (WarningTxt pass)
+deriving instance (Eq (IdP pass)) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP

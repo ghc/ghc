@@ -88,7 +88,8 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 -- caller sets location
 dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsValBinds (XValBindsLR (NValBinds binds _)) body
-  = foldrM ds_val_bind body binds
+  = do { dflags <- getDynFlags
+       ; foldrM (ds_val_bind dflags) body binds }
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
@@ -107,12 +108,12 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: DynFlags -> (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
-ds_val_bind (NonRecursive, hsbinds) body
+ds_val_bind _ (NonRecursive, hsbinds) body
   | [L loc bind] <- bagToList hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
@@ -146,13 +147,13 @@ ds_val_bind (NonRecursive, hsbinds) body
     is_polymorphic _ = False
 
 
-ds_val_bind (is_rec, binds) _body
+ds_val_bind _ (is_rec, binds) _body
   | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = assert (isRec is_rec )
     errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys (bagToList binds)
 
 -- Ordinary case for bindings; none should be unlifted
-ds_val_bind (is_rec, binds) body
+ds_val_bind _ (is_rec, binds) body
   = do  { massert (isRec is_rec || isSingletonBag binds)
                -- we should never produce a non-recursive list of multiple binds
 
@@ -269,7 +270,7 @@ dsExpr (HsRecSel _ (FieldOcc id _))
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
-dsExpr (HsPar _ _ e _)        = dsLExpr e
+dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
 dsExpr (HsIPVar x _)          = dataConCantHappen x
@@ -415,7 +416,7 @@ dsExpr (ExplicitSum types alt arity expr)
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
-dsExpr (HsEmbTy x _ _) = dataConCantHappen x
+dsExpr (HsEmbTy x _) = dataConCantHappen x
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
@@ -424,7 +425,7 @@ dsExpr (HsCase ctxt discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet _ _ binds _ body) = do
+dsExpr (HsLet _ binds body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
@@ -956,11 +957,11 @@ dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
-    go wrap (HsPar _ _ (L _ hs_e) _)
+    go wrap (HsPar _ (L _ hs_e))
        = go wrap hs_e
     go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
        = go (wrap1 <.> wrap2) hs_e
-    go wrap (HsAppType ty (L _ hs_e) _ _)
+    go wrap (HsAppType ty (L _ hs_e) _)
        = go (wrap <.> WpTyApp ty) hs_e
 
     go wrap (HsVar _ (L _ var))

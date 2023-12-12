@@ -415,7 +415,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
             free_vars `unionDVarSet`
               (exprFreeIdsDSet core_arg `uniqDSetIntersectUniqSet` local_vars))
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ _ cmd _) env_ids
+dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
 
 -- D, xs |- e :: Bool
@@ -591,7 +591,7 @@ dsCmd ids local_vars stack_ty res_ty
 --
 --              ---> premap (\ ((xs),stk) -> let binds in ((ys),stk)) c
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ _ lbinds@binds _ body) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@binds body) env_ids = do
     let
         defined_vars = mkVarSet (collectLocalBinders CollWithDictBinders binds)
         local_vars' = defined_vars `unionVarSet` local_vars

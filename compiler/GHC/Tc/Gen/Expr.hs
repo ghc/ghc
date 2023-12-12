@@ -230,9 +230,9 @@ tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
-tcExpr (HsPar x lpar expr rpar) res_ty
+tcExpr (HsPar x expr) res_ty
   = do { expr' <- tcMonoExprNC expr res_ty
-       ; return (HsPar x lpar expr' rpar) }
+       ; return (HsPar x expr') }
 
 tcExpr (HsPragE x prag expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
@@ -347,10 +347,10 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x tkLet binds tkIn expr) res_ty
+tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoExpr expr res_ty
-        ; return (HsLet x tkLet binds' tkIn expr') }
+        ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -468,7 +468,7 @@ tcExpr (HsStatic fvs expr) res_ty
                             (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty]) expr'))
         }
 
-tcExpr (HsEmbTy _ _ _) _ = failWith TcRnIllegalTypeExpr
+tcExpr (HsEmbTy _ _) _ = failWith TcRnIllegalTypeExpr
 
 {-
 ************************************************************************
@@ -1303,7 +1303,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
 
        -- STEP 2 (b): desugar to HsCase, as per note [Record Updates]
        ; let ds_expr :: HsExpr GhcRn
-             ds_expr = HsLet noExtField noHsTok let_binds noHsTok (L gen case_expr)
+             ds_expr = HsLet noExtField let_binds (L gen case_expr)
 
              case_expr :: HsExpr GhcRn
              case_expr = HsCase RecUpd record_expr
