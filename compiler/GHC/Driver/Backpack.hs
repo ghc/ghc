@@ -801,7 +801,7 @@ summariseRequirement pn mod_name = do
                 hpm_module = L loc (HsModule {
                         hsmodExt = XModulePs {
                             hsmodAnn = noAnn,
-                            hsmodLayout = NoLayoutInfo,
+                            hsmodLayout = EpNoLayout,
                             hsmodDeprecMessage = Nothing,
                             hsmodHaddockModHeader = Nothing
                                              },

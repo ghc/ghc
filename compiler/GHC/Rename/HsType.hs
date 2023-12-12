@@ -467,12 +467,12 @@ rnLHsKind ctxt kind = rnLHsTyKi (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 -- renaming a type only, not a kind
 rnLHsTypeArg :: HsDocContext -> LHsTypeArg GhcPs
                 -> RnM (LHsTypeArg GhcRn, FreeVars)
-rnLHsTypeArg ctxt (HsValArg ty)
+rnLHsTypeArg ctxt (HsValArg _ ty)
    = do { (tys_rn, fvs) <- rnLHsType ctxt ty
-        ; return (HsValArg tys_rn, fvs) }
-rnLHsTypeArg ctxt (HsTypeArg l ki)
+        ; return (HsValArg noExtField tys_rn, fvs) }
+rnLHsTypeArg ctxt (HsTypeArg _ ki)
    = do { (kis_rn, fvs) <- rnLHsKind ctxt ki
-        ; return (HsTypeArg l kis_rn, fvs) }
+        ; return (HsTypeArg noExtField kis_rn, fvs) }
 rnLHsTypeArg _ (HsArgPar sp)
    = return (HsArgPar sp, emptyFVs)
 
@@ -638,12 +638,12 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsAppKindTy _ ty at k)
+rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr KindLevel k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
-       ; return (HsAppKindTy noExtField ty' at k', fvs1 `plusFV` fvs2) }
+       ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env t@(HsIParamTy x n ty)
   = do { notInKinds env t
@@ -704,11 +704,10 @@ rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow _env (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr, emptyFVs)
-rnHsArrow _env (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr), emptyFVs)
-rnHsArrow _env (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr), emptyFVs)
-rnHsArrow env (HsExplicitMult pct p arr)
-  = (\(mult, fvs) -> (HsExplicitMult pct mult arr, fvs)) <$> rnLHsTyKi env p
+rnHsArrow _env (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField, emptyFVs)
+rnHsArrow _env (HsLinearArrow _) = return (HsLinearArrow noExtField, emptyFVs)
+rnHsArrow env (HsExplicitMult _ p)
+  = (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rnLHsTyKi env p
 
 {-
 Note [Renaming HsCoreTys]
@@ -1201,12 +1200,10 @@ rnLHsTyVarBndrVisFlag (L loc bndr) = do
       addErr (TcRnIllegalInvisTyVarBndr lbndr)
   return lbndr
 
--- rnHsBndrVis is a no-op. We could use 'coerce' in an ideal world,
--- but GHC can't crack this nut because type families are involved:
--- HsBndrInvisible stores (LHsToken "@" pass), which is defined via XRec.
+-- rnHsBndrVis is almost a no-op, it simply discards the token for "@".
 rnHsBndrVis :: HsBndrVis GhcPs -> HsBndrVis GhcRn
-rnHsBndrVis HsBndrRequired = HsBndrRequired
-rnHsBndrVis (HsBndrInvisible at) = HsBndrInvisible at
+rnHsBndrVis (HsBndrRequired _)    = HsBndrRequired  noExtField
+rnHsBndrVis (HsBndrInvisible _at) = HsBndrInvisible noExtField
 
 newTyVarNameRn, newTyVarNameRnImplicit
   :: Maybe a -- associated class
@@ -1955,7 +1952,7 @@ To account for that, we introduce another helper, `filterInScopeNonClassM`,
 which acts much like `filterInScopeM` but leaves class variables intact. -}
 
 extract_tyarg :: LHsTypeArg GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_tyarg (HsValArg ty) acc = extract_lty ty acc
+extract_tyarg (HsValArg _ ty) acc = extract_lty ty acc
 extract_tyarg (HsTypeArg _ ki) acc = extract_lty ki acc
 extract_tyarg (HsArgPar _) acc = acc
 
@@ -2016,8 +2013,8 @@ extractRdrKindSigVars (L _ resultSig) = case resultSig of
 extractConDeclGADTDetailsTyVars ::
   HsConDeclGADTDetails GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extractConDeclGADTDetailsTyVars con_args = case con_args of
-  PrefixConGADT args      -> extract_scaled_ltys args
-  RecConGADT (L _ flds) _ -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
+  PrefixConGADT _ args    -> extract_scaled_ltys args
+  RecConGADT _ (L _ flds) -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
 
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order:
@@ -2054,7 +2051,7 @@ extract_lty (L _ ty) acc
                                            flds
       HsAppTy _ ty1 ty2           -> extract_lty ty1 $
                                      extract_lty ty2 acc
-      HsAppKindTy _ ty _ k        -> extract_lty ty $
+      HsAppKindTy _ ty k          -> extract_lty ty $
                                      extract_lty k acc
       HsListTy _ ty               -> extract_lty ty acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
@@ -2103,7 +2100,7 @@ extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
-extract_hs_arrow (HsExplicitMult _ p _) acc = extract_lty p acc
+extract_hs_arrow (HsExplicitMult _ p) acc = extract_lty p acc
 extract_hs_arrow _ acc = acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs

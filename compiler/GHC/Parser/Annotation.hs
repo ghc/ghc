@@ -1,11 +1,17 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
+  EpToken(..), EpUniToken(..),
+  getEpTokenSrcSpan,
+  EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
@@ -15,7 +21,6 @@ module GHC.Parser.Annotation (
   AddEpAnn(..),
   EpaLocation, EpaLocation'(..), epaLocationRealSrcSpan,
   TokenLocation(..),
-  getTokenSrcSpan,
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor,
@@ -99,6 +104,7 @@ import Data.Function (on)
 import Data.List (sortBy, foldl1')
 import Data.Semigroup
 import GHC.Data.FastString
+import GHC.TypeLits (Symbol, KnownSymbol)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString
@@ -356,6 +362,59 @@ data HasE = HasE | NoE
 
 -- ---------------------------------------------------------------------
 
+-- | A token stored in the syntax tree. For example, when parsing a
+-- let-expression, we store @EpToken "let"@ and @EpToken "in"@.
+-- The locations of those tokens can be used to faithfully reproduce
+-- (exactprint) the original program text.
+data EpToken (tok :: Symbol)
+  = NoEpTok
+  | EpTok !EpaLocation
+
+-- | With @UnicodeSyntax@, there might be multiple ways to write the same
+-- token. For example an arrow could be either @->@ or @→@. This choice must be
+-- recorded in order to exactprint such tokens, so instead of @EpToken "->"@ we
+-- introduce @EpUniToken "->" "→"@.
+data EpUniToken (tok :: Symbol) (utok :: Symbol)
+  = NoEpUniTok
+  | EpUniTok !EpaLocation !IsUnicodeSyntax
+
+deriving instance Eq (EpToken tok)
+deriving instance KnownSymbol tok => Data (EpToken tok)
+deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
+
+getEpTokenSrcSpan :: EpToken tok -> SrcSpan
+getEpTokenSrcSpan NoEpTok = noSrcSpan
+getEpTokenSrcSpan (EpTok EpaDelta{}) = noSrcSpan
+getEpTokenSrcSpan (EpTok (EpaSpan span)) = span
+
+-- | Layout information for declarations.
+data EpLayout =
+
+    -- | Explicit braces written by the user.
+    --
+    -- @
+    -- class C a where { foo :: a; bar :: a }
+    -- @
+    EpExplicitBraces !(EpToken "{") !(EpToken "}")
+  |
+    -- | Virtual braces inserted by the layout algorithm.
+    --
+    -- @
+    -- class C a where
+    --   foo :: a
+    --   bar :: a
+    -- @
+    EpVirtualBraces
+      !Int -- ^ Layout column (indentation level, begins at 1)
+  |
+    -- | Empty or compiler-generated blocks do not have layout information
+    -- associated with them.
+    EpNoLayout
+
+deriving instance Data EpLayout
+
+-- ---------------------------------------------------------------------
+
 data EpaComment =
   EpaComment
     { ac_tok :: EpaCommentTok
@@ -428,11 +487,6 @@ noCommentsToEpaLocation (EpaDelta dp NoComments) = EpaDelta dp []
 -- generated code (e.g. by TH).
 data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
                deriving (Data,Eq)
-
-getTokenSrcSpan :: TokenLocation -> SrcSpan
-getTokenSrcSpan NoTokenLoc = noSrcSpan
-getTokenSrcSpan (TokenLoc EpaDelta{}) = noSrcSpan
-getTokenSrcSpan (TokenLoc (EpaSpan span)) = span
 
 instance Outputable a => Outputable (GenLocated TokenLocation a) where
   ppr (L _ x) = ppr x
@@ -1341,6 +1395,12 @@ instance NoAnn AnnPragma where
 
 instance NoAnn AnnParen where
   noAnn = AnnParen AnnParens noAnn noAnn
+
+instance NoAnn (EpToken s) where
+  noAnn = NoEpTok
+
+instance NoAnn (EpUniToken s t) where
+  noAnn = NoEpUniTok
 
 -- ---------------------------------------------------------------------
 

@@ -22,11 +22,11 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module Language.Haskell.Syntax.Type (
         HsScaled(..),
         hsMult, hsScaledThing,
-        HsArrow(..),
-        HsLinearArrowTokens(..),
+        HsArrow(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
 
         HsType(..), LHsType, HsKind, LHsKind,
-        HsBndrVis(..), isHsBndrInvisible,
+        HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
+        isHsBndrInvisible,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -38,7 +38,8 @@ module Language.Haskell.Syntax.Type (
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsArg(..),
+        HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
+
         LHsTypeArg,
 
         LBangType, BangType,
@@ -60,13 +61,11 @@ module Language.Haskell.Syntax.Type (
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
-import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..) )
 import GHC.Core.Type (Specificity)
-import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Arity)
 
 import GHC.Hs.Doc (LHsDoc)
@@ -726,19 +725,26 @@ data HsTyVarBndr flag pass
       !(XXTyVarBndr pass)
 
 data HsBndrVis pass
-  = HsBndrRequired
+  = HsBndrRequired !(XBndrRequired pass)
       -- Binder for a visible (required) variable:
       --     type Dup a = (a, a)
       --             ^^^
 
-  | HsBndrInvisible (LHsToken "@" pass)
+  | HsBndrInvisible !(XBndrInvisible pass)
       -- Binder for an invisible (specified) variable:
       --     type KindOf @k (a :: k) = k
       --                ^^^
 
+  | XXBndrVis !(XXBndrVis pass)
+
+type family XBndrRequired  p
+type family XBndrInvisible p
+type family XXBndrVis      p
+
 isHsBndrInvisible :: HsBndrVis pass -> Bool
 isHsBndrInvisible HsBndrInvisible{} = True
-isHsBndrInvisible HsBndrRequired    = False
+isHsBndrInvisible HsBndrRequired{}  = False
+isHsBndrInvisible (XXBndrVis _)     = False
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr flag pass -> Bool
@@ -783,7 +789,6 @@ data HsType pass
 
   | HsAppKindTy         (XAppKindTy pass) -- type level type app
                         (LHsType pass)
-                       !(LHsToken "@" pass)
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
@@ -932,21 +937,24 @@ data HsTyLit pass
 
 -- | Denotes the type of arrows in the surface language
 data HsArrow pass
-  = HsUnrestrictedArrow !(LHsUniToken "->" "→" pass)
+  = HsUnrestrictedArrow !(XUnrestrictedArrow pass)
     -- ^ a -> b or a → b
 
-  | HsLinearArrow !(HsLinearArrowTokens pass)
+  | HsLinearArrow !(XLinearArrow pass)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
 
-  | HsExplicitMult !(LHsToken "%" pass) !(LHsType pass) !(LHsUniToken "->" "→" pass)
+  | HsExplicitMult !(XExplicitMult pass) !(LHsType pass)
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-data HsLinearArrowTokens pass
-  = HsPct1 !(LHsToken "%1" pass) !(LHsUniToken "->" "→" pass)
-  | HsLolly !(LHsToken "⊸" pass)
+  | XArrow !(XXArrow pass)
+
+type family XUnrestrictedArrow p
+type family XLinearArrow       p
+type family XExplicitMult      p
+type family XXArrow            p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.
@@ -1227,9 +1235,15 @@ do not bring any type variables into scope over the body of a function at all.
 
 -- | Arguments in an expression/type after splitting
 data HsArg p tm ty
-  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
-  | HsTypeArg !(LHsToken "@" p) ty -- Argument is a visible type application (f @ty)
-  | HsArgPar SrcSpan -- See Note [HsArgPar]
+  = HsValArg !(XValArg p) tm   -- Argument is an ordinary expression     (f arg)
+  | HsTypeArg !(XTypeArg p) ty -- Argument is a visible type application (f @ty)
+  | HsArgPar !(XArgPar p)      -- See Note [HsArgPar]
+  | XArg !(XXArg p)
+
+type family XValArg  p
+type family XTypeArg p
+type family XArgPar  p
+type family XXArg    p
 
 -- type level equivalent
 type LHsTypeArg p = HsArg p (LHsType p) (LHsKind p)

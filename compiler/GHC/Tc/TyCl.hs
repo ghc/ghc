@@ -1817,8 +1817,8 @@ kcConH98Args new_or_data res_kind con_args = case con_args of
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: NewOrData -> TcKind -> HsConDeclGADTDetails GhcRn -> TcM ()
 kcConGADTArgs new_or_data res_kind con_args = case con_args of
-  PrefixConGADT tys     ->   kcConArgTys new_or_data res_kind tys
-  RecConGADT (L _ flds) _ -> kcConArgTys new_or_data res_kind $
+  PrefixConGADT _ tys     -> kcConArgTys new_or_data res_kind tys
+  RecConGADT _ (L _ flds) -> kcConArgTys new_or_data res_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
 kcConDecls :: Foldable f
@@ -3890,7 +3890,7 @@ tcConIsInfixGADT :: Name
 tcConIsInfixGADT con details
   = case details of
            RecConGADT{} -> return False
-           PrefixConGADT arg_tys       -- See Note [Infix GADT constructors]
+           PrefixConGADT _ arg_tys       -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
                , [_ty1,_ty2] <- map hsScaledThing arg_tys
                   -> do { fix_env <- getFixityEnv
@@ -3916,9 +3916,9 @@ tcConGADTArgs :: ContextKind  -- expected kind of arguments
                               -- might have a specific kind
               -> HsConDeclGADTDetails GhcRn
               -> TcM [(Scaled TcType, HsSrcBang)]
-tcConGADTArgs exp_kind (PrefixConGADT btys)
+tcConGADTArgs exp_kind (PrefixConGADT _ btys)
   = mapM (tcConArg exp_kind) btys
-tcConGADTArgs exp_kind (RecConGADT fields _)
+tcConGADTArgs exp_kind (RecConGADT _ fields)
   = tcRecConDeclFields exp_kind fields
 
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,

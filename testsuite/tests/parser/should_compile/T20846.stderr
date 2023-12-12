@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))

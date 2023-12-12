@@ -175,7 +175,6 @@ data HsExprArg (p :: TcPass)
              , eva_arg_ty :: !(XEVAType p) }
 
   | ETypeArg { eva_ctxt  :: AppCtxt
-             , eva_at    :: !(LHsToken "@" GhcRn)
              , eva_hs_ty :: LHsWcType GhcRn  -- The type arg
              , eva_ty    :: !(XETAType p) }  -- Kind-checked type arg
 
@@ -271,10 +270,10 @@ mkEValArg :: AppCtxt -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg ctxt e = EValArg { eva_arg = ValArg e, eva_ctxt = ctxt
                            , eva_arg_ty = noExtField }
 
-mkETypeArg :: AppCtxt -> LHsToken "@" GhcRn -> LHsWcType GhcRn -> HsExprArg 'TcpRn
-mkETypeArg ctxt at hs_ty =
+mkETypeArg :: AppCtxt -> LHsWcType GhcRn -> HsExprArg 'TcpRn
+mkETypeArg ctxt hs_ty =
   ETypeArg { eva_ctxt = ctxt
-           , eva_at = at, eva_hs_ty = hs_ty
+           , eva_hs_ty = hs_ty
            , eva_ty = noExtField }
 
 addArgWrap :: HsWrapper -> [HsExprArg p] -> [HsExprArg p]
@@ -296,9 +295,9 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- Always returns VACall fun n_val_args noSrcSpan
     -- to initialise the argument splitting in 'go'
     -- See Note [AppCtxt]
-    top_ctxt n (HsPar _ _ fun _)           = top_lctxt n fun
+    top_ctxt n (HsPar _ fun)               = top_lctxt n fun
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
-    top_ctxt n (HsAppType _ fun _ _)         = top_lctxt (n+1) fun
+    top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
     top_ctxt n (XExpr (HsExpanded orig _)) = VACall orig      n noSrcSpan
     top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
@@ -308,9 +307,9 @@ splitHsApps e = go e (top_ctxt 0 e) []
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
        -> TcM ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
     -- Modify the AppCtxt as we walk inwards, so it describes the next argument
-    go (HsPar _ _ (L l fun) _)       ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)     : args)
+    go (HsPar _ (L l fun))           ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)     : args)
     go (HsPragE _ p (L l fun))       ctxt args = go fun (set l ctxt) (EPrag      ctxt p     : args)
-    go (HsAppType _ (L l fun) at ty) ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt at ty : args)
+    go (HsAppType _ (L l fun) ty)    ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty    : args)
     go (HsApp _ (L l fun) arg)       ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg   : args)
 
     -- See Note [Looking through HsExpanded]
@@ -384,8 +383,8 @@ rebuild_hs_apps fun ctxt (arg : args)
   = case arg of
       EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
         -> rebuild_hs_apps (HsApp noAnn lfun arg) ctxt' args
-      ETypeArg { eva_hs_ty = hs_ty, eva_at = at, eva_ty = ty, eva_ctxt = ctxt' }
-        -> rebuild_hs_apps (HsAppType ty lfun at hs_ty) ctxt' args
+      ETypeArg { eva_hs_ty = hs_ty, eva_ty = ty, eva_ctxt = ctxt' }
+        -> rebuild_hs_apps (HsAppType ty lfun hs_ty) ctxt' args
       EPrag ctxt' p
         -> rebuild_hs_apps (HsPragE noExtField p lfun) ctxt' args
       EWrap (EPar ctxt')
@@ -938,7 +937,7 @@ tcInferRecSelId (FieldOcc sel_name lbl)
 -- outermost constructor ignoring parentheses.
 obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType GhcRn)
 obviousSig (ExprWithTySig _ _ ty) = Just ty
-obviousSig (HsPar _ _ p _)        = obviousSig (unLoc p)
+obviousSig (HsPar _ p)            = obviousSig (unLoc p)
 obviousSig (HsPragE _ _ p)        = obviousSig (unLoc p)
 obviousSig _                      = Nothing
 

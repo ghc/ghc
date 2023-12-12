@@ -18,12 +18,13 @@
     (EpaCommentsBalanced
      []
      [(L
-       (EpaSpan { Test20239.hs:8:34-63 })
+       (EpaSpan
+        { Test20239.hs:8:34-63 })
        (EpaComment
         (EpaLineComment
          "-- ^ Run any arbitrary IO code")
         { Test20239.hs:7:86 }))]))
-   (VirtualBraces
+   (EpVirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -45,13 +46,15 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { Test20239.hs:3:1-28 })
+        (EpaSpan
+         { Test20239.hs:3:1-28 })
         (EpaComment
          (EpaLineComment
           "-- | Leading Haddock Comment")
          { Test20239.hs:1:18-22 }))
       ,(L
-        (EpaSpan { Test20239.hs:4:1-25 })
+        (EpaSpan
+         { Test20239.hs:4:1-25 })
         (EpaComment
          (EpaLineComment
           "-- Running over two lines")
@@ -69,7 +72,8 @@
          ,(AddEpAnn AnnEqual (EpaSpan { Test20239.hs:5:34 }))]
          (EpaComments
           [(L
-            (EpaSpan { Test20239.hs:6:34-70 })
+            (EpaSpan
+             { Test20239.hs:6:34-70 })
             (EpaComment
              (EpaLineComment
               "-- ^ Run a query against the database")
@@ -86,6 +90,7 @@
         (HsOuterImplicit
          (NoExtField))
         [(HsValArg
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { Test20239.hs:5:22-32 })
@@ -147,13 +152,9 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (HsPct1
-                  (L
-                   (NoTokenLoc)
-                   (HsTok))
-                  (L
-                   (NoTokenLoc)
-                   (HsNormalTok))))
+                 (EpPct1
+                  (NoEpTok)
+                  (NoEpUniTok)))
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:5:51-55 })
@@ -207,13 +208,9 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (HsPct1
-                  (L
-                   (NoTokenLoc)
-                   (HsTok))
-                  (L
-                   (NoTokenLoc)
-                   (HsNormalTok))))
+                 (EpPct1
+                  (NoEpTok)
+                  (NoEpUniTok)))
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:7:50-86 })
@@ -244,10 +241,9 @@
                      (EpaComments
                       []))
                     (HsUnrestrictedArrow
-                     (L
-                      (TokenLoc
-                       (EpaSpan { Test20239.hs:7:62-63 }))
-                      (HsNormalTok)))
+                     (EpUniTok
+                      (EpaSpan { Test20239.hs:7:62-63 })
+                      (NormalSyntax)))
                     (L
                      (EpAnn
                       (EpaSpan { Test20239.hs:7:51-60 })

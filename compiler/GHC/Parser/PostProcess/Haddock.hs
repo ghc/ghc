@@ -289,8 +289,8 @@ instance HasHaddock (Located (HsModule GhcPs)) where
     --      data C = MkC  -- ^ Comment on MkC
     --      -- ^ Comment on C
     --
-    let layout_info = hsmodLayout (hsmodExt mod)
-    hsmodDecls' <- addHaddockInterleaveItems layout_info (mkDocHsDecl layout_info) (hsmodDecls mod)
+    let layout = hsmodLayout (hsmodExt mod)
+    hsmodDecls' <- addHaddockInterleaveItems layout (mkDocHsDecl layout) (hsmodDecls mod)
 
     pure $ L l_mod $
       mod { hsmodExports = hsmodExports'
@@ -312,7 +312,7 @@ lexLHsDocString = fmap lexHsDocString
 instance HasHaddock (LocatedL [LocatedA (IE GhcPs)]) where
   addHaddock (L l_exports exports) =
     extendHdkA (locA l_exports) $ do
-      exports' <- addHaddockInterleaveItems NoLayoutInfo mkDocIE exports
+      exports' <- addHaddockInterleaveItems EpNoLayout mkDocIE exports
       registerLocHdkA (srcLocSpan (srcSpanEnd (locA l_exports))) -- Do not consume comments after the closing parenthesis
       pure $ L l_exports exports'
 
@@ -340,10 +340,10 @@ In this case, we should produce four HsDecl items (pseudo-code):
 
 The inputs to addHaddockInterleaveItems are:
 
-  * layout_info :: LayoutInfo GhcPs
+  * layout :: EpLayout
 
     In the example above, note that the indentation level inside the module is
-    2 spaces. It would be represented as layout_info = VirtualBraces 2.
+    2 spaces. It would be represented as layout = EpVirtualBraces 2.
 
     It is used to delimit the search space for comments when processing
     declarations. Here, we restrict indentation levels to >=(2+1), so that when
@@ -352,7 +352,7 @@ The inputs to addHaddockInterleaveItems are:
   * get_doc_item :: PsLocated HdkComment -> Maybe a
 
     This is the function used to look up documentation comments.
-    In the above example, get_doc_item = mkDocHsDecl layout_info,
+    In the above example, get_doc_item = mkDocHsDecl layout,
     and it will produce the following parts of the output:
 
       DocD (DocCommentNext "Comment on D")
@@ -372,25 +372,25 @@ The inputs to addHaddockInterleaveItems are:
 addHaddockInterleaveItems
   :: forall a.
      HasHaddock a
-  => LayoutInfo GhcPs
+  => EpLayout
   -> (PsLocated HdkComment -> Maybe a) -- Get a documentation item
   -> [a]           -- Unprocessed (non-documentation) items
   -> HdkA [a]      -- Documentation items & processed non-documentation items
-addHaddockInterleaveItems layout_info get_doc_item = go
+addHaddockInterleaveItems layout get_doc_item = go
   where
     go :: [a] -> HdkA [a]
     go [] = liftHdkA (takeHdkComments get_doc_item)
     go (item : items) = do
       docItems <- liftHdkA (takeHdkComments get_doc_item)
-      item' <- with_layout_info (addHaddock item)
+      item' <- with_layout (addHaddock item)
       other_items <- go items
       pure $ docItems ++ item':other_items
 
-    with_layout_info :: HdkA a -> HdkA a
-    with_layout_info = case layout_info of
-      NoLayoutInfo -> id
-      ExplicitBraces{} -> id
-      VirtualBraces n ->
+    with_layout :: HdkA a -> HdkA a
+    with_layout = case layout of
+      EpNoLayout -> id
+      EpExplicitBraces{} -> id
+      EpVirtualBraces n ->
         let loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
         in hoistHdkA (inLocRange loc_range)
 
@@ -498,18 +498,18 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -- ^ Comment on the second method
   --
   addHaddock (TyClD _ decl)
-    | ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout,
+    | ClassDecl { tcdCExt = (x, layout, NoAnnSortKey),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
                   tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
     = do
         registerHdkA tcdLName
         -- todo: register keyword location of 'where', see Note [Register keyword location]
         where_cls' <-
-          addHaddockInterleaveItems tcdLayout (mkDocHsDecl tcdLayout) $
+          addHaddockInterleaveItems layout (mkDocHsDecl layout) $
           flattenBindsAndSigs (tcdMeths, tcdSigs, tcdATs, tcdATDefs, [], [])
         pure $
           let (tcdMeths', tcdSigs', tcdATs', tcdATDefs', _, tcdDocs) = partitionBindsAndSigs where_cls'
-              decl' = ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout
+              decl' = ClassDecl { tcdCExt = (x, layout, NoAnnSortKey)
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
                                 , tcdSigs = tcdSigs'
                                 , tcdMeths = tcdMeths'
@@ -698,19 +698,19 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA (locA l_con_decl) $
     case con_decl of
-      ConDeclGADT { con_g_ext, con_names, con_dcolon, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
+      ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
         -- discardHasInnerDocs is ok because we don't need this info for GADTs.
         con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
-            PrefixConGADT ts -> PrefixConGADT <$> addHaddock ts
-            RecConGADT (L l_rec flds) arr -> do
+            PrefixConGADT x ts -> PrefixConGADT x <$> addHaddock ts
+            RecConGADT arr (L l_rec flds) -> do
               -- discardHasInnerDocs is ok because we don't need this info for GADTs.
               flds' <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
-              pure $ RecConGADT (L l_rec flds') arr
+              pure $ RecConGADT arr (L l_rec flds')
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
-          ConDeclGADT { con_g_ext, con_names, con_dcolon, con_bndrs, con_mb_cxt,
+          ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt,
                         con_doc = lexLHsDocString <$> con_doc',
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }
@@ -1309,11 +1309,11 @@ reportExtraDocs =
 *                                                                      *
 ********************************************************************* -}
 
-mkDocHsDecl :: LayoutInfo GhcPs -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
-mkDocHsDecl layout_info a = fmap (DocD noExtField) <$> mkDocDecl layout_info a
+mkDocHsDecl :: EpLayout -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
+mkDocHsDecl layout a = fmap (DocD noExtField) <$> mkDocDecl layout a
 
-mkDocDecl :: LayoutInfo GhcPs -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
-mkDocDecl layout_info (L l_comment hdk_comment)
+mkDocDecl :: EpLayout -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
+mkDocDecl layout (L l_comment hdk_comment)
   | indent_mismatch = Nothing
   | otherwise =
     Just $ L (noAnnSrcSpan span) $
@@ -1344,10 +1344,10 @@ mkDocDecl layout_info (L l_comment hdk_comment)
     --         class C a where
     --           f :: a -> a
     --         -- ^ indent mismatch
-    indent_mismatch = case layout_info of
-      NoLayoutInfo -> False
-      ExplicitBraces{} -> False
-      VirtualBraces n -> n /= srcSpanStartCol (psRealSpan l_comment)
+    indent_mismatch = case layout of
+      EpNoLayout -> False
+      EpExplicitBraces{} -> False
+      EpVirtualBraces n -> n /= srcSpanStartCol (psRealSpan l_comment)
 
 mkDocIE :: PsLocated HdkComment -> Maybe (LIE GhcPs)
 mkDocIE (L l_comment hdk_comment) =

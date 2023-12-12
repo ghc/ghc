@@ -1245,7 +1245,7 @@ validRuleLhs foralls lhs
     check (OpApp _ e1 op e2)              = checkl op `mplus` checkl_e e1
                                                       `mplus` checkl_e e2
     check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
-    check (HsAppType _ e _ _)             = checkl e
+    check (HsAppType _ e _)               = checkl e
     check (HsVar _ lv)
       | (unLoc lv) `notElem` foralls      = Nothing
     check other                           = Just other  -- Failure
@@ -1727,8 +1727,7 @@ rnTyClDecl (DataDecl
                           , tcdDataDefn = defn'
                           , tcdDExt     = rn_info }, fvs) } }
 
-rnTyClDecl (ClassDecl { tcdLayout = layout,
-                        tcdCtxt = context, tcdLName = lcls,
+rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
@@ -1782,8 +1781,7 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
-        ; return (ClassDecl { tcdLayout = rnLayoutInfo layout,
-                              tcdCtxt = context', tcdLName = lcls',
+        ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
@@ -1791,11 +1789,6 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
-
-rnLayoutInfo :: LayoutInfo GhcPs -> LayoutInfo GhcRn
-rnLayoutInfo (ExplicitBraces ob cb) = ExplicitBraces ob cb
-rnLayoutInfo (VirtualBraces n) = VirtualBraces n
-rnLayoutInfo NoLayoutInfo = NoLayoutInfo
 
 -- Does the data type declaration include a CUSK?
 data_decl_has_cusk :: LHsQTyVars (GhcPass p) -> NewOrData -> Bool -> Maybe (LHsKind (GhcPass p')) -> RnM Bool
@@ -1915,7 +1908,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
 
     is_strict (HsSrcBang _ _ s) = isSrcStrict s
 
-    con_args (ConDeclGADT { con_g_args = PrefixConGADT args }) = args
+    con_args (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
     con_args (ConDeclH98 { con_args = PrefixCon _ args }) = args
     con_args (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [arg1, arg2]
     con_args _ = []
@@ -2405,7 +2398,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
              , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
 
         ; mb_doc' <- traverse rnLHsDoc mb_doc
-        ; return (decl { con_ext = noAnn
+        ; return (decl { con_ext = noExtField
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc'
@@ -2413,7 +2406,6 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
-                       , con_dcolon  = dcol
                        , con_bndrs   = L l outer_bndrs
                        , con_mb_cxt  = mcxt
                        , con_g_args  = args
@@ -2451,8 +2443,7 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
-        ; return (ConDeclGADT { con_g_ext = noAnn, con_names = new_names
-                              , con_dcolon = dcol
+        ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc },
@@ -2485,12 +2476,12 @@ rnConDeclGADTDetails ::
    -> HsDocContext
    -> HsConDeclGADTDetails GhcPs
    -> RnM (HsConDeclGADTDetails GhcRn, FreeVars)
-rnConDeclGADTDetails _ doc (PrefixConGADT tys)
+rnConDeclGADTDetails _ doc (PrefixConGADT _ tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
-       ; return (PrefixConGADT new_tys, fvs) }
-rnConDeclGADTDetails con doc (RecConGADT flds arr)
+       ; return (PrefixConGADT noExtField new_tys, fvs) }
+rnConDeclGADTDetails con doc (RecConGADT _ flds)
   = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
-       ; return (RecConGADT new_flds arr, fvs) }
+       ; return (RecConGADT noExtField new_flds, fvs) }
 
 rnRecConDeclFields ::
      Name
