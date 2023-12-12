@@ -1177,24 +1177,11 @@ checkSpecialPrimOpTypeArgs (Var fun_id) args
       _ -> failWithL $ text "tagToEnumPrim# needs two type arguments but has args:"
                        <+> ppr (take 2 args)
 
-checkSpecialPrimOpTypeArgs _ _ = pure ()
-
--- I'll move the commented out code here up into checkSpecialPrimOpTypeArgs
--- when I can do so without creating merge conflicts.
-
-{-
--- | Check that a use of a dataToTag# primop satisfies conditions DTT2
--- and DTT3 from Note [DataToTag overview] in GHC.Tc.Instance.Class
---
--- Ignores applications not headed by dataToTag# primops.
-
--- Commented out because GHC.PrimopWrappers doesn't respect this condition yet.
--- See wrinkle DTW7 in Note [DataToTag overview].
-checkDataToTagPrimOpTyCon
-  :: CoreExpr   -- ^ the function (head of the application) we are checking
-  -> [CoreArg]  -- ^ The arguments to the application
-  -> LintM ()
-checkDataToTagPrimOpTyCon (Var fun_id) args
+  -- Check that a use of a dataToTag# primop satisfies conditions DTT2
+  -- and DTT3 from Note [DataToTag overview] in GHC.Tc.Instance.Class.
+  -- (Commented out because GHC.PrimopWrappers doesn't respect this
+  -- condition yet.  See wrinkle DTW7 in Note [DataToTag overview].)
+  {-
   | Just op <- isPrimOpId_maybe fun_id
   , op == DataToTagSmallOp || op == DataToTagLargeOp
   = case args of
@@ -1208,11 +1195,11 @@ checkDataToTagPrimOpTyCon (Var fun_id) args
                    text "dataToTag# primop-size/tycon-family-size mismatch"
         | otherwise -> failWithL $ text "dataToTagLarge# used at non-ADT type:"
                                    <+> ppr dty
-      _ -> failWithL $ text "dataToTagLarge# needs two type arguments but has args:"
+      _ -> failWithL $ text "dataToTag# primop needs two type arguments but has args:"
                        <+> ppr (take 2 args)
+  -}
 
-checkDataToTagPrimOpTyCon _ _ = pure ()
--}
+checkSpecialPrimOpTypeArgs _ _ = pure ()
 
 -- | Check representation-polymorphic invariants in an application of a
 -- built-in function or newtype constructor.
