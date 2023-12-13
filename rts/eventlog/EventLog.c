@@ -27,6 +27,8 @@
 #include <unistd.h>
 #endif
 
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
+
 Mutex state_change_mutex;
 bool eventlog_enabled; // protected by state_change_mutex to ensure
                        // serialisation of calls to
@@ -85,6 +87,14 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
  * case is that we must ensure that the buffers of any disabled capabilities are
  * flushed, lest their events are stuck in limbo. This is achieved with a call to
  * flushLocalEventsBuf in traceCapDisable.
+ *
+ *
+ * Note [Maximum event length]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The maximum length of an eventlog event is determined by the maximum event
+ * buffer size, EVENT_LOG_SIZE. We must ensure that no variable-length event
+ * exceeds this limit. For this reason we impose maximum length limits on
+ * fields which may have unbounded values.
  */
 
 static const EventLogWriter *event_log_writer = NULL;
@@ -93,6 +103,7 @@ static const EventLogWriter *event_log_writer = NULL;
 // eventlog is restarted
 static eventlog_init_func_t *eventlog_header_funcs = NULL;
 
+// See Note [Maximum event length]
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
 static int flushCount = 0;
@@ -1440,14 +1451,16 @@ void postTickyCounterSamples(StgEntCounter *counters)
 #endif /* TICKY_TICKY */
 void postIPE(const InfoProvEnt *ipe)
 {
+    // See Note [Maximum event length].
+    const StgWord MAX_IPE_STRING_LEN = 65535;
     ACQUIRE_LOCK(&eventBufMutex);
-    StgWord table_name_len = strlen(ipe->prov.table_name);
-    StgWord closure_desc_len = strlen(ipe->prov.closure_desc);
-    StgWord ty_desc_len = strlen(ipe->prov.ty_desc);
-    StgWord label_len = strlen(ipe->prov.label);
-    StgWord module_len = strlen(ipe->prov.module);
-    StgWord src_file_len = strlen(ipe->prov.src_file);
-    StgWord src_span_len = strlen(ipe->prov.src_span);
+    StgWord table_name_len = MIN(strlen(ipe->prov.table_name), MAX_IPE_STRING_LEN);
+    StgWord closure_desc_len = MIN(strlen(ipe->prov.closure_desc), MAX_IPE_STRING_LEN);
+    StgWord ty_desc_len = MIN(strlen(ipe->prov.ty_desc), MAX_IPE_STRING_LEN);
+    StgWord label_len = MIN(strlen(ipe->prov.label), MAX_IPE_STRING_LEN);
+    StgWord module_len = MIN(strlen(ipe->prov.module), MAX_IPE_STRING_LEN);
+    StgWord src_file_len = MIN(strlen(ipe->prov.src_file), MAX_IPE_STRING_LEN);
+    StgWord src_span_len = MIN(strlen(ipe->prov.src_span), MAX_IPE_STRING_LEN);
 
     // 8 for the info word
     // 1 null after each string
