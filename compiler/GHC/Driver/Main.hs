@@ -1797,9 +1797,14 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
         (late_cc_binds, late_local_ccs, cc_state) <-
               if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
-                  then {-# SCC lateCC #-} do
-                    (binds, late_ccs, cc_state) <- addLateCostCentresPgm dflags logger this_mod core_binds
-                    return ( binds, (S.toList late_ccs `mappend` local_ccs ), cc_state)
+                  then
+                    withTiming
+                      logger
+                      (text "LateCCs"<+>brackets (ppr this_mod))
+                      (const ())
+                      $ {-# SCC lateCC #-} do
+                        (binds, late_ccs, cc_state) <- addLateCostCentresPgm dflags logger this_mod core_binds
+                        return ( binds, (S.toList late_ccs `mappend` local_ccs ), cc_state)
                   else
                     return (core_binds, local_ccs, newCostCentreState)
 
@@ -1819,15 +1824,19 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             }
           , _
           ) <-
-          {-# SCC "latePlugins" #-}
-          withPlugins (hsc_plugins hsc_env)
-            (($ hsc_env) . latePlugin)
-              ( cgguts
-                  { cg_binds = late_cc_binds
-                  , cg_ccs = late_local_ccs
-                  }
-              , cc_state
-              )
+          {-# SCC latePlugins #-}
+          withTiming
+            logger
+            (text "LatePlugins"<+>brackets (ppr this_mod))
+            (const ()) $
+            withPlugins (hsc_plugins hsc_env)
+              (($ hsc_env) . latePlugin)
+                ( cgguts
+                    { cg_binds = late_cc_binds
+                    , cg_ccs = late_local_ccs
+                    }
+                , cc_state
+                )
 
         let
           hooks  = hsc_hooks hsc_env
