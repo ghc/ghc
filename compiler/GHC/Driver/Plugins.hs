@@ -58,6 +58,10 @@ module GHC.Driver.Plugins (
       -- | hole fit plugins allow plugins to change the behavior of valid hole
       -- fit suggestions
     , HoleFitPluginR
+      -- ** Late plugins
+      -- | Late plugins can access and modify the core of a module after
+      -- optimizations have been applied and after interface creation.
+    , LatePlugin
 
       -- * Internal
     , PluginWithArgs(..), pluginsWithArgs, pluginRecompile'
@@ -90,7 +94,6 @@ import GHC.Hs
 import GHC.Types.Error (Messages)
 import GHC.Linker.Types
 import GHC.Types.CostCentre.State
-import GHC.Types.CostCentre
 import GHC.Types.Unique.DFM
 
 import GHC.Unit.Module.ModGuts (CgGuts)
