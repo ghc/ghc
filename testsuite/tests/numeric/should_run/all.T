@@ -79,6 +79,6 @@ test('IntegerToFloat', normal, compile_and_run, [''])
 
 test('T20291', normal, compile_and_run, [''])
 test('T22282', normal, compile_and_run, [''])
-test('T22671', normal, compile_and_run, [''])
-test('foundation', [when(js_arch(), run_timeout_multiplier(2))], compile_and_run, ['-O -package transformers'])
+test('T22671', js_fragile(24259), compile_and_run, [''])
+test('foundation', [when(js_arch(), run_timeout_multiplier(2)), js_fragile(24259)], compile_and_run, ['-O -package transformers'])
 test('T24066', normal, compile_and_run, [''])

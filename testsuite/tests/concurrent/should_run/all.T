@@ -47,7 +47,7 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
 # times out with ghci
 test('T4030', omit_ghci, compile_and_run, ['-O'])
 
-test('throwto002', normal, compile_and_run, [''])
+test('throwto002', js_fragile(24259), compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
