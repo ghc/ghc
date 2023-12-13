@@ -339,22 +339,6 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "Cannot apply expression of type" <+> quotes (ppr fun_ty) $$
            text "to a visible type argument" <+> quotes (ppr hs_ty)
-    TcRnTagToEnumMissingValArg
-      -> mkSimpleDecorated $
-           text "tagToEnum# must appear applied to one value argument"
-    TcRnTagToEnumUnspecifiedResTy ty
-      -> mkSimpleDecorated $
-           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
-              2 (vcat [ text "Specify the type by giving a type signature"
-                      , text "e.g. (tagToEnum# x) :: Bool" ])
-    TcRnTagToEnumResTyNotAnEnum ty
-      -> mkSimpleDecorated $
-           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
-              2 (text "Result type must be an enumeration type")
-    TcRnTagToEnumResTyTypeData ty
-      -> mkSimpleDecorated $
-           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
-              2 (text "Result type cannot be headed by a `type data` type")
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> mkSimpleDecorated $
            text "Predicate type of `ifThenElse' depends on result type"
@@ -2089,14 +2073,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInvalidTypeApplication{}
       -> ErrorWithoutFlag
-    TcRnTagToEnumMissingValArg
-      -> ErrorWithoutFlag
-    TcRnTagToEnumUnspecifiedResTy{}
-      -> ErrorWithoutFlag
-    TcRnTagToEnumResTyNotAnEnum{}
-      -> ErrorWithoutFlag
-    TcRnTagToEnumResTyTypeData{}
-      -> ErrorWithoutFlag
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> ErrorWithoutFlag
     TcRnIllegalHsBootOrSigDecl {}
@@ -2737,14 +2713,6 @@ instance Diagnostic TcRnMessage where
     TcRnAnnotationInSafeHaskell
       -> noHints
     TcRnInvalidTypeApplication{}
-      -> noHints
-    TcRnTagToEnumMissingValArg
-      -> noHints
-    TcRnTagToEnumUnspecifiedResTy{}
-      -> noHints
-    TcRnTagToEnumResTyNotAnEnum{}
-      -> noHints
-    TcRnTagToEnumResTyTypeData{}
       -> noHints
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> noHints

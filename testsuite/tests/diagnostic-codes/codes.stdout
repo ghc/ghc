@@ -50,7 +50,6 @@
 [GHC-84170] is untested (constructor = TcRnModMissingRealSrcSpan)
 [GHC-95822] is untested (constructor = TcRnSimplifierTooManyIterations)
 [GHC-17268] is untested (constructor = TcRnCharLiteralOutOfRange)
-[GHC-36495] is untested (constructor = TcRnTagToEnumMissingValArg)
 [GHC-55868] is untested (constructor = TcRnArrowIfThenElsePredDependsOnResultTy)
 [GHC-51876] is untested (constructor = TcRnDupeModuleExport)
 [GHC-64649] is untested (constructor = TcRnNullExportedModule)
