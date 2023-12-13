@@ -172,20 +172,29 @@ static inline void postBuf(EventsBuf *eb, const StgWord8 *buf, uint32_t size)
     eb->pos += size;
 }
 
-/* Post a null-terminated string to the event log.
- * It is the caller's responsibility to ensure that there is
- * enough room for strlen(buf)+1 bytes.
+/* Post a null-terminated string up to a given length to the event log. It is
+ * the caller's responsibility to ensure that there is enough room for
+ * len+1 bytes.
  */
-static inline void postString(EventsBuf *eb, const char *buf)
+static inline void postStringLen(EventsBuf *eb, const char *buf, StgWord len)
 {
     if (buf) {
-        const int len = strlen(buf);
         ASSERT(eb->begin + eb->size > eb->pos + len + 1);
         memcpy(eb->pos, buf, len);
         eb->pos += len;
     }
     *eb->pos = 0;
     eb->pos++;
+}
+
+/* Post a null-terminated string to the event log.
+ * It is the caller's responsibility to ensure that there is
+ * enough room for strlen(buf)+1 bytes.
+ */
+static inline void postString(EventsBuf *eb, const char *buf)
+{
+    const StgWord len = buf ? strlen(buf) : 0;
+    postStringLen(eb, buf, len);
 }
 
 static inline StgWord64 time_ns(void)
@@ -1224,13 +1233,13 @@ void postHeapProfBegin(StgWord8 profile_id)
     postWord8(&eventBuf, profile_id);
     postWord64(&eventBuf, TimeToNS(flags->heapProfileInterval));
     postWord32(&eventBuf, getHeapProfBreakdown());
-    postString(&eventBuf, flags->modSelector);
-    postString(&eventBuf, flags->descrSelector);
-    postString(&eventBuf, flags->typeSelector);
-    postString(&eventBuf, flags->ccSelector);
-    postString(&eventBuf, flags->ccsSelector);
-    postString(&eventBuf, flags->retainerSelector);
-    postString(&eventBuf, flags->bioSelector);
+    postStringLen(&eventBuf, flags->modSelector, modSelector_len);
+    postStringLen(&eventBuf, flags->descrSelector, descrSelector_len);
+    postStringLen(&eventBuf, flags->typeSelector, typeSelector_len);
+    postStringLen(&eventBuf, flags->ccSelector, ccSelector_len);
+    postStringLen(&eventBuf, flags->ccsSelector, ccsSelector_len);
+    postStringLen(&eventBuf, flags->retainerSelector, retainerSelector_len);
+    postStringLen(&eventBuf, flags->bioSelector, bioSelector_len);
     RELEASE_LOCK(&eventBufMutex);
 }
 
@@ -1275,7 +1284,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
     postPayloadSize(&eventBuf, len);
     postWord8(&eventBuf, profile_id);
     postWord64(&eventBuf, residency);
-    postString(&eventBuf, label);
+    postStringLen(&eventBuf, label, label_len);
     RELEASE_LOCK(&eventBufMutex);
 }
 
@@ -1295,9 +1304,9 @@ void postHeapProfCostCentre(StgWord32 ccID,
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_COST_CENTRE);
     postPayloadSize(&eventBuf, len);
     postWord32(&eventBuf, ccID);
-    postString(&eventBuf, label);
-    postString(&eventBuf, module);
-    postString(&eventBuf, srcloc);
+    postStringLen(&eventBuf, label, label_len);
+    postStringLen(&eventBuf, module, module_len);
+    postStringLen(&eventBuf, srcloc, srcloc_len);
     postWord8(&eventBuf, is_caf);
     RELEASE_LOCK(&eventBufMutex);
 }
@@ -1369,17 +1378,20 @@ void postProfBegin(void)
 #if defined(TICKY_TICKY)
 static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
 {
-    StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->str)+1 + 8 + strlen(p->ticky_json)+1;
+    StgWord arg_kinds_len = strlen(p->arg_kinds);
+    StgWord str_len = strlen(p->str);
+    StgWord ticky_json_len = strlen(p->ticky_json);
+    StgWord len = 8 + 2 + arg_kinds_len+1 + str_len+1 + 8 + ticky_json_len+1;
     CHECK(!ensureRoomForVariableEvent(eb, len));
     postEventHeader(eb, EVENT_TICKY_COUNTER_DEF);
     postPayloadSize(eb, len);
 
     postWord64(eb, (uint64_t)((uintptr_t) p));
     postWord16(eb, (uint16_t) p->arity);
-    postString(eb, p->arg_kinds);
-    postString(eb, p->str);
+    postStringLen(eb, p->arg_kinds, arg_kinds_len);
+    postStringLen(eb, p->str, str_len);
     postWord64(eb, (W_) (INFO_PTR_TO_STRUCT(p->info)));
-    postString(eb, p->ticky_json);
+    postStringLen(eb, p->ticky_json, ticky_json_len);
 
 }
 
@@ -1441,17 +1453,17 @@ void postIPE(const InfoProvEnt *ipe)
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
     postWord64(&eventBuf, (StgWord) INFO_PTR_TO_STRUCT(ipe->info));
-    postString(&eventBuf, ipe->prov.table_name);
-    postString(&eventBuf, ipe->prov.closure_desc);
-    postString(&eventBuf, ipe->prov.ty_desc);
-    postString(&eventBuf, ipe->prov.label);
-    postString(&eventBuf, ipe->prov.module);
+    postStringLen(&eventBuf, ipe->prov.table_name, table_name_len);
+    postStringLen(&eventBuf, ipe->prov.closure_desc, closure_desc_len);
+    postStringLen(&eventBuf, ipe->prov.ty_desc, ty_desc_len);
+    postStringLen(&eventBuf, ipe->prov.label, label_len);
+    postStringLen(&eventBuf, ipe->prov.module, module_len);
 
     // Manually construct the location field: "<file>:<span>\0"
     postBuf(&eventBuf, (const StgWord8*) ipe->prov.src_file, src_file_len);
     StgWord8 colon = ':';
     postBuf(&eventBuf, &colon, 1);
-    postString(&eventBuf, ipe->prov.src_span);
+    postStringLen(&eventBuf, ipe->prov.src_span, src_span_len);
 
     RELEASE_LOCK(&eventBufMutex);
 }
