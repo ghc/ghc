@@ -153,6 +153,13 @@ def js_broken( bug: IssueNumber ):
     else:
         return normal;
 
+# expect occasional failures for the JS backend
+def js_fragile( bug: IssueNumber ):
+    if js_arch():
+        return fragile(bug);
+    else:
+        return normal;
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
