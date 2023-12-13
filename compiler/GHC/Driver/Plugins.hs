@@ -167,6 +167,8 @@ data Plugin = Plugin {
     -- ^ A plugin that runs after interface creation and after late cost centre
     -- insertion. Useful for transformations that should not impact interfaces
     -- or optimization at all.
+    --
+    -- @since 9.10.1
 
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
