@@ -178,8 +178,9 @@ Runtime system
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Introduced per the `base library split proposal
-  <https://github.com/Ericson2314/tech-proposals/blob/ghc-base-libraries/proposals/accepted/051-ghc-base-libraries.rst>`_
+- ``ghc-experimental`` is a new library for functions and data types with
+  weaker stability guarantees. Introduced per the HF Technical Proposal `#51
+  <https://github.com/haskellfoundation/tech-proposals/blob/main/proposals/accepted/051-ghc-base-libraries.rst>`_.
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
