@@ -2,6 +2,7 @@ module LatePlugin where
 
 import Data.Bool
 import GHC.Core
+import GHC.Core.TyCo.Compare
 import GHC.Driver.Monad
 import GHC.Plugins
 import GHC.Types.Avail
@@ -43,7 +44,7 @@ editCoreBinding early modName pgm = do
   where
     go :: [CoreBind] -> [CoreBind]
     go (b@(NonRec v e) : bs)
-      | occNameString (getOccName v) == "testBinding" =
+      | occNameString (getOccName v) == "testBinding" && exprType e `eqType` intTy =
           NonRec v (mkUncheckedIntExpr $ bool 222222 111111 early) : bs
     go (b:bs) = b : go bs
     go [] = []

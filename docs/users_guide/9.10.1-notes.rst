@@ -126,6 +126,9 @@ Compiler
 - The :ghc-flag:`-Wforall-identifier` flag is now deprecated and removed from :ghc-flag:`-Wdefault`,
   as ``forall`` is no longer parsed as an identifier.
 
+- Late plugins have been added. These are plugins which can access and/or modify
+  the core of a module after optimization and after interface creation. See :ghc-ticket:`24254`.
+
 GHCi
 ~~~~
 

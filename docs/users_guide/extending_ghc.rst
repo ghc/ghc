@@ -510,6 +510,58 @@ in a module it compiles:
               return bndr
             printBind _ bndr = return bndr
 
+.. _late-plugins:
+
+Late Plugins
+^^^^^^^^^^^^
+
+If the ``CoreProgram`` of a module is modified in a normal core plugin, the
+modified bindings can end up in unfoldings the interface file for the module.
+This may be undesireable, as the plugin could make changes which affect inlining
+or optimization.
+
+Late plugins can be used to avoid introducing such changes into the interface
+file. Late plugins are a bit different from typical core plugins:
+
+1. They do not run in the ``CoreM`` monad. Instead, they are explicitly passed
+   the ``HscEnv`` and they run in ``IO``.
+2. They are given ``CgGuts`` instead of ``ModGuts``. ``CgGuts`` are a restricted
+   form of ``ModGuts`` intended for code generation. The ``CoreProgram`` held in
+   the ``CgGuts`` given to a late plugin will already be fully optimized.
+3. They must maintain a ``CostCentreState`` and track any cost centres they
+   introduce by adding them to the ``cg_ccs`` field of ``CgGuts``. This is
+   because the automatic collection of cost centres happens before the late
+   plugin stage. If a late plugin does not introduce any cost centres, it may
+   simply return the given cost centre state.
+
+Here is a very simply example of a late plugin that changes the value of a
+binding in a module. If it finds a non-recursive top-level binding named
+``testBinding`` with type ``Int``, it will change its value to the ``Int``
+expression ``111111``.
+
+::
+
+    plugin :: Plugin
+    plugin = defaultPlugin { latePlugin = lateP }
+
+    lateP :: LatePlugin
+    lateP _ _ (cg_guts, cc_state) = do
+        binds' <- editCoreBinding (cg_binds cg_guts)
+        return (cg_guts { cg_binds = binds' }, cc_state)
+
+    editCoreBinding :: CoreProgram -> IO CoreProgram
+    editCoreBinding pgm = pure . go
+      where
+        go :: [CoreBind] -> [CoreBind]
+        go (b@(NonRec v e) : bs)
+          | occNameString (getOccName v) == "testBinding" && exprType e `eqType` intTy =
+              NonRec v (mkUncheckedIntExpr 111111) : bs
+        go (b:bs) = b : go bs
+        go [] = []
+
+Since this is a late plugin, the changed binding value will not end up in the
+interface file.
+
 .. _getting-annotations:
 
 Using Annotations
