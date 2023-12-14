@@ -512,7 +512,8 @@ run_thread:
 #endif
 
     if (ret == ThreadBlocked) {
-        if (t->why_blocked == BlockedOnBlackHole) {
+        uint16_t why_blocked = ACQUIRE_LOAD(&t->why_blocked);
+        if (why_blocked == BlockedOnBlackHole) {
             StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
             traceEventStopThread(cap, t, t->why_blocked + 6,
                                  owner != NULL ? owner->id : 0);
