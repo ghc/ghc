@@ -198,16 +198,6 @@ static inline void postStringLen(EventsBuf *eb, const char *buf, StgWord len)
     eb->pos++;
 }
 
-/* Post a null-terminated string to the event log.
- * It is the caller's responsibility to ensure that there is
- * enough room for strlen(buf)+1 bytes.
- */
-static inline void postString(EventsBuf *eb, const char *buf)
-{
-    const StgWord len = buf ? strlen(buf) : 0;
-    postStringLen(eb, buf, len);
-}
-
 static inline StgWord64 time_ns(void)
 { return TimeToNS(stat_getElapsedTime()); }
 
