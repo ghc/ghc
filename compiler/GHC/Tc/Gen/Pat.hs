@@ -138,31 +138,10 @@ tcPats :: HsMatchContext GhcTc
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside = do
-    pat_tys' <- filter_exp_tys pats pat_tys
-    tc_tt_lpats pat_tys' penv pats thing_inside
+tcPats ctxt pats pat_tys thing_inside =
+    tc_tt_lpats (filterOut isExpForAllPatTyInvis pat_tys) penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
-
-    filter_exp_tys :: [LPat GhcRn] -> [ExpPatType] -> TcM ([ExpPatType])
-
-    filter_exp_tys [] rest = pure (drop_invis_pats rest)
-
-    -- visible patterns
-    filter_exp_tys pats@(L _ _ : _) (ExpForAllPatTy (Bndr _ Invisible{}) : pat_tys) =
-      filter_exp_tys pats (drop_invis_pats pat_tys)
-    filter_exp_tys (L _ _ : pats) (p : pat_tys) = do
-      (pat_tys') <- filter_exp_tys pats pat_tys
-      pure (p : pat_tys')
-
-    -- invisible patterns
-    -- There are no at the moment
-
-    filter_exp_tys (L _  _ :_) [] =
-      panic "filter_exp_tys: expected patterns more then expected pattern types"
-
-    drop_invis_pats (ExpForAllPatTy (Bndr _ Invisible{}) : pat_tys) = drop_invis_pats pat_tys
-    drop_invis_pats pat_tys = pat_tys
 
 tcInferPat :: FixedRuntimeRepContext
            -> HsMatchContext GhcTc
