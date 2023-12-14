@@ -401,7 +401,7 @@ match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
       | (tvs, theta, _) <- tcSplitSigmaTy ty  -- Invisible binders only!
       , not (null tvs && null theta)          -- Visible ones handled below
       = do { (wrap_gen, (wrap_res, result)) <- tcTopSkolemise ctx ty $ \imp_ty_pats ty' ->
-                      go (acc_arg_tys ++ reverse (map mkInvisExpPatType imp_ty_pats)) n ty'
+                      go (reverse (map mkInvisExpPatType imp_ty_pats) ++ acc_arg_tys) n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ coreView, so
