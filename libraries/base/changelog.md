@@ -35,6 +35,8 @@
 
   * Add more instances for `Compose`: `Fractional`, `RealFrac`, `Floating`, `RealFloat` ([CLC proposal #226](https://github.com/haskell/core-libraries-committee/issues/226))
 
+  * Treat all FDs as "nonblocking" on wasm32 ([CLC proposal #234](https://github.com/haskell/core-libraries-committee/issues/234))
+
 ## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.

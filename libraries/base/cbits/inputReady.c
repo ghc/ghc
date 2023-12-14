@@ -153,6 +153,9 @@ compute_WaitForSingleObject_timeout(bool infinite, Time remaining)
 int
 fdReady(int fd, bool write, int64_t msecs, bool isSock)
 {
+#if defined(wasm32_HOST_ARCH)
+    return 1;
+#else
     bool infinite = msecs < 0;
 
     // if we need to track the time then record the end time in case we are
@@ -477,4 +480,5 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
         }
     }
 #endif
+#endif // wasm32_HOST_ARCH
 }

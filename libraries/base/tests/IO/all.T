@@ -63,7 +63,7 @@ test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, ['']
 test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
 test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
 test('ioeGetHandle001',      normal, compile_and_run, ['-cpp'])
-test('isEOF001', [extra_run_opts('</dev/null'), when(arch('wasm32'), fragile(23275))], compile_and_run, [''])
+test('isEOF001', [extra_run_opts('</dev/null')], compile_and_run, [''])
 
 test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
      [''])
@@ -76,7 +76,7 @@ test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', js_broken(22261), compile_and_run, [''])
 test('openFile008', [cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
-test('openFile009', [when(arch('wasm32'), fragile(23284))], compile_and_run, [''])
+test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001', js_broken(22261), compile_and_run, [''])
@@ -155,7 +155,6 @@ test('encodingerror001', normal, compile_and_run, [''])
 
 # Requires use of the FD interface which is not supported under WINIO
 test('T4808', [when(opsys('mingw32'), skip)
-              , when(arch('wasm32'), fragile(23284))
               ,fragile_for(16909, concurrent_ways), exit_code(1)]
               , compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])

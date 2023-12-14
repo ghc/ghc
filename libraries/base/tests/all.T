@@ -175,9 +175,8 @@ test('T7457', normal, compile_and_run, [''])
 test('T7773',
      [when(opsys('mingw32'), skip),
       js_broken(22261),
-      expect_broken_for(23272, ['ghci-opt']), # unclear
-      when(arch('wasm32'),
-      fragile(23275))],
+      expect_broken_for(23272, ['ghci-opt']) # unclear
+     ],
      compile_and_run,
      [''])
 # Andreas says that T7773 will not (and should not) work on Windows
