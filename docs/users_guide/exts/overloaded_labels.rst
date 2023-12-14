@@ -91,4 +91,69 @@ showing how an overloaded label can be used as a record selector:
     example = #x (Point 1 2)
 
 
+Since GHC 9.6, any non-empty double quoted string can be used as a label. The
+restriction that the label must be a valid identifier has also been lifted.
 
+Examples of newly allowed syntax:
+
+- Leading capital letters: `#Foo` equivalant to `getLabel @"Foo"`
+
+- Numeric characters: `#3.14` equivalent to `getLabel @"3.14"`
+
+- Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
+
+Here is an example of the more permissive use of this extension, available since
+GHC 9.6:
+
+::
+
+    {-# LANGUAGE DataKinds             #-}
+    {-# LANGUAGE MultiParamTypeClasses #-}
+    {-# LANGUAGE OverloadedLabels      #-}
+    {-# LANGUAGE MagicHash             #-}
+
+    import Data.Foldable (traverse_)
+    import Data.Proxy (Proxy(..))
+    import GHC.OverloadedLabels (IsLabel(..))
+    import GHC.TypeLits (KnownSymbol, symbolVal)
+    import GHC.Prim (Addr#)
+
+    instance KnownSymbol symbol => IsLabel symbol String where
+      fromLabel = symbolVal (Proxy :: Proxy symbol)
+
+    (#) :: String -> Int -> String
+    (#) _ i = show i
+
+    f :: Addr# -> Int -> String
+    f _ i = show i
+
+    main :: IO ()
+    main = traverse_ putStrLn
+      [ #a
+      , #number17
+      , #do
+      , #type
+      , #Foo
+      , #3
+      , #199.4
+      , #17a23b
+      , #f'a'
+      , #'a'
+      , #'
+      , #''notTHSplice
+      , #...
+      , #привет
+      , #こんにちは
+      , #"3"
+      , #":"
+      , #"Foo"
+      , #"The quick brown fox"
+      , #"\""
+      , (++) #hello#world
+      , (++) #"hello"#"world"
+      , #"hello"# 1 -- equivalent to `(fromLabel @"hello") # 1`
+      , f "hello"#2 -- equivalent to `f ("hello"# :: Addr#) 2`
+      ]
+
+See `GHC Proposal #170 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0170-unrestricted-overloadedlabels.rst>`__
+for more details.
