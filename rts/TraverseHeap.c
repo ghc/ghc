@@ -1239,7 +1239,7 @@ inner_loop:
         traversePushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->bq, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->trec, c, sep, child_data);
-        switch (tso->why_blocked) {
+        switch (ACQUIRE_LOAD(&tso->why_blocked)) {
         case BlockedOnMVar:
         case BlockedOnMVarRead:
         case BlockedOnBlackHole:

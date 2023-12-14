@@ -1052,7 +1052,7 @@ trace_tso (MarkQueue *queue, StgTSO *tso)
     if (tso->label != NULL) {
         markQueuePushClosure_(queue, (StgClosure *) tso->label);
     }
-    switch (tso->why_blocked) {
+    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
     case BlockedOnBlackHole:

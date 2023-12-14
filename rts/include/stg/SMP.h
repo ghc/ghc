@@ -177,6 +177,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  *   - StgSmallMutArrPtrs: payload
  *   - StgThunk although this is a somewhat special case; see below
  *   - StgInd: indirectee
+ *   - StgTSO: block_info
  *
  * Finally, non-pointer fields can be safely mutated without barriers as
  * they do not refer to other memory locations. Technically, concurrent
@@ -304,6 +305,14 @@ EXTERN_INLINE void busy_wait_nop(void);
  * N.B. recordClosureMutated places a reference to the mutated object on
  * the capability-local mut_list. Consequently this does not require any memory
  * barrier.
+ *
+ * Barriers in thread blocking
+ * ---------------------------
+ * When a thread blocks (e.g. on an MVar) it will typically allocate a heap object
+ * to record its blocked-ness (e.g. a StgMVarTSOQueue), expose this via
+ * StgTSO.block_info, and update StgTSO.why_blocked to record the reason for
+ * its blocking. The visibility of the block_info is guaranteed by the ordering
+ * of the why_blocked update.
  *
  * Barriers in thread migration
  * ----------------------------

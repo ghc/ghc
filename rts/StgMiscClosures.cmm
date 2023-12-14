@@ -606,8 +606,8 @@ retry:
         if (r == 0) {
             goto retry;
         } else {
-            StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
             StgTSO_block_info(CurrentTSO) = msg;
+            %release StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
             jump stg_block_blackhole(node);
         }
     }

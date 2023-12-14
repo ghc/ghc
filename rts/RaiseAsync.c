@@ -266,7 +266,7 @@ check_target:
         return THROWTO_BLOCKED;
     }
 
-    status = target->why_blocked;
+    status = ACQUIRE_LOAD(&target->why_blocked);
 
     switch (status) {
     case NotBlocked:
@@ -728,7 +728,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   }
 
  done:
-  tso->why_blocked = NotBlocked;
+  RELAXED_STORE(&tso->why_blocked, NotBlocked);
   appendToRunQueue(cap, tso);
 }
 
