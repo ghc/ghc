@@ -426,7 +426,7 @@ match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-        do { let arg_pos = 1 + length (filterOut is_invis_pat_ty acc_arg_tys) -- for error messages only
+        do { let arg_pos = 1 + length (filterOut isExpForAllPatTyInvis acc_arg_tys) -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
            ; (wrap_res, result) <- go ((ExpFunPatTy $ Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
@@ -473,7 +473,7 @@ match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
     ------------
     defer :: [ExpPatType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
-      = do { let last_acc_arg_pos = length (filterOut is_invis_pat_ty acc_arg_tys)
+      = do { let last_acc_arg_pos = length (filterOut isExpForAllPatTyInvis acc_arg_tys)
            ; more_arg_tys <- mapM new_exp_arg_ty [last_acc_arg_pos + 1 .. last_acc_arg_pos + n]
            ; res_ty       <- newInferExpType
            ; result       <- thing_inside (reverse acc_arg_tys ++ map ExpFunPatTy more_arg_tys) res_ty
@@ -489,15 +489,12 @@ match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
       = mkScaled <$> newFlexiTyVarTy multiplicityTy
                  <*> newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
 
-    is_invis_pat_ty (ExpForAllPatTy (Bndr _ Invisible{})) = True
-    is_invis_pat_ty _                                     = False
-
     ------------
     mk_ctxt :: [ExpPatType] -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
-        arg_tys' = map prepare_arg_ty (reverse (filterOut is_invis_pat_ty arg_tys))
+        arg_tys' = map prepare_arg_ty (reverse (filterOut isExpForAllPatTyInvis arg_tys))
         prepare_arg_ty (ExpFunPatTy (Scaled u v)) = Anon (Scaled u (checkingExpType "matchExpectedFunTys" v)) visArgTypeLike
         prepare_arg_ty (ExpForAllPatTy tv)        = Named tv
             -- this is safe b/c we're called from "go"
@@ -1411,14 +1408,16 @@ deeplySkolemise skol_info ty
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
-      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTyBndr_maybe ty
+      | Just (arg_tys, bndrs, theta, ty') <- tcDeepSplitSigmaTyBndr_maybe ty
       = do { let arg_tys' = substScaledTys subst arg_tys
+           ; let tvs = binderVars bndrs
            ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
-           ; (subst', tvs1) <- tcInstSkolTyBindrVarsX skol_info subst tvs
+           ; (subst', bndrs1) <- tcInstSkolTyVarBndrsX skol_info subst bndrs
+           ; let tvs1 = binderVars bndrs1
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tv_prs1 = map (tyVarName . binderVar) tvs `zip` tvs1
-           ; return ( mkWpEta ids1 (mkWpTyLams (binderVars tvs1)
+           ; let tv_prs1 = map tyVarName tvs `zip` bndrs1
+           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
                                     <.> mkWpEvLams ev_vars1
                                     <.> wrap)
                     , tv_prs1  ++ tvs_prs2
@@ -1474,7 +1473,7 @@ tcDeepSplitSigmaTy_maybe = tcDeepSplit_maybe tcSplitSigmaTy
 
 tcDeepSplitSigmaTyBndr_maybe
   :: TcSigmaType -> Maybe ([Scaled TcType], [TcInvisTVBinder], ThetaType, TcSigmaType)
-tcDeepSplitSigmaTyBndr_maybe = tcDeepSplit_maybe tcSplitSigmaTyBindr
+tcDeepSplitSigmaTyBndr_maybe = tcDeepSplit_maybe tcSplitSigmaTyBndrs
 
 
 {- *********************************************************************

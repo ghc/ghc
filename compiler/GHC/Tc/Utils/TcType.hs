@@ -33,7 +33,7 @@ module GHC.Tc.Utils.TcType (
   mkCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
-  ExpPatType(..), mkInvisExpPatType,
+  ExpPatType(..), mkInvisExpPatType, isExpForAllPatTyInvis, isExpFunPatTy,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -76,7 +76,7 @@ module GHC.Tc.Utils.TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitAppTyNoView_maybe,
-  tcSplitSigmaTy, tcSplitSigmaTyBindr, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
+  tcSplitSigmaTy, tcSplitSigmaTyBndrs, tcSplitNestedSigmaTys, tcSplitIOType_maybe,
 
   ---------------------------------
   -- Predicates.
@@ -466,6 +466,14 @@ data ExpPatType =
 
 mkInvisExpPatType :: InvisTyBinder -> ExpPatType
 mkInvisExpPatType = ExpForAllPatTy . fmap Invisible
+
+isExpForAllPatTyInvis :: ExpPatType -> Bool
+isExpForAllPatTyInvis (ExpForAllPatTy (Bndr _ Invisible{})) = True
+isExpForAllPatTyInvis _ = False
+
+isExpFunPatTy :: ExpPatType -> Bool
+isExpFunPatTy ExpFunPatTy{}    = True
+isExpFunPatTy ExpForAllPatTy{} = False
 
 instance Outputable ExpPatType where
   ppr (ExpFunPatTy t) = ppr t
@@ -1438,8 +1446,8 @@ tcSplitSigmaTy ty = case tcSplitForAllInvisTyVars ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 
-tcSplitSigmaTyBindr :: Type -> ([TcInvisTVBinder], ThetaType, Type)
-tcSplitSigmaTyBindr ty = case tcSplitForAllInvisTVBinders ty of
+tcSplitSigmaTyBndrs :: Type -> ([TcInvisTVBinder], ThetaType, Type)
+tcSplitSigmaTyBndrs ty = case tcSplitForAllInvisTVBinders ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 

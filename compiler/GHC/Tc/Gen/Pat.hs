@@ -429,7 +429,10 @@ tc_tt_pat pat_ty penv (ParPat x pat) thing_inside = do
 tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
 tc_tt_pat (ExpForAllPatTy (Bndr tv Required))  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
 tc_tt_pat (ExpForAllPatTy (Bndr _tv Invisible{}))  _penv _pat _thing_inside
-  = panic "Patterns for invisible type binders aren't supported yet"
+  = panic "tc_tt_pat: invisible forall"
+      -- invisible foralls must have been filtered out
+      -- by drop_invis_pats in tcPats
+
 
 tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
 tc_forall_pat _ (EmbTyPat _ tp, tv) thing_inside

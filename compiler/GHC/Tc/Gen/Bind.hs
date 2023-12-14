@@ -625,7 +625,7 @@ tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id
                          , sig_ctxt  = ctxt
                          , sig_loc   = sig_loc })
-            (L bind_loc (FunBind { fun_id = (L nm_loc name)
+            (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 

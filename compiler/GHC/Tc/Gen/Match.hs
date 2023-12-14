@@ -82,7 +82,6 @@ import Control.Monad
 import Control.Arrow ( second )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
-import GHC.Types.Var
 
 {-
 ************************************************************************
@@ -299,15 +298,9 @@ tcMatch ctxt pat_tys rhs_ty match
     -- We filter out type patterns because we have no use for them in HsToCore.
     -- Type variable bindings have already been converted to HsWrappers.
     filter_out_type_pats :: [LPat GhcTc] -> [LPat GhcTc]
-    filter_out_type_pats = filterByList (map is_fun_pat_ty vis_pat_tys)
+    filter_out_type_pats = filterByList (map isExpFunPatTy vis_pat_tys)
       where
-        vis_pat_tys = filterOut is_inv_pat_ty pat_tys
-
-        is_inv_pat_ty (ExpForAllPatTy (Bndr _ Invisible{})) = True
-        is_inv_pat_ty _ = False
-
-        is_fun_pat_ty ExpFunPatTy{}    = True
-        is_fun_pat_ty ExpForAllPatTy{} = False
+        vis_pat_tys = filterOut isExpForAllPatTyInvis pat_tys
 
 -------------
 tcGRHSs :: AnnoBody body

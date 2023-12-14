@@ -19,7 +19,7 @@ module GHC.Tc.Utils.Instantiate (
 
      tcInstType, tcInstTypeBndrs,
      tcSkolemiseInvisibleBndrs,
-     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyBindrVarsX,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarBndrsX,
      tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
      freshenTyVarBndrs, freshenCoVarBndrsX,
@@ -183,13 +183,15 @@ topSkolemise skolem_info ty
 
     -- Why recursive?  See Note [Skolemisation]
     go subst wrap tv_prs ev_vars ty
-      | (tvs, theta, inner_ty) <- tcSplitSigmaTyBindr ty
+      | (bndrs, theta, inner_ty) <- tcSplitSigmaTyBndrs ty
+      , let tvs = binderVars bndrs
       , not (null tvs && null theta)
-      = do { (subst', tvs1) <- tcInstSkolTyBindrVarsX skolem_info subst tvs
+      = do { (subst', bndrs1) <- tcInstSkolTyVarBndrsX skolem_info subst bndrs
+           ; let tvs1 = binderVars bndrs1
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; go subst'
-                (wrap <.> mkWpTyLams (binderVars tvs1) <.> mkWpEvLams ev_vars1)
-                (tv_prs ++ (map (tyVarName . binderVar) tvs `zip` tvs1))
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1)
+                (tv_prs ++ (map tyVarName tvs `zip` bndrs1))
                 (ev_vars ++ ev_vars1)
                 inner_ty }
 
@@ -514,8 +516,8 @@ tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]
 tcInstSkolTyVarsX skol_info = tcInstSkolTyVarsPushLevel skol_info False
 
-tcInstSkolTyBindrVarsX :: SkolemInfo -> Subst -> [VarBndr TyCoVar vis] -> TcM (Subst, [VarBndr TyCoVar vis])
-tcInstSkolTyBindrVarsX skol_info subs bndrs = do
+tcInstSkolTyVarBndrsX :: SkolemInfo -> Subst -> [VarBndr TyCoVar vis] -> TcM (Subst, [VarBndr TyCoVar vis])
+tcInstSkolTyVarBndrsX skol_info subs bndrs = do
   (subst', bndrs') <- tcInstSkolTyVarsX skol_info subs (binderVars bndrs)
   pure (subst', zipWith mkForAllTyBinder flags bndrs')
   where
