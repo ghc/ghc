@@ -93,7 +93,8 @@ module GHC.Types.Var (
         mkForAllTyBinder, mkForAllTyBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
-        tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
+        tyVarSpecToBinder, tyVarSpecToBinders, filterInvisInferredTyBndrs,
+        tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs,
 
         -- ** ExportFlag
@@ -734,6 +735,9 @@ type ReqTVBinder    = VarBndr TyVar   ()
 
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ForAllTyFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
+
+filterInvisInferredTyBndrs :: [InvisTyBinder] -> [TcTyVar]
+filterInvisInferredTyBndrs = binderVars . filterOut (\bndr -> binderFlag bndr == InferredSpec)
 
 tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ForAllTyFlag
 tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)

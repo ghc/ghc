@@ -30,7 +30,7 @@ module GHC.Tc.Gen.Head
 
        , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcLExprWithTyVarsNC )
 
 import GHC.Prelude
 import GHC.Hs
@@ -87,6 +87,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import Control.Monad
+import GHC.Types.Var (filterInvisInferredTyBndrs)
 
 
 
@@ -984,17 +985,9 @@ tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc,
 tcExprSig ctxt expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id
-       ; (wrap, expr') <- check_expr poly_ty
+       ; (wrap, expr') <- tcSkolemiseScoped ctxt poly_ty $ \ty_vars rho_ty ->
+                          tcLExprWithTyVarsNC expr (filterInvisInferredTyBndrs ty_vars) (Check rho_ty)
        ; return (mkLHsWrap wrap expr', poly_ty) }
-    where
-      check_expr poly_ty = do
-        stv <- xoptM LangExt.ScopedTypeVariables
-        if stv then
-          tcSkolemiseScoped ctxt poly_ty $ \_ rho_ty ->
-          tcCheckMonoExprNC expr rho_ty
-        else
-          do { res <- tcCheckPolyExprNC expr poly_ty
-             ; pure (idHsWrapper, res)}
 
 tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint

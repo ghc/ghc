@@ -383,25 +383,26 @@ match_expected_fun_tys :: forall a.
                       ExpectedFunTyOrigin -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> Arity
-                    -> [ExpPatType] -- implicit, previously skolemised pattern types
+                    -> [TcTyVar] -- implicit, previously skolemised pattern types
                     -> ExpRhoType
                     -> ([ExpPatType] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (wrap, _)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-match_expected_fun_tys herald ctx arity imp_pat_tys orig_ty thing_inside
+match_expected_fun_tys herald ctx arity tv_vars orig_ty thing_inside
   = case orig_ty of    -- go collects pat tys in reversed order
-      Check ty -> go    (reverse imp_pat_tys) arity ty
-      _        -> defer (reverse imp_pat_tys) arity orig_ty
+      Check ty -> go    imp_pat_tys arity ty
+      _        -> defer imp_pat_tys arity orig_ty
   where
+    imp_pat_tys = reverse $ map mkInvisExpPatType tv_vars
     -- Skolemise any /invisible/ foralls /before/ the zero-arg case
     -- so that we guarantee to return a rho-type
     go acc_arg_tys n ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty  -- Invisible binders only!
       , not (null tvs && null theta)          -- Visible ones handled below
       = do { (wrap_gen, (wrap_res, result)) <- tcTopSkolemise ctx ty $ \imp_ty_pats ty' ->
-                      go (reverse (map mkInvisExpPatType imp_ty_pats) ++ acc_arg_tys) n ty'
+                      go (reverse (mkForAllPatTysFromSkolemised imp_ty_pats) ++ acc_arg_tys) n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ coreView, so
@@ -1560,16 +1561,16 @@ tcTopSkolemise ctxt expected_ty thing_inside
 
 -- | Variant of 'tcTopSkolemise' that takes an ExpType
 tcSkolemiseExpType :: UserTypeCtxt -> ExpSigmaType
-                   -> (ExpRhoType -> TcM result)
+                   -> ([TcInvisTVBinder] -> ExpRhoType -> TcM result)
                    -> TcM (HsWrapper, result)
 tcSkolemiseExpType _ et@(Infer {}) thing_inside
-  = (idHsWrapper, ) <$> thing_inside et
+  = (idHsWrapper, ) <$> thing_inside [] et
 tcSkolemiseExpType ctxt (Check ty) thing_inside
   = do { deep_subsumption <- xoptM LangExt.DeepSubsumption
        ; let skolemise | deep_subsumption = tcDeeplySkolemise
                        | otherwise        = tcTopSkolemise
-       ; skolemise ctxt ty $ \_ rho_ty ->
-         thing_inside (mkCheckExpType rho_ty) }
+       ; skolemise ctxt ty $ \ty_bndrs rho_ty ->
+         thing_inside ty_bndrs (Check rho_ty) }
 
 checkConstraints :: SkolemInfoAnon
                  -> [TcTyVar]           -- Skolems

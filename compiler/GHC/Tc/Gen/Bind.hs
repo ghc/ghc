@@ -633,7 +633,7 @@ tcPolyCheck prag_fn
        ; mult <- tcMultAnn (HsNoMultAnn noExtField)
        ; (wrap_gen, (wrap_res, matches'))
              <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
-                tcSkolemiseScoped ctxt (idType poly_id) $ \imp_ty_vars rho_ty ->
+                tcSkolemiseScoped ctxt (idType poly_id) $ \ty_vars rho_ty ->
                 -- Unwraps multiple layers; e.g
                 --    f :: forall a. Eq a => forall b. Ord b => blah
                 -- NB: tcSkolemiseScoped makes fresh type variables
@@ -646,7 +646,7 @@ tcPolyCheck prag_fn
 
                 setSrcSpanA bind_loc $
                 tc_matches_fun (L nm_loc (idName mono_id)) mult matches
-                            (map mkInvisExpPatType imp_ty_vars) (mkCheckExpType rho_ty)
+                            (filterInvisInferredTyBndrs ty_vars) (Check rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
        -- just so we have somewhere to put the SpecPrags.

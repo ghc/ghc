@@ -106,11 +106,11 @@ tcMatchesFun fun_name mult matches = tc_matches_fun fun_name mult matches []
 tc_matches_fun :: LocatedN Name -- MatchContext Id
              -> Mult -- The multiplicity of the binder
              -> MatchGroup GhcRn (LHsExpr GhcRn)
-             -> [ExpPatType]
+             -> [TcTyVar]
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
-tc_matches_fun fun_name mult matches implicit_pat_tys exp_ty
+tc_matches_fun fun_name mult matches ty_vars exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely
@@ -121,7 +121,7 @@ tc_matches_fun fun_name mult matches implicit_pat_tys exp_ty
         ; checkArgCounts what matches
 
         ; (wrapper, (mult_co_wrap, r)) <-
-            match_expected_fun_tys herald ctxt arity implicit_pat_tys exp_ty $ \ pat_tys rhs_ty ->
+            match_expected_fun_tys herald ctxt arity ty_vars exp_ty $ \ pat_tys rhs_ty ->
                -- NB: exp_type may be polymorphic, but
                --     matchExpectedFunTys can cope with that
             tcScalingUsage mult $
@@ -163,11 +163,21 @@ tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
 tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
               -> MatchGroup GhcRn (LHsExpr GhcRn)
-              -> ExpSigmaType
+              -> ExpRhoType
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
+  = tc_match_lambda herald match_ctxt match [] res_ty
+
+tc_match_lambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
+                -> TcMatchCtxt HsExpr
+                -> MatchGroup GhcRn (LHsExpr GhcRn)
+                -> [TcTyVar]
+                -> ExpRhoType
+                -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+tc_match_lambda herald match_ctxt match ty_vars res_ty
   =  do { checkArgCounts (mc_what match_ctxt) match
-        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
+        ; (wrapper, (mult_co_wrap, r)) <- match_expected_fun_tys herald GenSigCtxt n_pats ty_vars res_ty $
+            \ pat_tys rhs_ty ->
             -- checking argument counts since this is also used for \cases
             tcMatches match_ctxt pat_tys rhs_ty match
         ; return (wrapper <.> mult_co_wrap, r) }

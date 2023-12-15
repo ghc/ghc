@@ -33,7 +33,8 @@ module GHC.Tc.Utils.TcType (
   mkCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
-  ExpPatType(..), mkInvisExpPatType, isExpForAllPatTyInvis, isExpFunPatTy,
+  ExpPatType(..), mkInvisExpPatType, mkForAllPatTysFromSkolemised,
+  isExpForAllPatTyInvis, isExpFunPatTy,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -464,8 +465,11 @@ data ExpPatType =
     ExpFunPatTy    (Scaled ExpSigmaTypeFRR)   -- the type A of a function A -> B
   | ExpForAllPatTy ForAllTyBinder             -- the binder (a::A) of  forall (a::A) -> B or forall (a :: A). B
 
-mkInvisExpPatType :: InvisTyBinder -> ExpPatType
-mkInvisExpPatType = ExpForAllPatTy . fmap Invisible
+mkInvisExpPatType :: TcTyVar -> ExpPatType
+mkInvisExpPatType = ExpForAllPatTy . mkForAllTyBinder (Invisible SpecifiedSpec)
+
+mkForAllPatTysFromSkolemised :: [InvisTyBinder] -> [ExpPatType]
+mkForAllPatTysFromSkolemised = map mkInvisExpPatType . filterInvisInferredTyBndrs
 
 isExpForAllPatTyInvis :: ExpPatType -> Bool
 isExpForAllPatTyInvis (ExpForAllPatTy (Bndr _ Invisible{})) = True

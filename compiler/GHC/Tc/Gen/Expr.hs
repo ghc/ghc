@@ -20,7 +20,7 @@ module GHC.Tc.Gen.Expr
          tcCheckMonoExpr, tcCheckMonoExprNC,
          tcMonoExpr, tcMonoExprNC,
          tcInferRho, tcInferRhoNC,
-         tcPolyLExpr, tcPolyExpr, tcExpr,
+         tcPolyLExpr, tcPolyExpr, tcLExprWithTyVarsNC, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          ) where
@@ -90,6 +90,7 @@ import GHC.Utils.Panic
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
+import GHC.Types.Var (filterInvisInferredTyBndrs)
 
 {-
 ************************************************************************
@@ -176,11 +177,24 @@ tcInferRhoNC (L loc expr)
 ********************************************************************* -}
 
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
-tcPolyExpr (HsPar x expr) res_ty
-  = do { expr' <- tcPolyLExprNC expr res_ty
+tcPolyExpr expr res_ty
+  = do { traceTc "tcPolyExpr" (ppr res_ty)
+       ; (wrap, expr') <- tcSkolemiseExpType GenSigCtxt res_ty $ \bndrs res_ty ->
+                          tcExprWithTyVars expr (filterInvisInferredTyBndrs bndrs) res_ty
+       ; return $ mkHsWrap wrap expr' }
+
+tcLExprWithTyVarsNC :: LHsExpr GhcRn -> [TcTyVar] -> ExpRhoType -> TcM (LHsExpr GhcTc)
+tcLExprWithTyVarsNC (L loc expr) ty_vars res_ty
+  = setSrcSpanA loc    $
+    do { expr' <- tcExprWithTyVars expr ty_vars res_ty
+       ; return (L loc expr') }
+
+tcExprWithTyVars :: HsExpr GhcRn -> [TcTyVar] -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcExprWithTyVars (HsPar x expr) ty_vars res_ty
+  = do { expr' <- tcLExprWithTyVarsNC expr ty_vars res_ty
        ; return (HsPar x expr') }
 
-tcPolyExpr e@(HsLam x lam_variant matches) res_ty
+tcExprWithTyVars e@(HsLam x lam_variant matches) _ res_ty
   = do { (wrap, matches')
            <- tcMatchLambda herald match_ctxt matches res_ty
        ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
@@ -188,11 +202,9 @@ tcPolyExpr e@(HsLam x lam_variant matches) res_ty
     match_ctxt = MC { mc_what = LamAlt lam_variant, mc_body = tcBody }
     herald = ExpectedFunTyLam lam_variant e
 
-tcPolyExpr expr res_ty
-  = do { traceTc "tcPolyExpr" (ppr res_ty)
-       ; (wrap, expr') <- tcSkolemiseExpType GenSigCtxt res_ty $ \ res_ty ->
-                          tcExpr expr res_ty
-       ; return $ mkHsWrap wrap expr' }
+tcExprWithTyVars expr _ res_ty
+  = tcExpr expr res_ty
+
 
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 

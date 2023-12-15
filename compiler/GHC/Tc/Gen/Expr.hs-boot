@@ -3,7 +3,7 @@ import GHC.Hs              ( HsExpr, LHsExpr, SyntaxExprRn
                            , SyntaxExprTc )
 import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, TcSigmaTypeFRR
                            , SyntaxOpType
-                           , ExpType, ExpRhoType, ExpSigmaType )
+                           , ExpType, ExpRhoType, ExpSigmaType, TcTyVar )
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.Origin ( CtOrigin )
 import GHC.Core.Type ( Mult )
@@ -24,6 +24,8 @@ tcCheckMonoExpr, tcCheckMonoExprNC ::
        -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTc)
+
+tcLExprWithTyVarsNC :: LHsExpr GhcRn -> [TcTyVar] -> ExpRhoType -> TcM (LHsExpr GhcTc)
 
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
 tcExpr     :: HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
