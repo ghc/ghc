@@ -2,6 +2,7 @@
 
 ## 4.18.2.0 *January 2024*
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
+  * Improve String & IsString documentation.
 
 ## 4.18.1.0 *September 2023*
 
