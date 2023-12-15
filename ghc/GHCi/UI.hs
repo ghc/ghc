@@ -641,30 +641,27 @@ ghciLogAction lastErrLocations old_log_action
             _ -> return ()
         _ -> return ()
 
--- | Takes a file name and prefixes it with the appropriate
--- GHC appdir.
--- Uses ~/.ghc (getAppUserDataDirectory) if it exists
--- If it doesn't, then it uses $XDG_DATA_HOME/ghc
--- Earlier we always used to use ~/.ghc, but we want
--- to gradually move to $XDG_DATA_HOME to respect the XDG specification
---
--- As a migration strategy, we will only create new directories in
--- the appropriate XDG location. However, we will use the old directory
--- if it already exists.
-getAppDataFile :: FilePath -> IO (Maybe FilePath)
-getAppDataFile file = do
-    let new_path = tryIO (getXdgDirectory XdgConfig "ghc") >>= \case
-          Left _ -> pure Nothing
-          Right dir -> flip catchIO (const $ return Nothing) $ do
-            createDirectoryIfMissing False dir
-            pure $ Just $ dir </> file
-
-    e_old_path <- tryIO (getAppUserDataDirectory "ghc")
-    case e_old_path of
-      Right old_path -> doesDirectoryExist old_path >>= \case
-        True -> pure $ Just $ old_path </> file
-        False -> new_path
-      Left _ -> new_path
+-- | Takes a file name and prefixes it with the appropriate GHC appdir.
+-- ~/.ghc (getAppUserDataDirectory) is used if it exists, or XDG directories
+-- are used to respect the XDG specification.
+-- As a migration strategy, currently we will only create new directories in
+-- the appropriate XDG location.
+getAppDataFile :: XdgDirectory -> FilePath -> IO (Maybe FilePath)
+getAppDataFile xdgDir file = do
+  xdgAppDir <-
+    tryIO (getXdgDirectory xdgDir "ghc") >>= \case
+      Left _ -> pure Nothing
+      Right dir -> flip catchIO (const $ pure Nothing) $ do
+        createDirectoryIfMissing False dir
+        pure $ Just dir
+  appDir <-
+    tryIO (getAppUserDataDirectory "ghc") >>= \case
+      Right dir ->
+        doesDirectoryExist dir >>= \case
+          True -> pure $ Just dir
+          False -> pure xdgAppDir
+      Left _ -> pure xdgAppDir
+  pure $ appDir >>= \dir -> Just $ dir </> file
 
 runGHCi :: [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
@@ -672,13 +669,12 @@ runGHCi paths maybe_exprs = do
   let
    ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
-   app_user_dir = liftIO $ getAppDataFile "ghci.conf"
+   appDataCfg = liftIO $ getAppDataFile XdgConfig "ghci.conf"
 
-   home_dir = do
-    either_dir <- liftIO $ tryIO (getEnv "HOME")
-    case either_dir of
-      Right home -> return (Just (home </> ".ghci"))
-      _ -> return Nothing
+   homeCfg = do
+    liftIO $ tryIO (getEnv "HOME") >>= \case
+      Right home -> pure $ Just $ home </> ".ghci"
+      _ -> pure Nothing
 
    canonicalizePath' :: FilePath -> IO (Maybe FilePath)
    canonicalizePath' fp = liftM Just (canonicalizePath fp)
@@ -712,7 +708,7 @@ runGHCi paths maybe_exprs = do
     then pure []
     else do
       userCfgs <- do
-        paths <- catMaybes <$> sequence [ app_user_dir, home_dir ]
+        paths <- catMaybes <$> sequence [ appDataCfg, homeCfg ]
         checkedPaths <- liftIO $ filterM checkFileAndDirPerms paths
         liftIO . fmap (nub . catMaybes) $ mapM canonicalizePath' checkedPaths
 
@@ -799,12 +795,12 @@ runGHCiInput f = do
     dflags <- getDynFlags
     let ghciHistory = gopt Opt_GhciHistory dflags
     let localGhciHistory = gopt Opt_LocalGhciHistory dflags
-    currentDirectory <- liftIO $ getCurrentDirectory
+    currentDirectory <- liftIO getCurrentDirectory
 
     histFile <- case (ghciHistory, localGhciHistory) of
-      (True, True) -> return (Just (currentDirectory </> ".ghci_history"))
-      (True, _) -> liftIO $ getAppDataFile "ghci_history"
-      _ -> return Nothing
+      (True, True) -> pure $ Just $ currentDirectory </> ".ghci_history"
+      (True, _) -> liftIO $ getAppDataFile XdgData "ghci_history"
+      _ -> pure Nothing
 
     runInputT
         (setComplete ghciCompleteWord $ defaultSettings {historyFile = histFile})
