@@ -65,6 +65,7 @@
 /utils/iserv-proxy/               @angerman @simonmar
 /utils/iserv/                     @angerman @simonmar
 /utils/fs/                        @Phyx
+/utils/jsffi                      @TerrorJack
 
 [WinIO related code]
 /libraries/base/GHC/Event/Windows/                   @Phyx
