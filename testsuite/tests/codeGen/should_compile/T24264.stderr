@@ -1,0 +1,142 @@
+
+==================== Cmm produced by codegen ====================
+[T24264.fun1_entry() { //  [R2]
+         { info_tbls: [(cQO,
+                        label: T24264.fun1_info
+                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cQO: // global
+           _sQw::P64 = R2;   // CmmAssign
+           goto cQM;   // CmmBranch
+       cQM: // global
+           if ((old + 0) - <highSp> < SpLim) (likely: False) goto cQP; else goto cQQ;   // CmmCondBranch
+       cQP: // global
+           R2 = _sQw::P64;   // CmmAssign
+           R1 = T24264.fun1_closure;   // CmmAssign
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cQQ: // global
+           goto cQL;   // CmmBranch
+       cQL: // global
+           // slowCall
+           R1 = _sQw::P64;   // CmmAssign
+           call stg_ap_0_fast(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Cmm produced by codegen ====================
+[T24264.fun2_entry() { //  [R2]
+         { info_tbls: [(cQY,
+                        label: T24264.fun2_info
+                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cQY: // global
+           _sQz::P64 = R2;   // CmmAssign
+           goto cQW;   // CmmBranch
+       cQW: // global
+           if ((old + 0) - <highSp> < SpLim) (likely: False) goto cQZ; else goto cR0;   // CmmCondBranch
+       cQZ: // global
+           R2 = _sQz::P64;   // CmmAssign
+           R1 = T24264.fun2_closure;   // CmmAssign
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cR0: // global
+           goto cQV;   // CmmBranch
+       cQV: // global
+           // slowCall
+           R1 = _sQz::P64;   // CmmAssign
+           call stg_ap_0_fast(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Cmm produced by codegen ====================
+[T24264.fun3_entry() { //  [R2]
+         { info_tbls: [(cRb,
+                        label: T24264.fun3_info
+                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cRb: // global
+           _sQB::P64 = R2;   // CmmAssign
+           goto cR6;   // CmmBranch
+       cR6: // global
+           if ((old + 0) - <highSp> < SpLim) (likely: False) goto cRc; else goto cRd;   // CmmCondBranch
+       cRc: // global
+           R2 = _sQB::P64;   // CmmAssign
+           R1 = T24264.fun3_closure;   // CmmAssign
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cRd: // global
+           goto cR5;   // CmmBranch
+       cR5: // global
+           // slowCall
+           I64[(young<cR8> + 8)] = cR8;   // CmmStore
+           R1 = _sQB::P64;   // CmmAssign
+           call stg_ap_0_fast(R1) returns to cR8, args: 8, res: 8, upd: 8;   // CmmCall
+       cR8: // global
+           _sQD::P64 = R1;   // CmmAssign
+           // slow_call for _sQB::P64 with pat stg_ap_0
+           R1 = _sQD::P64;   // CmmAssign
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+
+
+==================== Cmm produced by codegen ====================
+[T24264.funPair_entry() { //  [R2]
+         { info_tbls: [(cRq,
+                        label: T24264.funPair_info
+                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       cRq: // global
+           _sQE::P64 = R2;   // CmmAssign
+           goto cRl;   // CmmBranch
+       cRl: // global
+           if ((old + 0) - <highSp> < SpLim) (likely: False) goto cRr; else goto cRs;   // CmmCondBranch
+       cRr: // global
+           R2 = _sQE::P64;   // CmmAssign
+           R1 = T24264.funPair_closure;   // CmmAssign
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cRs: // global
+           goto cRk;   // CmmBranch
+       cRk: // global
+           // slowCall
+           I64[(young<cRn> + 8)] = cRn;   // CmmStore
+           R1 = _sQE::P64;   // CmmAssign
+           call stg_ap_0_fast(R1) returns to cRn, args: 8, res: 8, upd: 8;   // CmmCall
+       cRn: // global
+           _sQG::P64 = R1;   // CmmAssign
+           // slow_call for _sQE::P64 with pat stg_ap_0
+           Hp = Hp + 24;   // CmmAssign
+           if (Hp > HpLim) (likely: False) goto cRv; else goto cRu;   // CmmCondBranch
+       cRv: // global
+           HpAlloc = 24;   // CmmAssign
+           goto cRt;   // CmmBranch
+       cRt: // global
+           R1 = _sQG::P64;   // CmmAssign
+           call stg_gc_unpt_r1(R1) returns to cRn, args: 8, res: 8, upd: 8;   // CmmCall
+       cRu: // global
+           // allocHeapClosure
+           I64[Hp - 16] = (,)_con_info;   // CmmStore
+           P64[Hp - 8] = _sQG::P64;   // CmmStore
+           P64[Hp] = _sQG::P64;   // CmmStore
+           _cRp::P64 = Hp - 15;   // CmmAssign
+           R1 = _cRp::P64;   // CmmAssign
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+

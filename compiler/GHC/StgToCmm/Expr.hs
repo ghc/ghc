@@ -570,6 +570,58 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 
+{-
+Note [Eliminate trivial Solo# continuations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have code like this:
+
+    case scrut of bndr {
+      alt -> Solo# bndr
+    }
+
+The RHS of the only branch does nothing except wrap the case-binder
+returned by 'scrut' in a unary unboxed tuple.  But unboxed tuples
+don't exist at run-time, i.e. the branch is a no-op!  So we can
+generate code as if we just had 'scrut' instead of a case-expression.
+
+This situation can easily arise for IO or ST code, where the last
+operation a function performs is commonly 'pure $! someExpr'.
+See also #24264 and !11778.  More concretely, as of December 2023,
+when building a stage2 "perf+no_profiled_libs" ghc:
+
+ * The special case is reached 398 times.
+ * Of these, 158 have scrutinees that call a function or enter a
+   potential thunk, and would need to push a useless stack frame if
+   not for this optimisation.
+
+We might consider rewriting such case expressions in GHC.Stg.CSE as a
+slight extension of Note [All alternatives are the binder].  But the
+RuntimeReps of 'bndr' and 'Solo# bndr' are not exactly the same, and
+per Note [Typing the STG language] in GHC.Stg.Lint, we do expect Stg
+code to remain RuntimeRep-correct.  So we just detect the situation in
+StgToCmm instead.
+
+Crucially, the return conventions for 'ty' and '(# ty #)' are compatible:
+The returned value is passed in the same register(s) or stack slot in
+both conventions, and the set of allowed return values for 'ty'
+is a subset of the allowed return values for '(# ty #)':
+
+ * For a lifted type 'ty', the return convention for 'ty' promises to
+   return an evaluated-properly-tagged heap pointer, while a return
+   type '(# ty #)' only promises to return a heap pointer to an object
+   that can be evaluated later if need be.
+
+ * If 'ty' is unlifted, the allowed return
+   values for 'ty' and '(# ty #)' are identical.
+-}
+
+cgCase scrut bndr _alt_type [GenStgAlt { alt_rhs = rhs}]
+  -- see Note [Eliminate trivial Solo# continuations]
+  | StgConApp dc _ [StgVarArg v] _ <- rhs
+  , isUnboxedTupleDataCon dc
+  , v == bndr
+  = cgExpr scrut
+
 cgCase scrut bndr alt_type alts
   = -- the general case
     do { platform <- getPlatform
