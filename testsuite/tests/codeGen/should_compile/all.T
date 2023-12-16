@@ -128,3 +128,5 @@ test('T21710a', [ unless(tables_next_to_code(), skip) , when(wordsize(32), skip)
                 , grep_errmsg('(call)',[1]) ]
                 , compile, ['-ddump-cmm -dno-typeable-binds'])
 test('T23002', normal, compile, ['-fregs-graph'])
+test('T24264', [req_cmm, grep_errmsg(r'(.*\().*(\) returns to)', [1,2])],
+     compile, ['-O -ddump-cmm-from-stg -dno-typeable-binds'])

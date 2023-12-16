@@ -240,3 +240,4 @@ test('MulMayOflo_full',
         ignore_stdout],
      multi_compile_and_run,
      ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
+test('T24264run', normal, compile_and_run, [''])
