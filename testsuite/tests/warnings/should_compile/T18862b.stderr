@@ -1,5 +1,5 @@
 
-T18862b.hs:7:9: warning: [GHC-12003] [-Wtype-equality-out-of-scope (in -Wcompat)]
+T18862b.hs:7:9: warning: [GHC-12003] [-Wtype-equality-out-of-scope (in -Wdefault)]
     • The ‘~’ operator is out of scope.
       Assuming it to stand for an equality constraint.
     • NB: ‘~’ used to be built-in syntax but now is a regular type operator

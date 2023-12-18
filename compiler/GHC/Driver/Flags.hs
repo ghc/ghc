@@ -953,7 +953,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
-        Opt_WarnDataKindsTC
+        Opt_WarnDataKindsTC,
+        Opt_WarnTypeEqualityOutOfScope
       ]
 
 -- | Things you get with -W
@@ -1002,10 +1003,7 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnNonCanonicalMonoidInstances
-      , Opt_WarnNonCanonicalMonadInstances
-      , Opt_WarnCompatUnqualifiedImports
-      , Opt_WarnTypeEqualityOutOfScope
+    = [ Opt_WarnCompatUnqualifiedImports
       , Opt_WarnImplicitRhsQuantification
       , Opt_WarnDeprecatedTypeAbstractions
       ]

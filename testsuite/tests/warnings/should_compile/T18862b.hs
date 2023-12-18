@@ -1,4 +1,4 @@
-{-# OPTIONS -Wcompat -Wno-error=type-equality-out-of-scope #-}
+{-# OPTIONS -Wno-error=type-equality-out-of-scope #-}
 
 module T18862b where
 

@@ -78,8 +78,12 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
+        * :ghc-flag:`-Wtype-equality-out-of-scope`
         * :ghc-flag:`-Wbadly-staged-types`
         * :ghc-flag:`-Winconsistent-flags`
+        * :ghc-flag:`-Wnoncanonical-monoid-instances`
+        * :ghc-flag:`-Wnoncanonical-monad-instances`
+        * :ghc-flag:`-Wdata-kinds-tc`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -165,10 +169,7 @@ as ``-Wno-...`` for every individual warning in the group.
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wnoncanonical-monoid-instances`
-        * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wcompat-unqualified-imports`
-        * :ghc-flag:`-Wtype-equality-out-of-scope`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
         * :ghc-flag:`-Wdeprecated-type-abstractions`
 
@@ -590,8 +591,6 @@ of ``-W(no-)*``.
      * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
 
-    This warning is  part of the :ghc-flag:`-Wcompat` option group.
-
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
     :shortdesc: *(deprecated)*
         warn when ``Monad`` or ``MonadFail`` instances have
@@ -634,8 +633,6 @@ of ``-W(no-)*``.
     Moreover, in ``Semigroup`` instance declarations:
 
      * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
-
-    This warning is  part of the :ghc-flag:`-Wcompat` option group.
 
 .. ghc-flag:: -Wmissing-monadfail-instances
     :shortdesc: *(deprecated)*
@@ -2375,6 +2372,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-type-equality-out-of-scope
 
     :since: 9.4.1
+    :default: on
 
     In accordance with `GHC Proposal #371
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`__,
@@ -2390,9 +2388,6 @@ of ``-W(no-)*``.
     The likely culprit is that you use :extension:`NoImplicitPrelude` and a
     custom Prelude. In this case, consider updating your custom Prelude to
     re-export ``~`` from ``Data.Type.Equality``.
-
-    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
-    default, but will be switched on in a future GHC release.
 
 .. ghc-flag:: -Wtype-equality-requires-operators
     :shortdesc: warn when type equality ``a ~ b`` is used despite being out of scope

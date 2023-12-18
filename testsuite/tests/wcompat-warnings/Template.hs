@@ -1,28 +1,13 @@
+{-# LANGUAGE DataKinds #-}
 module WCompatWarningsOnOff where
 
-import qualified Data.Semigroup as Semi
+import Data.Proxy
+import GHC.Types
+import Data.List
+import Data.Kind
 
--- -fwarn-noncanonical-monoid-instances
-newtype S = S Int
+type T1 = 'Nothing :: Maybe a
 
-instance Semi.Semigroup S where
-  (<>) = mappend
-
-instance Monoid S where
-  S a `mappend` S b = S (a+b)
-  mempty = S 0
-
-newtype M a = M a
-
-instance Functor M where
-  fmap = undefined
-
-instance Applicative M where
-  liftA2 = undefined
-  pure = return
-  (*>) = (>>)
-
-instance Monad M where
-  return = undefined
-  (>>=) = undefined
-  (>>) = undefined
+foo :: Maybe a -> Maybe a
+foo (Just @b x) = Just @b x
+foo _ = Nothing

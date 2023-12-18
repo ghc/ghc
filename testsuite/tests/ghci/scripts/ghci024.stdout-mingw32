@@ -16,7 +16,6 @@ other dynamic, non-language, flag settings:
   -fbreak-points
 warning settings:
   -Wcompat-unqualified-imports
-  -Wtype-equality-out-of-scope
   -Wimplicit-rhs-quantification
   -Wdeprecated-type-abstractions
 ~~~~~~~~~~ Testing :set -a
