@@ -134,8 +134,14 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
     # In --release-mode, the URL in the metadata needs to point into the downloads folder
     # rather then the pipeline.
     if release_mode:
+        # the test artifact is bundled with the source artifact, so it doesn't have its own job name
+        # So we must manually set the name of the bindist location
+        if artifact == test_artifact:
+            bindist_name = "testsuite"
+        else
+            bindist_name = fetch_gitlab.job_triple(artifact.job_name)
         final_url = release_base.format( version=version
-                                       , bindistName=urllib.parse.quote_plus(f"{fetch_gitlab.job_triple(artifact.job_name)}.tar.xz"))
+                                       , bindistName=urllib.parse.quote_plus(f"{bindist_name}.tar.xz"))
     else:
         final_url = url
 
