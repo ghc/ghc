@@ -702,65 +702,6 @@ tuple `t`, thus:
 See https://gitlab.haskell.org/ghc/ghc/wikis/strict-pragma for a more
 detailed explanation of the desugaring of strict bindings.
 
-Wrinkle 1: forcing linear variables
-
-Consider
-
-  let %1 !x = rhs in <body>
-==>
-  let x = rhs in x `seq` <body>
-
-In the desugared version x is used in both arguments of seq. This isn't
-recognised a linear. So we can't strictly speaking use seq. Instead, the code is
-really desugared as
-
-  let x = rhs in case x of x { _ -> <body> }
-
-The shadowing with the case-binder is crucial. The linear linter (see
-Note [Linting linearity] in GHC.Core.Lint) understands this as linear. This is
-what the seqVar function does.
-
-To be more precise, suppose x has multiplicity p, the fully annotated seqVar (in
-Core, p is really stored inside x) is
-
-  case x of %p x { _ -> <body> }
-
-In linear Core, case u of %p y { _ -> v } consumes u with multiplicity p, and
-makes y available with multiplicity p in v. Which is exactly what we want.
-
-Wrinkle 2: linear patterns
-
-Consider the following linear binding (linear lets are always non-recursive):
-
-  let
-     %1 f : g = rhs
-  in <body>
-
-The general case would desugar it to
-
-  let t = let tm = rhs
-              fm = case tm of fm:_ -> fm
-              gm = case tm of _:gm -> gm
-           in
-           (tm, fm, gm)
-
-  in let f = case t a of (_,fm,_) -> fm
-  in let g = case t a of (_,_,gm) -> gm
-  in let tm = case t a of (tm,_,_) -> tm
-  in tm `seq` <body>
-
-But all the case expression drop variables, which is prohibited by
-linearity. But because this is a non-recursive let (in particular we're
-desugaring a single binding), we can (and do) desugar the binding as a simple
-case-expression instead:
-
-  case rhs of {
-    (f:g) -> <body>
-  }
-
-This is handled by the special case: a non-recursive PatBind in
-GHC.HsToCore.Expr.ds_val_bind.
-
 Note [Strict binds checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are several checks around properly formed strict bindings. They

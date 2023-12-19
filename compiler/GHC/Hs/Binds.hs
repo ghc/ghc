@@ -1,4 +1,3 @@
-{-# LANGUAGE AllowAmbiguousTypes #-} -- used to pass the phase to ppr_mult_ann since MultAnn is a type family
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
@@ -138,10 +137,6 @@ type instance XPSB         (GhcPass idL) GhcRn = NameSet -- Post renaming, FVs. 
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
 type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
-
-type instance XMultAnn GhcPs = NoExtField
-type instance XMultAnn GhcRn = NoExtField
-type instance XMultAnn GhcTc = Mult
 
 -- ---------------------------------------------------------------------
 
@@ -513,16 +508,6 @@ plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
--- Used to print, for instance, let bindings:
---   let %1 x = …
-pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
-pprHsMultAnn HsNoMultAnn = empty
-pprHsMultAnn (HsPct1Ann _) = text "%1"
-pprHsMultAnn (HsMultAnn _ p) = text"%" <> ppr p
-
-ppr_mult_ann :: forall id. OutputableBndrId id => MultAnn (GhcPass id) -> SDoc
-ppr_mult_ann = pprHsMultAnn . mult_ann
-
 instance (OutputableBndrId pl, OutputableBndrId pr)
          => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where
     ppr mbind = ppr_monobind mbind
@@ -531,9 +516,8 @@ ppr_monobind :: forall idL idR.
                 (OutputableBndrId idL, OutputableBndrId idR)
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
-ppr_monobind (PatBind { pat_lhs = pat, pat_mult = mult_ann, pat_rhs = grhss })
-  = ppr_mult_ann @idL mult_ann
-    <+> pprPatBind pat grhss
+ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
+  = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun,

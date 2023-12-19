@@ -250,9 +250,6 @@ wrapBind new old body   -- NB: this function must deal with term
   | new==old    = body  -- variables, type variables or coercion variables
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
--- Used to force variables when desugaring strict binders. It's crucial that the
--- variable is shadowed by the case binder. See Wrinkle 1 in
--- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
 seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = mkDefaultCase (Var var) var body
 
@@ -754,7 +751,7 @@ mkSelectorBinds ticks pat ctx val_expr
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var val_var) ctx ManyTy pat'
+               = do { rhs_expr <- matchSimply (Var val_var) ctx pat'
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
@@ -769,7 +766,7 @@ mkSelectorBinds ticks pat ctx val_expr
   | otherwise                          -- General case (C)
   = do { tuple_var  <- newSysLocalDs ManyTy tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
-       ; tuple_expr <- matchSimply val_expr ctx ManyTy pat
+       ; tuple_expr <- matchSimply val_expr ctx pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
                = (binder, mkOptTickBox tick $

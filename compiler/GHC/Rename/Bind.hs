@@ -442,12 +442,11 @@ rnBindLHS :: NameMaker
           -- (i.e., any free variables of the pattern)
           -> RnM (HsBindLR GhcRn GhcPs)
 
-rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat, pat_mult = pat_mult })
+rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
   = do
       -- we don't actually use the FV processing of rnPatsAndThen here
       (pat',pat'_fvs) <- rnBindPat name_maker pat
-      (pat_mult', mult'_fvs) <- rnMultAnn pat_mult
-      return (bind { pat_lhs = pat', pat_ext = pat'_fvs `plusFV` mult'_fvs, pat_mult = pat_mult' })
+      return (bind { pat_lhs = pat', pat_ext = pat'_fvs })
                 -- We temporarily store the pat's FVs in bind_fvs;
                 -- gets updated to the FVs of the whole bind
                 -- when doing the RHS below
@@ -711,20 +710,6 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
            ; return env}
      }
 
-
--- | Multiplicity annotations are a simple wrapper around types. As such,
--- renaming them is a straightforward wrapper around 'rnLHsType'.
-rnHsMultAnn :: HsMultAnn GhcPs -> RnM (HsMultAnn GhcRn, FreeVars)
-rnHsMultAnn HsNoMultAnn = return $ (HsNoMultAnn, emptyFVs)
-rnHsMultAnn (HsPct1Ann x) = return $ (HsPct1Ann x, emptyFVs)
-rnHsMultAnn (HsMultAnn x p) = do
-  (p', freeVars') <- rnLHsType PatCtx p
-  return $ (HsMultAnn x p', freeVars')
-
-rnMultAnn :: MultAnn GhcPs -> RnM (MultAnn GhcRn, FreeVars)
-rnMultAnn (MultAnn{mult_ext=none, mult_ann=ann}) = do
-  (ann', freeVars') <- rnHsMultAnn ann
-  return $ (MultAnn{mult_ext=none, mult_ann=ann'}, freeVars')
 
 {- *********************************************************************
 *                                                                      *

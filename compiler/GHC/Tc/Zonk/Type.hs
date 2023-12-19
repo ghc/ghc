@@ -718,14 +718,11 @@ zonk_lbind = wrapLocZonkMA zonk_bind
 
 zonk_bind :: HsBind GhcTc -> ZonkTcM (HsBind GhcTc)
 zonk_bind bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
-                        , pat_mult = mult_ann
                         , pat_ext = (ty, ticks)})
   = do  { new_pat   <- don'tBind $ zonkPat pat            -- Env already extended
         ; new_grhss <- zonkGRHSs zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX ty
-        ; new_mult  <- onMultExt zonkTcTypeToTypeX mult_ann
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
-                       , pat_mult = new_mult
                        , pat_ext = (new_ty, ticks) }) }
 
 zonk_bind (VarBind { var_ext = x

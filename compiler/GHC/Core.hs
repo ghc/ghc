@@ -35,8 +35,6 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs,
 
-        mkBinds,
-
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
@@ -312,17 +310,6 @@ instance Ord AltCon where
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
   deriving Data
-
--- | Helper function. You can use the result of 'mkBinds' with 'mkLets' for
--- instance.
---
---   * @'mkBinds' 'Recursive' binds@ makes a single mutually-recursive
---     bindings with all the rhs/lhs pairs in @binds@
---   * @'mkBinds' 'NonRecursive' binds@ makes one non-recursive binding
---     for each rhs/lhs pairs in @binds@
-mkBinds :: RecFlag -> [(b, (Expr b))] -> [Bind b]
-mkBinds Recursive binds = [Rec binds]
-mkBinds NonRecursive binds = map (uncurry NonRec) binds
 
 {-
 Note [Literal alternatives]

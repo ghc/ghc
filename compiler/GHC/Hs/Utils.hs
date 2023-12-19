@@ -48,8 +48,7 @@ module GHC.Hs.Utils(
   mkMatchGroup, mkLamCaseMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
-  mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns,
-  mkHsWrapPat, mkLHsWrapPat, mkHsWrapPatCo,
+  mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
   mkHsCmdIf, mkConLikeTc,
 
@@ -793,9 +792,6 @@ mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 mkHsWrapPat :: HsWrapper -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = XPat $ CoPat co_fn p ty
-
-mkLHsWrapPat :: HsWrapper -> LPat GhcTc -> Type -> LPat GhcTc
-mkLHsWrapPat co_fn (L loc p) ty = L loc (mkHsWrapPat co_fn p ty)
 
 mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPatCo co pat ty | isReflCo co = pat
