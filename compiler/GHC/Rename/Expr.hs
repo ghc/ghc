@@ -359,7 +359,7 @@ rnExpr (HsUnboundVar _ v)
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel _ src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
-       ; return ( mkExpandedExpr (HsOverLabel noAnn src v) $
+       ; return ( mkExpandedExpr (HsOverLabel noExtField src v) $
                   HsAppType noExtField (genLHsVar from_label) hs_ty_arg
                 , fvs ) }
   where
@@ -383,7 +383,7 @@ rnExpr (HsOverLit x lit)
        ; case mb_neg of
               Nothing -> return (HsOverLit x lit', fvs)
               Just neg ->
-                 return (HsApp noComments (noLocA neg) (noLocA (HsOverLit x lit'))
+                 return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
 
 rnExpr (HsApp x fun arg)
@@ -688,9 +688,9 @@ rnSection section@(SectionL x expr op)
                         -- Note [Left and right sections]
         ; let rn_section = SectionL x expr' op'
               ds_section
-                | postfix_ops = HsApp noAnn op' expr'
+                | postfix_ops = HsApp noExtField op' expr'
                 | otherwise   = genHsApps leftSectionName
-                                   [wrapGenSpan $ HsApp noAnn op' expr']
+                                   [wrapGenSpan $ HsApp noExtField op' expr']
         ; return ( mkExpandedExpr rn_section ds_section
                  , fvs_op `plusFV` fvs_expr) }
 
@@ -2235,7 +2235,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
              (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
-             let expr = HsApp noComments (noLocA ret) tup
+             let expr = HsApp noExtField (noLocA ret) tup
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField

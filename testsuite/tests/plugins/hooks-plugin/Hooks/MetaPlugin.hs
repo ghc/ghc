@@ -36,7 +36,7 @@ fakeRunMeta opts (MetaE r) _ = do
   pure $ r zero
 
   where zero :: LHsExpr GhcPs
-        zero = noLocA $ HsLit noAnn $
+        zero = noLocA $ HsLit noExtField $
           HsInt NoExtField (mkIntegralLit (0 :: Int))
 
 fakeRunMeta _ _ _ = error "fakeRunMeta: unimplemented"

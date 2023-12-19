@@ -55,12 +55,8 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (EpAnn
-       (EpaSpan { T17544_kw.hs:(15,1)-(16,20) })
-       [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
-       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
-       (EpaComments
-        []))
+      [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
+      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:15:6-8 })
@@ -93,11 +89,7 @@
             (EpUniTok
              (EpaSpan { T17544_kw.hs:16:15-16 })
              (NormalSyntax))
-            (EpAnn
-             (EpaSpan { T17544_kw.hs:16:9-20 })
-             []
-             (EpaComments
-              [])))
+            [])
            (:|
             (L
              (EpAnn
@@ -130,11 +122,7 @@
              (EpaComments
               []))
             (HsTyVar
-             (EpAnn
-              (EpaSpan { T17544_kw.hs:16:18-20 })
-              []
-              (EpaComments
-               []))
+             []
              (NotPromoted)
              (L
               (EpAnn
@@ -169,12 +157,8 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (EpAnn
-       (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
-       [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
-       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
-       (EpaComments
-        []))
+      [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
+      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:18:9-11 })
@@ -206,11 +190,7 @@
            (EpUniTok
             (EpaSpan { T17544_kw.hs:19:15-16 })
             (NormalSyntax))
-           (EpAnn
-            (EpaSpan { T17544_kw.hs:19:9-26 })
-            []
-            (EpaComments
-             [])))
+           [])
           (:|
            (L
             (EpAnn
@@ -247,14 +227,10 @@
                (EpaComments
                 []))
               (HsTupleTy
-               (EpAnn
-                (EpaSpan { T17544_kw.hs:19:18-19 })
-                (AnnParen
-                 (AnnParens)
-                 (EpaSpan { T17544_kw.hs:19:18 })
-                 (EpaSpan { T17544_kw.hs:19:19 }))
-                (EpaComments
-                 []))
+               (AnnParen
+                (AnnParens)
+                (EpaSpan { T17544_kw.hs:19:18 })
+                (EpaSpan { T17544_kw.hs:19:19 }))
                (HsBoxedOrConstraintTuple)
                [])))])
           (L
@@ -265,11 +241,7 @@
             (EpaComments
              []))
            (HsTyVar
-            (EpAnn
-             (EpaSpan { T17544_kw.hs:19:24-26 })
-             []
-             (EpaComments
-              []))
+            []
             (NotPromoted)
             (L
              (EpAnn
@@ -305,12 +277,8 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       (EpAnn
-        (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
-        [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
-        (EpaComments
-         []))
+       [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
        (EpVirtualBraces
         (5))
        (NoAnnSortKey))
@@ -334,11 +302,7 @@
           (EpaComments
            []))
          (UserTyVar
-          (EpAnn
-           (EpaSpan { T17544_kw.hs:21:11 })
-           []
-           (EpaComments
-            []))
+          []
           (HsBndrRequired
            (NoExtField))
           (L
@@ -360,13 +324,9 @@
          (EpaComments
           []))
         (ClassOpSig
-         (EpAnn
-          (EpaSpan { T17544_kw.hs:24:5-18 })
-          (AnnSig
-           (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
-           [])
-          (EpaComments
-           []))
+         (AnnSig
+          (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
+          [])
          (False)
          [(L
            (EpAnn
@@ -396,11 +356,7 @@
              (EpaComments
               []))
             (HsTyVar
-             (EpAnn
-              (EpaSpan { T17544_kw.hs:24:18 })
-              []
-              (EpaComments
-               []))
+             []
              (NotPromoted)
              (L
               (EpAnn

@@ -1087,8 +1087,11 @@ instance (HasLoc a) => (HasLoc (Maybe a)) where
   getHasLoc Nothing = noSrcSpan
 
 instance HasLoc (EpAnn a) where
-  getHasLoc (EpAnn (EpaSpan l) _ _) = l
-  getHasLoc (EpAnn (EpaDelta _ _) _ _) = noSrcSpan
+  getHasLoc (EpAnn l _ _) = getHasLoc l
+
+instance HasLoc EpaLocation where
+  getHasLoc (EpaSpan l) = l
+  getHasLoc (EpaDelta _ _) = noSrcSpan
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
@@ -1187,8 +1190,8 @@ widenLocatedAn (EpAnn anc a cs) _as = EpAnn anc a cs
 epAnnAnns :: EpAnn [AddEpAnn] -> [AddEpAnn]
 epAnnAnns (EpAnn _ anns _) = anns
 
-annParen2AddEpAnn :: EpAnn AnnParen -> [AddEpAnn]
-annParen2AddEpAnn (EpAnn _ (AnnParen pt o c) _)
+annParen2AddEpAnn :: AnnParen -> [AddEpAnn]
+annParen2AddEpAnn (AnnParen pt o c)
   = [AddEpAnn ai o, AddEpAnn ac c]
   where
     (ai,ac) = parenTypeKws pt

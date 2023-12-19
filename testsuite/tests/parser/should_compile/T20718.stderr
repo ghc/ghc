@@ -114,11 +114,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { T20718.hs:8:1-5 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -158,11 +154,7 @@
                  (EpaComments
                   []))
                 (HsOverLit
-                 (EpAnn
-                  (EpaSpan { T20718.hs:8:5 })
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (NoExtField)
                  (OverLit
                   (NoExtField)
                   (HsIntegral

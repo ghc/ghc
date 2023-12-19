@@ -1042,12 +1042,12 @@ tcPatToExpr args pat = go pat
                                          ; return $ ExplicitSum noExtField alt arity
                                                                    (noLocA expr)
                                          }
-    go1 (LitPat _ lit)              = return $ HsLit noComments lit
+    go1 (LitPat _ lit)              = return $ HsLit noExtField lit
     go1 (NPat _ (L _ n) mb_neg _)
         | Just (SyntaxExprRn neg) <- mb_neg
                                     = return $ unLoc $ foldl' nlHsApp (noLocA neg)
-                                                       [noLocA (HsOverLit noAnn n)]
-        | otherwise                 = return $ HsOverLit noAnn n
+                                                       [noLocA (HsOverLit noExtField n)]
+        | otherwise                 = return $ HsOverLit noExtField n
     go1 (SplicePat (HsUntypedSpliceTop _ pat) _) = go1 pat
     go1 (SplicePat (HsUntypedSpliceNested _) _)  = panic "tcPatToExpr: invalid nested splice"
     go1 (EmbTyPat _ tp) = return $ HsEmbTy noExtField (hstp_to_hswc tp)
@@ -1061,7 +1061,7 @@ tcPatToExpr args pat = go pat
       Nothing      -> notInvertible p
       Just inverse ->
         fmap
-          (\ expr -> HsApp noAnn (wrapGenSpan inverse) (wrapGenSpan expr))
+          (\ expr -> HsApp noExtField (wrapGenSpan inverse) (wrapGenSpan expr))
           (go1 (unLoc pat))
 
     -- The following patterns are not invertible.

@@ -215,8 +215,8 @@ type AnnoBody body
     , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
     , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnn NoEpAnns
-    , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnCO
+    , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     )

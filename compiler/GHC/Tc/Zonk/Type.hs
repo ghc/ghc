@@ -864,7 +864,7 @@ zonkLTcSpecPrags ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
                => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
                -> MatchGroup GhcTc (LocatedA (body GhcTc))
                -> ZonkTcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -878,7 +878,7 @@ zonkMatchGroup zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty' origin
                      }) }
 
-zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (LMatch GhcTc (LocatedA (body GhcTc)))
@@ -889,7 +889,7 @@ zonkMatch zBody (L loc match@(Match { m_pats = pats
       ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnn NoEpAnns
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (GRHSs GhcTc (LocatedA (body GhcTc)))

@@ -92,11 +92,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -136,11 +132,7 @@
                  (EpaComments
                   []))
                 (HsOverLit
-                 (EpAnn
-                  (EpaSpan { ZeroWidthSemi.hs:6:5 })
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (NoExtField)
                  (OverLit
                   (NoExtField)
                   (HsIntegral

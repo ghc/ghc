@@ -57,6 +57,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
     showAstData' =
       generic
               `ext1Q` list
+              `extQ` list_addEpAnn
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
               `extQ` annotation
               `extQ` annotationModule
@@ -100,6 +101,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             bytestring :: B.ByteString -> SDoc
             bytestring = text . normalize_newlines . show
+
+            list_addEpAnn :: [AddEpAnn] -> SDoc
+            list_addEpAnn ls = case ba of
+              BlankEpAnnotations -> parens
+                                       $ text "blanked:" <+> text "[AddEpAnn]"
+              NoBlankEpAnnotations -> list ls
 
             list []    = brackets empty
             list [x]   = brackets (showAstData' x)

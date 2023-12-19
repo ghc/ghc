@@ -971,7 +971,7 @@ stubNestedSplice :: HsExpr GhcTc
 -- do a debug-print.  The warning is because this should never happen
 -- /except/ when doing debug prints.
 stubNestedSplice = warnPprTrace True "stubNestedSplice" empty $
-                   HsLit noComments (mkHsString "stubNestedSplice")
+                   HsLit noExtField (mkHsString "stubNestedSplice")
 
 
 {-
@@ -1002,7 +1002,7 @@ runAnnotation target expr = do
               ; let specialised_to_annotation_wrapper_expr
                       = L loc' (mkHsWrap wrapper
                                  (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
-              ; return (L loc' (HsApp noComments
+              ; return (L loc' (HsApp noExtField
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
 

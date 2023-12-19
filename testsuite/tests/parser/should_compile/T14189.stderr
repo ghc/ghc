@@ -77,11 +77,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   []
-                   (EpaComments
-                    []))
+                  []
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -160,11 +156,7 @@
                   (EpaComments
                    []))
                  (ConDeclField
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   []
-                   (EpaComments
-                    []))
+                  []
                   [(L
                     (EpAnn
                      (EpaSpan { T14189.hs:6:33 })
@@ -191,11 +183,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     []
-                     (EpaComments
-                      []))
+                    []
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -267,12 +255,8 @@
       (IEThingWith
        ((,)
         (Nothing)
-        (EpAnn
-         (EpaSpan { T14189.hs:3:3-8 })
-         [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
-         ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
-         (EpaComments
-          [])))
+        [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
+        ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))])
        (L
         (EpAnn
          (EpaSpan { T14189.hs:3:3-8 })

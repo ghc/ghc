@@ -210,8 +210,8 @@ captureLineSpacing ds = map (\(_,_,x) -> x) $ go (map to ds)
 -- ---------------------------------------------------------------------
 
 captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (HsWC xw ty))))
-  = (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc' rs') cs) ns (HsWC xw ty'))))
+captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig dc rs') ns (HsWC xw ty))))
+  = (L l (SigD x (TypeSig (AnnSig dc' rs') ns (HsWC xw ty'))))
   where
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty

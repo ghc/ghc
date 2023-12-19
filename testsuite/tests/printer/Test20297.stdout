@@ -80,11 +80,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { Test20297.hs:(5,1)-(7,7) })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -204,11 +200,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { Test20297.hs:(9,1)-(11,26) })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -318,11 +310,7 @@
                        (EpaComments
                         []))
                       (Match
-                       (EpAnn
-                        (EpaSpan { Test20297.hs:11:9-26 })
-                        []
-                        (EpaComments
-                         []))
+                       []
                        (FunRhs
                         (L
                          (EpAnn
@@ -362,17 +350,13 @@
                              (EpaComments
                               []))
                             (HsDo
-                             (EpAnn
-                              (EpaSpan { Test20297.hs:11:19-26 })
-                              (AnnList
-                               (Just
-                                (EpaSpan { Test20297.hs:11:22-26 }))
-                               (Nothing)
-                               (Nothing)
-                               [(AddEpAnn AnnDo (EpaSpan { Test20297.hs:11:19-20 }))]
-                               [])
-                              (EpaComments
-                               []))
+                             (AnnList
+                              (Just
+                               (EpaSpan { Test20297.hs:11:22-26 }))
+                              (Nothing)
+                              (Nothing)
+                              [(AddEpAnn AnnDo (EpaSpan { Test20297.hs:11:19-20 }))]
+                              [])
                              (DoExpr
                               (Nothing))
                              (L
@@ -503,11 +487,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -615,11 +595,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -723,11 +699,7 @@
                        (EpaComments
                         []))
                       (Match
-                       (EpAnn
-                        (EpaSpan { Test20297.ppr.hs:9:7-24 })
-                        []
-                        (EpaComments
-                         []))
+                       []
                        (FunRhs
                         (L
                          (EpAnn
@@ -767,17 +739,13 @@
                              (EpaComments
                               []))
                             (HsDo
-                             (EpAnn
-                              (EpaSpan { Test20297.ppr.hs:9:17-24 })
-                              (AnnList
-                               (Just
-                                (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                               (Nothing)
-                               (Nothing)
-                               [(AddEpAnn AnnDo (EpaSpan { Test20297.ppr.hs:9:17-18 }))]
-                               [])
-                              (EpaComments
-                               []))
+                             (AnnList
+                              (Just
+                               (EpaSpan { Test20297.ppr.hs:9:20-24 }))
+                              (Nothing)
+                              (Nothing)
+                              [(AddEpAnn AnnDo (EpaSpan { Test20297.ppr.hs:9:17-18 }))]
+                              [])
                              (DoExpr
                               (Nothing))
                              (L

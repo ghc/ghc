@@ -43,11 +43,7 @@
     (SigD
      (NoExtField)
      (FixSig
-      (EpAnn
-       (EpaSpan { T20846.hs:3:1-11 })
-       [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
-       (EpaComments
-        []))
+      [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
       (FixitySig
        (NoExtField)
        [(L
@@ -105,11 +101,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { T20846.hs:4:1-18 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn

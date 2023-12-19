@@ -129,7 +129,7 @@ data SyntaxExprTc = SyntaxExprTc { syn_expr      :: HsExpr GhcTc
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
-noExpr = HsLit noComments (HsString (SourceText $ fsLit "noExpr") (fsLit "noExpr"))
+noExpr = HsLit noExtField (HsString (SourceText $ fsLit "noExpr") (fsLit "noExpr"))
 
 noSyntaxExpr :: forall p. IsPass p => SyntaxExpr (GhcPass p)
                               -- Before renaming, and sometimes after
@@ -185,10 +185,10 @@ data HsBracketTc = HsBracketTc
                                         -- pasted back in by the desugarer
   }
 
-type instance XTypedBracket GhcPs = EpAnn [AddEpAnn]
+type instance XTypedBracket GhcPs = [AddEpAnn]
 type instance XTypedBracket GhcRn = NoExtField
 type instance XTypedBracket GhcTc = HsBracketTc
-type instance XUntypedBracket GhcPs = EpAnn [AddEpAnn]
+type instance XUntypedBracket GhcPs = [AddEpAnn]
 type instance XUntypedBracket GhcRn = [PendingRnSplice] -- See Note [Pending Splices]
                                                         -- Output of the renamer is the *original* renamed expression,
                                                         -- plus _renamed_ splices to be type checked
@@ -220,15 +220,15 @@ type instance XRecSel              GhcTc = NoExtField
 
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XOverLabel     GhcPs = EpAnnCO
-type instance XOverLabel     GhcRn = EpAnnCO
+type instance XOverLabel     GhcPs = NoExtField
+type instance XOverLabel     GhcRn = NoExtField
 type instance XOverLabel     GhcTc = DataConCantHappen
 
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
 
-type instance XUnboundVar    GhcPs = EpAnn (Maybe EpAnnUnboundVar)
+type instance XUnboundVar    GhcPs = Maybe EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
   -- We really don't need the whole HoleExprRef; just the IORef EvTerm
@@ -236,13 +236,13 @@ type instance XUnboundVar    GhcTc = HoleExprRef
   -- Much, much easier just to define HoleExprRef with a Data instance and
   -- store the whole structure.
 
-type instance XIPVar         GhcPs = EpAnnCO
-type instance XIPVar         GhcRn = EpAnnCO
+type instance XIPVar         GhcPs = NoExtField
+type instance XIPVar         GhcRn = NoExtField
 type instance XIPVar         GhcTc = DataConCantHappen
-type instance XOverLitE      (GhcPass _) = EpAnnCO
-type instance XLitE          (GhcPass _) = EpAnnCO
-type instance XLam           (GhcPass _) = EpAnn [AddEpAnn]
-type instance XApp           (GhcPass _) = EpAnnCO
+type instance XOverLitE      (GhcPass _) = NoExtField
+type instance XLitE          (GhcPass _) = NoExtField
+type instance XLam           (GhcPass _) = [AddEpAnn]
+type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField
@@ -250,21 +250,21 @@ type instance XAppTypeE      GhcTc = Type
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XOpApp         GhcPs = EpAnn [AddEpAnn]
+type instance XOpApp         GhcPs = [AddEpAnn]
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = DataConCantHappen
 
 -- SectionL, SectionR not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XSectionL      GhcPs = EpAnnCO
-type instance XSectionR      GhcPs = EpAnnCO
-type instance XSectionL      GhcRn = EpAnnCO
-type instance XSectionR      GhcRn = EpAnnCO
+type instance XSectionL      GhcPs = NoExtField
+type instance XSectionR      GhcPs = NoExtField
+type instance XSectionL      GhcRn = NoExtField
+type instance XSectionR      GhcRn = NoExtField
 type instance XSectionL      GhcTc = DataConCantHappen
 type instance XSectionR      GhcTc = DataConCantHappen
 
 
-type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
+type instance XNegApp        GhcPs = [AddEpAnn]
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
@@ -272,23 +272,23 @@ type instance XPar           GhcPs = (EpToken "(", EpToken ")")
 type instance XPar           GhcRn = NoExtField
 type instance XPar           GhcTc = NoExtField
 
-type instance XExplicitTuple GhcPs = EpAnn [AddEpAnn]
+type instance XExplicitTuple GhcPs = [AddEpAnn]
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
-type instance XExplicitSum   GhcPs = EpAnn AnnExplicitSum
+type instance XExplicitSum   GhcPs = AnnExplicitSum
 type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
-type instance XCase          GhcPs = EpAnn EpAnnHsCase
+type instance XCase          GhcPs = EpAnnHsCase
 type instance XCase          GhcRn = HsMatchContextRn
 type instance XCase          GhcTc = HsMatchContextRn
 
-type instance XIf            GhcPs = EpAnn AnnsIf
+type instance XIf            GhcPs = AnnsIf
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
-type instance XMultiIf       GhcPs = EpAnn [AddEpAnn]
+type instance XMultiIf       GhcPs = [AddEpAnn]
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
@@ -296,11 +296,11 @@ type instance XLet           GhcPs = (EpToken "let", EpToken "in")
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = EpAnn AnnList
+type instance XDo            GhcPs = AnnList
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = EpAnn AnnList
+type instance XExplicitList  GhcPs = AnnList
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -311,11 +311,11 @@ type instance XExplicitList  GhcTc = Type
 -- See Note [Handling overloaded and rebindable constructs]
 -- in  GHC.Rename.Expr
 
-type instance XRecordCon     GhcPs = EpAnn [AddEpAnn]
+type instance XRecordCon     GhcPs = [AddEpAnn]
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
-type instance XRecordUpd     GhcPs = EpAnn [AddEpAnn]
+type instance XRecordUpd     GhcPs = [AddEpAnn]
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = DataConCantHappen
   -- We desugar record updates in the typechecker.
@@ -347,29 +347,29 @@ type instance XLHsRecUpdLabels GhcTc = DataConCantHappen
 
 type instance XLHsOLRecUpdLabels p = NoExtField
 
-type instance XGetField     GhcPs = EpAnnCO
+type instance XGetField     GhcPs = NoExtField
 type instance XGetField     GhcRn = NoExtField
 type instance XGetField     GhcTc = DataConCantHappen
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XProjection     GhcPs = EpAnn AnnProjection
+type instance XProjection     GhcPs = AnnProjection
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = DataConCantHappen
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XExprWithTySig GhcPs = EpAnn [AddEpAnn]
+type instance XExprWithTySig GhcPs = [AddEpAnn]
 type instance XExprWithTySig GhcRn = NoExtField
 type instance XExprWithTySig GhcTc = NoExtField
 
-type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
+type instance XArithSeq      GhcPs = [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
+type instance XProc          (GhcPass _) = [AddEpAnn]
 
-type instance XStatic        GhcPs = EpAnn [AddEpAnn]
+type instance XStatic        GhcPs = [AddEpAnn]
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = (NameSet, Type)
   -- Free variables and type of expression, this is stored for convenience as wiring in
@@ -428,10 +428,10 @@ instance NoAnn AnnsIf where
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = (EpAnn AnnPragma, SourceText)
+type instance XSCC           (GhcPass _) = (AnnPragma, SourceText)
 type instance XXPragE        (GhcPass _) = DataConCantHappen
 
-type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
+type instance XCDotFieldOcc (GhcPass _) = AnnFieldLabel
 type instance XXDotFieldOcc (GhcPass _) = DataConCantHappen
 
 type instance XPresent         (GhcPass _) = NoExtField
@@ -1240,28 +1240,28 @@ names 'getField' and 'setField' are whatever in-scope names they are.
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = EpAnn AddEpAnn
+type instance XCmdArrApp  GhcPs = AddEpAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = EpAnn AnnList
+type instance XCmdArrForm GhcPs = AnnList
 type instance XCmdArrForm GhcRn = NoExtField
 type instance XCmdArrForm GhcTc = NoExtField
 
-type instance XCmdApp     (GhcPass _) = EpAnnCO
+type instance XCmdApp     (GhcPass _) = NoExtField
 type instance XCmdLam     (GhcPass _) = NoExtField
 
 type instance XCmdPar     GhcPs = (EpToken "(", EpToken ")")
 type instance XCmdPar     GhcRn = NoExtField
 type instance XCmdPar     GhcTc = NoExtField
 
-type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
+type instance XCmdCase    GhcPs = EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
 type instance XCmdCase    GhcTc = NoExtField
 
-type instance XCmdLamCase (GhcPass _) = EpAnn [AddEpAnn]
+type instance XCmdLamCase (GhcPass _) = [AddEpAnn]
 
-type instance XCmdIf      GhcPs = EpAnn AnnsIf
+type instance XCmdIf      GhcPs = AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
@@ -1269,7 +1269,7 @@ type instance XCmdLet     GhcPs = (EpToken "let", EpToken "in")
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = EpAnn AnnList
+type instance XCmdDo      GhcPs = AnnList
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
@@ -1463,7 +1463,7 @@ data MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
 
-type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
+type instance XCMatch (GhcPass _) b = [AddEpAnn]
 type instance XXMatch (GhcPass _) b = DataConCantHappen
 
 instance (OutputableBndrId pr, Outputable body)
@@ -1649,7 +1649,7 @@ data RecStmtTc =
 
 type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XBindStmt        (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
+type instance XBindStmt        (GhcPass _) GhcPs b = [AddEpAnn]
 type instance XBindStmt        (GhcPass _) GhcRn b = XBindStmtRn
 type instance XBindStmt        (GhcPass _) GhcTc b = XBindStmtTc
 
@@ -1673,17 +1673,17 @@ type instance XBodyStmt        (GhcPass _) GhcPs b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcTc b = Type
 
-type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpAnn [AddEpAnn]
+type instance XLetStmt         (GhcPass _) (GhcPass _) b = [AddEpAnn]
 
 type instance XParStmt         (GhcPass _) GhcPs b = NoExtField
 type instance XParStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XParStmt         (GhcPass _) GhcTc b = Type
 
-type instance XTransStmt       (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
+type instance XTransStmt       (GhcPass _) GhcPs b = [AddEpAnn]
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn AnnList
+type instance XRecStmt         (GhcPass _) GhcPs b = AnnList
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
@@ -1892,17 +1892,17 @@ data HsUntypedSpliceResult thing  -- 'thing' can be HsExpr or HsType
       }
   | HsUntypedSpliceNested SplicePointName -- A unique name to identify this splice point
 
-type instance XTypedSplice   GhcPs = (EpAnnCO, EpAnn [AddEpAnn])
+type instance XTypedSplice   GhcPs = [AddEpAnn]
 type instance XTypedSplice   GhcRn = SplicePointName
 type instance XTypedSplice   GhcTc = DelayedSplice
 
-type instance XUntypedSplice GhcPs = EpAnnCO
+type instance XUntypedSplice GhcPs = NoExtField
 type instance XUntypedSplice GhcRn = HsUntypedSpliceResult (HsExpr GhcRn)
 type instance XUntypedSplice GhcTc = DataConCantHappen
 
 -- HsUntypedSplice
-type instance XUntypedSpliceExpr GhcPs = EpAnn [AddEpAnn]
-type instance XUntypedSpliceExpr GhcRn = EpAnn [AddEpAnn]
+type instance XUntypedSpliceExpr GhcPs = [AddEpAnn]
+type instance XUntypedSpliceExpr GhcRn = [AddEpAnn]
 type instance XUntypedSpliceExpr GhcTc = DataConCantHappen
 
 type instance XQuasiQuote        p = NoExtField
@@ -2322,26 +2322,26 @@ type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
   = SrcSpanAnnL
-type instance Anno (HsCmdTop (GhcPass p)) = EpAnn NoEpAnns
+type instance Anno (HsCmdTop (GhcPass p)) = EpAnnCO
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = EpAnn NoEpAnns
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = EpAnn NoEpAnns
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = EpAnnCO
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = EpAnnCO
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA
 
 type instance Anno (HsUntypedSplice (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr))))] = SrcSpanAnnL
 
-type instance Anno (FieldLabelStrings (GhcPass p)) = EpAnn NoEpAnns
+type instance Anno (FieldLabelStrings (GhcPass p)) = EpAnnCO
 type instance Anno FieldLabelString                = SrcSpanAnnN
 
-type instance Anno FastString                      = EpAnn NoEpAnns
+type instance Anno FastString                      = EpAnnCO
   -- Used in HsQuasiQuote and perhaps elsewhere
 
-type instance Anno (DotFieldOcc (GhcPass p))       = EpAnn NoEpAnns
+type instance Anno (DotFieldOcc (GhcPass p))       = EpAnnCO
 
 instance (HasAnnotation (Anno a))
    => WrapXRec (GhcPass p) a where

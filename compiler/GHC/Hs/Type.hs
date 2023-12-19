@@ -305,8 +305,8 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = EpAnn [AddEpAnn]
-type instance XKindedTyVar  (GhcPass _) = EpAnn [AddEpAnn]
+type instance XUserTyVar    (GhcPass _) = [AddEpAnn]
+type instance XKindedTyVar  (GhcPass _) = [AddEpAnn]
 
 type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 
@@ -349,17 +349,17 @@ type instance XXBndrVis (GhcPass _) = DataConCantHappen
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = EpAnn [AddEpAnn]
+type instance XTyVar           (GhcPass _) = [AddEpAnn]
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = EpAnnCO
-type instance XListTy          (GhcPass _) = EpAnn AnnParen
-type instance XTupleTy         (GhcPass _) = EpAnn AnnParen
-type instance XSumTy           (GhcPass _) = EpAnn AnnParen
-type instance XOpTy            (GhcPass _) = EpAnn [AddEpAnn]
-type instance XParTy           (GhcPass _) = EpAnn AnnParen
-type instance XIParamTy        (GhcPass _) = EpAnn [AddEpAnn]
+type instance XFunTy           (GhcPass _) = NoExtField
+type instance XListTy          (GhcPass _) = AnnParen
+type instance XTupleTy         (GhcPass _) = AnnParen
+type instance XSumTy           (GhcPass _) = AnnParen
+type instance XOpTy            (GhcPass _) = [AddEpAnn]
+type instance XParTy           (GhcPass _) = AnnParen
+type instance XIParamTy        (GhcPass _) = [AddEpAnn]
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = EpAnn [AddEpAnn]
+type instance XKindSig         (GhcPass _) = [AddEpAnn]
 
 type instance XAppKindTy       GhcPs = EpToken "@"
 type instance XAppKindTy       GhcRn = NoExtField
@@ -369,18 +369,18 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = EpAnn [AddEpAnn]
-type instance XBangTy          (GhcPass _) = EpAnn [AddEpAnn]
+type instance XDocTy           (GhcPass _) = [AddEpAnn]
+type instance XBangTy          (GhcPass _) = [AddEpAnn]
 
-type instance XRecTy           GhcPs = EpAnn AnnList
+type instance XRecTy           GhcPs = AnnList
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 
-type instance XExplicitListTy  GhcPs = EpAnn [AddEpAnn]
+type instance XExplicitListTy  GhcPs = [AddEpAnn]
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = EpAnn [AddEpAnn]
+type instance XExplicitTupleTy GhcPs = [AddEpAnn]
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 
@@ -470,7 +470,7 @@ pprHsArrow (HsUnrestrictedArrow _) = pprArrowWithMultiplicity visArgTypeLike (Le
 pprHsArrow (HsLinearArrow _)       = pprArrowWithMultiplicity visArgTypeLike (Left True)
 pprHsArrow (HsExplicitMult _ p)    = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
 
-type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
+type instance XConDeclField  (GhcPass _) = [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
@@ -615,15 +615,12 @@ splitHsFunType ty = go ty
       = let
           (anns, cs, args, res) = splitHsFunType ty
           anns' = anns ++ annParen2AddEpAnn an
-          cs' = cs S.<> epAnnComments l S.<> epAnnComments an
+          cs' = cs S.<> epAnnComments l
         in (anns', cs', args, res)
 
-    go (L ll (HsFunTy (EpAnn _ _ cs) mult x y))
+    go (L ll (HsFunTy _ mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> epAnnComments ll, HsScaled mult x':args, res)
-      where
-        L l t = x
-        x' = L (addCommentsToEpAnn l cs) t
+      = (anns, csy S.<> epAnnComments ll, HsScaled mult x:args, res)
 
     go other = ([], emptyComments, [], other)
 
@@ -1483,7 +1480,7 @@ type instance Anno (HsTyVarBndr _flag GhcRn) = SrcSpanAnnA
 type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
-type instance Anno HsIPName = EpAnn NoEpAnns
+type instance Anno HsIPName = EpAnnCO
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA

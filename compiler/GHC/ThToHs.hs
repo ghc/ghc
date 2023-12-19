@@ -1028,9 +1028,9 @@ cvtl e = wrapLA (cvt e)
     cvt (VarE s)   = do { s' <- vName s; wrapParLA (HsVar noExtField) s' }
     cvt (ConE s)   = do { s' <- cName s; wrapParLA (HsVar noExtField) s' }
     cvt (LitE l)
-      | overloadedLit l = go cvtOverLit (HsOverLit noComments)
+      | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)
-      | otherwise       = go cvtLit (HsLit noComments)
+      | otherwise       = go cvtLit (HsLit noExtField)
                              (hsLitNeedsParens appPrec)
       where
         go :: (Lit -> CvtM (l GhcPs))
@@ -1043,7 +1043,7 @@ cvtl e = wrapLA (cvt e)
           if is_compound_lit l' then wrapParLA gHsPar e' else pure e'
     cvt (AppE e1 e2)   = do { e1' <- parenthesizeHsExpr opPrec <$> cvtl e1
                             ; e2' <- parenthesizeHsExpr appPrec <$> cvtl e2
-                            ; return $ HsApp noComments e1' e2' }
+                            ; return $ HsApp noExtField e1' e2' }
     cvt (AppTypeE e t) = do { e' <- parenthesizeHsExpr opPrec <$> cvtl e
                             ; t' <- parenthesizeHsType appPrec <$> cvtType t
                             ; return $ HsAppType noAnn e'
@@ -1090,7 +1090,7 @@ cvtl e = wrapLA (cvt e)
                             ; return $ ArithSeq noAnn Nothing dd' }
     cvt (ListE xs)
       | Just s <- allCharLs xs       = do { l' <- cvtLit (StringL s)
-                                          ; return (HsLit noComments l') }
+                                          ; return (HsLit noExtField l') }
              -- Note [Converting strings]
       | otherwise       = do { xs' <- mapM cvtl xs
                              ; return $ ExplicitList noAnn xs'
@@ -1112,12 +1112,12 @@ cvtl e = wrapLA (cvt e)
     cvt (InfixE Nothing  s (Just y)) = ensureValidOpExp s $
                                        do { s' <- cvtl s; y' <- cvtl y
                                           ; wrapParLA gHsPar $
-                                                          SectionR noComments s' y' }
+                                                          SectionR noExtField s' y' }
                                             -- See Note [Sections in HsSyn] in GHC.Hs.Expr
     cvt (InfixE (Just x) s Nothing ) = ensureValidOpExp s $
                                        do { x' <- cvtl x; s' <- cvtl s
                                           ; wrapParLA gHsPar $
-                                                          SectionL noComments x' s' }
+                                                          SectionL noExtField x' s' }
 
     cvt (InfixE Nothing  s Nothing ) = ensureValidOpExp s $
                                        do { s' <- cvtl s
@@ -1153,15 +1153,15 @@ cvtl e = wrapLA (cvt e)
                               -- constructor names - see #14627.
                               { s' <- vcName s
                               ; wrapParLA (HsVar noExtField) s' }
-    cvt (LabelE s)       = return $ HsOverLabel noComments NoSourceText (fsLit s)
-    cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noComments n' }
+    cvt (LabelE s)       = return $ HsOverLabel noExtField NoSourceText (fsLit s)
+    cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
-                               ; return $ HsGetField noComments e'
+                               ; return $ HsGetField noExtField e'
                                          (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
                                          (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
-                              ; return $ HsTypedSplice (noAnn, noAnn) e' }
+                              ; return $ HsTypedSplice [] e' }
     cvt (TypedBracketE e) = do { e' <- cvtl e
                                ; return $ HsTypedBracket noAnn e' }
     cvt (TypeE t) = do { t' <- cvtType t
@@ -1641,7 +1641,7 @@ cvtTypeKind typeOrKind ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnLA (HsFunTy noAnn (HsUnrestrictedArrow noAnn) x'' y'')
+                 returnLA (HsFunTy noExtField (HsUnrestrictedArrow noAnn) x'' y'')
              | otherwise
              -> do { fun_tc <- returnLA $ getRdrName unrestrictedFunTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
@@ -1656,7 +1656,7 @@ cvtTypeKind typeOrKind ty
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
                      w'' = hsTypeToArrow w'
-                 returnLA (HsFunTy noAnn w'' x'' y'')
+                 returnLA (HsFunTy noExtField w'' x'' y'')
              | otherwise
              -> do { fun_tc <- returnLA $ getRdrName fUNTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
