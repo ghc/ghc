@@ -732,7 +732,7 @@ genHsVar :: Name -> HsExpr GhcRn
 genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
-genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBndrs (wrapGenSpan ty))
+genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
 genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noAnn

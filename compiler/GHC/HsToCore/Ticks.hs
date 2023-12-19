@@ -483,9 +483,9 @@ addTickHsExpr (HsLam x v mg)            = liftM (HsLam x v)
                                                 (addTickMatchGroup True mg)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)
                                                           (addTickLHsExpr      e2)
-addTickHsExpr (HsAppType x e ty) = do
+addTickHsExpr (HsAppType x e at ty) = do
         e' <- addTickLHsExprNever e
-        return (HsAppType x e' ty)
+        return (HsAppType x e' at ty)
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
                 (return fix)
@@ -496,9 +496,9 @@ addTickHsExpr (NegApp x e neg) =
         liftM2 (NegApp x)
                 (addTickLHsExpr e)
                 (addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar x e) = do
+addTickHsExpr (HsPar x lpar e rpar) = do
         e' <- addTickLHsExprEvalInner e
-        return (HsPar x e')
+        return (HsPar x lpar e' rpar)
 addTickHsExpr (SectionL x e1 e2) =
         liftM2 (SectionL x)
                 (addTickLHsExpr e1)
@@ -528,11 +528,11 @@ addTickHsExpr (HsMultiIf ty alts)
   = do { let isOneOfMany = case alts of [_] -> False; _ -> True
        ; alts' <- mapM (traverse $ addTickGRHS isOneOfMany False) alts
        ; return $ HsMultiIf ty alts' }
-addTickHsExpr (HsLet x binds e) =
+addTickHsExpr (HsLet x tkLet binds tkIn e) =
         bindLocals (collectLocalBinders CollNoDictBinders binds) $ do
           binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
           e' <- addTickLHsExprLetBody e
-          return (HsLet x binds' e')
+          return (HsLet x tkLet binds' tkIn e')
 addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
@@ -824,9 +824,9 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (return fix)
                 (addTickLHsCmd c3)
 -}
-addTickHsCmd (HsCmdPar x e) = do
+addTickHsCmd (HsCmdPar x lpar e rpar) = do
         e' <- addTickLHsCmd e
-        return (HsCmdPar x e')
+        return (HsCmdPar x lpar e' rpar)
 addTickHsCmd (HsCmdCase x e mgs) =
         liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
@@ -836,11 +836,11 @@ addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsCmd c2)
                 (addTickLHsCmd c3)
-addTickHsCmd (HsCmdLet x binds c) =
+addTickHsCmd (HsCmdLet x tkLet binds tkIn c) =
         bindLocals (collectLocalBinders CollNoDictBinders binds) $ do
           binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
           c' <- addTickLHsCmd c
-          return (HsCmdLet x binds' c')
+          return (HsCmdLet x tkLet binds' tkIn c')
 addTickHsCmd (HsCmdDo srcloc (L l stmts))
   = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
        ; return (HsCmdDo srcloc (L l stmts')) }

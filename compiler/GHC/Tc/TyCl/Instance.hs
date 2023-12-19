@@ -2232,7 +2232,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
     (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
 
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
-    mk_vta fun ty = noLocA (HsAppType noExtField fun
+    mk_vta fun ty = noLocA (HsAppType noExtField fun noHsTok
         (mkEmptyWildCardBndrs $ nlHsParTy $ noLocA $ XHsType ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]

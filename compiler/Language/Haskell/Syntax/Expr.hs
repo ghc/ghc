@@ -25,6 +25,7 @@ import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
@@ -321,6 +322,7 @@ data HsExpr p
 
   | HsAppType (XAppTypeE p) -- After typechecking: the type argument
               (LHsExpr p)
+             !(LHsToken "@" p)
               (LHsWcType (NoGhcTc p))  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
@@ -354,7 +356,9 @@ data HsExpr p
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | HsPar       (XPar p)
+               !(LHsToken "(" p)
                 (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
+               !(LHsToken ")" p)
 
   | SectionL    (XSectionL p)
                 (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
@@ -425,7 +429,9 @@ data HsExpr p
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
+               !(LHsToken "let" p)
                 (HsLocalBinds p)
+               !(LHsToken "in" p)
                 (LHsExpr  p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
@@ -577,6 +583,7 @@ data HsExpr p
   -- Embed the syntax of types into expressions.
   -- Used with RequiredTypeArguments, e.g. fn (type (Int -> Bool))
   | HsEmbTy   (XEmbTy p)
+             !(LHsToken "type" p)
               (LHsWcType (NoGhcTc p))
 
   | XExpr       !(XXExpr p)
@@ -854,7 +861,9 @@ data HsCmd id
              (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdPar    (XCmdPar id)
+               !(LHsToken "(" id)
                 (LHsCmd id)                     -- parenthesised command
+               !(LHsToken ")" id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --             'GHC.Parser.Annotation.AnnClose' @')'@
 
@@ -882,7 +891,9 @@ data HsCmd id
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
+               !(LHsToken "let" id)
                 (HsLocalBinds id)      -- let(rec)
+               !(LHsToken "in" id)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
     --       'GHC.Parser.Annotation.AnnOpen' @'{'@,

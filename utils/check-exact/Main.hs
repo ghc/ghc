@@ -444,7 +444,7 @@ changeLetIn1 _libdir parsed
   = return (everywhere (mkT replace) parsed)
   where
     replace :: HsExpr GhcPs -> HsExpr GhcPs
-    replace (HsLet (tkLet, _) localDecls expr)
+    replace (HsLet an tkLet localDecls _ expr)
       =
          let (HsValBinds x (ValBinds xv bagDecls sigs)) = localDecls
              [l2,_l1] = map wrapDecl $ bagToList bagDecls
@@ -452,9 +452,9 @@ changeLetIn1 _libdir parsed
              (L _ e) = expr
              a = EpAnn (EpaDelta (SameLine 1) []) noAnn emptyComments
              expr' = L a e
-             tkIn' = EpTok (EpaDelta (DifferentLine 1 0) [])
-         in (HsLet (tkLet, tkIn')
-                (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
+             tkIn' = L (TokenLoc (EpaDelta (DifferentLine 1 0) [])) HsTok
+         in (HsLet an tkLet
+                (HsValBinds x (ValBinds xv bagDecls' sigs)) tkIn' expr')
 
     replace x = x
 
@@ -802,13 +802,13 @@ rmDecl5 _libdir lp = do
       doRmDecl = do
         let
           go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
-          go (HsLet (tkLet, tkIn) lb expr) = do
+          go (HsLet a tkLet lb tkIn expr) = do
             let decs = hsDeclsLocalBinds lb
             let hdecs : _ = decs
             let dec = last decs
             _ <- transferEntryDP hdecs dec
             lb' <- replaceDeclsValbinds WithoutWhere lb [dec]
-            return (HsLet (tkLet, tkIn) lb' expr)
+            return (HsLet a tkLet lb' tkIn expr)
           go x = return x
 
         everywhereM (mkM go) lp

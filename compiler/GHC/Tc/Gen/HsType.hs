@@ -1175,7 +1175,7 @@ tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
 
 tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` unrestrictedFunTyConKey
-  = tc_fun_type mode (HsUnrestrictedArrow noExtField) ty1 ty2 exp_kind
+  = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
@@ -1551,12 +1551,12 @@ splitHsAppTys hs_ty
        -> [HsArg GhcRn (LHsType GhcRn) (LHsKind GhcRn)]
        -> (LHsType GhcRn,
            [HsArg GhcRn (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
-    go (L _  (HsAppTy _ f a))      as = go f (HsValArg noExtField a : as)
-    go (L _  (HsAppKindTy _ ty k)) as = go ty (HsTypeArg noExtField k : as)
+    go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
+    go (L _  (HsAppKindTy _ ty at k)) as = go ty (HsTypeArg at k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
       = ( L (l2l sp) (HsTyVar noAnn prom op)
-        , HsValArg noExtField l : HsValArg noExtField r : as )
+        , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 
 ---------------------------
@@ -1672,7 +1672,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                            ty_app_err ki_arg substed_fun_ki
 
       ---------------- HsValArg: a normal argument (fun ty)
-      (HsValArg _ arg : args, Just (ki_binder, inner_ki))
+      (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
         | Named (Bndr kv flag) <- ki_binder
         , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
@@ -1693,7 +1693,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                 ; go (n+1) fun' subst' inner_ki args }
 
           -- no binder; try applying the substitution, or infer another arrow in fun kind
-      (HsValArg _ _ : _, Nothing)
+      (HsValArg _ : _, Nothing)
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
               ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
@@ -1920,10 +1920,10 @@ unsaturated arguments: see #11246.  Hence doing this in tcInferApps.
 
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
 appTypeToArg f []                       = f
-appTypeToArg f (HsValArg _ arg   : args) = appTypeToArg (mkHsAppTy f arg) args
+appTypeToArg f (HsValArg arg     : args) = appTypeToArg (mkHsAppTy f arg) args
 appTypeToArg f (HsArgPar _       : args) = appTypeToArg f                 args
-appTypeToArg f (HsTypeArg _ arg  : args)
-  = appTypeToArg (mkHsAppKindTy noExtField f arg) args
+appTypeToArg f (HsTypeArg at arg : args)
+  = appTypeToArg (mkHsAppKindTy f at arg) args
 
 
 {- *********************************************************************
@@ -2470,7 +2470,7 @@ mkExplicitTyConBinder :: TyCoVarSet -- variables that are used dependently
                       -> TyConBinder
 mkExplicitTyConBinder dep_set (Bndr tv flag) =
   case flag of
-    HsBndrRequired{}  -> mkRequiredTyConBinder dep_set tv
+    HsBndrRequired    -> mkRequiredTyConBinder dep_set tv
     HsBndrInvisible{} -> mkNamedTyConBinder Specified tv
 
 -- | Kind-check a 'LHsQTyVars'. Used in 'inferInitialKind' (for tycon kinds and
@@ -2741,7 +2741,7 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
     -- See GHC Proposal #425, section "Kind checking",
     -- where zippable and skippable are defined.
     zippable :: TyConBndrVis -> HsBndrVis GhcRn -> Bool
-    zippable vis (HsBndrRequired _)  = isVisibleTcbVis vis
+    zippable vis HsBndrRequired      = isVisibleTcbVis vis
     zippable vis (HsBndrInvisible _) = isInvisSpecTcbVis vis
 
     -- See GHC Proposal #425, section "Kind checking",

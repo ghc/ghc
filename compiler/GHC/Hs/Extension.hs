@@ -25,7 +25,10 @@ module GHC.Hs.Extension where
 
 import GHC.Prelude
 
+import GHC.TypeLits (KnownSymbol, symbolVal)
+
 import Data.Data hiding ( Fixity )
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -234,6 +237,16 @@ pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case ghcPass @p of GhcTc -> pp
                                 _     -> empty
 
+type instance Anno (HsToken tok) = TokenLocation
+
+noHsTok :: GenLocated TokenLocation (HsToken tok)
+noHsTok = L NoTokenLoc HsTok
+
+type instance Anno (HsUniToken tok utok) = TokenLocation
+
+noHsUniTok :: GenLocated TokenLocation (HsUniToken tok utok)
+noHsUniTok = L NoTokenLoc HsNormalTok
+
 --- Outputable
 
 instance Outputable NoExtField where
@@ -241,3 +254,12 @@ instance Outputable NoExtField where
 
 instance Outputable DataConCantHappen where
   ppr = dataConCantHappen
+
+instance KnownSymbol tok => Outputable (HsToken tok) where
+   ppr _ = text (symbolVal (Proxy :: Proxy tok))
+
+instance (KnownSymbol tok, KnownSymbol utok) => Outputable (HsUniToken tok utok) where
+   ppr HsNormalTok  = text (symbolVal (Proxy :: Proxy tok))
+   ppr HsUnicodeTok = text (symbolVal (Proxy :: Proxy utok))
+
+deriving instance Typeable p => Data (LayoutInfo (GhcPass p))

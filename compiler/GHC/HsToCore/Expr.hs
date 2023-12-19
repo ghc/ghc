@@ -158,7 +158,7 @@ ds_val_bind _ (is_rec, binds) _body
 -- would transform a linear definition into a non-linear one. See Wrinkle 2
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
 ds_val_bind dflags (NonRecursive, hsbinds) body
-  | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann
+  | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = MultAnn{mult_ext=mult}
                      , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- bagToList hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
   , pat' <- decideBangHood dflags pat
@@ -167,7 +167,6 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
         ; rhs_expr <- dsGuarded grhss ty rhss_nablas
         ; let rhs' = mkOptTickBox rhs_tick rhs_expr
         ; let body_ty = exprType body
-        ; let mult = getTcMultAnn mult_ann
         ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat')
         ; matchSimply rhs' PatBindRhs mult pat' body error_expr }
     -- This is the one place where matchSimply is given a non-ManyTy
@@ -296,7 +295,7 @@ dsExpr (HsRecSel _ (FieldOcc id _))
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
-dsExpr (HsPar _ e)            = dsLExpr e
+dsExpr (HsPar _ _ e _)        = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
 dsExpr (HsIPVar x _)          = dataConCantHappen x
@@ -442,7 +441,7 @@ dsExpr (ExplicitSum types alt arity expr)
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
-dsExpr (HsEmbTy x _) = dataConCantHappen x
+dsExpr (HsEmbTy x _ _) = dataConCantHappen x
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
@@ -451,7 +450,7 @@ dsExpr (HsCase ctxt discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet _ binds body) = do
+dsExpr (HsLet _ _ binds _ body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
@@ -983,11 +982,11 @@ dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
-    go wrap (HsPar _ (L _ hs_e))
+    go wrap (HsPar _ _ (L _ hs_e) _)
        = go wrap hs_e
     go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
        = go (wrap1 <.> wrap2) hs_e
-    go wrap (HsAppType ty (L _ hs_e) _)
+    go wrap (HsAppType ty (L _ hs_e) _ _)
        = go (wrap <.> WpTyApp ty) hs_e
 
     go wrap (HsVar _ (L _ var))

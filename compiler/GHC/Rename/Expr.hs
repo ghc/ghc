@@ -293,7 +293,7 @@ rnExpr (HsUnboundVar _ v)
 rnExpr (HsOverLabel _ src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
        ; return ( mkExpandedExpr (HsOverLabel noAnn src v) $
-                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
+                  HsAppType noExtField (genLHsVar from_label) noHsTok hs_ty_arg
                 , fvs ) }
   where
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
@@ -324,12 +324,12 @@ rnExpr (HsApp x fun arg)
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (HsAppType _ fun arg)
+rnExpr (HsAppType _ fun at arg)
   = do { type_app <- xoptM LangExt.TypeApplications
        ; unless type_app $ addErr $ typeAppErr TypeLevel $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
-       ; return (HsAppType noExtField fun' arg', fvFun `plusFV` fvArg) }
+       ; return (HsAppType NoExtField fun' at arg', fvFun `plusFV` fvArg) }
 
 rnExpr (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
@@ -391,17 +391,17 @@ rnExpr (HsUntypedSplice _ splice) = rnUntypedSpliceExpr splice
 ---------------------------------------------
 --      Sections
 -- See Note [Parsing sections] in GHC.Parser
-rnExpr (HsPar _ (L loc (section@(SectionL {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionL {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar noExtField (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar _ (L loc (section@(SectionR {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionR {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar noExtField (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar _ e)
+rnExpr (HsPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLExpr e
-        ; return (HsPar noExtField e', fvs_e) }
+        ; return (HsPar x lpar e' rpar, fvs_e) }
 
 rnExpr expr@(SectionL {})
   = do  { addErr (sectionErr expr); rnSection expr }
@@ -425,10 +425,10 @@ rnExpr (HsCase _ expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase CaseAlt new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnExpr (HsLet _ binds expr)
+rnExpr (HsLet _ tkLet binds tkIn expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
       { (expr',fvExpr) <- rnLExpr expr
-      ; return (HsLet noExtField binds' expr', fvExpr) }
+      ; return (HsLet noExtField tkLet binds' tkIn expr', fvExpr) }
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
  = do { ((stmts1, _), fvs1) <-
@@ -560,9 +560,9 @@ rnExpr (ArithSeq _ _ seq)
            else
             return (ArithSeq noExtField Nothing new_seq, fvs) }
 
-rnExpr (HsEmbTy _ ty)
+rnExpr (HsEmbTy _ toktype ty)
   = do { (ty', fvs) <- rnHsWcType HsTypeCtx ty
-       ; return (HsEmbTy noExtField ty', fvs) }
+       ; return (HsEmbTy noExtField toktype ty', fvs) }
 
 {-
 ************************************************************************
@@ -883,9 +883,9 @@ rnCmd (HsCmdLam x lam_variant matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup ctxt rnLCmd matches
        ; return (HsCmdLam x lam_variant new_matches, ms_fvs) }
 
-rnCmd (HsCmdPar _ e)
+rnCmd (HsCmdPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLCmd e
-        ; return (HsCmdPar noExtField e', fvs_e) }
+        ; return (HsCmdPar x lpar e' rpar, fvs_e) }
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
@@ -905,10 +905,10 @@ rnCmd (HsCmdIf _ _ p b1 b2)
 
        ; return (HsCmdIf noExtField ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2])}
 
-rnCmd (HsCmdLet _ binds cmd)
+rnCmd (HsCmdLet _ tkLet binds tkIn cmd)
   = rnLocalBindsAndThen binds $ \ binds' _ -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet noExtField binds' cmd', fvExpr) }
+      ; return (HsCmdLet noExtField tkLet binds' tkIn cmd', fvExpr) }
 
 rnCmd (HsCmdDo _ (L l stmts))
   = do  { ((stmts', _), fvs) <-
@@ -931,12 +931,12 @@ methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
 
-methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
+methodNamesCmd (HsCmdPar _ _ c _) = methodNamesLCmd c
 
 methodNamesCmd (HsCmdIf _ _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsCmdLet _ _ c)          = methodNamesLCmd c
+methodNamesCmd (HsCmdLet _ _ _ _ c)      = methodNamesLCmd c
 methodNamesCmd (HsCmdDo _ (L _ stmts))   = methodNamesStmts stmts
 methodNamesCmd (HsCmdApp _ c _)          = methodNamesLCmd c
 
@@ -2282,8 +2282,8 @@ isStrictPattern (L loc pat) =
     WildPat{}       -> False
     VarPat{}        -> False
     LazyPat{}       -> False
-    AsPat _ _ p     -> isStrictPattern p
-    ParPat _ p      -> isStrictPattern p
+    AsPat _ _ _ p   -> isStrictPattern p
+    ParPat _ _ p _  -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
     SigPat _ p _    -> isStrictPattern p
     BangPat{}       -> True
@@ -2447,7 +2447,7 @@ isReturnApp :: MonadNames
             -- If this is @Nothing@, strip the return/pure
             -> Maybe (HsExpr GhcRn)
             -> Maybe (LHsExpr GhcRn, Maybe Bool)
-isReturnApp monad_names (L _ (HsPar _ expr)) mb_pure =
+isReturnApp monad_names (L _ (HsPar _ _ expr _)) mb_pure =
   isReturnApp monad_names expr mb_pure
 isReturnApp monad_names (L loc e) mb_pure = case e of
   OpApp x l op r
@@ -2460,8 +2460,8 @@ isReturnApp monad_names (L loc e) mb_pure = case e of
     | is_return f -> Just (arg, Just False)
   _otherwise -> Nothing
  where
-  is_var f (L _ (HsPar _ e)) = is_var f e
-  is_var f (L _ (HsAppType _ e _)) = is_var f e
+  is_var f (L _ (HsPar _ _ e _)) = is_var f e
+  is_var f (L _ (HsAppType _ e _ _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False

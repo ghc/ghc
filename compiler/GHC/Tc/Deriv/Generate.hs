@@ -858,7 +858,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
     enum_index
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [noLocA (AsPat noAnn (noLocA c_RDR)
+                [noLocA (AsPat noAnn (noLocA c_RDR) noHsTok
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr [(a_RDR, ah_RDR)] (
@@ -2100,7 +2100,7 @@ gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
         rep_cvs'    = scopedSort rep_cvs
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
+nlHsAppType e s = noLocA (HsAppType noExtField e noHsTok hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 

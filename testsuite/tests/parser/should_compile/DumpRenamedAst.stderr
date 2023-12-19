@@ -176,7 +176,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:9:14-17 })
@@ -200,7 +204,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:9:21-24 })
@@ -216,7 +224,13 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:9:26-30 })
@@ -288,7 +302,6 @@
                [{Name: a}
                ,{Name: as}])
               [(HsValArg
-                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:13:10-17 })
@@ -496,7 +509,6 @@
               (HsOuterImplicit
                [])
               [(HsValArg
-                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:14:10-12 })
@@ -557,8 +569,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:12:30 }))]
               (EpaComments
                []))
-             (HsBndrRequired
-              (NoExtField))
+             (HsBndrRequired)
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:12:21-22 })
@@ -680,7 +691,10 @@
              (EpaComments
               []))
             (HsUnrestrictedArrow
-             (NoExtField))
+             (L
+              (TokenLoc
+               (EpaSpan { DumpRenamedAst.hs:11:20-21 }))
+              (HsNormalTok)))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:11:16-18 })
@@ -795,7 +809,10 @@
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (NoExtField))
+              (L
+               (TokenLoc
+                (EpaSpan { DumpRenamedAst.hs:16:22-23 }))
+               (HsNormalTok)))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:16:20 })
@@ -832,7 +849,10 @@
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
-                (NoExtField))
+                (L
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:16:27-28 }))
+                 (HsNormalTok)))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:16:25 })
@@ -908,7 +928,6 @@
            [{Name: a}
            ,{Name: k}])
           [(HsValArg
-            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:19:22-37 })
@@ -974,7 +993,10 @@
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
-                   (NoExtField))
+                   (L
+                    (TokenLoc
+                     (EpaSpan { DumpRenamedAst.hs:19:30-31 }))
+                    (HsNormalTok)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:28 })
@@ -1039,7 +1061,10 @@
                (EpaComments
                 []))
               (HsUnrestrictedArrow
-               (NoExtField))
+               (L
+                (TokenLoc
+                 (EpaSpan { DumpRenamedAst.hs:19:54-55 }))
+                (HsNormalTok)))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:42-52 })
@@ -1070,7 +1095,10 @@
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
-                   (NoExtField))
+                   (L
+                    (TokenLoc
+                     (EpaSpan { DumpRenamedAst.hs:19:45-46 }))
+                    (HsNormalTok)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:43 })
@@ -1146,7 +1174,11 @@
               (EpaComments
                []))
              (ConDeclGADT
-              (NoExtField)
+              (EpAnn
+               (EpaDelta (SameLine 0) [])
+               []
+               (EpaComments
+                []))
               (:|
                (L
                 (EpAnn
@@ -1157,6 +1189,10 @@
                   []))
                 {Name: DumpRenamedAst.Nat})
                [])
+              (L
+               (TokenLoc
+                (EpaSpan { DumpRenamedAst.hs:20:7-8 }))
+               (HsNormalTok))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:20:10-45 })
@@ -1169,10 +1205,12 @@
                 ,{Name: g}]))
               (Nothing)
               (PrefixConGADT
-               (NoExtField)
                [(HsScaled
                  (HsUnrestrictedArrow
-                  (NoExtField))
+                  (L
+                   (TokenLoc
+                    (EpaSpan { DumpRenamedAst.hs:20:36-37 }))
+                   (HsNormalTok)))
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:20:10-34 })
@@ -1242,7 +1280,10 @@
                         (EpaComments
                          []))
                        (HsUnrestrictedArrow
-                        (NoExtField))
+                        (L
+                         (TokenLoc
+                          (EpaSpan { DumpRenamedAst.hs:20:27-28 }))
+                         (HsNormalTok)))
                        (L
                         (EpAnn
                          (EpaSpan { DumpRenamedAst.hs:20:22-25 })
@@ -1473,8 +1514,7 @@
              []
              (EpaComments
               []))
-            (HsBndrRequired
-             (NoExtField))
+            (HsBndrRequired)
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:22:8 })
@@ -1498,8 +1538,7 @@
              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:22:17 }))]
              (EpaComments
               []))
-            (HsBndrRequired
-             (NoExtField))
+            (HsBndrRequired)
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:22:11 })
@@ -1546,7 +1585,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:22:21-23 })
@@ -1562,7 +1605,13 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:22:25-29 })
@@ -1681,7 +1730,10 @@
                [{Name: a}
                ,{Name: f}])
               [(HsTypeArg
-                (NoExtField)
+                (L
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:26:6 }))
+                 (HsTok))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:26:7-11 })
@@ -1705,7 +1757,6 @@
                      []))
                    {Name: DumpRenamedAst.Peano}))))
               ,(HsValArg
-                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:26:13 })
@@ -1729,7 +1780,6 @@
                      []))
                    {Name: a}))))
               ,(HsValArg
-                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:26:15 })
@@ -1802,6 +1852,10 @@
                         (EpaComments
                          []))
                        {Name: DumpRenamedAst.T})))
+                    (L
+                     (TokenLoc
+                      (EpaSpan { DumpRenamedAst.hs:26:21 }))
+                     (HsTok))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:26:22-26 })
@@ -1894,8 +1948,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:25:23 }))]
               (EpaComments
                []))
-             (HsBndrRequired
-              (NoExtField))
+             (HsBndrRequired)
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:25:17 })
@@ -1941,8 +1994,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:25:40 }))]
               (EpaComments
                []))
-             (HsBndrRequired
-              (NoExtField))
+             (HsBndrRequired)
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:25:26 })
@@ -1965,7 +2017,10 @@
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
-                (NoExtField))
+                (L
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:25:33-34 }))
+                 (HsNormalTok)))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:25:31 })
@@ -2085,7 +2140,10 @@
              (EpaComments
               []))
             (HsUnrestrictedArrow
-             (NoExtField))
+             (L
+              (TokenLoc
+               (EpaSpan { DumpRenamedAst.hs:24:14-15 }))
+              (HsNormalTok)))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:24:12 })
@@ -2122,7 +2180,10 @@
                (EpaComments
                 []))
               (HsUnrestrictedArrow
-               (NoExtField))
+               (L
+                (TokenLoc
+                 (EpaSpan { DumpRenamedAst.hs:24:29-30 }))
+                (HsNormalTok)))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:24:17-27 })
@@ -2153,7 +2214,10 @@
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
-                   (NoExtField))
+                   (L
+                    (TokenLoc
+                     (EpaSpan { DumpRenamedAst.hs:24:20-21 }))
+                    (HsNormalTok)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:24:18 })
@@ -2233,6 +2297,8 @@
        (ClassDecl
         {NameSet:
          []}
+        (VirtualBraces
+         (3))
         (Nothing)
         (L
          (EpAnn
@@ -2257,8 +2323,7 @@
              []
              (EpaComments
               []))
-            (HsBndrRequired
-             (NoExtField))
+            (HsBndrRequired)
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:28:9 })
@@ -2310,8 +2375,7 @@
                 []
                 (EpaComments
                  []))
-               (HsBndrRequired
-                (NoExtField))
+               (HsBndrRequired)
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:29:10 })
@@ -2333,8 +2397,7 @@
                 []
                 (EpaComments
                  []))
-               (HsBndrRequired
-                (NoExtField))
+               (HsBndrRequired)
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:29:12 })
@@ -2481,7 +2544,6 @@
              (HsOuterImplicit
               [{Name: b}])
              [(HsValArg
-               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:32:10-12 })
@@ -2521,7 +2583,6 @@
                       []))
                     {Name: a}))))))
              ,(HsValArg
-               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:32:14 })

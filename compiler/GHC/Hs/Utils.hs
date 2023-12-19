@@ -179,7 +179,7 @@ just attach 'noSrcSpan' to everything.
 -}
 
 -- | @e => (e)@
-mkHsPar :: IsPass p => LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (gHsPar e)
 
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
@@ -261,7 +261,7 @@ mkHsAppsWith
 mkHsAppsWith mkLocated = foldl' (mkHsAppWith mkLocated)
 
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
-mkHsAppType e t = addCLocA t_body e (HsAppType noExtField e paren_wct)
+mkHsAppType e t = addCLocA t_body e (HsAppType noExtField e noHsTok paren_wct)
   where
     t_body    = hswc_body t
     paren_wct = t { hswc_body = t_body }
@@ -321,7 +321,7 @@ mkLHsPar = parenthesizeHsExpr appPrec
 mkParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
 mkParPat = parenthesizePat appPrec
 
-nlParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
+nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
 nlParPat p = noLocA (gParPat p)
 
 -------------------------------
@@ -604,7 +604,7 @@ nlHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsOpApp e1 op e2 = noLocA (mkHsOpApp e1 op e2)
 
 nlHsLam  :: LMatch GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
-nlHsPar  :: IsPass p => LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+nlHsPar  :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
@@ -626,46 +626,36 @@ nlList exprs = noLocA (ExplicitList noAnn exprs)
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IsSrcSpanAnn p a
           => PromotionFlag -> IdP (GhcPass p)           -> LHsType (GhcPass p)
-nlHsFunTy :: forall p. IsPass p
-          => LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
 nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
-nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow x) a b)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
-nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
+nlHsTyConApp :: IsSrcSpanAnn p a
              => PromotionFlag
              -> LexicalFixity -> IdP (GhcPass p)
              -> [LHsTypeArg (GhcPass p)] -> LHsType (GhcPass p)
 nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
-  , HsValArg _ ty1 : HsValArg _ ty2 : rest <- tys
+  , HsValArg ty1 : HsValArg ty2 : rest <- tys
   = foldl' mk_app (noLocA $ HsOpTy noAnn prom ty1 (noLocA tycon) ty2) rest
   | otherwise
   = foldl' mk_app (nlHsTyVar prom tycon) tys
   where
     mk_app :: LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
-    mk_app fun@(L _ (HsOpTy {})) arg = mk_app (nlHsParTy fun) arg
+    mk_app fun@(L _ (HsOpTy {})) arg = mk_app (noLocA $ HsParTy noAnn fun) arg
       -- parenthesize things like `(A + B) C`
-    mk_app fun (HsValArg _ ty) = nlHsAppTy fun ty
-    mk_app fun (HsTypeArg _ ki) = nlHsAppKindTy fun ki
-    mk_app fun (HsArgPar _) = nlHsParTy fun
+    mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun ty)
+    mk_app fun (HsTypeArg at ki) = noLocA (HsAppKindTy noExtField fun at ki)
+    mk_app fun (HsArgPar _) = noLocA (HsParTy noAnn fun)
 
-nlHsAppKindTy :: forall p. IsPass p =>
+nlHsAppKindTy ::
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
-nlHsAppKindTy f k = noLocA (HsAppKindTy x f k)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+nlHsAppKindTy f k
+  = noLocA (HsAppKindTy noExtField f noHsTok k)
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
@@ -1247,9 +1237,9 @@ collect_pat flag pat bndrs = case pat of
   WildPat _             -> bndrs
   LazyPat _ pat         -> collect_lpat flag pat bndrs
   BangPat _ pat         -> collect_lpat flag pat bndrs
-  AsPat _ a pat         -> unXRec @p a : collect_lpat flag pat bndrs
+  AsPat _ a _ pat       -> unXRec @p a : collect_lpat flag pat bndrs
   ViewPat _ _ pat       -> collect_lpat flag pat bndrs
-  ParPat _ pat          -> collect_lpat flag pat bndrs
+  ParPat _ _ pat _      -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
@@ -1262,7 +1252,7 @@ collect_pat flag pat bndrs = case pat of
     CollVarTyVarBinders -> collect_lpat flag pat bndrs ++ collectPatSigBndrs sig
   XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
-  EmbTyPat _ tp         -> case flag of
+  EmbTyPat _ _ tp       -> case flag of
     CollNoDictBinders   -> bndrs
     CollWithDictBinders -> bndrs
     CollVarTyVarBinders -> collectTyPatBndrs tp ++ bndrs
@@ -1631,8 +1621,8 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
 
     get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
                   -> (Maybe [Located Int], FieldIndices p)
-    get_flds_gadt seen (RecConGADT _ flds) = first Just $ get_flds seen flds
-    get_flds_gadt seen (PrefixConGADT _ []) = (Just [], seen)
+    get_flds_gadt seen (RecConGADT flds _) = first Just $ get_flds seen flds
+    get_flds_gadt seen (PrefixConGADT []) = (Just [], seen)
     get_flds_gadt seen _ = (Nothing, seen)
 
     get_flds :: FieldIndices p -> LocatedL [LConDeclField (GhcPass p)]
@@ -1808,9 +1798,9 @@ lPatImplicits = hs_lpat
 
     hs_pat (LazyPat _ pat)      = hs_lpat pat
     hs_pat (BangPat _ pat)      = hs_lpat pat
-    hs_pat (AsPat _ _ pat)      = hs_lpat pat
+    hs_pat (AsPat _ _ _ pat)    = hs_lpat pat
     hs_pat (ViewPat _ _ pat)    = hs_lpat pat
-    hs_pat (ParPat _ pat)       = hs_lpat pat
+    hs_pat (ParPat _ _ pat _)   = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
     hs_pat (SigPat _ pat _)     = hs_lpat pat

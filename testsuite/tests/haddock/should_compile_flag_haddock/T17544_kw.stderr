@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Just
@@ -89,15 +89,11 @@
            (EpaComments
             []))
           (ConDeclGADT
-           ((,)
-            (EpUniTok
-             (EpaSpan { T17544_kw.hs:16:15-16 })
-             (NormalSyntax))
-            (EpAnn
-             (EpaSpan { T17544_kw.hs:16:9-20 })
-             []
-             (EpaComments
-              [])))
+           (EpAnn
+            (EpaSpan { T17544_kw.hs:16:9-20 })
+            []
+            (EpaComments
+             []))
            (:|
             (L
              (EpAnn
@@ -110,6 +106,10 @@
               {OccName: MkFoo}))
             [])
            (L
+            (TokenLoc
+             (EpaSpan { T17544_kw.hs:16:15-16 }))
+            (HsNormalTok))
+           (L
             (EpAnn
              (EpaSpan { T17544_kw.hs:16:18-20 })
              (AnnListItem
@@ -120,7 +120,6 @@
              (NoExtField)))
            (Nothing)
            (PrefixConGADT
-            (NoExtField)
             [])
            (L
             (EpAnn
@@ -202,15 +201,11 @@
           (EpaComments
            []))
          (ConDeclGADT
-          ((,)
-           (EpUniTok
-            (EpaSpan { T17544_kw.hs:19:15-16 })
-            (NormalSyntax))
-           (EpAnn
-            (EpaSpan { T17544_kw.hs:19:9-26 })
-            []
-            (EpaComments
-             [])))
+          (EpAnn
+           (EpaSpan { T17544_kw.hs:19:9-26 })
+           []
+           (EpaComments
+            []))
           (:|
            (L
             (EpAnn
@@ -223,6 +218,10 @@
              {OccName: MkBar}))
            [])
           (L
+           (TokenLoc
+            (EpaSpan { T17544_kw.hs:19:15-16 }))
+           (HsNormalTok))
+          (L
            (EpAnn
             (EpaSpan { T17544_kw.hs:19:18-26 })
             (AnnListItem
@@ -233,12 +232,12 @@
             (NoExtField)))
           (Nothing)
           (PrefixConGADT
-           (NoExtField)
            [(HsScaled
              (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544_kw.hs:19:21-22 })
-               (NormalSyntax)))
+              (L
+               (TokenLoc
+                (EpaSpan { T17544_kw.hs:19:21-22 }))
+               (HsNormalTok)))
              (L
               (EpAnn
                (EpaSpan { T17544_kw.hs:19:18-19 })
@@ -304,16 +303,16 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
         [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
         ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
         (EpaComments
          []))
-       (EpVirtualBraces
-        (5))
        (NoAnnSortKey))
+      (VirtualBraces
+       (5))
       (Nothing)
       (L
        (EpAnn
@@ -339,8 +338,7 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { T17544_kw.hs:21:11 })

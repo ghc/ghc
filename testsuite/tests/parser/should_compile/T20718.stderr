@@ -17,48 +17,42 @@
        { T20718.hs:11:1-8 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan
-        { T20718.hs:1:1-16 })
+       (EpaSpan { T20718.hs:1:1-16 })
        (EpaComment
         (EpaLineComment
          "-- top of file 1")
         { T20718.hs:1:1 }))
      ,(L
-       (EpaSpan
-        { T20718.hs:2:1-16 })
+       (EpaSpan { T20718.hs:2:1-16 })
        (EpaComment
         (EpaLineComment
          "-- top of file 2")
         { T20718.hs:1:1-16 }))
      ,(L
-       (EpaSpan
-        { T20718.hs:5:1-11 })
+       (EpaSpan { T20718.hs:5:1-11 })
        (EpaComment
         (EpaLineComment
          "-- before 1")
         { T20718.hs:3:15-19 }))
      ,(L
-       (EpaSpan
-        { T20718.hs:6:1-11 })
+       (EpaSpan { T20718.hs:6:1-11 })
        (EpaComment
         (EpaLineComment
          "-- before 2")
         { T20718.hs:5:1-11 }))]
      [(L
-       (EpaSpan
-        { T20718.hs:10:1-8 })
+       (EpaSpan { T20718.hs:10:1-8 })
        (EpaComment
         (EpaLineComment
          "-- end 1")
         { T20718.hs:8:5 }))
      ,(L
-       (EpaSpan
-        { T20718.hs:11:1-8 })
+       (EpaSpan { T20718.hs:11:1-8 })
        (EpaComment
         (EpaLineComment
          "-- end 2")
         { T20718.hs:10:1-8 }))]))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))

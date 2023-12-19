@@ -29,7 +29,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -1328,16 +1328,16 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (EpaSpan { DumpSemis.hs:(28,1)-(29,23) })
         [(AddEpAnn AnnClass (EpaSpan { DumpSemis.hs:28:1-5 }))
         ,(AddEpAnn AnnWhere (EpaSpan { DumpSemis.hs:28:40-44 }))]
         (EpaComments
          []))
-       (EpVirtualBraces
-        (3))
        (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (EpAnn
@@ -1367,8 +1367,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { DumpSemis.hs:28:38 }))]
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { DumpSemis.hs:28:24-28 })
@@ -1453,9 +1452,10 @@
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { DumpSemis.hs:29:18-19 })
-               (NormalSyntax)))
+              (L
+               (TokenLoc
+                (EpaSpan { DumpSemis.hs:29:18-19 }))
+               (HsNormalTok)))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:29:12-16 })
@@ -1694,9 +1694,10 @@
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { DumpSemis.hs:31:27-28 })
-               (NormalSyntax)))
+              (L
+               (TokenLoc
+                (EpaSpan { DumpSemis.hs:31:27-28 }))
+               (HsNormalTok)))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:31:25 })
@@ -1950,11 +1951,15 @@
                  (EpaComments
                   []))
                 (HsLet
-                 ((,)
-                  (EpTok
+                 (EpAnn
+                  (EpaSpan { DumpSemis.hs:34:10-35 })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (L
+                  (TokenLoc
                    (EpaSpan { DumpSemis.hs:34:10-12 }))
-                  (EpTok
-                   (EpaSpan { DumpSemis.hs:34:32-33 })))
+                  (HsTok))
                  (HsValBinds
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:34:13-31 })
@@ -2181,6 +2186,10 @@
                              (EmptyLocalBinds
                               (NoExtField)))))]))))]}
                    []))
+                 (L
+                  (TokenLoc
+                   (EpaSpan { DumpSemis.hs:34:32-33 }))
+                  (HsTok))
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:34:35 })

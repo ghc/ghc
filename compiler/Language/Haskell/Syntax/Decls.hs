@@ -70,8 +70,7 @@ module Language.Haskell.Syntax.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclH98Details,
-  HsConDeclGADTDetails(..), XPrefixConGADT, XRecConGADT, XXConDeclGADTDetails,
+  HsConDeclH98Details, HsConDeclGADTDetails(..),
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -95,6 +94,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role)
@@ -457,6 +457,8 @@ data TyClDecl pass
     --                          'GHC.Parser.Annotation.AnnRarrow'
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
+                tcdLayout  :: !(LayoutInfo pass),      -- ^ Explicit or virtual braces
+                              -- See Note [Class LayoutInfo]
                 tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
@@ -499,9 +501,9 @@ c.f. Note [Associated type tyvar names] in GHC.Core.Class
      Note [Family instance declaration binders]
 -}
 
-{- Note [Class EpLayout]
-~~~~~~~~~~~~~~~~~~~~~~~~
-The EpLayout is used to associate Haddock comments with parts of the declaration.
+{- Note [Class LayoutInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The LayoutInfo is used to associate Haddock comments with parts of the declaration.
 Compare the following examples:
 
     class C a where
@@ -1079,6 +1081,7 @@ data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
       , con_names   :: NonEmpty (LIdP pass)
+      , con_dcolon  :: !(LHsUniToken "::" "∷" pass)
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
       , con_bndrs   :: XRec pass (HsOuterSigTyVarBndrs pass)
@@ -1239,13 +1242,8 @@ type HsConDeclH98Details pass
 -- derived Show instances—see Note [Infix GADT constructors] in
 -- GHC.Tc.TyCl—but that is an orthogonal concern.)
 data HsConDeclGADTDetails pass
-   = PrefixConGADT !(XPrefixConGADT pass) [HsScaled pass (LBangType pass)]
-   | RecConGADT !(XRecConGADT pass) (XRec pass [LConDeclField pass])
-   | XConDeclGADTDetails !(XXConDeclGADTDetails pass)
-
-type family XPrefixConGADT       p
-type family XRecConGADT          p
-type family XXConDeclGADTDetails p
+   = PrefixConGADT [HsScaled pass (LBangType pass)]
+   | RecConGADT (XRec pass [LConDeclField pass]) (LHsUniToken "->" "→" pass)
 
 {-
 ************************************************************************

@@ -418,8 +418,8 @@ h98ConArgDocs con_args = case con_args of
 
 gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> IntMap (HsDoc GhcRn)
 gadtConArgDocs con_args res_ty = case con_args of
-  PrefixConGADT _ args -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args ++ [res_ty]
-  RecConGADT _ _       -> con_arg_docs 1 [res_ty]
+  PrefixConGADT args -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args ++ [res_ty]
+  RecConGADT _ _     -> con_arg_docs 1 [res_ty]
 
 con_arg_docs :: Int -> [HsType GhcRn] -> IntMap (HsDoc GhcRn)
 con_arg_docs n = IM.fromList . catMaybes . zipWith f [n..]

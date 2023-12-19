@@ -243,7 +243,7 @@ type instance XLitE          (GhcPass _) = EpAnnCO
 type instance XLam           (GhcPass _) = EpAnn [AddEpAnn]
 type instance XApp           (GhcPass _) = EpAnnCO
 
-type instance XAppTypeE      GhcPs = EpToken "@"
+type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField
 type instance XAppTypeE      GhcTc = Type
 
@@ -267,9 +267,7 @@ type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
-type instance XPar           GhcPs = (EpToken "(", EpToken ")")
-type instance XPar           GhcRn = NoExtField
-type instance XPar           GhcTc = NoExtField
+type instance XPar           (GhcPass _) = EpAnnCO
 
 type instance XExplicitTuple GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTuple GhcRn = NoExtField
@@ -291,7 +289,7 @@ type instance XMultiIf       GhcPs = EpAnn [AddEpAnn]
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           GhcPs = (EpToken "let", EpToken "in")
+type instance XLet           GhcPs = EpAnnCO
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
@@ -374,7 +372,7 @@ type instance XStatic        GhcTc = (NameSet, Type)
   -- Free variables and type of expression, this is stored for convenience as wiring in
   -- StaticPtr is a bit tricky (see #20150)
 
-type instance XEmbTy         GhcPs = EpToken "type"
+type instance XEmbTy         GhcPs = NoExtField
 type instance XEmbTy         GhcRn = NoExtField
 type instance XEmbTy         GhcTc = DataConCantHappen
   -- A free-standing HsEmbTy is an error.
@@ -541,7 +539,7 @@ ppr_expr (HsOverLabel _ s l) = char '#' <> case s of
                                              SourceText src -> ftext src
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
-ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
+ppr_expr (HsPar _ _ e _)     = parens (ppr_lexpr e)
 
 ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
@@ -646,11 +644,11 @@ ppr_expr (HsMultiIf _ alts)
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
-ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
+ppr_expr (HsLet _ _ binds _ expr@(L _ (HsLet _ _ _ _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet _ binds expr)
+ppr_expr (HsLet _ _ binds _ expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
@@ -720,7 +718,7 @@ ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
 
-ppr_expr (HsEmbTy _ ty)
+ppr_expr (HsEmbTy _ _ ty)
   = hsep [text "type", ppr ty]
 
 ppr_expr (XExpr x) = case ghcPass @p of
@@ -778,7 +776,7 @@ ppr_apps :: (OutputableBndrId p)
          -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType _ (L _ fun) arg)    args
+ppr_apps (HsAppType _ (L _ fun) _ arg)  args
   = ppr_apps fun (Right arg : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
   where
@@ -874,13 +872,8 @@ hsExprNeedsParens prec = go
 
 
 -- | Parenthesize an expression without token information
-gHsPar :: forall p. IsPass p => LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
-gHsPar e = HsPar x e
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+gHsPar :: LHsExpr (GhcPass id) -> HsExpr (GhcPass id)
+gHsPar e = HsPar noAnn noHsTok e noHsTok
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
@@ -890,11 +883,11 @@ parenthesizeHsExpr p le@(L loc e)
   | otherwise             = le
 
 stripParensLHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-stripParensLHsExpr (L _ (HsPar _ e)) = stripParensLHsExpr e
+stripParensLHsExpr (L _ (HsPar _ _ e _)) = stripParensLHsExpr e
 stripParensLHsExpr e = e
 
 stripParensHsExpr :: HsExpr (GhcPass p) -> HsExpr (GhcPass p)
-stripParensHsExpr (HsPar _ (L _ e)) = stripParensHsExpr e
+stripParensHsExpr (HsPar _ _ (L _ e) _) = stripParensHsExpr e
 stripParensHsExpr e = e
 
 isAtomicHsExpr :: forall p. IsPass p => HsExpr (GhcPass p) -> Bool
@@ -1129,10 +1122,7 @@ type instance XCmdArrForm GhcTc = NoExtField
 
 type instance XCmdApp     (GhcPass _) = EpAnnCO
 type instance XCmdLam     (GhcPass _) = NoExtField
-
-type instance XCmdPar     GhcPs = (EpToken "(", EpToken ")")
-type instance XCmdPar     GhcRn = NoExtField
-type instance XCmdPar     GhcTc = NoExtField
+type instance XCmdPar     (GhcPass _) = EpAnnCO
 
 type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
@@ -1144,7 +1134,7 @@ type instance XCmdIf      GhcPs = EpAnn AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
-type instance XCmdLet     GhcPs = (EpToken "let", EpToken "in")
+type instance XCmdLet     GhcPs = EpAnnCO
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
@@ -1245,7 +1235,7 @@ ppr_lcmd c = ppr_cmd (unLoc c)
 
 ppr_cmd :: forall p. (OutputableBndrId p
                      ) => HsCmd (GhcPass p) -> SDoc
-ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
+ppr_cmd (HsCmdPar _ _ c _) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp _ c e)
   = let (fun, args) = collect_args c [e] in
@@ -1270,11 +1260,11 @@ ppr_cmd (HsCmdIf _ _ e ct ce)
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
+ppr_cmd (HsCmdLet _ _ binds _ cmd@(L _ (HsCmdLet {})))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet _ binds cmd)
+ppr_cmd (HsCmdLet _ _ binds _ cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 

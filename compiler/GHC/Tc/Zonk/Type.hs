@@ -723,7 +723,7 @@ zonk_bind bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
   = do  { new_pat   <- don'tBind $ zonkPat pat            -- Env already extended
         ; new_grhss <- zonkGRHSs zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX ty
-        ; new_mult  <- zonkMultAnn mult_ann
+        ; new_mult  <- onMultExt zonkTcTypeToTypeX mult_ann
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
                        , pat_mult = new_mult
                        , pat_ext = (new_ty, ticks) }) }
@@ -811,17 +811,6 @@ zonk_bind (PatSynBind x bind@(PSB { psb_id   = L loc id
                        , psb_args = details'
                        , psb_def  = lpat'
                        , psb_dir  = dir' } } }
-
-zonkMultAnn :: HsMultAnn GhcTc -> ZonkTcM (HsMultAnn GhcTc)
-zonkMultAnn (HsNoMultAnn mult)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsNoMultAnn mult') }
-zonkMultAnn (HsPct1Ann mult)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsPct1Ann mult') }
-zonkMultAnn (HsMultAnn mult hs_ty)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsMultAnn mult' hs_ty) }
 
 zonkPatSynDetails :: HsPatSynDetails GhcTc
                   -> ZonkTcM (HsPatSynDetails GhcTc)
@@ -961,10 +950,10 @@ zonkExpr (HsApp x e1 e2)
        new_e2 <- zonkLExpr e2
        return (HsApp x new_e1 new_e2)
 
-zonkExpr (HsAppType ty e t)
+zonkExpr (HsAppType ty e at t)
   = do new_e <- zonkLExpr e
        new_ty <- zonkTcTypeToTypeX ty
-       return (HsAppType new_ty new_e t)
+       return (HsAppType new_ty new_e at t)
        -- NB: the type is an HsType; can't zonk that!
 
 zonkExpr (HsTypedBracket hsb_tc body)
@@ -984,9 +973,9 @@ zonkExpr (NegApp x expr op)
     do { new_expr <- zonkLExpr expr
        ; return (NegApp x new_expr new_op) }
 
-zonkExpr (HsPar x e)
+zonkExpr (HsPar x lpar e rpar)
   = do { new_e <- zonkLExpr e
-       ; return (HsPar x new_e) }
+       ; return (HsPar x lpar new_e rpar) }
 
 zonkExpr (SectionL x _ _) = dataConCantHappen x
 zonkExpr (SectionR x _ _) = dataConCantHappen x
@@ -1025,10 +1014,10 @@ zonkExpr (HsMultiIf ty alts)
             do { expr' <- zonkLExpr expr
                ; return $ GRHS x guard' expr' }
 
-zonkExpr (HsLet x binds expr)
+zonkExpr (HsLet x tkLet binds tkIn expr)
   = runZonkBndrT (zonkLocalBinds binds) $ \ new_binds ->
     do { new_expr <- zonkLExpr expr
-       ; return (HsLet x new_binds new_expr) }
+       ; return (HsLet x tkLet new_binds tkIn new_expr) }
 
 zonkExpr (HsDo ty do_or_lc (L l stmts))
   = do new_stmts <- don'tBind $ zonkStmts zonkLExpr stmts
@@ -1073,7 +1062,7 @@ zonkExpr (HsStatic (fvs, ty) expr)
   = do new_ty <- zonkTcTypeToTypeX ty
        HsStatic (fvs, new_ty) <$> zonkLExpr expr
 
-zonkExpr (HsEmbTy x _) = dataConCantHappen x
+zonkExpr (HsEmbTy x _ _) = dataConCantHappen x
 
 zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
@@ -1159,9 +1148,9 @@ zonkCmd (HsCmdApp x c e)
        new_e <- zonkLExpr e
        return (HsCmdApp x new_c new_e)
 
-zonkCmd (HsCmdPar x c)
+zonkCmd (HsCmdPar x lpar c rpar)
   = do new_c <- zonkLCmd c
-       return (HsCmdPar x new_c)
+       return (HsCmdPar x lpar new_c rpar)
 
 zonkCmd (HsCmdCase x expr ms)
   = do new_expr <- zonkLExpr expr
@@ -1179,10 +1168,10 @@ zonkCmd (HsCmdIf x eCond ePred cThen cElse)
        ; new_cElse <- zonkLCmd cElse
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
 
-zonkCmd (HsCmdLet x binds cmd)
+zonkCmd (HsCmdLet x tkLet binds tkIn cmd)
   = runZonkBndrT (zonkLocalBinds binds) $ \ new_binds ->
     do new_cmd <- zonkLCmd cmd
-       return (HsCmdLet x new_binds new_cmd)
+       return (HsCmdLet x tkLet new_binds tkIn new_cmd)
 
 zonkCmd (HsCmdDo ty (L l stmts))
   = do new_stmts <- don'tBind $ zonkStmts zonkLCmd stmts
@@ -1481,9 +1470,9 @@ zonkPat :: LPat GhcTc -> ZonkBndrTcM (LPat GhcTc)
 zonkPat pat = wrapLocZonkBndrMA zonk_pat pat
 
 zonk_pat :: Pat GhcTc -> ZonkBndrTcM (Pat GhcTc)
-zonk_pat (ParPat x p)
+zonk_pat (ParPat x lpar p rpar)
   = do  { p' <- zonkPat p
-        ; return (ParPat x p') }
+        ; return (ParPat x lpar p' rpar) }
 
 zonk_pat (WildPat ty)
   = do  { ty' <- noBinders $ zonkTcTypeToTypeX ty
@@ -1501,10 +1490,10 @@ zonk_pat (BangPat x pat)
   = do  { pat' <- zonkPat pat
         ; return (BangPat x pat') }
 
-zonk_pat (AsPat x (L loc v) pat)
+zonk_pat (AsPat x (L loc v) at pat)
   = do  { v'   <- zonkIdBndrX v
         ; pat' <- zonkPat pat
-        ; return (AsPat x (L loc v') pat') }
+        ; return (AsPat x (L loc v') at pat') }
 
 zonk_pat (ViewPat ty expr pat)
   = do  { expr' <- noBinders $ zonkLExpr expr
@@ -1584,9 +1573,9 @@ zonk_pat (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; n'    <- zonkIdBndrX n
         ; return (NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
 
-zonk_pat (EmbTyPat ty tp)
+zonk_pat (EmbTyPat ty toktype tp)
   = do { ty' <- noBinders $ zonkTcTypeToTypeX ty
-       ; return (EmbTyPat ty' tp) }
+       ; return (EmbTyPat ty' toktype tp) }
 
 zonk_pat (XPat ext) = case ext of
   { ExpansionPat orig pat->

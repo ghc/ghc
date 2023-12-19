@@ -875,16 +875,16 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (HsExpr GhcPs)) where
-  hsDecls (L _ (HsLet _ decls _ex)) = return $ hsDeclsLocalBinds decls
-  hsDecls _                         = return []
+  hsDecls (L _ (HsLet _ _ decls _ _ex)) = return $ hsDeclsLocalBinds decls
+  hsDecls _                             = return []
 
-  replaceDecls (L ll (HsLet (tkLet, tkIn) binds ex)) newDecls
+  replaceDecls (L ll (HsLet x tkLet binds tkIn ex)) newDecls
     = do
         logTr "replaceDecls HsLet"
         let lastAnc = realSrcSpan $ spanHsLocaLBinds binds
         -- TODO: may be an intervening comment, take account for lastAnc
         let (tkLet', tkIn', ex',newDecls') = case (tkLet, tkIn) of
-              (EpTok l, EpTok i) ->
+              (L (TokenLoc l) ls, L (TokenLoc i) is) ->
                 let
                   off = case l of
                           (EpaSpan (RealSrcSpan r _)) -> LayoutStartCol $ snd $ ss2pos r
@@ -895,20 +895,20 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                   newDecls'' = case newDecls of
                     [] -> newDecls
                     (d:ds) -> setEntryDPDecl d (SameLine 0) : ds
-                in ( EpTok l
-                   , EpTok (addEpaLocationDelta off lastAnc i)
+                in ( L (TokenLoc l) ls
+                   , L (TokenLoc (addEpaLocationDelta off lastAnc i)) is
                    , ex''
                    , newDecls'')
               (_,_) -> (tkLet, tkIn, ex, newDecls)
         binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
-        return (L ll (HsLet (tkLet', tkIn') binds' ex'))
+        return (L ll (HsLet x tkLet' binds' tkIn' ex'))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
-  replaceDecls (L l (HsPar x e)) newDecls
+  replaceDecls (L l (HsPar x lpar e rpar)) newDecls
     = do
         logTr "replaceDecls HsPar"
         e' <- replaceDecls e newDecls
-        return (L l (HsPar x e'))
+        return (L l (HsPar x lpar e' rpar))
   replaceDecls old _new = error $ "replaceDecls (LHsExpr GhcPs) undefined for:" ++ showGhc old
 
 -- ---------------------------------------------------------------------

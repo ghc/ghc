@@ -476,7 +476,7 @@ orderedDecls sortKey declGroup  =
 
 hsDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs]
 hsDeclsClassDecl dec = case dec of
-  ClassDecl { tcdCExt = (_an2, _layout, sortKey),
+  ClassDecl { tcdCExt = (_an2, sortKey),
               tcdSigs = sigs,tcdMeths = methods,
               tcdATs = ats, tcdATDefs = at_defs
             } -> map snd decls
@@ -494,10 +494,10 @@ hsDeclsClassDecl dec = case dec of
 
 replaceDeclsClassDecl :: TyClDecl GhcPs -> [LHsDecl GhcPs] -> TyClDecl GhcPs
 replaceDeclsClassDecl decl decls = case decl of
-  ClassDecl { tcdCExt = (an2, layout, _) } -> decl'
+  ClassDecl { tcdCExt = (an2, _) } -> decl'
     where
       (tags, methods', sigs', ats', at_defs', _, _docs) = partitionWithSortKey decls
-      decl' = decl { tcdCExt = (an2, layout, AnnSortKey tags),
+      decl' = decl { tcdCExt = (an2, AnnSortKey tags),
                      tcdSigs = sigs',tcdMeths = methods',
                      tcdATs = ats', tcdATDefs = at_defs'
                    }

@@ -25,6 +25,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Module.Name,
         module Language.Haskell.Syntax.Pat,
         module Language.Haskell.Syntax.Type,
+        module Language.Haskell.Syntax.Concrete,
         module Language.Haskell.Syntax.Extension,
         ModuleName(..), HsModule(..)
 ) where
@@ -35,6 +36,7 @@ import Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.ImpExp
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Type

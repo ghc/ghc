@@ -52,7 +52,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:15-16 })
@@ -68,7 +72,13 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
                 (L
                  (EpAnn
                   (EpaSpan { T14189.hs:6:18-20 })
@@ -101,7 +111,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:24-25 })
@@ -125,7 +139,11 @@
              (EpaComments
               []))
             (ConDeclH98
-             (NoExtField)
+             (EpAnn
+              (EpaDelta (SameLine 0) [])
+              []
+              (EpaComments
+               []))
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:29 })

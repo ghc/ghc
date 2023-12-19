@@ -437,7 +437,7 @@ getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
 getLHsIntegralLit (L _ e) = go e
   where
-    go (HsPar _ e)            = getLHsIntegralLit e
+    go (HsPar _ _ e _)        = getLHsIntegralLit e
     go (HsOverLit _ over_lit) = getIntegralLit over_lit
     go (HsLit _ lit)          = getSimpleIntegralLit lit
 
@@ -481,7 +481,7 @@ getSimpleIntegralLit HsDoublePrim{}     = Nothing
 
 -- | Extract the Char if the expression is a Char literal.
 getLHsCharLit :: LHsExpr GhcTc -> Maybe Char
-getLHsCharLit (L _ (HsPar _ e))            = getLHsCharLit e
+getLHsCharLit (L _ (HsPar _ _ e _))        = getLHsCharLit e
 getLHsCharLit (L _ (HsLit _ (HsChar _ c))) = Just c
 getLHsCharLit (L _ (XExpr (HsTick _ e)))         = getLHsCharLit e
 getLHsCharLit (L _ (XExpr (HsBinTick _ _ e)))    = getLHsCharLit e

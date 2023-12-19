@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -114,7 +114,6 @@
             (HsOuterImplicit
              (NoExtField))
             [(HsValArg
-              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { KindSigs.hs:12:7 })
@@ -223,8 +222,7 @@
             []
             (EpaComments
              []))
-           (HsBndrRequired
-            (NoExtField))
+           (HsBndrRequired)
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:11:17 })
@@ -284,8 +282,7 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:15:10 })
@@ -528,8 +525,7 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:16:11 })
@@ -889,9 +885,10 @@
             (EpaComments
              []))
            (HsUnrestrictedArrow
-            (EpUniTok
-             (EpaSpan { KindSigs.hs:22:22-23 })
-             (NormalSyntax)))
+            (L
+             (TokenLoc
+              (EpaSpan { KindSigs.hs:22:22-23 }))
+             (HsNormalTok)))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:22:8-20 })
@@ -981,9 +978,10 @@
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { KindSigs.hs:22:30-31 })
-               (NormalSyntax)))
+              (L
+               (TokenLoc
+                (EpaSpan { KindSigs.hs:22:30-31 }))
+               (HsNormalTok)))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:25-28 })
@@ -1501,8 +1499,7 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { KindSigs.hs:28:12 })

@@ -17,14 +17,13 @@
        { T22919.hs:2:7-9 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan
-        { T22919.hs:1:15-27 })
+       (EpaSpan { T22919.hs:1:15-27 })
        (EpaComment
         (EpaBlockComment
          "{- comment -}")
         { T22919.hs:1:8-13 }))]
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))

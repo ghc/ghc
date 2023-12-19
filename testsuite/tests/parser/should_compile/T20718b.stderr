@@ -17,35 +17,31 @@
        { T20718b.hs:7:1-21 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan
-        { T20718b.hs:1:1-19 })
+       (EpaSpan { T20718b.hs:1:1-19 })
        (EpaComment
         (EpaLineComment
          "-- header comment 1")
         { T20718b.hs:1:1 }))
      ,(L
-       (EpaSpan
-        { T20718b.hs:2:1-19 })
+       (EpaSpan { T20718b.hs:2:1-19 })
        (EpaComment
         (EpaLineComment
          "-- header comment 2")
         { T20718b.hs:1:1-19 }))
      ,(L
-       (EpaSpan
-        { T20718b.hs:6:1-21 })
+       (EpaSpan { T20718b.hs:6:1-21 })
        (EpaComment
         (EpaLineComment
          "-- trailing comment 1")
         { T20718b.hs:4:16-20 }))
      ,(L
-       (EpaSpan
-        { T20718b.hs:7:1-21 })
+       (EpaSpan { T20718b.hs:7:1-21 })
        (EpaComment
         (EpaLineComment
          "-- trailing comment 2")
         { T20718b.hs:6:1-21 }))]
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))

@@ -110,7 +110,7 @@ desugarPat :: Id -> Pat GhcTc -> DsM [PmGrd]
 desugarPat x pat = case pat of
   WildPat  _ty -> pure []
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
-  ParPat _ p   -> desugarLPat x p
+  ParPat _ _ p _ -> desugarLPat x p
   LazyPat _ _  -> pure [] -- like a wildcard
   BangPat _ p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
@@ -120,10 +120,10 @@ desugarPat x pat = case pat of
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> desugarLPat y p
+  AsPat _ (L _ y) _ p -> (mkPmLetVar y x ++) <$> desugarLPat y p
 
   SigPat _ p _ty -> desugarLPat x p
-  EmbTyPat _ _ -> pure []
+  EmbTyPat _ _ _ -> pure []
 
   XPat ext -> case ext of
 

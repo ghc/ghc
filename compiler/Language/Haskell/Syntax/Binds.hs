@@ -29,6 +29,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat
   ( LPat )
 
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
@@ -42,6 +43,7 @@ import GHC.Types.SourceText (StringLiteral)
 import Data.Void
 import Data.Bool
 import Data.Maybe
+import Data.Functor
 
 {-
 ************************************************************************
@@ -166,14 +168,12 @@ other interesting cases. Namely,
 
 Note [Multiplicity annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Multiplicity annotations are stored in the pat_mult field on PatBinds,
-represented by the HsMultAnn data type
-
-  HsNoMultAnn <=> no annotation in the source file
-  HsPct1Ann   <=> the %1 annotation
-  HsMultAnn   <=> the %t annotation, where `t` is some type
-
-In case of HsNoMultAnn the typechecker infers a multiplicity.
+Multiplicity annotation are stored in the pat_mult field on PatBinds. The type
+of the pat_mult field is given by the type family MultAnn: it changes depending
+on the phase. Before typechecking, MultAnn is Maybe (HsMultAnn) where Nothing
+means that there was no annotation in the original file. After typechecking
+MultAnn is Mult: the typechecker infers a multiplicity when there is no
+annotation.
 
 We don't need to store a multiplicity on FunBinds:
 - let %1 x = … is parsed as a PatBind. So we don't need an annotation before
@@ -239,7 +239,7 @@ data HsBindLR idL idR
   | PatBind {
         pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
-        pat_mult   :: HsMultAnn idL,
+        pat_mult   :: MultAnn idL,
         -- ^ See Note [Multiplicity annotations].
         pat_rhs    :: GRHSs idR (LHsExpr idR)
     }
@@ -285,19 +285,25 @@ data PatSynBind idL idR
      }
    | XPatSynBind !(XXPatSynBind idL idR)
 
+
 -- | Multiplicity annotations, on binders, are always resolved (to a unification
 -- variable if there is no annotation) during type-checking. The resolved
--- multiplicity is stored in the extension fields.
-data HsMultAnn pass
-  = HsNoMultAnn !(XNoMultAnn pass)
-  | HsPct1Ann   !(XPct1Ann pass)
-  | HsMultAnn   !(XMultAnn pass) (LHsType (NoGhcTc pass))
-  | XMultAnn    !(XXMultAnn pass)
+-- multiplicity is stored in the `mult_ext` field.
+type family XMultAnn pass
 
-type family XNoMultAnn p
-type family XPct1Ann   p
-type family XMultAnn   p
-type family XXMultAnn  p
+data MultAnn pass
+  = MultAnn { mult_ext :: XMultAnn pass, mult_ann :: HsMultAnn (NoGhcTc pass)}
+
+-- | Multiplicity annotations at parse time. In particular `%1` is
+-- special-cased.
+data HsMultAnn pass
+  = HsNoMultAnn
+  | HsPct1Ann !(LHsToken "%1" pass)
+  | HsMultAnn !(LHsToken "%" pass) (LHsType pass)
+
+onMultExt :: Functor f => (XMultAnn pass -> f (XMultAnn pass)) -> MultAnn pass -> f (MultAnn pass)
+onMultExt f (MultAnn{mult_ext=x, mult_ann=ann}) =
+  f x <&> (\y -> MultAnn{mult_ext = y, mult_ann = ann})
 
 {-
 ************************************************************************

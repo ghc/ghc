@@ -18,7 +18,7 @@
     (EpaCommentsBalanced
      []
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -73,8 +73,7 @@
            []
            (EpaComments
             []))
-          (HsBndrRequired
-           (NoExtField))
+          (HsBndrRequired)
           (L
            (EpAnn
             (EpaSpan { T15323.hs:5:19 })
@@ -100,15 +99,11 @@
            (EpaComments
             []))
           (ConDeclGADT
-           ((,)
-            (EpUniTok
-             (EpaSpan { T15323.hs:6:17-18 })
-             (NormalSyntax))
-            (EpAnn
-             (EpaSpan { T15323.hs:6:5-54 })
-             []
-             (EpaComments
-              [])))
+           (EpAnn
+            (EpaSpan { T15323.hs:6:5-54 })
+            []
+            (EpaComments
+             []))
            (:|
             (L
              (EpAnn
@@ -120,6 +115,10 @@
              (Unqual
               {OccName: TestParens}))
             [])
+           (L
+            (TokenLoc
+             (EpaSpan { T15323.hs:6:17-18 }))
+            (HsNormalTok))
            (L
             (EpAnn
              (EpaSpan { T15323.hs:6:20-29 })
@@ -243,7 +242,6 @@
                      (Unqual
                       {OccName: v}))))))))]))
            (PrefixConGADT
-            (NoExtField)
             [])
            (L
             (EpAnn

@@ -24,7 +24,7 @@
          "{-# OPTIONS -ddump-parsed-ast #-}")
         { Test20297.hs:1:1 }))]
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))
@@ -447,7 +447,7 @@
          "{-# OPTIONS -ddump-parsed-ast #-}")
         { Test20297.ppr.hs:1:1 }))]
      []))
-   (EpVirtualBraces
+   (VirtualBraces
     (1))
    (Nothing)
    (Nothing))

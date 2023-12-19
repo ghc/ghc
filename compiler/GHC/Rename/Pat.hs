@@ -498,9 +498,9 @@ rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
 rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
 rnPatAndThen _  (WildPat _)   = return (WildPat noExtField)
-rnPatAndThen mk (ParPat _ pat) =
+rnPatAndThen mk (ParPat x lpar pat rpar) =
   do { pat' <- rnLPatAndThen mk pat
-     ; return (ParPat noExtField pat') }
+     ; return (ParPat x lpar pat' rpar) }
 rnPatAndThen mk (LazyPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (LazyPat noExtField pat') }
 rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
@@ -567,10 +567,10 @@ rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
                                       (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
-rnPatAndThen mk (AsPat _ rdr pat)
+rnPatAndThen mk (AsPat _ rdr at pat)
   = do { new_name <- newPatLName mk rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat noExtField new_name pat') }
+       ; return (AsPat noExtField new_name at pat') }
 
 rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
@@ -633,9 +633,9 @@ rnPatAndThen mk (SplicePat _ splice)
            (rn_splice, HsUntypedSpliceNested splice_name) -> return (SplicePat (HsUntypedSpliceNested splice_name) rn_splice) -- Splice was nested and thus already renamed
        }
 
-rnPatAndThen _ (EmbTyPat _ tp)
+rnPatAndThen _ (EmbTyPat _ toktype tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
-       ; return (EmbTyPat noExtField tp') }
+       ; return (EmbTyPat noExtField toktype tp') }
 
 --------------------
 rnConPatAndThen :: NameMaker
@@ -667,9 +667,9 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
                 | otherwise -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
            }
 
-    rnConPatTyArg (HsConPatTyArg _ t) = do
+    rnConPatTyArg (HsConPatTyArg at t) = do
       t' <- rnHsTyPat HsTypePatCtx t
-      return (HsConPatTyArg noExtField t')
+      return (HsConPatTyArg at t')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
@@ -1295,12 +1295,12 @@ rn_ty_pat (HsAppTy _ fun_ty arg_ty) = do
   arg_ty' <- rn_lty_pat arg_ty
   pure (HsAppTy noExtField fun_ty' arg_ty')
 
-rn_ty_pat (HsAppKindTy _ ty ki) = do
+rn_ty_pat (HsAppKindTy _ ty at ki) = do
   kind_app <- liftRn $ xoptM LangExt.TypeApplications
   unless kind_app (liftRn $ addErr (typeAppErr KindLevel ki))
   ty' <- rn_lty_pat ty
   ki' <- rn_lty_pat ki
-  pure (HsAppKindTy noExtField ty' ki')
+  pure (HsAppKindTy noExtField ty' at ki')
 
 rn_ty_pat (HsFunTy an mult lhs rhs) = do
   lhs' <- rn_lty_pat lhs
@@ -1412,10 +1412,11 @@ rn_ty_pat ty@(XHsType{}) = do
   liftRnFV $ rnHsType ctxt ty
 
 rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)
-rn_ty_pat_arrow (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField)
-rn_ty_pat_arrow (HsLinearArrow _) = pure (HsLinearArrow noExtField)
-rn_ty_pat_arrow (HsExplicitMult _ p)
-  = rn_lty_pat p <&> (\mult -> HsExplicitMult noExtField mult)
+rn_ty_pat_arrow (HsUnrestrictedArrow arr) = pure (HsUnrestrictedArrow arr)
+rn_ty_pat_arrow (HsLinearArrow (HsPct1 pct1 arr)) = pure (HsLinearArrow (HsPct1 pct1 arr))
+rn_ty_pat_arrow (HsLinearArrow (HsLolly arr)) = pure (HsLinearArrow (HsLolly arr))
+rn_ty_pat_arrow (HsExplicitMult pct p arr)
+  = rn_lty_pat p <&> (\mult -> HsExplicitMult pct mult arr)
 
 check_data_kinds :: HsType GhcPs -> TPRnM ()
 check_data_kinds thing = liftRn $ do

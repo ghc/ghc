@@ -555,8 +555,8 @@ instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
     HsOuterExplicit{hso_bndrs = tvs} ->
       foldl1' combineSrcSpans [getHasLoc a, getHasLocList tvs, getHasLocList b, getHasLoc c]
 
-instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg (GhcPass p) tm ty) where
-  getHasLoc (HsValArg _ tm) = getHasLoc tm
+instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg p tm ty) where
+  getHasLoc (HsValArg tm) = getHasLoc tm
   getHasLoc (HsTypeArg _ ty) = getHasLoc ty
   getHasLoc (HsArgPar sp)  = sp
 
@@ -736,10 +736,10 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         HsApp{} -> Nothing
         HsAppType{} -> Nothing
         NegApp{} -> Nothing
-        HsPar _ e -> computeLType e
+        HsPar _ _ e _ -> computeLType e
         ExplicitTuple{} -> Nothing
         HsIf _ _ t f -> computeLType t <|> computeLType f
-        HsLet _ _ body -> computeLType body
+        HsLet _ _ _ _ body -> computeLType body
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
@@ -960,14 +960,14 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       LazyPat _ p ->
         [ toHie $ PS rsp scope pscope p
         ]
-      AsPat _ lname pat ->
+      AsPat _ lname _ pat ->
         [ toHie $ C (PatternBind scope
                                  (combineScopes (mkScope pat) pscope)
                                  rsp)
                     lname
         , toHie $ PS rsp scope pscope pat
         ]
-      ParPat _ pat ->
+      ParPat _ _ pat _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
       BangPat _ pat ->
@@ -1028,7 +1028,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                            sig
             HieRn -> pure []
         ]
-      EmbTyPat _ tp ->
+      EmbTyPat _ _ tp ->
         [ toHie $ TS (ResolvedScopes [scope, pscope]) tp
         ]
       XPat e ->
@@ -1176,7 +1176,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie a
         , toHie b
         ]
-      HsAppType _ expr sig ->
+      HsAppType _ expr _ sig ->
         [ toHie expr
         , toHie $ TS (ResolvedScopes []) sig
         ]
@@ -1188,7 +1188,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       NegApp _ a _ ->
         [ toHie a
         ]
-      HsPar _ a ->
+      HsPar _ _ a _ ->
         [ toHie a
         ]
       SectionL _ a b ->
@@ -1217,7 +1217,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsMultiIf _ grhss ->
         [ toHie grhss
         ]
-      HsLet _ binds expr ->
+      HsLet _ _ binds _ expr ->
         [ toHie $ RS (mkScope expr) binds
         , toHie expr
         ]
@@ -1264,7 +1264,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsStatic _ expr ->
         [ toHie expr
         ]
-      HsEmbTy _ ty ->
+      HsEmbTy _ _ ty ->
         [ toHie $ TS (ResolvedScopes []) ty
         ]
       HsTypedBracket xbracket b -> case hiePass @p of
@@ -1474,8 +1474,8 @@ instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg re
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
 instance ToHie (HsConDeclGADTDetails GhcRn) where
-  toHie (PrefixConGADT _ args) = toHie args
-  toHie (RecConGADT _ rec) = toHie rec
+  toHie (PrefixConGADT args) = toHie args
+  toHie (RecConGADT rec _) = toHie rec
 
 instance HiePass p => ToHie (LocatedAn NoEpAnns (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNodeA top span : case top of
@@ -1497,7 +1497,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         [ toHie a
         , toHie b
         ]
-      HsCmdPar _ a ->
+      HsCmdPar _ _ a _ ->
         [ toHie a
         ]
       HsCmdCase _ expr alts ->
@@ -1512,7 +1512,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         , toHie b
         , toHie c
         ]
-      HsCmdLet _ binds cmd' ->
+      HsCmdLet _ _ binds _ cmd' ->
         [ toHie $ RS (mkScope cmd') binds
         , toHie cmd'
         ]
@@ -1706,8 +1706,8 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
           rhsScope = combineScopes argsScope tyScope
           ctxScope = maybe NoScope mkScope ctx
           argsScope = case args of
-            PrefixConGADT _ xs -> scaled_args_scope xs
-            RecConGADT _ x     -> mkScope x
+            PrefixConGADT xs -> scaled_args_scope xs
+            RecConGADT x _   -> mkScope x
           tyScope = mkScope typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
@@ -1839,7 +1839,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie a
         , toHie b
         ]
-      HsAppKindTy _ ty ki ->
+      HsAppKindTy _ ty _ ki ->
         [ toHie ty
         , toHie ki
         ]
@@ -1897,8 +1897,8 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsStarTy _ _ -> []
       XHsType _ -> []
 
-instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where
-  toHie (HsValArg _ tm) = toHie tm
+instance (ToHie tm, ToHie ty) => ToHie (HsArg p tm ty) where
+  toHie (HsValArg tm) = toHie tm
   toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = locOnly sp
 

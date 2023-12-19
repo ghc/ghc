@@ -298,7 +298,7 @@ no_anon_wc_ty lty = go lty
     go (L _ ty) = case ty of
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
-      HsAppKindTy _ ty ki            -> go ty && go ki
+      HsAppKindTy _ ty _ ki          -> go ty && go ki
       HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (arrowToHsType w)
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
