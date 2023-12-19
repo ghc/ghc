@@ -80,11 +80,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { T22919.hs:2:1-9 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -124,11 +120,7 @@
                  (EpaComments
                   []))
                 (HsLit
-                 (EpAnn
-                  (EpaSpan { T22919.hs:2:7-9 })
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (NoExtField)
                  (HsChar
                   (SourceText 's')
                   ('s'))))))]

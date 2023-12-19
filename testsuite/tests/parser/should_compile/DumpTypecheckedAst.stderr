@@ -20,11 +20,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -33,11 +29,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -46,11 +38,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -59,11 +47,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -72,11 +56,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -85,11 +65,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -110,11 +86,7 @@
                   (EpaComments
                    []))
                  (HsLit
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
               (L
                (EpAnn
@@ -124,11 +96,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
             (L
              (EpAnn
@@ -164,11 +132,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -189,11 +153,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (HsStringPrim
                  (NoSourceText)
                  "T")))))))))
@@ -205,11 +165,7 @@
           (EpaComments
            []))
          (HsLit
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           {HsInt{64}Prim (1) (NoSourceText)}))))
       (L
        (EpAnn
@@ -246,11 +202,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -259,11 +211,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -272,11 +220,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -285,11 +229,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -298,11 +238,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -311,11 +247,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -336,11 +268,7 @@
                   (EpaComments
                    []))
                  (HsLit
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
               (L
                (EpAnn
@@ -350,11 +278,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
             (L
              (EpAnn
@@ -390,11 +314,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -415,11 +335,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (HsStringPrim
                  (NoSourceText)
                  "'MkT")))))))))
@@ -431,11 +347,7 @@
           (EpaComments
            []))
          (HsLit
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           {HsInt{64}Prim (3) (NoSourceText)}))))
       (L
        (EpAnn
@@ -472,11 +384,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -485,11 +393,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -498,11 +402,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -511,11 +411,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -524,11 +420,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -537,11 +429,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -562,11 +450,7 @@
                   (EpaComments
                    []))
                  (HsLit
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               (L
                (EpAnn
@@ -576,11 +460,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             (L
              (EpAnn
@@ -616,11 +496,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -641,11 +517,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (HsStringPrim
                  (NoSourceText)
                  "Peano")))))))))
@@ -657,11 +529,7 @@
           (EpaComments
            []))
          (HsLit
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (EpAnn
@@ -698,11 +566,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -711,11 +575,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -724,11 +584,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -737,11 +593,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -750,11 +602,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -763,11 +611,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -788,11 +632,7 @@
                   (EpaComments
                    []))
                  (HsLit
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               (L
                (EpAnn
@@ -802,11 +642,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             (L
              (EpAnn
@@ -842,11 +678,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -867,11 +699,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (HsStringPrim
                  (NoSourceText)
                  "'Zero")))))))))
@@ -883,11 +711,7 @@
           (EpaComments
            []))
          (HsLit
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (EpAnn
@@ -924,11 +748,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -937,11 +757,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -950,11 +766,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -963,11 +775,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -976,11 +784,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -989,11 +793,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -1014,11 +814,7 @@
                   (EpaComments
                    []))
                  (HsLit
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               (L
                (EpAnn
@@ -1028,11 +824,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             (L
              (EpAnn
@@ -1068,11 +860,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -1093,11 +881,7 @@
                 (EpaComments
                  []))
                (HsLit
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (HsStringPrim
                  (NoSourceText)
                  "'Succ")))))))))
@@ -1109,11 +893,7 @@
           (EpaComments
            []))
          (HsLit
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (EpAnn
@@ -1150,11 +930,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1175,11 +951,7 @@
         (EpaComments
          []))
        (HsLit
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (HsInt
          (NoExtField)
          (IL
@@ -1204,11 +976,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1229,11 +997,7 @@
         (EpaComments
          []))
        (HsLit
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (HsInt
          (NoExtField)
          (IL
@@ -1258,11 +1022,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1283,11 +1043,7 @@
         (EpaComments
          []))
        (HsLit
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (HsInt
          (NoExtField)
          (IL
@@ -1312,11 +1068,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1325,11 +1077,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1394,11 +1142,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1407,11 +1151,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1476,11 +1216,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1489,11 +1225,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1558,11 +1290,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1571,11 +1299,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1640,11 +1364,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1653,11 +1373,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1722,11 +1438,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1735,11 +1447,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1786,11 +1494,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -1799,11 +1503,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -1857,11 +1557,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -1870,11 +1566,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -1928,11 +1620,7 @@
                   (EpaComments
                    []))
                  (HsApp
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   (L
                    (EpAnn
                     (EpaSpan { <no location info> })
@@ -1941,11 +1629,7 @@
                     (EpaComments
                      []))
                    (HsApp
-                    (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (NoExtField)
                     (L
                      (EpAnn
                       (EpaSpan { <no location info> })
@@ -2019,11 +1703,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -2032,11 +1712,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -2103,11 +1779,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -2116,11 +1788,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -2150,11 +1818,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -2175,11 +1839,7 @@
               (EpaComments
                []))
              (HsLit
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (HsStringPrim
                (NoSourceText)
                "main")))))))))
@@ -2200,11 +1860,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -2225,11 +1881,7 @@
             (EpaComments
              []))
            (HsLit
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (HsStringPrim
              (NoSourceText)
              "DumpTypecheckedAst")))))))))))
@@ -2299,11 +1951,7 @@
               (EpaComments
                []))
              (Match
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               []
-               (EpaComments
-                []))
+              []
               (FunRhs
                (L
                 (EpAnn
@@ -2342,11 +1990,7 @@
                     (EpaComments
                      []))
                    (HsApp
-                    (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (NoExtField)
                     (L
                      (EpAnn
                       (EpaSpan { DumpTypecheckedAst.hs:20:8-15 })
@@ -2372,11 +2016,7 @@
                       (EpaComments
                        []))
                      (HsLit
-                      (EpAnn
-                       (EpaSpan { DumpTypecheckedAst.hs:20:17-23 })
-                       (NoEpAnns)
-                       (EpaComments
-                        []))
+                      (NoExtField)
                       (HsString
                        (SourceText "hello")
                        {FastString: "hello"})))))))]

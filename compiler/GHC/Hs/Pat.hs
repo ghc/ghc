@@ -93,7 +93,7 @@ type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
 
-type instance XLazyPat GhcPs = EpAnn [AddEpAnn] -- For '~'
+type instance XLazyPat GhcPs = [AddEpAnn] -- For '~'
 type instance XLazyPat GhcRn = NoExtField
 type instance XLazyPat GhcTc = NoExtField
 
@@ -105,11 +105,11 @@ type instance XParPat  GhcPs = (EpToken "(", EpToken ")")
 type instance XParPat  GhcRn = NoExtField
 type instance XParPat  GhcTc = NoExtField
 
-type instance XBangPat GhcPs = EpAnn [AddEpAnn] -- For '!'
+type instance XBangPat GhcPs = [AddEpAnn] -- For '!'
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
-type instance XListPat GhcPs = EpAnn AnnList
+type instance XListPat GhcPs = AnnList
   -- After parsing, ListPat can refer to a built-in Haskell list pattern
   -- or an overloaded list pattern.
 type instance XListPat GhcRn = NoExtField
@@ -119,19 +119,19 @@ type instance XListPat GhcRn = NoExtField
 type instance XListPat GhcTc = Type
   -- List element type, for use in hsPatType.
 
-type instance XTuplePat GhcPs = EpAnn [AddEpAnn]
+type instance XTuplePat GhcPs = [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = EpAnn EpAnnSumPat
+type instance XSumPat GhcPs = EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XConPat GhcPs = EpAnn [AddEpAnn]
+type instance XConPat GhcPs = [AddEpAnn]
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
-type instance XViewPat GhcPs = EpAnn [AddEpAnn]
+type instance XViewPat GhcPs = [AddEpAnn]
 type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
   -- The @HsExpr GhcRn@ gives an inverse to the view function.
   -- This is used for overloaded lists in particular.
@@ -147,15 +147,15 @@ type instance XSplicePat GhcTc = DataConCantHappen
 
 type instance XLitPat    (GhcPass _) = NoExtField
 
-type instance XNPat GhcPs = EpAnn [AddEpAnn]
-type instance XNPat GhcRn = EpAnn [AddEpAnn]
+type instance XNPat GhcPs = [AddEpAnn]
+type instance XNPat GhcRn = [AddEpAnn]
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = EpAnn EpaLocation -- Of the "+"
+type instance XNPlusKPat GhcPs = EpaLocation -- Of the "+"
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = EpAnn [AddEpAnn]
+type instance XSigPat GhcPs = [AddEpAnn]
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
@@ -180,7 +180,7 @@ type instance XConPatTyArg GhcPs = EpToken "@"
 type instance XConPatTyArg GhcRn = NoExtField
 type instance XConPatTyArg GhcTc = NoExtField
 
-type instance XHsFieldBind _ = EpAnn [AddEpAnn]
+type instance XHsFieldBind _ = [AddEpAnn]
 
 -- ---------------------------------------------------------------------
 
@@ -896,7 +896,7 @@ collectEvVarsPat pat =
 -}
 
 type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
-type instance Anno (HsOverLit (GhcPass p)) = EpAnn NoEpAnns
+type instance Anno (HsOverLit (GhcPass p)) = EpAnnCO
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
 type instance Anno RecFieldsDotDot = SrcSpan

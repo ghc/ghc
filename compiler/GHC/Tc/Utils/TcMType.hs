@@ -2371,11 +2371,11 @@ shortCutLit platform val res_ty
   where
     go_integral int@(IL src neg i)
       | isIntTy res_ty  && platformInIntRange  platform i
-      = Just (HsLit noAnn (HsInt noExtField int))
+      = Just (HsLit noExtField (HsInt noExtField int))
       | isWordTy res_ty && platformInWordRange platform i
       = Just (mkLit wordDataCon (HsWordPrim src i))
       | isIntegerTy res_ty
-      = Just (HsLit noAnn (HsInteger src i res_ty))
+      = Just (HsLit noExtField (HsInteger src i res_ty))
       | otherwise
       = go_fractional (integralFractionalLit neg i)
         -- The 'otherwise' case is important
@@ -2396,11 +2396,11 @@ shortCutLit platform val res_ty
             -- is less than 100, which ensures desugaring isn't slow.
 
     go_string src s
-      | isStringTy res_ty = Just (HsLit noAnn (HsString src s))
+      | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
       | otherwise         = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
-mkLit con lit = HsApp noComments (nlHsDataCon con) (nlHsLit lit)
+mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
 hsOverLitName :: OverLitVal -> Name

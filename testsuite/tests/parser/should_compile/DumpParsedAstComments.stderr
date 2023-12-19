@@ -101,11 +101,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -145,11 +141,7 @@
                  (EpaComments
                   []))
                 (HsOverLit
-                 (EpAnn
-                  (EpaSpan { DumpParsedAstComments.hs:9:7 })
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (NoExtField)
                  (OverLit
                   (NoExtField)
                   (HsIntegral
@@ -220,11 +212,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -262,25 +250,21 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  []))
+                  [(L
+                    (EpaSpan
+                     { DumpParsedAstComments.hs:15:3-19 })
+                    (EpaComment
+                     (EpaLineComment
+                      "-- normal comment")
+                     { DumpParsedAstComments.hs:14:7-8 }))]))
                 (HsDo
-                 (EpAnn
-                  (EpaSpan { DumpParsedAstComments.hs:(14,7)-(16,3) })
-                  (AnnList
-                   (Just
-                    (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                   (Nothing)
-                   (Nothing)
-                   [(AddEpAnn AnnDo (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))]
-                   [])
-                  (EpaComments
-                   [(L
-                     (EpaSpan
-                      { DumpParsedAstComments.hs:15:3-19 })
-                     (EpaComment
-                      (EpaLineComment
-                       "-- normal comment")
-                      { DumpParsedAstComments.hs:14:7-8 }))]))
+                 (AnnList
+                  (Just
+                   (EpaSpan { DumpParsedAstComments.hs:16:3 }))
+                  (Nothing)
+                  (Nothing)
+                  [(AddEpAnn AnnDo (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))]
+                  [])
                  (DoExpr
                   (Nothing))
                  (L
@@ -312,11 +296,7 @@
                        (EpaComments
                         []))
                       (HsOverLit
-                       (EpAnn
-                        (EpaSpan { DumpParsedAstComments.hs:16:3 })
-                        (NoEpAnns)
-                        (EpaComments
-                         []))
+                       (NoExtField)
                        (OverLit
                         (NoExtField)
                         (HsIntegral
@@ -375,11 +355,7 @@
            (EpaComments
             []))
           (Match
-           (EpAnn
-            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
-            []
-            (EpaComments
-             []))
+           []
            (FunRhs
             (L
              (EpAnn
@@ -419,11 +395,7 @@
                  (EpaComments
                   []))
                 (HsApp
-                 (EpAnn
-                  (EpaSpan { DumpParsedAstComments.hs:19:8-23 })
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (NoExtField)
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAstComments.hs:19:8-15 })
@@ -450,11 +422,7 @@
                    (EpaComments
                     []))
                   (HsLit
-                   (EpAnn
-                    (EpaSpan { DumpParsedAstComments.hs:19:17-23 })
-                    (NoEpAnns)
-                    (EpaComments
-                     []))
+                   (NoExtField)
                    (HsString
                     (SourceText "hello")
                     {FastString: "hello"})))))))]

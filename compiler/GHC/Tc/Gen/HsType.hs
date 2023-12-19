@@ -1378,14 +1378,14 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; ty1'  <- tc_lhs_type mode ty1 arg_k
        ; ty2'  <- tc_lhs_type mode ty2 res_k
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
+       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2)
                            (tcMkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2'  <- tc_lhs_type mode ty2 liftedTypeKind
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
+       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2)
                            (tcMkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 

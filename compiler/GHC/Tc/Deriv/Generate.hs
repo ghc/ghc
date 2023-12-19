@@ -515,7 +515,7 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       where
         tag     = get_tag data_con
         tag_lit
-             = noLocA (HsLit noComments (HsIntPrim NoSourceText (toInteger tag)))
+             = noLocA (HsLit noExtField (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -1655,8 +1655,8 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
     mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
     mk_typed_bracket = HsTypedBracket noAnn
 
-    mk_tsplice = HsTypedSplice (noAnn, noAnn)
-    mk_usplice = HsUntypedSplice noAnn . HsUntypedSpliceExpr noAnn
+    mk_tsplice = HsTypedSplice []
+    mk_usplice = HsUntypedSplice noExtField . HsUntypedSpliceExpr noAnn
     data_cons = getPossibleDataCons tycon tycon_args
 
     pats_etc mk_bracket mk_splice lift_name data_con

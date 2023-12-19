@@ -115,7 +115,7 @@ type instance XFunBind    (GhcPass pL) GhcTc = (HsWrapper, [CoreTickish])
 -- type         Int -> forall a'. a' -> a'
 -- Notice that the coercion captures the free a'.
 
-type instance XPatBind    GhcPs (GhcPass pR) = EpAnn [AddEpAnn]
+type instance XPatBind    GhcPs (GhcPass pR) = [AddEpAnn]
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- See Note [Bind free vars]
 type instance XPatBind    GhcTc (GhcPass pR) =
     ( Type                  -- Type of the GRHSs
@@ -133,7 +133,7 @@ type instance XXHsBindsLR GhcPs pR = DataConCantHappen
 type instance XXHsBindsLR GhcRn pR = DataConCantHappen
 type instance XXHsBindsLR GhcTc pR = AbsBinds
 
-type instance XPSB         (GhcPass idL) GhcPs = EpAnn [AddEpAnn]
+type instance XPSB         (GhcPass idL) GhcPs = [AddEpAnn]
 type instance XPSB         (GhcPass idL) GhcRn = NameSet -- Post renaming, FVs. See Note [Bind free vars]
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
@@ -679,7 +679,7 @@ isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 -- EPA annotations in GhcPs, dictionary Id in GhcTc
-type instance XCIPBind GhcPs = EpAnn [AddEpAnn]
+type instance XCIPBind GhcPs = [AddEpAnn]
 type instance XCIPBind GhcRn = NoExtField
 type instance XCIPBind GhcTc = Id
 type instance XXIPBind    (GhcPass p) = DataConCantHappen
@@ -704,16 +704,16 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XTypeSig          (GhcPass p) = EpAnn AnnSig
-type instance XPatSynSig        (GhcPass p) = EpAnn AnnSig
-type instance XClassOpSig       (GhcPass p) = EpAnn AnnSig
-type instance XFixSig           (GhcPass p) = EpAnn [AddEpAnn]
-type instance XInlineSig        (GhcPass p) = EpAnn [AddEpAnn]
-type instance XSpecSig          (GhcPass p) = EpAnn [AddEpAnn]
-type instance XSpecInstSig      (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
-type instance XMinimalSig       (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
-type instance XSCCFunSig        (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
-type instance XCompleteMatchSig (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
+type instance XTypeSig          (GhcPass p) = AnnSig
+type instance XPatSynSig        (GhcPass p) = AnnSig
+type instance XClassOpSig       (GhcPass p) = AnnSig
+type instance XFixSig           (GhcPass p) = [AddEpAnn]
+type instance XInlineSig        (GhcPass p) = [AddEpAnn]
+type instance XSpecSig          (GhcPass p) = [AddEpAnn]
+type instance XSpecInstSig      (GhcPass p) = ([AddEpAnn], SourceText)
+type instance XMinimalSig       (GhcPass p) = ([AddEpAnn], SourceText)
+type instance XSCCFunSig        (GhcPass p) = ([AddEpAnn], SourceText)
+type instance XCompleteMatchSig (GhcPass p) = ([AddEpAnn], SourceText)
     -- SourceText: Note [Pragma source text] in "GHC.Types.SourceText"
 type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
@@ -909,7 +909,7 @@ type instance Anno [LocatedN Id]      = SrcSpan
 
 type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno StringLiteral = EpAnn NoEpAnns
+type instance Anno StringLiteral = EpAnnCO
 type instance Anno (LocatedN RdrName) = SrcSpan
 type instance Anno (LocatedN Name) = SrcSpan
 type instance Anno (LocatedN Id) = SrcSpan

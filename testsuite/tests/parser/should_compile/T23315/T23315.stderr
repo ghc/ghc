@@ -61,13 +61,9 @@
     (SigD
      (NoExtField)
      (TypeSig
-      (EpAnn
-       (EpaSpan { T23315.hsig:3:1-7 })
-       (AnnSig
-        (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
-        [])
-       (EpaComments
-        []))
+      (AnnSig
+       (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
+       [])
       [(L
         (EpAnn
          (EpaSpan { T23315.hsig:3:1 })
@@ -98,14 +94,10 @@
            (EpaComments
             []))
           (HsTupleTy
-           (EpAnn
-            (EpaSpan { T23315.hsig:3:6-7 })
-            (AnnParen
-             (AnnParens)
-             (EpaSpan { T23315.hsig:3:6 })
-             (EpaSpan { T23315.hsig:3:7 }))
-            (EpaComments
-             []))
+           (AnnParen
+            (AnnParens)
+            (EpaSpan { T23315.hsig:3:6 })
+            (EpaSpan { T23315.hsig:3:7 }))
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L

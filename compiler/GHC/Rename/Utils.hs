@@ -727,7 +727,7 @@ genHsExpApps :: HsExpr GhcRn -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsExpApps fun arg = foldl genHsApp fun arg
 
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
+genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
 
 genLHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)
@@ -742,7 +742,7 @@ genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
 genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
-genLHsLit = wrapGenSpan . HsLit noAnn
+genLHsLit = wrapGenSpan . HsLit noExtField
 
 genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField

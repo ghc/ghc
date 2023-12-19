@@ -1332,7 +1332,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
-             app_to_meth fun meth_id = HsApp noComments (L loc' fun)
+             app_to_meth fun meth_id = HsApp noExtField (L loc' fun)
                                             (L loc' (wrapId arg_wrapper meth_id))
 
              inst_tv_tys = mkTyVarTys inst_tyvars
@@ -1869,13 +1869,13 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
       where
         inst_loc' = noAnnSrcSpan inst_loc
         error_rhs dflags = L inst_loc'
-                         $ HsApp noComments error_fun (error_msg dflags)
+                         $ HsApp noExtField error_fun (error_msg dflags)
         error_fun    = L inst_loc' $
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
         error_msg dflags = L inst_loc'
-                                    (HsLit noComments (HsStringPrim NoSourceText
+                                    (HsLit noExtField (HsStringPrim NoSourceText
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags

@@ -58,26 +58,23 @@
         (EpaComment
          (EpaLineComment
           "-- Running over two lines")
-         { Test20239.hs:3:1-28 }))]))
+         { Test20239.hs:3:1-28 }))
+      ,(L
+        (EpaSpan
+         { Test20239.hs:6:34-70 })
+        (EpaComment
+         (EpaLineComment
+          "-- ^ Run a query against the database")
+         { Test20239.hs:5:51-55 }))]))
     (InstD
      (NoExtField)
      (DataFamInstD
       (NoExtField)
       (DataFamInstDecl
        (FamEqn
-        (EpAnn
-         (EpaSpan { Test20239.hs:(5,1)-(7,86) })
-         [(AddEpAnn AnnData (EpaSpan { Test20239.hs:5:1-4 }))
-         ,(AddEpAnn AnnInstance (EpaSpan { Test20239.hs:5:6-13 }))
-         ,(AddEpAnn AnnEqual (EpaSpan { Test20239.hs:5:34 }))]
-         (EpaComments
-          [(L
-            (EpaSpan
-             { Test20239.hs:6:34-70 })
-            (EpaComment
-             (EpaLineComment
-              "-- ^ Run a query against the database")
-             { Test20239.hs:5:51-55 }))]))
+        [(AddEpAnn AnnData (EpaSpan { Test20239.hs:5:1-4 }))
+        ,(AddEpAnn AnnInstance (EpaSpan { Test20239.hs:5:6-13 }))
+        ,(AddEpAnn AnnEqual (EpaSpan { Test20239.hs:5:34 }))]
         (L
          (EpAnn
           (EpaSpan { Test20239.hs:5:15-20 })
@@ -99,11 +96,7 @@
             (EpaComments
              []))
            (HsTyVar
-            (EpAnn
-             (EpaSpan { Test20239.hs:5:22-32 })
-             []
-             (EpaComments
-              []))
+            []
             (NotPromoted)
             (L
              (EpAnn
@@ -131,11 +124,7 @@
              (EpaComments
               []))
             (ConDeclH98
-             (EpAnn
-              (EpaSpan { Test20239.hs:5:36-55 })
-              []
-              (EpaComments
-               []))
+             []
              (L
               (EpAnn
                (EpaSpan { Test20239.hs:5:36-49 })
@@ -163,11 +152,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (EpAnn
-                   (EpaSpan { Test20239.hs:5:51-55 })
-                   []
-                   (EpaComments
-                    []))
+                  []
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -187,11 +172,7 @@
              (EpaComments
               []))
             (ConDeclH98
-             (EpAnn
-              (EpaSpan { Test20239.hs:7:36-86 })
-              []
-              (EpaComments
-               []))
+             []
              (L
               (EpAnn
                (EpaSpan { Test20239.hs:7:36-48 })
@@ -219,14 +200,10 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (EpAnn
-                   (EpaSpan { Test20239.hs:7:50-86 })
-                   (AnnParen
-                    (AnnParens)
-                    (EpaSpan { Test20239.hs:7:50 })
-                    (EpaSpan { Test20239.hs:7:86 }))
-                   (EpaComments
-                    []))
+                  (AnnParen
+                   (AnnParens)
+                   (EpaSpan { Test20239.hs:7:50 })
+                   (EpaSpan { Test20239.hs:7:86 }))
                   (L
                    (EpAnn
                     (EpaSpan { Test20239.hs:7:51-85 })
@@ -235,11 +212,7 @@
                     (EpaComments
                      []))
                    (HsFunTy
-                    (EpAnn
-                     (EpaSpan { Test20239.hs:7:51-85 })
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (NoExtField)
                     (HsUnrestrictedArrow
                      (EpUniTok
                       (EpaSpan { Test20239.hs:7:62-63 })
@@ -252,11 +225,7 @@
                       (EpaComments
                        []))
                      (HsTyVar
-                      (EpAnn
-                       (EpaSpan { Test20239.hs:7:51-60 })
-                       []
-                       (EpaComments
-                        []))
+                      []
                       (NotPromoted)
                       (L
                        (EpAnn
@@ -284,11 +253,7 @@
                         (EpaComments
                          []))
                        (HsTyVar
-                        (EpAnn
-                         (EpaSpan { Test20239.hs:7:65-66 })
-                         []
-                         (EpaComments
-                          []))
+                        []
                         (NotPromoted)
                         (L
                          (EpAnn
@@ -307,14 +272,10 @@
                         (EpaComments
                          []))
                        (HsParTy
-                        (EpAnn
-                         (EpaSpan { Test20239.hs:7:68-85 })
-                         (AnnParen
-                          (AnnParens)
-                          (EpaSpan { Test20239.hs:7:68 })
-                          (EpaSpan { Test20239.hs:7:85 }))
-                         (EpaComments
-                          []))
+                        (AnnParen
+                         (AnnParens)
+                         (EpaSpan { Test20239.hs:7:68 })
+                         (EpaSpan { Test20239.hs:7:85 }))
                         (L
                          (EpAnn
                           (EpaSpan { Test20239.hs:7:69-84 })
@@ -341,11 +302,7 @@
                               (EpaComments
                                []))
                              (HsTyVar
-                              (EpAnn
-                               (EpaSpan { Test20239.hs:7:69-74 })
-                               []
-                               (EpaComments
-                                []))
+                              []
                               (NotPromoted)
                               (L
                                (EpAnn
@@ -364,11 +321,7 @@
                               (EpaComments
                                []))
                              (HsTyVar
-                              (EpAnn
-                               (EpaSpan { Test20239.hs:7:76-81 })
-                               []
-                               (EpaComments
-                                []))
+                              []
                               (NotPromoted)
                               (L
                                (EpAnn
@@ -387,14 +340,10 @@
                             (EpaComments
                              []))
                            (HsTupleTy
-                            (EpAnn
-                             (EpaSpan { Test20239.hs:7:83-84 })
-                             (AnnParen
-                              (AnnParens)
-                              (EpaSpan { Test20239.hs:7:83 })
-                              (EpaSpan { Test20239.hs:7:84 }))
-                             (EpaComments
-                              []))
+                            (AnnParen
+                             (AnnParens)
+                             (EpaSpan { Test20239.hs:7:83 })
+                             (EpaSpan { Test20239.hs:7:84 }))
                             (HsBoxedOrConstraintTuple)
                             [])))))))))))))])
              (Nothing)))])

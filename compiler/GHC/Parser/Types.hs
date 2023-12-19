@@ -57,12 +57,12 @@ data PatBuilder p
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
   | PatBuilderAppType (LocatedA (PatBuilder p)) (EpToken "@") (HsTyPat GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
-                    (LocatedA (PatBuilder p)) (EpAnn [AddEpAnn])
+                    (LocatedA (PatBuilder p)) [AddEpAnn]
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 
 -- These instances are here so that they are not orphans
-type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs)))             = EpAnn NoEpAnns
+type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs)))             = EpAnnCO
 type instance Anno [LocatedA (Match GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnL
 type instance Anno (Match GhcPs (LocatedA (PatBuilder GhcPs)))            = SrcSpanAnnA
 type instance Anno (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))     = SrcSpanAnnA

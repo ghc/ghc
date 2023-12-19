@@ -293,7 +293,7 @@ tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
          -- See Note [Short cut for overloaded literals] in GHC.Tc.Zonk.Type
        ; case mb_res of
-           Just lit' -> return (HsOverLit noAnn lit')
+           Just lit' -> return (HsOverLit noExtField lit')
            Nothing   -> tcApp e res_ty }
 
 -- Typecheck an occurrence of an unbound Id
@@ -536,7 +536,7 @@ tcExpr (HsStatic fvs expr) res_ty
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
-        ; return $ mkHsWrapCo co $ HsApp noComments
+        ; return $ mkHsWrapCo co $ HsApp noExtField
                             (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
                             (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty]) expr'))
         }
