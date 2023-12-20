@@ -111,13 +111,13 @@ import GHC.Types.Error
 import System.Console.Haskeline as Haskeline
 
 import Control.Applicative hiding (empty)
-import Control.DeepSeq (NFData, deepseq, force)
+import Control.Concurrent(myThreadId, killThread, forkIO, threadDelay)
+import Control.DeepSeq (deepseq)
 import Control.Monad as Monad
 import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
-import Control.Exception as E (evaluate) 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
@@ -153,7 +153,6 @@ import System.IO
 import System.IO.Error
 import System.IO.Unsafe ( unsafePerformIO )
 import System.Process
-import System.Timeout (timeout)
 import Text.Printf
 import Text.Read ( readMaybe )
 import Text.Read.Lex (isSymbolChar)
@@ -1084,7 +1083,7 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (unmask $ withTimeLimit (Just False) $ runOneCommand eh gCmd)
+            (withTimeLimit (Just False) $ unmask $ runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
       Just success -> do
@@ -1093,16 +1092,35 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
 
 -- | Wraps a single run input action into a timout action, if the timelimit field has been set.
 -- | Otherwise it just runs the action without doing anything. 
-withTimeLimit :: (MonadIO m, GhciMonad m, NFData a) => a -> m (a) -> m (a) 
+withTimeLimit :: (MonadIO m, MonadCatch m, GhciMonad m) => a -> m a -> m a 
 withTimeLimit time_out_value cmd = do 
   maybe_limit <- time_limit <$> getGHCiState
   case maybe_limit of 
     Nothing -> cmd 
-    Just limit  -> do 
-      result_or_timeout <- liftIO . timeout limit . E.evaluate . force =<< cmd
+    Just limit  -> do
+      result_or_timeout <- timeout limit cmd -- puts the IO action inside GhciMonad 
       case result_or_timeout of 
         Just fin  -> pure fin
-        Nothing   -> printForUser (text "GhciTimedOut.") $> time_out_value
+        Nothing   -> printForUser (text "GhciTimedOut.") $> time_out_value 
+
+-- | I'd use System.Timeout(Timeout)
+-- | If it exported the constructor...
+data TimeoutTM = TimeoutTM deriving Show
+instance Exception TimeoutTM
+
+catchTimeout :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a)
+catchTimeout action = catch (Just <$> action) $ \ TimeoutTM -> return Nothing
+
+-- | duping System.Timeout(timeout), because I needed a lifted version
+-- | a transient duping, because really this is a dupe of Control.Timeout(timeout), but that one isn't in base...
+-- | If we want this feature we'll want something like this, presumably not located here.
+timeout :: (MonadIO m, MonadCatch m) => Int -> m a -> m (Maybe a) 
+timeout time action = do
+  tidMain <- liftIO myThreadId
+  tidTemp <- liftIO $ forkIO $ threadDelay (time*1000000) >> throwTo tidMain TimeoutTM -- need a better way to threaddelay in seconds rather than just multiplying with 1000 000, which feels... fragile
+  result  <- catchTimeout action `MC.onException` liftIO (killThread tidTemp)  
+  when (isJust result) $ liftIO $ killThread tidTemp
+  return result
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
