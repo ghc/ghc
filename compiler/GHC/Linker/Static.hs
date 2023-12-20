@@ -121,11 +121,13 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
     let
       dead_strip
         | gopt Opt_WholeArchiveHsLibs dflags = []
-        | otherwise = if osSubsectionsViaSymbols (platformOS platform)
-                        then ["-Wl,-dead_strip"]
-                        else []
-    let lib_paths = libraryPaths dflags
-    let lib_path_opts = map ("-L"++) lib_paths
+        | osSubsectionsViaSymbols (platformOS platform) = ["-Wl,-dead_strip"]
+        | otherwise = []
+      lib_paths = libraryPaths dflags
+      lib_path_opts = map ("-L"++) lib_paths
+      r_paths = libraryRuntimePaths dflags
+      r_path_opts = concatMap optXLinkerRPath r_paths
+
 
     extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_units
@@ -172,7 +174,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
           runLink logger tmpfs linker_config args
           -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
           when (platformOS platform == OSDarwin && gopt Opt_RPath dflags) $
-            GHC.Linker.MacOS.runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
+            GHC.Linker.MacOS.runInjectRPaths logger (toolSettings dflags) (pkg_lib_paths ++ r_paths) output_fn
 
     link dflags (
                        map GHC.SysTools.Option verbFlags
@@ -230,7 +232,8 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                           else [])
 
                       ++ o_files
-                      ++ lib_path_opts)
+                      ++ lib_path_opts
+                      ++ r_path_opts)
                       ++ extra_ld_inputs
                       ++ map GHC.SysTools.Option (
                          rc_objs

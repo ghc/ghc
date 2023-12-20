@@ -214,6 +214,7 @@ module GHC.Driver.Session (
         LinkerInfo(..),
         CompilerInfo(..),
         useXLinkerRPath,
+        optXLinkerRPath,
 
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
@@ -1160,6 +1161,7 @@ dynamic_flags_deps = [
         ------- Libraries ---------------------------------------------------
   , make_ord_flag defFlag "L"   (Prefix addLibraryPath)
   , make_ord_flag defFlag "l"   (hasArg (addLdInputs . Option . ("-l" ++)))
+  , make_ord_flag defFlag "rpath" (HasArg addLibraryRuntimePath)
 
         ------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
@@ -3372,7 +3374,7 @@ parseEnvFile envfile = mapM_ parseEntry . lines
 -----------------------------------------------------------------------------
 -- Paths & Libraries
 
-addImportPath, addLibraryPath, addIncludePath, addFrameworkPath :: FilePath -> DynP ()
+addImportPath, addLibraryPath, addIncludePath, addLibraryRuntimePath, addFrameworkPath :: FilePath -> DynP ()
 
 -- -i on its own deletes the import paths
 addImportPath "" = upd (\s -> s{importPaths = []})
@@ -3384,6 +3386,9 @@ addLibraryPath p =
 addIncludePath p =
   upd (\s -> s{includePaths =
                   addGlobalInclude (includePaths s) (splitPathList p)})
+
+addLibraryRuntimePath p =
+  upd (\s -> s{libraryRuntimePaths = libraryRuntimePaths s ++ splitPathList p})
 
 addFrameworkPath p =
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})

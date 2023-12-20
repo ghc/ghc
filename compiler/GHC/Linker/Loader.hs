@@ -340,7 +340,8 @@ loadCmdLineLibs'' interp hsc_env pls =
   do
 
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
-                           , libraryPaths = lib_paths_base})
+                           , libraryPaths = lib_paths_base
+                           , libraryRuntimePaths = r_paths_base })
             = hsc_dflags hsc_env
       let logger = hsc_logger hsc_env
 
@@ -393,9 +394,13 @@ loadCmdLineLibs'' interp hsc_env pls =
            let all_paths = let paths = takeDirectory (pgm_c dflags)
                                      : framework_paths
                                     ++ lib_paths_base
+                                    ++ r_paths_base
+                                    -- OMES:TODO: Should this also have gcc_paths?
+                                    -- in that case, we should just add
+                                    -- lib_paths
                                     ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
                            in nubOrd $ map normalise paths
-           let lib_paths = nubOrd $ lib_paths_base ++ gcc_paths
+           let lib_paths = nubOrd $ lib_paths_base ++ r_paths_base ++ gcc_paths
            all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
            pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 

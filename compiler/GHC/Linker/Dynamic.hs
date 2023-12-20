@@ -52,7 +52,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
     pkgs_with_rts <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
 
     let pkg_lib_paths = collectLibraryDirs (ways dflags) pkgs_with_rts
-    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
+        pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget os || osMachOTarget os
          , dynLibLoader dflags == SystemDependent
@@ -64,7 +64,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
-    let lib_path_opts = map ("-L"++) lib_paths
+        lib_path_opts = map ("-L"++) lib_paths
+        r_paths = libraryRuntimePaths dflags
+        r_path_opts = concatMap optXLinkerRPath r_paths
 
     -- In general we don't want to link our dynamic libs against the RTS
     -- package, because the RTS lib comes in several flavours and we want to be
@@ -127,6 +129,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ extra_ld_inputs
                  ++ map Option (
                     lib_path_opts
+                 ++ r_path_opts
                  ++ pkg_lib_path_opts
                  ++ pkg_link_opts
                 ))
@@ -190,6 +193,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                      else [ Option "-Wl,-read_only_relocs,suppress" ])
                  ++ [ Option "-install_name", Option instName ]
                  ++ map Option lib_path_opts
+                 ++ map Option r_path_opts
                  ++ extra_ld_inputs
                  ++ map Option framework_opts
                  ++ map Option pkg_lib_path_opts
@@ -205,7 +209,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
               )
             -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
             when (gopt Opt_RPath dflags) $
-              runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
+              runInjectRPaths logger (toolSettings dflags) (pkg_lib_paths ++ r_paths) output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
@@ -234,6 +238,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ [ Option ("-Wl,-h," ++ takeFileName output_fn) ]
                  ++ extra_ld_inputs
                  ++ map Option lib_path_opts
+                 ++ map Option r_path_opts
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )

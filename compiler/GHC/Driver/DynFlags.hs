@@ -302,6 +302,7 @@ data DynFlags = DynFlags {
 
   includePaths          :: IncludeSpecs,
   libraryPaths          :: [String],
+  libraryRuntimePaths   :: [String],
   frameworkPaths        :: [String],    -- used on darwin only
   cmdlineFrameworks     :: [String],    -- ditto
 
@@ -614,6 +615,7 @@ defaultDynFlags mySettings =
         ldInputs                = [],
         includePaths            = IncludeSpecs [] [] [],
         libraryPaths            = [],
+        libraryRuntimePaths     = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
         rtsOpts                 = Nothing,
