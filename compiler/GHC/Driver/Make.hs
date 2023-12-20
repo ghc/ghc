@@ -643,7 +643,7 @@ createBuildPlan mod_graph maybe_top_mod =
         collapseSCC :: [SCC ModuleGraphNode] -> Either [ModuleGraphNode] [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
         -- Must be at least two nodes, as we were in a cycle
         collapseSCC [AcyclicSCC node1, AcyclicSCC node2] = Right [toNodeWithBoot node1, toNodeWithBoot node2]
-        collapseSCC (AcyclicSCC node : nodes) = (toNodeWithBoot node :) <$> collapseSCC nodes
+        collapseSCC (AcyclicSCC node : nodes) = either (Left . (node :)) (Right . (toNodeWithBoot node :)) (collapseSCC nodes)
         -- Cyclic
         collapseSCC nodes = Left (flattenSCCs nodes)
 
