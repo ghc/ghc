@@ -45,7 +45,7 @@ module GHC.Data.Graph.Directed (
 
 import GHC.Prelude
 
-import GHC.Utils.Misc ( minWith, count )
+import GHC.Utils.Misc ( sortWith, count )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Maybe ( expectJust )
@@ -218,47 +218,52 @@ type WorkItem key payload
      [payload])         -- Rest of the path;
                         --  [a,b,c] means c depends on b, b depends on a
 
--- | Find a reasonably short cycle a->b->c->a, in a strongly
--- connected component.  The input nodes are presumed to be
--- a SCC, so you can start anywhere.
+-- | Find a reasonably short cycle a->b->c->a, in a graph
+-- The graph might not necessarily be strongly connected.
 findCycle :: forall payload key. Ord key
           => [Node key payload]     -- The nodes.  The dependencies can
                                     -- contain extra keys, which are ignored
           -> Maybe [payload]        -- A cycle, starting with node
                                     -- so each depends on the next
 findCycle graph
-  = go Set.empty (new_work root_deps []) []
+  = goRoots plausible_roots
   where
     env :: Map.Map key (Node key payload)
     env = Map.fromList [ (node_key node, node) | node <- graph ]
 
-    -- Find the node with fewest dependencies among the SCC modules
+    goRoots [] = Nothing
+    goRoots (root:xs) =
+        case go Set.empty (new_work root_deps []) [] of
+          Nothing -> goRoots xs
+          Just res -> Just res
+      where
+        DigraphNode root_payload root_key root_deps = root
+        -- 'go' implements Dijkstra's algorithm, more or less
+        go :: Set.Set key   -- Visited
+           -> [WorkItem key payload]        -- Work list, items length n
+           -> [WorkItem key payload]        -- Work list, items length n+1
+           -> Maybe [payload]               -- Returned cycle
+           -- Invariant: in a call (go visited ps qs),
+           --            visited = union (map tail (ps ++ qs))
+
+        go _       [] [] = Nothing  -- No cycles
+        go visited [] qs = go visited qs []
+        go visited (((DigraphNode payload key deps), path) : ps) qs
+           | key == root_key           = Just (root_payload : reverse path)
+           | key `Set.member` visited  = go visited ps qs
+           | key `Map.notMember` env   = go visited ps qs
+           | otherwise                 = go (Set.insert key visited)
+                                            ps (new_qs ++ qs)
+           where
+             new_qs = new_work deps (payload : path)
+
+
+    -- Find the nodes with fewest dependencies among the SCC modules
     -- This is just a heuristic to find some plausible root module
-    root :: Node key payload
-    root = fst (minWith snd [ (node, count (`Map.member` env)
-                                           (node_dependencies node))
-                            | node <- graph ])
-    DigraphNode root_payload root_key root_deps = root
+    plausible_roots :: [Node key payload]
+    plausible_roots = map fst (sortWith snd [ (node, count (`Map.member` env) (node_dependencies node))
+                                            | node <- graph ])
 
-
-    -- 'go' implements Dijkstra's algorithm, more or less
-    go :: Set.Set key   -- Visited
-       -> [WorkItem key payload]        -- Work list, items length n
-       -> [WorkItem key payload]        -- Work list, items length n+1
-       -> Maybe [payload]               -- Returned cycle
-       -- Invariant: in a call (go visited ps qs),
-       --            visited = union (map tail (ps ++ qs))
-
-    go _       [] [] = Nothing  -- No cycles
-    go visited [] qs = go visited qs []
-    go visited (((DigraphNode payload key deps), path) : ps) qs
-       | key == root_key           = Just (root_payload : reverse path)
-       | key `Set.member` visited  = go visited ps qs
-       | key `Map.notMember` env   = go visited ps qs
-       | otherwise                 = go (Set.insert key visited)
-                                        ps (new_qs ++ qs)
-       where
-         new_qs = new_work deps (payload : path)
 
     new_work :: [key] -> [payload] -> [WorkItem key payload]
     new_work deps path = [ (n, path) | Just n <- map (`Map.lookup` env) deps ]
