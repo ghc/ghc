@@ -51,20 +51,6 @@ import Data.Maybe
 -- read any interface files), so the user must explicitly specify all
 -- the packages.
 
-{-
-Note [-Xlinker -rpath vs -Wl,-rpath]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
--Wl takes a comma-separated list of options which in the case of
--Wl,-rpath -Wl,some,path,with,commas parses the path with commas
-as separate options.
-Buck, the build system, produces paths with commas in them.
-
--Xlinker doesn't have this disadvantage and as far as I can tell
-it is supported by both gcc and clang. Anecdotally nvcc supports
--Xlinker, but not -Wl.
--}
-
 linkBinary :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
@@ -98,9 +84,8 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-                  -- See Note [-Xlinker -rpath vs -Wl,-rpath]
                   rpath = if useXLinkerRPath dflags (platformOS platform)
-                          then ["-Xlinker", "-rpath", "-Xlinker", libpath]
+                          then optXLinkerRPath libpath
                           else []
                   -- Solaris 11's linker does not support -rpath-link option. It silently
                   -- ignores it and then complains about next option which is -l<some
@@ -120,7 +105,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                             then "@loader_path" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-              in ["-L" ++ l] ++ ["-Xlinker", "-rpath", "-Xlinker", libpath]
+              in ["-L" ++ l] ++ optXLinkerRPath libpath
          | otherwise = ["-L" ++ l]
 
     pkg_lib_path_opts <-

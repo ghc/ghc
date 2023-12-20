@@ -60,8 +60,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
            ways dflags `hasWay` WayDyn
            -- Only use RPath if we explicitly asked for it
          , useXLinkerRPath dflags os
-            = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
-              -- See Note [-Xlinker -rpath vs -Wl,-rpath]
+            = ["-L" ++ l] ++ optXLinkerRPath l
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags

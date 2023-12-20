@@ -3756,7 +3756,28 @@ useXLinkerRPath :: DynFlags -> OS -> Bool
 useXLinkerRPath _ OSDarwin = False -- See Note [Dynamic linking on macOS]
 useXLinkerRPath dflags _ = gopt Opt_RPath dflags
 
+-- | Create a list of options from a path to pass an rpath @path@ to the
+-- linker.
+--
+-- The rpath is passed via @-XLinker -rpath -XLinker path@ rather than
+-- @-Wl,-rpath,@. See Note [-Xlinker -rpath vs -Wl,-rpath].
+optXLinkerRPath :: FilePath -> [String]
+optXLinkerRPath rpath = ["-Xlinker", "-rpath", "-Xlinker", rpath]
+
 {-
+Note [-Xlinker -rpath vs -Wl,-rpath]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-Wl takes a comma-separated list of options which in the case of
+-Wl,-rpath -Wl,some,path,with,commas parses the path with commas
+as separate options.
+Buck, the build system, produces paths with commas in them.
+
+-Xlinker doesn't have this disadvantage and as far as I can tell
+it is supported by both gcc and clang. Anecdotally nvcc supports
+-Xlinker, but not -Wl.
+
+
 Note [-fno-use-rpaths]
 ~~~~~~~~~~~~~~~~~~~~~~
 
