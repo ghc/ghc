@@ -1083,12 +1083,19 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (withTimeLimit (Just False) $ unmask $ runOneCommand eh gCmd)
+            (unmask $ runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
       Just success -> do
         unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
+
+
+-- | I'd use System.Timeout(Timeout)
+-- | If it exported the constructor...
+-- | Should we just export its constructor
+data GhciTimedOut = GhciTimedOut deriving Show
+instance Exception GhciTimedOut
 
 -- | Wraps a single run input action into a timout action, if the timelimit field has been set.
 -- | Otherwise it just runs the action without doing anything. 
@@ -1102,25 +1109,29 @@ withTimeLimit time_out_value cmd = do
       case result_or_timeout of 
         Just fin  -> pure fin
         Nothing   -> printForUser (text "GhciTimedOut.") $> time_out_value 
+        where
 
--- | I'd use System.Timeout(Timeout)
--- | If it exported the constructor...
-data TimeoutTM = TimeoutTM deriving Show
-instance Exception TimeoutTM
+      -- | transiently duping System.Timeout(timeout), because we need a lifted version
+      -- | transiently, because really this is a dupe of time-outs Control.Timeout(timeout)
+      -- | We might want to move this function somewhere else?
+      timeout :: (MonadIO m, MonadCatch m) => Int -> m a -> m (Maybe a) 
+      timeout time action = do
+        tidMain <- liftIO myThreadId
+        -- | We also might want to keep a single thread alive to reuse
+        tidTemp <- liftIO $ forkIO $ delay time >> throwTo tidMain GhciTimedOut
+        result  <- catchTimeout action `MC.onException` liftIO (killThread tidTemp)  
+        when (isJust result) $ liftIO $ killThread tidTemp
+        return result  
+      ms = maxBound `div` 1000000
+      catchTimeout :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a)
+      catchTimeout action = catch (Just <$> action) $ \ GhciTimedOut -> return Nothing
+      delay t = if t <= 0 
+        then pure () 
+        else threadDelay (1000000 * min t ms) >> delay (t - min t ms) -- urgh... 
 
-catchTimeout :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a)
-catchTimeout action = catch (Just <$> action) $ \ TimeoutTM -> return Nothing
 
--- | duping System.Timeout(timeout), because I needed a lifted version
--- | a transient duping, because really this is a dupe of Control.Timeout(timeout), but that one isn't in base...
--- | If we want this feature we'll want something like this, presumably not located here.
-timeout :: (MonadIO m, MonadCatch m) => Int -> m a -> m (Maybe a) 
-timeout time action = do
-  tidMain <- liftIO myThreadId
-  tidTemp <- liftIO $ forkIO $ threadDelay (time*1000000) >> throwTo tidMain TimeoutTM -- need a better way to threaddelay in seconds rather than just multiplying with 1000 000, which feels... fragile
-  result  <- catchTimeout action `MC.onException` liftIO (killThread tidTemp)  
-  when (isJust result) $ liftIO $ killThread tidTemp
-  return result
+
+
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
@@ -1141,7 +1152,7 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       ghciHandle (\e -> lift $ eh e >>= return . Just) $
         handleSourceError printErrorAndFail $
-          cmd_wrapper st $ doCommand c
+          withTimeLimit (Just False) $ cmd_wrapper st $ doCommand c
                -- source error's are handled by runStmt
                -- is the handler necessary here?
   where
@@ -2359,18 +2370,21 @@ exceptT = ExceptT . pure
 -----------------------------------------------------------------------------
 -- | @:timeout@ command.
 timeoutCmd :: GhciMonad m => String -> m ()
-timeoutCmd str = handleSourceError printErrAndMaybeExit $ do 
-  case (str, readMaybe str) of 
-    ("", _)       -> printForUser (text "no input argument, resetting the timeout to nothing") 
-      *> modifyGHCiState (\st -> st{ time_limit = Nothing } )
-    (_, Just t_lim) -> printForUser (text "setting timeout length to" <+> text (show t_lim) <+> text "seconds") 
-      *> modifyGHCiState (\st -> st{ time_limit = if t_lim > 0 then Just t_lim else Nothing})
-    _             -> printForUser (text "The argument for timeout: " <+> text (show str) <+> "should be an Int, but it couldn't be read as one") 
-  return ()
+timeoutCmd str = handleSourceError printErrAndMaybeExit $ if null str
+  then unbounded
+  else (case readMaybe str of 
+    (Just lim) -> if lim > 0 
+      then set_time lim 
+      else unbounded
+    Nothing -> unbounded) where 
+  unbounded = printForUser (text "Resetting timeout to unbounded execution time") 
+            *> modifyGHCiState (\st -> st{ time_limit = Nothing })
+  set_time l = printForUser (text "setting timeout length to" <+> text (show l) <+> text "seconds") 
+            *> modifyGHCiState (\st -> st{ time_limit = Just l }) 
+
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
-
 typeOfExpr :: GhciMonad m => String -> m ()
 typeOfExpr str = handleSourceError printErrAndMaybeExit $
     case break isSpace str of
@@ -2565,12 +2579,12 @@ runScript filename = do
       let prog = progname st
           line = line_number st
       setGHCiState st{progname=filename',line_number=0}
-      scriptLoop script
+      withTimeLimit () $ scriptLoop script
       liftIO $ hClose script
       new_st <- getGHCiState
       setGHCiState new_st{progname=prog,line_number=line}
   where scriptLoop script = do
-          res <- withTimeLimit (Just False) $ runOneCommand handler $ fileLoop script
+          res <- runOneCommand handler $ fileLoop script
           case res of
             Nothing -> return ()
             Just s  -> if s
