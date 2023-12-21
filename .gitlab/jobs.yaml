@@ -1013,7 +1013,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
@@ -1077,7 +1076,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
@@ -1141,7 +1139,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
@@ -4590,7 +4587,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
     }
@@ -4654,7 +4650,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static"
     }
@@ -4718,7 +4713,6 @@
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static"
     }

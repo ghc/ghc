@@ -1047,7 +1047,6 @@ job_groups =
     make_wasm_jobs cfg =
       modifyJobs
         ( delVariable "BROKEN_TESTS"
-            . setVariable "HADRIAN_ARGS" "--docs=none"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
         $ validateBuilds Amd64 (Linux AlpineWasm) cfg
