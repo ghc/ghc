@@ -45,15 +45,20 @@ import Foreign.Storable
 
 #include "MachDeps.h"
 
-#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0) && WORD_SIZE_IN_BITS == 64
-import GHC.Word( Word64(..) )
-import GHC.Exts( fetchAddWordAddr#, plusWord#, readWordOffAddr# )
-#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-import GHC.Exts( wordToWord64# )
-#endif
+#if WORD_SIZE_IN_BITS != 64
+#define NO_FETCH_ADD
 #endif
 
-#include "Unique.h"
+#if defined(NO_FETCH_ADD)
+import GHC.Exts ( atomicCasWord64Addr#, eqWord64# )
+#else
+import GHC.Exts( fetchAddWordAddr#, word64ToWord#, wordToWord64# )
+#endif
+
+import GHC.Exts ( Addr#, State#, Word64#, RealWorld )
+
+import GHC.Word( Word64(..) )
+import GHC.Exts( plusWord64#, readWord64OffAddr# )
 
 {-
 ************************************************************************
@@ -228,25 +233,37 @@ mkSplitUniqSupply c
         (# s4, MkSplitUniqSupply (tag .|. u) x y #)
         }}}}
 
--- If a word is not 64 bits then we would need a fetchAddWord64Addr# primitive,
--- which does not exist. So we fall back on the C implementation in that case.
-
-#if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0) || WORD_SIZE_IN_BITS != 64
-foreign import ccall unsafe "genSym" genSym :: IO Word64
+#if defined(NO_FETCH_ADD)
+-- GHC currently does not provide this operation on 32-bit platforms,
+-- hence the CAS-based implementation.
+fetchAddWord64Addr# :: Addr# -> Word64# -> State# RealWorld
+                    -> (# State# RealWorld, Word64# #)
+fetchAddWord64Addr# = go
+  where
+    go ptr inc s0 =
+      case readWord64OffAddr# ptr 0# s0 of
+        (# s1, n0 #) ->
+          case atomicCasWord64Addr# ptr n0 (n0 `plusWord64#` inc) s1 of
+            (# s2, res #)
+              | 1# <- res `eqWord64#` n0 -> (# s2, n0 #)
+              | otherwise -> go ptr inc s2
 #else
+fetchAddWord64Addr# :: Addr# -> Word64# -> State# RealWorld
+                    -> (# State# RealWorld, Word64# #)
+fetchAddWord64Addr# addr inc s0 =
+    case fetchAddWordAddr# addr (word64ToWord# inc) s0 of
+      (# s1, res #) -> (# s1, wordToWord64# res #)
+#endif
+
 genSym :: IO Word64
 genSym = do
     let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
     let !(Ptr counter) = ghc_unique_counter64
     let !(Ptr inc_ptr) = ghc_unique_inc
-    u <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
-        (# s1, inc #) -> case fetchAddWordAddr# counter inc s1 of
+    u <- IO $ \s0 -> case readWord64OffAddr# inc_ptr 0# s0 of
+        (# s1, inc #) -> case fetchAddWord64Addr# counter inc s1 of
             (# s2, val #) ->
-#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-                let !u = W64# (val `plusWord#` inc) .&. mask
-#else
-                let !u = W64# (wordToWord64# (val `plusWord#` inc)) .&. mask
-#endif
+                let !u = W64# (val `plusWord64#` inc) .&. mask
                 in (# s2, u #)
 #if defined(DEBUG)
     -- Uh oh! We will overflow next time a unique is requested.
@@ -254,7 +271,6 @@ genSym = do
     massert (u /= mask)
 #endif
     return u
-#endif
 
 foreign import ccall unsafe "&ghc_unique_counter64" ghc_unique_counter64 :: Ptr Word64
 foreign import ccall unsafe "&ghc_unique_inc"       ghc_unique_inc       :: Ptr Int
