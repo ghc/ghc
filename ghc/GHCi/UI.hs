@@ -122,7 +122,6 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
-import Data.Functor (($>))
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
@@ -1091,14 +1090,34 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
         unmask $ runCommands' eh sourceErrorHandler gCmd
 
 
--- | I'd use System.Timeout(Timeout)
--- | If it exported the constructor...
--- | Should we just export its constructor
+{-
+Note [Where to Time]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Annoyingly, its not immediately clear what actions within ghci
+should be wrapped with the withTimeLimit function. For a while
+I thought wrapping `runOneCommand`, called from `runCommands` 
+and `scriptLoop` made the most sense. And indeed, wrapping 
+that function does properly cause things to timeout. But 
+it also caused ghci to timeout while idling...  
+
+In the end it was `doCommand`, nested within `runOneCommand` 
+that needed wrapping for the timeout to work as expected. 
+Maybe that'll be enough for now and ever more, but if 
+anything else ends up needing to be wrapped, be sure 
+to add it to the Note!
+
+The current state does mean that if you call a script 
+with ghci :script cmd, the timeout will apply to *individual* 
+statements within that script, and not the script as a 
+whole. Is that correct? Its a decision, anyway.
+-}
+
 data GhciTimedOut = GhciTimedOut deriving Show
 instance Exception GhciTimedOut
 
 -- | Wraps a single run input action into a timout action, if the timelimit field has been set.
--- | Otherwise it just runs the action without doing anything. 
+-- | Otherwise it just runs the action without doing anything.
+-- | See Note [Where to Time] 
 withTimeLimit :: (MonadIO m, MonadCatch m, GhciMonad m) => a -> m a -> m a 
 withTimeLimit time_out_value cmd = do 
   maybe_limit <- time_limit <$> getGHCiState
@@ -1106,18 +1125,16 @@ withTimeLimit time_out_value cmd = do
     Nothing -> cmd 
     Just limit  -> do
       result_or_timeout <- timeout limit cmd -- puts the IO action inside GhciMonad 
-      case result_or_timeout of 
-        Just fin  -> pure fin
-        Nothing   -> printForUser (text "GhciTimedOut.") $> time_out_value 
-        where
+      let r = fromMaybe time_out_value result_or_timeout 
+      pure r where
 
       -- | transiently duping System.Timeout(timeout), because we need a lifted version
-      -- | transiently, because really this is a dupe of time-outs Control.Timeout(timeout)
-      -- | We might want to move this function somewhere else?
+      -- | transiently, because really this is a dupe of time-out's Control.Timeout(timeout)
+      -- | Luckily time-out is Public Domain 😌
       timeout :: (MonadIO m, MonadCatch m) => Int -> m a -> m (Maybe a) 
       timeout time action = do
         tidMain <- liftIO myThreadId
-        -- | We also might want to keep a single thread alive to reuse
+        -- | We might want to keep a single thread alive to reuse?
         tidTemp <- liftIO $ forkIO $ delay time >> throwTo tidMain GhciTimedOut
         result  <- catchTimeout action `MC.onException` liftIO (killThread tidTemp)  
         when (isJust result) $ liftIO $ killThread tidTemp
@@ -1128,9 +1145,6 @@ withTimeLimit time_out_value cmd = do
       delay t = if t <= 0 
         then pure () 
         else threadDelay (1000000 * min t ms) >> delay (t - min t ms) -- urgh... 
-
-
-
 
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
@@ -1152,7 +1166,7 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       ghciHandle (\e -> lift $ eh e >>= return . Just) $
         handleSourceError printErrorAndFail $
-          withTimeLimit (Just False) $ cmd_wrapper st $ doCommand c
+          withTimeLimit (Just False) $ cmd_wrapper st $ doCommand c -- ^ See Note [Where to Time] 
                -- source error's are handled by runStmt
                -- is the handler necessary here?
   where
@@ -2579,7 +2593,7 @@ runScript filename = do
       let prog = progname st
           line = line_number st
       setGHCiState st{progname=filename',line_number=0}
-      withTimeLimit () $ scriptLoop script
+      scriptLoop script
       liftIO $ hClose script
       new_st <- getGHCiState
       setGHCiState new_st{progname=prog,line_number=line}
