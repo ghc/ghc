@@ -16,11 +16,3 @@ var h$ghc_unique_counter64   = h$newByteArray(8);
 h$ghc_unique_counter64.i3[0] = 0;
 h$ghc_unique_counter64.i3[1] = 0;
 
-function h$genSym() {
-  var rl = h$hs_plusWord64(h$ghc_unique_counter64.i3[1] >>> 0, h$ghc_unique_counter64.i3[0] >>> 0, 0, h$ghc_unique_inc.i3[0] >>> 0);
-  h$ret1 = (h$ret1 & HIGH_UNIQUE_MASK) >>> 0;
-  // h$ret1 contains the higher part (rh)
-  h$ghc_unique_counter64.i3[0] = rl | 0;
-  h$ghc_unique_counter64.i3[1] = h$ret1 | 0;
-  return rl; // h$ret1 still contains rh
-}
