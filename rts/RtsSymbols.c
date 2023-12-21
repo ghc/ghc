@@ -923,6 +923,7 @@ extern char **environ;
       SymI_HasProto(startHeapProfTimer)                                 \
       SymI_HasProto(stopHeapProfTimer)                                  \
       SymI_HasProto(setUserEra)                                         \
+      SymI_HasProto(getUserEra)                                         \
       SymI_HasProto(requestHeapCensus)                                  \
       SymI_HasProto(atomic_inc)                                         \
       SymI_HasProto(atomic_inc64)                                       \

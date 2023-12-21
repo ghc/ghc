@@ -10,6 +10,7 @@ module GHC.Profiling ( -- * Cost Centre Profiling
                      , stopHeapProfTimer
                      , requestHeapCensus
                      , setUserEra
+                     , getUserEra
                      )where
 
 import GHC.Base
@@ -56,3 +57,4 @@ foreign import ccall stopHeapProfTimer :: IO ()
 -- counted. TODO: Move this into ghc-experimental to avoid CLC.
 foreign import ccall setUserEra :: Word -> IO ()
 
+foreign import ccall getUserEra :: IO Word

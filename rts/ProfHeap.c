@@ -150,6 +150,11 @@ setUserEra (StgWord w){
   user_era = w;
 }
 
+StgWord
+getUserEra (void){
+  return user_era;
+}
+
 inline void
 initLDVCtr( counter *ctr )
 {

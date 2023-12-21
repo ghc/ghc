@@ -23,3 +23,4 @@ void requestHeapCensus ( void );
 void startHeapProfTimer ( void );
 void stopHeapProfTimer ( void );
 void setUserEra ( StgWord w);
+StgWord getUserEra ( void );

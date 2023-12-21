@@ -153,6 +153,7 @@ import GHC.Utils.Constants
 import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
 import GHC.Types.Unique
 import GHC.Iface.Errors.Types
+import GHC.Profiling
 
 import qualified GHC.Data.Word64Set as W
 
@@ -702,6 +703,8 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     -- In normal usage plugins are initialised already by ghc/Main.hs this is protective
     -- for any client who might interact with GHC via load'.
     -- See Note [Timing of plugin initialization]
+    era <- liftIO getUserEra
+    liftIO $ setUserEra (era + 1)
     initializeSessionPlugins
     modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
     guessOutputFile
