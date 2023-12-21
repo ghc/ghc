@@ -6,7 +6,6 @@ module Settings.Program
 import Base
 import Context
 import Oracles.Flavour
-import Oracles.Flag
 import Packages
 
 import GHC.Platform.ArchOS
@@ -18,44 +17,39 @@ import Settings.Builders.Common (anyTargetOs, anyTargetArch, isArmTarget)
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- askGhcProfiled stage
-    dynGhcProgs <- askDynGhcPrograms --dynamicGhcPrograms =<< flavour
+    dynGhcProgs <- askDynGhcPrograms stage
+    -- Have to build static if it's a cross stage as we won't distribute the libraries built for the host.
     return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
     where wayFor prof dyn
             | prof && dyn                          = profilingDynamic
             | pkg == ghc && prof && notStage0 stage = profiling
             | dyn && notStage0 stage                = dynamic
-            | otherwise                            = vanilla
+            | otherwise                             = vanilla
 
           notStage0 (Stage0 {}) = False
           notStage0 _ = True
 
--- | When cross compiling, enable for stage0 to get ghci
--- support. But when not cross compiling, disable for
--- stage0, otherwise we introduce extra dependencies
--- like haskeline etc, and mixing stageBoot/stage0 libs
--- can cause extra trouble (e.g. #25406)
---
--- Also checks whether the target supports GHCi.
+-- | Check whether the target supports GHCi.
+-- Disable for stage 0: it would introduce extra dependencies like haskeline,
+-- and mixing stageBoot/stage0 libs can cause trouble (e.g. #25406).
 ghcWithInterpreter :: Stage -> Action Bool
 ghcWithInterpreter stage = do
-    is_cross <- flag CrossCompiling
-    goodOs <- anyTargetOs [ OSMinGW32, OSLinux, OSSolaris2
+    goodOs <- anyTargetOs stage [ OSMinGW32, OSLinux, OSSolaris2
                           , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
                           , OSDarwin, OSKFreeBSD
                           , OSWasi ]
     goodArch <- (||) <$>
-                anyTargetArch [ ArchX86, ArchX86_64, ArchPPC
+                anyTargetArch stage
+                              [ ArchX86, ArchX86_64, ArchPPC
                               , ArchAArch64, ArchS390X
                               , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
                               , ArchRISCV64, ArchLoongArch64
                               , ArchWasm32 ]
-                              <*> isArmTarget
+                              <*> isArmTarget stage
     -- The explicit support list is essentially a list of platforms for which
     -- the RTS linker has support. If the RTS linker is not supported then we
     -- fall back on dynamic linking:
-    dynamicGhcProgs <- askDynGhcPrograms
+    dynamicGhcProgs <- askDynGhcPrograms stage
 
-    -- Maybe this should just be false for cross compilers. But for now
-    -- I've kept the old behaviour where it will say yes. (See #25939)
-    return $ ((goodOs && goodArch) || dynamicGhcProgs) && (stage >= Stage1 || is_cross)
+    return $ ((goodOs && goodArch) || dynamicGhcProgs) && stage >= Stage1

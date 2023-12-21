@@ -111,8 +111,8 @@ registerPackageRules rs stage iplace = do
 
         when (pkg == compiler) $ do
             baseDeps <- ghcLibDeps stage iplace
-            jsTarget <- isJsTarget
-            wasmTarget <- isWasmTarget
+            jsTarget <- isJsTarget stage
+            wasmTarget <- isWasmTarget stage
             libPath <- stageLibPath stage
             let jsDeps
                   | jsTarget  = ["ghc-interp.js"]
@@ -152,7 +152,7 @@ buildConfFinal rs context@Context {..} _conf = do
 
     -- Special package cases (these should ideally be rolled into Cabal).
     when (package == rts) $ do
-        jsTarget <- isJsTarget
+        jsTarget <- isJsTarget (succStage stage)
 
         -- If Cabal knew about "generated-headers", we could read them from the
         -- 'configuredCabal' information, and just "need" them here.

@@ -10,7 +10,7 @@ module Expression (
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, buildingCompilerStage,
     buildingCompilerStage', threadedBootstrapper,
-     package, notPackage, packageOneOf, cross, notCross,
+     package, notPackage, packageOneOf,
      libraryPackage, builder, way, input, inputs, output, outputs,
 
     -- ** Evaluation
@@ -145,7 +145,7 @@ buildingCompilerStage' f = f . succStage <$> getStage
 --   compiler's RTS ways. See Note [Linking ghc-bin against threaded stage0 RTS]
 --   in Settings.Packages for details.
 threadedBootstrapper :: Predicate
-threadedBootstrapper = expr (flag BootstrapThreadedRts)
+threadedBootstrapper = staged (buildFlag BootstrapThreadedRts)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
@@ -162,9 +162,3 @@ cabalFlag pred flagName = do
     ifM (toPredicate pred) (arg flagName) (arg $ "-"<>flagName)
 
 infixr 3 `cabalFlag`
-
-cross :: Predicate
-cross = expr (flag CrossCompiling)
-
-notCross :: Predicate
-notCross = notM cross

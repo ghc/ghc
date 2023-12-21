@@ -329,6 +329,18 @@ workflow, for now.
 
 Note: On windows you need to use the `reloc-binary-dist` target.
 
+#### Staged `system.config.*` configuration
+
+There are three `system.config.*` configuration files with different roles:
+
+- `system.config`: Contains general settings that are valid for all stages.
+- `system.config.host`: Contains system settings for the initial stages.
+- `system.config.target`: Contains system settings for the final stages.
+
+The flags of the `./configure` script refer to `system.config.target`.
+`system.config.host` contains only a minimal vanilla configuration. This may
+change if it turns out that specific options are required for the early stages.
+
 #### Relocatable Binary Distribution
 
 If you require a relocatable binary distribution (for example on Windows), then you

@@ -1,0 +1,15 @@
+section: packaging
+synopsis: Hadrian now builds stage 2 cross-compilers
+issues: #19174
+mrs: !15231
+description: {
+  Hadrian can now build a stage 2 cross-compiler. Following the usual staged
+  build, the bootstrap compiler (stage 0) builds a stage 1 compiler
+  (host → host), which is then used to build the stage 2 cross-compiler
+  (host → target).
+
+  This sanitizes a number of special cases in the build system that previously
+  had to accommodate the absence of a stage 2 in cross builds, and lays the
+  groundwork for fully cross-compiled binary distributions where the compiler
+  runs on the target (stage3 cross-compiler, target → target).
+}

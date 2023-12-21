@@ -12,18 +12,17 @@ import Flavour.Type
 splitSectionsArgs :: Args
 splitSectionsArgs = do
   pkg <- getPackage
-  osx <- expr isOsxTarget
-  cross <- expr $ flag CrossCompiling
+  osx <- staged isOsxTarget
   notSt0 <- notStage0
   flav <- expr flavour
   if ( ghcSplitSections flav
          -- Flavour enables split-sections
     && not osx
          -- OS X doesn't support split sections
-    && (cross || notSt0)
+    && notSt0
          -- Disable for stage 0 because we aren't going to ship
          -- the resulting binaries and consequently there is no
-         -- reason to minimize size. Unless cross compiling.
+         -- reason to minimize size.
     && (pkg /= ghc)
          -- Disable section splitting for the GHC library.
          -- It takes too long and there is little benefit.

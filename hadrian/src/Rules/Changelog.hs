@@ -2,7 +2,7 @@ module Rules.Changelog (changelogRules) where
 
 import Base
 import CommandLine
-import Oracles.Setting (topDirectory, setting, Setting(..))
+import Oracles.Setting (topDirectory, setting, ProjectSetting(..))
 import Packages
 import Settings.Program (programContext)
 

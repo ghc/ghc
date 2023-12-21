@@ -14,7 +14,7 @@ rtsRules = priority 3 $ do
     forM_ [Stage1, Stage2, Stage3 ] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
         buildPath -/- "libHSghc-internal-*.def" %> buildGhcInternalImportDef
-        buildPath -/- "libHSghc-internal-*.dll.a" %> buildGhcInternalImportLib
+        buildPath -/- "libHSghc-internal-*.dll.a" %> buildGhcInternalImportLib stage
 
 buildGhcInternalImportDef :: FilePath -> Action ()
 buildGhcInternalImportDef target = do
@@ -23,9 +23,9 @@ buildGhcInternalImportDef target = do
         templateOut = replace "@GhcInternalDll@" dllName templateIn
     writeFile' target templateOut
 
-buildGhcInternalImportLib :: FilePath -> Action ()
-buildGhcInternalImportLib target = do
-    let input = dropExtension (dropExtension target) <.> "def" -- the .def file
+buildGhcInternalImportLib :: Stage -> FilePath -> Action ()
+buildGhcInternalImportLib stg target = do
+    let input = dropExtensions (dropExtension target) <.> "def" -- the .def file
         output = target -- the .dll.a import lib
     need [input]
-    runBuilder Dlltool ["-d", input, "-l", output] [input] [output]
+    runBuilder (Dlltool stg) ["-d", input, "-l", output] [input] [output]

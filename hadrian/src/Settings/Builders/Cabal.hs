@@ -11,7 +11,7 @@ import qualified Settings.Builders.Common as S
 import Control.Exception (assert)
 import qualified Data.Set as Set
 import Settings.Program (programContext)
-import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
+import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink, targetPlatformTriple)
 import GHC.Toolchain.Program (prgFlags)
 
 cabalBuilderArgs :: Args
@@ -87,14 +87,18 @@ commonCabalArgs stage = do
   -- makes it harder for non-boot packages to link to boot packages, see #26635
   package_simple_id <- expr $ pkgSimpleIdentifier pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
+  let compilerStage = predStage stage  -- the GHC that builds packages in this stage
+      isCross = case stage of
+        Stage0 {} -> return False
+        _         -> expr (crossStage compilerStage)
   mconcat [ -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
             -- and if it's @:@ disable stripping as well. As it is now, I believe
             -- we might have issues with stripping on Windows, as I can't see a
             -- consumer of 'stripCmdPath'.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
-              flag CrossCompiling ? pure [ "--disable-executable-stripping"
-                                         , "--disable-library-stripping" ]
+              isCross ? pure [ "--disable-executable-stripping"
+                             , "--disable-library-stripping" ]
             -- We don't want to strip the debug RTS
             , S.package rts ? pure [ "--disable-executable-stripping"
                                   , "--disable-library-stripping" ]
@@ -187,19 +191,20 @@ configureArgs cFlags' ldFlags' = do
                            , arg $ top -/- pkgPath pkg
                            , cFlags'
                            ]
-    useSystemFfi <- getFlag UseSystemFfi
+    useSystemFfi <- staged $ buildFlag  UseSystemFfi
+    let predStage' s = case s of {Stage0 {} -> stage0InTree ; _ -> predStage s }
     mconcat $
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags'
-        , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
-        , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
-        , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
-        , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
-        , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        , conf "--with-ffi-includes"      $ arg =<< getSetting FfiIncludeDir
-        , conf "--with-ffi-libraries"     $ arg =<< getSetting FfiLibDir
-        -- ROMES:TODO: how is the Host set to TargetPlatformFull? That would be the target
-        , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
+        , conf "--with-iconv-includes"    $ arg =<< staged (buildSetting IconvIncludeDir)
+        , conf "--with-iconv-libraries"   $ arg =<< staged (buildSetting IconvLibDir)
+        , conf "--with-gmp-includes"      $ arg =<< staged (buildSetting GmpIncludeDir)
+        , conf "--with-gmp-libraries"     $ arg =<< staged (buildSetting GmpLibDir)
+        , conf "--with-curses-libraries"  $ arg =<< staged (buildSetting CursesLibDir)
+        , conf "--with-ffi-includes"      $ arg =<< staged (buildSetting FfiIncludeDir)
+        , conf "--with-ffi-libraries"     $ arg =<< staged (buildSetting FfiLibDir)
+        , conf "--host"                   $ arg =<< flip queryTarget targetPlatformTriple  . predStage' =<< getStage
+        , conf "--target"                 $ arg =<< flip queryTarget targetPlatformTriple =<< getStage
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , ghcVersionH
         ] ++ if useSystemFfi then [arg "--configure-option=--with-system-libffi"] else []

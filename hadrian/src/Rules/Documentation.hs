@@ -25,6 +25,8 @@ import Utilities
 
 import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
+import Oracles.Flavour
+import BindistConfig
 
 docRoot :: FilePath
 docRoot = "doc"
@@ -241,10 +243,16 @@ buildLibraryDocumentation = do
         need neededDocs
         build $ target docContext (Haddock BuildIndex) libDocs [file]
 
+-- | The stage whose libraries are documented. For cross builds this is
+-- Stage2 (the wasm32/cross-target libraries); for native builds Stage1.
+pkgDocStage :: Action Stage
+pkgDocStage = library_stage <$> implicitBindistConfig
+
 allHaddocks :: Action [FilePath]
 allHaddocks = do
-    pkgs <- stagePackages Stage1
-    sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
+    docStage <- pkgDocStage
+    pkgs <- stagePackages docStage
+    sequence [ pkgHaddockFile $ vanillaContext docStage pkg
              | pkg <- pkgs, isLibrary pkg, pkgName pkg `notElem` haddockExclude ]
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
@@ -256,20 +264,20 @@ buildPackageDocumentation = do
 
     -- Per-package haddocks
     root -/- htmlRoot -/- "libraries/*/haddock-prologue.txt" %> \file -> do
-        ctx <- pkgDocContext <$> getPkgDocTarget root file
+        ctx <- pkgDocContext =<< getPkgDocTarget root file
         syn  <- pkgSynopsis    (Context.package ctx)
         desc <- pkgDescription (Context.package ctx)
         let prologue = if null desc then syn else desc
         liftIO $ writeFile file prologue
 
     root -/- htmlRoot -/- "libraries/*/*.haddock" %> \file -> do
-        context <- pkgDocContext <$> getPkgDocTarget root file
+        context <- pkgDocContext =<< getPkgDocTarget root file
         need [ takeDirectory file  -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
-        dynamicPrograms <- dynamicGhcPrograms =<< flavour
+        dynamicPrograms <- askDynGhcPrograms (stage context)
         let haddockWay = if dynamicPrograms then dynamic else vanilla
 
         -- Build the dependencies of the package we are going to build documentation for
@@ -289,8 +297,10 @@ buildPackageDocumentation = do
 data PkgDocTarget = DotHaddock PackageName | HaddockPrologue PackageName
   deriving (Eq, Show)
 
-pkgDocContext :: PkgDocTarget -> Context
-pkgDocContext target = Context Stage1 (unsafeFindPackageByName name) vanilla Final
+pkgDocContext :: PkgDocTarget -> Action Context
+pkgDocContext target = do
+    docStage <- pkgDocStage
+    return $ Context docStage (unsafeFindPackageByName name) vanilla Final
   where
     name = case target of DotHaddock n      -> n
                           HaddockPrologue n -> n
@@ -416,5 +426,5 @@ buildManPage = do
 haddockDependencies :: Context -> Action [(Package, FilePath)]
 haddockDependencies context = do
     depNames <- interpretInContext context (getContextData depNames)
-    sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext Stage1 depPkg)
+    sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext (stage context) depPkg)
              | Just depPkg <- map findPackageByName depNames, (pkgName depPkg) `notElem` haddockExclude ]
