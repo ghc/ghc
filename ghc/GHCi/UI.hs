@@ -1144,7 +1144,7 @@ withTimeLimit time_out_value cmd = do
       catchTimeout action = catch (Just <$> action) $ \ GhciTimedOut -> return Nothing
       delay t = if t <= 0 
         then pure () 
-        else threadDelay (1000000 * min t ms) >> delay (t - min t ms) -- urgh... 
+        else threadDelay (1000000 * min t ms) >> delay (t - min t ms) -- ^ there has to be a better way. 
 
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
