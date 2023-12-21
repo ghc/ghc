@@ -1018,7 +1018,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1082,7 +1081,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1146,7 +1144,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -4770,7 +4767,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }
@@ -4834,7 +4830,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }
@@ -4898,7 +4893,6 @@
       "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }

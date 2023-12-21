@@ -121,7 +121,6 @@ installTo relocatable prefix = do
                 NotRelocatable -> []
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
 
-
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
@@ -159,7 +158,7 @@ bindistRules = do
 
         let lib_exe_targets = (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
 
-        let doc_target = if cross then [] else ["docs"]
+        let doc_target = ["docs"]
 
         let other_targets = map (bindistFilesDir -/-) (["configure", "Makefile"] ++ bindistInstallFiles)
         let all_targets = lib_exe_targets ++ doc_target ++ other_targets
@@ -233,8 +232,6 @@ bindistRules = do
         -- (c.f. #20267).
         ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
         cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
-
-
 
         -- TODO: we should only embed the docs that have been generated
         -- depending on the current settings (flavours' "ghcDocs" field and
