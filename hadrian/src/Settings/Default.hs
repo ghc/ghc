@@ -284,8 +284,18 @@ defaultFlavour = Flavour
     , ghcDebugAssertions = const False
     , ghcSplitSections   = False
     , ghcDocs            = cmdDocsArgs
-    , ghcHieFiles        = const False
-    , hashUnitIds        = False }
+    , ghcHieFiles        = defaultDocsTargets }
+
+defaultDocsTargets :: Action DocTargets
+defaultDocsTargets = do
+  cross <- flag CrossCompiling
+  -- MP: Building documentation in cross configurations can work and should
+  -- work but currently is left as a TODO
+  --
+  -- This is the ONLY place where we should branch on building documentation in
+  -- the cross setting.
+  if cross then return Set.empty
+           else cmdDocsArgs
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.
