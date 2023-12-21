@@ -26,7 +26,7 @@ test('T18441fail1', req_interp, makefile_test, ['T18441fail1'])
 
 test('T18441fail2', req_interp, makefile_test, ['T18441fail2'])
 
-test('T18441fail3', [ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":! abcde"'])
+test('T18441fail3', [req_interp, ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":! abcde"'])
 
 test('T18441fail4', req_interp, makefile_test, ['T18441fail4'])
 
@@ -58,7 +58,7 @@ test('T18441fail17', req_interp, makefile_test, ['T18441fail17'])
 
 test('T18441fail18', req_interp, makefile_test, ['T18441fail18'])
 
-test('T18441fail19', [ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":cd abcd"'])
+test('T18441fail19', [req_interp, ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":cd abcd"'])
 
 test('T23663', req_interp, makefile_test, ['T23663'])
 
