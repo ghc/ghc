@@ -15,6 +15,7 @@ import Packages
 import Settings.Program (programContext)
 import Hadrian.Oracles.Path
 import System.Directory (makeAbsolute)
+import Oracles.Flag
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -112,7 +113,11 @@ getBinaryDirectory compiler = pure $ takeDirectory compiler
 getCompilerPath :: String -> Action FilePath
 getCompilerPath "stage0" = setting SystemGhc
 getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure ("stage1-test/bin/ghc" <.> exe))
-getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
+getCompilerPath "stage2" = do
+  cross <- flag CrossCompiling
+  if cross
+    then liftM2 (-/-) absoluteBuildRoot (pure ("stage2-test-cross/bin/ghc" <.> exe))
+    else liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
 getCompilerPath "stage-cabal" = do
   top <- topDirectory
