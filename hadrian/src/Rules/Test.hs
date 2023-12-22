@@ -125,11 +125,11 @@ buildStageWrappers path stage = do
   abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
   -- Use the stage1 package database
   pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath (PackageDbLoc stage Final)
-  if prog `elem` ["ghc","runghc"] then do
-      let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
+  if any (`isSuffixOf` prog) ["ghc","runghc"] then do
+      let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb] 
       writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
       makeExecutable path
-  else if prog == "ghc-pkg" then do
+  else if "ghc-pkg" `isSuffixOf` prog then do
     let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
     writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
     makeExecutable path

@@ -116,8 +116,11 @@ getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure ("stage1-test/bi
 getCompilerPath "stage2" = do
   cross <- flag CrossCompiling
   if cross
-    then liftM2 (-/-) absoluteBuildRoot (pure ("stage2-test-cross/bin/ghc" <.> exe))
+    then do
+	name <- programName =<< programContext Stage1 ghc
+	liftM2 (-/-) absoluteBuildRoot (pure ("stage2-test-cross/bin/" <> name <.> exe))
     else liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
+
 getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
 getCompilerPath "stage-cabal" = do
   top <- topDirectory
