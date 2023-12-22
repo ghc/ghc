@@ -89,31 +89,30 @@ data TestCompilerArgs = TestCompilerArgs{
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
 
-
+    let ghcStage = succStage stg
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- interpretInContext (vanillaContext stg rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
     hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
-    leadingUnderscore   <- queryTargetTarget stg tgtSymbolsHaveLeadingUnderscore
-    withInterpreter     <- ghcWithInterpreter stg
-    unregisterised      <- queryTargetTarget stg tgtUnregisterised
-    tables_next_to_code <- queryTargetTarget stg tgtTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP stg
+    leadingUnderscore   <- queryTargetTarget ghcStage tgtSymbolsHaveLeadingUnderscore
+    withInterpreter     <- ghcWithInterpreter ghcStage
+    unregisterised      <- queryTargetTarget ghcStage tgtUnregisterised
+    tables_next_to_code <- queryTargetTarget ghcStage tgtTablesNextToCode
+    targetWithSMP       <- targetSupportsSMP ghcStage
 
-    let ghcStage = succStage stg
     debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
     debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- queryHostTarget queryOS
-    arch        <- queryTargetTarget stg queryArch
+    arch        <- queryTargetTarget ghcStage queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- queryTargetTarget stg targetPlatformTriple
-    wordsize    <- show @Int . (*8) <$> queryTargetTarget stg (wordSize2Bytes . tgtWordSize)
+    platform    <- queryTargetTarget ghcStage targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
 
     llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
