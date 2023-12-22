@@ -19,6 +19,7 @@ import GHC.Toolchain (ccProgram, tgtCCompiler, ccLinkProgram, tgtCCompilerLink)
 import GHC.Toolchain.Program (prgFlags)
 import qualified Data.Set as Set
 import Oracles.Flavour
+import BindistConfig
 
 {-
 Note [Binary distributions]
@@ -124,27 +125,6 @@ installTo relocatable prefix = do
                 Relocatable -> [AddEnv "RelocatableBuild" "YES"]
                 NotRelocatable -> []
     runBuilderWithCmdOptions env (Make bindistFilesDir) ["install"] [] []
-
-
-data BindistConfig = BindistConfig { library_stage :: Stage -- ^ The stage compiler which builds the libraries
-                                   , executable_stage :: Stage -- ^ The stage compiler which builds the executables
-                                   }
-
--- | A bindist for when the host = target, non cross-compilation setting.
--- Both the libraries and final executables are built with stage1 compiler.
-normalBindist :: BindistConfig
-normalBindist = BindistConfig { library_stage = Stage1, executable_stage = Stage1 }
-
--- | A bindist which contains a cross compiler (when host /= target)
--- The cross compiler is produced by the stage1 compiler, but then we must compile
--- all the boot libraries with the cross compiler (hence stage2 for libraries)
-crossBindist :: BindistConfig
-crossBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage1 }
-
--- | A bindist which contains executables for the target, which produce code for the
--- target. These are produced as "Stage3" build products, produced by a stage2 cross compiler.
-targetBindist ::  BindistConfig
-targetBindist = BindistConfig { library_stage = Stage2, executable_stage = Stage2 }
 
 
 buildBinDistDir :: FilePath -> BindistConfig -> Action ()
@@ -345,13 +325,8 @@ bindistRules = do
         installTo NotRelocatable installPrefix
 
     phony "binary-dist-dir" $ do
-      -- A "normal" bindist doesn't make sense when cross compiled because there would be
-      -- libraries built for the host, but the distributed compiler would produce files for
-      -- the target.
-      cross <- flag CrossCompiling
-      if cross
-        then need ["binary-dist-dir-cross"]
-        else buildBinDistDir root normalBindist
+      cfg <- implicitBindistConfig
+      buildBinDistDir root cfg
 
     phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
     -- MP: Not working yet

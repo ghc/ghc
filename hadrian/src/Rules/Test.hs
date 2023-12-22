@@ -116,6 +116,26 @@ testsuiteDeps = do
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
 
+buildStageWrappers :: FilePath -> Stage -> Action ()
+buildStageWrappers path stage = do
+  bin_path <- stageBinPath (predStage stage)
+  let prog = takeBaseName path
+      stage0prog = bin_path -/- prog <.> exe
+  need [stage0prog]
+  abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
+  -- Use the stage1 package database
+  pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath (PackageDbLoc stage Final)
+  if prog `elem` ["ghc","runghc"] then do
+      let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
+      writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
+      makeExecutable path
+  else if prog == "ghc-pkg" then do
+    let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
+    writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
+    makeExecutable path
+  else createFileLink abs_prog_path path
+
+
 -- TODO: clean up after testing
 testRules :: Rules ()
 testRules = do
@@ -126,24 +146,9 @@ testRules = do
     -- we need to create wrappers to test the stage1 compiler
     -- as the stage1 compiler needs the stage2 libraries
     -- to have any hope of passing tests.
-    root -/- "stage1-test/bin/*" %> \path -> do
-
-      bin_path <- stageBinPath stage0InTree
-      let prog = takeBaseName path
-          stage0prog = bin_path -/- prog <.> exe
-      need [stage0prog]
-      abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
-      -- Use the stage1 package database
-      pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath (PackageDbLoc Stage1 Final)
-      if prog `elem` ["ghc","runghc"] then do
-          let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
-          writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
-          makeExecutable path
-      else if prog == "ghc-pkg" then do
-        let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
-        writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
-        makeExecutable path
-      else createFileLink abs_prog_path path
+    root -/- "stage1-test/bin/*" %> \path -> buildStageWrappers path Stage1
+    -- If we are testing an in-tree cross compiler, we need stage3 libraries
+    root -/- "stage2-test-cross/bin/*" %> \path -> buildStageWrappers path Stage2
 
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
@@ -344,6 +349,21 @@ needTestsuitePackages stg = do
       fail "Testing stage1 is not supported"
 
     need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile stage0InTree p) | (Stage0 InTreeLibs,p) <- exepkgs]
+
+  -- Also need wrappers to test a normal cross compiler because the libraries are built with the same compiler we are testing
+  -- (much in the same way as testing a stage1 compiler)
+  when (stg == Stage1 && cross) $ do
+   -- Windows not supported as the wrapper scripts don't work on windows.. we could
+   -- support it with a separate .bat or C wrapper code path but seems overkill when no-one will
+   -- probably ever try and do this.
+    when windowsHost $ do
+      putFailure $ unlines [ "Testing stage2 cross-compiler with windows is currently unsupported,"
+                             , "if you desire to do this then please open a ticket"]
+      fail "Testing stage2 cross is not supported"
+    need =<< sequence [(\f -> root -/- "stage2-test-cross/bin" -/- takeFileName f) <$> (pkgFile Stage1 p) | (Stage1,p) <- exepkgs]
+
+
+
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc

@@ -12,6 +12,7 @@ import Data.Either
 import Rules.BinaryDist
 import Hadrian.Haskell.Cabal (pkgUnitId)
 import Oracles.Setting
+import BindistConfig
 
 {-
 Note [Testing reinstallable GHC]

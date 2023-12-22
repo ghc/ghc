@@ -22,6 +22,7 @@ import Rules.Libffi
 import Settings
 import Target
 import Utilities
+import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Toolchain.Program
@@ -345,16 +346,24 @@ templateRules = do
 ghcWrapper :: Stage -> Expr String
 ghcWrapper (Stage0 {}) = error "Stage0 GHC does not require a wrapper script to run."
 ghcWrapper stage  = do
-    dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath (PackageDbLoc stage Final)
     ghcPath <- expr $ (</>) <$> topDirectory
                             <*> programPath (vanillaContext (predStage stage) ghc)
+    let get_libdir stg = expr $ (</>) <$> topDirectory <*> packageDbPath (PackageDbLoc stg Final)
+        db_args stg = do
+            dbPath <- get_libdir stg
+            return $ ["-no-global-package-db"
+                     , "-package-env=-"
+                     , "-package-db " ++ dbPath
+                     ]
+    extra_args <-
+      case stage of
+        Stage1 -> db_args Stage1
+        Stage2 -> do
+          cfg <- expr $ implicitBindistConfig
+          db_args (library_stage cfg)
+        Stage3 -> return []
     return $ unwords $ map show $ [ ghcPath ]
-                               ++ (if stage == Stage1
-                                     then ["-no-global-package-db"
-                                          , "-package-env=-"
-                                          , "-package-db " ++ dbPath
-                                          ]
-                                     else [])
+                               ++ extra_args
                                ++ [ "$@" ]
 
 generateSettings :: Expr String
