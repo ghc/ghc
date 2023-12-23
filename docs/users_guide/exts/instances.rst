@@ -139,8 +139,8 @@ BNF-style grammar for the tops of instance declarations below.
              |  arg_type infix_cls_tycon arg_type
              |  '(' arg_type infix_cls_tycon arg_type ')' arg_types
 
-  arg_type ::= <empty>
-            |  arg_type arg_types
+  arg_types ::= <empty>
+             |  arg_type arg_types
 
   opt_where ::= <empty>
              |  'where'
