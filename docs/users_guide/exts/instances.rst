@@ -718,7 +718,7 @@ Some details:
 -  The instance signature is purely local to the class instance
    declaration. It only affects the typechecking of the method in
    the instance; it does not affect anything outside the class
-   instance. In this way, it is similar to an inline type signature:
+   instance. In this way, it is similar to an inline type signature: ::
 
        instance Eq a => Eq (T a) where
            (==) = (\ x y -> True) :: forall b. b -> b -> Bool
