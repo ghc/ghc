@@ -414,6 +414,10 @@ class TestOptions:
        # Command to run before the test
        self.pre_cmd = None
 
+       # Optional per test target wrapper that overrides the default
+       # one when testing a cross target
+       self.target_wrapper = None
+
        # Command wrapper: a function to apply to the command before running it
        self.cmd_wrapper = None
 

@@ -2042,7 +2042,9 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
     args = [prog, stats_args, my_rts_flags, extra_run_opts]
-    if config.target_wrapper is not None:
+    if opts.target_wrapper is not None:
+        args = [opts.target_wrapper] + args
+    elif config.target_wrapper is not None:
         args = [config.target_wrapper] + args
     cmd = ' '.join(args)
 
