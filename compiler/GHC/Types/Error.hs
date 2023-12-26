@@ -659,7 +659,7 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
 
           code_doc =
             case msg_class of
-              MCDiagnostic _ _ (Just code) -> brackets (coloured msg_colour $ ppr_with_hyperlink code)
+              MCDiagnostic _ _ (Just code) -> brackets (ppr_with_hyperlink code)
               _                            -> empty
 
           flag_msg :: Severity -> DiagnosticReason -> Maybe SDoc

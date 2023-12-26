@@ -56,3 +56,5 @@ test('T18441fail18', req_interp, makefile_test, ['T18441fail18'])
 test('T18441fail19', [ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":cd abcd"'])
 
 test('T23663', req_interp, makefile_test, ['T23663'])
+
+test('T24172', normal, compile_fail, ['-fdiagnostics-color=always'])
