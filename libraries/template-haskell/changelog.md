@@ -8,6 +8,8 @@
   * Extend `Pat` with `TypeP` and `Exp` with `TypeE`,
     introduce functions `typeP` and `typeE` (GHC Proposal #281).
 
+  * Extend `Pragma` with `SCCP`.
+
 ## 2.21.0.0
 
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of

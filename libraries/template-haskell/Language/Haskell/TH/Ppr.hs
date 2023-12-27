@@ -658,6 +658,8 @@ instance Ppr Pragma where
     ppr (CompleteP cls mty)
        = text "{-# COMPLETE" <+> (fsep $ punctuate comma $ map (pprName' Applied) cls)
                 <+> maybe empty (\ty -> dcolon <+> pprName' Applied ty) mty <+> text "#-}"
+    ppr (SCCP nm str)
+       = text "{-# SCC" <+> pprName' Applied nm <+> maybe empty text str <+> text "#-}"
 
 ------------------------------
 instance Ppr Inline where

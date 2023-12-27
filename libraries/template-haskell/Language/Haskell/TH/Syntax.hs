@@ -2629,6 +2629,8 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
             | LineP           Int String
             | CompleteP       [Name] (Maybe Name)
                 -- ^ @{ {\-\# COMPLETE C_1, ..., C_i [ :: T ] \#-} }@
+            | SCCP            Name (Maybe String)
+                -- ^ @{ {\-\# SCC fun "optional_name" \#-} }@
         deriving( Show, Eq, Ord, Data, Generic )
 
 data Inline = NoInline

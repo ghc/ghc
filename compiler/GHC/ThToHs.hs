@@ -954,6 +954,12 @@ cvtPragmaD (CompleteP cls mty)
        ; mty'  <- traverse tconNameN mty
        ; returnJustLA $ Hs.SigD noExtField
                    $ CompleteMatchSig (noAnn, NoSourceText) cls' mty' }
+cvtPragmaD (SCCP nm str) = do
+  nm' <- vcNameN nm
+  str' <- traverse (\s ->
+    returnLA $ StringLiteral NoSourceText (mkFastString s) Nothing) str
+  returnJustLA $ Hs.SigD noExtField
+    $ SCCFunSig (noAnn, SourceText $ fsLit "{-# SCC") nm' str'
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive

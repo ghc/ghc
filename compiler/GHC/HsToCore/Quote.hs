@@ -997,7 +997,7 @@ rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
 rep_sig (L loc (SpecInstSig _ ty))  = rep_specialiseInst ty (locA loc)
 rep_sig (L _   (MinimalSig {}))       = notHandled ThMinimalPragmas
-rep_sig (L _   (SCCFunSig {}))        = notHandled ThSCCPragmas
+rep_sig (L loc (SCCFunSig _ nm str)) = rep_sccFun nm str (locA loc)
 rep_sig (L loc (CompleteMatchSig _ cls mty))
   = rep_complete_sig cls mty (locA loc)
 rep_sig d@(L _ (XSig {}))             = pprPanic "rep_sig IdSig" (ppr d)
@@ -1120,6 +1120,21 @@ rep_specialiseInst ty loc
   = do { ty1    <- repHsSigType ty
        ; pragma <- repPragSpecInst ty1
        ; return [(loc, pragma)] }
+
+rep_sccFun :: LocatedN Name
+        -> Maybe (XRec GhcRn StringLiteral)
+        -> SrcSpan
+        -> MetaM [(SrcSpan, Core (M TH.Dec))]
+rep_sccFun nm Nothing loc = do
+  nm1 <- lookupLOcc nm
+  scc <- repPragSCCFun nm1
+  return [(loc, scc)]
+
+rep_sccFun nm (Just (L _ str)) loc = do
+  nm1 <- lookupLOcc nm
+  str1 <- coreStringLit (sl_fs str)
+  scc <- repPragSCCFunNamed nm1 str1
+  return [(loc, scc)]
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
 repInline (NoInline          _ )   = dataCon noInlineDataConName
@@ -2686,6 +2701,12 @@ repPragRule (MkC nm) (MkC ty_bndrs) (MkC tm_bndrs) (MkC lhs) (MkC rhs) (MkC phas
 
 repPragAnn :: Core TH.AnnTarget -> Core (M TH.Exp) -> MetaM (Core (M TH.Dec))
 repPragAnn (MkC targ) (MkC e) = rep2 pragAnnDName [targ, e]
+
+repPragSCCFun :: Core TH.Name -> MetaM (Core (M TH.Dec))
+repPragSCCFun (MkC nm) = rep2 pragSCCFunDName [nm]
+
+repPragSCCFunNamed :: Core TH.Name -> Core String -> MetaM (Core (M TH.Dec))
+repPragSCCFunNamed (MkC nm) (MkC str) = rep2 pragSCCFunNamedDName [nm, str]
 
 repTySynInst :: Core (M TH.TySynEqn) -> MetaM (Core (M TH.Dec))
 repTySynInst (MkC eqn)

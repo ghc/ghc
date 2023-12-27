@@ -553,6 +553,12 @@ pragLineD line file = pure $ PragmaD $ LineP line file
 pragCompleteD :: Quote m => [Name] -> Maybe Name -> m Dec
 pragCompleteD cls mty = pure $ PragmaD $ CompleteP cls mty
 
+pragSCCFunD :: Quote m => Name -> m Dec
+pragSCCFunD nm = pure $ PragmaD $ SCCP nm Nothing
+
+pragSCCFunNamedD :: Quote m => Name -> String -> m Dec
+pragSCCFunNamedD nm str = pure $ PragmaD $ SCCP nm (Just str)
+
 dataInstD :: Quote m => m Cxt -> (Maybe [m (TyVarBndr ())]) -> m Type -> Maybe (m Kind) -> [m Con]
           -> [m DerivClause] -> m Dec
 dataInstD ctxt mb_bndrs ty ksig cons derivs =
