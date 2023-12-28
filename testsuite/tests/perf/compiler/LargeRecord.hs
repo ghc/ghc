@@ -11,6 +11,9 @@
 
 {- Notes on LargeRecord
 ~~~~~~~~~~~~~~~~~~~~~~~
+Subject to Note [Sensitivity to unique increment] in T12545.hs with spread of 2.2%
+
+
 I noticed that in GHC of July 2022, when compiling this
 module I got lots of "SPEC" rules
 

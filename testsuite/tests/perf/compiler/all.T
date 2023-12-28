@@ -206,9 +206,11 @@ test('CoOpt_Singletons',
 
 #########
 
+# LargeRecord is subject to Note [Sensitivity to unique increment] in T12545.hs
+# observed spread was 2.2%
 test ('LargeRecord',
       [ only_ways(['normal']),
-        collect_compiler_stats('bytes allocated',1)
+        collect_compiler_stats('bytes allocated',5)
       , extra_files(['SuperRecord.hs'])
       ],
       multimod_compile,

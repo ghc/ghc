@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -freduction-depth=1000 #-}
 {-# LANGUAGE TypeOperators,DataKinds,KindSignatures,TypeFamilies,PolyKinds,UndecidableInstances #-}
--- Subject to Note [Sensitivity to unique increment] with spread of 1.7%
+-- Subject to Note [Sensitivity to unique increment] in T12545.hs with spread of 1.7%
 import GHC.TypeLits
 data Nat1 = Zero | Succ Nat1
 type family Replicate1 (n :: Nat1) (x::a) :: [a]
