@@ -1749,7 +1749,7 @@ dropCastsB b = b   -- Don't bother in the kind of a forall
 
 -- | See Note [Validity checking of HasField instances]
 checkHasFieldInst :: Class -> [Type] -> TcM ()
-checkHasFieldInst cls tys@[_k_ty, lbl_ty, r_ty, _a_ty] =
+checkHasFieldInst cls tys@[_k_ty, _r_rep, _a_rep, lbl_ty, r_ty, _a_ty] =
   case splitTyConApp_maybe r_ty of
     Nothing -> add_err IllegalHasFieldInstanceNotATyCon
     Just (tc, _)

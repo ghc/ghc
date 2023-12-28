@@ -23,6 +23,13 @@ Language
   This change is backwards-incompatible, although in practice we don't expect it
   to cause significant disruption.
 
+- The built-in ``HasField`` class, used by :extension:`OverloadedRecordDot`, now
+  supports representation polymorphism (implementing part of `GHC Proposal #583
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0583-hasfield-redesign.rst>`_).
+  This means that code using :extension:`UnliftedDatatypes` or
+  :extension:`UnliftedNewtypes` can now use :extension:`OverloadedRecordDot`.
+
+
 Compiler
 ~~~~~~~~
 
