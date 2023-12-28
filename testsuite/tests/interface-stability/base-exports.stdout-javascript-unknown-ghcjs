@@ -12297,7 +12297,7 @@ module GHC.Real where
 
 module GHC.Records where
   -- Safety: Safe
-  type HasField :: forall {k}. k -> * -> * -> Constraint
+  type HasField :: forall {k} {r_rep :: GHC.Types.RuntimeRep} {a_rep :: GHC.Types.RuntimeRep}. k -> TYPE r_rep -> TYPE a_rep -> Constraint
   class HasField x r a | x r -> a where
     getField :: r -> a
     {-# MINIMAL getField #-}

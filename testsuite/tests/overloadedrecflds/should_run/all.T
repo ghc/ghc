@@ -15,6 +15,7 @@ test('overloadedlabelsrun04', [req_th, extra_files(['OverloadedLabelsRun04_A.hs'
      ['overloadedlabelsrun04', config.ghc_th_way_flags])
 test('hasfieldrun01', normal, compile_and_run, [''])
 test('hasfieldrun02', normal, compile_and_run, [''])
+test('hasfieldrun03', normal, compile_and_run, [''])
 test('T12243', normal, compile_and_run, [''])
 test('T11228', normal, compile_and_run, [''])
 test('T11671_run', normal, compile_and_run, [''])

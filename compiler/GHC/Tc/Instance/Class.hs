@@ -1192,7 +1192,8 @@ appropriately cast.
 
 The HasField class is defined (in GHC.Records) thus:
 
-    class HasField (x :: k) r a | x r -> a where
+    type HasField :: forall {k} {r_rep} {a_rep} . k -> TYPE r_rep -> TYPE a_rep -> Constraint
+    class HasField x r a | x r -> a where
       getField :: r -> a
 
 Since this is a one-method class, it is represented as a newtype.
@@ -1248,8 +1249,8 @@ matchHasField dflags short_cut clas tys
   = do { fam_inst_envs <- tcGetFamInstEnvs
        ; rdr_env       <- getGlobalRdrEnv
        ; case tys of
-           -- We are matching HasField {k} x r a...
-           [_k_ty, x_ty, r_ty, a_ty]
+           -- We are matching HasField {k} {r_rep} {a_rep} x r a...
+           [_k_ty, _r_rep, _a_rep, x_ty, r_ty, a_ty]
                -- x should be a literal string
              | Just x <- isStrLitTy x_ty
                -- r should be an applied type constructor
