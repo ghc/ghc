@@ -291,7 +291,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         --              ?y = ?x + 1
     tc_ip_bind :: Class -> IPBind GhcRn -> TcM (DictId, IPBind GhcTc)
     tc_ip_bind ipClass (IPBind _ l_name@(L _ ip) expr)
-       = do { ty <- newOpenFlexiTyVarTy
+       = do { ty <- newFlexiTyVarTy liftedTypeKind  -- see #24298
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcCheckMonoExpr expr ty
