@@ -361,9 +361,10 @@ needTestsuitePackages stg = do
                              , "if you desire to do this then please open a ticket"]
       fail "Testing stage2 cross is not supported"
     need =<< sequence [(\f -> root -/- "stage2-test-cross/bin" -/- takeFileName f) <$> (pkgFile Stage1 p) | (Stage1,p) <- exepkgs]
-
-
-
+    -- The cross compiler needs cross-compiled libraries; i.e. libraries of the next stage (Stage2)
+    let crossCompiledStage = succStage stg
+    crossLibpkgs <- map (crossCompiledStage,) . filter isLibrary <$> allpkgs crossCompiledStage
+    need =<< mapM (uncurry pkgFile) crossLibpkgs
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
