@@ -166,8 +166,8 @@ avoid #19645. Other alternatives considered include:
     way to fix what is ultimately a corner-case.
 
 
-Note [Types in StgConApp]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Representations in StgConApp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have this unboxed sum term:
 
   (# 123 | #)
@@ -180,9 +180,21 @@ type of this term. For example, these are all valid tuples for this:
   (# 1#, 123, rubbish, rubbish #)
                          -- when type is (# Int | (# Int, Int, Int #) #)
 
-So we pass type arguments of the DataCon's TyCon in StgConApp to decide what
-layout to use. Note that unlifted values can't be let-bound, so we don't need
-types in StgRhsCon.
+Therefore, in StgConApp we store a list [[PrimRep]] of representations
+to decide what layout to use.
+Given (# T_1 | ... | T_n #), this list will be
+[typePrimRep T_1, ..., typePrimRep T_n].
+For example, given type
+  (# Int | String #)              we will store [[LiftedRep], [LiftedRep]]
+  (# Int | Float# #)              we will store [[LiftedRep], [FloatRep]]
+  (# Int | (# Int, Int, Int #) #) we will store [[LiftedRep], [LiftedRep, LiftedRep, LiftedRep]].
+
+This field is used for unboxed sums only and it's an empty list otherwise.
+Perhaps it would be more elegant to have a separate StgUnboxedSumCon,
+but that would require duplication of code in cases where the logic is shared.
+
+Note that unlifted values can't be let-bound, so we don't need
+representations in StgRhsCon.
 
 Note [Casting slot arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -527,7 +539,7 @@ unariseExpr rho (StgConApp dc n args ty_args)
           -> return $ (mkTuple args')
   | otherwise =
       let args' = unariseConArgs rho args in
-      return $ (StgConApp dc n args' (map stgArgType args'))
+      return $ (StgConApp dc n args' [])
 
 unariseExpr rho (StgOpApp op args ty)
   = return (StgOpApp op (unariseFunArgs rho args) ty)
@@ -572,7 +584,7 @@ unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e
 
 -- Doesn't return void args.
-unariseUbxSumOrTupleArgs :: UnariseEnv -> UniqSupply -> DataCon -> [InStgArg] -> [Type]
+unariseUbxSumOrTupleArgs :: UnariseEnv -> UniqSupply -> DataCon -> [InStgArg] -> [[PrimRep]]
                    -> ( [OutStgArg]           -- Arguments representing the unboxed sum
                       , Maybe (StgExpr -> StgExpr)) -- Transformation to apply to the arguments, to bring them
                                                     -- into the right Rep
@@ -860,7 +872,7 @@ mkCast arg_in cast_op out_id out_ty in_rhs =
 --
 -- Example, for (# x | #) :: (# (# #) | Int #) we call
 --
---   mkUbxSum (# _ | #) [ (# #), Int ] [ voidPrimId ]
+--   mkUbxSum (# _ | #) [ [], [LiftedRep] ] [ voidPrimId ]
 --
 -- which returns
 --
@@ -869,7 +881,7 @@ mkCast arg_in cast_op out_id out_ty in_rhs =
 mkUbxSum
   :: HasDebugCallStack
   => DataCon      -- Sum data con
-  -> [Type]       -- Type arguments of the sum data con
+  -> [[PrimRep]]  -- Representations of type arguments of the sum data con
   -> [OutStgArg]  -- Actual arguments of the alternative.
   -> UniqSupply
   -> ([OutStgArg] -- Final tuple arguments
@@ -877,7 +889,7 @@ mkUbxSum
      )
 mkUbxSum dc ty_args args0 us
   = let
-      _ :| sum_slots = ubxSumRepType (map typePrimRep ty_args)
+      _ :| sum_slots = ubxSumRepType ty_args
       -- drop tag slot
       field_slots = (mapMaybe (repSlotTy . stgArgRep) args0)
       tag = dataConTag dc
@@ -1121,7 +1133,7 @@ isUnboxedTupleBndr :: Id -> Bool
 isUnboxedTupleBndr = isUnboxedTupleType . idType
 
 mkTuple :: [StgArg] -> StgExpr
-mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) NoNumber args (map stgArgType args)
+mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) NoNumber args []
 
 tagAltTy :: AltType
 tagAltTy = PrimAlt IntRep
