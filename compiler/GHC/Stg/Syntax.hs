@@ -310,7 +310,7 @@ for the details of this transformation.
   | StgConApp   DataCon
                 ConstructorNumber
                 [StgArg] -- Saturated. See Note [Constructor applications in STG]
-                [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
+                [[PrimRep]]   -- See Note [Representations in StgConApp] in GHC.Stg.Unarise
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
                 [StgArg] -- Saturated.

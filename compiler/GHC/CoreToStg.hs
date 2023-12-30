@@ -56,7 +56,6 @@ import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Panic
 
 import Control.Monad (ap)
-import Data.Maybe (fromMaybe)
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -531,8 +530,10 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> StgConApp dc NoNumber args'
-                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+                  | saturated    -> if isUnboxedSumDataCon dc then
+                                      StgConApp dc NoNumber args' (sumPrimReps args)
+                                    else
+                                      StgConApp dc NoNumber args' []
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
@@ -560,6 +561,16 @@ coreToStgApp f args ticks = do
     -- profiling for #4367
     app `seq` return tapp
 
+
+-- Given Core arguments to an unboxed sum datacon, return the 'PrimRep's
+-- of every alternative. For example, in (#_|#) @LiftedRep @IntRep @Int @Int# 0
+-- the arguments are [Type LiftedRep, Type IntRep, Type Int, Type Int#, 0]
+-- and we return the list [[LiftedRep], [IntRep]].
+-- See Note [Representations in StgConApp] in GHC.Stg.Unarise.
+sumPrimReps :: [CoreArg] -> [[PrimRep]]
+sumPrimReps (Type ty : args) | isRuntimeRepKindedTy ty
+  = runtimeRepPrimRep (text "sumPrimReps") ty : sumPrimReps args
+sumPrimReps _ = []
 -- ---------------------------------------------------------------------------
 -- Argument lists
 -- This is the guy that turns applications into A-normal form
