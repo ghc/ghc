@@ -83,7 +83,6 @@ import Data.IntMap (IntMap)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
-import qualified Data.List.NonEmpty as NE
 import qualified GHC.Data.FiniteMap as Map
 import Data.Ord
 import GHC.Stack.CCS
@@ -297,11 +296,6 @@ argBits platform (rep : args)
   | isFollowableArg rep  = False : argBits platform args
   | otherwise = replicate (argRepSizeW platform rep) True ++ argBits platform args
 
-non_void :: NonEmpty ArgRep -> [ArgRep]
-non_void = NE.filter nv
-  where nv V = False
-        nv _ = True
-
 -- -----------------------------------------------------------------------------
 -- schemeTopBind
 
@@ -495,11 +489,9 @@ returnUnliftedAtom
     -> StgArg
     -> BcM BCInstrList
 returnUnliftedAtom d s p e = do
-    let reps = case e of
-                 StgLitArg lit -> typePrimRepArgs (literalType lit)
-                 StgVarArg i   -> bcIdPrimReps i
+    let reps = stgArgRep e
     (push, szb) <- pushAtom d p e
-    ret <- returnUnliftedReps d s szb (NE.toList $! reps)
+    ret <- returnUnliftedReps d s szb reps
     return (push `appOL` ret)
 
 -- return an unlifted value from the top of the stack
@@ -512,9 +504,7 @@ returnUnliftedReps
 returnUnliftedReps d s szb reps = do
     profile <- getProfile
     let platform = profilePlatform profile
-        non_void VoidRep = False
-        non_void _ = True
-    ret <- case filter non_void reps of
+    ret <- case reps of
              -- use RETURN for nullary/unary representations
              []    -> return (unitOL $ RETURN V)
              [rep] -> return (unitOL $ RETURN (toArgRep platform rep))
@@ -549,10 +539,12 @@ returnUnboxedTuple d s p es = do
                                          massert (off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
+    let non_void VoidRep = False
+        non_void _ = True
     ret <- returnUnliftedReps d
                               s
                               (wordsToBytes platform $ nativeCallSize call_info)
-                              (map atomPrimRep es)
+                              (filter non_void $ map atomPrimRep es)
     return (mconcat pushes `appOL` ret)
 
 -- Compile code to apply the given expression to the remaining args
@@ -866,7 +858,7 @@ doCase d s p scrut bndr alts
         -- have the same runtime rep. We have more efficient specialized
         -- return frames for the situations with one non-void element.
 
-        non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
+        non_void_arg_reps = typeArgReps platform bndr_ty
         ubx_tuple_frame =
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
@@ -899,7 +891,7 @@ doCase d s p scrut bndr alts
         (bndr_size, call_info, args_offsets)
            | ubx_tuple_frame =
                let bndr_ty = primRepCmmType platform
-                   bndr_reps = NE.filter (not.isVoidRep) (bcIdPrimReps bndr)
+                   bndr_reps = typePrimRep (idType bndr)
                    (call_info, args_offsets) =
                        layoutNativeCall profile NativeTupleReturn 0 bndr_ty bndr_reps
                in ( wordsToBytes platform (nativeCallSize call_info)
@@ -1695,19 +1687,15 @@ maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
    = let
        (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
-       r_reps = typePrimRepArgs r_ty
-
-       blargh :: a -- Used at more than one type
-       blargh = pprPanic "maybe_getCCallReturn: can't handle:"
-                         (pprType fn_ty)
      in
-       case r_reps of
-         VoidRep :| [] -> Nothing
-         rep     :| [] -> Just rep
+       case typePrimRep r_ty of
+         [] -> Nothing
+         [rep] -> Just rep
 
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
-         _             -> blargh
+         _ -> pprPanic "maybe_getCCallReturn: can't handle:"
+                         (pprType fn_ty)
 
 maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (Id, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
@@ -2147,7 +2135,7 @@ idSizeCon platform var
     isUnboxedSumType (idType var) =
     wordsToBytes platform .
     WordOff . sum . map (argRepSizeW platform . toArgRep platform) .
-    NE.toList . bcIdPrimReps $ var
+    typePrimRep . idType $ var
   | otherwise = ByteOff (primRepSizeB platform (bcIdPrimRep var))
 
 bcIdArgRep :: Platform -> Id -> ArgRep
@@ -2159,10 +2147,6 @@ bcIdPrimRep id
   = rep
   | otherwise
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
-
-
-bcIdPrimReps :: Id -> NonEmpty PrimRep
-bcIdPrimReps id = typePrimRepArgs (idType id)
 
 repSizeWords :: Platform -> PrimRep -> WordOff
 repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep platform rep)
@@ -2214,8 +2198,8 @@ atomRep platform e = toArgRep platform (atomPrimRep e)
 mkStackOffsets :: ByteOff -> [ByteOff] -> [ByteOff]
 mkStackOffsets original_depth szsb = tail (scanl' (+) original_depth szsb)
 
-typeArgReps :: Platform -> Type -> NonEmpty ArgRep
-typeArgReps platform = NE.map (toArgRep platform) . typePrimRepArgs
+typeArgReps :: Platform -> Type -> [ArgRep]
+typeArgReps platform = map (toArgRep platform) . typePrimRep
 
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad
