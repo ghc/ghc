@@ -37,6 +37,10 @@ This extension enables kind signatures in the following places:
 
          data Set (cxt :: Type -> Type) a = Set [a]
 
+-  ``newtype`` declarations: ::
+
+         newtype Set (cxt :: Type -> Type) a = Set [a]
+
 -  ``type`` declarations: ::
 
          type T (f :: Type -> Type) = f Int
