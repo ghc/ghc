@@ -157,6 +157,13 @@ JavaScript backend
   into C functions and pragmas have been added to indicate which C functions are
   exported (see the users guide).
 
+WebAssembly backend
+~~~~~~~~~~~~~~~~~~~
+
+- The wasm backend now implements JavaScript FFI, allowing JavaScript
+  to be called from Haskell and vice versa when targetting JavaScript
+  environments like browsers and node.js. See :ref:`JavaScript FFI in
+  the wasm backend <wasm-jsffi>` for details.
 
 GHCi
 ~~~~
