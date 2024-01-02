@@ -353,6 +353,8 @@ needTestsuitePackages stg = do
   -- Also need wrappers to test a normal cross compiler because the libraries are built with the same compiler we are testing
   -- (much in the same way as testing a stage1 compiler)
   when (stg == Stage1 && cross) $ do
+    libpkgs <- map (Stage2,) . filter isLibrary <$> allpkgs Stage2
+    need =<< mapM (uncurry pkgFile) libpkgs
    -- Windows not supported as the wrapper scripts don't work on windows.. we could
    -- support it with a separate .bat or C wrapper code path but seems overkill when no-one will
    -- probably ever try and do this.
