@@ -25,7 +25,7 @@ import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons
 import GHC.Core.Multiplicity     ( scaledThing )
 
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
-import GHC.StgToCmm.Closure ( tagForCon, NonVoid (..) )
+import GHC.StgToCmm.Closure ( tagForCon )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -61,7 +61,7 @@ make_constr_itbls interp profile cons =
  where
   mk_itbl :: DataCon -> Int -> IO (Name,ItblPtr)
   mk_itbl dcon conNo = do
-     let rep_args = [ NonVoid prim_rep
+     let rep_args = [ prim_rep
                     | arg <- dataConRepArgTys dcon
                     , prim_rep <- typePrimRep (scaledThing arg) ]
 

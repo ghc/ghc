@@ -382,7 +382,7 @@ mkRhsClosure    profile use_std_ap check_tags bndr _cc
                                -- args are all distinct local variables
                                -- The "-1" is for fun_id
     -- Missed opportunity:   (f x x) is not detected
-  , all (isGcPtrRep . idPrimRep . fromNonVoid) fvs
+  , all (isGcPtrRep . idPrimRepU . fromNonVoid) fvs
   , isUpdatable upd_flag
   , n_fvs <= pc_MAX_SPEC_AP_SIZE (profileConstants profile)
   , not (profileIsProfiling profile)

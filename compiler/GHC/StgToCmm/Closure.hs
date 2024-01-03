@@ -18,7 +18,7 @@
 module GHC.StgToCmm.Closure (
         DynTag,  tagForCon, isSmallFamily,
 
-        idPrimRep, isVoidRep, isGcPtrRep, addIdReps, addArgReps,
+        idPrimRep1, idPrimRepU, isGcPtrRep, addIdReps, addArgReps,
 
         NonVoid(..), fromNonVoid, nonVoidIds, nonVoidStgArgs,
         assertNonVoidIds, assertNonVoidStgArgs,
@@ -176,24 +176,27 @@ assertNonVoidStgArgs args = assert (not (any (null . stgArgRep) args)) $
 
 -- Why are these here?
 
--- | Assumes that there is precisely one 'PrimRep' of the type. This assumption
+-- | Assumes that there is at most one 'PrimRep' of the type. This assumption
 -- holds after unarise.
 -- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
-idPrimRep :: Id -> PrimRep
-idPrimRep id = typePrimRep1 (idType id)
-    -- See also Note [VoidRep] in GHC.Types.RepType
+-- See Note [VoidRep] in GHC.Types.RepType.
+idPrimRep1 :: Id -> PrimOrVoidRep
+idPrimRep1 id = typePrimRep1 (idType id)
+
+idPrimRepU :: Id -> PrimRep
+idPrimRepU id = typePrimRepU (idType id)
 
 -- | Assumes that Ids have one PrimRep, which holds after unarisation.
 -- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 addIdReps :: [NonVoid Id] -> [NonVoid (PrimRep, Id)]
 addIdReps = map (\id -> let id' = fromNonVoid id
-                         in NonVoid (idPrimRep id', id'))
+                         in NonVoid (idPrimRepU id', id'))
 
 -- | Assumes that arguments have one PrimRep, which holds after unarisation.
 -- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 addArgReps :: [NonVoid StgArg] -> [NonVoid (PrimRep, StgArg)]
 addArgReps = map (\arg -> let arg' = fromNonVoid arg
-                           in NonVoid (stgArgRep1 arg', arg'))
+                           in NonVoid (stgArgRepU arg', arg'))
 
 ------------------------------------------------------
 --                Building LambdaFormInfo

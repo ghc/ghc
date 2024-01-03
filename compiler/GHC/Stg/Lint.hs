@@ -377,14 +377,8 @@ lintStgAppReps fun args = do
       match_args (Nothing:_) _   = return ()
       match_args (_) (Nothing:_) = return ()
       match_args (Just actual_rep:actual_reps_left) (Just expected_rep:expected_reps_left)
-        -- Common case, reps are exactly the same
+        -- Common case, reps are exactly the same (perhaps void)
         | actual_rep == expected_rep
-        = match_args actual_reps_left expected_reps_left
-
-        -- Check for void rep (empty list)
-        -- Note typePrimRep_maybe will never return a result containing VoidRep.
-        -- We should refactor to make this obvious from the types.
-        | isVoidRep actual_rep && isVoidRep expected_rep
         = match_args actual_reps_left expected_reps_left
 
         -- Some reps are compatible *even* if they are not the same. E.g. IntRep and WordRep.
@@ -409,8 +403,6 @@ lintStgAppReps fun args = do
               -- text "expected reps:" <> ppr arg_ty_reps $$
               text "unarised?:" <> ppr (lf_unarised lf))
         where
-          isVoidRep [] = True
-          isVoidRep _ = False
           -- Try to strip one non-void arg rep from the current argument type returning
           -- the remaining list of arguments. We return Nothing for invalid input which
           -- will result in a lint failure in match_args.

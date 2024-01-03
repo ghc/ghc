@@ -57,7 +57,7 @@ import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
-import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRep,
+import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               addIdReps, addArgReps,
                               nonVoidIds, nonVoidStgArgs )
 import GHC.StgToCmm.Layout
@@ -529,7 +529,7 @@ returnUnboxedTuple
 returnUnboxedTuple d s p es = do
     profile <- getProfile
     let platform = profilePlatform profile
-        arg_ty e = primRepCmmType platform (stgArgRep1 e)
+        arg_ty e = primRepCmmType platform (stgArgRepU e)
         (call_info, tuple_components) = layoutNativeCall profile
                                                          NativeTupleReturn
                                                          d
@@ -540,12 +540,14 @@ returnUnboxedTuple d s p es = do
                                          massert (off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
-    let non_void VoidRep = False
-        non_void _ = True
+    let rep_to_maybe :: PrimOrVoidRep -> Maybe PrimRep
+        rep_to_maybe VoidRep = Nothing
+        rep_to_maybe (NVRep rep) = Just rep
+
     ret <- returnUnliftedReps d
                               s
                               (wordsToBytes platform $ nativeCallSize call_info)
-                              (filter non_void $ map stgArgRep1 es)
+                              (mapMaybe (rep_to_maybe . stgArgRep1) es)
     return (mconcat pushes `appOL` ret)
 
 -- Compile code to apply the given expression to the remaining args
@@ -928,7 +930,7 @@ doCase d s p scrut bndr alts
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
-             let bndr_ty = primRepCmmType platform . idPrimRep
+             let bndr_ty = primRepCmmType platform . idPrimRepU
                  tuple_start = d_bndr
                  (call_info, args_offsets) =
                    layoutNativeCall profile
@@ -944,7 +946,7 @@ doCase d s p scrut bndr alts
                                 wordsToBytes platform (nativeCallSize call_info) +
                                 offset)
                         | (arg, offset) <- args_offsets
-                        , not (isVoidRep $ idPrimRep arg)]
+                        , not (isZeroBitTy $ idType arg)]
                         p_alts
              in do
                rhs_code <- schemeE stack_bot s p' rhs
@@ -1378,10 +1380,10 @@ generatePrimCall d s p target _mb_unit _result_ty args
               layoutNativeCall profile
                                NativePrimCall
                                0
-                               (primRepCmmType platform . stgArgRep1)
+                               (primRepCmmType platform . stgArgRepU)
                                nv_args
 
-         prim_args_offsets = mapFst stgArgRep1 args_offsets
+         prim_args_offsets = mapFst stgArgRepU args_offsets
          shifted_args_offsets = mapSnd (+ d) args_offsets
 
          push_target = PUSH_UBX (LitLabel target Nothing IsFunction) 1
@@ -1457,7 +1459,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- ArgRep of what was actually pushed.
 
          pargs
-             :: ByteOff -> [StgArg] -> BcM [(BCInstrList, PrimRep)]
+             :: ByteOff -> [StgArg] -> BcM [(BCInstrList, PrimOrVoidRep)]
          pargs _ [] = return []
          pargs d (aa@(StgVarArg a):az)
             | Just t      <- tyConAppTyCon_maybe (idType a)
@@ -1470,7 +1472,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
                  -- The ptr points at the header.  Advance it over the
                  -- header and then pretend this is an Addr#.
                  let code = push_fo `snocOL` SWIZZLE 0 (fromIntegral hdr_sz)
-                 return ((code, AddrRep) : rest)
+                 return ((code, NVRep AddrRep) : rest)
          pargs d (aa:az) =  do (code_a, sz_a) <- pushAtom d p aa
                                rest <- pargs (d + sz_a) az
                                return ((code_a, stgArgRep1 aa) : rest)
@@ -1483,8 +1485,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes platform a_reps_sizeW
          a_reps_pushed_RAW
-            | x:xs <- a_reps_pushed_r_to_l
-            , isVoidRep x
+            | VoidRep:xs <- a_reps_pushed_r_to_l
             = reverse xs
             | otherwise
             = panic "GHC.StgToByteCode.generateCCall: missing or invalid World token?"
@@ -1494,10 +1495,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- d_after_args is the stack depth once the args are on.
 
          -- Get the result rep.
-         (returns_void, r_rep)
-            = case maybe_getCCallReturnRep result_ty of
-                 Nothing -> (True,  VoidRep)
-                 Just rr -> (False, rr)
+         r_rep = maybe_getCCallReturnRep result_ty
          {-
          Because the Haskell stack grows down, the a_reps refer to
          lowest to highest addresses in that order.  The args for the call
@@ -1570,10 +1568,9 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- this is a V (tag).
          r_sizeW   = repSizeWords platform r_rep
          d_after_r = d_after_Addr + wordsToBytes platform r_sizeW
-         push_r =
-             if returns_void
-                then nilOL
-                else unitOL (PUSH_UBX (mkDummyLiteral platform r_rep) (r_sizeW))
+         push_r = case r_rep of
+                    VoidRep -> nilOL
+                    NVRep r -> unitOL (PUSH_UBX (mkDummyLiteral platform r) r_sizeW)
 
          -- generate the marshalling code we're going to call
 
@@ -1611,17 +1608,17 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)
          wrapup       = mkSlideW r_sizeW (d_after_r_min_s - r_sizeW)
-                        `snocOL` RETURN (toArgRep platform r_rep)
+                        `snocOL` RETURN (toArgRepOrV platform r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
      return (
          push_args `appOL`
          push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
          )
 
-primRepToFFIType :: Platform -> PrimRep -> FFIType
-primRepToFFIType platform r
+primRepToFFIType :: Platform -> PrimOrVoidRep -> FFIType
+primRepToFFIType _ VoidRep = FFIVoid
+primRepToFFIType platform (NVRep r)
   = case r of
-     VoidRep     -> FFIVoid
      IntRep      -> signed_word
      WordRep     -> unsigned_word
      Int8Rep     -> FFISInt8
@@ -1668,7 +1665,7 @@ mkDummyLiteral platform pr
 --     GHC.Prim.Char# -> GHC.Prim.State# GHC.Prim.RealWorld
 --                   -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Prim.Int# #)
 --
--- to  Just IntRep
+-- to  NVRep IntRep
 -- and check that an unboxed pair is returned wherein the first arg is V'd.
 --
 -- Alternatively, for call-targets returning nothing, convert
@@ -1676,16 +1673,16 @@ mkDummyLiteral platform pr
 --     GHC.Prim.Char# -> GHC.Prim.State# GHC.Prim.RealWorld
 --                   -> (# GHC.Prim.State# GHC.Prim.RealWorld #)
 --
--- to  Nothing
+-- to  VoidRep
 
-maybe_getCCallReturnRep :: Type -> Maybe PrimRep
+maybe_getCCallReturnRep :: Type -> PrimOrVoidRep
 maybe_getCCallReturnRep fn_ty
    = let
        (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
      in
        case typePrimRep r_ty of
-         [] -> Nothing
-         [rep] -> Just rep
+         [] -> VoidRep
+         [rep] -> NVRep rep
 
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
@@ -2131,10 +2128,10 @@ idSizeCon platform var
     wordsToBytes platform .
     WordOff . sum . map (argRepSizeW platform . toArgRep platform) .
     typePrimRep . idType $ var
-  | otherwise = ByteOff (primRepSizeB platform (idPrimRep var))
+  | otherwise = ByteOff (primRepSizeB platform (idPrimRepU var))
 
-repSizeWords :: Platform -> PrimRep -> WordOff
-repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep platform rep)
+repSizeWords :: Platform -> PrimOrVoidRep -> WordOff
+repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRepOrV platform rep)
 
 isFollowableArg :: ArgRep -> Bool
 isFollowableArg P = True
@@ -2171,7 +2168,7 @@ mkSlideW !n !ws
 
 
 atomRep :: Platform -> StgArg -> ArgRep
-atomRep platform e = toArgRep platform (stgArgRep1 e)
+atomRep platform e = toArgRepOrV platform (stgArgRep1 e)
 
 -- | Let szsw be the sizes in bytes of some items pushed onto the stack, which
 -- has initial depth @original_depth@.  Return the values which the stack

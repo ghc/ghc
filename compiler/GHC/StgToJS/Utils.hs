@@ -20,6 +20,7 @@ module GHC.StgToJS.Utils
   , typeJSRep
   , unaryTypeJSRep
   , primRepToJSRep
+  , primOrVoidRepToJSRep
   , stackSlotType
   , primRepSize
   , mkArityTag
@@ -196,10 +197,9 @@ typeJSRep t = map primRepToJSRep (typePrimRep t)
 
 -- only use if you know it's not an unboxed tuple
 unaryTypeJSRep :: HasDebugCallStack => UnaryType -> JSRep
-unaryTypeJSRep ut = primRepToJSRep (typePrimRep1 ut)
+unaryTypeJSRep ut = primOrVoidRepToJSRep (typePrimRep1 ut)
 
 primRepToJSRep :: HasDebugCallStack => PrimRep -> JSRep
-primRepToJSRep VoidRep      = VoidV
 primRepToJSRep (BoxedRep _) = PtrV
 primRepToJSRep IntRep       = IntV
 primRepToJSRep Int8Rep      = IntV
@@ -215,6 +215,10 @@ primRepToJSRep AddrRep      = AddrV
 primRepToJSRep FloatRep     = DoubleV
 primRepToJSRep DoubleRep    = DoubleV
 primRepToJSRep (VecRep{})   = error "primRepToJSRep: vector types are unsupported"
+
+primOrVoidRepToJSRep :: HasDebugCallStack => PrimOrVoidRep -> JSRep
+primOrVoidRepToJSRep VoidRep = VoidV
+primOrVoidRepToJSRep (NVRep rep) = primRepToJSRep rep
 
 dataConType :: DataCon -> Type
 dataConType dc = idType (dataConWrapId dc)

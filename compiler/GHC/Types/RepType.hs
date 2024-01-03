@@ -11,11 +11,11 @@ module GHC.Types.RepType
     isZeroBitTy,
 
     -- * Type representation for the code generator
-    typePrimRep, typePrimRep1,
-    runtimeRepPrimRep, typePrimRepArgs,
+    typePrimRep, typePrimRep1, typePrimRepU,
+    runtimeRepPrimRep,
     PrimRep(..), primRepToRuntimeRep, primRepToType,
     countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
-    tyConPrimRep, tyConPrimRep1,
+    tyConPrimRep,
     runtimeRepPrimRep_maybe, kindPrimRep_maybe, typePrimRep_maybe,
 
     -- * Unboxed sum representation type
@@ -38,7 +38,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind
   , vecRepDataConTyCon
-  , liftedRepTy, unliftedRepTy, zeroBitRepTy
+  , liftedRepTy, unliftedRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -80,15 +80,6 @@ isNvUnaryRep :: [PrimRep] -> Bool
 isNvUnaryRep [_] = True
 isNvUnaryRep _ = False
 
--- INVARIANT: the result list is never empty.
-typePrimRepArgs :: HasDebugCallStack => Type -> NonEmpty PrimRep
-typePrimRepArgs ty
-  = case reps of
-      [] -> VoidRep :| []
-      (x:xs) ->   x :| xs
-  where
-    reps = typePrimRep ty
-
 -- | Gets rid of the stuff that prevents us from understanding the
 -- runtime representation of a type. Including:
 --   1. Casts
@@ -129,7 +120,10 @@ countFunRepArgs 0 _
   = 0
 countFunRepArgs n ty
   | FunTy _ _ arg res <- unwrapType ty
-  = length (typePrimRepArgs arg) + countFunRepArgs (n - 1) res
+  = (length (typePrimRep arg) `max` 1)
+    + countFunRepArgs (n - 1) res
+    -- If typePrimRep returns [] that means a void arg,
+    -- and we count 1 for that
   | otherwise
   = pprPanic "countFunRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 
@@ -308,7 +302,6 @@ repSlotTy reps = case reps of
                   _ -> pprPanic "repSlotTy" (ppr reps)
 
 primRepSlot :: PrimRep -> SlotTy
-primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")
 primRepSlot (BoxedRep mlev) = case mlev of
   Nothing       -> panic "primRepSlot: levity polymorphic BoxedRep"
   Just Lifted   -> PtrLiftedSlot
@@ -391,8 +384,7 @@ needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep
-  = VoidRep       -- See Note [VoidRep]
-  | LiftedRep     -- ^ Lifted pointer
+  = LiftedRep     -- ^ Lifted pointer
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
@@ -441,18 +433,37 @@ See also Note [Getting from RuntimeRep to PrimRep] and Note [VoidRep].
 
 Note [VoidRep]
 ~~~~~~~~~~~~~~
-PrimRep contains a constructor VoidRep, while RuntimeRep does
-not. Yet representations are often characterised by a list of PrimReps,
-where a void would be denoted as []. (See also Note [RuntimeRep and PrimRep].)
+PrimRep is used to denote one primitive representation.
+Because of unboxed tuples and sums, the representation of a value
+in general is a list of PrimReps. (See also Note [RuntimeRep and PrimRep].)
 
-However, after the unariser, all identifiers have exactly one PrimRep, but
-void arguments still exist. Thus, PrimRep includes VoidRep to describe these
-binders. Perhaps post-unariser representations (which need VoidRep) should be
-a different type than pre-unariser representations (which use a list and do
-not need VoidRep), but we have what we have.
+For example:
+    typePrimRep Int#             = [IntRep]
+    typePrimRep Int              = [LiftedRep]
+    typePrimRep (# Int#, Int# #) = [IntRep,IntRep]
+    typePrimRep (# #)            = []
+    typePrimRep (State# s)       = []
 
-RuntimeRep instead uses TupleRep '[] to denote a void argument. When
-converting a TupleRep '[] into a list of PrimReps, we get an empty list.
+After the unariser, all identifiers have at most one PrimRep
+(that is, the [PrimRep] for each identifier is empty or a singleton list).
+More precisely: typePrimRep1 will succeed (not crash) on every binder
+and argument type.
+(See Note [Post-unarisation invariants] in GHC.Stg.Unarise.)
+
+Thus, we have
+
+1. typePrimRep :: Type -> [PrimRep]
+   which returns the list
+
+2. typePrimRepU :: Type -> PrimRep
+   which asserts that the type has exactly one PrimRep and returns it
+
+3. typePrimRep1 :: Type -> PrimOrVoidRep
+   data PrimOrVoidRep = VoidRep | NVRep PrimRep
+   which asserts that the type either has exactly one PrimRep or is void.
+
+Likewise, we have idPrimRepU and idPrimRep1, stgArgRepU and stgArgRep1,
+which have analogous preconditions.
 
 Note [Getting from RuntimeRep to PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -546,16 +557,21 @@ typePrimRep ty = kindPrimRep (text "typePrimRep" <+>
 typePrimRep_maybe :: Type -> Maybe [PrimRep]
 typePrimRep_maybe ty = kindPrimRep_maybe (typeKind ty)
 
--- | Like 'typePrimRep', but assumes that there is precisely one 'PrimRep' output;
+-- | Like 'typePrimRep', but assumes that there is at most one 'PrimRep' output;
 -- an empty list of PrimReps becomes a VoidRep.
 -- This assumption holds after unarise, see Note [Post-unarisation invariants].
 -- Before unarise it may or may not hold.
 -- See also Note [RuntimeRep and PrimRep] and Note [VoidRep]
-typePrimRep1 :: HasDebugCallStack => UnaryType -> PrimRep
+typePrimRep1 :: HasDebugCallStack => UnaryType -> PrimOrVoidRep
 typePrimRep1 ty = case typePrimRep ty of
   []    -> VoidRep
-  [rep] -> rep
+  [rep] -> NVRep rep
   _     -> pprPanic "typePrimRep1" (ppr ty $$ ppr (typePrimRep ty))
+
+typePrimRepU :: HasDebugCallStack => NvUnaryType -> PrimRep
+typePrimRepU ty = case typePrimRep ty of
+  [rep] -> rep
+  _     -> pprPanic "typePrimRepU" (ppr ty $$ ppr (typePrimRep ty))
 
 -- | Find the runtime representation of a 'TyCon'. Defined here to
 -- avoid module loops. Returns a list of the register shapes necessary.
@@ -566,15 +582,6 @@ tyConPrimRep tc
                 res_kind
   where
     res_kind = tyConResKind tc
-
--- | Like 'tyConPrimRep', but assumed that there is precisely zero or
--- one 'PrimRep' output
--- See also Note [Getting from RuntimeRep to PrimRep] and Note [VoidRep]
-tyConPrimRep1 :: HasDebugCallStack => TyCon -> PrimRep
-tyConPrimRep1 tc = case tyConPrimRep tc of
-  []    -> VoidRep
-  [rep] -> rep
-  _     -> pprPanic "tyConPrimRep1" (ppr tc $$ ppr (tyConPrimRep tc))
 
 -- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
 -- of values of types of this kind.
@@ -603,8 +610,6 @@ kindPrimRep_maybe ki
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep].
 -- The @[PrimRep]@ is the final runtime representation /after/ unarisation.
---
--- The result does not contain any VoidRep.
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> RuntimeRepType -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
@@ -617,8 +622,7 @@ runtimeRepPrimRep doc rr_ty
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep].
--- The @[PrimRep]@ is the final runtime representation /after/ unarisation
--- and does not contain VoidRep.
+-- The @[PrimRep]@ is the final runtime representation /after/ unarisation.
 --
 -- Returns @Nothing@ if rep can't be determined. Eg. levity polymorphic types.
 runtimeRepPrimRep_maybe :: Type -> Maybe [PrimRep]
@@ -634,7 +638,6 @@ runtimeRepPrimRep_maybe rr_ty
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 primRepToRuntimeRep :: PrimRep -> RuntimeRepType
 primRepToRuntimeRep rep = case rep of
-  VoidRep       -> zeroBitRepTy
   BoxedRep mlev -> case mlev of
     Nothing       -> panic "primRepToRuntimeRep: levity polymorphic BoxedRep"
     Just Lifted   -> liftedRepTy

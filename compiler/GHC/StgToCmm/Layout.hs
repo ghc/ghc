@@ -26,7 +26,7 @@ module GHC.StgToCmm.Layout (
         mkVirtConstrSizes,
         getHpRelOffset,
 
-        ArgRep(..), toArgRep, idArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
+        ArgRep(..), toArgRep, toArgRepOrV, idArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
         getArgAmode, getNonVoidArgAmodes
   ) where
 
@@ -50,7 +50,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.CLabel
 import GHC.Stg.Syntax
 import GHC.Types.Id
-import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
+import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), primRepSizeB )
 import GHC.Types.Basic   ( RepArity )
 import GHC.Platform
 import GHC.Platform.Profile
@@ -330,8 +330,8 @@ getArgRepsAmodes args = do
   where getArgRepAmode platform arg
            = case stgArgRep1 arg of
                VoidRep -> return (V, Nothing)
-               rep -> do expr <- getArgAmode (NonVoid arg)
-                         return (toArgRep platform rep, Just expr)
+               NVRep rep -> do expr <- getArgAmode (NonVoid arg)
+                               return (toArgRep platform rep, Just expr)
 
 nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
 nonVArgs [] = []
@@ -438,7 +438,6 @@ mkVirtHeapOffsetsWithPadding
 -- than the unboxed things
 
 mkVirtHeapOffsetsWithPadding profile header things =
-    assert (not (any (isVoidRep . fst . fromNonVoid) things))
     ( tot_wds
     , bytesToWordsRoundUp platform bytes_of_ptrs
     , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
@@ -520,13 +519,13 @@ mkVirtConstrOffsets profile = mkVirtHeapOffsets profile StdHeader
 -- | Just like mkVirtConstrOffsets, but used when we don't have the actual
 -- arguments. Useful when e.g. generating info tables; we just need to know
 -- sizes of pointer and non-pointer fields.
-mkVirtConstrSizes :: Profile -> [NonVoid PrimRep] -> (WordOff, WordOff)
+mkVirtConstrSizes :: Profile -> [PrimRep] -> (WordOff, WordOff)
 mkVirtConstrSizes profile field_reps
   = (tot_wds, ptr_wds)
   where
     (tot_wds, ptr_wds, _) =
        mkVirtConstrOffsets profile
-         (map (\nv_rep -> NonVoid (fromNonVoid nv_rep, ())) field_reps)
+         (map (\nv_rep -> NonVoid (nv_rep, ())) field_reps)
 
 -------------------------------------------------------------------------
 --

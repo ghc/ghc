@@ -57,7 +57,7 @@ primTyDescChar :: Platform -> Type -> Char
 primTyDescChar !platform ty
  | ty `eqType` unitTy = 'v'
  | otherwise
- = case typePrimRep1 (getPrimTyOf ty) of
+ = case typePrimRepU (getPrimTyOf ty) of
      IntRep      -> signed_word
      WordRep     -> unsigned_word
      Int8Rep     -> 'B'

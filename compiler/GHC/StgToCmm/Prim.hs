@@ -1720,7 +1720,7 @@ emitPrimOp cfg primop =
     -> PrimopCmmEmit
   opIntoRegs f = PrimopCmmEmit_Internal $ \res_ty -> do
     regs <- case result_info of
-      ReturnsPrim VoidRep -> pure []
+      ReturnsVoid -> pure []
       ReturnsPrim rep
         -> do reg <- newTemp (primRepCmmType platform rep)
               pure [reg]

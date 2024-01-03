@@ -126,8 +126,9 @@ module GHC.Core.TyCon(
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..), Levity(..),
+        PrimOrVoidRep(..),
         primElemRepToPrimRep,
-        isVoidRep, isGcPtrRep,
+        isGcPtrRep,
         primRepSizeB, primRepSizeW64_B,
         primElemRepSizeB, primElemRepSizeW64_B,
         primRepIsFloat,
@@ -1532,17 +1533,18 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 -}
 
 
--- | A 'PrimRep' is an abstraction of a type.  It contains information that
--- the code generator needs in order to pass arguments, return results,
+-- | A 'PrimRep' is an abstraction of a /non-void/ type.
+-- (Use 'PrimRepOrVoidRep' if you want void types too.)
+-- It contains information that the code generator needs
+-- in order to pass arguments, return results,
 -- and store values of this type. See also Note [RuntimeRep and PrimRep] in
 -- "GHC.Types.RepType" and Note [VoidRep] in "GHC.Types.RepType".
 data PrimRep
-  = VoidRep
 -- Unpacking of sum types is only supported since 9.6.1
 #if MIN_VERSION_GLASGOW_HASKELL(9,6,0,0)
-  | BoxedRep {-# UNPACK #-} !(Maybe Levity) -- ^ Boxed, heap value
+  = BoxedRep {-# UNPACK #-} !(Maybe Levity) -- ^ Boxed, heap value
 #else
-  | BoxedRep                !(Maybe Levity) -- ^ Boxed, heap value
+  = BoxedRep                !(Maybe Levity) -- ^ Boxed, heap value
 #endif
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
@@ -1559,6 +1561,9 @@ data PrimRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
   deriving( Data.Data, Eq, Ord, Show )
+
+data PrimOrVoidRep = VoidRep | NVRep PrimRep
+  -- See Note [VoidRep] in GHC.Types.RepType
 
 data PrimElemRep
   = Int8ElemRep
@@ -1580,57 +1585,51 @@ instance Outputable PrimElemRep where
   ppr r = text (show r)
 
 instance Binary PrimRep where
-  put_ bh VoidRep        = putByte bh 0
   put_ bh (BoxedRep ml)  = case ml of
     -- cheaper storage of the levity than using
     -- the Binary (Maybe Levity) instance
-    Nothing       -> putByte bh 1
-    Just Lifted   -> putByte bh 2
-    Just Unlifted -> putByte bh 3
-  put_ bh Int8Rep        = putByte bh 4
-  put_ bh Int16Rep       = putByte bh 5
-  put_ bh Int32Rep       = putByte bh 6
-  put_ bh Int64Rep       = putByte bh 7
-  put_ bh IntRep         = putByte bh 8
-  put_ bh Word8Rep       = putByte bh 9
-  put_ bh Word16Rep      = putByte bh 10
-  put_ bh Word32Rep      = putByte bh 11
-  put_ bh Word64Rep      = putByte bh 12
-  put_ bh WordRep        = putByte bh 13
-  put_ bh AddrRep        = putByte bh 14
-  put_ bh FloatRep       = putByte bh 15
-  put_ bh DoubleRep      = putByte bh 16
-  put_ bh (VecRep n per) = putByte bh 17 *> put_ bh n *> put_ bh per
+    Nothing       -> putByte bh 0
+    Just Lifted   -> putByte bh 1
+    Just Unlifted -> putByte bh 2
+  put_ bh Int8Rep        = putByte bh 3
+  put_ bh Int16Rep       = putByte bh 4
+  put_ bh Int32Rep       = putByte bh 5
+  put_ bh Int64Rep       = putByte bh 6
+  put_ bh IntRep         = putByte bh 7
+  put_ bh Word8Rep       = putByte bh 8
+  put_ bh Word16Rep      = putByte bh 9
+  put_ bh Word32Rep      = putByte bh 10
+  put_ bh Word64Rep      = putByte bh 11
+  put_ bh WordRep        = putByte bh 12
+  put_ bh AddrRep        = putByte bh 13
+  put_ bh FloatRep       = putByte bh 14
+  put_ bh DoubleRep      = putByte bh 15
+  put_ bh (VecRep n per) = putByte bh 16 *> put_ bh n *> put_ bh per
   get  bh = do
     h <- getByte bh
     case h of
-      0  -> pure VoidRep
-      1  -> pure $ BoxedRep Nothing
-      2  -> pure $ BoxedRep (Just Lifted)
-      3  -> pure $ BoxedRep (Just Unlifted)
-      4  -> pure Int8Rep
-      5  -> pure Int16Rep
-      6  -> pure Int32Rep
-      7  -> pure Int64Rep
-      8  -> pure IntRep
-      9  -> pure Word8Rep
-      10 -> pure Word16Rep
-      11 -> pure Word32Rep
-      12 -> pure Word64Rep
-      13 -> pure WordRep
-      14 -> pure AddrRep
-      15 -> pure FloatRep
-      16 -> pure DoubleRep
-      17 -> VecRep <$> get bh <*> get bh
+      0  -> pure $ BoxedRep Nothing
+      1  -> pure $ BoxedRep (Just Lifted)
+      2  -> pure $ BoxedRep (Just Unlifted)
+      3  -> pure Int8Rep
+      4  -> pure Int16Rep
+      5  -> pure Int32Rep
+      6  -> pure Int64Rep
+      7  -> pure IntRep
+      8  -> pure Word8Rep
+      9  -> pure Word16Rep
+      10 -> pure Word32Rep
+      11 -> pure Word64Rep
+      12 -> pure WordRep
+      13 -> pure AddrRep
+      14 -> pure FloatRep
+      15 -> pure DoubleRep
+      16 -> VecRep <$> get bh <*> get bh
       _  -> pprPanic "Binary:PrimRep" (int (fromIntegral h))
 
 instance Binary PrimElemRep where
   put_ bh per = putByte bh (fromIntegral (fromEnum per))
   get  bh = toEnum . fromIntegral <$> getByte bh
-
-isVoidRep :: PrimRep -> Bool
-isVoidRep VoidRep = True
-isVoidRep _other  = False
 
 isGcPtrRep :: PrimRep -> Bool
 isGcPtrRep (BoxedRep _) = True
@@ -1676,7 +1675,6 @@ primRepSizeB platform = \case
    DoubleRep        -> dOUBLE_SIZE
    AddrRep          -> platformWordSizeInBytes platform
    BoxedRep _       -> platformWordSizeInBytes platform
-   VoidRep          -> 0
    (VecRep len rep) -> len * primElemRepSizeB platform rep
 
 -- | Like primRepSizeB but assumes pointers/words are 8 words wide.
@@ -1699,7 +1697,6 @@ primRepSizeW64_B = \case
    DoubleRep        -> dOUBLE_SIZE
    AddrRep          -> 8
    BoxedRep{}       -> 8
-   VoidRep          -> 0
    (VecRep len rep) -> len * primElemRepSizeW64_B rep
 
 primElemRepSizeB :: Platform -> PrimElemRep -> Int

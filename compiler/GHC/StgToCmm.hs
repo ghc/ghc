@@ -253,8 +253,8 @@ cgDataCon mn data_con
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.
-            arg_reps :: [NonVoid PrimRep]
-            arg_reps = [ NonVoid rep_ty
+            arg_reps :: [PrimRep]
+            arg_reps = [ rep_ty
                        | ty <- dataConRepArgTys data_con
                        , rep_ty <- typePrimRep (scaledThing ty)
                        ]

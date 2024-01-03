@@ -58,6 +58,7 @@ module GHC.Stg.Syntax (
         stgArgType,
         stgArgRep,
         stgArgRep1,
+        stgArgRepU,
         stgArgRep_maybe,
 
         stgCaseBndrInScope,
@@ -80,7 +81,7 @@ import GHC.Types.CostCentre ( CostCentreStack )
 
 import GHC.Core     ( AltCon )
 import GHC.Core.DataCon
-import GHC.Core.TyCon    ( PrimRep(..), TyCon )
+import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Core.Ppr( {- instances -} )
 
@@ -90,7 +91,7 @@ import GHC.Types.Name        ( isDynLinkName )
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.RepType ( typePrimRep1, typePrimRep, typePrimRep_maybe )
+import GHC.Types.RepType ( typePrimRep, typePrimRep1, typePrimRepU, typePrimRep_maybe )
 
 import GHC.Unit.Module       ( Module )
 import GHC.Utils.Outputable
@@ -177,10 +178,10 @@ isDllConApp platform ext_dyn_refs this_mod con args
 --    $WT1 = T1 Int (Coercion (Refl Int))
 --
 -- The coercion argument here gets VoidRep
-isAddrRep :: PrimRep -> Bool
-isAddrRep AddrRep      = True
-isAddrRep (BoxedRep _) = True -- FIXME: not true for JavaScript
-isAddrRep _            = False
+isAddrRep :: PrimOrVoidRep -> Bool
+isAddrRep (NVRep AddrRep)      = True
+isAddrRep (NVRep (BoxedRep _)) = True -- FIXME: not true for JavaScript
+isAddrRep _                    = False
 
 -- | Type of an @StgArg@
 --
@@ -199,10 +200,16 @@ stgArgRep ty = typePrimRep (stgArgType ty)
 stgArgRep_maybe :: StgArg -> Maybe [PrimRep]
 stgArgRep_maybe ty = typePrimRep_maybe (stgArgType ty)
 
--- | Assumes that the argument has one PrimRep, which holds after unarisation.
+-- | Assumes that the argument has at most one PrimRep, which holds after unarisation.
 -- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
-stgArgRep1 :: StgArg -> PrimRep
+-- See Note [VoidRep] in GHC.Types.RepType.
+stgArgRep1 :: StgArg -> PrimOrVoidRep
 stgArgRep1 ty = typePrimRep1 (stgArgType ty)
+
+-- | Assumes that the argument has exactly one PrimRep.
+-- See Note [VoidRep] in GHC.Types.RepType.
+stgArgRepU :: StgArg -> PrimRep
+stgArgRepU ty = typePrimRepU (stgArgType ty)
 
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.

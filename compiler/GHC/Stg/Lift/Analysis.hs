@@ -418,7 +418,7 @@ closureSize profile ids = words + pc_STD_HDR_SIZE (platformConstants (profilePla
 -- | The number of words a single 'Id' adds to a closure's size.
 -- Note that this can't handle unboxed tuples (which may still be present in
 -- let-no-escapes, even after Unarise), in which case
--- @'GHC.StgToCmm.Closure.idPrimRep'@ will crash.
+-- @'GHC.StgToCmm.ArgRep.idArgRep'@ will crash.
 idClosureFootprint:: Platform -> Id -> WordOff
 idClosureFootprint platform
   = StgToCmm.ArgRep.argRepSizeW platform

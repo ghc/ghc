@@ -488,7 +488,7 @@ accurate update would complexify the implementation and doesn't seem worth it.
 -}
 
 cgCase (StgApp v []) _ (PrimAlt _) alts
-  | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
+  | isZeroBitTy (idType v)  -- See Note [Scrutinising VoidRep]
   , [GenStgAlt{alt_con=DEFAULT, alt_bndrs=_, alt_rhs=rhs}] <- alts
   = cgExpr rhs
 
@@ -522,9 +522,9 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
-    reps_compatible platform = primRepCompatible platform (idPrimRep v) (idPrimRep bndr)
+    reps_compatible platform = primRepCompatible platform (idPrimRepU v) (idPrimRepU bndr)
 
-    pp_bndr id = ppr id <+> dcolon <+> ppr (idType id) <+> parens (ppr (idPrimRep id))
+    pp_bndr id = ppr id <+> dcolon <+> ppr (idType id) <+> parens (ppr (idPrimRepU id))
 
 {- Note [Dodgy unsafeCoerce 2, #3132]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1525,7 +1525,6 @@ shouldUnpackArgTy bang_opts prag fam_envs arg_ty
         -- and tells us if they can fit into 8 bytes. See Note [Unpack one-wide fields]
         is_small_rep =
           let -- Neccesary to look through unboxed tuples.
-              -- Note typePrimRep never returns VoidRep
               prim_reps = concatMap (typePrimRep . scaledThing . fst) $ rep_tys
               -- And then get the actual size of the unpacked constructor.
               rep_size = sum $ map primRepSizeW64_B prim_reps
