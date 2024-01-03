@@ -42,6 +42,8 @@ Compiler
   variables (:ghc-ticket:`24083`).
 - Fix a bug where certain warning flags were not recognised (:ghc-ticket:`24071`).
 - Fix an incorrect assertion in the simplifier (:ghc-ticket:`23862`).
+- Align objects in the data section properly when using the LLVM backend
+  (:ghc-ticket:`24163`).
 
 Runtime system
 --------------
@@ -64,6 +66,8 @@ Build system and packaging
   :ghc-ticket:`24033`).
 - Fix a bug where ``-DNOSMP`` wasn't being passed to the C compiler even if the
   target doesn't support SMP (:ghc-ticket:`24082`).
+- Ensure we use the right ``otool`` and ``install_name_tool`` on Darwin
+  (:ghc-ticket:`24211`).
 
 Core libraries
 --------------
@@ -75,6 +79,7 @@ Core libraries
 - Bump ``filepath`` to 1.4.200.1
 - Bump ``unix`` to 2.8.4.0
 - Bump ``haddock`` to 2.29.2
+- Bump ``bytestring`` to 0.11.5.3
 
 Included libraries
 ------------------
