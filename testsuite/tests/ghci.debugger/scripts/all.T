@@ -140,3 +140,4 @@ test('break030',
   ['break030.script'],
 )
 test('T23057', [only_ghci, extra_hc_opts('-fno-break-points')], ghci_script, ['T23057.script'])
+test('T24306', normal, ghci_script, ['T24306.script'])
