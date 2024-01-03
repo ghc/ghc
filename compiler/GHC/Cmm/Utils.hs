@@ -70,7 +70,7 @@ module GHC.Cmm.Utils(
 import GHC.Prelude
 
 import GHC.Core.TyCon     ( PrimRep(..), PrimElemRep(..) )
-import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
+import GHC.Types.RepType  ( NvUnaryType, SlotTy (..), typePrimRepU )
 
 import GHC.Platform
 import GHC.Runtime.Heap.Layout
@@ -97,7 +97,6 @@ import GHC.Cmm.Dataflow.Collections
 
 primRepCmmType :: Platform -> PrimRep -> CmmType
 primRepCmmType platform = \case
-   VoidRep          -> panic "primRepCmmType:VoidRep"
    BoxedRep _       -> gcWord platform
    IntRep           -> bWord platform
    WordRep          -> bWord platform
@@ -136,11 +135,10 @@ primElemRepCmmType Word64ElemRep = b64
 primElemRepCmmType FloatElemRep  = f32
 primElemRepCmmType DoubleElemRep = f64
 
-typeCmmType :: Platform -> UnaryType -> CmmType
-typeCmmType platform ty = primRepCmmType platform (typePrimRep1 ty)
+typeCmmType :: Platform -> NvUnaryType -> CmmType
+typeCmmType platform ty = primRepCmmType platform (typePrimRepU ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
-primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
 primRepForeignHint (BoxedRep _) = AddrHint
 primRepForeignHint IntRep       = SignedHint
 primRepForeignHint Int8Rep      = SignedHint
@@ -157,8 +155,8 @@ primRepForeignHint FloatRep     = NoHint
 primRepForeignHint DoubleRep    = NoHint
 primRepForeignHint (VecRep {})  = NoHint
 
-typeForeignHint :: UnaryType -> ForeignHint
-typeForeignHint = primRepForeignHint . typePrimRep1
+typeForeignHint :: NvUnaryType -> ForeignHint
+typeForeignHint = primRepForeignHint . typePrimRepU
 
 ---------------------------------------------------
 --

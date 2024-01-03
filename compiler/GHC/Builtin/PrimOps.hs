@@ -44,7 +44,7 @@ import GHC.Types.Demand
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
-import GHC.Types.RepType ( tyConPrimRep1 )
+import GHC.Types.RepType ( tyConPrimRep )
 import GHC.Types.Basic
 import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
@@ -857,7 +857,8 @@ primOpSig op
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 
 data PrimOpResultInfo
-  = ReturnsPrim     PrimRep
+  = ReturnsVoid
+  | ReturnsPrim     PrimRep
   | ReturnsTuple
 
 -- Some PrimOps need not return a manifest primitive or algebraic value
@@ -867,8 +868,11 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
-      GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
+      Compare _ _                         -> ReturnsPrim IntRep
+      GenPrimOp _ _ _ ty | isPrimTyCon tc -> case tyConPrimRep tc of
+                                               [] -> ReturnsVoid
+                                               [rep] -> ReturnsPrim rep
+                                               _ -> pprPanic "getPrimOpResultInfo" (ppr op)
                          | isUnboxedTupleTyCon tc -> ReturnsTuple
                          | otherwise      -> pprPanic "getPrimOpResultInfo" (ppr op)
                          where

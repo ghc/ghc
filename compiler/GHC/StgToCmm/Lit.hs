@@ -52,7 +52,6 @@ cgLit (LitString s) =
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit (LitRubbish _ rep) =
   case expectOnly "cgLit" prim_reps of -- Note [Post-unarisation invariants]
-    VoidRep     -> panic "cgLit:VoidRep"   -- ditto
     BoxedRep _  -> idInfoToAmode <$> getCgIdInfo unitDataConId
     AddrRep     -> cgLit LitNullAddr
     VecRep n elem -> do

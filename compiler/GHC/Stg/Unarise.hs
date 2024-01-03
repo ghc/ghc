@@ -373,6 +373,7 @@ STG programs after unarisation have these invariants:
  2. No unboxed tuple binders. Tuples only appear in return position.
 
  3. Binders and literals always have zero (for void arguments) or one PrimRep.
+    (i.e. typePrimRep1 won't crash; see Note [VoidRep] in GHC.Types.RepType.)
 
  4. DataCon applications (StgRhsCon and StgConApp) don't have void arguments.
     This means that it's safe to wrap `StgArg`s of DataCon applications with
@@ -607,13 +608,12 @@ unariseUbxSumOrTupleArgs rho us dc args ty_args
 -- See also Note [Rubbish literals] in GHC.Types.Literal.
 unariseLiteral_maybe :: Literal -> Maybe [OutStgArg]
 unariseLiteral_maybe (LitRubbish torc rep)
-  | [prep] <- preps
-  , assert (not (isVoidRep prep)) True
-  = Nothing   -- Single, non-void PrimRep. Nothing to do!
+  | [_] <- preps
+  = Nothing   -- Single PrimRep. Nothing to do!
 
-  | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
+  | otherwise -- Multiple reps, or zero. Eliminate via elimCase
   = Just [ StgLitArg (LitRubbish torc (primRepToRuntimeRep prep))
-         | prep <- preps, assert (not (isVoidRep prep)) True ]
+         | prep <- preps ]
   where
     preps = runtimeRepPrimRep (text "unariseLiteral_maybe") rep
 
@@ -814,7 +814,7 @@ mapSumIdBinders alt_bndr args rhs rho0
 
       mkCastInput :: (Id,PrimRep,UniqSupply) -> ([(PrimOp,Type,Unique)],Id,Id)
       mkCastInput (id,rep,bndr_us) =
-        let (ops,types) = unzip $ getCasts (typePrimRep1 $ idType id) rep
+        let (ops,types) = unzip $ getCasts (typePrimRepU $ idType id) rep
             cst_opts = zip3 ops types $ uniqsFromSupply bndr_us
             out_id = case cst_opts of
               [] -> id
@@ -860,7 +860,7 @@ mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq ManyTy ty
 
 mkCast :: StgArg -> PrimOp -> OutId -> Type -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_ty in_rhs =
-  let r2 = typePrimRep1 out_ty
+  let r2 = typePrimRepU out_ty
       scrut = StgOpApp (StgPrimOp cast_op) [arg_in] out_ty
       alt = GenStgAlt { alt_con = DEFAULT, alt_bndrs = [], alt_rhs = in_rhs}
       alt_ty = PrimAlt r2
@@ -922,8 +922,8 @@ mkUbxSum dc ty_args args0 us
       castArg :: UniqSupply -> SlotTy -> StgArg -> Maybe (StgArg,UniqSupply,StgExpr -> StgExpr)
       castArg us slot_ty arg
         -- Cast the argument to the type of the slot if required
-        | slotPrimRep slot_ty /= stgArgRep1 arg
-        , (ops,types) <- unzip $ getCasts (stgArgRep1 arg) $ slotPrimRep slot_ty
+        | slotPrimRep slot_ty /= stgArgRepU arg
+        , (ops,types) <- unzip $ getCasts (stgArgRepU arg) $ slotPrimRep slot_ty
         , not . null $ ops
         = let (us1,us2) = splitUniqSupply us
               cast_uqs = uniqsFromSupply us1

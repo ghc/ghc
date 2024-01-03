@@ -205,4 +205,4 @@ idToReg :: Platform -> NonVoid Id -> LocalReg
 -- about accidental collision
 idToReg platform (NonVoid id)
              = LocalReg (idUnique id)
-                        (primRepCmmType platform (idPrimRep id))
+                        (primRepCmmType platform (idPrimRepU id))

@@ -9,7 +9,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.StgToCmm.ArgRep (
-        ArgRep(..), toArgRep, argRepSizeW,
+        ArgRep(..), toArgRep, toArgRepOrV, argRepSizeW,
 
         argRepString, isNonV, idArgRep,
 
@@ -20,10 +20,10 @@ module GHC.StgToCmm.ArgRep (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.StgToCmm.Closure    ( idPrimRep )
+import GHC.StgToCmm.Closure    ( idPrimRep1 )
 import GHC.Runtime.Heap.Layout ( WordOff )
 import GHC.Types.Id            ( Id )
-import GHC.Core.TyCon          ( PrimRep(..), primElemRepSizeB )
+import GHC.Core.TyCon          ( PrimRep(..), PrimOrVoidRep(..), primElemRepSizeB )
 import GHC.Types.Basic         ( RepArity )
 import GHC.Settings.Constants  ( wORD64_SIZE, dOUBLE_SIZE )
 
@@ -68,7 +68,6 @@ argRepString V64 = "V64"
 
 toArgRep :: Platform -> PrimRep -> ArgRep
 toArgRep platform rep = case rep of
-   VoidRep           -> V
    BoxedRep _        -> P
    IntRep            -> N
    WordRep           -> N
@@ -93,6 +92,10 @@ toArgRep platform rep = case rep of
                            64 -> V64
                            _  -> error "toArgRep: bad vector primrep"
 
+toArgRepOrV :: Platform -> PrimOrVoidRep -> ArgRep
+toArgRepOrV _ VoidRep = V
+toArgRepOrV platform (NVRep rep) = toArgRep platform rep
+
 isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
@@ -112,7 +115,7 @@ argRepSizeW platform = \case
    ws       = platformWordSizeInBytes platform
 
 idArgRep :: Platform -> Id -> ArgRep
-idArgRep platform = toArgRep platform . idPrimRep
+idArgRep platform = toArgRepOrV platform . idPrimRep1
 
 -- This list of argument patterns should be kept in sync with at least
 -- the following:

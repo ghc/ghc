@@ -120,7 +120,7 @@ genStaticArg a = case a of
       Nothing -> reg
       Just expr -> unfloated expr
      where
-       r = primRepToJSRep $ stgArgRep1 a
+       r = primOrVoidRepToJSRep $ stgArgRep1 a
        reg
          | isVoid r            =
              return []
@@ -162,7 +162,7 @@ genArg a = case a of
    where
      -- if our argument is a joinid, it can be an unboxed tuple
      r :: HasDebugCallStack => JSRep
-     r = primRepToJSRep $ stgArgRep1 a
+     r = primOrVoidRepToJSRep $ stgArgRep1 a
 
      unfloated :: HasDebugCallStack => CgStgExpr -> G [JStgExpr]
      unfloated = \case

@@ -118,7 +118,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
+import GHC.StgToCmm.ArgRep    ( slowCallPattern, toArgRepOrV, argRepString )
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
 import {-# SOURCE #-} GHC.StgToCmm.Foreign   ( emitPrimCall )
@@ -615,7 +615,7 @@ tickySlowCall lf_info args = do
 tickySlowCallPat :: [StgArg] -> FCode ()
 tickySlowCallPat args = ifTicky $ do
   platform <- profilePlatform <$> getProfile
-  let argReps = map (toArgRep platform . stgArgRep1) args
+  let argReps = map (toArgRepOrV platform . stgArgRep1) args
       (_, n_matched) = slowCallPattern argReps
   if n_matched > 0 && args `lengthIs` n_matched
      then bumpTickyLbl $ mkRtsSlowFastTickyCtrLabel $ concatMap (map Data.Char.toLower . argRepString) argReps

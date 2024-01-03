@@ -351,7 +351,7 @@ genBody ctx startReg args e typ = do
 --
 -- Se we're left to use the applied arguments to peel the type (unwrapped) one
 -- arg at a time. But passed args are args after unarisation so we need to
--- unarise every argument type that we peel (using typePrimRepArgs) to get the
+-- unarise every argument type that we peel (using typePrimRep) to get the
 -- number of passed args consumed by each type arg.
 --
 -- In case of failure to determine the type, we default to LiftedRep as it's
