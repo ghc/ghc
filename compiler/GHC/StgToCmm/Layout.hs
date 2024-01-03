@@ -26,7 +26,7 @@ module GHC.StgToCmm.Layout (
         mkVirtConstrSizes,
         getHpRelOffset,
 
-        ArgRep(..), toArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
+        ArgRep(..), toArgRep, idArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
         getArgAmode, getNonVoidArgAmodes
   ) where
 
@@ -328,10 +328,10 @@ getArgRepsAmodes args = do
    platform <- profilePlatform <$> getProfile
    mapM (getArgRepAmode platform) args
   where getArgRepAmode platform arg
-           | V <- rep  = return (V, Nothing)
-           | otherwise = do expr <- getArgAmode (NonVoid arg)
-                            return (rep, Just expr)
-           where rep = toArgRep platform (stgArgRep1 arg)
+           = case stgArgRep1 arg of
+               VoidRep -> return (V, Nothing)
+               rep -> do expr <- getArgAmode (NonVoid arg)
+                         return (toArgRep platform rep, Just expr)
 
 nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
 nonVArgs [] = []
@@ -603,12 +603,7 @@ getArgAmode (NonVoid (StgLitArg lit)) = cgLit lit
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args,
 --     so the result list may be shorter than the argument list
-getNonVoidArgAmodes [] = return []
-getNonVoidArgAmodes (arg:args)
-  | isVoidRep (stgArgRep1 arg) = getNonVoidArgAmodes args
-  | otherwise = do { amode  <- getArgAmode (NonVoid arg)
-                   ; amodes <- getNonVoidArgAmodes args
-                   ; return ( amode : amodes ) }
+getNonVoidArgAmodes args = mapM getArgAmode (nonVoidStgArgs args)
 
 -------------------------------------------------------------------------
 --

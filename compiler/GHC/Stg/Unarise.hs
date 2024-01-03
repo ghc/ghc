@@ -808,15 +808,13 @@ mapSumIdBinders alt_bndr args rhs rho0
       -- Select only the args which contain parts of the current field.
       id_arg_exprs   = [ args !! i | i <- layout1 ]
       id_vars   = [v | StgVarArg v <- id_arg_exprs]
-      -- Output types for the field binders based on their rep
-      id_tys    = map primRepToType fld_reps
 
-      typed_id_arg_input = assert (equalLength id_vars id_tys) $
-                           zip3 id_vars id_tys uss
+      typed_id_arg_input = assert (equalLength id_vars fld_reps) $
+                           zip3 id_vars fld_reps uss
 
-      mkCastInput :: (Id,Type,UniqSupply) -> ([(PrimOp,Type,Unique)],Id,Id)
-      mkCastInput (id,tar_type,bndr_us) =
-        let (ops,types) = unzip $ getCasts (typePrimRep1 $ idType id) (typePrimRep1 tar_type)
+      mkCastInput :: (Id,PrimRep,UniqSupply) -> ([(PrimOp,Type,Unique)],Id,Id)
+      mkCastInput (id,rep,bndr_us) =
+        let (ops,types) = unzip $ getCasts (typePrimRep1 $ idType id) rep
             cst_opts = zip3 ops types $ uniqsFromSupply bndr_us
             out_id = case cst_opts of
               [] -> id
@@ -834,7 +832,7 @@ mapSumIdBinders alt_bndr args rhs rho0
       typed_id_args = map StgVarArg typed_ids
 
       -- pprTrace "mapSumIdBinders"
-      --           (text "id_tys" <+> ppr id_tys $$
+      --           (text "fld_reps" <+> ppr fld_reps $$
       --           text "id_args" <+> ppr id_arg_exprs $$
       --           text "rhs" <+> ppr rhs $$
       --           text "rhs_with_casts" <+> ppr rhs_with_casts
@@ -925,8 +923,7 @@ mkUbxSum dc ty_args args0 us
       castArg us slot_ty arg
         -- Cast the argument to the type of the slot if required
         | slotPrimRep slot_ty /= stgArgRep1 arg
-        , out_ty <- primRepToType $ slotPrimRep slot_ty
-        , (ops,types) <- unzip $ getCasts (stgArgRep1 arg) $ typePrimRep1 out_ty
+        , (ops,types) <- unzip $ getCasts (stgArgRep1 arg) $ slotPrimRep slot_ty
         , not . null $ ops
         = let (us1,us2) = splitUniqSupply us
               cast_uqs = uniqsFromSupply us1
