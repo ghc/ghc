@@ -381,9 +381,9 @@ lintStgAppReps fun args = do
         | actual_rep == expected_rep
         = match_args actual_reps_left expected_reps_left
 
-        -- Check for void rep which can be either an empty list *or* [VoidRep]
-           -- No, typePrimRep_maybe will never return a result containing VoidRep.
-           -- We should refactor to make this obvious from the types.
+        -- Check for void rep (empty list)
+        -- Note typePrimRep_maybe will never return a result containing VoidRep.
+        -- We should refactor to make this obvious from the types.
         | isVoidRep actual_rep && isVoidRep expected_rep
         = match_args actual_reps_left expected_reps_left
 
@@ -410,7 +410,6 @@ lintStgAppReps fun args = do
               text "unarised?:" <> ppr (lf_unarised lf))
         where
           isVoidRep [] = True
-          isVoidRep [VoidRep] = True
           isVoidRep _ = False
           -- Try to strip one non-void arg rep from the current argument type returning
           -- the remaining list of arguments. We return Nothing for invalid input which

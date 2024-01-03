@@ -587,7 +587,7 @@ tickyDirectCall :: RepArity -> [StgArg] -> FCode ()
 tickyDirectCall arity args
   | args `lengthIs` arity = tickyKnownCallExact
   | otherwise = do tickyKnownCallExtraArgs
-                   tickySlowCallPat (map stgArgRep1 (drop arity args))
+                   tickySlowCallPat (drop arity args)
 
 tickyKnownCallTooFewArgs :: FCode ()
 tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter (fsLit "KNOWN_CALL_TOO_FEW_ARGS_ctr")
@@ -610,12 +610,12 @@ tickySlowCall lf_info args = do
  if isKnownFun lf_info
    then tickyKnownCallTooFewArgs
    else tickyUnknownCall
- tickySlowCallPat (map stgArgRep1 args)
+ tickySlowCallPat args
 
-tickySlowCallPat :: [PrimRep] -> FCode ()
+tickySlowCallPat :: [StgArg] -> FCode ()
 tickySlowCallPat args = ifTicky $ do
   platform <- profilePlatform <$> getProfile
-  let argReps = map (toArgRep platform) args
+  let argReps = map (toArgRep platform . stgArgRep1) args
       (_, n_matched) = slowCallPattern argReps
   if n_matched > 0 && args `lengthIs` n_matched
      then bumpTickyLbl $ mkRtsSlowFastTickyCtrLabel $ concatMap (map Data.Char.toLower . argRepString) argReps

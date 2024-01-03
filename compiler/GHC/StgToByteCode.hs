@@ -57,7 +57,9 @@ import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
-import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
+import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRep,
+                              addIdReps, addArgReps,
+                              nonVoidIds, nonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -80,7 +82,6 @@ import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import Data.IntMap (IntMap)
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified GHC.Data.FiniteMap as Map
@@ -372,7 +373,7 @@ schemeR_wrk fvs nm original_body (args, body)
          p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
-         bits = argBits platform (reverse (map (bcIdArgRep platform) all_args))
+         bits = argBits platform (reverse (map (idArgRep platform) all_args))
          bitmap_size = genericLength bits
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
@@ -528,7 +529,7 @@ returnUnboxedTuple
 returnUnboxedTuple d s p es = do
     profile <- getProfile
     let platform = profilePlatform profile
-        arg_ty e = primRepCmmType platform (atomPrimRep e)
+        arg_ty e = primRepCmmType platform (stgArgRep1 e)
         (call_info, tuple_components) = layoutNativeCall profile
                                                          NativeTupleReturn
                                                          d
@@ -544,7 +545,7 @@ returnUnboxedTuple d s p es = do
     ret <- returnUnliftedReps d
                               s
                               (wordsToBytes platform $ nativeCallSize call_info)
-                              (filter non_void $ map atomPrimRep es)
+                              (filter non_void $ map stgArgRep1 es)
     return (mconcat pushes `appOL` ret)
 
 -- Compile code to apply the given expression to the remaining args
@@ -745,11 +746,7 @@ mkConAppCode orig_d _ p con args = app_code
         let platform = profilePlatform profile
 
             non_voids =
-                [ NonVoid (prim_rep, arg)
-                | arg <- args
-                , let prim_rep = atomPrimRep arg
-                , not (isVoidRep prim_rep)
-                ]
+                addArgReps (nonVoidStgArgs args)
             (_, _, args_offsets) =
                 mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
 
@@ -931,7 +928,7 @@ doCase d s p scrut bndr alts
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
-             let bndr_ty = primRepCmmType platform . bcIdPrimRep
+             let bndr_ty = primRepCmmType platform . idPrimRep
                  tuple_start = d_bndr
                  (call_info, args_offsets) =
                    layoutNativeCall profile
@@ -947,7 +944,7 @@ doCase d s p scrut bndr alts
                                 wordsToBytes platform (nativeCallSize call_info) +
                                 offset)
                         | (arg, offset) <- args_offsets
-                        , not (isVoidRep $ bcIdPrimRep arg)]
+                        , not (isVoidRep $ idPrimRep arg)]
                         p_alts
              in do
                rhs_code <- schemeE stack_bot s p' rhs
@@ -956,9 +953,7 @@ doCase d s p scrut bndr alts
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
                      mkVirtHeapOffsets profile NoHeader
-                         [ NonVoid (bcIdPrimRep id, id)
-                         | NonVoid id <- nonVoidIds real_bndrs
-                         ]
+                         (addIdReps (nonVoidIds real_bndrs))
                  size = WordOff tot_wds
 
                  stack_bot = d_alts + wordsToBytes platform size
@@ -1052,7 +1047,7 @@ doCase d s p scrut bndr alts
           rel_slots = IntSet.toAscList $ IntSet.fromList $ Map.elems $ Map.mapMaybeWithKey spread p
           spread id offset | isUnboxedTupleType (idType id) ||
                              isUnboxedSumType (idType id) = Nothing
-                           | isFollowableArg (bcIdArgRep platform id) = Just (fromIntegral rel_offset)
+                           | isFollowableArg (idArgRep platform id) = Just (fromIntegral rel_offset)
                            | otherwise                      = Nothing
                 where rel_offset = bytesToWords platform (d - offset)
 
@@ -1478,7 +1473,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
                  return ((code, AddrRep) : rest)
          pargs d (aa:az) =  do (code_a, sz_a) <- pushAtom d p aa
                                rest <- pargs (d + sz_a) az
-                               return ((code_a, atomPrimRep aa) : rest)
+                               return ((code_a, stgArgRep1 aa) : rest)
 
      code_n_reps <- pargs d0 args_r_to_l
      let
@@ -2126,7 +2121,7 @@ lookupBCEnv_maybe :: Id -> BCEnv -> Maybe ByteOff
 lookupBCEnv_maybe = Map.lookup
 
 idSizeW :: Platform -> Id -> WordOff
-idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep platform
+idSizeW platform = WordOff . argRepSizeW platform . idArgRep platform
 
 idSizeCon :: Platform -> Id -> ByteOff
 idSizeCon platform var
@@ -2136,17 +2131,7 @@ idSizeCon platform var
     wordsToBytes platform .
     WordOff . sum . map (argRepSizeW platform . toArgRep platform) .
     typePrimRep . idType $ var
-  | otherwise = ByteOff (primRepSizeB platform (bcIdPrimRep var))
-
-bcIdArgRep :: Platform -> Id -> ArgRep
-bcIdArgRep platform = toArgRep platform . bcIdPrimRep
-
-bcIdPrimRep :: Id -> PrimRep
-bcIdPrimRep id
-  | rep :| [] <- typePrimRepArgs (idType id)
-  = rep
-  | otherwise
-  = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
+  | otherwise = ByteOff (primRepSizeB platform (idPrimRep var))
 
 repSizeWords :: Platform -> PrimRep -> WordOff
 repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep platform rep)
@@ -2185,12 +2170,8 @@ mkSlideW !n !ws
 
 
 
-atomPrimRep :: StgArg -> PrimRep
-atomPrimRep (StgVarArg v) = bcIdPrimRep v
-atomPrimRep (StgLitArg l) = typePrimRep1 (literalType l)
-
 atomRep :: Platform -> StgArg -> ArgRep
-atomRep platform e = toArgRep platform (atomPrimRep e)
+atomRep platform e = toArgRep platform (stgArgRep1 e)
 
 -- | Let szsw be the sizes in bytes of some items pushed onto the stack, which
 -- has initial depth @original_depth@.  Return the values which the stack
