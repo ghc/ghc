@@ -1907,7 +1907,7 @@ isRhoExpTy (Infer {}) = True
 
 isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing
--- Used only by bindLocalMethods
+-- Used by bindLocalMethods and for -fprof-late-overloaded
 isOverloadedTy ty | Just ty' <- coreView ty = isOverloadedTy ty'
 isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = af })       = isInvisibleFunArg af

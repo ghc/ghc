@@ -518,6 +518,49 @@ of your profiled program will be different to that of the unprofiled one.
 
     You can try this mode if :ghc-flag:`-fprof-late` results in a profile that's too hard to interpret.
 
+.. ghc-flag:: -fprof-late-overloaded
+    :shortdesc: Auto-add ``SCC``\\ s to all top level overloaded bindings *after* the core pipeline has run.
+    :type: dynamic
+    :reverse: -fno-prof-late-overloaded
+    :category:
+
+    :since: 9.10.1
+
+    Adds an automatic ``SCC`` annotation to all *overloaded* top level bindings
+    late in the compilation pipeline after the optimizer has run and unfoldings
+    have been created. This means these cost centres will not interfere with
+    core-level optimizations and the resulting profile will be closer to the
+    performance profile of an optimized non-profiled executable.
+
+    This flag can help determine which top level bindings encountered during a
+    program's execution are still overloaded after inlining and specialization.
+
+.. ghc-flag:: -fprof-late-overloaded-calls
+    :shortdesc: Auto-add ``SCC``\\ s to all call sites that include dictionary arguments *after* the core pipeline has run.
+    :type: dynamic
+    :reverse: -fno-prof-late-overloaded-calls
+    :category:
+
+    :since: 9.10.1
+
+    Adds an automatic ``SCC`` annotation to all call sites that include
+    dictionary arguments late in the compilation pipeline after the optimizer
+    has run and unfoldings have been created. This means these cost centres will
+    not interfere with core-level optimizations and the resulting profile will
+    be closer to the performance profile of an optimized non-profiled
+    executable.
+
+    This flag is potentially more useful than :ghc-flag:`-fprof-late-overloaded`
+    since it will also add ``SCC`` annotations to call sites of imported
+    overloaded functions.
+
+    Some overloaded calls may not be annotated, specifically in cases where the
+    optimizer turns an overloaded function into a join point. Calls to such
+    functions will not be wrapped in ``SCC`` annotations, since it would make
+    them non-tail calls, which is a requirement for join points. Instead,
+    ``SCC`` annotations are added around the body of overloaded join variables
+    and given distinct names (``join-rhs-<var>``) to avoid confusion.
+
 .. ghc-flag:: -fprof-cafs
     :shortdesc: Auto-add ``SCC``\\ s to all CAFs
     :type: dynamic

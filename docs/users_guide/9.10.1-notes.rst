@@ -186,6 +186,15 @@ Compiler
   This means that if you are using ``-fllvm`` you now need ``llc``, ``opt`` and ``clang``
   available.
 
+- The :ghc-flag:`-fprof-late-overloaded` flag has been introduced. It causes
+  cost centres to be added to *overloaded* top level bindings, unlike
+  :ghc-flag:`-fprof-late` which adds cost centres to all top level bindings.
+
+- The :ghc-flag:`-fprof-late-overloaded-calls` flag has been introduced. It
+  causes cost centres to be inserted at call sites including instance dictionary
+  arguments. This may be preferred over :ghc-flag:`-fprof-late-overloaded` since
+  it may reveal whether imported functions are called overloaded.
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 

@@ -175,7 +175,6 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import GHC.Core
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
-import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
@@ -185,7 +184,8 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
-import GHC.Core.LateCC (addLateCostCentresPgm)
+import GHC.Core.LateCC
+import GHC.Core.LateCC.Types
 
 
 import GHC.CoreToStg.Prep
@@ -197,6 +197,7 @@ import GHC.Parser.Lexer as Lexer
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.Env ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
@@ -297,7 +298,6 @@ import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-import GHC.Types.CostCentre.State (newCostCentreState)
 
 
 {- **********************************************************************
@@ -1791,22 +1791,41 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
 
         -------------------
-        -- Insert late cost centres if enabled.
-        -- If `-fprof-late-inline` is enabled we can skip this, as it will have added
-        -- a superset of cost centres we would add here already.
-
-        (late_cc_binds, late_local_ccs, cc_state) <-
-              if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
-                  then
-                    withTiming
-                      logger
-                      (text "LateCCs"<+>brackets (ppr this_mod))
-                      (const ())
-                      $ {-# SCC lateCC #-} do
-                        (binds, late_ccs, cc_state) <- addLateCostCentresPgm dflags logger this_mod core_binds
-                        return ( binds, (S.toList late_ccs `mappend` local_ccs ), cc_state)
+        -- Insert late cost centres based on the provided flags.
+        --
+        -- If -fprof-late-inline is enabled, we will skip adding CCs on any
+        -- top-level bindings here (via shortcut in `addLateCostCenters`),
+        -- since it will have already added a superset of the CCs we would add
+        -- here.
+        let
+          late_cc_config :: LateCCConfig
+          late_cc_config =
+            LateCCConfig
+              { lateCCConfig_whichBinds =
+                  if gopt Opt_ProfLateInlineCcs dflags then
+                    LateCCNone
+                  else if gopt Opt_ProfLateCcs dflags then
+                    LateCCAllBinds
+                  else if gopt Opt_ProfLateOverloadedCcs dflags then
+                    LateCCOverloadedBinds
                   else
-                    return (core_binds, local_ccs, newCostCentreState)
+                    LateCCNone
+              , lateCCConfig_overloadedCalls =
+                  gopt Opt_ProfLateoverloadedCallsCCs dflags
+              , lateCCConfig_env =
+                  LateCCEnv
+                    { lateCCEnv_module = this_mod
+                    , lateCCEnv_file = fsLit <$> ml_hs_file location
+                    , lateCCEnv_countEntries= gopt Opt_ProfCountEntries dflags
+                    , lateCCEnv_collectCCs = True
+                    }
+              }
+
+        (late_cc_binds, late_cc_state) <-
+          addLateCostCenters logger late_cc_config core_binds
+
+        when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
+          putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr late_cc_binds))
 
         -------------------
         -- Run late plugins
@@ -1820,7 +1839,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               cg_hpc_info      = hpc_info,
               cg_spt_entries   = spt_entries,
               cg_binds         = late_binds,
-              cg_ccs           = late_local_ccs'
+              cg_ccs           = late_local_ccs
             }
           , _
           ) <-
@@ -1833,9 +1852,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               (($ hsc_env) . latePlugin)
                 ( cgguts
                     { cg_binds = late_cc_binds
-                    , cg_ccs = late_local_ccs
+                    , cg_ccs = S.toList (lateCCState_ccs late_cc_state) ++ local_ccs
                     }
-                , cc_state
+                , lateCCState_ccState late_cc_state
                 )
 
         let
@@ -1876,7 +1895,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
         let cost_centre_info =
-              (late_local_ccs' ++ caf_ccs, caf_cc_stacks)
+              (late_local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info

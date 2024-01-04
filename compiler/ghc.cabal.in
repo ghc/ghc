@@ -336,6 +336,10 @@ Library
         GHC.Core.Lint
         GHC.Core.Lint.Interactive
         GHC.Core.LateCC
+        GHC.Core.LateCC.Types
+        GHC.Core.LateCC.TopLevelBinds
+        GHC.Core.LateCC.Utils
+        GHC.Core.LateCC.OverloadedCalls
         GHC.Core.Make
         GHC.Core.Map.Expr
         GHC.Core.Map.Type
