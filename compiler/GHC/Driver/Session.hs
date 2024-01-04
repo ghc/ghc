@@ -3460,6 +3460,8 @@ fFlagsDeps = [
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "prof-late"                        Opt_ProfLateCcs,
+  flagSpec "prof-late-overloaded"             Opt_ProfLateOverloadedCcs,
+  flagSpec "prof-late-overloaded-calls"       Opt_ProfLateoverloadedCallsCCs,
   flagSpec "prof-manual"                      Opt_ProfManualCcs,
   flagSpec "prof-late-inline"                 Opt_ProfLateInlineCcs,
   flagSpec "regs-graph"                       Opt_RegsGraph,
@@ -4935,6 +4937,10 @@ sccProfilingEnabled dflags = profileIsProfiling (targetProfile dflags)
 needSourceNotes :: DynFlags -> Bool
 needSourceNotes dflags = debugLevel dflags > 0
                        || gopt Opt_InfoTableMap dflags
+
+                       -- Source ticks are used to approximate the location of
+                       -- overloaded call cost centers
+                       || gopt Opt_ProfLateoverloadedCallsCCs dflags
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information

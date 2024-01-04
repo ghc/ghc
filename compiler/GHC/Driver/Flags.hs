@@ -319,6 +319,8 @@ data GeneralFlag
    | Opt_ProfCountEntries
    | Opt_ProfLateInlineCcs
    | Opt_ProfLateCcs
+   | Opt_ProfLateOverloadedCcs
+   | Opt_ProfLateoverloadedCallsCCs
    | Opt_ProfManualCcs -- ^ Ignore manual SCC annotations
 
    -- misc opts

@@ -43,7 +43,7 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
-import GHC.Core.LateCC           (addLateCostCentresMG)
+import GHC.Core.LateCC.TopLevelBinds (topLevelBindsCCMG)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
@@ -515,7 +515,7 @@ doCorePass pass guts = do
                                  addCallerCostCentres guts
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
-                                 addLateCostCentresMG guts
+                                 topLevelBindsCCMG guts
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts

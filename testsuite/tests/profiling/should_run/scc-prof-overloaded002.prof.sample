@@ -1,0 +1,23 @@
+	Thu Jan  4 11:55 2024 Time and Allocation Profiling Report  (Final)
+
+	   scc-prof-overloaded002 +RTS -hc -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =      56,472 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC              %time %alloc
+
+MAIN        MAIN             <built-in>         0.0   32.7
+CAF         GHC.IO.Handle.FD <entire-module>    0.0   61.5
+CAF         GHC.IO.Encoding  <entire-module>    0.0    4.3
+CAF         GHC.Conc.Signal  <entire-module>    0.0    1.1
+
+
+                                                                      individual      inherited
+COST CENTRE  MODULE                SRC             no.     entries  %time %alloc   %time %alloc
+
+MAIN         MAIN                  <built-in>      128           0    0.0   32.7     0.0  100.0
+ CAF         GHC.Conc.Signal       <entire-module> 238           0    0.0    1.1     0.0    1.1
+ CAF         GHC.IO.Encoding       <entire-module> 219           0    0.0    4.3     0.0    4.3
+ CAF         GHC.IO.Encoding.Iconv <entire-module> 217           0    0.0    0.4     0.0    0.4
+ CAF         GHC.IO.Handle.FD      <entire-module> 208           0    0.0   61.5     0.0   61.5

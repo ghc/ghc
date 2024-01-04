@@ -1,0 +1,31 @@
+	Fri Jan  5 11:06 2024 Time and Allocation Profiling Report  (Final)
+
+	   scc-prof-overloaded-calls002 +RTS -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =      59,152 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC              %time %alloc
+
+MAIN        MAIN             <built-in>         0.0   34.8
+CAF         GHC.IO.Handle.FD <entire-module>    0.0   58.7
+CAF         GHC.IO.Encoding  <entire-module>    0.0    4.1
+CAF         GHC.Conc.Signal  <entire-module>    0.0    1.1
+
+
+                                                                                              individual      inherited
+COST CENTRE  MODULE                SRC                                     no.     entries  %time %alloc   %time %alloc
+
+MAIN         MAIN                  <built-in>                              128           0    0.0   34.8     0.0  100.0
+ CAF         Main                  <entire-module>                         255           0    0.0    0.6     0.0    0.9
+  f          Main                  scc-prof-overloaded-calls002.hs:52:1-25 262           1    0.0    0.1     0.0    0.1
+  f          Main                  scc-prof-overloaded-calls002.hs:48:1-25 261           1    0.0    0.1     0.0    0.1
+  f          Main                  scc-prof-overloaded-calls002.hs:44:1-25 260           1    0.0    0.1     0.0    0.1
+  f          Main                  scc-prof-overloaded-calls002.hs:40:1-25 259           1    0.0    0.0     0.0    0.0
+  f          Main                  scc-prof-overloaded-calls002.hs:36:1-25 258           1    0.0    0.0     0.0    0.0
+  f          Main                  scc-prof-overloaded-calls002.hs:32:1-25 257           1    0.0    0.0     0.0    0.0
+  f          Main                  scc-prof-overloaded-calls002.hs:28:1-25 256           1    0.0    0.0     0.0    0.0
+ CAF         GHC.Conc.Signal       <entire-module>                         238           0    0.0    1.1     0.0    1.1
+ CAF         GHC.IO.Encoding       <entire-module>                         219           0    0.0    4.1     0.0    4.1
+ CAF         GHC.IO.Encoding.Iconv <entire-module>                         217           0    0.0    0.3     0.0    0.3
+ CAF         GHC.IO.Handle.FD      <entire-module>                         208           0    0.0   58.7     0.0   58.7

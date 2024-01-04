@@ -194,3 +194,30 @@ test('ignore_scc', [], compile_and_run,
      ['-fno-prof-manual'])
 
 test('T21446', [], makefile_test, ['T21446'])
+
+
+test('scc-prof-overloaded001',
+     [],
+     compile_and_run,
+     ['-fno-prof-auto -fno-full-laziness -fprof-late-overloaded'] # See Note [consistent stacks]
+)
+
+test('scc-prof-overloaded002',
+     [],
+     compile_and_run,
+     ['-fno-prof-auto -fno-full-laziness -fprof-late-overloaded'] # See Note [consistent stacks]
+)
+
+test('scc-prof-overloaded-calls001',
+     [],
+     compile_and_run,
+     # Need optimizations to get rid of unwanted overloaded calls
+     ['-O -fno-prof-auto -fno-full-laziness -fprof-late-overloaded-calls'] # See Note [consistent stacks]
+)
+
+test('scc-prof-overloaded-calls002',
+     [],
+     compile_and_run,
+     # Need optimizations to get rid of unwanted overloaded calls
+     ['-O -fno-prof-auto -fprof-late-overloaded-calls']
+)
