@@ -7,7 +7,7 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-module GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
+module GHC.Stg.InferTags.Rewrite (rewriteTopBinds, rewriteOpApp)
 where
 
 import GHC.Prelude
@@ -388,15 +388,15 @@ rewriteId v = do
     if is_tagged then return $! setIdTagSig v (TagSig TagProper)
                  else return v
 
-rewriteExpr :: InferStgExpr -> RM TgStgExpr
-rewriteExpr (e@StgCase {})          = rewriteCase e
-rewriteExpr (e@StgLet {})           = rewriteLet e
-rewriteExpr (e@StgLetNoEscape {})   = rewriteLetNoEscape e
-rewriteExpr (StgTick t e)           = StgTick t <$!> rewriteExpr e
-rewriteExpr e@(StgConApp {})        = rewriteConApp e
-rewriteExpr e@(StgOpApp {})         = rewriteOpApp e
-rewriteExpr e@(StgApp {})           = rewriteApp e
-rewriteExpr (StgLit lit)            = return $! (StgLit lit)
+rewriteExpr :: GenStgExpr 'InferTaggedBinders -> RM (GenStgExpr 'CodeGen)
+rewriteExpr (e@StgCase {})            = rewriteCase e
+rewriteExpr (e@StgLet {})             = rewriteLet e
+rewriteExpr (e@StgLetNoEscape {})     = rewriteLetNoEscape e
+rewriteExpr (StgTick t e)             = StgTick t <$!> rewriteExpr e
+rewriteExpr e@(StgConApp {})          = rewriteConApp e
+rewriteExpr e@(StgApp {})             = rewriteApp e
+rewriteExpr (StgLit lit)              = return $! (StgLit lit)
+rewriteExpr (StgOpApp op args res_ty) = (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
 
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
@@ -404,7 +404,7 @@ rewriteCase (StgCase scrut bndr alt_type alts) =
     withBinder NotTopLevel bndr $
         pure StgCase <*>
             rewriteExpr scrut <*>
-            pure (fst bndr) <*>
+            rewriteId (fst bndr) <*>
             pure alt_type <*>
             mapM rewriteAlt alts
 

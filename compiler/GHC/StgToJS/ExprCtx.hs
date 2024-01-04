@@ -18,14 +18,12 @@
 module GHC.StgToJS.ExprCtx
   ( ExprCtx
   , initExprCtx
-  , ctxAssertEvaluated
   , ctxIsEvaluated
   , ctxSetSrcSpan
   , ctxSrcSpan
   , ctxSetTop
   , ctxTarget
   , ctxSetTarget
-  , ctxEvaluatedIds
   -- * Let-no-escape
   , ctxClearLneFrame
   , ctxUpdateLneFrame
@@ -43,9 +41,12 @@ import GHC.Prelude
 import GHC.StgToJS.Types
 
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Types.Var
 import GHC.Types.SrcLoc
+import GHC.Types.Id
+import GHC.Types.Id.Info
+
+import GHC.Stg.InferTags.TagSig
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -60,10 +61,6 @@ data ExprCtx = ExprCtx
 
   , ctxTarget     :: [TypedExpr]
     -- ^ Target variables for the evaluated expression
-
-  , ctxEvaluatedIds :: UniqSet Id
-    -- ^ Ids that we know to be evaluated (e.g. case binders when the expression
-    -- to evaluate is in an alternative)
 
   , ctxSrcSpan    :: Maybe RealSrcSpan
     -- ^ Source location
@@ -95,7 +92,6 @@ initExprCtx :: Id -> ExprCtx
 initExprCtx i = ExprCtx
   { ctxTop          = i
   , ctxTarget       = []
-  , ctxEvaluatedIds = emptyUniqSet
   , ctxLneFrameBs   = emptyUFM
   , ctxLneFrameVars = []
   , ctxLneFrameSize = 0
@@ -109,10 +105,6 @@ ctxSetTarget t ctx = ctx { ctxTarget = t }
 -- | Set top-level binding Id
 ctxSetTop :: Id -> ExprCtx -> ExprCtx
 ctxSetTop i ctx = ctx { ctxTop = i }
-
--- | Add an Id to the known-evaluated set
-ctxAssertEvaluated :: Id -> ExprCtx -> ExprCtx
-ctxAssertEvaluated i ctx = ctx { ctxEvaluatedIds = addOneToUniqSet (ctxEvaluatedIds ctx) i }
 
 -- | Set source location
 ctxSetSrcSpan :: RealSrcSpan -> ExprCtx -> ExprCtx
@@ -139,8 +131,39 @@ ctxClearLneFrame ctx =
     }
 
 -- | Predicate: do we know for sure that the given Id is evaluated?
-ctxIsEvaluated :: ExprCtx -> Id -> Bool
-ctxIsEvaluated ctx i = i `elementOfUniqSet` ctxEvaluatedIds ctx
+ctxIsEvaluated :: Id -> Bool
+ctxIsEvaluated i =
+  maybe False isTaggedSig (idTagSig_maybe i)
+  && go (idDetails i)
+  where
+    go JoinId{} = False
+    go _        = True
+
+
+      -- DFunId new_type -> not new_type
+      --    -- DFuns terminate, unless the dict is implemented
+      --    -- with a newtype in which case they may not
+
+      -- DataConWorkId {} -> True
+
+      -- ClassOpId {} -> False
+      --   -- suppose an argument, and we don't have one
+
+      -- PrimOpId op _ -> primop_ok op
+      --   -- probably already handled by StgOpApp
+
+      -- JoinId {} -> False
+      --   -- Don't speculate join points
+
+      -- TickBoxOpId {} -> False
+      --   -- Don't speculate box ticking
+
+      -- -- Tagged (evaluated) ids
+      -- _ | Just sig <- idTagSig_maybe i
+      --   , isTaggedSig sig
+      --   -> True
+
+      -- _ -> False
 
 -- | Does the given Id correspond to a LNE binding
 ctxIsLneBinding :: ExprCtx -> Id -> Bool

@@ -342,6 +342,9 @@ data TypedExpr = TypedExpr
   , typex_expr :: [JStgExpr]
   }
 
+instance Outputable TypedExpr where
+  ppr (TypedExpr typ x) = ppr (typ, x)
+
 -- | A Primop result is either an inlining of some JS payload, or a primitive
 -- call to a JS function defined in Shim files in base.
 data PrimRes

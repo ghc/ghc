@@ -70,6 +70,7 @@ module GHC.JS.JStg.Syntax
   ) where
 
 import GHC.Prelude
+import GHC.Utils.Outputable
 
 import GHC.JS.Ident
 
@@ -147,6 +148,16 @@ data JStgExpr
   | IfExpr     JStgExpr JStgExpr JStgExpr  -- ^ If-expression
   | ApplExpr   JStgExpr [JStgExpr]         -- ^ Application
   deriving (Eq, Typeable, Generic)
+
+instance Outputable JStgExpr where
+  ppr x = case x of
+    ValExpr _ -> text ("ValExpr" :: String)
+    SelExpr x' _ -> text ("SelExpr" :: String) <+> ppr x'
+    IdxExpr x' y' -> text ("IdxExpr" :: String) <+> ppr (x', y')
+    InfixExpr _ x' y' -> text ("InfixExpr" :: String) <+> ppr (x', y')
+    UOpExpr _ x' -> text ("UOpExpr" :: String) <+> ppr x'
+    IfExpr p t e -> text ("IfExpr" :: String) <+> ppr (p, t, e)
+    ApplExpr x' xs -> text ("ApplExpr" :: String) <+> ppr (x', xs)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
 --   AST. Each pattern wraps @UOp@ and @Op@ into a @JStgExpr@s to save typing and

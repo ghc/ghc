@@ -137,12 +137,12 @@ genBind ctx bndr =
        j <- assign b r >>= \case
          Just ja -> return ja
          Nothing -> allocCls Nothing [(b,r)]
-       return (j, addEvalRhs ctx [(b,r)])
+       return (j, ctx)
     StgRec bs     -> do
        jas <- mapM (uncurry assign) bs -- fixme these might depend on parts initialized by allocCls
        let m = if null jas then Nothing else Just (mconcat $ catMaybes jas)
        j <- allocCls m . map snd . filter (isNothing . fst) $ zip jas bs
-       return (j, addEvalRhs ctx bs)
+       return (j, ctx)
    where
      ctx' = ctxClearLneFrame ctx
 
@@ -168,7 +168,7 @@ genBind ctx bndr =
                (tgt ||= ApplExpr (var ("h$c_sel_" <> mkFastString sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
      assign b (StgRhsClosure _ext _ccs _upd [] expr _typ)
-       | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
+       | isInlineExpr expr = do
            d   <- declVarsForId b
            tgt <- varsForId b
            let ctx' = ctx { ctxTarget = assocIdExprs b tgt }
@@ -176,12 +176,6 @@ genBind ctx bndr =
            return (Just (d <> j))
      assign _b StgRhsCon{} = return Nothing
      assign  b r           = genEntry ctx' b r >> return Nothing
-
-     addEvalRhs c [] = c
-     addEvalRhs c ((b,r):xs)
-       | StgRhsCon{} <- r                         = addEvalRhs (ctxAssertEvaluated b c) xs
-       | (StgRhsClosure _ _ ReEntrant _ _ _) <- r = addEvalRhs (ctxAssertEvaluated b c) xs
-       | otherwise                                = addEvalRhs c xs
 
 genBindLne :: HasDebugCallStack
            => ExprCtx
@@ -559,7 +553,7 @@ genCase :: HasDebugCallStack
         -> LiveVars
         -> G (JStgStat, ExprResult)
 genCase ctx bnd e at alts l
-  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = do
+  | isInlineExpr e = do
       bndi <- identsForId bnd
       let ctx' = ctxSetTop bnd
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))
@@ -570,7 +564,7 @@ genCase ctx bnd e at alts l
                 ExprCont -> pprPanic "genCase: expression was not inline"
                                      (pprStgExpr panicStgPprOpts e)
 
-      (aj, ar) <- genAlts (ctxAssertEvaluated bnd ctx) bnd at d alts
+      (aj, ar) <- genAlts ctx bnd at d alts
       (saveCCS,restoreCCS) <- ifProfilingM $ do
         ccsVar <- freshIdent
         pure ( ccsVar ||= toJExpr jCurrentCCS
@@ -586,7 +580,7 @@ genCase ctx bnd e at alts l
         , ar
          )
   | otherwise = do
-      rj       <- genRet (ctxAssertEvaluated bnd ctx) bnd at alts l
+      rj       <- genRet ctx bnd at alts l
       let ctx' = ctxSetTop bnd
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr [R1 ..]))
                   $ ctx
