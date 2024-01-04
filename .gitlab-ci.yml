@@ -836,6 +836,10 @@ release-hackage-lint:
   rules:
     - if: '$RELEASE_JOB == "yes"'
   extends: .hackage
+  # The ghcup metadata pipeline requires all prior jobs to
+  # pass. The hackage job can easily fail due to API changes
+  # or similar - so we allow it to fail.
+  allow_failure: true
   variables:
     # No slow-validate bindist on release pipeline
     EXTRA_HC_OPTS: "-dlint"
