@@ -15,6 +15,7 @@ module GHC.Utils.Misc (
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
+        zipWithEqualM_,
         stretchZipWith, zipWithAndUnzip, zipAndUnzip,
 
         filterByList, filterByLists, partitionByList,
@@ -135,7 +136,7 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Exts
 import GHC.Stack (HasCallStack)
 
-import Control.Monad    ( guard )
+import Control.Monad
 import Control.Monad.IO.Class ( MonadIO, liftIO )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime, renameFile )
@@ -248,11 +249,14 @@ zipWithEqual    :: HasDebugCallStack => String -> (a->b->c) -> [a]->[b]->[c]
 zipWith3Equal   :: HasDebugCallStack => String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith4Equal   :: HasDebugCallStack => String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
+zipWithEqualM_  :: (HasDebugCallStack, Applicative f) => String -> (a->b->f ()) -> [a]->[b]->f ()
+
 #if !defined(DEBUG)
 zipEqual      _ = zip
 zipWithEqual  _ = zipWith
 zipWith3Equal _ = zipWith3
 zipWith4Equal _ = List.zipWith4
+zipWithEqualM_ _ = zipWithM_
 #else
 zipEqual _   []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
@@ -271,6 +275,10 @@ zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
                                 =  z a b c d : zipWith4Equal msg z as bs cs ds
 zipWith4Equal _   _ [] [] [] [] =  []
 zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists: "++msg)
+
+zipWithEqualM_ msg z (a:as) (b:bs) =  z a b *> zipWithEqualM_ msg z as bs
+zipWithEqualM_ _   _ [] []         =  pure ()
+zipWithEqualM_ msg _ _ _           =  panic ("zipWithEqualM_: unequal lists: "++msg)
 #endif
 
 -- | 'filterByList' takes a list of Bools and a list of some elements and
