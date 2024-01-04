@@ -69,7 +69,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Types.ForeignCall
 import GHC.Types.TyThing
 import GHC.Types.Name
@@ -108,11 +107,16 @@ assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
 assignCoerce1 :: [TypedExpr] -> [TypedExpr] -> JStgStat
 assignCoerce1 [x] [y] = assignCoerce x y
 assignCoerce1 []  []  = mempty
-assignCoerce1 _x _y   = pprPanic "assignCoerce1"
+-- We silently ignore the case of an empty list on the first argument. It denotes
+-- "assign nothing to n empty slots on the right". Usually this case shouldn't come
+-- up, but rare cases where the earlier code can't correctly guess the size of type
+-- classes causes slots to be allocated when they aren't needed.
+assignCoerce1 []  _   = mempty
+assignCoerce1 x y     = pprPanic "assignCoerce1"
                           (vcat [ text "lengths do not match"
                                 -- FIXME: Outputable instance removed until JStg replaces JStat
-                                -- , ppr x
-                                -- , ppr y
+                                , ppr x
+                                , ppr y
                                 ])
 
 -- | Assign p2 to p1 with optional coercion
@@ -417,61 +421,48 @@ stgLneLiveExpr rhs = dVarSetElems (liveVars $ stgRhsLive rhs)
 -- stgLneLiveExpr StgRhsCon {}              = []
 
 -- | returns True if the expression is definitely inline
-isInlineExpr :: UniqSet Id -> CgStgExpr -> (UniqSet Id, Bool)
-isInlineExpr v = \case
+isInlineExpr :: CgStgExpr -> Bool
+isInlineExpr = \case
   StgApp i args
-    -> (emptyUniqSet, isInlineApp v i args)
+    -> isInlineApp i args
   StgLit{}
-    -> (emptyUniqSet, True)
+    -> True
   StgConApp{}
-    -> (emptyUniqSet, True)
+    -> True
   StgOpApp (StgFCallOp f _) _ _
-    -> (emptyUniqSet, isInlineForeignCall f)
+    -> isInlineForeignCall f
   StgOpApp (StgPrimOp SeqOp) [StgVarArg e] t
-    -> (emptyUniqSet, e `elementOfUniqSet` v || isStrictType t)
+    -> ctxIsEvaluated e || isStrictType t
   StgOpApp (StgPrimOp op) _ _
-    -> (emptyUniqSet, primOpIsReallyInline op)
+    -> primOpIsReallyInline op
   StgOpApp (StgPrimCallOp _c) _ _
-    -> (emptyUniqSet, True)
-  StgCase e b _ alts
-    ->let (_ve, ie)   = isInlineExpr v e
-          v'          = addOneToUniqSet v b
-          (vas, ias)  = unzip $ map (isInlineExpr v') (fmap alt_rhs alts)
-          vr          = L.foldl1' intersectUniqSets vas
-      in (vr, (ie || b `elementOfUniqSet` v) && and ias)
-  StgLet _ b e
-    -> isInlineExpr (inspectInlineBinding v b) e
-  StgLetNoEscape _ _b e
-    -> isInlineExpr v e
-  StgTick  _ e
-    -> isInlineExpr v e
-
-inspectInlineBinding :: UniqSet Id -> CgStgBinding -> UniqSet Id
-inspectInlineBinding v = \case
-  StgNonRec i r -> inspectInlineRhs v i r
-  StgRec bs     -> foldl' (\v' (i,r) -> inspectInlineRhs v' i r) v bs
-
-inspectInlineRhs :: UniqSet Id -> Id -> CgStgRhs -> UniqSet Id
-inspectInlineRhs v i = \case
-  StgRhsCon{}                       -> addOneToUniqSet v i
-  StgRhsClosure _ _ ReEntrant _ _ _ -> addOneToUniqSet v i
-  _                                 -> v
+    -> True
+  StgCase e _ _ alts
+    ->let ie   = isInlineExpr e
+          ias  = map isInlineExpr (fmap alt_rhs alts)
+      in ie && and ias
+  StgLet _ _ e
+    -> isInlineExpr e
+  StgLetNoEscape _ _ e
+    -> isInlineExpr e
+  StgTick _ e
+    -> isInlineExpr e
 
 isInlineForeignCall :: ForeignCall -> Bool
 isInlineForeignCall (CCall (CCallSpec _ cconv safety)) =
   not (playInterruptible safety) &&
   not (cconv /= JavaScriptCallConv && playSafe safety)
 
-isInlineApp :: UniqSet Id -> Id -> [StgArg] -> Bool
-isInlineApp v i = \case
+isInlineApp :: Id -> [StgArg] -> Bool
+isInlineApp i = \case
   _ | isJoinId i -> False
   [] -> isUnboxedTupleType (idType i) ||
                      isStrictType (idType i) ||
-                     i `elementOfUniqSet` v
+                     ctxIsEvaluated i
 
   [StgVarArg a]
     | DataConWrapId dc <- idDetails i
     , isNewTyCon (dataConTyCon dc)
-    , isStrictType (idType a) || a `elementOfUniqSet` v || isStrictId a
+    , isStrictType (idType a) || ctxIsEvaluated a || isStrictId a
     -> True
   _ -> False

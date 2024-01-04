@@ -157,7 +157,7 @@ genApp ctx i args
     | [] <- args
     , [vt] <- idJSRep i
     , isUnboxable vt
-    , ctxIsEvaluated ctx i
+    , ctxIsEvaluated i
     = do
       let c = head (concatMap typex_expr $ ctxTarget ctx)
       is <- varsForId i
@@ -171,7 +171,7 @@ genApp ctx i args
     -- case of Id without args and known to be already evaluated: return fields
     -- individually
     | [] <- args
-    , ctxIsEvaluated ctx i || isStrictType (idType i)
+    , ctxIsEvaluated i || isStrictType (idType i)
     = do
       a <- storeIdFields i (ctxTarget ctx)
       -- optional runtime assert for detecting unexpected thunks (unevaluated)
@@ -199,7 +199,7 @@ genApp ctx i args
               a' = case args of
                 [StgVarArg a'] -> a'
                 _              -> panic "genApp: unexpected arg"
-          if isStrictId a' || ctxIsEvaluated ctx a'
+          if isStrictId a' || ctxIsEvaluated a'
             then return (t |= ai, ExprInline Nothing)
             else return (returnS (app "h$e" [ai]), ExprCont)
         _ -> panic "genApp: invalid size"
