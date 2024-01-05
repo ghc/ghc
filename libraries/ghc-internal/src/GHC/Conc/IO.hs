@@ -74,6 +74,11 @@ import GHC.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
 import qualified GHC.Event.Thread as Event
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+import qualified GHC.Wasm.Prim.Conc as Wasm
+import qualified GHC.Wasm.Prim.Flag as Wasm
+#endif
+
 ensureIOManagerIsRunning :: IO ()
 #if defined(javascript_HOST_ARCH)
 ensureIOManagerIsRunning = pure ()
@@ -204,6 +209,8 @@ threadDelay time
 #if defined(mingw32_HOST_OS)
   | isWindowsNativeIO = Windows.threadDelay time
   | threaded          = Windows.threadDelay time
+#elif defined(wasm32_HOST_ARCH)
+  | Wasm.isJSFFIUsed  = Wasm.threadDelay time
 #elif !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadDelay time
 #endif
