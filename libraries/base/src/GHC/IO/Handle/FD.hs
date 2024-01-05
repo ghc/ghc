@@ -27,7 +27,9 @@ module GHC.IO.Handle.FD (
 
 import GHC.Base
 import GHC.Show
+import Control.Exception (try)
 import Data.Maybe
+import Data.Either (either)
 import Data.Typeable
 import Foreign.C.Types
 import GHC.MVar
@@ -162,10 +164,12 @@ openFile fp im =
 --
 -- @since 4.16.0.0
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withFile fp im act =
+withFile fp im act = do
+  -- Only annotate when setup or teardown of withFile' raised the exception
   catchException
-    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True act)
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True (try . act))
     (\e -> ioError (addFilePathToIOError "withFile" fp e))
+    >>= either ioError pure
 
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
 -- This can be useful for opening a FIFO for writing: if we open in
@@ -196,10 +200,12 @@ openFileBlocking fp im =
 --
 -- @since 4.16.0.0
 withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withFileBlocking fp im act =
+withFileBlocking fp im act = do
+  -- Only annotate when setup or teardown of withFile' raised the exception
   catchException
-    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False act)
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False (try . act))
     (\e -> ioError (addFilePathToIOError "withFileBlocking" fp e))
+    >>= either ioError pure
 
 -- | Like 'openFile', but open the file in binary mode.
 -- On Windows, reading a file in text mode (which is the default)
@@ -227,9 +233,11 @@ openBinaryFile fp m =
 -- @since 4.16.0.0
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withBinaryFile fp im act =
+  -- Only annotate when setup or teardown of withFile' raised the exception
   catchException
-    (withFile' fp im True True act)
+    (withFile' fp im True True (try . act))
     (\e -> ioError (addFilePathToIOError "withBinaryFile" fp e))
+    >>= either ioError pure
 
 -- | Open a file and perform an action with it. If the action throws an
 -- exception, then the file will be closed. If the last argument is 'True',

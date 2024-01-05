@@ -1,0 +1,1 @@
+withBinaryFile001: test.bin: withBinaryFile: does not exist (No such file or directory)

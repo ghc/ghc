@@ -68,6 +68,13 @@ test('isEOF001', [extra_run_opts('</dev/null')], compile_and_run, [''])
 test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
      [''])
 
+test('withFile001', [exit_code(1)], compile_and_run, [''])
+test('withFile002', [exit_code(1)], compile_and_run, [''])
+test('withFileBlocking001', [exit_code(1)], compile_and_run, [''])
+test('withFileBlocking002', [exit_code(1)], compile_and_run, [''])
+test('withBinaryFile001', [exit_code(1)], compile_and_run, [''])
+test('withBinaryFile002', [exit_code(1)], compile_and_run, [''])
+
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
 test('openFile003', normalise_win32_io_errors, compile_and_run, [''])
