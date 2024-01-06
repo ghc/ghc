@@ -572,7 +572,13 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 -- Extend reader monad with information that
                 -- self-recursive tail calls can be optimized into local
                 -- jumps. See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr.
-                ; withSelfLoop (bndr, loop_header_id, arg_regs) $ do
+                ; let !self_loop_info = MkSelfLoopInfo
+                        { sli_id = bndr
+                        , sli_arity = arity
+                        , sli_header_block = loop_header_id
+                        , sli_registers = arg_regs
+                        }
+                ; withSelfLoop self_loop_info $ do
                 {
                 -- Main payload
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
