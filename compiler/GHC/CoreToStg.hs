@@ -41,7 +41,7 @@ import GHC.Types.Basic  ( Arity, TypeOrConstraint(..) )
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
-import GHC.Types.Demand    ( isUsedOnceDmd )
+import GHC.Types.Demand    ( isAtMostOnceDmd )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import GHC.Unit.Module
@@ -746,8 +746,8 @@ mkTopStgRhs CoreToStgOpts
   where
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
-    upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                         = Updatable
+    upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
+             | otherwise                           = Updatable
 
     -- CAF cost centres generated for -fcaf-all
     caf_cc = mkAutoCC bndr modl
@@ -792,8 +792,8 @@ mkStgRhs bndr (PreStgRhs bndrs rhs typ)
   where
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
-    upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                         = Updatable
+    upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
+             | otherwise                           = Updatable
 
   {-
     SDM: disabled.  Eval/Apply can't handle functions with arity zero very

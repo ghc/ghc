@@ -1939,7 +1939,7 @@ nospecId = pcMiscPrelId nospecIdName ty info
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
-oneShotId :: Id -- See Note [The oneShot function]
+oneShotId :: Id -- See Note [oneShot magic]
 oneShotId = pcRepPolyId oneShotName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
@@ -2238,7 +2238,7 @@ This is crucial: otherwise, we could import an unfolding in which
 * To defeat the specialiser when we have incoherent instances.
   See Note [Coherence and specialisation: overview] in GHC.Core.InstEnv.
 
-Note [The oneShot function]
+Note [oneShot magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
 and Note [Left folds via right fold]) it was determined that it would be useful
@@ -2263,11 +2263,17 @@ after unfolding the definition `oneShot = \f \x[oneshot]. f x` we get
  --> \x[oneshot] e[x/y]
 which is what we want.
 
-It is only effective if the one-shot info survives as long as possible; in
-particular it must make it into the interface in unfoldings. See Note [Preserve
-OneShotInfo] in GHC.Core.Tidy.
-
 Also see https://gitlab.haskell.org/ghc/ghc/wikis/one-shot.
+
+Wrinkles:
+(OS1)  It is only effective if the one-shot info survives as long as possible; in
+       particular it must make it into the interface in unfoldings. See Note [Preserve
+       OneShotInfo] in GHC.Core.Tidy.
+
+(OS2) (oneShot (error "urk")) rewrites to
+           \x[oneshot]. error "urk" x
+      thereby hiding the `error` under a lambda, which might be surprising,
+      particularly if you have `-fpedantic-bottoms` on.  See #24296.
 
 
 -------------------------------------------------------------

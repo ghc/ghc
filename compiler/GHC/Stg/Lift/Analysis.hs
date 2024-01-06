@@ -478,9 +478,9 @@ closureGrowth expander sizer group abs_ids = go
       -- cardinality. The @body_dmd@ part of 'RhsSk' is the result of
       -- 'rhsCard' and accurately captures the cardinality of the RHSs body
       -- relative to its defining context.
-      | isAbs n      = 0
-      | cg <= 0      = if isStrict n then cg else 0
-      | isUsedOnce n = cg
-      | otherwise    = infinity
+      | isAbs n        = 0
+      | cg <= 0        = if isStrict n then cg else 0
+      | isAtMostOnce n = cg
+      | otherwise      = infinity
       where
         cg = go body
