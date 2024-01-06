@@ -93,7 +93,6 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Data.Maybe (isNothing)
 
 import Data.Coerce (coerce)
@@ -535,12 +534,12 @@ instance Outputable CallMethod where
 
 getCallMethod :: StgToCmmConfig
               -> Name           -- Function being applied
-              -> Id             -- Function Id used to chech if it can refer to
+              -> Id             -- Function Id used to check if it can refer to
                                 -- CAF's and whether the function is tail-calling
                                 -- itself
               -> LambdaFormInfo -- Its info
               -> RepArity       -- Number of available arguments
-              -> RepArity       -- Number of them being void arguments
+                                -- (including void args)
               -> CgLoc          -- Passed in from cgIdApp so that we can
                                 -- handle let-no-escape bindings and self-recursive
                                 -- tail calls using the same data constructor,
@@ -549,19 +548,22 @@ getCallMethod :: StgToCmmConfig
               -> Maybe SelfLoopInfo -- can we perform a self-recursive tail-call
               -> CallMethod
 
-getCallMethod cfg _ id _  n_args v_args _cg_loc (Just (self_loop_id, block_id, args))
+getCallMethod cfg _ id _  n_args _cg_loc (Just self_loop)
   | stgToCmmLoopification cfg
-  , id == self_loop_id
-  , args `lengthIs` (n_args - v_args)
+  , MkSelfLoopInfo
+    { sli_id = loop_id, sli_arity = arity
+    , sli_header_block = blk_id, sli_registers = arg_regs
+    } <- self_loop
+  , id == loop_id
+  , n_args == arity
   -- If these patterns match then we know that:
   --   * loopification optimisation is turned on
   --   * function is performing a self-recursive call in a tail position
-  --   * number of non-void parameters of the function matches functions arity.
-  -- See Note [Self-recursive tail calls] and Note [Void arguments in
-  -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
-  = JumpToIt block_id args
+  --   * number of parameters matches the function's arity.
+  -- See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr for more details
+  = JumpToIt blk_id arg_regs
 
-getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _cg_loc _self_loop_info
   | n_args == 0 -- No args at all
   && not (profileIsProfiling (stgToCmmProfile cfg))
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
@@ -569,16 +571,16 @@ getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc _self
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel (stgToCmmPlatform cfg) name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ LFUnlifted n_args _cg_loc _self_loop_info
   = assert (n_args == 0) ReturnIt
 
-getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ (LFCon _) n_args _cg_loc _self_loop_info
   = assert (n_args == 0) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
 getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
-              n_args _v_args _cg_loc _self_loop_info
+              n_args _cg_loc _self_loop_info
 
   | Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
@@ -616,7 +618,7 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
                 updatable) 0
 
 -- Imported(Unknown) Ids
-getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_locs _self_loop_info
+getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _cg_locs _self_loop_info
   | n_args == 0
   , Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
@@ -633,14 +635,14 @@ getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_loc
       EnterIt   -- Not a function
 
 -- TODO: Redundant with above match?
--- getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
+-- getCallMethod _ name _ (LFUnknown False) n_args _cg_loc _self_loop_info
 --   = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
 --     EnterIt -- Not a function
 
-getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs) _self_loop_info
+getCallMethod _ _name _ LFLetNoEscape _n_args (LneLoc blk_id lne_regs) _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod _ _ _ _ _ _ _ = panic "Unknown call method"
 
 -----------------------------------------------------------------------------
 --              Data types for closure information

@@ -1080,8 +1080,7 @@ cgIdApp fun_id args = do
         fun            = idInfoToAmode fun_info
         lf_info        = cg_lf         fun_info
         n_args         = length args
-        v_args         = length $ filter (null . stgArgRep) args
-    case getCallMethod cfg fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop of
+    case getCallMethod cfg fun_name fun_id lf_info n_args (cg_loc fun_info) self_loop of
             -- A value in WHNF, so we can just return it.
         ReturnIt
           | isZeroBitTy (idType fun_id) -> emitReturn []
@@ -1176,12 +1175,14 @@ cgIdApp fun_id args = do
 --
 -- Implementation is spread across a couple of places in the code:
 --
---   * FCode monad stores additional information in its reader environment
---     (stgToCmmSelfLoop field). This information tells us which function can
---     tail call itself in an optimized way (it is the function currently
---     being compiled), what is the label of a loop header (L1 in example above)
---     and information about local registers in which we should arguments
---     before making a call (this would be a and b in example above).
+--   * FCode monad stores additional information in its reader
+--     environment (stgToCmmSelfLoop field). This `SelfLoopInfo`
+--     record tells us which function can tail call itself in an
+--     optimized way (it is the function currently being compiled),
+--     its RepArity, what is the label of its loop header (L1 in
+--     example above) and information about which local registers
+--     should receive arguments when making a call (this would be a
+--     and b in the example above).
 --
 --   * Whenever we are compiling a function, we set that information to reflect
 --     the fact that function currently being compiled can be jumped to, instead
@@ -1205,36 +1206,13 @@ cgIdApp fun_id args = do
 --     of call will be generated. getCallMethod decides to generate a self
 --     recursive tail call when (a) environment stores information about
 --     possible self tail-call; (b) that tail call is to a function currently
---     being compiled; (c) number of passed non-void arguments is equal to
---     function's arity. (d) loopification is turned on via -floopification
---     command-line option.
+--     being compiled; (c) number of passed arguments is equal to
+--     function's unarised arity. (d) loopification is turned on via
+--     -floopification command-line option.
 --
 --   * Command line option to turn loopification on and off is implemented in
 --     DynFlags, then passed to StgToCmmConfig for this phase.
---
---
--- Note [Void arguments in self-recursive tail calls]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- State# tokens can get in the way of the loopification optimization as seen in
--- #11372. Consider this:
---
--- foo :: [a]
---     -> (a -> State# s -> (# State s, Bool #))
---     -> State# s
---     -> (# State# s, Maybe a #)
--- foo [] f s = (# s, Nothing #)
--- foo (x:xs) f s = case f x s of
---      (# s', b #) -> case b of
---          True -> (# s', Just x #)
---          False -> foo xs f s'
---
--- We would like to compile the call to foo as a local jump instead of a call
--- (see Note [Self-recursive tail calls]). However, the generated function has
--- an arity of 2 while we apply it to 3 arguments, one of them being of void
--- type. Thus, we mustn't count arguments of void type when checking whether
--- we can turn a call into a self-recursive jump.
---
+
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do

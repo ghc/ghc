@@ -42,6 +42,8 @@ module GHC.StgToCmm.Monad (
         Sequel(..), ReturnKind(..),
         withSequel, getSequel,
 
+        SelfLoopInfo(..),
+
         setTickyCtrLabel, getTickyCtrLabel,
         tickScope, getTickScope,
 
@@ -298,7 +300,7 @@ data FCodeState =
                                                          -- else the RTS will deadlock _and_ also experience a severe
                                                          -- performance degradation
               , fcs_sequel        :: !Sequel             -- ^ What to do at end of basic block
-              , fcs_selfloop      :: Maybe SelfLoopInfo  -- ^ Which tail calls can be compiled as local jumps?
+              , fcs_selfloop      :: !(Maybe SelfLoopInfo) -- ^ Which tail calls can be compiled as local jumps?
                                                          --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr
               , fcs_ticky         :: !CLabel             -- ^ Destination for ticky counts
               , fcs_tickscope     :: !CmmTickScope       -- ^ Tick scope for new blocks & ticks
