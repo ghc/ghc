@@ -22,13 +22,15 @@ module GHC.Types.Demand (
     absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
+    -- *** Greatest lower bound
+    glbCard,
     -- *** Plus
     plusCard, plusDmd, plusSubDmd,
     -- *** Multiply
     multCard, multDmd, multSubDmd,
     -- ** Predicates on @Card@inalities and @Demand@s
-    isAbs, isUsedOnce, isStrict,
-    isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrictDmd,
+    isAbs, isAtMostOnce, isStrict,
+    isAbsDmd, isAtMostOnceDmd, isStrUsedDmd, isStrictDmd,
     isTopDmd, isWeakDmd, onlyBoxedArguments,
     -- ** Special demands
     evalDmd,
@@ -39,7 +41,7 @@ module GHC.Types.Demand (
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
-    argOneShots, argsOneShots, saturatedByOneShots,
+    callCards, argOneShots, argsOneShots, saturatedByOneShots,
     -- ** Manipulating Boxity of a Demand
     unboxDeeplyDmd,
 
@@ -540,9 +542,9 @@ isAbs :: Card -> Bool
 isAbs (Card c) = c .&. 0b110 == 0 -- simply check 1 and n bit are not set
 
 -- | True <=> upper bound is 1.
-isUsedOnce :: Card -> Bool
+isAtMostOnce :: Card -> Bool
 -- See Note [Bit vector representation for Card]
-isUsedOnce (Card c) = c .&. 0b100 == 0 -- simply check n bit is not set
+isAtMostOnce (Card c) = c .&. 0b100 == 0 -- simply check n bit is not set
 
 -- | Is this a 'CardNonAbs'?
 isCardNonAbs :: Card -> Bool
@@ -550,7 +552,7 @@ isCardNonAbs = not . isAbs
 
 -- | Is this a 'CardNonOnce'?
 isCardNonOnce :: Card -> Bool
-isCardNonOnce n = isAbs n || not (isUsedOnce n)
+isCardNonOnce n = isAbs n || not (isAtMostOnce n)
 
 -- | Intersect with [0,1].
 oneifyCard :: Card -> Card
@@ -927,8 +929,8 @@ isStrUsedDmd :: Demand -> Bool
 isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
 
 -- | Is the value used at most once?
-isUsedOnceDmd :: Demand -> Bool
-isUsedOnceDmd (n :* _) = isUsedOnce n
+isAtMostOnceDmd :: Demand -> Bool
+isAtMostOnceDmd (n :* _) = isAtMostOnce n
 
 -- | We try to avoid tracking weak free variable demands in strictness
 -- signatures for analysis performance reasons.
@@ -1068,12 +1070,16 @@ argOneShots :: Demand          -- ^ depending on saturation
 argOneShots AbsDmd    = [] -- This defn conflicts with 'saturatedByOneShots',
 argOneShots BotDmd    = [] -- according to which we should return
                            -- @repeat OneShotLam@ here...
-argOneShots (_ :* sd) = go sd
+argOneShots (_ :* sd) = map go (callCards sd)
   where
-    go (Call n sd)
-      | isUsedOnce n = OneShotLam    : go sd
-      | otherwise    = NoOneShotInfo : go sd
-    go _    = []
+    go n | isAtMostOnce n = OneShotLam
+         | otherwise      = NoOneShotInfo
+
+-- | See Note [Computing one-shot info]
+callCards :: SubDemand -> [Card]
+callCards (Call n sd) = n : callCards sd
+callCards (Poly _ _n) = [] -- n is never C_01 or C_11 so we may as well stop here
+callCards Prod{}      = []
 
 -- |
 -- @saturatedByOneShots n C(M,C(M,...)) = True@
@@ -1083,7 +1089,7 @@ argOneShots (_ :* sd) = go sd
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots _ AbsDmd    = True
 saturatedByOneShots _ BotDmd    = True
-saturatedByOneShots n (_ :* sd) = isUsedOnce $ fst $ peelManyCalls n sd
+saturatedByOneShots n (_ :* sd) = isAtMostOnce $ fst $ peelManyCalls n sd
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~

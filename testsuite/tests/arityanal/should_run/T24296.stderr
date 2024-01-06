@@ -1,0 +1,3 @@
+T24296: tricky called with at least two args
+CallStack (from HasCallStack):
+  error, called at T24296.hs:12:7 in main:Main

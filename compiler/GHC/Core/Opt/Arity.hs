@@ -513,8 +513,11 @@ this transformation.  So we try to limit it as much as possible:
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
-4. Note [Newtype arity]
-~~~~~~~~~~~~~~~~~~~~~~~~
+There also is an interaction with Note [Combining arity type with demand info],
+outlined in Wrinkle (CAD1).
+
+Note [Newtype arity]
+~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.
 We do (currently) eta-expand recursive newtypes too.  So if we have, say
 
@@ -716,7 +719,7 @@ So safeArityType will trim it to (AT [C?, C?] Top), whose [ATLamInfo]
 now reflects the (cost-free) arity of the expression
 
 Why do we ever need an "unsafe" ArityType, such as the example above?
-Because its (cost-free) arity may increased by combineWithDemandOneShots
+Because its (cost-free) arity may increased by combineWithCallCards
 in findRhsArity. See Note [Combining arity type with demand info].
 
 Thus the function `arityType` returns a regular "unsafe" ArityType, that
@@ -918,14 +921,14 @@ findRhsArity opts is_rec bndr rhs
                          NonRecursive -> trimArityType ty_arity (cheapArityType rhs)
 
     ty_arity     = typeArity (idType bndr)
-    id_one_shots = idDemandOneShots bndr
+    use_call_cards = useSiteCallCards bndr
 
     step :: ArityEnv -> SafeArityType
     step env = trimArityType ty_arity $
                safeArityType $ -- See Note [Arity invariants for bindings], item (3)
-               arityType env rhs `combineWithDemandOneShots` id_one_shots
+               combineWithCallCards env (arityType env rhs) use_call_cards
        -- trimArityType: see Note [Trim arity inside the loop]
-       -- combineWithDemandOneShots: take account of the demand on the
+       -- combineWithCallCards: take account of the demand on the
        -- binder.  Perhaps it is always called with 2 args
        --   let f = \x. blah in (f 3 4, f 1 9)
        -- f's demand-info says how many args it is called with
@@ -950,14 +953,24 @@ findRhsArity opts is_rec bndr rhs
       where
         next_at = step (extendSigEnv init_env bndr cur_at)
 
-infixl 2 `combineWithDemandOneShots`
-
-combineWithDemandOneShots :: ArityType -> [OneShotInfo] -> ArityType
+combineWithCallCards :: ArityEnv -> ArityType -> [Card] -> ArityType
 -- See Note [Combining arity type with demand info]
-combineWithDemandOneShots at@(AT lams div) oss
+combineWithCallCards env at@(AT lams div) cards
   | null lams = at
   | otherwise = AT (zip_lams lams oss) div
   where
+    oss = map card_to_oneshot cards
+    card_to_oneshot n
+      | isAtMostOnce n, not (pedanticBottoms env)
+         -- Take care for -fpedantic-bottoms;
+         -- see Note [Combining arity type with demand info], Wrinkle (CAD1)
+      = OneShotLam
+      | n == C_11
+         -- Safe to eta-expand even in the presence of -fpedantic-bottoms
+         -- see Note [Combining arity type with demand info], Wrinkle (CAD1)
+      = OneShotLam
+      | otherwise
+      = NoOneShotInfo
     zip_lams :: [ATLamInfo] -> [OneShotInfo] -> [ATLamInfo]
     zip_lams lams []  = lams
     zip_lams []   oss | isDeadEndDiv div = []
@@ -966,29 +979,33 @@ combineWithDemandOneShots at@(AT lams div) oss
     zip_lams ((ch,os1):lams) (os2:oss)
       = (ch, os1 `bestOneShot` os2) : zip_lams lams oss
 
-idDemandOneShots :: Id -> [OneShotInfo]
-idDemandOneShots bndr
-  = call_arity_one_shots `zip_lams` dmd_one_shots
+useSiteCallCards :: Id -> [Card]
+useSiteCallCards bndr
+  = call_arity_one_shots `zip_cards` dmd_one_shots
   where
-    call_arity_one_shots :: [OneShotInfo]
+    call_arity_one_shots :: [Card]
     call_arity_one_shots
       | call_arity == 0 = []
-      | otherwise       = NoOneShotInfo : replicate (call_arity-1) OneShotLam
-    -- Call Arity analysis says the function is always called
-    -- applied to this many arguments.  The first NoOneShotInfo is because
-    -- if Call Arity says "always applied to 3 args" then the one-shot info
-    -- we get is [NoOneShotInfo, OneShotLam, OneShotLam]
+      | otherwise       = C_0N : replicate (call_arity-1) C_01
+    -- Call Arity analysis says /however often the function is called/, it is
+    -- always applied to this many arguments.
+    -- The first C_0N is because of the "however often it is called" part.
+    -- Thus if Call Arity says "always applied to 3 args" then the one-shot info
+    -- we get is [C_0N, C_01, C_01]
     call_arity = idCallArity bndr
 
-    dmd_one_shots :: [OneShotInfo]
+    dmd_one_shots :: [Card]
     -- If the demand info is C(x,C(1,C(1,.))) then we know that an
     -- application to one arg is also an application to three
-    dmd_one_shots = argOneShots (idDemandInfo bndr)
+    dmd_one_shots = case idDemandInfo bndr of
+      AbsDmd  -> [] -- There is no use in eta expanding
+      BotDmd  -> [] -- when the binding could be dropped instead
+      _ :* sd -> callCards sd
 
     -- Take the *longer* list
-    zip_lams (lam1:lams1) (lam2:lams2) = (lam1 `bestOneShot` lam2) : zip_lams lams1 lams2
-    zip_lams []           lams2        = lams2
-    zip_lams lams1        []           = lams1
+    zip_cards (n1:ns1) (n2:ns2) = (n1 `glbCard` n2) : zip_cards ns1 ns2
+    zip_cards []       ns2      = ns2
+    zip_cards ns1      []       = ns1
 
 {- Note [Arity analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1084,7 +1101,7 @@ Combining these two pieces of info, we can get the final ArityType
 result: arity=3, which is better than we could do from either
 source alone.
 
-The "combining" part is done by combineWithDemandOneShots.  It
+The "combining" part is done by combineWithCallCards.  It
 uses info from both Call Arity and demand analysis.
 
 We may have /more/ call demands from the calls than we have lambdas
@@ -1102,6 +1119,22 @@ But /only/ for called-once demands.  Suppose we had
 Now we don't want to eta-expand f1 to have 3 args; only two.
 Nor, in the case of f2, do we want to push that error call under
 a lambda.  Hence the takeWhile in combineWithDemandDoneShots.
+
+Wrinkles:
+
+(CAD1) #24296 exposed a subtle interaction with -fpedantic-bottoms
+  (See Note [Dealing with bottom]). Consider
+
+    let f = \x y. error "blah" in
+    f 2 1 `seq` Just (f 3 2 1)
+      -- Demand on f is C(x,C(1,C(M,L)))
+
+  Usually, it is OK to consider a lambda that is called *at most* once (so call
+  cardinality C_01, abbreviated M) a one-shot lambda and eta-expand over it.
+  But with -fpedantic-bottoms that is no longer true: If we were to eta-expand
+  f to arity 3, we'd discard the error raised when evaluating `f 2 1`.
+  Hence in the presence of -fpedantic-bottoms, we must have C_11 for
+  eta-expansion.
 
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

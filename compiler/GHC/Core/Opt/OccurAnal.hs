@@ -2190,7 +2190,7 @@ occ_anal_lam_tail env expr@(Lam {})
                   -- Use updOneShotInfo, not setOneShotInfo, as pre-existing
                   -- one-shot info might be better than what we can infer, e.g.
                   -- due to explicit use of the magic 'oneShot' function.
-                  -- See Note [The oneShot function]
+                  -- See Note [oneShot magic]
             env' = env { occ_encl = OccVanilla, occ_one_shots = env_one_shots' }
          in go env' (bndr':rev_bndrs) body
 

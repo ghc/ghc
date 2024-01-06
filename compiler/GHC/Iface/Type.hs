@@ -134,7 +134,7 @@ ifaceBndrType (IfaceTvBndr (_, t)) = t
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
 data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
-  = IfaceNoOneShot   -- and Note [The oneShot function] in "GHC.Types.Id.Make"
+  = IfaceNoOneShot   -- and Note [oneShot magic] in "GHC.Types.Id.Make"
   | IfaceOneShot
 
 instance Outputable IfaceOneShot where
