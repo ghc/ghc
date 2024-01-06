@@ -634,8 +634,6 @@ pprInstr platform instr = case instr of
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
   STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
   STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
-  STR f o1 o2    -> pprPanic "RV64.pprInstr - STR not implemented for ... "
-                              (text "STR" <+> (text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_ [ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
@@ -652,12 +650,6 @@ pprInstr platform instr = case instr of
     -- op_adrp o1 (text "%pcrel_hi(" <> pprAsmLabel platform lbl <> text ")") $$
     -- op_add o1 (text "%pcrel_lo(" <> pprAsmLabel platform lbl <> text ")")
     line $ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
-
-  -- TODO: Are these two special cases really needed?
-  LDR _f o1@(OpReg W8 reg) o2 | isIntRealReg reg ->
-    op2 (text "\tlb") o1 o2
-  LDR _f o1@(OpReg W16 reg) o2 | isIntRealReg reg ->
-    op2 (text "\tlh") o1 o2
 
   LDR II8  o1 o2 -> op2 (text "\tlb") o1 o2
   LDR II16 o1 o2 -> op2 (text "\tlh") o1 o2
