@@ -514,10 +514,10 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
     (subst',bndrs') = substBndrs subst bndrs
     args'           = map (substExpr subst') args
 
-substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src, uf_cache = cache })
+substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
   -- Retain stable unfoldings
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
-  = if uf_is_value cache then evaldUnfolding else NoUnfolding
+  = NoUnfolding
   | otherwise                 -- But keep a stable one!
   = seqExpr new_tmpl `seq`
     unf { uf_tmpl = new_tmpl }
