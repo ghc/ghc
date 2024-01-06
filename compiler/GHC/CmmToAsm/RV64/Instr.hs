@@ -32,9 +32,14 @@ import Data.Maybe (fromMaybe)
 
 import GHC.Stack
 
--- | TODO: Should be `2 * spillSlotSize = 16`
-stackFrameHeaderSize :: Platform -> Int
-stackFrameHeaderSize _ = 64
+-- | Stack frame header size in bytes.
+--
+-- The stack frame header is made of the values that are always saved
+-- (regardless of the context.) It consists of the saved return address and a
+-- pointer to the previous frame. Thus, its size is two stack frame slots which
+-- equals two addresses/words (2 * 8 byte).
+stackFrameHeaderSize :: Int
+stackFrameHeaderSize = 2 * spillSlotSize
 
 -- | All registers are 8 byte wide.
 spillSlotSize :: Int
@@ -48,15 +53,13 @@ stackAlign = 16
 -- | The number of spill slots available without allocating more.
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config
---  = 0 -- set to zero, to see when allocMoreStack has to fire.
-    = let platform = ncgPlatform config
-      in ((ncgSpillPreallocSize config - stackFrameHeaderSize platform)
+    = ((ncgSpillPreallocSize config - stackFrameHeaderSize)
          `div` spillSlotSize) - 1
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
-spillSlotToOffset :: NCGConfig -> Int -> Int
-spillSlotToOffset config slot
-   = stackFrameHeaderSize (ncgPlatform config) + spillSlotSize * slot
+spillSlotToOffset :: Int -> Int
+spillSlotToOffset slot
+   = stackFrameHeaderSize + spillSlotSize * slot
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -378,7 +381,7 @@ mkSpillInstr config reg delta slot =
     addSpToIp = ANN (text "Spill: IP <- SP + IP ") $ ADD ip ip sp
     mkStrIp = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
 
-    off = spillSlotToOffset config slot
+    off = spillSlotToOffset slot
 
 mkLoadInstr
    :: NCGConfig
@@ -387,7 +390,7 @@ mkLoadInstr
    -> Int       -- spill slot to use
    -> [Instr]
 
-mkLoadInstr config reg delta slot =
+mkLoadInstr _config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
     imm ->
@@ -404,7 +407,7 @@ mkLoadInstr config reg delta slot =
     addSpToIp = ANN (text "Reload: IP <- SP + IP ") $ ADD ip ip sp
     mkLdrIp = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
 
-    off = spillSlotToOffset config slot
+    off = spillSlotToOffset slot
 
   --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
