@@ -635,7 +635,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
   -- See Note [Self-recursive loop header].
   self_loop_info <- getSelfLoop
   case self_loop_info of
-    Just (_, loop_header_id, _)
+    Just MkSelfLoopInfo { sli_header_block = loop_header_id }
         | checkYield && isJust mb_stk_hwm -> emitLabel loop_header_id
     _otherwise -> return ()
 
