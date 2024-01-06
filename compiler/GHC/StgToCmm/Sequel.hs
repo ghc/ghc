@@ -12,13 +12,14 @@
 
 module GHC.StgToCmm.Sequel
   ( Sequel(..)
-  , SelfLoopInfo
+  , SelfLoopInfo(..)
   ) where
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
 
 import GHC.Types.Id
+import GHC.Types.Basic (RepArity)
 import GHC.Utils.Outputable
 
 import GHC.Prelude
@@ -41,5 +42,14 @@ instance Outputable Sequel where
     ppr Return = text "Return"
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 
-type SelfLoopInfo = (Id, BlockId, [LocalReg])
+data SelfLoopInfo = MkSelfLoopInfo
+  { sli_id :: !Id
+  , sli_arity :: !RepArity
+    -- ^ always equal to 'idFunRepArity' of sli_id,
+    -- i.e. unarised arity, including void arguments
+  , sli_registers :: ![LocalReg]
+    -- ^ Excludes void arguments (LocalReg is never void)
+  , sli_header_block :: !BlockId
+  }
+
 --------------------------------------------------------------------------------
