@@ -145,10 +145,6 @@ classOfRealReg (RealRegSingle i)
         | i < 32        = RcInteger
         | otherwise     = RcDouble
 
-isIntRealReg :: Reg -> Bool
-isIntRealReg (RegReal r) = classOfRealReg r == RcInteger
-isIntRealReg _ = False
-
 regDotColor :: RealReg -> SDoc
 regDotColor reg
  = case classOfRealReg reg of
