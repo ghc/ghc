@@ -374,6 +374,7 @@ Library
         GHC.Core.Opt.WorkWrap.Utils
         GHC.Core.PatSyn
         GHC.Core.Ppr
+        GHC.Core.Semantics
         GHC.Types.TyThing.Ppr
         GHC.Core.Predicate
         GHC.Core.Reduction
