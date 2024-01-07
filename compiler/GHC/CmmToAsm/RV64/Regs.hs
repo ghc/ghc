@@ -45,6 +45,7 @@ allFpArgRegs = map regSingle [42..49]
 
 -- addressing modes ------------------------------------------------------------
 
+-- TODO: AddrRegReg constructor is never used.  Remove it?
 data AddrMode
         = AddrRegReg    Reg Reg
         | AddrRegImm    Reg Imm
