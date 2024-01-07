@@ -544,7 +544,6 @@ getRegister' config plat expr =
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-              -- width = typeWidth rep
           return (Any format (\dst -> imm_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op))
 
         CmmLabelOff lbl off -> do
