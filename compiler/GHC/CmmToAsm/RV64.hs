@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- | Native code generator for RiscV64 architectures
 module GHC.CmmToAsm.RV64
    ( ncgRV64 )
