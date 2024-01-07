@@ -24,7 +24,7 @@ allMachRegNos = [0 .. 31] ++ [32 .. 63]
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform
-   = let isFree i = freeReg platform i
+   = let isFree = freeReg platform
      in  map RealRegSingle $ filter isFree allMachRegNos
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
