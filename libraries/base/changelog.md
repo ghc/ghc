@@ -4,6 +4,7 @@
   * Add the `MonadFix` instance for `(,) a`, similar to the one for `Writer a` ([CLC proposal #238](https://github.com/haskell/core-libraries-committee/issues/238))
   * Improve `toInteger :: Word32 -> Integer` on 64-bit platforms ([CLC proposal #259](https://github.com/haskell/core-libraries-committee/issues/259))
   * Make `read` accept binary integer notation ([CLC proposal #177](https://github.com/haskell/core-libraries-committee/issues/177))
+  * Improve the performance of `Data.List.sort` using an improved merging strategy. Instead of `compare`, `sort` now uses `(>)` which may break *malformed* `Ord` instances ([CLC proposal #236](https://github.com/haskell/core-libraries-committee/issues/236))
 
 ## 4.20.0.0 *TBA*
   * Deprecate `GHC.Pack` ([#21461](https://gitlab.haskell.org/ghc/ghc/-/issues/21461))
