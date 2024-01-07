@@ -327,6 +327,7 @@ pprReg w r = case r of
   _                            -> pprPanic "RiscV64.pprReg" (text $ show r)
 
   where
+    -- TODO: Width is only used in error messages, so we could just remove it.
     ppr_reg_no :: Width -> Int -> doc
     -- General Purpose Registers
     ppr_reg_no _ 0 = text "zero"
