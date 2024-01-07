@@ -16,8 +16,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-allMachRegNos   :: [RegNo]
-allMachRegNos   = [0..31] ++ [32..63]
+allMachRegNos :: [RegNo]
+allMachRegNos = [0 .. 31] ++ [32 .. 63]
+
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
