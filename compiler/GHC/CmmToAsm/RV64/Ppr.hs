@@ -324,7 +324,7 @@ pprReg w r = case r of
   RegVirtual (VirtualRegI u)   -> text "%vI_" <> pprUniqueAlways u
   RegVirtual (VirtualRegF u)   -> text "%vF_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u)   -> text "%vD_" <> pprUniqueAlways u
-  _                            -> pprPanic "AArch64.pprReg" (text $ show r)
+  _                            -> pprPanic "RiscV64.pprReg" (text $ show r)
 
   where
     ppr_reg_no :: Width -> Int -> doc
