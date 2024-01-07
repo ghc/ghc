@@ -1533,5 +1533,8 @@ pprCtorArray platform initOrFini lbls =
     body = vcat [ pprCLabel platform lbl <> text " ();" | lbl <- lbls ]
     decls = vcat [ text "void" <+> pprCLabel platform lbl <> text " (void);" | lbl <- lbls ]
     attribute = case initOrFini of
-                  IsInitArray -> text "constructor"
+                  IsInitArray
+                    -- See Note [JSFFI initialization] for details
+                    | ArchWasm32 <- platformArch platform -> text "constructor(101)"
+                    | otherwise -> text "constructor"
                   IsFiniArray -> text "destructor"

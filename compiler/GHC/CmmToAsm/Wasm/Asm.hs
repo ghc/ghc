@@ -452,7 +452,8 @@ asmTellGlobals ty_word = do
 asmTellCtors :: WasmTypeTag w -> [SymName] -> WasmAsmM ()
 asmTellCtors _ [] = mempty
 asmTellCtors ty_word syms = do
-  asmTellSectionHeader ".init_array"
+  -- See Note [JSFFI initialization] for details
+  asmTellSectionHeader ".init_array.101"
   asmTellAlign $ alignmentFromWordType ty_word
   for_ syms $ \sym ->
     asmTellTabLine $
