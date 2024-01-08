@@ -299,6 +299,13 @@ def req_c( name, opts ):
     # JS backend doesn't support C (yet)
     js_skip(name, opts)
 
+def req_cxx( name, opts ):
+    """
+    Mark a test as requiring C++ source file support
+    """
+    # JS backend doesn't support C (yet)
+    js_skip(name, opts)
+
 def req_cmm( name, opts ):
     """
     Mark a test as requiring Cmm support
@@ -952,6 +959,10 @@ def literate( name, opts ):
 def c_src( name, opts ):
     opts.c_src = True
     req_c (name, opts)
+
+def cxx_src( name, opts ):
+    opts.cxx_src = True
+    req_cxx (name, opts)
 
 def objc_src( name, opts ):
     opts.objc_src = True
@@ -1948,6 +1959,7 @@ async def simple_build(name: Union[TestName, str],
 
     # Required by GHC 7.3+, harmless for earlier versions:
     if (getTestOpts().c_src or
+        getTestOpts().cxx_src or
         getTestOpts().objc_src or
         getTestOpts().objcpp_src):
         extra_hc_opts += ' -no-hs-main '
@@ -2922,6 +2934,8 @@ def add_hs_lhs_suffix(name: str) -> Path:
         return add_suffix(name, 'c')
     elif getTestOpts().cmm_src:
         return add_suffix(name, 'cmm')
+    elif getTestOpts().cxx_src:
+        return add_suffix(name, 'cpp')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
     elif getTestOpts().objcpp_src:

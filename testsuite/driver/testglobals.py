@@ -399,8 +399,9 @@ class TestOptions:
        # Does this test use a literate (.lhs) file?
        self.literate = False
 
-       # Does this test use a .c, .m or .mm file?
+       # Does this test use a .c, .cpp, .m or .mm file?
        self.c_src      = False
+       self.cxx_src    = False
        self.objc_src   = False
        self.objcpp_src = False
 
