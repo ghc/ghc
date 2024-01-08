@@ -322,4 +322,4 @@ instance Eq StringLiteral where
   (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
 
 instance Outputable StringLiteral where
-  ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
+  ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)
