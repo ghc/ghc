@@ -31,6 +31,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name( Name, mkSysTvName, mkSystemVarName )
+import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
@@ -1149,8 +1150,10 @@ unify_ty env ty1 ty2 _kco
   -- TYPE and CONSTRAINT are not Apart
   -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
   -- NB: at this point we know that the two TyCons do not match
-  | Just {} <- sORTKind_maybe ty1
-  , Just {} <- sORTKind_maybe ty2
+  | Just (tc1,_) <- mb_tc_app1, let u1 = tyConUnique tc1
+  , Just (tc2,_) <- mb_tc_app2, let u2 = tyConUnique tc2
+  , (u1 == tYPETyConKey && u2 == cONSTRAINTTyConKey) ||
+    (u2 == tYPETyConKey && u1 == cONSTRAINTTyConKey)
   = maybeApart MARTypeVsConstraint
     -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
     -- Note [Type and Constraint are not apart]
