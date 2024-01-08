@@ -1,0 +1,19 @@
+
+T24279.hs:18:9: error: [GHC-83865]
+    • Couldn't match type ‘F CONSTRAINT’ with ‘Bool’
+      Expected: Bool
+        Actual: F (G Constraint)
+    • In the expression: x
+      In an equation for ‘foo’: foo x = x
+
+T24279.hs:27:10: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’
+                  with actual type ‘H TYPE CONSTRAINT’
+    • In the expression: x
+      In an equation for ‘bar1’: bar1 x = x
+
+T24279.hs:31:10: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’
+                  with actual type ‘H (*) Constraint’
+    • In the expression: x
+      In an equation for ‘bar2’: bar2 x = x
