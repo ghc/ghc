@@ -31,6 +31,7 @@ module GHC.Platform.Ways
    , wayGeneralFlags
    , wayUnsetGeneralFlags
    , wayOptc
+   , wayOptcxx
    , wayOptl
    , wayOptP
    , wayDesc
@@ -176,6 +177,9 @@ wayOptc platform WayThreaded = case platformOS platform of
 wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
+
+wayOptcxx :: Platform -> Way -> [String]
+wayOptcxx = wayOptc -- Use the same flags as C
 
 -- | Pass these options to linker when enabling this way
 wayOptl :: Platform -> Way -> [String]

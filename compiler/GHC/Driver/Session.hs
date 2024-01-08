@@ -438,7 +438,8 @@ opt_c                 :: DynFlags -> [String]
 opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
             ++ toolSettings_opt_c (toolSettings dflags)
 opt_cxx               :: DynFlags -> [String]
-opt_cxx dflags= toolSettings_opt_cxx $ toolSettings dflags
+opt_cxx dflags = concatMap (wayOptcxx (targetPlatform dflags)) (ways dflags)
+           ++ toolSettings_opt_cxx (toolSettings dflags)
 opt_a                 :: DynFlags -> [String]
 opt_a dflags= toolSettings_opt_a $ toolSettings dflags
 opt_l                 :: DynFlags -> [String]
