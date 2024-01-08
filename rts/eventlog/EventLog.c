@@ -1438,7 +1438,8 @@ void postIPE(const InfoProvEnt *ipe)
     // 8 for the info word
     // 1 null after each string
     // 1 colon between src_file and src_span
-    StgWord len = 8+table_name_len+1+closure_desc_len+1+ty_desc_len+1+label_len+1+module_len+1+src_file_len+1+src_span_len+1;
+    StgWord extra_comma = 1;
+    StgWord len = 8+table_name_len+1+closure_desc_len+1+ty_desc_len+1+label_len+1+module_len+1+src_file_len+1+extra_comma+src_span_len+1;
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
