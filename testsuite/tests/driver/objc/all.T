@@ -12,8 +12,8 @@ test('objc-hi',
        expect_fail_for(['ghci']) ],
      compile_and_run, ['-framework Foundation'])
 
-test('objcpp-hi',
+test('objcxx-hi',
      [ skip_if_not_osx,
-       objcpp_src,
+       objcxx_src,
        expect_fail_for(['ghci']) ],
      compile_and_run, ['-framework Foundation -lc++'])
