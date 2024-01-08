@@ -2588,12 +2588,12 @@ supportedExtensions (ArchOS arch os) = concatMap toFlagSpecNamePair xFlags
       -- the rationale
       | isAIX, flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
       | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
-      -- "JavaScriptFFI" is only supported on the JavaScript backend
-      | notJS, flagSpecFlag flg == LangExt.JavaScriptFFI    = [noName]
+      -- "JavaScriptFFI" is only supported on the JavaScript/Wasm backend
+      | notJSOrWasm, flagSpecFlag flg == LangExt.JavaScriptFFI = [noName]
       | otherwise = [name, noName]
       where
         isAIX = os == OSAIX
-        notJS = arch /= ArchJavaScript
+        notJSOrWasm = not $ arch `elem` [ ArchJavaScript, ArchWasm32 ]
         noName = "No" ++ name
         name = flagSpecName flg
 
