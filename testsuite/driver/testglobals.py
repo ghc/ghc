@@ -403,7 +403,7 @@ class TestOptions:
        self.c_src      = False
        self.cxx_src    = False
        self.objc_src   = False
-       self.objcpp_src = False
+       self.objcxx_src = False
 
        # Does this test use a .cmm file?
        self.cmm_src    = False

@@ -967,8 +967,8 @@ def cxx_src( name, opts ):
 def objc_src( name, opts ):
     opts.objc_src = True
 
-def objcpp_src( name, opts ):
-    opts.objcpp_src = True
+def objcxx_src( name, opts ):
+    opts.objcxx_src = True
 
 def cmm_src( name, opts ):
     opts.cmm_src = True
@@ -1961,7 +1961,7 @@ async def simple_build(name: Union[TestName, str],
     if (getTestOpts().c_src or
         getTestOpts().cxx_src or
         getTestOpts().objc_src or
-        getTestOpts().objcpp_src):
+        getTestOpts().objcxx_src):
         extra_hc_opts += ' -no-hs-main '
 
     if getTestOpts().compile_cmd_prefix == '':
@@ -2938,7 +2938,7 @@ def add_hs_lhs_suffix(name: str) -> Path:
         return add_suffix(name, 'cpp')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
-    elif getTestOpts().objcpp_src:
+    elif getTestOpts().objcxx_src:
         return add_suffix(name, 'mm')
     elif getTestOpts().literate:
         return add_suffix(name, 'lhs')
