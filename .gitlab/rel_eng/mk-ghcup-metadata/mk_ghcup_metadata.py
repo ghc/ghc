@@ -145,7 +145,7 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
         # So we must manually set the name of the bindist location
         if artifact == test_artifact:
             bindist_name = "testsuite"
-        else
+        else:
             bindist_name = fetch_gitlab.job_triple(artifact.job_name)
         final_url = release_base.format( version=version
                                        , bindistName=urllib.parse.quote_plus(f"{bindist_name}.tar.xz"))
