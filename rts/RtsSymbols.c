@@ -507,6 +507,7 @@ extern char **environ;
       SymI_HasDataProto(stg_block_takemvar)                                 \
       SymI_HasDataProto(stg_block_readmvar)                                 \
       SymI_HasDataProto(stg_block_putmvar)                                  \
+      SymI_HasDataProto(stg_END_TSO_QUEUE_closure)                          \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(addDLL)                                             \
       SymI_HasProto(addLibrarySearchPath)                               \
@@ -949,6 +950,14 @@ extern char **environ;
       SymI_HasProto(arenaAlloc)                                         \
       SymI_HasProto(arenaFree)                                          \
       SymI_HasProto(rts_clearMemory)                                    \
+      SymI_HasProto(rts_pause)                                          \
+      SymI_HasProto(rts_resume)                                         \
+      SymI_HasProto(rts_listThreads)                                    \
+      SymI_HasProto(rts_listMiscRoots)                                  \
+      SymI_HasProto(closure_sizeW)                                      \
+      SymI_HasProto(closure_sizeW_)                                     \
+      SymI_HasProto(listAllBlocks)                                      \
+      SymI_HasProto(generations)                                      \
       SymI_HasProto(setKeepCAFs)                                        \
       SymI_HasProto(rtsBadAlignmentBarf)                                \
       SymI_HasProto(rtsOutOfBoundsAccess)                               \
