@@ -766,11 +766,7 @@ getRegister' config plat expr =
 
     -- Generic case.
     CmmMachOp op [x, y] -> do
-      -- alright, so we have an operation, and two expressions. And we want to essentially do
-      -- ensure we get float regs (TODO(Ben): What?)
-      let withTempIntReg w op = OpReg w <$> getNewRegNat (intFormat w) >>= op
-          -- withTempFloatReg w op = OpReg w <$> getNewRegNat (floatFormat w) >>= op
-
+      let
           -- A "plain" operation.
           bitOp w op = do
             -- compute x<m> <- x
