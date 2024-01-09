@@ -38,7 +38,7 @@ import Control.Monad (guard)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe,mapMaybe)
 
-data Language = Haskell98 | Haskell2010 | GHC2021
+data Language = Haskell98 | Haskell2010 | GHC2021 | GHC2024
    deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where

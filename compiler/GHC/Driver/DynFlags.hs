@@ -1339,7 +1339,7 @@ default_PIC platform =
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 -- Nothing: the default case
-languageExtensions Nothing = languageExtensions (Just GHC2021)
+languageExtensions Nothing = languageExtensions (Just GHC2024)
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
@@ -1427,6 +1427,16 @@ languageExtensions (Just GHC2021)
        LangExt.TypeOperators,
        LangExt.TypeSynonymInstances]
 
+languageExtensions (Just GHC2024)
+    = languageExtensions (Just GHC2021) ++
+      [LangExt.DataKinds,
+       LangExt.DerivingStrategies,
+       LangExt.DisambiguateRecordFields,
+       LangExt.ExplicitNamespaces,
+       LangExt.GADTs,
+       LangExt.MonoLocalBinds,
+       LangExt.LambdaCase,
+       LangExt.RoleAnnotations]
 
 ways :: DynFlags -> Ways
 ways dflags

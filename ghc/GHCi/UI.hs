@@ -3477,6 +3477,7 @@ showLanguages' show_all dflags =
            Haskell98   -> text "Haskell98"
            Haskell2010 -> text "Haskell2010"
            GHC2021     -> text "GHC2021"
+           GHC2024     -> text "GHC2024"
      , (if show_all then text "all active language options:"
                     else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
@@ -3493,7 +3494,7 @@ showLanguages' show_all dflags =
 
    default_dflags = defaultDynFlags (settings dflags) `lang_set` Just lang
 
-   lang = fromMaybe GHC2021 (language dflags)
+   lang = fromMaybe GHC2024 (language dflags)
 
 
 showTargets :: GHC.GhcMonad m => m ()

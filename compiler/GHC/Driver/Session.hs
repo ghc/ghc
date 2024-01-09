@@ -2596,7 +2596,8 @@ languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
 languageFlagsDeps = [
   flagSpec "Haskell98"   Haskell98,
   flagSpec "Haskell2010" Haskell2010,
-  flagSpec "GHC2021"     GHC2021
+  flagSpec "GHC2021"     GHC2021,
+  flagSpec "GHC2024"     GHC2024
   ]
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
