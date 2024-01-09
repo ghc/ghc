@@ -1020,7 +1020,7 @@ job_groups =
          make_wasm_jobs wasm_build_config {bignumBackend = Native}
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {unregisterised = True}
-     , onlyRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+     , onlyRule NonmovingGc (validateBuilds Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
      , onlyRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      ]
 
