@@ -636,14 +636,6 @@ getRegister' config plat expr =
 
         _ -> pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
       where
-        toImm W8 =  (OpImm (ImmInt 7))
-        toImm W16 = (OpImm (ImmInt 15))
-        toImm W32 = (OpImm (ImmInt 31))
-        toImm W64 = (OpImm (ImmInt 63))
-        toImm W128 = (OpImm (ImmInt 127))
-        toImm W256 = (OpImm (ImmInt 255))
-        toImm W512 = (OpImm (ImmInt 511))
-
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
         -- See Note [Signed arithmetic on RISCV64].
         negate code w reg = do
