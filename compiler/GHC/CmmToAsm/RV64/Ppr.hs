@@ -452,7 +452,6 @@ pprInstr platform instr = case instr of
   LOCATION file line' col _name
     -> line (text "\t.loc" <+> int file <+> int line' <+> int col)
   DELTA d   -> dualDoc (asmComment $ text "\tdelta = " <> int d) empty
-               -- see Note [dualLine and dualDoc] in GHC.Utils.Outputable
   NEWBLOCK _ -> panic "PprInstr: NEWBLOCK"
   LDATA _ _  -> panic "pprInstr: LDATA"
 
