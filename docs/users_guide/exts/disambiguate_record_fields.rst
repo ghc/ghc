@@ -9,6 +9,7 @@ Record field disambiguation
 
     :since: 6.8.1
     :implied by: :extension:`RecordWildCards`, :extension:`DuplicateRecordFields`
+    :status: Included in :extension:`GHC2024`
 
     Allow the compiler to automatically choose between identically-named record
     fields (if the choice is unambiguous).

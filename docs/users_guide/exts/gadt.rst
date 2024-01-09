@@ -9,6 +9,7 @@ Generalised Algebraic Data Types (GADTs)
 
     :implies: :extension:`MonoLocalBinds`, :extension:`GADTSyntax`
     :since: 6.8.1
+    :status: Included in :extension:`GHC2024`
 
     Allow use of Generalised Algebraic Data Types (GADTs).
 
