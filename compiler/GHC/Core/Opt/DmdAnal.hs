@@ -7,6 +7,9 @@
                         -----------------
 -}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 
 module GHC.Core.Opt.DmdAnal
@@ -33,6 +36,7 @@ import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.Semantics
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -54,12 +58,14 @@ import GHC.Utils.Outputable
 
 import Data.List        ( mapAccumL )
 import Data.Functor.Identity
-import Data.STRef
-import Control.Monad.ST
 import Control.Monad.Trans.Reader
-import Control.Monad (zipWithM_)
+import Control.Monad
 import GHC.Data.Maybe
 import Data.Foldable (foldlM)
+import GHC.Types.Unique.FM
+import Data.IORef
+import System.IO.Unsafe
+import GHC.Types.Unique
 
 {-
 ************************************************************************
@@ -89,25 +95,28 @@ data DmdAnalOpts = DmdAnalOpts
 -- See Note [Space Leaks in Demand Analysis]
 type WithDmdType a = SPair DmdType a
 
-type AnalM s = ReaderT (DmdAnnotations (STRef s)) (ST s)
+type AnalM = ReaderT (DmdAnnotations IORef) IO
 
-annotate :: (DmdAnnotations (STRef s) -> STRef s (IdEnv a)) -> Id -> a -> AnalM s ()
-annotate ref id !a = ReaderT $ \ann -> modifySTRef' (ref ann) (\env -> extendVarEnv env id a)
+annotate :: (DmdAnnotations IORef -> IORef (IdEnv a)) -> Id -> a -> AnalM ()
+annotate ref x !a = ReaderT $ \ann -> modifyIORef' (ref ann) (\env -> extendVarEnv env x a)
 
-readAnn :: (DmdAnnotations (STRef s) -> STRef s (IdEnv a)) -> AnalM s (IdEnv a)
-readAnn ref = ReaderT $ \ann -> readSTRef (ref ann)
+readAnn :: (DmdAnnotations IORef -> IORef (IdEnv a)) -> AnalM (IdEnv a)
+readAnn ref = ReaderT $ \ann -> readIORef (ref ann)
 
-runAnalM :: (forall s. AnalM s a) -> DmdAnnotations Identity
-runAnalM m = runST $ do
-  env <- DA <$> newSTRef emptyVarEnv <*> newSTRef emptyVarEnv
+runAnalM :: AnalM a -> IO (DmdAnnotations Identity)
+runAnalM m = do -- unsafePerformIO would be fine, too; we are just using IO for local IORefs
+  env <- DA <$> newIORef emptyVarEnv <*> newIORef emptyVarEnv
   _a <- runReaderT m env
-  demands <- readSTRef (da_demands env)
-  sigs    <- readSTRef (da_sigs env)
+  demands <- readIORef (da_demands env)
+  sigs    <- readIORef (da_sigs env)
   pure $! DA (Identity demands) (Identity sigs)
 
-discardAnnotations :: (forall s. AnalM s a) -> a
-discardAnnotations m = runST $ do
-  env <- DA <$> newSTRef emptyVarEnv <*> newSTRef emptyVarEnv
+discardAnnotations :: AnalM a -> a
+-- a is either DmdEnv or DmdType.
+-- IO is just used for local IORefs for annotations that will be discarded
+-- afterwards, hence the use of unsafePerformIO below is safe
+discardAnnotations m = unsafePerformIO $ do
+  env <- DA <$> newIORef emptyVarEnv <*> newIORef emptyVarEnv
   runReaderT m env
 
 -- | Outputs a new copy of the Core program in which binders have been annotated
@@ -115,9 +124,10 @@ discardAnnotations m = runST $ do
 --
 -- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
 -- [Stamp out space leaks in demand analysis])
-dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
-dmdAnalProgram opts fam_envs rules binds
-  = annotateProgram (runAnalM $ go (emptyAnalEnv opts fam_envs) binds) binds
+dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
+dmdAnalProgram opts fam_envs rules binds = do
+  anns <- runAnalM (go (emptyAnalEnv opts fam_envs) binds)
+  pure $! annotateProgram anns binds
   where
     -- See Note [Analysing top-level bindings]
     -- and Note [Why care for top-level demand annotations?]
@@ -316,9 +326,9 @@ dmdAnalBind
   -> SubDemand                 -- ^ Demand put on the "body"
                                --   (important for join points)
   -> CoreBind
-  -> (AnalEnv -> AnalM s DmdType) -- ^ How to analyse the "body", e.g.
+  -> (AnalEnv -> AnalM DmdType) -- ^ How to analyse the "body", e.g.
                                --   where the binding is in scope
-  -> AnalM s DmdType
+  -> AnalM DmdType
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | useLetUp top_lvl id
@@ -327,18 +337,18 @@ dmdAnalBind top_lvl env dmd bind anal_body = case bind of
   where
     env_rhs = enterDFun bind env
 
--- | Annotates uninteresting top level functions ('isInterestingTopLevelFn')
+-- | Annotates uninteresting top level functions ('isInterestingTopLevelFn)
 -- with 'topDmd', the rest with the given demand.
-annotateBindIdDemand :: TopLevelFlag -> Id -> Demand -> AnalM s ()
-annotateBindIdDemand top_lvl id dmd = case top_lvl of
-  TopLevel | not (isInterestingTopLevelFn id) -> annotate da_demands id topDmd
-  _                                           -> annotate da_demands id dmd
+annotateBindDemand :: TopLevelFlag -> Id -> Demand -> AnalM ()
+annotateBindDemand top_lvl x dmd = case top_lvl of
+  TopLevel | not (isInterestingTopLevelFn x) -> annotate da_demands x topDmd
+  _                                          -> annotate da_demands x dmd
 
 -- | Update the demand signature, but be careful not to change boxity info if
 -- `dmd_do_boxity` is True or if the signature is bottom.
 -- See Note [Don't change boxity without worker/wrapper]
 -- and Note [Boxity for bottoming functions].
-annotateSig :: DmdAnalOpts -> Id -> DmdSig -> AnalM s ()
+annotateSig :: DmdAnalOpts -> Id -> DmdSig -> AnalM ()
 annotateSig opts id sig = annotate da_sigs id $
   if dmd_do_boxity opts || isBottomingSig sig
     then sig
@@ -361,8 +371,8 @@ dmdAnalBindLetUp :: TopLevelFlag
                  -> AnalEnv
                  -> Id
                  -> CoreExpr
-                 -> (AnalEnv -> AnalM s DmdType)
-                 -> AnalM s DmdType
+                 -> (AnalEnv -> AnalM DmdType)
+                 -> AnalM DmdType
 dmdAnalBindLetUp top_lvl env id rhs anal_body = do
   -- See Note [Bringing a new variable into scope]
   body_ty <- anal_body (addInScopeAnalEnv env id)
@@ -370,7 +380,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = do
   -- See Note [Finalising boxity for demand signatures]
   let S2 body_ty' id_dmd = findBndrDmd env body_ty id
   let id_dmd'            = finaliseLetBoxity env (idType id) id_dmd
-  annotateBindIdDemand top_lvl id id_dmd'
+  annotateBindDemand top_lvl id id_dmd'
 
   rhs_ty <- dmdAnalStar env id_dmd' rhs
 
@@ -392,7 +402,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = do
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> AnalM s DmdType) -> AnalM s DmdType
+dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> AnalM DmdType) -> AnalM DmdType
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs -> do
     S2 env' weak_fv <- dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
@@ -407,7 +417,7 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
         -- see Note [Lazy and unleashable free variables]
       let S2 final_ty id_dmds = findBndrsDmds env' dmd_ty bndrs
       -- pprTraceM "dmdAnalBindLetDown" (ppr bndrs <+> ppr id_dmds)
-      zipWithM_ (annotateBindIdDemand top_lvl) bndrs id_dmds
+      zipWithM_ (annotateBindDemand top_lvl) bndrs id_dmds
       pure final_ty
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -441,7 +451,7 @@ anticipateANF e n
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr
-            -> AnalM s DmdEnv
+            -> AnalM DmdEnv
 dmdAnalStar env (n :* sd) e = do
   -- NB: (:*) expands AbsDmd and BotDmd as needed
   dmd_ty <- dmdAnal env sd e
@@ -453,7 +463,7 @@ dmdAnalStar env (n :* sd) e = do
 -- Main Demand Analysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
-        -> CoreExpr -> AnalM s DmdType
+        -> CoreExpr -> AnalM DmdType
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
@@ -622,7 +632,7 @@ forcesRealWorld fam_envs ty
   | otherwise
   = False
 
-dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> CoreAlt -> AnalM s DmdType
+dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> CoreAlt -> AnalM DmdType
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs) = do
   let rhs_env = addInScopeAnalEnvs env (case_bndr:bndrs)
         -- See Note [Bringing a new variable into scope]
@@ -1032,7 +1042,7 @@ dmdTransform env var sd
 
 -- | An environment in which all demands are weak according to 'isWeakDmd'.
 -- See Note [Lazy and unleashable free variables].
-type WeakDmds = VarEnv Demand
+type WeakDmds = IdEnv Demand
 
 -- | @dmdAnalRhsSig@ analyses the given RHS to compute a demand signature
 -- for the LetDown rule. It works as follows:
@@ -1048,7 +1058,7 @@ dmdAnalRhsSig
   -> RecFlag
   -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
-  -> AnalM s (SPair AnalEnv WeakDmds)
+  -> AnalM (SPair AnalEnv WeakDmds)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
@@ -1067,7 +1077,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs = do
       -- See Note [Unboxed demand on function bodies returning small products]
       = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
 
-  rhs_dmd_ty <- dmdAnal env rhs_dmd rhs
+  rhs_dmd_ty <- _dmdAnalNew env rhs_dmd rhs
 
   let
     (lam_bndrs, _) = collectBinders rhs
@@ -1111,7 +1121,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs = do
 
 splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
 splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
-  where (!weak_fvs, !sig_fvs) = partitionVarEnv isWeakDmd fvs
+  where (!weak_fvs, !sig_fvs) = partitionUFM isWeakDmd fvs
 
 thresholdArity :: Id -> CoreExpr -> Arity
 -- See Note [Demand signatures are computed for a threshold arity based on idArity]
@@ -2151,7 +2161,7 @@ dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> SubDemand
        -> [(Id,CoreExpr)]
-       -> AnalM s (SPair AnalEnv WeakDmds)
+       -> AnalM (SPair AnalEnv WeakDmds)
 dmdFix top_lvl env let_sd pairs
   = do sigs <- read_sigs; loop 1 (next_env sigs) sigs
   where
@@ -2166,7 +2176,7 @@ dmdFix top_lvl env let_sd pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
     -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: AnalM s (SPair AnalEnv WeakDmds)
+    abort :: AnalM (SPair AnalEnv WeakDmds)
     abort = do
       S3 env' sigs' weak_fv <- step (next_env [ nopSig | _ <- bndrs ])
         -- NB: step updates the annotation
@@ -2179,7 +2189,7 @@ dmdFix top_lvl env let_sd pairs
     -- terminates if that annotation does not change any more.
     -- For convenience, we also pass the bndr's DmdSig instead of fetching it
     -- from AnalEnv on every iteration.
-    loop :: Int -> AnalEnv -> [DmdSig] -> AnalM s (SPair AnalEnv WeakDmds)
+    loop :: Int -> AnalEnv -> [DmdSig] -> AnalM (SPair AnalEnv WeakDmds)
     loop n env sigs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
                       --                                   | (id,_) <- sigs]) $
                       loop' n env sigs
@@ -2193,7 +2203,7 @@ dmdFix top_lvl env let_sd pairs
         then pure $! S2 env' weak_fv'
         else loop (n+1) env' sigs'
 
-    step :: AnalEnv -> AnalM s (STriple AnalEnv [DmdSig] WeakDmds)
+    step :: AnalEnv -> AnalM (STriple AnalEnv [DmdSig] WeakDmds)
     step env = do
       S2 env' weak_fv' <- foldlM do_one (S2 env emptyVarEnv) pairs
         -- foldlM: Use the new signature to do the next pair
@@ -2290,9 +2300,9 @@ coercionsDmdEnv cos
   = mkTermDmdEnv $ mapVarEnv (const topDmd) $ getUniqSet $ coVarsOfCos cos
   -- The VarSet from coVarsOfCos is really a VarEnv Var
 
-addVarDmd :: DmdType -> Var -> Demand -> DmdType
-addVarDmd (DmdType fv ds) var dmd
-  = DmdType (addVarDmdEnv fv var dmd) ds
+addVarDmd :: DmdType -> Id -> Demand -> DmdType
+addVarDmd (DmdType fv ds) x dmd
+  = DmdType (addVarDmdEnv fv x dmd) ds
 
 addWeakFVs :: DmdType -> WeakDmds -> DmdType
 addWeakFVs dmd_ty weak_fvs
@@ -2321,7 +2331,7 @@ addWeakFVs dmd_ty weak_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-annotateBndrsDemands :: HasCallStack => [Var] -> [Demand] -> AnalM s ()
+annotateBndrsDemands :: HasCallStack => [Var] -> [Demand] -> AnalM ()
 annotateBndrsDemands bs ds =
   zipWithEqualM_ "annotateBndrsDemands"
                  (annotate da_demands) (filter isRuntimeVar bs) ds
@@ -2419,7 +2429,7 @@ data AnalEnv = AE
         -- The DmdEnv gives the demand on the free vars of the function
         -- when it is given enough args to satisfy the strictness signature
 
-type SigEnv = VarEnv (DmdSig, TopLevelFlag)
+type SigEnv = IdEnv (DmdSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
   ppr env = text "AE" <+> braces (vcat
@@ -2457,14 +2467,14 @@ extendSigEnvs top_lvl env vars sigs
   = extendVarEnvList env (zipWith (\v s -> (v, (s, top_lvl))) vars sigs)
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> DmdSig -> AnalEnv
-extendAnalEnv top_lvl env var sig
-  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig }
+extendAnalEnv top_lvl env x sig
+  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) x sig }
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> DmdSig -> SigEnv
-extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
+extendSigEnv top_lvl sigs x sig = extendVarEnv sigs x (sig, top_lvl)
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe (DmdSig, TopLevelFlag)
-lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+lookupSigEnv env x = lookupVarEnv (ae_sigs env) x
 
 addInScopeAnalEnv :: AnalEnv -> Var -> AnalEnv
 addInScopeAnalEnv env id = env { ae_sigs = delVarEnv (ae_sigs env) id }
@@ -2704,3 +2714,432 @@ annotateProgram anns = runIdentity . traverseBinders (Identity . annotate)
       = bndr `setIdDemandInfo` dmd
       | otherwise
       = bndr
+
+-- Semantics stuff
+
+type DmdT v = AnalEnv -> SubDemand -> AnalM (SPair v DmdEnv)
+
+type DmdVal = [Demand]
+  -- Think
+  --   data DmdVal = DmdFun Demand DmdVal | DmdNop
+  -- NB: lacks constructor values; these are always DmdNop
+
+type DmdD = DmdT DmdVal
+  -- Think: demand transformer, SubDemand -> DmdType
+
+type DmdHnf = DmdD
+  -- Denotation of a (syntactic) value;
+  -- squeezing with `seqSubDmd` yields nothing.
+  -- DmdHnf can be freely duplicated.
+
+dmdType2SPair :: DmdType -> SPair DmdVal DmdEnv
+dmdType2SPair (DmdType env val) = S2 val env
+sPair2DmdType :: SPair DmdVal DmdEnv -> DmdType
+sPair2DmdType (S2 val env) = DmdType env val
+
+instance Trace DmdD where
+  step (Lookup x) d = \env sd -> d env sd >>= \t ->
+    case (t, lookupSigEnv env x) of
+      (S2 val env, Just (_,NotTopLevel)) -> pure $! S2 val (addVarDmdEnv env x (C_11 :* sd))
+      (S2 val env, Just (_,TopLevel))
+        -- Top-level things will be used multiple times or not at
+        -- all anyway, hence the multDmd below: It means we don't
+        -- have to track whether @x@ is used strictly or at most
+        -- once, because ultimately it never will.
+        | isInterestingTopLevelFn x
+        -> pure $! S2 val (addVarDmdEnv env x (C_0N `multDmd` (C_11 :* sd))) -- discard strictness
+        -- otherwise, fall through; we'll annotate with topDmd at the binding site.
+      _ -> pure t
+  step _ d = d
+
+botDmdD, nopDmdD :: DmdD
+botDmdD _ _ = pure (dmdType2SPair botDmdType)
+nopDmdD _ _ = pure (dmdType2SPair nopDmdType)
+
+mkSurrogate :: Id -> DmdD
+mkSurrogate x = step (Lookup x) nopDmdD
+
+instance Domain DmdD where
+  keepAlive ds env _ = do
+    -- This is called for denotations of free variables of Coercions, RULE RHSs
+    -- and unfoldings
+    fvs <- plusDmdEnvs <$> traverse (\d -> squeezeSubDmd env d topSubDmd) ds
+    pure $! S2 [] fvs -- Nop value
+  stuck = botDmdD
+  erased = nopDmdD
+  lit _l = nopDmdD
+  primOp x _op = sig2DmdHnf (idDmdSig x)
+  global x = -- pprTrace "dmdAnal:global" (ppr x <+> ppr (idDmdSig x)) $
+             sig2DmdHnf (idDmdSig x)
+  classOp x _cls _env sd = do
+    pprTraceM "dmdAnal:classOp" (ppr x <+> ppr (idDmdSig x))
+    pure $! dmdType2SPair (dmdTransformDictSelSig (idDmdSig x) sd)
+  fun x f env sd | isTyVar x = f nopDmdD (addInScopeAnalEnv env x) sd
+                 | otherwise = do
+    let body_env = extendAnalEnv NotTopLevel env x nopSig -- Ultimately, we will not store nopDmdD here. This is just for compatibility with existing code
+    let (n,body_sd) = peelCallDmd sd
+    S2 val fvs <- f (mkSurrogate x) body_env body_sd
+    let S2 body_ty' dmd = findBndrDmd env (DmdType fvs val) x
+    pprTraceM "dmdAnal:Lam" (ppr x <+> ppr dmd $$ ppr sd <+> ppr body_ty')
+    annotate da_demands x dmd
+    let !lam_ty = addDemand dmd body_ty'
+    let DmdType fvs val = multDmdType n lam_ty
+    return $! S2 val fvs
+  con dc ds env sd = do
+    let call_sd = mkCalledOnceDmds (dataConRepArity dc) sd
+    let DmdType _env dmds = dmdTransformDataConSig (dataConRepStrictness dc) call_sd
+    let value_ds = dropList (dataConUnivAndExTyCoVars dc) ds
+    massert (equalLength value_ds dmds)
+    fvs <- plusDmdEnvs <$> zipWithM (squeezeDmd env) value_ds dmds
+    pprTraceM "dmdAnal:Con" (ppr dc <+> ppr sd <+> ppr dmds $$ ppr fvs)
+    pure $! S2 [] fvs
+  applyTy f = f
+  apply f a env sd = do
+    let call_sd = mkCalledOnceDmd sd
+    fun_ty <- sPair2DmdType <$> f env call_sd
+    let (arg_dmd, res_ty) = splitDmdTy fun_ty
+    arg_fvs <- squeezeDmd env a arg_dmd
+    let combined_ty = res_ty `plusDmdType` arg_fvs
+--    pprTraceM "dmdAnal:app" vcat $
+--         [ text "sd =" <+> ppr sd
+--         , text "fun dmd_ty =" <+> ppr fun_ty
+--         , text "arg dmd =" <+> ppr arg_dmd
+--         , text "arg dmd_ty =" <+> ppr arg_fvs
+--         , text "res dmd_ty =" <+> ppr res_ty
+--         , text "overall res dmd_ty =" <+> ppr combined_ty ]
+    pure $! dmdType2SPair combined_ty
+  seq_ a b env sd = do
+    fvs <- sSnd <$> a env seqSubDmd
+    dmd_ty <- sPair2DmdType <$> b env sd
+    pure $! dmdType2SPair (dmd_ty `plusDmdType` fvs) -- plain and simple :)
+  select d test_scrut case_bndr alts env sd
+    | [(alt_con, bndrs, rhs)] <- alts, want_precise_field_dmds alt_con = do
+        let rhs_env = extendAnalEnvs NotTopLevel env (case_bndr:bndrs) (repeat nopSig)
+              -- See Note [Bringing a new variable into scope]
+        rhs_ty <- sPair2DmdType <$> rhs (mkSurrogate case_bndr) (map mkSurrogate bndrs) rhs_env sd
+        let S2 alt_ty1 fld_dmds      = findBndrsDmds env rhs_ty bndrs
+            S2 alt_ty2 case_bndr_dmd = findBndrDmd env alt_ty1 case_bndr
+        annotate da_demands case_bndr case_bndr_dmd
+
+            -- Evaluation cardinality on the case binder is irrelevant and a no-op.
+            -- What matters is its nested sub-demand!
+            -- NB: If case_bndr_dmd is absDmd, boxity will say Unboxed, which is
+            -- what we want, because then `seq` will put a `seqDmd` on its scrut.
+        let !scrut_sd
+              | (_ :* case_bndr_sd) <- strictifyDmd case_bndr_dmd
+              -- See Note [Demand on the scrutinee of a product case]
+              = scrutSubDmd case_bndr_sd fld_dmds
+
+        -- See Note [Demand on case-alternative binders]
+        case alt_con of
+          DataAlt _ -> annotateBndrsDemands bndrs (fieldBndrDmds scrut_sd (length fld_dmds))
+          _         -> pure ()
+
+        let alt_ty3
+              -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
+              | test_scrut (exprMayThrowPreciseException (ae_fam_envs env))
+              = deferAfterPreciseException alt_ty2
+              | otherwise
+              = alt_ty2
+
+        scrut_ty <- sPair2DmdType <$> d env scrut_sd
+        let !res_ty = alt_ty3 `plusDmdType` discardArgDmds scrut_ty
+--        pprTraceM "dmdAnal:Case1" (vcat [ text "case_bndr" <+> ppr case_bndr
+--                                        , text "sd" <+> ppr sd
+--                                        , text "case_bndr_dmd" <+> ppr case_bndr_dmd
+--                                        , text "scrut_sd" <+> ppr scrut_sd
+--                                        , text "scrut_ty" <+> ppr scrut_ty
+--                                        , text "alt_ty" <+> ppr alt_ty2
+--                                        , text "res_ty" <+> ppr res_ty ])
+        pure $! dmdType2SPair res_ty
+    | otherwise = do
+        -- Case expression with multiple alternatives
+        let one_alt (con,bndrs,rhs) = do
+              let rhs_env = extendAnalEnvs NotTopLevel env (case_bndr:bndrs) (repeat nopSig) -- need the NotTopLevel flag
+                    -- See Note [Bringing a new variable into scope]
+              rhs_ty <- sPair2DmdType <$> rhs (mkSurrogate case_bndr) (map mkSurrogate bndrs) rhs_env sd
+              let S2 alt_ty dmds = findBndrsDmds env rhs_ty bndrs
+              -- See Note [Demand on case-alternative binders]
+              -- we can't use the scrut_sd, because it says 'Prod' and we'll use
+              -- topSubDmd anyway for scrutinees of sum types.
+              let scrut_sd
+                    | (_ :* case_bndr_sd) <- findIdDemand alt_ty case_bndr
+                    = scrutSubDmd case_bndr_sd dmds
+              case con of
+                DataAlt _ -> annotateBndrsDemands bndrs (fieldBndrDmds scrut_sd (length dmds))
+                _         -> pure ()
+              annotateBndrsDemands bndrs (fieldBndrDmds scrut_sd (length dmds))
+              -- pprTraceM "dmdAnalSumAlt" (ppr con $$ ppr case_bndr $$ ppr dmd $$ ppr alt_ty)
+              pure alt_ty
+        alt_tys <- traverse one_alt alts
+        let lub = foldr lubDmdType botDmdType
+        let S2 alt_ty1 case_bndr_dmd = findBndrDmd env (lub alt_tys) case_bndr
+        annotate da_demands case_bndr case_bndr_dmd
+        scrut_ty <- sPair2DmdType <$> d env topSubDmd
+
+        let fam_envs = ae_fam_envs env
+            alt_ty2
+              -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
+              | test_scrut (exprMayThrowPreciseException fam_envs)
+              = deferAfterPreciseException alt_ty1
+              | otherwise
+              = alt_ty1
+            res_ty = scrut_ty `plusDmdType` discardArgDmds alt_ty2
+
+      --    pprTraceM "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
+      --                                    , text "scrut_ty" <+> ppr scrut_ty
+      --                                    , text "alt_ty1" <+> ppr alt_ty1
+      --                                    , text "alt_ty2" <+> ppr alt_ty2
+      --                                    , text "res_ty" <+> ppr res_ty ])
+        pure $! dmdType2SPair res_ty
+    where
+      want_precise_field_dmds (DataAlt dc)
+        | Nothing <- tyConSingleAlgDataCon_maybe $ dataConTyCon dc
+        = False    -- Not a product type, even though this is the
+                   -- only remaining possible data constructor
+        | DefinitelyRecursive <- ae_rec_dc env dc
+        = False     -- See Note [Demand analysis for recursive data constructors]
+        | otherwise
+        = True
+      want_precise_field_dmds (LitAlt {}) = False  -- Like the non-product datacon above
+      want_precise_field_dmds DEFAULT     = True
+
+squeezeSubDmd :: AnalEnv -> DmdD -> SubDemand -> AnalM DmdEnv
+squeezeSubDmd env d sd = sSnd <$> d env sd
+
+squeezeDmd :: AnalEnv -> DmdD -> Demand -> AnalM DmdEnv
+squeezeDmd env d (n :* sd) = do
+  deep <- squeezeSubDmd env d sd
+  let hnf = discardAnnotations $ squeezeSubDmd env d seqSubDmd
+  if isUsedOnce n
+    then pure $!            n `multDmdEnv`  deep
+    else pure $! oneifyCard n `multDmdEnv` (deep `plusDmdEnv` hnf)
+
+-- | Here we assume that repeated evaluation shares work; still, we must lazify
+-- the results when evaluating the arg. TODO think about it more
+squeezeDmdShared :: AnalEnv -> DmdD -> Demand -> AnalM DmdEnv
+squeezeDmdShared env d (n :* sd) = do
+  env <- squeezeSubDmd env d sd
+  pure $! oneifyCard n `multDmdEnv` env
+
+instance HasBind DmdD where
+  bind (BindArg x)    arg  body env sd = do
+    -- TODO this is pretty much bindLetUp, with some differences:
+    --   1. we need a surrogate to track eval of x
+    --   2. we don't need to annotate
+    --   3. no need to call finaliseLetBoxity
+    let body_env = extendAnalEnv NotTopLevel env x nopSig
+    -- See Note [Bringing a new variable into scope]
+    body_ty <- sPair2DmdType <$> body [mkSurrogate x] body_env sd
+
+    -- See Note [Finalising boxity for demand signatures]
+    let S2 body_ty' id_dmd = findBndrDmd env body_ty x
+    rhs_ty <- squeezeDmdShared env (only arg []) id_dmd
+    pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
+  bind (BindLet bind) rhss body env sd = case bind of
+    NonRec x _
+      | useLetUp NotTopLevel x -> bindLetUp               x    (only rhss []) body env_rhs sd
+    _                          -> bindLetDown NotTopLevel bind rhss           body env_rhs sd
+    where
+      env_rhs = enterDFun bind env
+
+sig2DmdHnf :: DmdSig -> DmdHnf
+sig2DmdHnf sig _env sd = pure (dmdType2SPair (dmdTransformSig sig sd))
+
+bindLetDown :: TopLevelFlag -> CoreBind -> [[DmdD] -> DmdD] -> ([DmdD] -> DmdD) -> DmdD
+bindLetDown top_lvl bind rhss body env sd = case bind of
+  NonRec x e | let rhs = only rhss -> do
+    S2 sig weak_fv <- bindRhsSig NonRecursive x e (rhs []) env sd
+    do_rest [x] [sig] weak_fv
+  Rec pairs -> do
+    S2 sigs weak_fv <- bindFix top_lvl pairs rhss env sd
+    do_rest (map fst pairs) sigs weak_fv
+  where
+    do_rest bndrs sigs weak_fv = do
+      let env' = extendAnalEnvs top_lvl env bndrs sigs
+      body_ty <- sPair2DmdType <$> body (map sig2DmdHnf sigs) env' sd -- TODO surrogates
+      let dmd_ty = addWeakFVs body_ty weak_fv
+        -- see Note [Lazy and unleashable free variables]
+      let S2 final_ty id_dmds = findBndrsDmds env' dmd_ty bndrs
+      -- pprTraceM "dmdAnalBindLetDown" (ppr bndrs <+> ppr id_dmds)
+      zipWithM_ (annotateBindDemand top_lvl) bndrs id_dmds
+      pure $! dmdType2SPair final_ty
+        -- If the actual demand is better than the vanilla call
+        -- demand, you might think that we might do better to re-analyse
+        -- the RHS with the stronger demand.
+        -- But (a) That seldom happens, because it means that *every* path in
+        --         the body of the let has to use that stronger demand
+        -- (b) It often happens temporarily in when fixpointing, because
+        --     the recursive function at first seems to place a massive demand.
+        --     But we don't want to go to extra work when the function will
+        --     probably iterate to something less demanding.
+        -- In practice, all the times the actual demand on id2 is more than
+        -- the vanilla call demand seem to be due to (b).  So we don't
+        -- bother to re-analyse the RHS.
+
+
+bindLetUp :: Id -> DmdD -> ([DmdD] -> DmdD) -> DmdD
+bindLetUp x rhs body env sd = do
+  let body_env = extendAnalEnv NotTopLevel env x nopSig
+  -- See Note [Bringing a new variable into scope]
+  body_ty <- sPair2DmdType <$> body [nopDmdD] body_env sd
+
+  -- See Note [Finalising boxity for demand signatures]
+  let S2 body_ty' id_dmd = findBndrDmd env body_ty x
+  let id_dmd'            = finaliseLetBoxity env (idType x) id_dmd
+  annotate da_demands x id_dmd'
+  rhs_ty <- squeezeDmdShared env rhs id_dmd' --perhaps inline squeezeDmdShared
+  pprTraceM "dmdAnal:LetUp" (ppr x <+> ppr id_dmd <+> ppr id_dmd' $$ ppr rhs_ty)
+  pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
+
+
+bindRhsSig
+  :: RecFlag -> Id -> CoreExpr -> DmdD
+  -> AnalEnv -> SubDemand -> AnalM (SPair DmdSig WeakDmds)
+-- Process the RHS of the binding, add the strictness signature
+-- to the Id, and augment the environment with the signature as well.
+-- See Note [NOINLINE and strictness]
+bindRhsSig rec_flag x e rhs env let_sd = do
+  let
+    body_sd
+      | isJoinId x
+      -- See Note [Demand analysis for join points]
+      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+      --     threshold_arity matches the join arity of the join point
+      -- See Note [Unboxed demand on function bodies returning small products]
+      = unboxedWhenSmall env rec_flag (resultType_maybe x) let_sd
+      | otherwise
+      -- See Note [Unboxed demand on function bodies returning small products]
+      = unboxedWhenSmall env rec_flag (resultType_maybe x) topSubDmd
+    threshold_arity = thresholdArity x e
+    rhs_sd = mkCalledOnceDmds threshold_arity body_sd
+
+  rhs_dmd_ty <- sPair2DmdType <$> rhs env rhs_sd
+
+  let
+    (lam_bndrs, _) = collectBinders e
+    DmdType rhs_env rhs_dmds = rhs_dmd_ty
+    final_rhs_dmds = finaliseArgBoxities env x threshold_arity rhs_dmds
+                                         (de_div rhs_env) lam_bndrs
+  -- Attach the demands to the outer lambdas of this expression
+  -- NB: zipWithM_, not zipWithEqualM_, in contrast to annotateBndrsDemands.
+  -- We might have more demands than binders (PAP), hence don't panic (#22997).
+  zipWithM_ (annotate da_demands) (filter isId lam_bndrs) final_rhs_dmds
+
+  let
+    -- See Note [Aggregated demand for cardinality]
+    -- FIXME: That Note doesn't explain the following lines at all. The reason
+    --        is really much different: When we have a recursive function, we'd
+    --        have to also consider the free vars of the strictness signature
+    --        when checking whether we found a fixed-point. That is expensive;
+    --        we only want to check whether argument demands of the sig changed.
+    --        reuseEnv makes it so that the FV results are stable as long as the
+    --        last argument demands were. Strictness won't change. But used-once
+    --        might turn into used-many even if the signature was stable and
+    --        we'd have to do an additional iteration. reuseEnv makes sure that
+    --        we never get used-once info for FVs of recursive functions.
+    --        See #14816 where we try to get rid of reuseEnv.
+    rhs_env1 = case rec_flag of
+                Recursive    -> reuseEnv rhs_env
+                NonRecursive -> rhs_env
+
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds x)
+
+    -- See Note [Lazy and unleashable free variables]
+    !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
+    sig        = mkDmdSigForArity threshold_arity (DmdType sig_env final_rhs_dmds)
+    opts       = ae_opts env
+
+  -- pprTraceM "bindRhsSig" (ppr x $$ ppr let_sd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs)
+  annotateSig opts x sig
+  pure $! S2 sig weak_fvs
+
+bindFix :: TopLevelFlag
+       -> [(Id,CoreExpr)]
+       -> [[DmdD] -> DmdD]
+       -> AnalEnv                            -- Does not include bindings for this binding
+       -> SubDemand
+       -> AnalM (SPair [DmdSig] WeakDmds)
+bindFix top_lvl pairs rhss env let_sd
+  = do sigs <- read_sigs; loop 1 sigs
+  where
+    bndrs = map fst pairs
+    next_env sigs = extendAnalEnvs top_lvl env bndrs sigs
+
+    -- See Note [Initialising strictness]
+    read_sigs = do
+      annotations <- readAnn da_sigs
+      let init_sigs = [ botSig | _ <- bndrs ]
+      pure $! traverse (lookupVarEnv annotations) bndrs `orElse` init_sigs
+
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: AnalM (SPair [DmdSig] WeakDmds)
+    abort = do
+      S2 sigs' weak_fv <- step [ nopSig | _ <- bndrs ]
+        -- NB: step updates the annotation
+      -- Note [Lazy and unleashable free variables]
+      let weak_fvs = plusVarEnvList $ map (de_fvs . dmdSigDmdEnv) sigs'
+          weak_fv' = plusVarEnv_C plusDmd weak_fv $ mapVarEnv (const topDmd) weak_fvs
+      pure $! S2 sigs' weak_fv'
+
+    -- The fixed-point varies the DmdSig stored in the AnalEnv for bndrs, and
+    -- terminates if that annotation does not change any more.
+    -- For convenience, we also pass the bndr's DmdSig instead of fetching it
+    -- from AnalEnv on every iteration.
+    loop :: Int -> [DmdSig] -> AnalM (SPair [DmdSig] WeakDmds)
+    loop n sigs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
+                      --                                   | (id,_) <- sigs]) $
+                      loop' n sigs
+
+    loop' n sigs | n == 10   = abort
+                 | otherwise = do
+      S2 sigs' weak_fv' <- step sigs
+        -- NB: step updates the annotation
+      let found_fixpoint = sigs' == sigs
+      if found_fixpoint
+        then pure $! S2 sigs' weak_fv'
+        else loop (n+1) sigs'
+
+    step :: [DmdSig] -> AnalM (SPair [DmdSig] WeakDmds)
+    step sigs = do
+      -- TODO URGH updating one list entry at a time is easily the worst case
+      -- for linked lists. Unfortunately, it's linked lists all the way in
+      -- Core.Semantics because we zip with the list of binders.
+      -- Something to worry about later.
+      S2 sigs' weak_fv' <- foldlM do_one (S2 sigs emptyVarEnv) (zip3 pairs rhss [0..])
+        -- foldlM: Use the new signature to do the next pair
+        -- The occurrence analyser has arranged them in a good order
+        -- so this can significantly reduce the number of iterations needed
+      pure $! S2 sigs' weak_fv'
+      where
+        do_one (S2 sigs weak_fv) ((id, e), rhs, i) = do
+          -- pprTraceM "my_downRhs" (ppr id $$ ppr (idDmdSig id) $$ ppr sig)
+          -- NB: No surrogate needed, because
+          S2 sig' weak_fv1 <- bindRhsSig Recursive id e (rhs (map sig2DmdHnf sigs)) (next_env sigs) let_sd
+          let !weak_fv' = plusVarEnv_C plusDmd weak_fv weak_fv1
+          let !sigs' = updateListAt i sig' sigs -- URGHHHHH
+          pure $! S2 sigs' weak_fv'
+
+updateListAt :: Int -> a -> [a] -> [a]
+updateListAt 0 x (_:xs) = x:xs
+updateListAt n x (y:xs) = y:updateListAt (n-1) x xs
+updateListAt _ _ [] = panic "oops"
+
+_dmdAnalNew :: AnalEnv
+        -> SubDemand         -- The main one takes a *SubDemand*
+        -> CoreExpr -> AnalM DmdType
+_dmdAnalNew env sd e = sPair2DmdType <$> eval e (mapUFM_Directly f (ae_sigs env)) env sd
+  where
+    f x (sig, top_lvl) env sd = do
+      -- We imitate `step (Lookup x)` here, for a top-level thing.
+      S2 val fvs <- sig2DmdHnf sig env sd
+      pure $! case top_lvl of
+        NotTopLevel -> S2 val (addVarDmdEnv_Directly fvs x (C_11 :* sd))
+        TopLevel    -> S2 val (addVarDmdEnv_Directly fvs x (C_0N `multDmd` (C_11 :* sd))) -- discard strictness
+
+    addVarDmdEnv_Directly :: DmdEnv -> Unique -> Demand -> DmdEnv
+    -- like addVarDmdEnv, but working on a Unique (which is all we have)
+    addVarDmdEnv_Directly (DE fvs div) x dmd
+      = DE (addToUFM_Directly fvs x (dmd `plusDmd` (lookupVarEnv_Directly fvs x `orElse` defaultFvDmd div))) div

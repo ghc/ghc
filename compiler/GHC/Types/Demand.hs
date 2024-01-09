@@ -19,7 +19,7 @@ module GHC.Types.Demand (
     Demand(AbsDmd, BotDmd, (:*)),
     SubDemand(Prod, Poly), mkProd, viewProd,
     -- ** Algebra
-    absDmd, topDmd, botDmd, seqDmd, topSubDmd,
+    absDmd, topDmd, botDmd, seqDmd, topSubDmd, seqSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
     -- *** Plus
@@ -47,8 +47,8 @@ module GHC.Types.Demand (
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
 
     -- * Demand environments
-    DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
-    reuseEnv,
+    DmdEnv(..), defaultFvDmd, addVarDmdEnv, mkTermDmdEnv,
+    nopDmdEnv, plusDmdEnv, plusDmdEnvs, multDmdEnv, reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
