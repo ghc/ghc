@@ -645,7 +645,7 @@ getRegister' config plat expr =
         toImm W512 = (OpImm (ImmInt 511))
 
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
-        -- See Note [Signed arithmetic on AArch64].
+        -- See Note [Signed arithmetic on RISCV64].
         negate code w reg = do
             let w' = opRegWidth w
             (reg', code_sx) <- signExtendReg w w' reg
@@ -795,7 +795,7 @@ getRegister' config plat expr =
           -- A (potentially signed) integer operation.
           -- In the case of 8- and 16-bit signed arithmetic we must first
           -- sign-extend both arguments to 32-bits.
-          -- See Note [Signed arithmetic on AArch64].
+          -- See Note [Signed arithmetic on RISCV64].
           intOp is_signed w op = do
               -- compute x<m> <- x
               -- compute x<o> <- y
@@ -1580,8 +1580,8 @@ genCCall target dest_regs arg_regs bid = do
         -- Conversion
         MO_UF_Conv w        -> mkCCall (word2FloatLabel w)
 
-        -- Arithmatic
-        -- These are not supported on X86, so I doubt they are used much.
+        -- Optional MachOps
+        -- These are enabled/disabled by backend flags: GHC.StgToCmm.Config
         MO_S_Mul2     _w -> unsupported mop
         MO_S_QuotRem  _w -> unsupported mop
         MO_U_QuotRem  _w -> unsupported mop
