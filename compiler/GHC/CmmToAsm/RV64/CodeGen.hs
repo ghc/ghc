@@ -3,7 +3,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NumericUnderscores #-}
 module GHC.CmmToAsm.RV64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
