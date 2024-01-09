@@ -7,7 +7,7 @@ Field selectors
     :shortdesc: Control visibility of field selector functions.
 
     :since: 9.2.1
-    :status: Included in :extension:`Haskell98`, :extension:`Haskell2010`, :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`, :extension:`Haskell2010`, :extension:`Haskell98`
 
     Make `record field selector functions
     <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-500003.15.1>`_

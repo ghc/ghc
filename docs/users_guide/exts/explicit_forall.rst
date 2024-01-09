@@ -11,7 +11,7 @@ Explicit universal quantification (forall)
     :implied by: :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
         :extension:`RankNTypes`, :extension:`ExistentialQuantification`
     :since: 6.12.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow use of the ``forall`` keyword in places where universal quantification
     is implicit.

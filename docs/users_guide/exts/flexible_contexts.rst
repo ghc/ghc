@@ -7,7 +7,7 @@ Loosening restrictions on class contexts
     :shortdesc: Remove some restrictions on class contexts
 
     :since: 6.8.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Remove the type-variable restriction on class contexts.
 

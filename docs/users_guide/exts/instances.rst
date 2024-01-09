@@ -48,7 +48,7 @@ Relaxed rules for the instance head
     :implied by: :extension:`FlexibleInstances`
     :since: 6.8.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow definition of type class instances for type synonyms.
 
@@ -60,7 +60,7 @@ Relaxed rules for the instance head
 
     :since: 6.8.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow definition of type class instances with arbitrary nested types in the
     instance head.
@@ -671,7 +671,7 @@ Instance signatures: type signatures in instance declarations
 
     :since: 7.6.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow type signatures for members in instance definitions.
 

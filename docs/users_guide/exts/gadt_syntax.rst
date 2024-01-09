@@ -9,7 +9,7 @@ Declaring data types with explicit constructor signatures
     :implied by: :extension:`GADTs`
     :since: 7.2.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow the use of GADT syntax in data type definitions (but not GADTs
     themselves; for this see :extension:`GADTs`)

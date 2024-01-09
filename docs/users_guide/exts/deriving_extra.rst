@@ -55,7 +55,7 @@ Deriving ``Functor`` instances
 
     :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
@@ -251,7 +251,7 @@ Deriving ``Foldable`` instances
 
     :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
@@ -472,7 +472,7 @@ Deriving ``Data`` instances
     :shortdesc: Enable deriving for the ``Data`` class.
 
     :since: 6.8.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Enable automatic deriving of instances for the ``Data`` typeclass
 
@@ -526,7 +526,7 @@ Deriving ``Lift`` instances
     :shortdesc: Enable deriving for the Lift class
 
     :since: 8.0.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.

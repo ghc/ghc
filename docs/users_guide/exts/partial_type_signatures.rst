@@ -125,7 +125,7 @@ Named Wildcards
 
     :since: 7.10.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow naming of wildcards (e.g. ``_x``) in type signatures.
 

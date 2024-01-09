@@ -8,7 +8,7 @@ Writing qualified in postpositive position
 
     :since: 8.10.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     ``ImportQualifiedPost`` allows the syntax ``import M qualified``, that is, to annotate a module as qualified by writing ``qualified`` after the module name.
 
