@@ -537,7 +537,7 @@ getRegister' config plat expr =
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-          return (Any format (\dst -> imm_code `snocOL` (annExpr expr $ LDR format (OpReg (formatToWidth format) dst) op)))
+          return (Any format (\dst -> imm_code `snocOL` annExpr expr (LDR format (OpReg (formatToWidth format) dst) op)))
 
         CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
           (op, imm_code) <- litToImm' lit
@@ -553,7 +553,7 @@ getRegister' config plat expr =
           (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
           return (Any format (\dst -> imm_code `appOL` off_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)))
 
-        CmmLabelDiffOff _ _ _ _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
+        CmmLabelDiffOff {} -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
     CmmLoad mem rep _ -> do
@@ -692,12 +692,12 @@ getRegister' config plat expr =
     CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     -- 1. Compute Reg +/- n directly.
     --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
-    CmmMachOp (MO_Add w) [(CmmReg reg), CmmLit (CmmInt n _)]
+    CmmMachOp (MO_Add w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
-    CmmMachOp (MO_Sub w) [(CmmReg reg), CmmLit (CmmInt n _)]
+    CmmMachOp (MO_Sub w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
@@ -713,14 +713,14 @@ getRegister' config plat expr =
                                           annExpr expr (DIVU (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     -- 2. Shifts. x << n, x >> n.
-    CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
+    CmmMachOp (MO_Shl w) [x, CmmLit (CmmInt n _)] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst ->
                                     code_x `snocOL`
                                     annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))) `appOL`
                                     truncateReg w w dst
                                  )
-    CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
+    CmmMachOp (MO_Shl w) [x, CmmLit (CmmInt n _)] | w == W64, 0 <= n, n < 64 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst ->
                                     code_x `snocOL`
@@ -728,7 +728,7 @@ getRegister' config plat expr =
                                     truncateReg w w dst
                                  )
 
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | fitsIn12bitImm n -> do
+    CmmMachOp (MO_S_Shr w) [x, CmmLit (CmmInt n _)] | fitsIn12bitImm n -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_x', code_x') <- signExtendReg (formatToWidth format_x) w reg_x
       return $ Any (intFormat w) (
@@ -744,30 +744,30 @@ getRegister' config plat expr =
           code_x `appOL` code_x' `appOL` code_y `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
         )
 
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+    CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)] | w == W8, 0 <= n, n < 8 -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
+    CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)] | w == W16, 0 <= n, n < 16 -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
     CmmMachOp (MO_U_Shr w) [x, y] | w == W8 || w == W16 -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
+    CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
+    CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)] | w == W64, 0 <= n, n < 64 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
+    CmmMachOp (MO_And w) [CmmReg reg, CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
+    CmmMachOp (MO_Or w) [CmmReg reg, CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORI (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
@@ -934,9 +934,7 @@ getRegister' config plat expr =
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (LSR d x y))
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ annExpr expr (ASR d x y))
 
-        -- TODO
-
-        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> (pdoc plat expr)
+        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
     CmmMachOp _op _xs
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
@@ -1233,12 +1231,12 @@ genCondJump bid expr = do
       -- Optimized == 0 case.
       CmmMachOp (MO_Eq w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
-        return $ code_x `snocOL` (annExpr expr (CBZ (OpReg w reg_x) (TBlock bid)))
+        return $ code_x `snocOL` annExpr expr (CBZ (OpReg w reg_x) (TBlock bid))
 
       -- Optimized /= 0 case.
       CmmMachOp (MO_Ne w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
-        return $ code_x `snocOL`  (annExpr expr (CBNZ (OpReg w reg_x) (TBlock bid)))
+        return $ code_x `snocOL`  annExpr expr (CBNZ (OpReg w reg_x) (TBlock bid))
 
       -- Generic case.
       CmmMachOp mop [x, y] -> do
@@ -1480,11 +1478,11 @@ genCCall target dest_regs arg_regs bid = do
                                , POP_STACK_FRAME
                                , DELTA 0 ]
 
-      let code =    call_target_code          -- compute the label (possibly into a register)
+      let code = call_target_code          -- compute the label (possibly into a register)
             `appOL` moveStackDown (stackSpace `div` 8)
-            `appOL` passArgumentsCode         -- put the arguments into x0, ...
-            `appOL` (unitOL $ BL call_target passRegs returnRegs) -- branch and link.
-            `appOL` readResultsCode           -- parse the results into registers
+            `appOL` passArgumentsCode      -- put the arguments into x0, ...
+            `snocOL` BL call_target passRegs returnRegs -- branch and link.
+            `appOL` readResultsCode        -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
 
@@ -1755,7 +1753,7 @@ genCCall target dest_regs arg_regs bid = do
              COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r) `consOL`
                        signExtend w W64 r gpReg
 
-            else toOL[COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r)
+            else toOL [COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r)
                      , MOV (OpReg w gpReg) (OpReg w r)]
           accumCode' = accumCode `appOL`
                        code_r `appOL`

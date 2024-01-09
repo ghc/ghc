@@ -699,7 +699,7 @@ pprInstr platform instr = case instr of
 
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
-  instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ (instrCon instr)
+  instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
