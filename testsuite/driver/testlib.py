@@ -2676,6 +2676,8 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     # clang may warn about unused argument when used as assembler
     s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
+    # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
+    s = re.sub('cache:INFO: .*\n', '', s)
 
     return s
 

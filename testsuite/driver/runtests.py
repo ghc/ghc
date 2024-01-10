@@ -47,6 +47,11 @@ ghc_env['TERM'] = 'vt100'
 # Ensure that GHC doesn't go looking for environment files. See #21365.
 ghc_env['GHC_ENVIRONMENT'] = "-"
 
+# Ensure that EMCC doesn't output cache info
+# (cf https://github.com/emscripten-core/emscripten/issues/18607)
+os.environ['EMCC_LOGGING'] = '0'
+ghc_env['EMCC_LOGGING'] = '0'
+
 global config
 config = getConfig() # get it from testglobals
 config.validate()
