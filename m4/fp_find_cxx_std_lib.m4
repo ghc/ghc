@@ -26,7 +26,7 @@ unknown
 #endif
 EOF
         AC_MSG_CHECKING([C++ standard library flavour])
-        if ! "$CXX" -E actest.cpp -o actest.out; then
+        if ! eval "$CXX" -E actest.cpp -o actest.out; then
             rm -f actest.cpp actest.out
             AC_MSG_ERROR([Failed to compile test program])
         fi
@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 EOF
-        if ! "$CXX" -c actest.cpp; then
+        if ! eval "$CXX" -c actest.cpp; then
             AC_MSG_ERROR([Failed to compile test object])
         fi
 
@@ -102,4 +102,3 @@ EOF
     AC_SUBST([CXX_STD_LIB_LIB_DIRS])
     AC_SUBST([CXX_STD_LIB_DYN_LIB_DIRS])
 ])
-
