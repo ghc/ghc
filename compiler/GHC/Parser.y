@@ -3943,9 +3943,40 @@ literal :: { Located (HsLit GhcPs) }
 -----------------------------------------------------------------------------
 -- Layout
 
+{- Note [Layout and error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Haskell 2010 report (Section 10.3, Note 5) dictates the use of the error
+token in `close`. To recall why that is necessary, consider
+
+  f x = case x of
+    True -> False
+    where y = x+1
+
+The virtual pass L inserts vocurly, semi, vccurly to return a laid-out
+token stream. It must insert a vccurly before `where` to close the layout
+block introduced by `of`.
+But there is no good way to do so other than L becoming aware of the grammar!
+Thus, L is specified to detect the ensuing parse error (implemented via
+happy's `error` token) and then insert the vccurly.
+Thus in effect, L is distributed between Lexer.x and Parser.y.
+
+There are a bunch of other, less "tricky" examples:
+
+  let x = x {- vccurly -} in x   -- could just track bracketing of
+                                 -- let..in on layout stack to fix
+  (case x of
+   True -> False {- vccurly -})  -- ditto for surrounding delimiters such as ()
+
+  data T = T;{- vccurly -}       -- Need insert vccurly at EOF
+
+Many of these are not that hard to fix, but still tedious and prone to break
+when the grammar changes; but the `of`/`where` example is especially gnarly,
+because it demonstrates a grammatical interaction between two lexically
+unrelated tokens.
+-}
 close :: { () }
         : vccurly               { () } -- context popped in lexer.
-        | error                 {% popContext }
+        | error                 {% popContext } -- See Note [Layout and error]
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
