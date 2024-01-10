@@ -395,7 +395,10 @@ instance Ppr Dec where
 ppr_dec :: Bool     -- ^ declaration on the toplevel?
         -> Dec
         -> Doc
-ppr_dec _ (FunD f cs)   = vcat $ map (\c -> pprPrefixOcc f <+> ppr c) cs
+ppr_dec isTop (FunD f cs)   = layout $ map (\c -> pprPrefixOcc f <+> ppr c) cs
+  where
+    layout :: [Doc] -> Doc
+    layout = if isTop then vcat else semiSepWith id
 ppr_dec _ (ValD p r ds) = ppr p <+> pprBody True r
                           $$ where_clause ds
 ppr_dec _ (TySynD t xs rhs)
