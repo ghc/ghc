@@ -647,29 +647,31 @@ getRegister' config plat expr =
                 NEG (OpReg w' dst) (OpReg w' reg') `appOL`
                 truncateReg w' w dst
 
-        ss_conv from to reg code | from == to =
-          pure $ Any (intFormat from) $ \dst ->
-            code `snocOL` (MOV (OpReg from dst) (OpReg from reg))
-        ss_conv from to reg code | from < to = do
-          pure $ Any (intFormat to) $ \dst ->
-            code
-            `appOL` signExtend from to reg dst
-            `appOL` truncateReg from to dst
-        ss_conv from to reg code | from > to =
-          pure $ Any (intFormat to) $ \dst ->
-            code
-              `appOL` toOL
-                [ ann
-                    (text "MO_SS_Conv: narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
-                    (LSL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
-                  -- signed right shift
-                  ASR (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
-                ]
-              `appOL` truncateReg from to dst
-                  where
-                    shift = 64 - (widthInBits from - widthInBits to)
+        ss_conv from to reg code
+          | from < to = do
+              pure $ Any (intFormat to) $ \dst ->
+                code
+                  `appOL` signExtend from to reg dst
+                  `appOL` truncateReg from to dst
+          | from > to =
+              pure $ Any (intFormat to) $ \dst ->
+                code
+                  `appOL` toOL
+                    [ ann
+                        (text "MO_SS_Conv: narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
+                        (LSL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
+                      -- signed right shift
+                      ASR (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
+                    ]
+                  `appOL` truncateReg from to dst
+          | otherwise =
+              -- No conversion necessary: Just copy.
+              pure $ Any (intFormat from) $ \dst ->
+                code `snocOL` MOV (OpReg from dst) (OpReg from reg)
+          where
+            shift = 64 - (widthInBits from - widthInBits to)
 
-    -- Dyadic machops:
+-- Dyadic machops:
     --
     -- The general idea is:
     -- compute x<i> <- x
