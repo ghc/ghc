@@ -297,7 +297,7 @@ ghcWithInterpreter = do
                           , "darwin", "kfreebsdgnu" ]
     goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc"
                               , "arm", "aarch64", "s390x"
-                              , "powerpc64", "powerpc64le" ]
+                              , "powerpc64", "powerpc64le", "riscv64" ]
     return $ goodOs && goodArch
 
 -- | Variants of the ARM architecture.
