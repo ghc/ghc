@@ -35,6 +35,11 @@ completeMatchAppliesAtType ty cm = all @Maybe ty_matches (cmResultTyCon cm)
     ty_matches sig_tc
       | Just (tc, _arg_tys) <- splitTyConApp_maybe ty
       , tc == sig_tc
+      || sig_tc `is_family_ty_con_of` tc
+         -- #24326: sig_tc might be the data Family TyCon of the representation
+         --         TyCon tc -- this CompleteMatch still applies
       = True
       | otherwise
       = False
+    fam_tc `is_family_ty_con_of` repr_tc =
+      (fst <$> tyConFamInst_maybe repr_tc) == Just fam_tc
