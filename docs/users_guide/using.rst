@@ -1737,6 +1737,8 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
+    :default: off by default, except for Aarch64 where it's on by default.
+
     :since: 9.8.1
 
     Use native FMA instructions to implement the fused multiply-add floating-point

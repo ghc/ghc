@@ -694,7 +694,8 @@ defaultDynFlags mySettings =
         avx512er = False,
         avx512f = False,
         avx512pf = False,
-        fma = False,
+        -- Use FMA by default on AArch64
+        fma = (platformArch . sTargetPlatform $ mySettings) == ArchAArch64,
         rtldInfo = panic "defaultDynFlags: no rtldInfo",
         rtccInfo = panic "defaultDynFlags: no rtccInfo",
         rtasmInfo = panic "defaultDynFlags: no rtasmInfo",
