@@ -1369,6 +1369,10 @@ deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 --
 -- It's often preferable to use @Data.List.NonEmpty.@'Data.List.NonEmpty.group',
 -- which provides type-level guarantees of non-emptiness of inner lists.
+-- A common idiom to squash repeating elements 'map' 'head' '.' 'group'
+-- is better served by
+-- 'map' @Data.List.NonEmpty.@'Data.List.NonEmpty.head' '.' @Data.List.NonEmpty.@'Data.List.NonEmpty.group'
+-- because it avoids partial functions.
 --
 -- ==== __Examples__
 --
