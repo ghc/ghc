@@ -69,6 +69,12 @@ infix  4 `elem`, `notElem`
 
 -- | \(\mathcal{O}(1)\). Extract the first element of a list, which must be non-empty.
 --
+-- To disable the warning about partiality put @{-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}@
+-- at the top of the file. To disable it throughout a package put the same
+-- options into @ghc-options@ section of Cabal file. To disable it in GHCi
+-- put @:set -Wno-x-partial -Wno-unrecognised-warning-flags@ into @~/.ghci@ config file.
+-- See also the [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/warning-for-head-and-tail.md).
+--
 -- ===== __Examples__
 --
 -- >>> head [1, 2, 3]
@@ -84,7 +90,7 @@ head (x:_)              =  x
 head []                 =  badHead
 {-# NOINLINE [1] head #-}
 
-{-# WARNING in "x-partial" head "This is a partial function, it throws an error on empty lists. Use pattern matching or Data.List.uncons instead. Consider refactoring to use Data.List.NonEmpty." #-}
+{-# WARNING in "x-partial" head "This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
 
 badHead :: HasCallStack => a
 badHead = errorEmptyList "head"
@@ -164,6 +170,12 @@ unsnoc = foldr (\x -> Just . maybe ([], x) (\(~(a, b)) -> (x : a, b))) Nothing
 -- | \(\mathcal{O}(1)\). Extract the elements after the head of a list, which
 -- must be non-empty.
 --
+-- To disable the warning about partiality put @{-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}@
+-- at the top of the file. To disable it throughout a package put the same
+-- options into @ghc-options@ section of Cabal file. To disable it in GHCi
+-- put @:set -Wno-x-partial -Wno-unrecognised-warning-flags@ into @~/.ghci@ config file.
+-- See also the [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/warning-for-head-and-tail.md).
+--
 -- ==== __Examples__
 --
 -- >>> tail [1, 2, 3]
@@ -178,7 +190,7 @@ tail                    :: HasCallStack => [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
-{-# WARNING in "x-partial" tail "This is a partial function, it throws an error on empty lists. Replace it with drop 1, or use pattern matching or Data.List.uncons instead. Consider refactoring to use Data.List.NonEmpty." #-}
+{-# WARNING in "x-partial" tail "This is a partial function, it throws an error on empty lists. Replace it with 'drop' 1, or use pattern matching or 'Data.List.uncons' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
 
 -- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
 -- finite and non-empty.
