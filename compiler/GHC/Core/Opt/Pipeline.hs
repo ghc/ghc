@@ -463,11 +463,16 @@ doCorePass pass guts = do
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
+  -- Important to force this now as name_ppr_ctx lives through an entire phase in
+  -- the optimiser and if it's not forced then the entire previous `ModGuts` will
+  -- be retained until the end of the phase. (See #24328 for more analysis)
+  let !rdr_env = mg_rdr_env guts
   let name_ppr_ctx =
         mkNamePprCtx
           (initPromotionTickContext dflags)
           (hsc_unit_env hsc_env)
-          (mg_rdr_env guts)
+          rdr_env
+
 
   case pass of
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
