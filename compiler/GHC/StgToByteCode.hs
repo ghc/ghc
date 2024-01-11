@@ -86,7 +86,6 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified GHC.Data.FiniteMap as Map
 import Data.Ord
-import GHC.Stack.CCS
 import Data.Either ( partitionEithers )
 
 import GHC.Stg.Syntax
@@ -391,8 +390,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs mod) rhs) = do
   current_mod_breaks <- getCurrentModBreaks
   case break_info hsc_env mod current_mod current_mod_breaks of
     Nothing -> pure code
-    Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr} -> do
-      cc_arr <- getCCArray
+    Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr, modBreaks_ccs = cc_arr} -> do
       platform <- profilePlatform <$> getProfile
       let idOffSets = getVarOffSets platform d p fvs
           ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -2259,12 +2257,6 @@ getLabelsBc :: Word32 -> BcM [LocalLabel]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
                  in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
-
-getCCArray :: BcM (Array BreakIndex (RemotePtr CostCentre))
-getCCArray = BcM $ \st ->
-  let breaks = expectJust "GHC.StgToByteCode.getCCArray" $ modBreaks st in
-  return (st, modBreaks_ccs breaks)
-
 
 newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
 newBreakInfo ix info = BcM $ \st ->
