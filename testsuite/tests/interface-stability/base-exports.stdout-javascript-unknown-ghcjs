@@ -14322,6 +14322,7 @@ instance GHC.Exception.Type.Exception GHC.IO.Exception.FixIOException -- Defined
 instance GHC.Exception.Type.Exception GHC.IO.Exception.IOException -- Defined in ‘GHC.IO.Exception’
 instance GHC.Exception.Type.Exception GHC.IO.Exception.SomeAsyncException -- Defined in ‘GHC.IO.Exception’
 instance GHC.Exception.Type.Exception GHC.Exception.Type.ArithException -- Defined in ‘GHC.Exception.Type’
+instance forall a b. (GHC.Exception.Type.Exception a, GHC.Exception.Type.Exception b) => GHC.Exception.Type.Exception (Data.Either.Either a b) -- Defined in ‘GHC.Exception.Type’
 instance GHC.Exception.Type.Exception GHC.Exception.Type.SomeException -- Defined in ‘GHC.Exception.Type’
 instance GHC.Exception.Type.Exception GHC.Base.Void -- Defined in ‘GHC.Exception.Type’
 instance GHC.Exception.Type.Exception GHC.Exception.ErrorCall -- Defined in ‘GHC.Exception’

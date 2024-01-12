@@ -30,6 +30,7 @@ module GHC.Exception.Type
        , underflowException
        ) where
 
+import Data.Either (Either(..), either)
 import Data.Maybe
 import Data.Typeable (Typeable, cast)
    -- loop: Data.Typeable -> GHC.Err -> GHC.Exception
@@ -150,6 +151,11 @@ class (Typeable e, Show e) => Exception e where
 
 -- | @since 4.8.0.0
 instance Exception Void
+
+-- | @since 4.20.0.0
+instance (Exception a, Exception b) => Exception (Either a b) where
+  toException = either toException toException
+  fromException e = fmap Left (fromException e) <|> fmap Right (fromException e)
 
 -- | @since 3.0
 instance Exception SomeException where
