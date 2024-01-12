@@ -171,3 +171,11 @@ deriving instance Num (f (g a)) => Num (Compose f g a)
 deriving instance Real (f (g a)) => Real (Compose f g a)
 -- | @since 4.19.0.0
 deriving instance Integral (f (g a)) => Integral (Compose f g a)
+-- | @since 4.20.0.0
+deriving instance Fractional (f (g a)) => Fractional (Compose f g a)
+-- | @since 4.20.0.0
+deriving instance RealFrac (f (g a)) => RealFrac (Compose f g a)
+-- | @since 4.20.0.0
+deriving instance Floating (f (g a)) => Floating (Compose f g a)
+-- | @since 4.20.0.0
+deriving instance RealFloat (f (g a)) => RealFloat (Compose f g a)

@@ -33,6 +33,8 @@
 
     ([CLC proposal #104](https://github.com/haskell/core-libraries-committee/issues/104))
 
+  * Add more instances for `Compose`: `Fractional`, `RealFrac`, `Floating`, `RealFloat` ([CLC proposal #226](https://github.com/haskell/core-libraries-committee/issues/226))
+
 ## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.

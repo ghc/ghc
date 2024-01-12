@@ -14342,12 +14342,14 @@ instance GHC.Exception.Type.Exception GHC.JS.Prim.WouldBlockException -- Defined
 instance [safe] GHC.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance forall a k (b :: k). GHC.Float.Floating a => GHC.Float.Floating (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall a. GHC.Float.RealFloat a => GHC.Float.Floating (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
+instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Float.Floating (f (g a)) => GHC.Float.Floating (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Float.Floating a => GHC.Float.Floating (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Float.Floating a => GHC.Float.Floating (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
 instance forall a. GHC.Float.Floating a => GHC.Float.Floating (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Float.Floating GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Float.Floating GHC.Types.Float -- Defined in ‘GHC.Float’
 instance forall a k (b :: k). GHC.Float.RealFloat a => GHC.Float.RealFloat (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
+instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Float.RealFloat (f (g a)) => GHC.Float.RealFloat (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Float.RealFloat a => GHC.Float.RealFloat (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
 instance forall a. GHC.Float.RealFloat a => GHC.Float.RealFloat (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Float.RealFloat GHC.Types.Double -- Defined in ‘GHC.Float’
@@ -14686,6 +14688,7 @@ instance GHC.Read.Read GHC.TypeNats.SomeNat -- Defined in ‘GHC.TypeNats’
 instance forall a k (b :: k). GHC.Real.Fractional a => GHC.Real.Fractional (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall a. GHC.Float.RealFloat a => GHC.Real.Fractional (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Real.Fractional (f (g a)) => GHC.Real.Fractional (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Real.Fractional a => GHC.Real.Fractional (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Real.Fractional a => GHC.Real.Fractional (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
 instance forall a. GHC.Real.Fractional a => GHC.Real.Fractional (Data.Ord.Down a) -- Defined in ‘Data.Ord’
@@ -14733,6 +14736,7 @@ instance GHC.Real.Real GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Real.Real GHC.Types.Float -- Defined in ‘GHC.Float’
 instance forall a k (b :: k). GHC.Real.RealFrac a => GHC.Real.RealFrac (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Real.RealFrac (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Real.RealFrac (f (g a)) => GHC.Real.RealFrac (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Real.RealFrac a => GHC.Real.RealFrac (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
 instance forall a. GHC.Real.RealFrac a => GHC.Real.RealFrac (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Real.Integral a => GHC.Real.RealFrac (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
