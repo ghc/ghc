@@ -57,3 +57,6 @@ test('T22106_D', [extra_files(['T22106_aux.hs'])], multimod_compile, ['T22106_D'
 test('T22424', req_th, compile, ['-this-unit-id="me"'])
 test('T23279', [extra_files(['T23279_aux.hs'])], multimod_compile, ['T23279', '-v0'])
 test('T23557', [extra_files(['T23557_aux.hs'])], multimod_compile, ['T23557', '-v0'])
+test('T24293', req_th, compile, [''])
+test('T24293b', req_th, compile, [''])
+test('T24293c', req_th, compile_fail, [''])
