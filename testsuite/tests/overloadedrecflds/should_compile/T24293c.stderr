@@ -1,0 +1,11 @@
+
+T24293c.hs:9:9: error: [GHC-87543]
+    • Ambiguous occurrence ‘hibou’.
+      It could refer to
+         either the field ‘hibou’ of record ‘Cheval’,
+                defined at T24293c.hs:6:24,
+             or the field ‘hibou’ of record ‘Agneau’,
+                defined at T24293c.hs:7:24.
+    • In the untyped splice:
+        $(do n <- lookupValueName "hibou"
+             pure $ LitE $ StringL $ show n)

@@ -1945,8 +1945,8 @@ lookupName :: Bool      -- True  <=> type namespace
                         -- False <=> value namespace
            -> String -> TcM (Maybe TH.Name)
 lookupName is_type_name s
-  = do { mb_nm <- lookupSameOccRn_maybe rdr_name
-       ; return (fmap reifyName mb_nm) }
+  = do { mb_nm <- lookupOccRn_maybe rdr_name
+       ; return (fmap (reifyName . greName) mb_nm) }
   where
     th_name = TH.mkName s       -- Parses M.x into a base of 'x' and a module of 'M'
 
@@ -1961,6 +1961,12 @@ lookupName is_type_name s
         | otherwise
         = if isLexCon occ_fs then mkDataOccFS occ_fs
                              else mkVarOccFS  occ_fs
+                               -- NB: when we pick the variable namespace, we
+                               -- might well obtain an identifier in a record
+                               -- field namespace, as lookupOccRn_maybe looks in
+                               -- record field namespaces when looking up variables.
+                               -- This ensures we can look up record fields using
+                               -- this function (#24293).
 
     rdr_name = case TH.nameModule th_name of
                  Nothing  -> mkRdrUnqual occ
