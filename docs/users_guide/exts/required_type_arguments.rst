@@ -281,8 +281,8 @@ to bind type variables::
   const :: a -> b -> a               -- implicit quantification
   const :: forall a b. a -> b -> a   -- explicit quantification
 
-Normally, implicit quantification is unaffected by term variables in scope:
-::
+Normally, implicit quantification is unaffected by term variables in scope: ::
+
   f a = ...  -- the LHS binds `a`
     where const :: a -> b -> a
              -- implicit quantification over `a` takes place

@@ -1046,7 +1046,7 @@ Checking for consistency
     :shortdesc: Enable several common internal sanity checkers
     :type: dynamic
 
-    :implies: -dcore-lint, -dstg-lint, -dcmm-lint, -dasm-lint, -fllvm-fill-undef-with-garbage, -debug
+    :implies: -dcore-lint, -dstg-lint, -dcmm-lint, -dasm-lint, -fllvm-fill-undef-with-garbage, -fcatch-nonexhaustive-cases, -debug
     :since: 9.4.1
 
     Turn on various heavy-weight intra-pass sanity-checking measures within GHC
