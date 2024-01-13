@@ -11,7 +11,7 @@ module GHC.Core.Utils (
         -- * Constructing expressions
         mkCast, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
-        bindNonRec, needsCaseBinding,
+        bindNonRec, needsCaseBinding, needsCaseBindingL,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
         -- * Taking expressions apart
@@ -513,14 +513,21 @@ bindNonRec bndr rhs body
     case_bind = mkDefaultCase rhs bndr body
     let_bind  = Let (NonRec bndr rhs) body
 
--- | Tests whether we have to use a @case@ rather than @let@ binding for this
--- expression as per the invariants of 'CoreExpr': see "GHC.Core#let_can_float_invariant"
-needsCaseBinding :: Type -> CoreExpr -> Bool
-needsCaseBinding ty rhs
-  = mightBeUnliftedType ty && not (exprOkForSpeculation rhs)
-        -- Make a case expression instead of a let
-        -- These can arise either from the desugarer,
-        -- or from beta reductions: (\x.e) (x +# y)
+-- | `needsCaseBinding` tests whether we have to use a @case@ rather than @let@
+-- binding for this expression as per the invariants of 'CoreExpr': see
+-- "GHC.Core#let_can_float_invariant"
+-- (needsCaseBinding ty rhs) requires that `ty` has a well-defined levity, else
+-- `typeLevity ty` will fail; but that should be the case because
+-- `needsCaseBinding` is only called once typechecking is complete
+needsCaseBinding :: HasDebugCallStack => Type -> CoreExpr -> Bool
+needsCaseBinding ty rhs = needsCaseBindingL (typeLevity ty) rhs
+
+needsCaseBindingL :: Levity -> CoreExpr -> Bool
+-- True <=> make a case expression instead of a let
+-- These can arise either from the desugarer,
+-- or from beta reductions: (\x.e) (x +# y)
+needsCaseBindingL Lifted   _rhs = False
+needsCaseBindingL Unlifted rhs = not (exprOkForSpeculation rhs)
 
 mkAltExpr :: AltCon     -- ^ Case alternative constructor
           -> [CoreBndr] -- ^ Things bound by the pattern match

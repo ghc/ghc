@@ -198,8 +198,10 @@ typeOneShots ty
   = go initRecTc ty
   where
     go rec_nts ty
-      | Just (_, ty')  <- splitForAllTyCoVar_maybe ty
-      = go rec_nts ty'
+      | Just (tcv, ty')  <- splitForAllTyCoVar_maybe ty
+      = if isCoVar tcv
+        then idOneShotInfo tcv : go rec_nts ty'
+        else go rec_nts ty'
 
       | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
