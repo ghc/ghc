@@ -256,7 +256,7 @@ Runtime system
 - The extensions fields of constructors of ``IE`` now take ``Maybe (WarningTxt p)``
   in ``GhcPs`` and ``GhcRn`` variants of the Syntax Tree.
   This represents the warning assigned to a certain export item,
-  which is used for :ref:`deprecated-exports`.
+  which is used for deprecated exports (see :ref:`warning-deprecated-pragma`).
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~

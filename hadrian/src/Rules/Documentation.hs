@@ -168,6 +168,12 @@ checkSphinxWarnings out = do
     when ("reference target not found" `isInfixOf` log)
       $ fail "Undefined reference targets found in Sphinx log."
 
+    when ("undefined label:" `isInfixOf` log)
+      $ fail "Undefined labels found in Sphinx log."
+
+    when ("ERROR:" `isInfixOf` log)
+      $ fail "Errors found in the Sphinx log."
+
 -- | Check that all GHC flags are documented in the users guide.
 checkUserGuideFlags :: FilePath -> Action ()
 checkUserGuideFlags documentedFlagList = do
