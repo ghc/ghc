@@ -822,7 +822,27 @@ special behaviour.  For example, this is /not/ fine:
     join j = ...
     in runRW# @r @ty (jump j)
 
+Note [Coercions in terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The expression (Type ty) can occur only as the argument of an application,
+or the RHS of a non-recursive Let.  But what about (Coercion co)?
 
+Currently it appears in ghc-prim:GHC.Types.coercible_sel, a WiredInId whose
+definition is:
+   coercible_sel :: Coercible a b => (a ~R# b)
+   coercible_sel d = case d of
+                         MkCoercibleDict (co :: a ~# b) -> Coercion co
+
+So this function has a (Coercion co) in the alternative of a case.
+
+Richard says (!11908): it shouldn't appear outside of arguments, but we've been
+loose about this. coercible_sel is some thin ice. Really we should be unpacking
+Coercible using case, not a selector. I recall looking into this a few years
+back and coming to the conclusion that the fix was worse than the disease. Don't
+remember the details, but could probably recover it if we want to revisit.
+
+So Lint current accepts (Coercion co) in arbitrary places.  There is no harm in
+that: it really is a value, albeit a zero-bit value.
 
 ************************************************************************
 *                                                                      *
@@ -996,6 +1016,7 @@ lintCoreExpr (Type ty)
   = failWithL (text "Type found as expression" <+> ppr ty)
 
 lintCoreExpr (Coercion co)
+  -- See Note [Coercions in terms]
   = do { co' <- addLoc (InCo co) $
                 lintCoercion co
        ; return (coercionType co', zeroUE) }
@@ -1438,6 +1459,8 @@ lintCoreArgs  :: (LintedType, UsageEnv) -> [CoreArg] -> LintM (LintedType, Usage
 lintCoreArgs (fun_ty, fun_ue) args = foldM lintCoreArg (fun_ty, fun_ue) args
 
 lintCoreArg  :: (LintedType, UsageEnv) -> CoreArg -> LintM (LintedType, UsageEnv)
+
+-- Type argument
 lintCoreArg (fun_ty, ue) (Type arg_ty)
   = do { checkL (not (isCoercionTy arg_ty))
                 (text "Unnecessary coercion-to-type injection:"
@@ -1446,6 +1469,14 @@ lintCoreArg (fun_ty, ue) (Type arg_ty)
        ; res <- lintTyApp fun_ty arg_ty'
        ; return (res, ue) }
 
+-- Coercion argument
+lintCoreArg (fun_ty, ue) (Coercion co)
+  = do { co' <- addLoc (InCo co) $
+                lintCoercion co
+       ; res <- lintCoApp fun_ty co'
+       ; return (res, ue) }
+
+-- Other value argument
 lintCoreArg (fun_ty, fun_ue) arg
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Representation polymorphism invariants] in GHC.Core
@@ -1510,7 +1541,7 @@ checkCaseLinearity ue case_bndr var_w bndr = do
 -----------------
 lintTyApp :: LintedType -> LintedType -> LintM LintedType
 lintTyApp fun_ty arg_ty
-  | Just (tv,body_ty) <- splitForAllTyCoVar_maybe fun_ty
+  | Just (tv,body_ty) <- splitForAllTyVar_maybe fun_ty
   = do  { lintTyKind tv arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
@@ -1522,11 +1553,34 @@ lintTyApp fun_ty arg_ty
   = failWithL (mkTyAppMsg fun_ty arg_ty)
 
 -----------------
+lintCoApp :: LintedType -> LintedCoercion -> LintM LintedType
+lintCoApp fun_ty co
+  | Just (cv,body_ty) <- splitForAllCoVar_maybe fun_ty
+  , let co_ty = coercionType co
+        cv_ty = idType cv
+  , cv_ty `eqType` co_ty
+  = do { in_scope <- getInScope
+       ; let init_subst = mkEmptySubst in_scope
+             subst = extendCvSubst init_subst cv co
+       ; return (substTy subst body_ty) }
+
+  | Just (_, _, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  , co_ty `eqType` arg_ty'
+  = return (res_ty')
+
+  | otherwise
+  = failWithL (mkCoAppMsg fun_ty co)
+
+  where
+    co_ty = coercionType co
+
+-----------------
 
 -- | @lintValApp arg fun_ty arg_ty@ lints an application of @fun arg@
 -- where @fun :: fun_ty@ and @arg :: arg_ty@, returning the type of the
 -- application.
-lintValApp :: CoreExpr -> LintedType -> LintedType -> UsageEnv -> UsageEnv -> LintM (LintedType, UsageEnv)
+lintValApp :: CoreExpr -> LintedType -> LintedType -> UsageEnv -> UsageEnv
+           -> LintM (LintedType, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
   | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
@@ -3627,10 +3681,18 @@ mkLetErr bndr rhs
 mkTyAppMsg :: Type -> Type -> SDoc
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
-              hang (text "Exp type:")
+              hang (text "Function type:")
                  4 (ppr ty <+> dcolon <+> ppr (typeKind ty)),
-              hang (text "Arg type:")
+              hang (text "Type argument:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
+
+mkCoAppMsg :: Type -> Coercion -> SDoc
+mkCoAppMsg fun_ty co
+  = vcat [ text "Illegal coercion application:"
+         , hang (text "Function type:")
+              4 (ppr fun_ty)
+         , hang (text "Coercion argument:")
+              4 (ppr co <+> dcolon <+> ppr (coercionType co))]
 
 emptyRec :: CoreExpr -> SDoc
 emptyRec e = hang (text "Empty Rec binding:") 2 (ppr e)

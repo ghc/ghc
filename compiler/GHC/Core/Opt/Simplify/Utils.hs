@@ -214,7 +214,7 @@ data SimplCont
 
 type StaticEnv = SimplEnv       -- Just the static part is relevant
 
-data FromWhat = FromLet | FromBeta OutType
+data FromWhat = FromLet | FromBeta Levity
 
 -- See Note [DupFlag invariants]
 data DupFlag = NoDup       -- Unsimplified, might be big

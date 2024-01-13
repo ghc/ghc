@@ -126,7 +126,7 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         sORTKind_maybe, typeTypeOrConstraint,
-        typeLevity_maybe, tyConIsTYPEorCONSTRAINT,
+        typeLevity, typeLevity_maybe, tyConIsTYPEorCONSTRAINT,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
         isBoxedRuntimeRep,
@@ -1417,7 +1417,7 @@ funResultTy ty
   | FunTy { ft_res = res } <- coreFullView ty = res
   | otherwise                                 = pprPanic "funResultTy" (ppr ty)
 
-funArgTy :: Type -> Type
+funArgTy :: HasDebugCallStack => Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty
   | FunTy { ft_arg = arg } <- coreFullView ty = arg
@@ -1471,8 +1471,9 @@ piResultTys ty orig_args@(arg:args)
   | FunTy { ft_res = res } <- ty
   = piResultTys res args
 
-  | ForAllTy (Bndr tv _) res <- ty
-  = go (extendTCvSubst init_subst tv arg) res args
+  | ForAllTy (Bndr tcv _) res <- ty
+  = -- Both type and coercion variables
+    go (extendTCvSubst init_subst tcv arg) res args
 
   | Just ty' <- coreView ty
   = piResultTys ty' orig_args
@@ -2291,6 +2292,11 @@ buildSynTyCon name binders res_kind roles rhs
 typeLevity_maybe :: HasDebugCallStack => Type -> Maybe Levity
 typeLevity_maybe ty = runtimeRepLevity_maybe (getRuntimeRep ty)
 
+typeLevity :: HasDebugCallStack => Type -> Levity
+typeLevity ty = case typeLevity_maybe ty of
+                   Just lev -> lev
+                   Nothing  -> pprPanic "typeLevity" (ppr ty)
+
 -- | Is the given type definitely unlifted?
 -- See "Type#type_classification" for what an unlifted type is.
 --
@@ -2647,18 +2653,20 @@ typeKind (AppTy fun arg)
     go fun             args = piResultTys (typeKind fun) args
 
 typeKind ty@(ForAllTy {})
-  = case occCheckExpand tvs body_kind of
-      -- We must make sure tv does not occur in kind
-      -- As it is already out of scope!
+  = assertPpr (not (null tcvs)) (ppr ty) $
+       -- If tcvs is empty somehow we'll get an infinite loop!
+    case occCheckExpand tcvs body_kind of
+      -- We must make sure tvs do not occur in kind,
+      -- as they would be out of scope!
       -- See Note [Phantom type variables in kinds]
       Nothing -> pprPanic "typeKind"
-                  (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
+                  (ppr ty $$ ppr tcvs $$ ppr body <+> dcolon <+> ppr body_kind)
 
-      Just k' | all isTyVar tvs -> k'                     -- Rule (FORALL1)
-              | otherwise       -> lifted_kind_from_body  -- Rule (FORALL2)
+      Just k' | all isTyVar tcvs -> k'                     -- Rule (FORALL1)
+              | otherwise        -> lifted_kind_from_body  -- Rule (FORALL2)
   where
-    (tvs, body) = splitForAllTyVars ty
-    body_kind   = typeKind body
+    (tcvs, body) = splitForAllTyCoVars ty  -- Important: splits both TyVar and CoVar binders
+    body_kind    = typeKind body
 
     lifted_kind_from_body  -- Implements (FORALL2)
       = case sORTKind_maybe body_kind of

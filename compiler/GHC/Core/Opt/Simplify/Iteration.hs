@@ -20,7 +20,7 @@ import GHC.Driver.Flags
 import GHC.Core
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
-import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
+import GHC.Core.Type hiding ( substTy, substCo, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
@@ -1551,8 +1551,8 @@ completeBindX :: SimplEnv
               -> SimplCont         -- Consumed by this continuation
               -> SimplM (SimplFloats, OutExpr)
 completeBindX env from_what bndr rhs body cont
-  | FromBeta arg_ty <- from_what
-  , needsCaseBinding arg_ty rhs -- Enforcing the let-can-float-invariant
+  | FromBeta arg_levity <- from_what
+  , needsCaseBindingL arg_levity rhs -- Enforcing the let-can-float-invariant
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
@@ -1753,26 +1753,47 @@ simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
        ; simplLam (extendTvSubst env bndr arg_ty) body cont }
 
+-- Coercion beta-reduction
+simpl_lam env bndr body (ApplyToVal { sc_arg = Coercion arg_co, sc_env = arg_se
+                                    , sc_cont = cont })
+  = assertPpr (isCoVar bndr) (ppr bndr) $
+    do { tick (BetaReduction bndr)
+       ; let arg_co' = substCo (arg_se `setInScopeFromE` env) arg_co
+       ; simplLam (extendCvSubst env bndr arg_co') body cont }
+
 -- Value beta-reduction
+-- This works for /coercion/ lambdas too
 simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                                     , sc_cont = cont, sc_dup = dup
                                     , sc_hole_ty = fun_ty})
   = do { tick (BetaReduction bndr)
-       ; let arg_ty = funArgTy fun_ty
+       ; let from_what = FromBeta arg_levity
+             arg_levity
+               | isForAllTy fun_ty = assertPpr (isCoVar bndr) (ppr bndr) Unlifted
+               | otherwise         = typeLevity (funArgTy fun_ty)
+             -- Example:  (\(cv::a ~# b). blah) co
+             -- The type of (\cv.blah) can be (forall cv. ty); see GHC.Core.Utils.mkLamType
+
+             -- Using fun_ty: see Note [Dark corner with representation polymorphism]
+             -- e.g  (\r \(a::TYPE r) \(x::a). blah) @LiftedRep @Int arg
+             --      When we come to `x=arg` we must choose lazy/strict correctly
+             --      It's wrong to err in either direction
+             --      But fun_ty is an OutType, so is fully substituted
+
        ; if | isSimplified dup  -- Don't re-simplify if we've simplified it once
                                 -- Including don't preInlineUnconditionally
                                 -- See Note [Avoiding exponential behaviour]
-            -> completeBindX env (FromBeta arg_ty) bndr arg body cont
+            -> completeBindX env from_what bndr arg body cont
 
             | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
-            , not (needsCaseBinding arg_ty arg)
+            , not (needsCaseBindingL arg_levity arg)
               -- Ok to test arg::InExpr in needsCaseBinding because
               -- exprOkForSpeculation is stable under simplification
             -> do { tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
             | otherwise
-            -> simplNonRecE env (FromBeta arg_ty) bndr (arg, arg_se) body cont }
+            -> simplNonRecE env from_what bndr (arg, arg_se) body cont }
 
 -- Discard a non-counting tick on a lambda.  This may change the
 -- cost attribution slightly (moving the allocation of the
@@ -1846,15 +1867,12 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
 
   where
     is_strict_bind = case from_what of
-       FromBeta arg_ty | isUnliftedType arg_ty -> True
-         -- If we are coming from a beta-reduction (FromBeta) we must
-         -- establish the let-can-float invariant, so go via StrictBind
-         -- If not, the invariant holds already, and it's optional.
-         -- Using arg_ty: see Note [Dark corner with representation polymorphism]
-         -- e.g  (\r \(a::TYPE r) \(x::a). blah) @LiftedRep @Int arg
-         --      When we come to `x=arg` we myst choose lazy/strict correctly
-         --      It's wrong to err in either directly
+       FromBeta Unlifted -> True
+       -- If we are coming from a beta-reduction (FromBeta) we must
+       -- establish the let-can-float invariant, so go via StrictBind
+       -- If not, the invariant holds already, and it's optional.
 
+       -- (FromBeta Lifted) or FromLet: look at the demand info
        _ -> seCaseCase env && isStrUsedDmd (idDemandInfo bndr)
 
 
