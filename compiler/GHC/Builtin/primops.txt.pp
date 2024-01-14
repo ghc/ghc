@@ -2882,9 +2882,9 @@ section "Continuations"
     'control0#' will fail by raising an exception. However, such violations
     are only detected on a best-effort basis, as the bookkeeping necessary for
     detecting /all/ illegal uses of 'control0#' would have significant overhead.
-    Therefore, although the operations are “safe” from the runtime’s point of
+    Therefore, although the operations are "safe" from the runtime's point of
     view (e.g. they will not compromise memory safety or clobber internal runtime
-    state), it is still ultimately the programmer’s responsibility to ensure
+    state), it is still ultimately the programmer's responsibility to ensure
     these invariants hold to guarantee predictable program behavior.
 
     In a similar vein, since each captured continuation includes the full local
@@ -2896,13 +2896,13 @@ section "Continuations"
     finish reading it when it is resumed; further attempts to resume from the
     same place would then fail because the file handle was already closed.
 
-    In other words, although the RTS ensures that a computation’s control state
+    In other words, although the RTS ensures that a computation's control state
     and local variables are properly restored for each distinct resumption of
     a continuation, it makes no attempt to duplicate any local state the
     computation may have been using (and could not possibly do so in general).
     Furthermore, it provides no mechanism for an arbitrary computation to
     protect itself against unwanted reentrancy (i.e. there is no analogue to
-    Scheme’s @dynamic-wind@). For those reasons, manipulating the continuation
+    Scheme's @dynamic-wind@). For those reasons, manipulating the continuation
     is only safe if the caller can be certain that doing so will not violate any
     expectations or invariants of the enclosing computation. }
 ------------------------------------------------------------------------
