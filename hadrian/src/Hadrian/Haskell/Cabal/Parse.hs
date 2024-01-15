@@ -194,11 +194,10 @@ copyPackage context@Context {..} = do
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
--- | Increase by 1 by because 'simpleUserHooks' calls 'lessVerbose'
 shakeVerbosityToCabalFlag :: Verbosity -> String
 shakeVerbosityToCabalFlag = \case
-    Diagnostic -> "-v3"
-    Verbose -> "-v2"
+    Diagnostic -> "-v2"
+    Verbose -> "-v1"
     -- Normal levels should not produce output to stdout
     Silent -> "-v0"
     _ -> "-v1"
