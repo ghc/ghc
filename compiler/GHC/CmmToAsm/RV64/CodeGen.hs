@@ -1252,21 +1252,8 @@ genCondJump bid expr = do
               (reg_y, format_y, code_y) <- getSomeReg y
               let x' = OpReg w reg_x
                   y' = OpReg w reg_y
-              -- TODO: Reduce duplication in this block.
               return $ case w of
-                W8 ->
-                  code_x
-                    `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
-                    `appOL` code_y
-                    `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
-                    `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
-                W16 ->
-                  code_x
-                    `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
-                    `appOL` code_y
-                    `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
-                    `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
-                W32 ->
+                w | w `elem` [W8, W16, W32] ->
                   code_x
                     `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
                     `appOL` code_y
