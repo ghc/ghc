@@ -4,7 +4,7 @@ setTestOpts(js_skip) # JS backend doesn't support profiling yet
 
 test('heapprof002',
      [extra_files(['heapprof001.hs']),
-      ignore_extension,
+      when(not(wasm_arch()),ignore_extension),
       pre_cmd('cp heapprof001.hs heapprof002.hs'), extra_ways(['normal_h']),
       extra_run_opts('7')],
      compile_and_run, [''])

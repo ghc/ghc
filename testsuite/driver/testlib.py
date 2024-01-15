@@ -824,6 +824,9 @@ def cygwin( ) -> bool:
 def js_arch() -> bool:
     return arch("javascript");
 
+def wasm_arch() -> bool:
+    return arch("wasm32")
+
 def have_vanilla( ) -> bool:
     return config.have_vanilla
 
