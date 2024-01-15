@@ -40,5 +40,5 @@ rnHsDocIdentifiers :: GlobalRdrEnv
 rnHsDocIdentifiers gre_env ns =
   [ L l $ greName gre
   | L l rdr_name <- ns
-  , gre <- lookupGRE gre_env (LookupOccName (rdrNameOcc rdr_name) AllRelevantGREs)
+  , gre <- lookupGRE gre_env (LookupRdrName rdr_name AllRelevantGREs)
   ]
