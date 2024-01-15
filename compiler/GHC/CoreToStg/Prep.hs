@@ -1983,8 +1983,12 @@ zipManyFloats :: [Floats] -> Floats
 zipManyFloats = foldr zipFloats emptyFloats
 
 mkNonRecFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
-mkNonRecFloat env dmd is_unlifted bndr rhs = -- pprTraceWith "mkNonRecFloat" ppr $
-  Float (NonRec bndr' rhs) bound info
+mkNonRecFloat env dmd is_unlifted bndr rhs
+  = -- pprTrace "mkNonRecFloat" (ppr bndr <+> ppr (bound,info)
+    --                             <+> ppr is_lifted <+> ppr is_strict
+    --                             <+> ppr ok_for_spec
+    --                           $$ ppr rhs) $
+    Float (NonRec bndr' rhs) bound info
   where
     bndr' = setIdDemandInfo bndr dmd -- See Note [Pin demand info on floats]
     (bound,info)
