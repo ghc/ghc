@@ -274,6 +274,7 @@ data DoHeapProfile
     | HeapByLDV
     | HeapByClosureType
     | HeapByInfoTable
+    | HeapByEra -- ^ @since base-4.20.0.0
     deriving ( Show -- ^ @since base-4.8.0.0
              , Generic -- ^ @since base-4.15.0.0
              )
@@ -289,6 +290,7 @@ instance Enum DoHeapProfile where
     fromEnum HeapByLDV         = #{const HEAP_BY_LDV}
     fromEnum HeapByClosureType = #{const HEAP_BY_CLOSURE_TYPE}
     fromEnum HeapByInfoTable   = #{const HEAP_BY_INFO_TABLE}
+    fromEnum HeapByEra         = #{const HEAP_BY_ERA}
 
     toEnum #{const NO_HEAP_PROFILING}    = NoHeapProfiling
     toEnum #{const HEAP_BY_CCS}          = HeapByCCS
@@ -299,6 +301,7 @@ instance Enum DoHeapProfile where
     toEnum #{const HEAP_BY_LDV}          = HeapByLDV
     toEnum #{const HEAP_BY_CLOSURE_TYPE} = HeapByClosureType
     toEnum #{const HEAP_BY_INFO_TABLE}   = HeapByInfoTable
+    toEnum #{const HEAP_BY_ERA}          = HeapByEra
     toEnum e = errorWithoutStackTrace ("invalid enum for DoHeapProfile: " ++ show e)
 
 -- | Parameters of the cost-center profiler
@@ -311,6 +314,7 @@ data ProfFlags = ProfFlags
     , startHeapProfileAtStartup :: Bool
     , startTimeProfileAtStartup :: Bool   -- ^ @since base-4.20.0.0
     , showCCSOnException       :: Bool
+    , automaticEraIncrement    :: Bool   -- ^ @since 4.20.0.0
     , maxRetainerSetSize       :: Word
     , ccsLength                :: Word
     , modSelector              :: Maybe String
@@ -320,6 +324,7 @@ data ProfFlags = ProfFlags
     , ccsSelector              :: Maybe String
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
+    , eraSelector              :: Word -- ^ @since base-4.20.0.0
     } deriving ( Show -- ^ @since base-4.8.0.0
                , Generic -- ^ @since base-4.15.0.0
                )
@@ -633,6 +638,8 @@ getProfFlags = do
                   (#{peek PROFILING_FLAGS, startTimeProfileAtStartup} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek PROFILING_FLAGS, showCCSOnException} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek PROFILING_FLAGS, incrementUserEra} ptr :: IO CBool))
             <*> #{peek PROFILING_FLAGS, maxRetainerSetSize} ptr
             <*> #{peek PROFILING_FLAGS, ccsLength} ptr
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, modSelector} ptr)
@@ -642,6 +649,7 @@ getProfFlags = do
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, ccsSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, retainerSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, bioSelector} ptr)
+            <*> #{peek PROFILING_FLAGS, eraSelector} ptr
 
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
