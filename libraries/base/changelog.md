@@ -5,6 +5,8 @@
   * Add `permutations` and `permutations1` to `Data.List.NonEmpty` ([CLC proposal #68](https://github.com/haskell/core-libraries-committee/issues/68))
   * Add a `RULE` to `Prelude.lookup`, allowing it to participate in list fusion ([CLC proposal #175](https://github.com/haskell/core-libraries-committee/issues/175))
   * Implement `stimes` for `instance Semigroup (Endo a)` explicitly ([CLC proposal #4](https://github.com/haskell/core-libraries-committee/issues/4))
+  * Add `startTimeProfileAtStartup` to `GHC.RTS.Flags` to expose new RTS flag
+    `--no-automatic-heap-samples` in the Haskell API ([CLC proposal #243](https://github.com/haskell/core-libraries-committee/issues/243)).
   * Add laws relating between `Foldable` / `Traversable` with `Bifoldable` / `Bitraversable` ([CLC proposal #205](https://github.com/haskell/core-libraries-committee/issues/205))
   * The `Enum Int64` and `Enum Word64` instances now use native operations on 32-bit platforms, increasing performance by up to 1.5x on i386 and up to 5.6x with the JavaScript backend. ([CLC proposal #187](https://github.com/haskell/core-libraries-committee/issues/187))
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
