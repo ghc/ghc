@@ -240,14 +240,14 @@ mkLocatedList ms = case nonEmpty ms of
     Just ms1 -> L (noAnnSrcSpan $ locA $ combineLocsA (NE.head ms1) (NE.last ms1)) ms
 
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsApp e1 e2 = addCLocA e1 e2 (HsApp noComments e1 e2)
+mkHsApp e1 e2 = addCLocA e1 e2 (HsApp noExtField e1 e2)
 
 mkHsAppWith
   :: (LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> HsExpr (GhcPass id) -> LHsExpr (GhcPass id))
   -> LHsExpr (GhcPass id)
   -> LHsExpr (GhcPass id)
   -> LHsExpr (GhcPass id)
-mkHsAppWith mkLocated e1 e2 = mkLocated e1 e2 (HsApp noAnn e1 e2)
+mkHsAppWith mkLocated e1 e2 = mkLocated e1 e2 (HsApp noExtField e1 e2)
 
 mkHsApps
   :: LHsExpr (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
@@ -527,7 +527,7 @@ nlLitPat :: HsLit GhcPs -> LPat GhcPs
 nlLitPat l = noLocA (LitPat noExtField l)
 
 nlHsApp :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-nlHsApp f x = noLocA (HsApp noComments f (mkLHsPar x))
+nlHsApp f x = noLocA (HsApp noExtField f (mkLHsPar x))
 
 nlHsSyntaxApps :: SyntaxExprTc -> [LHsExpr GhcTc]
                -> LHsExpr GhcTc
@@ -542,7 +542,7 @@ nlHsVarApps :: IsSrcSpanAnn p a
 nlHsVarApps f xs = noLocA (foldl' mk (HsVar noExtField (noLocA f))
                                          (map ((HsVar noExtField) . noLocA) xs))
                  where
-                   mk f a = HsApp noComments (noLocA f) (noLocA a)
+                   mk f a = HsApp noExtField (noLocA f) (noLocA a)
 
 nlConVarPat :: RdrName -> [RdrName] -> LPat GhcPs
 nlConVarPat con vars = nlConPat con (map nlVarPat vars)

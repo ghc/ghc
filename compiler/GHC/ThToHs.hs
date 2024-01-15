@@ -1043,7 +1043,7 @@ cvtl e = wrapLA (cvt e)
           if is_compound_lit l' then wrapParLA gHsPar e' else pure e'
     cvt (AppE e1 e2)   = do { e1' <- parenthesizeHsExpr opPrec <$> cvtl e1
                             ; e2' <- parenthesizeHsExpr appPrec <$> cvtl e2
-                            ; return $ HsApp noComments e1' e2' }
+                            ; return $ HsApp noExtField e1' e2' }
     cvt (AppTypeE e t) = do { e' <- parenthesizeHsExpr opPrec <$> cvtl e
                             ; t' <- parenthesizeHsType appPrec <$> cvtType t
                             ; return $ HsAppType noAnn e'

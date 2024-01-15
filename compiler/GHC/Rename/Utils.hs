@@ -720,7 +720,7 @@ genHsApps' (L _ fun) [] = genHsVar fun
 genHsApps' (L loc fun) (arg:args) = foldl genHsApp (unLoc $ mkHsApp (L (l2l loc) $ genHsVar fun) arg) args
 
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
+genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
 
 genLHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)

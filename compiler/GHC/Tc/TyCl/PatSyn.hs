@@ -1061,7 +1061,7 @@ tcPatToExpr args pat = go pat
       Nothing      -> notInvertible p
       Just inverse ->
         fmap
-          (\ expr -> HsApp noAnn (wrapGenSpan inverse) (wrapGenSpan expr))
+          (\ expr -> HsApp noExtField (wrapGenSpan inverse) (wrapGenSpan expr))
           (go1 (unLoc pat))
 
     -- The following patterns are not invertible.

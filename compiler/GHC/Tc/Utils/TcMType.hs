@@ -2393,7 +2393,7 @@ shortCutLit platform val res_ty
       | otherwise         = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
-mkLit con lit = HsApp noComments (nlHsDataCon con) (nlHsLit lit)
+mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
 hsOverLitName :: OverLitVal -> Name

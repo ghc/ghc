@@ -419,8 +419,8 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter (L q_span' quote)
-  = L q_span $ HsApp noComments (L q_span
-             $ HsApp noComments (L q_span
+  = L q_span $ HsApp noExtField (L q_span
+             $ HsApp noExtField (L q_span
                     (HsVar noExtField (L (l2l q_span) quote_selector)))
                                 quoterExpr)
                     quoteExpr

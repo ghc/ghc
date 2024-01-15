@@ -2840,7 +2840,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsOverLit an _)             = fromAnn an
   getAnnotationEntry (HsLit an _)                 = fromAnn an
   getAnnotationEntry (HsLam an _ _)               = fromAnn an
-  getAnnotationEntry (HsApp an _ _)               = fromAnn an
+  getAnnotationEntry (HsApp _ _ _)                = NoEntryVal
   getAnnotationEntry (HsAppType _ _ _)            = NoEntryVal
   getAnnotationEntry (OpApp an _ _ _)             = fromAnn an
   getAnnotationEntry (NegApp an _ _)              = fromAnn an
@@ -2878,7 +2878,7 @@ instance ExactPrint (HsExpr GhcPs) where
   setAnnotationAnchor (HsOverLit an a)       anc ts cs = (HsOverLit (setAnchorEpa an anc ts cs) a)
   setAnnotationAnchor (HsLit an a)           anc ts cs = (HsLit (setAnchorEpa an anc ts cs) a)
   setAnnotationAnchor (HsLam an a b)         anc ts cs = (HsLam (setAnchorEpa an anc ts cs) a b)
-  setAnnotationAnchor (HsApp an a b)         anc ts cs = (HsApp (setAnchorEpa an anc ts cs) a b)
+  setAnnotationAnchor a@(HsApp {})              _ _ _s = a
   setAnnotationAnchor a@(HsAppType {})          _ _ _s = a
   setAnnotationAnchor (OpApp an a b c)       anc ts cs = (OpApp (setAnchorEpa an anc ts cs) a b c)
   setAnnotationAnchor (NegApp an a b)        anc ts cs = (NegApp (setAnchorEpa an anc ts cs) a b)

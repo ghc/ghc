@@ -1818,10 +1818,9 @@ instance DisambECP (HsExpr GhcPs) where
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l e1 e2 = do
-    cs <- getCommentsFor (locA l)
     checkExpBlockArguments e1
     checkExpBlockArguments e2
-    return $ L l (HsApp (comment (realSrcSpan $ locA l) cs) e1 e2)
+    return $ L l (HsApp noExtField e1 e2)
   mkHsAppTypePV l e at t = do
     checkExpBlockArguments e
     return $ L l (HsAppType at e (mkHsWildCardBndrs t))

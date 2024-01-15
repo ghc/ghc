@@ -382,7 +382,7 @@ rebuild_hs_apps fun _ [] = fun
 rebuild_hs_apps fun ctxt (arg : args)
   = case arg of
       EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
-        -> rebuild_hs_apps (HsApp noAnn lfun arg) ctxt' args
+        -> rebuild_hs_apps (HsApp noExtField lfun arg) ctxt' args
       ETypeArg { eva_hs_ty = hs_ty, eva_ty = ty, eva_ctxt = ctxt' }
         -> rebuild_hs_apps (HsAppType ty lfun hs_ty) ctxt' args
       EPrag ctxt' p
@@ -1088,7 +1088,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
                         HsLit noAnn hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
                          HsVar noExtField (L loc from_id)
-             witness = HsApp noAnn (L (l2l loc) from_expr) lit_expr
+             witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
              lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
                                              , ol_witness = witness
                                              , ol_type = res_ty } }

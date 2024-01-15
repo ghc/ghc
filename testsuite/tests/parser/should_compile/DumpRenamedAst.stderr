@@ -92,11 +92,7 @@
                       (EpaComments
                        []))
                      (HsApp
-                      (EpAnn
-                       (EpaSpan { DumpRenamedAst.hs:35:8-23 })
-                       (NoEpAnns)
-                       (EpaComments
-                        []))
+                      (NoExtField)
                       (L
                        (EpAnn
                         (EpaSpan { DumpRenamedAst.hs:35:8-15 })

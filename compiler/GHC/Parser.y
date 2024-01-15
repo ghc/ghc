@@ -2831,7 +2831,8 @@ fexp    :: { ECP }
                                           superFunArg $
                                           unECP $1 >>= \ $1 ->
                                           unECP $2 >>= \ $2 ->
-                                          mkHsAppPV (noAnnSrcSpan $ comb2 $1 $>) $1 $2 }
+                                          spanWithComments (comb2 $1 $>) >>= \l ->
+                                          mkHsAppPV l $1 $2 }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | fexp PREFIX_AT atype       { ECP $
@@ -4437,6 +4438,11 @@ parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
 commentsA :: (NoAnn ann) => SrcSpan -> EpAnnComments -> EpAnn ann
 commentsA loc cs = EpAnn (EpaSpan loc) noAnn cs
+
+spanWithComments :: (NoAnn ann, MonadP m) => SrcSpan -> m (EpAnn ann)
+spanWithComments l = do
+  cs <- getCommentsFor l
+  return (commentsA l cs)
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments

@@ -784,9 +784,9 @@ dsCases ids local_vars stack_id stack_ty res_ty
   let
       left_id  = mkConLikeTc (RealDataCon left_con)
       right_id = mkConLikeTc (RealDataCon right_con)
-      left_expr  ty1 ty2 e = noLocA $ HsApp noComments
+      left_expr  ty1 ty2 e = noLocA $ HsApp noExtField
                          (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
-      right_expr ty1 ty2 e = noLocA $ HsApp noComments
+      right_expr ty1 ty2 e = noLocA $ HsApp noExtField
                          (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
 
       -- Prefix each tuple with a distinct series of Left's and Right's,

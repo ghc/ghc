@@ -241,7 +241,7 @@ type instance XIPVar         GhcTc = DataConCantHappen
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
 type instance XLam           (GhcPass _) = EpAnn [AddEpAnn]
-type instance XApp           (GhcPass _) = EpAnnCO
+type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField

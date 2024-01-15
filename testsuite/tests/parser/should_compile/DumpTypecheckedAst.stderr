@@ -20,11 +20,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -33,11 +29,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -46,11 +38,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -59,11 +47,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -72,11 +56,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -85,11 +65,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -164,11 +140,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -246,11 +218,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -259,11 +227,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -272,11 +236,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -285,11 +245,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -298,11 +254,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -311,11 +263,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -390,11 +338,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -472,11 +416,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -485,11 +425,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -498,11 +434,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -511,11 +443,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -524,11 +452,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -537,11 +461,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -616,11 +536,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -698,11 +614,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -711,11 +623,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -724,11 +632,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -737,11 +641,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -750,11 +650,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -763,11 +659,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -842,11 +734,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -924,11 +812,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -937,11 +821,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -950,11 +830,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -963,11 +839,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -976,11 +848,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -989,11 +857,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -1068,11 +932,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -1150,11 +1010,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1204,11 +1060,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1258,11 +1110,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1312,11 +1160,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1325,11 +1169,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1394,11 +1234,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1407,11 +1243,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1476,11 +1308,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1489,11 +1317,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1558,11 +1382,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1571,11 +1391,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1640,11 +1456,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1653,11 +1465,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1722,11 +1530,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -1735,11 +1539,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -1786,11 +1586,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -1799,11 +1595,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -1857,11 +1649,7 @@
               (EpaComments
                []))
              (HsApp
-              (EpAnn
-               (EpaDelta (SameLine 0) [])
-               (NoEpAnns)
-               (EpaComments
-                []))
+              (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { <no location info> })
@@ -1870,11 +1658,7 @@
                 (EpaComments
                  []))
                (HsApp
-                (EpAnn
-                 (EpaDelta (SameLine 0) [])
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (NoExtField)
                 (L
                  (EpAnn
                   (EpaSpan { <no location info> })
@@ -1928,11 +1712,7 @@
                   (EpaComments
                    []))
                  (HsApp
-                  (EpAnn
-                   (EpaDelta (SameLine 0) [])
-                   (NoEpAnns)
-                   (EpaComments
-                    []))
+                  (NoExtField)
                   (L
                    (EpAnn
                     (EpaSpan { <no location info> })
@@ -1941,11 +1721,7 @@
                     (EpaComments
                      []))
                    (HsApp
-                    (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (NoExtField)
                     (L
                      (EpAnn
                       (EpaSpan { <no location info> })
@@ -2019,11 +1795,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -2032,11 +1804,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -2103,11 +1871,7 @@
       (EpaComments
        []))
      (HsApp
-      (EpAnn
-       (EpaDelta (SameLine 0) [])
-       (NoEpAnns)
-       (EpaComments
-        []))
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { <no location info> })
@@ -2116,11 +1880,7 @@
         (EpaComments
          []))
        (HsApp
-        (EpAnn
-         (EpaDelta (SameLine 0) [])
-         (NoEpAnns)
-         (EpaComments
-          []))
+        (NoExtField)
         (L
          (EpAnn
           (EpaSpan { <no location info> })
@@ -2150,11 +1910,7 @@
             (EpaComments
              []))
            (HsApp
-            (EpAnn
-             (EpaDelta (SameLine 0) [])
-             (NoEpAnns)
-             (EpaComments
-              []))
+            (NoExtField)
             (L
              (EpAnn
               (EpaSpan { <no location info> })
@@ -2200,11 +1956,7 @@
           (EpaComments
            []))
          (HsApp
-          (EpAnn
-           (EpaDelta (SameLine 0) [])
-           (NoEpAnns)
-           (EpaComments
-            []))
+          (NoExtField)
           (L
            (EpAnn
             (EpaSpan { <no location info> })
@@ -2342,11 +2094,7 @@
                     (EpaComments
                      []))
                    (HsApp
-                    (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (NoExtField)
                     (L
                      (EpAnn
                       (EpaSpan { DumpTypecheckedAst.hs:20:8-15 })
