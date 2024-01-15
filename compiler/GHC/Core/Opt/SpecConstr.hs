@@ -789,47 +789,70 @@ scTopBinds env  (b:bs) = do { (usg, b', bs') <- scBind TopLevel env b $
 *                                                                      *
 ************************************************************************
 
-Note [Work-free values only in environment]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The sc_vals field keeps track of in-scope value bindings, so
-that if we come across (case x of Just y ->...) we can reduce the
-case from knowing that x is bound to a pair.
+Note [ConVal work-free-ness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The sc_vals field keeps track of in-scope value bindings, and is used in
+two ways:
 
-But only *work-free* values are ok here. For example if the envt had
-    x -> Just (expensive v)
-then we do NOT want to expand to
-     let y = expensive v in ...
-because the x-binding still exists and we've now duplicated (expensive v).
+(1) To do case-of-known-constructor in a case expression.  E.g. if sc_vals
+    includes [x :-> ConVal Just e], then we can simplify
+      case x of Just y -> ...
+    with the case-of-known-constructor transformation. (Yes this is
+    done by the Simplifier, but SpecConstr creates new opportunities when
+    it makes a specialised RHS for a function.)
 
-This seldom happens because let-bound constructor applications are
-ANF-ised, but it can happen as a result of on-the-fly transformations in
-SpecConstr itself.  Here is #7865:
+    For (1) it is crucial that the arguments are /work-free/; see (CV1)
+    below.
 
-        let {
-          a'_shr =
-            case xs_af8 of _ {
-              [] -> acc_af6;
-              : ds_dgt [Dmd=<L,A>] ds_dgu [Dmd=<L,A>] ->
-                (expensive x_af7, x_af7
-            } } in
-        let {
-          ds_sht =
-            case a'_shr of _ { (p'_afd, q'_afe) ->
-            TSpecConstr_DoubleInline.recursive
-              (GHC.Types.: @ GHC.Types.Int x_af7 wild_X6) (q'_afe, p'_afd)
-            } } in
+(2) To figure out call pattresns. E.g. if sc_vals includes
+    [x :-> ConVal Just e], and we have call (f x), then we might want
+    to specialise `f (Just _)`
 
-When processed knowing that xs_af8 was bound to a cons, we simplify to
-   a'_shr = (expensive x_af7, x_af7)
-and we do NOT want to inline that at the occurrence of a'_shr in ds_sht.
-(There are other occurrences of a'_shr.)  No no no.
+    For (2) it is /not/ important that the constructor arguments are work-free;
+    indeed, it would be bad to insist on that. For example
+       let x = Just <expensive>
+       in ....(f x)...
+    Here we want to specialise for `f (Just _)`, and we won't do so if we
+    don't allow [x :-> ConVal Just e] into the environment.  Does this ever happen?
+    Yes: see #24282.
 
-It would be possible to do some on-the-fly ANF-ising, so that a'_shr turned
-into a work-free value again, thus
-   a1 = expensive x_af7
-   a'_shr = (a1, x_af7)
-but that's more work, so until its shown to be important I'm going to
-leave it for now.
+    (Yes, the Simplifier will ANF that let-binding, but SpecConstr can
+    make more: see (CV1) for an example.)
+
+Wrinkle:
+
+(CV1) Why is work-free-ness important for (1)?  In the example in (1) above, of `e` is
+      expensive, we do /not/ want to simplify
+         case x of { Just y -> ... }  ==>   let y = e in ...
+      because the x-binding still exists and we've now duplicated `e`.
+
+      This seldom happens because let-bound constructor applications are ANF-ised, but
+      it can happen as a result of on-the-fly transformations in SpecConstr itself.
+      Here is #7865:
+
+              let { a'_shr =
+                      case xs_af8 of _ {
+                        [] -> acc_af6;
+                        : ds_dgt [Dmd=<L,A>] ds_dgu [Dmd=<L,A>] ->
+                          (expensive x_af7, x_af7
+                      } } in
+              let { ds_sht =
+                      case a'_shr of _ { (p'_afd, q'_afe) ->
+                      TSpecConstr_DoubleInline.recursive
+                        (GHC.Types.: @ GHC.Types.Int x_af7 wild_X6) (q'_afe, p'_afd)
+                      } } in
+
+      When processed knowing that xs_af8 was bound to a cons, we simplify to
+         a'_shr = (expensive x_af7, x_af7)
+      and we do NOT want to inline that at the occurrence of a'_shr in ds_sht.
+      (There are other occurrences of a'_shr.)  No no no.
+
+      It would be possible to do some on-the-fly ANF-ising, so that a'_shr turned
+      into a work-free value again, thus
+         a1 = expensive x_af7
+         a'_shr = (a1, x_af7)
+      but that's more work, so until its shown to be important I'm going to
+      leave it for now.
 
 Note [Making SpecConstr keener]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -910,10 +933,6 @@ data ScEnv = SCE { sc_opts      :: !SpecConstrOpts,
                    sc_vals      :: ValueEnv,
                         -- Domain is OutIds (*after* applying the substitution)
                         -- Used even for top-level bindings (but not imported ones)
-                        -- The range of the ValueEnv is *work-free* values
-                        -- such as (\x. blah), or (Just v)
-                        -- but NOT (Just (expensive v))
-                        -- See Note [Work-free values only in environment]
 
                    sc_annotations :: UniqFM Name SpecConstrAnnotation
              }
@@ -922,14 +941,22 @@ data ScEnv = SCE { sc_opts      :: !SpecConstrOpts,
 type HowBoundEnv = VarEnv HowBound      -- Domain is OutVars
 
 ---------------------
-type ValueEnv = IdEnv Value             -- Domain is OutIds
-data Value    = ConVal AltCon [CoreArg] -- _Saturated_ constructors
-                                        --   The AltCon is never DEFAULT
-              | LambdaVal               -- Inlinable lambdas or PAPs
+type ValueEnv = IdEnv Value            -- Domain is OutIds
+
+data Value = ConVal            -- Constructor application
+                  Bool             -- True <=> all args are work-free
+                                   --      See Note [ConVal work-free-ness]
+                  AltCon           -- Never DEFAULT
+                  [CoreArg]        -- Saturates the constructor
+           | LambdaVal         -- Inlinable lambdas or PAPs
 
 instance Outputable Value where
-   ppr (ConVal con args) = ppr con <+> interpp'SP args
-   ppr LambdaVal         = text "<Lambda>"
+   ppr LambdaVal            = text "<Lambda>"
+   ppr (ConVal wf con args) = ppr con <> braces pp_wf <+> interpp'SP args
+     where
+       pp_wf | wf        = text "wf"
+             | otherwise = text "not-wf"
+
 
 ---------------------
 initScOpts :: DynFlags -> Module -> SpecConstrOpts
@@ -1058,11 +1085,10 @@ extendBndr env bndr  = (env { sc_subst = subst' }, bndr')
                        (subst', bndr') = substBndr (sc_subst env) bndr
 
 extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
-extendValEnv env _  Nothing   = env
-extendValEnv env id (Just cv)
- | valueIsWorkFree cv      -- Don't duplicate work!!  #7865
- = env { sc_vals = extendVarEnv (sc_vals env) id cv }
-extendValEnv env _ _ = env
+extendValEnv env id mb_val
+  = case mb_val of
+      Nothing -> env
+      Just cv -> env { sc_vals = extendVarEnv (sc_vals env) id cv }
 
 extendCaseBndrs :: ScEnv -> OutExpr -> OutId -> AltCon -> [Var] -> (ScEnv, [Var])
 -- When we encounter
@@ -1089,8 +1115,8 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
 
    cval = case con of
                 DEFAULT    -> Nothing
-                LitAlt {}  -> Just (ConVal con [])
-                DataAlt {} -> Just (ConVal con vanilla_args)
+                LitAlt {}  -> Just (ConVal True con [])
+                DataAlt {} -> Just (ConVal True con vanilla_args)
                       where
                         vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
                                        varsToCoreExprs alt_bndrs
@@ -1497,8 +1523,11 @@ scExpr' env (Let bind body)
 scExpr' env (Case scrut b ty alts)
   = do  { (scrut_usg, scrut') <- scExpr env scrut
         ; case isValue (sc_vals env) scrut' of
-                Just (ConVal con args) -> sc_con_app con args scrut'
-                _other                 -> sc_vanilla scrut_usg scrut'
+                Just (ConVal args_are_work_free con args)
+                   | args_are_work_free -> sc_con_app con args scrut'
+                     -- Don't duplicate work!!  #7865
+                     -- See Note [ConVal work-free-ness] (1)
+                _other -> sc_vanilla scrut_usg scrut'
         }
   where
     sc_con_app con args scrut'  -- Known constructor; simplify
@@ -2608,7 +2637,8 @@ argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
 argToPat1 env in_scope val_env arg arg_occ _arg_str
-  | Just (ConVal (DataAlt dc) args) <- isValue val_env arg
+  | Just (ConVal _wf (DataAlt dc) args) <- isValue val_env arg
+    -- Ignore `_wf` here; see Note [ConVal work-free-ness] (2)
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
   = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
@@ -2726,7 +2756,7 @@ wildCardPat ty str
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)
   | litIsLifted lit = Nothing
-  | otherwise       = Just (ConVal (LitAlt lit) [])
+  | otherwise       = Just (ConVal True (LitAlt lit) [])
 
 isValue env (Var v)
   | Just cval <- lookupVarEnv env v
@@ -2757,7 +2787,7 @@ isValue _env expr       -- Maybe it's a constructor application
         DataConWorkId con | args `lengthAtLeast` dataConRepArity con
                 -- Check saturated; might be > because the
                 --                  arity excludes type args
-                -> Just (ConVal (DataAlt con) args)
+                -> Just (ConVal (all exprIsWorkFree args) (DataAlt con) args)
 
         DFunId {} -> Just LambdaVal
         -- DFunId: see Note [Specialising on dictionaries]
@@ -2770,34 +2800,43 @@ isValue _env expr       -- Maybe it's a constructor application
 
 isValue _env _expr = Nothing
 
-valueIsWorkFree :: Value -> Bool
-valueIsWorkFree LambdaVal       = True
-valueIsWorkFree (ConVal _ args) = all exprIsWorkFree args
-
 betterPat :: InScopeSet -> CallPat -> CallPat -> Bool
 -- pat1    f @a   (Just @a   (x::a))
 --      is better than
 -- pat2    f @Int (Just @Int (x::Int))
--- That is, we can instantiate pat1 to get pat2
+-- That is, we can instantiate pat1 to get pat2, using only type instantiate
 -- See Note [Pattern duplicate elimination]
 betterPat is (CP { cp_qvars = vs1, cp_args = as1 })
              (CP { cp_qvars = vs2, cp_args = as2 })
+  | equalLength as1 as2
   = case matchExprs ise vs1 as1 as2 of
       Just (_, ms) -> all exprIsTrivial ms
       Nothing      -> False
+
+  | otherwise -- We must handle patterns of unequal length separately (#24282)
+  = False  -- For the pattern with more args, the last arg is "interesting"
+           -- but the corresponding one on the other is "not interesting";
+           -- So we can't get from one to the other with only exprIsTrivial
+           -- instantiation.  Example nofib/spectral/ansi, function `loop`:
+           --    P1: loop (I# x) (a : b)
+           --    P2: loop (I# y)           -- Pattern eta-reduced
+           -- Neither is better than the other, in the sense of betterPat
   where
     ise = ISE (is `extendInScopeSetList` vs2) (const noUnfolding)
 
 subsumePats :: InScopeSet -> [CallPat] -> [CallPat]
 -- Remove any patterns subsumed by others
 -- See Note [Pattern duplicate elimination]
-subsumePats is pats = foldr add [] pats
+-- Other than deleting subsumed patterns, this operation is a no-op;
+-- in particular it does not reverse the input.  It should not matter
+-- but in #24282 it did; doing it this way keeps the existing behaviour.
+subsumePats is pats = foldl add [] pats
   where
-    add :: CallPat -> [CallPat] -> [CallPat]
-    add ci [] = [ci]
-    add ci1 (ci2:cis) | betterPat is ci2 ci1 = ci2:cis
-                      | betterPat is ci1 ci2 = ci1:cis
-                      | otherwise             = ci2 : add ci1 cis
+    add :: [CallPat] -> CallPat -> [CallPat]
+    add []        ci                         = [ci]
+    add (ci1:cis) ci2 | betterPat is ci1 ci2 = ci1 : cis
+                      | betterPat is ci2 ci1 = ci2 : cis
+                      | otherwise            = ci1 : add cis ci2
 
 {-
 Note [Pattern duplicate elimination]

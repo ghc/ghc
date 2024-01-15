@@ -605,10 +605,8 @@ isMoreSpecific :: InScopeSet -> CoreRule -> CoreRule -> Bool
 isMoreSpecific _        (BuiltinRule {}) _                = False
 isMoreSpecific _        (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
-                        (Rule { ru_bndrs = bndrs2, ru_args = args2
-                              , ru_name = rule_name2, ru_rhs = rhs2 })
-  = isJust (matchN in_scope_env
-                   rule_name2 bndrs2 args2 args1 rhs2)
+                        (Rule { ru_bndrs = bndrs2, ru_args = args2 })
+  = isJust (matchExprs in_scope_env bndrs2 args2 args1)
   where
    full_in_scope = in_scope `extendInScopeSetList` bndrs1
    in_scope_env  = ISE full_in_scope noUnfoldingFun
