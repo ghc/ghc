@@ -97,7 +97,8 @@ noDuplicateST = ST $ \s -> (# noDuplicate# s, () #)
 -- | 'unsafeInterleaveST' allows an 'ST' computation to be deferred
 -- lazily.  When passed a value of type @ST a@, the 'ST' computation will
 -- only be performed when the value of the @a@ is demanded.
-{-# INLINE unsafeInterleaveST #-}
+{-# NOINLINE unsafeInterleaveST #-}
+-- See Note [unsafeInterleaveIO should not be inlined] in GHC.IO.Unsafe
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST m = unsafeDupableInterleaveST (noDuplicateST >> m)
 
@@ -109,9 +110,6 @@ unsafeInterleaveST m = unsafeDupableInterleaveST (noDuplicateST >> m)
 -- possibly at the same time. To prevent this, use 'unsafeInterleaveST' instead.
 --
 -- @since 4.11
-{-# NOINLINE unsafeDupableInterleaveST #-}
--- See Note [unsafeDupableInterleaveIO should not be inlined]
--- in GHC.IO.Unsafe
 unsafeDupableInterleaveST :: ST s a -> ST s a
 unsafeDupableInterleaveST (ST m) = ST ( \ s ->
     let

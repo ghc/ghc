@@ -1,3 +1,5 @@
+# See also the tests in libraries/base/tests/
+
 test('DataTypeOrd', normal, compile_and_run, [''])
 test('T16586', normal, compile_and_run, ['-O2'])
 # Event-manager not supported on Windows

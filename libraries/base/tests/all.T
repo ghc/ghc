@@ -1,3 +1,5 @@
+# See also the tests in testsuite/tests/lib/base/
+
 import string
 import re
 
@@ -163,7 +165,11 @@ test('T2528', normal, compile_and_run, [''])
 #     so let's normalise the output.
 test('T4006', [normalise_fun(normalise_quotes), req_process], compile_and_run, [''])
 
-test('T5943', normal, compile_and_run, [''])
+# These two tests should have "-fstate-hack" (to be explicit),
+# but that flag apparently doesn't exist for some reason
+test('T5859', normal, compile_and_run, ['-O'])
+test('T5943', normal, compile_and_run, ['-O'])
+
 test('T5962', normal, compile_and_run, [''])
 test('T7034', normal, compile_and_run, [''])
 
