@@ -9029,7 +9029,7 @@ module GHC.RTS.Flags where
   type DoCostCentres :: *
   data DoCostCentres = CostCentresNone | CostCentresSummary | CostCentresVerbose | CostCentresAll | CostCentresJSON
   type DoHeapProfile :: *
-  data DoHeapProfile = NoHeapProfiling | HeapByCCS | HeapByMod | HeapByDescr | HeapByType | HeapByRetainer | HeapByLDV | HeapByClosureType | HeapByInfoTable
+  data DoHeapProfile = NoHeapProfiling | HeapByCCS | HeapByMod | HeapByDescr | HeapByType | HeapByRetainer | HeapByLDV | HeapByClosureType | HeapByInfoTable | HeapByEra
   type DoTrace :: *
   data DoTrace = TraceNone | TraceEventLog | TraceStderr
   type GCFlags :: *
@@ -9080,6 +9080,7 @@ module GHC.RTS.Flags where
                  startHeapProfileAtStartup :: GHC.Types.Bool,
                  startTimeProfileAtStartup :: GHC.Types.Bool,
                  showCCSOnException :: GHC.Types.Bool,
+                 automaticEraIncrement :: GHC.Types.Bool,
                  maxRetainerSetSize :: GHC.Types.Word,
                  ccsLength :: GHC.Types.Word,
                  modSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
@@ -9088,7 +9089,8 @@ module GHC.RTS.Flags where
                  ccSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
                  ccsSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
                  retainerSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
-                 bioSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String}
+                 bioSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 eraSelector :: GHC.Types.Word}
   type RTSFlags :: *
   data RTSFlags = RTSFlags {gcFlags :: GCFlags, concurrentFlags :: ConcFlags, miscFlags :: MiscFlags, debugFlags :: DebugFlags, costCentreFlags :: CCFlags, profilingFlags :: ProfFlags, traceFlags :: TraceFlags, tickyFlags :: TickyFlags, parFlags :: ParFlags, hpcFlags :: HpcFlags}
   type RtsTime :: *

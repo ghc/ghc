@@ -50,6 +50,10 @@
 
   * Treat all FDs as "nonblocking" on wasm32 ([CLC proposal #234](https://github.com/haskell/core-libraries-committee/issues/234))
 
+  * Add `HeapByEra`, `eraSelector` and `automaticEraIncrement` to `GHC.RTS.Flags` to
+    reflect the new RTS flags: `-he` profiling mode, `-he` selector and `--automatic-era-increment`.
+    ([CLC proposal #254](https://github.com/haskell/core-libraries-committee/issues/254))
+
 ## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
