@@ -1,5 +1,5 @@
 
-T13847.hs:4:24: error: [GHC-53822]
+T13847.hs:5:24: error: [GHC-53822]
     • Constructor ‘A.A’ does not have field ‘foo’
     • In the second argument of ‘($)’, namely ‘A.A {foo = ()}’
       In the second argument of ‘($)’, namely ‘A.foo $ A.A {foo = ()}’

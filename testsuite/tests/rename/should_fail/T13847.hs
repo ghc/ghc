@@ -1,4 +1,4 @@
-{-# LANGUAGE NoDataKinds #-}
+{-# LANGUAGE NoDisambiguateRecordFields #-}
 module Main where
 import qualified T13847A as A
 foo = "foo"
