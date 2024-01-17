@@ -91,7 +91,7 @@ inTreeCompilerArgs stg = do
 
     let ghcStage = succStage stg
     (hasDynamicRts, hasThreadedRts) <- do
-      ways <- interpretInContext (vanillaContext stg rts) getRtsWays
+      ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
     hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
     leadingUnderscore   <- queryTargetTarget ghcStage tgtSymbolsHaveLeadingUnderscore

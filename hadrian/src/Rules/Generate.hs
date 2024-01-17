@@ -229,7 +229,7 @@ generateRules = do
 
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
-            go gen file = generate file (semiEmptyTarget stage) gen
+            go gen file = generate file (semiEmptyTarget (succStage stage)) gen
         (prefix -/- "settings") %> go generateSettings
 
   where
@@ -369,7 +369,7 @@ ghcWrapper stage  = do
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
-    stage <- succStage <$> getStage
+    stage <- getStage
     settings <- traverse sequence $
         [ ("C compiler command",   queryTarget stage ccPath)
         , ("C compiler flags",     queryTarget stage ccFlags)
