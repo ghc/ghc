@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 {-# LANGUAGE TypeOperators       #-}
-
+{-# LANGUAGE NoMonoLocalBinds #-}
 module T15322 where
 
 import Data.Proxy (Proxy (..))

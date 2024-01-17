@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 module T10770a where
 
 import Data.Typeable

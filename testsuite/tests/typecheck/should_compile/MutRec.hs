@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 module MutRec where
 
 -- Mutual recursion with different
