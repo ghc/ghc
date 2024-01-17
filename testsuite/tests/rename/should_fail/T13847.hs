@@ -1,3 +1,4 @@
+{-# LANGUAGE NoDataKinds #-}
 module Main where
 import qualified T13847A as A
 foo = "foo"

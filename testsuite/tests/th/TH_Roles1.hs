@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-
+{-# LANGUAGE NoRoleAnnotations #-}
 module TH_Roles1 where
 
 import Language.Haskell.TH

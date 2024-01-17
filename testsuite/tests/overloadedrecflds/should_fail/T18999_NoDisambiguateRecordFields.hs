@@ -1,4 +1,4 @@
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE NoFieldSelectors, NoDisambiguateRecordFields #-}
 module T18999_NoDisambiguateRecordFields where
 
 data Foo = Foo { not :: Int }

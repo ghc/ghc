@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, NoDataKinds #-}
 
 module TH_Promoted1Tuple where
 

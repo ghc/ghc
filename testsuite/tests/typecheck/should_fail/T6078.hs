@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, NoMonoLocalBinds #-}
 module T6078 where
 
 import GHC.Ptr
