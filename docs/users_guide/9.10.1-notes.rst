@@ -6,6 +6,23 @@ Version 9.10.1
 Language
 ~~~~~~~~
 
+- The :extension:`GHC2024` language edition is supported now. It builds on top of
+  :extension:`GHC2021`, adding the following extensions:
+
+  * :extension:`DataKinds`
+  * :extension:`DerivingStrategies`
+  * :extension:`DisambiguateRecordFields`
+  * :extension:`ExplicitNamespaces`
+  * :extension:`GADTs`
+  * :extension:`MonoLocalBinds`
+  * :extension:`LambdaCase`
+  * :extension:`RoleAnnotations`
+
+  It is now also the “default” langauge edition that is active when no other
+  language edition is explicitly loaded (e.g via Cabal’s ``default-language``).
+  Because language editions are not backwards compatible it is highly recommended to
+  explicitly specify the language edition.
+
 - GHC Proposal `#281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
   "Visible forall in types of terms" has been partially implemented.
   The following code is now accepted by GHC::
