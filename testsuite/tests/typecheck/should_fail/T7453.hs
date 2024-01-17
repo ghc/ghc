@@ -1,4 +1,4 @@
-
+{-# LANGUAGE NoMonoLocalBinds #-}
 module T7453 where
 
 newtype Id a = Id { runId :: a }

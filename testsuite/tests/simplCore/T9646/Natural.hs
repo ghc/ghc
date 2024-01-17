@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, NoMonoLocalBinds #-}
 
 module Natural where
 

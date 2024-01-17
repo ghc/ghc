@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 {-# OPTIONS_GHC -fdefer-type-errors #-}
 
 module T18467 where

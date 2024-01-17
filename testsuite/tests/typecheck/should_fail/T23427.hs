@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE NoMonomorphismRestriction, NoMonoLocalBinds #-}
 module T23427 where
 
 class C a where

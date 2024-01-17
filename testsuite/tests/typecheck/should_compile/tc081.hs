@@ -1,5 +1,5 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 -- !!! an example Simon made up
---
 module ShouldSucceed where
 
 f x = (x+1, x<3, g True, g 'c')

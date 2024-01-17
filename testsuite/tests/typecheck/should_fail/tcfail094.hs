@@ -1,4 +1,4 @@
-
+{-# LANGUAGE NoDataKinds #-}
 
 module ShouldFail where
 

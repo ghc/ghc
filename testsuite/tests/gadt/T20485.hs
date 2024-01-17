@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms, NoMonoLocalBinds #-}
 module T20485 where
 
 import Data.Type.Equality

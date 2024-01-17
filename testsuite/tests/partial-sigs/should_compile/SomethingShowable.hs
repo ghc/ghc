@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, PartialTypeSignatures, NamedWildCards #-}
+{-# LANGUAGE FlexibleContexts, PartialTypeSignatures, NamedWildCards, NoMonoLocalBinds #-}
 module SomethingShowable where
 
 somethingShowable :: Show _x => _x -> _

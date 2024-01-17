@@ -1,4 +1,4 @@
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE NoFieldSelectors, NoDisambiguateRecordFields #-}
 module NoFieldSelectorsFail (foo, bar) where
 
 import NoFieldSelectorsFailA

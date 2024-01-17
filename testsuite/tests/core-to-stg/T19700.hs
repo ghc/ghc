@@ -2,6 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 module T19700 where
 
 import GHC.Exts (Int(..), Int#, SmallArray#, SmallMutableArray#, State#,

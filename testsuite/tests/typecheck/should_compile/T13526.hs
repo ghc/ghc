@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, FlexibleInstances, NoMonoLocalBinds #-}
 
 module T13526 where
 

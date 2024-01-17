@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 -- |
 -- Module      : Data.Text.Encoding
 -- Copyright   : (c) 2009, 2010, 2011 Bryan O'Sullivan,

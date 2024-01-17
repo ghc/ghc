@@ -1,3 +1,4 @@
+{-# LANGUAGE NoRoleAnnotations #-}
 module Roles5 where
 
 data T a

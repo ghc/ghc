@@ -1,5 +1,5 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 module T11397 where
-
 
 f :: a -> [Maybe a]
 f x =

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 
  module Main (main) where
 

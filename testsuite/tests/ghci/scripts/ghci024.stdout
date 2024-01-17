@@ -1,6 +1,6 @@
 ~~~~~~~~~~ Testing :set
 options currently set: none.
-base language is: GHC2021
+base language is: GHC2024
 with the following modifiers:
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
@@ -23,7 +23,7 @@ warning settings:
   -Wdeprecated-type-abstractions
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
-base language is: GHC2021
+base language is: GHC2024
 all active language options:
 GHCi-specific dynamic flag settings:
   -fno-print-explicit-foralls
@@ -31,10 +31,10 @@ other dynamic, non-language, flag settings:
 warning settings:
   -Wno-implicit-prelude
 ~~~~~~~~~~ Testing :show languages
-base language is: GHC2021
+base language is: GHC2024
 with the following modifiers:
 ~~~~~~~~~~ Testing :show languages, with -XMagicHash
-base language is: GHC2021
+base language is: GHC2024
 with the following modifiers:
   -XMagicHash
 ~~~~~~~~~~ Testing :show packages
