@@ -243,7 +243,9 @@ docs:
          ScopedTypeVariables
          BangPatterns
          TypeFamilies
+         DisambiguateRecordFields
          NamedFieldPuns
+         GADTs
          GADTSyntax
          DoAndIfThenElse
          ConstraintKinds
@@ -257,6 +259,7 @@ docs:
          DeriveFoldable
          DeriveGeneric
          DeriveLift
+         DerivingStrategies
          TypeSynonymInstances
          FlexibleContexts
          FlexibleInstances
@@ -265,6 +268,7 @@ docs:
          ExistentialQuantification
          EmptyDataDecls
          KindSignatures
+         RoleAnnotations
          GeneralizedNewtypeDeriving
          PostfixOperators
          TupleSections
@@ -274,6 +278,7 @@ docs:
          ExplicitNamespaces
          ExplicitForAll
          TraditionalRecordSyntax
+         LambdaCase
          BinaryLiterals
          HexFloatLiterals
          EmptyCase

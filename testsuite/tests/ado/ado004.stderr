@@ -32,16 +32,16 @@ TYPE SIGNATURES
     (Monad m, Num t1) =>
     (t1 -> m t2) -> (t2 -> t2 -> m a) -> m a
   test4 ::
-    forall {m :: * -> *} {t} {a1} {a2}.
-    (Monad m, Num t) =>
-    (t -> m a1) -> (a1 -> a1 -> m a2) -> m a2
+    forall {m :: * -> *} {t1} {t2} {a}.
+    (Monad m, Num t1) =>
+    (t1 -> m t2) -> (t2 -> t2 -> m a) -> m a
   test5 ::
-    forall {m :: * -> *} {t} {a1} {a2}.
-    (Monad m, Num t) =>
-    (t -> m a1) -> (a1 -> a1 -> m a2) -> m a2
+    forall {m :: * -> *} {t1} {t2} {a}.
+    (Monad m, Num t1) =>
+    (t1 -> m t2) -> (t2 -> t2 -> m a) -> m a
   test6 ::
     forall {m :: * -> *} {a} {p}.
     (Monad m, Num (m a)) =>
     (m a -> m (m a)) -> p -> m a
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.19.0.0]

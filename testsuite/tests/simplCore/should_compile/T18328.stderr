@@ -1,11 +1,11 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 69, types: 55, coercions: 0, joins: 1/1}
+  = {terms: 64, types: 48, coercions: 0, joins: 1/1}
 
--- RHS size: {terms: 42, types: 25, coercions: 0, joins: 1/1}
+-- RHS size: {terms: 37, types: 18, coercions: 0, joins: 1/1}
 T18328.$wf [InlPrag=[2]]
-  :: forall {a}. GHC.Prim.Int# -> [a] -> [a] -> [a]
+  :: forall a. GHC.Prim.Int# -> [a] -> [a] -> [a]
 [GblId[StrictWorker([~, !])],
  Arity=3,
  Str=<SL><SL><ML>,
@@ -15,18 +15,18 @@ T18328.$wf [InlPrag=[2]]
 T18328.$wf
   = \ (@a) (ww :: GHC.Prim.Int#) (ys :: [a]) (eta :: [a]) ->
       join {
-        $wj [InlPrag=NOINLINE, Dmd=MC(1,L)] :: forall {p}. (# #) -> [a]
-        [LclId[JoinId(2)(Nothing)], Arity=1, Str=<A>, Unf=OtherCon []]
-        $wj (@p) _ [Occ=Dead, OS=OneShot]
+        $wj [InlPrag=NOINLINE, Dmd=ML] :: [a]
+        [LclId[JoinId(0)(Nothing)]]
+        $wj
           = case ww of {
               __DEFAULT -> ++ @a ys (++ @a ys (++ @a ys eta));
               3# -> ++ @a ys (++ @a ys (++ @a ys (++ @a ys eta)))
             } } in
       case ww of {
         __DEFAULT -> ++ @a ys eta;
-        1# -> jump $wj @Integer GHC.Prim.(##);
-        2# -> jump $wj @Integer GHC.Prim.(##);
-        3# -> jump $wj @Integer GHC.Prim.(##)
+        1# -> jump $wj;
+        2# -> jump $wj;
+        3# -> jump $wj
       }
 
 -- RHS size: {terms: 11, types: 9, coercions: 0, joins: 0/0}

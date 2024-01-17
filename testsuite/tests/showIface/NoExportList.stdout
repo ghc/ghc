@@ -49,16 +49,20 @@ docs:
          Nothing
        language extensions:
          MonomorphismRestriction
+         MonoLocalBinds
          RelaxedPolyRec
          ForeignFunctionInterface
          ImplicitPrelude
          ScopedTypeVariables
          BangPatterns
+         DisambiguateRecordFields
          NamedFieldPuns
+         GADTs
          GADTSyntax
          DoAndIfThenElse
          ConstraintKinds
          PolyKinds
+         DataKinds
          InstanceSigs
          StandaloneDeriving
          DeriveDataTypeable
@@ -67,6 +71,7 @@ docs:
          DeriveFoldable
          DeriveGeneric
          DeriveLift
+         DerivingStrategies
          TypeSynonymInstances
          FlexibleContexts
          FlexibleInstances
@@ -75,14 +80,17 @@ docs:
          ExistentialQuantification
          EmptyDataDecls
          KindSignatures
+         RoleAnnotations
          GeneralizedNewtypeDeriving
          PostfixOperators
          TupleSections
          PatternGuards
          RankNTypes
          TypeOperators
+         ExplicitNamespaces
          ExplicitForAll
          TraditionalRecordSyntax
+         LambdaCase
          BinaryLiterals
          HexFloatLiterals
          EmptyCase

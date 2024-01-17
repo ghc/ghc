@@ -1,3 +1,4 @@
 
 rnfail035.hs:2:21: error: [GHC-76037]
     Not in scope: type constructor or class ‘C’
+    Suggested fix: Perhaps use data constructor ‘C’ (line 3)

@@ -1,6 +1,8 @@
 
-T13568.hs:7:8: error: [GHC-76037]
-    Not in scope: type constructor or class ‘A’
-    Suggested fix:
-      Perhaps you intended to use DataKinds
-      to refer to the data constructor of that name?
+T13568.hs:7:8: error: [GHC-87543]
+    Ambiguous occurrence ‘A’.
+    It could refer to
+       either ‘T13568a.A’,
+              imported from ‘T13568a’ at T13568.hs:3:1-14
+              (and originally defined at T13568a.hs:3:10),
+           or ‘T13568.A’, defined at T13568.hs:5:10.

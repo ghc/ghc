@@ -1,3 +1,6 @@
 
 mod116.hs:2:18: error: [GHC-76037]
     Not in scope: type constructor or class ‘M2’
+    Suggested fix:
+      Perhaps use one of these:
+        data constructor ‘M2’ (line 4), data constructor ‘M1’ (line 4)
