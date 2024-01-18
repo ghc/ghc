@@ -1,0 +1,12 @@
+=== 'Haskell CPP flags' contains 2 new entries: True
+    Contains spaces: True
+=== 'C compiler flags' contains 2 new entries: True
+    Contains spaces: True
+=== 'C compiler link flags' contains 2 new entries: True
+    Contains spaces: True
+=== 'C++ compiler flags' contains 2 new entries: True
+    Contains spaces: True
+=== 'CPP flags' contains 2 new entries: True
+    Contains spaces: True
+=== 'Merge objects flags' contains expected entries: True
+=== FilePath 'unlit command' contains only escaped spaces: True
