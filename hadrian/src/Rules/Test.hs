@@ -304,7 +304,7 @@ testRules = do
 -- We should have built them already by this point, but
 isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
-   = isJust (stageOf (testCompiler args))
+   = isInTreeCompiler (testCompiler args)
   || testHasInTreeFiles args
   || target `elem` map cp_target checkPrograms
 
