@@ -91,8 +91,8 @@ def setLocalTestOpts(opts: TestOptions) -> None:
     global testopts_ctx_var
     testopts_ctx_var.set(opts)
 
-def isCross() -> bool:
-    """ Are we testing a cross-compiler? """
+def needsTargetWrapper() -> bool:
+    """ Do we need to use a target wrapper? """
     return config.target_wrapper is not None
 
 def isCompilerStatsTest() -> bool:
@@ -240,7 +240,7 @@ def req_dynamic_hs( name, opts ):
         opts.expect = 'fail'
 
 def req_interp( name, opts ):
-    if not config.have_interp or isCross():
+    if not config.have_interp or needsTargetWrapper():
         opts.expect = 'fail'
     # skip on wasm32, otherwise they show up as unexpected passes
     if arch('wasm32'):
@@ -346,11 +346,10 @@ def req_host_target_ghc( name, opts ):
     """
     When testing a cross GHC, some test cases require a host GHC as well (e.g.
     for compiling custom Setup.hs). This is not supported yet (#23236), so for
-    the time being we skip them when testing cross GHCs. However, this is not
-    the case for the JS backend. The JS backend is a cross-compiler that
-    produces code that the host can run.
+    the time being we skip them when testing cross GHCs. However, for cross targets
+    which don't need a target wrapper (e.g. javascript), we can still run these testcases.
     """
-    if isCross() and not js_arch():
+    if needsTargetWrapper():
         opts.skip = True
 
 has_ls_files = None
@@ -1290,20 +1289,17 @@ async def test_common_work(name: TestName, opts,
                 all_ways = [WayName('ghci'), WayName('ghci-opt')]
             else:
                 all_ways = []
-            if isCross():
-                opts.cross_okay = False
+            if needsTargetWrapper():
+                opts.skip = True
         elif func in [makefile_test, run_command]:
             # makefile tests aren't necessarily runtime or compile-time
             # specific. Assume we can run them in all ways. See #16042 for what
             # happened previously.
             all_ways = config.compile_ways + config.run_ways
-            if isCross():
-                opts.cross_okay = False
+            if needsTargetWrapper():
+                opts.skip = True
         else:
             all_ways = [WayName('normal')]
-
-        if isCross() and opts.cross_okay is False:
-            opts.skip = True
 
         # A test itself can request extra ways by setting opts.extra_ways
         all_ways = list(OrderedDict.fromkeys(all_ways + [way for way in opts.extra_ways if way not in all_ways]))
