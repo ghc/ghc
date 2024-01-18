@@ -414,7 +414,7 @@ constructor worker or wrapper
       (This binding looks recursive, but isn't; it defines a top-level, curried
       function whose body just allocates and returns the data constructor.)
 
-      But if (a) the data contructor is nullary and (b) the data type is unlifted,
+      But if (a) the data constructor is nullary and (b) the data type is unlifted,
       this binding is unlifted.
       e.g.   data S :: UnliftedType where { S1 :: S, S2 :: S -> S }
       we generate

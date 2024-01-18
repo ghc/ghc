@@ -1598,11 +1598,11 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
 -- Note [Fundeps with instances, and equality orientation] in GHC.Tc.Solver.Dict
 --    NotSwapped:
 --        ev      :: (lhs1:ki1) ~r# (xi2:ki2)
---        kind_co :: k11 ~# ki2               -- Same orientiation as ev
+--        kind_co :: k11 ~# ki2               -- Same orientation as ev
 --        type_ev :: lhs1 ~r# (xi2 |> sym kind_co)
 --    Swapped
 --        ev      :: (xi2:ki2) ~r# (lhs1:ki1)
---        kind_co :: ki2 ~# ki1               -- Same orientiation as ev
+--        kind_co :: ki2 ~# ki1               -- Same orientation as ev
 --        type_ev :: (xi2 |> kind_co) ~r# lhs1
 
   = do { (kind_co, rewriters, unifs_happened) <- mk_kind_eq   -- :: ki1 ~N ki2

@@ -208,7 +208,7 @@ dnl In configure, we don't configure nearly as much tools for
 dnl the HOST toolchain as we do for the TARGET toolchain. This is because
 dnl Hadrian only depends on certain properties and tools of the HOST toolchain,
 dnl and, ultimately, the shipped GHC has in `settings` the TARGET toolchain and
-dnl properties. (In constrast, ghc-toolchain can as easily configure 1
+dnl properties. (In contrast, ghc-toolchain can as easily configure 1
 dnl toolchain as it can 100)
 dnl
 dnl Unfortunately, we need to produce a valid Target value to write to default.host.target.

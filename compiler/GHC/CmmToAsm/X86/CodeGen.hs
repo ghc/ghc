@@ -4007,13 +4007,13 @@ genMemSetInlineMaybe align dst c n = do
 
 genMemMove :: BlockId -> p -> CmmActual -> CmmActual -> CmmActual -> NatM InstrBlock
 genMemMove bid _align dst src n = do
-  -- TODO: generate inline assembly when under a given treshold (similarly to
+  -- TODO: generate inline assembly when under a given threshold (similarly to
   -- memcpy and memset)
   genLibCCall bid (fsLit "memmove") [] [dst,src,n]
 
 genMemCmp :: BlockId -> p -> CmmFormal -> CmmActual -> CmmActual -> CmmActual -> NatM InstrBlock
 genMemCmp bid _align res dst src n = do
-  -- TODO: generate inline assembly when under a given treshold (similarly to
+  -- TODO: generate inline assembly when under a given threshold (similarly to
   -- memcpy and memset)
   genLibCCall bid (fsLit "memcmp") [res] [dst,src,n]
 

@@ -2417,7 +2417,7 @@ data TcRnMessage where
   -}
   TcRnUnexpectedPatSigType :: HsPatSigType GhcPs -> TcRnMessage
 
-  {-| TcRnIllegalKindSignature is an error occuring when there is
+  {-| TcRnIllegalKindSignature is an error occurring when there is
       a kind signature without -XKindSignatures extension
 
       Examples:

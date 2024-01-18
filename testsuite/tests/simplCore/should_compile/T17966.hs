@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
--- The issue here is whether $cm gets a specialiation
+-- The issue here is whether $cm gets a specialization
 -- See #17966
 
 module T17966 where

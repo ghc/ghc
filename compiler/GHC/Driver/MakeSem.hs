@@ -343,7 +343,7 @@ tryAcquire opts js@( Jobserver { jobs = jobs_tvar })
 tryAcquire _ _ _ = retry
 
 -- | When there are free tokens and no pending jobs,
--- spawn a thread to release a token from the semamphore.
+-- spawn a thread to release a token from the semaphore.
 --
 -- See 'releaseThread'.
 tryRelease :: Jobserver

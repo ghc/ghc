@@ -393,7 +393,7 @@ stringTable = unsafePerformIO $ do
 #else
   sharedCAF tab getOrSetLibHSghcFastStringTable
 
--- from the 9.3 RTS; the previouss RTS before might not have this symbol.  The
+-- from the 9.3 RTS; the previous RTS before might not have this symbol.  The
 -- right way to do this however would be to define some HAVE_FAST_STRING_TABLE
 -- or similar rather than use (odd parity) development versions.
 foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
@@ -504,7 +504,7 @@ bucket_match fs sbs = go fs
           | fs_sbs == sbs = Just fs
           | otherwise     = go ls
 -- bucket_match used to inline before changes to instance Eq ShortByteString
--- in bytestring-0.12, which made it slighhtly larger than inlining threshold.
+-- in bytestring-0.12, which made it slightly larger than inlining threshold.
 -- Non-inlining causes a small, but measurable performance regression, so let's force it.
 {-# INLINE bucket_match #-}
 

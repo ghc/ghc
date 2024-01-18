@@ -1731,7 +1731,7 @@ noGivenNewtypeReprEqs tc inerts
           _  -> False
 
 -- | Returns True iff there are no Given constraints that might,
--- potentially, match the given class consraint. This is used when checking to see if a
+-- potentially, match the given class constraint. This is used when checking to see if a
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
 -- in GHC.Tc.Solver.Dict
 noMatchableGivenDicts :: InertSet -> CtLoc -> Class -> [TcType] -> Bool

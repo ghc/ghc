@@ -1,4 +1,4 @@
--- Case for general occurences of selectors
+-- Case for general occurrences of selectors
 {-# LANGUAGE PatternSynonyms #-}
 module DsIncompleteRecSel1 where
 

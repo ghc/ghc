@@ -73,7 +73,7 @@ assume that the code produced for a MachOp does not introduce new blocks.
 --
 -- (1) has the benefit that its interpretation is completely independent of the
 -- architecture. So, the mid-term plan is to migrate to this
--- interpretation/sematics.
+-- interpretation/semantics.
 
 data MachOp
   -- Integer operations (insensitive to signed/unsigned)

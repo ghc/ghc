@@ -4,7 +4,7 @@
 
 -- This module declares some basic types used by GHC.Stg.Lift
 -- We can import this module into GHC.Stg.Syntax, where the
--- type instance declartions for BinderP etc live
+-- type instance declarations for BinderP etc live
 
 module GHC.Stg.Lift.Types(
    Skeleton(..),

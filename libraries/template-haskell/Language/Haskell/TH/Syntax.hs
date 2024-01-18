@@ -783,7 +783,7 @@ runIO m = Q (qRunIO m)
 -- assumption from splices that they will be executed in the directory where the
 -- cabal file resides. Projects such as haskell-language-server can't and don't
 -- change directory when compiling files but instead set the -package-root flag
--- appropiately.
+-- appropriately.
 getPackageRoot :: Q FilePath
 getPackageRoot = Q qGetPackageRoot
 
@@ -923,7 +923,7 @@ extsEnabled = Q qExtsEnabled
 putDoc :: DocLoc -> String -> Q ()
 putDoc t s = Q (qPutDoc t s)
 
--- | Retreives the Haddock documentation at the specified location, if one
+-- | Retrieves the Haddock documentation at the specified location, if one
 -- exists.
 -- It can be used to read documentation on things defined outside of the current
 -- module, provided that those modules were compiled with the @-haddock@ flag.

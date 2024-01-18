@@ -13,5 +13,5 @@ type family
   UnitC = ()
 
 instance UnitC => Functor I where
-  -- The UnitC type family in the context needs UndecidableIntances
+  -- The UnitC type family in the context needs UndecidableInstances
   fmap = undefined

@@ -325,7 +325,7 @@ instance Outputable DiagnosticHint where
 
 -- | A generic 'Diagnostic' message, without any further classification or
 -- provenance: By looking at a 'DiagnosticMessage' we don't know neither
--- /where/ it was generated nor how to intepret its payload (as it's just a
+-- /where/ it was generated nor how to interpret its payload (as it's just a
 -- structured document). All we can do is to print it out and look at its
 -- 'DiagnosticReason'.
 data DiagnosticMessage = DiagnosticMessage

@@ -73,7 +73,7 @@ that needs to be updated.
 Note [Type comparisons using object pointer comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Quite often we substitute the type from a definition site into
-occurances without a change. This means for code like:
+occurrences without a change. This means for code like:
     \x -> (x,x,x)
 The type of every `x` will often be represented by a single object
 in the heap. We can take advantage of this by shortcutting the equality

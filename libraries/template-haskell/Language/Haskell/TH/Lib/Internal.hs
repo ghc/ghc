@@ -253,7 +253,7 @@ clause ps r ds = do { ps' <- sequenceA ps;
 ---------------------------------------------------------------------------
 -- *   Exp
 
--- | Dynamically binding a variable (unhygenic)
+-- | Dynamically binding a variable (unhygienic)
 dyn :: Quote m => String -> m Exp
 dyn s = pure (VarE (mkName s))
 

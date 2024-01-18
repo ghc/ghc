@@ -249,7 +249,7 @@ foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
 -- A mutable array holding the current EventManager for each capability
 -- An entry is Nothing only while the eventmanagers are initialised, see
 -- 'startIOManagerThread' and 'ioManagerCapabilitiesChanged'.
--- The 'ThreadId' at array position 'cap'  will have been 'forkOn'ed capabality
+-- The 'ThreadId' at array position 'cap'  will have been 'forkOn'ed capability
 -- 'cap'.
 -- The array will be swapped with newer arrays when the number of capabilities
 -- changes(via 'setNumCapabilities'). However:

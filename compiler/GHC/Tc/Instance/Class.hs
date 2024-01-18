@@ -798,7 +798,7 @@ Wrinkles:
 
   * dataToTagSmall# consults the tag bits in the pointer, ignoring the
     info table.  It should, therefore, be used only for data type with
-    few enough contructors that the tag always fits in the pointer.
+    few enough constructors that the tag always fits in the pointer.
 
   * dataToTagLarge# also consults the tag bits in the pointer, but
     must fall back to examining the info table whenever those tag

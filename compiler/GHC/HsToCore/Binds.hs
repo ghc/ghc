@@ -126,7 +126,7 @@ But for /non-recursive/ bindings, the desugarer guarantees to desugar them to
 a sequence of non-recurive Core bindings, in dependency order.
 
 Why is this important?  Partly it saves a bit of work in the first run of the
-ocurrence analyser. But more importantly, for linear types, non-recursive lets
+occurrence analyser. But more importantly, for linear types, non-recursive lets
 can be linear whereas recursive-let can't. Since we check the output of the
 desugarer for linearity (see also Note [Linting linearity]), desugaring
 non-recursive lets to recursive lets would break linearity checks. An

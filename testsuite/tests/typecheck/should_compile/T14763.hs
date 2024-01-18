@@ -27,7 +27,7 @@ instance Esqueleto SqlQuery SqlExpr SqlBackend
 match' :: SomeValue SqlExpr -> a
 match' (SomeValue ECompositeKey) = undefined
 
--- This is tricky becauuse we get a Given constraint
+-- This is tricky because we get a Given constraint
 --    [G] Esqueleto query SqlExpr backend
 -- where query and backend are existential.
 -- Then fundeps with the top-level instance specify

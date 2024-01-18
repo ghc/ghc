@@ -186,7 +186,7 @@ We need to know:
   - We can fill in the dots if you say `T1 {..}` in construction or pattern matching
     See GHC.Rename.Pat.rnHsRecFields.rn_dotdot
 
-* Whether the contructor is nullary.
+* Whether the constructor is nullary.
   We need to know this to accept `T2 {..}`, and `T3 {..}`, but reject `T4 {..}`,
   in both construction and pattern matching.
   See GHC.Rename.Pat.rnHsRecFields.rn_dotdot

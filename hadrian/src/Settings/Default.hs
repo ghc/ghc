@@ -63,7 +63,7 @@ defaultBignumBackend = "gmp"
 -- These packages are things needed to do the build.. so they are only built by
 -- boot compiler, with global package database. By default we will only build these
 -- packages in StageBoot so if you also need to distribute anything here then add
--- it to `stage0packages` or `stage1packages` as appropiate.
+-- it to `stage0packages` or `stage1packages` as appropriate.
 stageBootPackages :: Action [Package]
 stageBootPackages = return
   [ lintersCommon, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, lintNotes

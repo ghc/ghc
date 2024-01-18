@@ -87,7 +87,7 @@ data DmdResult a b = R !a !b
 -- | Outputs a new copy of the Core program in which binders have been annotated
 -- with demand and strictness information.
 --
--- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
+-- Note: use `seqBinds` on the result to avoid leaks due to laziness (cf Note
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
 dmdAnalProgram opts fam_envs rules binds
@@ -1402,7 +1402,7 @@ and transform to
 Now if f is subsequently inlined, we'll use 'g' and ... disaster.
 
 SOLUTION: if f has a stable unfolding, treat every free variable as a
-/demand root/, that is: Analyse it as if it was a variable occuring in a
+/demand root/, that is: Analyse it as if it was a variable occurring in a
 'topDmd' context. This is done in `demandRoot` (which we also use for exported
 top-level ids). Do the same for Ids free in the RHS of any RULES for f.
 

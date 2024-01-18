@@ -7,7 +7,7 @@ module Check04_A (
 import qualified Debug.Trace as D
 import qualified Data.ByteString.Lazy.Char8 as BS
 
--- | Allowed declasification
+-- | Allowed declassification
 trace :: String -> a -> a
 trace s = D.trace $ s ++ show a3
 

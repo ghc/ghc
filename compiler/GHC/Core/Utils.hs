@@ -2670,7 +2670,7 @@ shouldUseCbvForId = wantCbvForId True
 
 -- When we strictify we want to skip strict args otherwise the logic is the same
 -- as for shouldUseCbvForId so we common up the logic here.
--- Basically returns true if it would be benefitial for runtime to pass this argument
+-- Basically returns true if it would be beneficial for runtime to pass this argument
 -- as CBV independent of weither or not it's correct. E.g. it might return true for lazy args
 -- we are not allowed to force.
 wantCbvForId :: Bool -> Var -> Bool

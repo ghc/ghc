@@ -343,7 +343,7 @@ span.spaces    { background: white }
 <span class="lineno">   15 </span>
 <span class="lineno">   16 </span>import Debug.Trace
 <span class="lineno">   17 </span>
-<span class="lineno">   18 </span>-- Now the parsed (expresssion) language
+<span class="lineno">   18 </span>-- Now the parsed (expression) language
 <span class="lineno">   19 </span>
 <span class="lineno">   20 </span>type Name = String
 <span class="lineno">   21 </span>
@@ -453,7 +453,7 @@ span.spaces    { background: white }
 <span class="lineno">  125 </span>-- All primitive operators
 <span class="lineno">  126 </span>-- 
 <span class="lineno">  127 </span>-- There is no Op_apply, Op_false, Op_true and Op_if
-<span class="lineno">  128 </span>-- (because they appear explcitly in the rules).
+<span class="lineno">  128 </span>-- (because they appear explicitly in the rules).
 <span class="lineno">  129 </span>
 <span class="lineno">  130 </span>data GMLOp
 <span class="lineno">  131 </span>   = Op_acos
@@ -2106,7 +2106,7 @@ span.spaces    { background: white }
 <span class="lineno">   24 </span>
 <span class="lineno">   25 </span>-- Just the list of intersections isn't enough, however.  An empty
 <span class="lineno">   26 </span>-- list can denote either a trace that is always within the solid
-<span class="lineno">   27 </span>-- or never in the solid.  To dissambiguate, an extra flag is kept
+<span class="lineno">   27 </span>-- or never in the solid.  To disambiguate, an extra flag is kept
 <span class="lineno">   28 </span>-- that indicates whether we are starting inside or outside of the
 <span class="lineno">   29 </span>-- solid.  As a convenience, we also keep an additional flag that
 <span class="lineno">   30 </span>-- indicates whether the last intersection ends inside or outside.
@@ -2635,7 +2635,7 @@ span.spaces    { background: white }
 <span class="lineno">  248 </span><span class="spaces">      </span><span class="istickedoff"><span class="nottickedoff">types = getPrimOpType primOp</span></span></span>
 <span class="lineno">  249 </span>
 <span class="lineno">  250 </span>
-<span class="lineno">  251 </span>-- Render is somewhat funny, becauase it can only get called at top level.
+<span class="lineno">  251 </span>-- Render is somewhat funny, because it can only get called at top level.
 <span class="lineno">  252 </span>-- All other operations are purely functional.
 <span class="lineno">  253 </span>
 <span class="lineno">  254 </span>doAllOp :: PrimOp -&gt; GMLOp -&gt; Stack -&gt; IO Stack

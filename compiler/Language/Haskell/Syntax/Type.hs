@@ -1297,7 +1297,7 @@ deriving instance (
   , Eq (XXFieldOcc pass)
   ) => Eq (FieldOcc pass)
 
--- | Located Ambiguous Field Occurence
+-- | Located Ambiguous Field Occurrence
 type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 
 -- | Ambiguous Field Occurrence

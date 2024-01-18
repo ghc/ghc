@@ -803,7 +803,7 @@ mkLocalFieldGREs p cons =
                                 , recFieldCons  = fl_cons } ]
   where
     -- We are given a map taking a constructor to its fields, but we want
-    -- a map taking a field to the contructors which have it.
+    -- a map taking a field to the constructors which have it.
     -- We thus need to convert [(Con, [Field])] into [(Field, [Con])].
     flds = Map.toList
          $ Map.fromListWith unionUniqSets

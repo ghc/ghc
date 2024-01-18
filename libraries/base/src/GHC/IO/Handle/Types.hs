@@ -188,7 +188,7 @@ isAppendHandleType _            = False
 --     (an unbuffered handle needs a 1 character buffer in order to support
 --      hLookAhead and hIsEOF).
 --   * In a read Handle, the byte buffer is always empty (we decode when reading)
---   * In a wriite Handle, the Char buffer is always empty (we encode when writing)
+--   * In a write Handle, the Char buffer is always empty (we encode when writing)
 --
 checkHandleInvariants :: Handle__ -> IO ()
 #if defined(DEBUG)

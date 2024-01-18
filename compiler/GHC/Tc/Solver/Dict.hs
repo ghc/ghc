@@ -1504,7 +1504,7 @@ orientation during solving. Wrinkles:
      Decompose to
        [W] kfresh0 ~ kb0
        [W] (yfresh0::kfresh0) ~ (b0::kb0)
-     Preserve orientiation when decomposing!!
+     Preserve orientation when decomposing!!
 
 (W2) Suppose we happen to tackle the second Wanted from (W1)
      first. Then in canEqCanLHSHetero we emit a /kind/ equality, as

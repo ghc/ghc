@@ -3,7 +3,7 @@ import GHC.Exts
 import Unsafe.Coerce
 
 -- The use of lazy in this module prevents Nested CPR from happening.
--- Doing so would separate contructor application from their payloads,
+-- Doing so would separate constructor application from their payloads,
 -- so that CSE can't kick in.
 -- This is unfortunate, but this testcase is about demonstrating
 -- effectiveness of STG CSE.

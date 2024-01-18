@@ -131,7 +131,7 @@ singletonGraph g = case labNodes g of [_] -> True
 -- to a single supernode, then materialize (``inflate'') the reducible
 -- equivalent graph from that supernode.  The `Supernode` class
 -- defines only the methods needed to collapse; rematerialization is
--- the responsiblity of the client.
+-- the responsibility of the client.
 --
 -- During the Hecht-Ullman algorithm, every supernode has a unique
 -- entry point, which is given by `superLabel`.  But this invariant is

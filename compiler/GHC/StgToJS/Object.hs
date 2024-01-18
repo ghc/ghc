@@ -232,7 +232,7 @@ data IndexEntry = IndexEntry
 
 
 --------------------------------------------------------------------------------
--- Essential oeprations on Objects
+-- Essential operations on Objects
 --------------------------------------------------------------------------------
 
 -- | Given a handle to a Binary payload, add the module, 'mod_name', its
@@ -307,7 +307,7 @@ getObjectHeader bh = do
           pure (Right (mkModuleName (mod_name)))
 
 
--- | Parse object body. Must be called after a sucessful getObjectHeader
+-- | Parse object body. Must be called after a successful getObjectHeader
 getObjectBody :: BinHandle -> ModuleName -> IO Object
 getObjectBody bh0 mod_name = do
   -- Read the string table
