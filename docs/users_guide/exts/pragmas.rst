@@ -199,7 +199,7 @@ There are three ways of using these pragmas.
           import A (g)
 
    If the :ghc-flag: `-Wincomplete-export-warnings` is on,
-   such occurences are warned about.
+   such occurrences are warned about.
 
    Moreover, all warning declarations of a specific name have to
    be warned with the same pragma and message: ::

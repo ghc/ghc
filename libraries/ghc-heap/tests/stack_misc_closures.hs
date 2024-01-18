@@ -350,7 +350,7 @@ test setup assertion = do
 -- not to its frames.)
 --
 -- The "level of entertainment" x is a bit arbitrarily choosen: A future
--- performace improvement may be to reduce it to a smaller number.
+-- performance improvement may be to reduce it to a smaller number.
 entertainGC :: Int -> String
 entertainGC 0 = "0"
 entertainGC x = show x ++ entertainGC (x - 1)

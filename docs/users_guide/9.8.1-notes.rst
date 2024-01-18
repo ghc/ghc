@@ -185,7 +185,7 @@ Compiler
 
 - Guard polymorphic specialisation behind the flag :ghc-flag:`-fpolymorphic-specialisation`.
   This optimisation has led to a number of incorrect runtime result bugs, so we are disabling it
-  by default for now whilst we consider more carefully an appropiate fix.
+  by default for now whilst we consider more carefully an appropriate fix.
   (See :ghc-ticket:`23469`, :ghc-ticket:`23109`, :ghc-ticket:`21229`, :ghc-ticket:`23445`)
 
 - The warning about incompatible command line flags can now be controlled with the

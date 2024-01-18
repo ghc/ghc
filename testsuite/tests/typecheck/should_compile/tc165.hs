@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -dcore-lint #-}
 
 -- Fails GHC 5.04.2 with -dcore-lint
--- The issue ariseswhen you have a method that
+-- The issue arises when you have a method that
 -- constrains a class variable
 
 module Test where

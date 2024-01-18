@@ -3398,7 +3398,7 @@ caseRules _ _ = Nothing
 
 -- | Case rules
 --
--- It's important that occurence info are present, hence the use of In* types.
+-- It's important that occurrence info are present, hence the use of In* types.
 caseRules2
    :: InExpr  -- ^ Scutinee
    -> InId    -- ^ Case-binder

@@ -233,7 +233,7 @@ class Bifoldable p where
 -- | Class laws for tuples hold only up to laziness. The
 -- Bifoldable methods are lazier than their Foldable counterparts.
 -- For example the law @'bifoldr' ('flip' 'const') ≡ 'foldr'@ does
--- not hold for tuples if lazyness is exploited:
+-- not hold for tuples if laziness is exploited:
 --
 -- >>> bifoldr (flip const) (:) [] (undefined :: (Int, Word)) `seq` ()
 -- ()

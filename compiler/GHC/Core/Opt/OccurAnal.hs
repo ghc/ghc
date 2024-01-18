@@ -665,7 +665,7 @@ through A, so it should have ManyOcc.  Bear this case in mind!
       [j :-> [v :-> OneOcc{occ_n_br=0}]]
   See addJoinPoint.
 
-* At an occurence of a join point, we do everything as normal, but add in the
+* At an occurrence of a join point, we do everything as normal, but add in the
   UsageDetails from the occ_join_points.  See mkOneOcc.
 
 * Crucially, at the NonRec binding of the join point, in `occAnalBind`, we use

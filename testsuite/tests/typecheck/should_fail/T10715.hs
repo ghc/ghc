@@ -10,7 +10,7 @@ data X a
 -- this should be accepted or not.
 --
 -- But in #12466 we decided to accept contradictory
--- type signatures, so definition is now accepeted even
+-- type signatures, so definition is now accepted even
 -- though you can never call it.  Instead we get a
 -- redundant pattern-match warning, in the
 -- post-typechecking pattern-match checks

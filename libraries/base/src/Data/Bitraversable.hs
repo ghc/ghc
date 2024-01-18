@@ -174,7 +174,7 @@ bisequence = bitraverse id id
 -- | Class laws for tuples hold only up to laziness. The
 -- Bitraversable methods are lazier than their Traversable counterparts.
 -- For example the law @'bitraverse' 'pure' ≡ 'traverse'@ does
--- not hold for tuples if lazyness is exploited:
+-- not hold for tuples if laziness is exploited:
 --
 -- >>> (bitraverse pure pure undefined :: IO (Int, Word)) `seq` ()
 -- ()

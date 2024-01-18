@@ -312,7 +312,7 @@ See #12615 for some more examples.
 
 Note [Handling overloaded and rebindable patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Overloaded paterns and rebindable patterns are desugared in the renamer
+Overloaded patterns and rebindable patterns are desugared in the renamer
 using the HsPatExpansion mechanism detailed in:
 Note [Rebindable syntax and HsExpansion]
 The approach is similar to that of expressions, which is further detailed
@@ -1434,15 +1434,15 @@ In `g` only `b` is bound by the pattern, whereas `a` is locally bound in the pat
 and does not scope over the RHS of `g`.
 
 We track locally bound names in the `OccSet` in `TPRnM` monad, and use it to
-decide whether occurences of type variables are usages or bindings.
+decide whether occurrences of type variables are usages or bindings.
 
 The check is done in `rn_ty_pat_var`
 
 Note [Implicit and explicit type variable binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Type patterns are renamed differently from ordinary types.
-  * Types are renamed by `rnHsType` where all type variable occurences are considered usages
-  * Type patterns are renamed by `rnHsTyPat` where some type variable occurences are usages
+  * Types are renamed by `rnHsType` where all type variable occurrences are considered usages
+  * Type patterns are renamed by `rnHsTyPat` where some type variable occurrences are usages
     and other are bindings
 
 Here is an example:

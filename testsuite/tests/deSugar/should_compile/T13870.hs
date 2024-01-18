@@ -1,4 +1,4 @@
--- !!! T13870 -- missing-fields warnings for recprd-construction
+-- !!! T13870 -- missing-fields warnings for record-construction
 
 module ShouldCompile where
 

@@ -844,7 +844,7 @@ mkIfElse e s = go (L.reverse s)
         [] -> panic "mkIfElse: empty expression list"
         _  -> panic "mkIfElse: multiple DEFAULT cases"
 
--- | Wrapper to contruct sequences of (===), e.g.,
+-- | Wrapper to construct sequences of (===), e.g.,
 --
 -- > mkEq [l0,l1,l2] [r0,r1,r2] = (l0 === r0) && (l1 === r1) && (l2 === r2)
 --

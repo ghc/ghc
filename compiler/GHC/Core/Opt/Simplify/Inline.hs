@@ -206,7 +206,7 @@ The heuristic can be tuned in two ways:
 
 Some guidance on setting these defaults:
 
-* A low treshold (<= 2) is needed to prevent exponential cases from spiraling out of
+* A low threshold (<= 2) is needed to prevent exponential cases from spiraling out of
   control. We picked 2 for no particular reason.
 * Scaling the penalty by any more than 30 means the reproducer from
   T18730 won't compile even with reasonably small values of n. Instead

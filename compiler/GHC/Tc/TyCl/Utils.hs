@@ -1060,7 +1060,7 @@ To determine naughtiness we distingish two cases:
   The selector is defined like this:
     $selReadPfld :: forall a. ReadP a => String -> a
     $selReadPfld @a (d::ReadP a) s = readp @a d s
-  Perfectly fine!  The (ReadP a) constraint lets us contruct a value of type
+  Perfectly fine!  The (ReadP a) constraint lets us construct a value of type
   'a' from a bare String.
 
   Another curious case (#23038):

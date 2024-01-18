@@ -197,7 +197,7 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
 {-
 Note [Detecting incomplete record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A record selector occurence is incomplete iff. it could fail due to
+A record selector occurrence is incomplete iff. it could fail due to
 being applied to a data type constructor not present for this record field.
 
 e.g.
@@ -225,7 +225,7 @@ incomplete record selectors to consider:
       f :: T -> Int
       f = g -- warning will be emitted here
 
-  - Emitting a warning for a general occurence of the record selector
+  - Emitting a warning for a general occurrence of the record selector
     This is done during the renaming of a `HsRecSel` expression in `dsExpr`
     and simply pulls the information about incompleteness from the `Id`
 

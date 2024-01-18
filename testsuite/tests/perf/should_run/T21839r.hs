@@ -1,6 +1,6 @@
 -- For in depth details see the ticket #21839. The short version:
 
--- We noticed that GHC got slower compiling Cabal the libary.
+-- We noticed that GHC got slower compiling Cabal the library.
 -- Eventually I narrowed it down to the pattern below of deriving Generics
 -- for a Enum, and then deriving a Binary instance for that Enum via Generics.
 -- A pattern very frequently used in Cabal.

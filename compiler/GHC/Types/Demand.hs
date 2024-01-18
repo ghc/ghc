@@ -1740,7 +1740,7 @@ a consequence of fixed-point iteration, it's not important that they agree.
 -- Subject to Note [Default demand on free variables and arguments]
 -- | Captures the result of an evaluation of an expression, by
 --
---   * Listing how the free variables of that expression have been evaluted
+--   * Listing how the free variables of that expression have been evaluated
 --     ('de_fvs')
 --   * Saying whether or not evaluation would surely diverge ('de_div')
 --

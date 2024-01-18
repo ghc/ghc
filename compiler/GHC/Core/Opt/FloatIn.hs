@@ -345,7 +345,7 @@ the "used-here" set:
 
 * In fiExpr (AnnCase ...). Remember to include the case_bndr in the
   binders.  Again, no need to delete the alt binders from the rhs
-  free vars, beause any bindings mentioning them will be dropped
+  free vars, because any bindings mentioning them will be dropped
   here unconditionally.
 -}
 

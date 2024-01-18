@@ -24,7 +24,7 @@ import Geometry
 
 -- Just the list of intersections isn't enough, however.  An empty
 -- list can denote either a trace that is always within the solid
--- or never in the solid.  To dissambiguate, an extra flag is kept
+-- or never in the solid.  To disambiguate, an extra flag is kept
 -- that indicates whether we are starting inside or outside of the
 -- solid.  As a convenience, we also keep an additional flag that
 -- indicates whether the last intersection ends inside or outside.

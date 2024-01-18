@@ -4,11 +4,11 @@ import System.IO.Unsafe
 
 -- x is killed during evaluation with an asynchronous exception, but
 -- nevertheless gets overwritten with 'throw ThreadKilled' because the
--- async exception is re-thrown as a synchrnonous exception by
+-- async exception is re-thrown as a synchronous exception by
 -- 'onException'.
 
 main = do
-  let x = unsafePerformIO $ 
+  let x = unsafePerformIO $
              (do threadDelay 1000000; return 42)
              `onException` return ()
 

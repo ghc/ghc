@@ -118,7 +118,7 @@ rtsLibffiLibrary stage way = do
 
 -- | Get the libffi files bundled with the rts (header and library files).
 -- Unless using the system libffi, this needs the libffi library. It must be
--- built before the targets can be calcuulated.
+-- built before the targets can be calculated.
 needRtsLibffiTargets :: Stage -> Action [FilePath]
 needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage

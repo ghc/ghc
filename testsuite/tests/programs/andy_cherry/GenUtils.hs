@@ -201,7 +201,7 @@ arrElem obj = \x -> inRange size x && arr ! x
 
 -- Here is the functional version of a multi-way conditional,
 -- again using arrays, of course. Remember @b@ can be a function !
--- Note again the use of partiual application.
+-- Note again the use of partial application.
 
 arrCond :: (Ix a)
         => (a,a)                      -- the bounds

@@ -2019,7 +2019,7 @@ Wrinkles:
               case dataToTagLarge# x of t -> blah
            into
               case x of { A -> ...; B -> .. }
-           because again that conjures up the type-level-only data contructors
+           because again that conjures up the type-level-only data constructors
            `A` and `B` in a pattern, violating (I1) (#23023).
            So we check for "type data" TyCons before applying this
            transformation.  (In practice, this doesn't matter because

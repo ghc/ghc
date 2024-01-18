@@ -1147,7 +1147,7 @@ in type-level contexts. The only problem is that the namespaces do not match.
 Demotion allows us to connect the `tvName` usages to the `varName` binding.
 
 Demotion of an RdrName means that we change its namespace from tvName/tcClsName
-to varName/dataName. Suppose we are looking up an occurence of a variable `a`
+to varName/dataName. Suppose we are looking up an occurrence of a variable `a`
 in a type (in `lookupTypeOccRn`). The parser gave `a` a `tvName` occurrence,
 so we try looking that up first.  If that fails, and RequiredTypeArguments is
 on, then "demote" it to the `varName` namespace with `demoteRdrNameTv` and look

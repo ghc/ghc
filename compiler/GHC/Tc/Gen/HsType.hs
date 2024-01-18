@@ -4263,10 +4263,10 @@ tcHsPatSigType ctxt hole_mode
 -- Typecheck type patterns, in data constructor patterns, e.g
 --    f (MkT @a @(Maybe b) ...) = ...
 --
--- We have two competely separate typing rules,
+-- We have two completely separate typing rules,
 --   one for binder type patterns  (handled by `tc_bndr_in_pat`)
 --   one for unifier type patterns (handled by `tc_type_in_pat`)
--- The two cases are distingished by `tyPatToBndr`.
+-- The two cases are distinguished by `tyPatToBndr`.
 -- See Note [Type patterns: binders and unifiers]
 tcHsTyPat :: HsTyPat GhcRn               -- The type pattern
           -> Kind                        -- What kind is expected

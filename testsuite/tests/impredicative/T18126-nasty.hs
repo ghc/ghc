@@ -7,7 +7,7 @@ module Bug where
 
 -- This nasty example fails with quick-look
 -- (which here is switched on by ($))
--- beecause of a very subtle issue where we instantiate an
+-- because of a very subtle issue where we instantiate an
 -- instantiation variable with (F alpha), where F is a type function
 --
 -- It's a stripped-down version of T5490

@@ -807,7 +807,7 @@ visVarsOfTypes = foldMap visVarsOfType
 isInjectiveInType :: TyVar -> Type -> Bool
 -- True <=> tv /definitely/ appears injectively in ty
 -- A bit more efficient that (tv `elemVarSet` injectiveTyVarsOfType ty)
--- Ignore occurence in coercions, and even in injective positions of
+-- Ignore occurrence in coercions, and even in injective positions of
 -- type families.
 isInjectiveInType tv ty
   = go ty

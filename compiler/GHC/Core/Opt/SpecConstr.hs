@@ -1302,7 +1302,7 @@ deadArgOcc UnkOcc        = False
 deadArgOcc NoOcc         = True
 
 specialisableArgOcc :: ArgOcc -> Bool
--- | Does this occurence represent one worth specializing for.
+-- | Does this occurrence represent one worth specializing for.
 specialisableArgOcc UnkOcc        = False
 specialisableArgOcc NoOcc         = False
 specialisableArgOcc (ScrutOcc {}) = True

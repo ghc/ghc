@@ -746,7 +746,7 @@ runGHCi paths maybe_exprs = do
     -- explicitly specifying it does cause it to be processed.
 
   -- Perform a :reload for files given on the GHCi command line
-  -- The appropiate targets will already be set
+  -- The appropriate targets will already be set
   -- When in -e mode, if the load fails then we want to stop
   -- immediately rather than going on to evaluate the expression.
   when (not (null paths)) $ do
@@ -3748,7 +3748,7 @@ wrapIdentCompleter = wrapCompleter' word_break_chars_pred
 wrapIdentCompleterMod :: Monad m => (String -> m [String]) -> CompletionFunc m
 wrapIdentCompleterMod = wrapCompleter' go
   where
-    go '.' = False -- Treated specially since it is a seperator for module qualifiers
+    go '.' = False -- Treated specially since it is a separator for module qualifiers
     go c = word_break_chars_pred c
 
 wrapIdentCompleterWithModifier

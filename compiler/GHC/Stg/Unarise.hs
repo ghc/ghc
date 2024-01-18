@@ -310,7 +310,7 @@ of Int64Rep. This means instead of retuning the original alt_rhs we will return:
       (x' :: Int32#) -> alt_rhs
   )
 
-We then run unarise on alt_rhs within that expression, which will replace the first occurence
+We then run unarise on alt_rhs within that expression, which will replace the first occurrence
 of `x` with sum_slot_arg_1 giving us post-unarise:
 
     f sum_tag sum_slot1 =

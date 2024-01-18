@@ -488,7 +488,7 @@ mapAccumR f s t = coerce (traverse @t @(StateR s) @a @b) (flip f) t s
 -- `mapAccumL` that traverses the structure while evaluating the actions
 -- and passing an accumulating parameter from left to right.
 -- It returns a final value of this accumulator together with the new structure.
--- The accummulator is often used for caching the intermediate results of a computation.
+-- The accumulator is often used for caching the intermediate results of a computation.
 --
 --  @since 4.18.0.0
 --

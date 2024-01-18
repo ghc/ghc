@@ -573,7 +573,7 @@ foldrSM = foldrSMWith foldStream
 -- {-# RULES "foldrSM/app" [1]
 --  forall ys. foldrSM consM ys = \xs -> xs `conjoin` ys #-}
 
--- Like foldrSM but sharing the SVar state within the recostructed stream.
+-- Like foldrSM but sharing the SVar state within the reconstructed stream.
 {-# INLINE_NORMAL foldrSMShared #-}
 foldrSMShared :: (IsStream t, Monad m)
     => (m a -> t m b -> t m b) -> t m b -> t m a -> t m b
@@ -1116,7 +1116,7 @@ bindWith par m1 f = go m1
 
 -- XXX express in terms of foldrS?
 -- XXX can we use a different stream type for the generated stream being
--- falttened so that we can combine them differently and keep the resulting
+-- flattened so that we can combine them differently and keep the resulting
 -- stream different?
 -- XXX do we need specialize to IO?
 -- XXX can we optimize when c and a are same, by removing the forall using

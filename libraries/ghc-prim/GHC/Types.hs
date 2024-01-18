@@ -574,7 +574,7 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- > loop SPEC x where loop !_ arg = ...
 --
 -- There is no semantic difference between 'SPEC' and 'SPEC2',
--- we just need a type with two contructors lest it is optimised away
+-- we just need a type with two constructors lest it is optimised away
 -- before @SpecConstr@.
 --
 -- This type is reexported from "GHC.Exts" since GHC 9.0 and @base-4.15@.

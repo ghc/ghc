@@ -110,7 +110,7 @@ moveBy by Ring {..} ringHead = ringStartPtr `plusPtr` advanceFromHead
 
 -- | Insert an item at the head of the ring, when the ring is full this
 -- replaces the oldest item in the ring with the new item. This is unsafe
--- beause ringHead supplied is not verified to be within the Ring. Also,
+-- because ringHead supplied is not verified to be within the Ring. Also,
 -- the ringStart foreignPtr must be guaranteed to be alive by the caller.
 {-# INLINE unsafeInsert #-}
 unsafeInsert :: Storable a => Ring a -> Ptr a -> a -> IO (Ptr a)

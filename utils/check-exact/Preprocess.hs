@@ -59,7 +59,7 @@ defaultCppOptions :: CppOptions
 defaultCppOptions = CppOptions [] [] []
 
 -- ---------------------------------------------------------------------
--- | Remove GHC style line pragams (@{-# LINE .. #-}@) and convert them into comments.
+-- | Remove GHC style line pragmas (@{-# LINE .. #-}@) and convert them into comments.
 stripLinePragmas :: String -> (String, [GHC.LEpaComment])
 stripLinePragmas = unlines' . unzip . findLines . lines
   where

@@ -1315,7 +1315,7 @@ removeCommentsA :: EpAnn ann -> EpAnn ann
 removeCommentsA (EpAnn a an _) = EpAnn a an emptyComments
 
 -- ---------------------------------------------------------------------
--- Semigroup instances, to allow easy combination of annotaion elements
+-- Semigroup instances, to allow easy combination of annotation elements
 -- ---------------------------------------------------------------------
 
 instance (Semigroup a) => Semigroup (EpAnn a) where

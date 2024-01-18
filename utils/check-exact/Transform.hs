@@ -335,7 +335,7 @@ setEntryDPFromAnchor  off (EpaSpan (RealSrcSpan anc _)) ll@(L la _) = setEntryDP
 -- ---------------------------------------------------------------------
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
--- Also transfer any comments occuring before it.
+-- Also transfer any comments occurring before it.
 transferEntryDP :: (Monad m, NoAnn t2, Typeable t1, Typeable t2)
   => LocatedAn t1 a -> LocatedAn t2 b -> TransformT m (LocatedAn t2 b)
 transferEntryDP (L (EpAnn anc1 an1 cs1) _) (L (EpAnn _anc2 an2 cs2) b) = do
@@ -355,7 +355,7 @@ combine :: (Typeable a, Typeable b) => a -> b -> b
 combine x y = fromMaybe y (cast x)
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
--- Also transfer any comments occuring before it.
+-- Also transfer any comments occurring before it.
 -- TODO: call transferEntryDP, and use pushDeclDP
 transferEntryDP' :: (Monad m) => LHsDecl GhcPs -> LHsDecl GhcPs -> TransformT m (LHsDecl GhcPs)
 transferEntryDP' la lb = do
@@ -589,7 +589,7 @@ priorCommentsDeltas r cs = go r (reverse $ sortEpaComments cs)
 
 -- ---------------------------------------------------------------------
 
--- | Split comments into ones occuring before the end of the reference
+-- | Split comments into ones occurring before the end of the reference
 -- span, and those after it.
 splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
 splitCommentsEnd p (EpaComments cs) = cs'
@@ -608,7 +608,7 @@ splitCommentsEnd p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
     cs' = before
     ts' = after <> ts
 
--- | Split comments into ones occuring before the start of the reference
+-- | Split comments into ones occurring before the start of the reference
 -- span, and those after it.
 splitCommentsStart :: RealSrcSpan -> EpAnnComments -> EpAnnComments
 splitCommentsStart p (EpaComments cs) = cs'
@@ -789,7 +789,7 @@ insertBefore (getLocA -> k) = insertAt findBefore
 -- start of HasDecls instances
 -- =====================================================================
 
--- |Provide a means to get and process the immediate child declartions of a
+-- |Provide a means to get and process the immediate child declarations of a
 -- given AST element.
 class (Data t) => HasDecls t where
 -- ++AZ++: TODO: add tests to confirm that hsDecls followed by replaceDecls is idempotent

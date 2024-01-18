@@ -8,7 +8,7 @@
 -- | Break Arrays
 --
 -- An array of words, indexed by a breakpoint number (breakpointId in Tickish)
--- containing the ignore count for every breakpopint.
+-- containing the ignore count for every breakpoint.
 -- There is one of these arrays per module.
 --
 -- For each word with value n:
