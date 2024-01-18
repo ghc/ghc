@@ -111,7 +111,7 @@ getCompilerPath "stage-cabal" = do
 getCompilerPath compiler = pure compiler
 
 isInTreeCompiler :: String -> Bool
-isInTreeCompiler c = c `elem` ["stage1","stage2","stage3"]
+isInTreeCompiler c = isJust (stageOfTestCompiler c)
 
 -- | Get the full path to the given program.
 fullPath :: Stage -> Package -> Action FilePath
