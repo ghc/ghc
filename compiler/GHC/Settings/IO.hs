@@ -16,9 +16,11 @@ import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
 import GHC.Utils.Panic
+import GHC.ResponseFile
 import GHC.Settings
 import GHC.SysTools.BaseDir
 
+import Data.Char
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
 import qualified Data.Map as Map
@@ -72,9 +74,13 @@ initSettings top_dir = do
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
   let getSetting key = either pgmError pure $
-        getRawFilePathSetting top_dir settingsFile mySettings key
+        -- Escape the 'top_dir', to make sure we don't accidentally introduce an
+        -- unescaped space
+        getRawFilePathSetting (escapeArg top_dir) settingsFile mySettings key
       getToolSetting :: String -> ExceptT SettingsError m String
-      getToolSetting key = expandToolDir useInplaceMinGW mtool_dir <$> getSetting key
+        -- Escape the 'mtool_dir', to make sure we don't accidentally introduce
+        -- an unescaped space
+      getToolSetting key = expandToolDir useInplaceMinGW (fmap escapeArg mtool_dir) <$> getSetting key
   targetPlatformString <- getSetting "target platform string"
   cc_prog <- getToolSetting "C compiler command"
   cxx_prog <- getToolSetting "C++ compiler command"
@@ -91,10 +97,10 @@ initSettings top_dir = do
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                       else []
-      cpp_args    = map Option (words cpp_args_str)
-      hs_cpp_args = map Option (words hs_cpp_args_str)
-      cc_args  = words cc_args_str ++ unreg_cc_args
-      cxx_args = words cxx_args_str
+      cpp_args    = map Option (unescapeArgs cpp_args_str)
+      hs_cpp_args = map Option (unescapeArgs hs_cpp_args_str)
+      cc_args  = unescapeArgs cc_args_str ++ unreg_cc_args
+      cxx_args = unescapeArgs cxx_args_str
 
       -- The extra flags we need to pass gcc when we invoke it to compile .hc code.
       --
@@ -135,12 +141,12 @@ initSettings top_dir = do
   let   as_prog  = cc_prog
         as_args  = map Option cc_args
         ld_prog  = cc_prog
-        ld_args  = map Option (cc_args ++ words cc_link_args_str)
+        ld_args  = map Option (cc_args ++ unescapeArgs cc_link_args_str)
   ld_r_prog <- getToolSetting "Merge objects command"
   ld_r_args <- getToolSetting "Merge objects flags"
   let ld_r
         | null ld_r_prog = Nothing
-        | otherwise      = Just (ld_r_prog, map Option $ words ld_r_args)
+        | otherwise      = Just (ld_r_prog, map Option $ unescapeArgs ld_r_args)
 
   llvmTarget <- getSetting "LLVM target"
 
@@ -261,3 +267,19 @@ getTargetPlatform settingsFile settings = do
     , platformHasLibm = targetHasLibm
     , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }
+
+-- ----------------------------------------------------------------------------
+-- Escape Args helpers
+-- ----------------------------------------------------------------------------
+
+-- | Just like 'GHC.ResponseFile.escapeArg', but it is not exposed from base.
+escapeArg :: String -> String
+escapeArg = reverse . foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs

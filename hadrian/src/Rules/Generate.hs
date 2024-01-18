@@ -6,6 +6,7 @@ module Rules.Generate (
     ) where
 
 import Development.Shake.FilePath
+import Data.Char (isSpace)
 import qualified Data.Set as Set
 import Base
 import qualified Context
@@ -416,7 +417,7 @@ generateSettings = do
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
-        , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
+        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Tables next to code", queryTarget (yesNo . tgtTablesNextToCode))
         , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
@@ -431,23 +432,23 @@ generateSettings = do
             ++ ["]"]
   where
     ccPath  = prgPath . ccProgram . tgtCCompiler
-    ccFlags = unwords . prgFlags . ccProgram . tgtCCompiler
+    ccFlags = escapeArgs . prgFlags . ccProgram . tgtCCompiler
     cxxPath  = prgPath . cxxProgram . tgtCxxCompiler
-    cxxFlags = unwords . prgFlags . cxxProgram . tgtCxxCompiler
-    clinkFlags = unwords . prgFlags . ccLinkProgram . tgtCCompilerLink
+    cxxFlags = escapeArgs . prgFlags . cxxProgram . tgtCxxCompiler
+    clinkFlags = escapeArgs . prgFlags . ccLinkProgram . tgtCCompilerLink
     linkSupportsNoPie = yesNo . ccLinkSupportsNoPie . tgtCCompilerLink
     cppPath  = prgPath . cppProgram . tgtCPreprocessor
-    cppFlags = unwords . prgFlags . cppProgram . tgtCPreprocessor
+    cppFlags = escapeArgs . prgFlags . cppProgram . tgtCPreprocessor
     hsCppPath  = prgPath . hsCppProgram . tgtHsCPreprocessor
-    hsCppFlags = unwords . prgFlags . hsCppProgram . tgtHsCPreprocessor
+    hsCppFlags = escapeArgs . prgFlags . hsCppProgram . tgtHsCPreprocessor
     mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) . tgtMergeObjs
-    mergeObjsFlags = maybe "" (unwords . prgFlags . mergeObjsProgram) . tgtMergeObjs
+    mergeObjsFlags = maybe "" (escapeArgs . prgFlags . mergeObjsProgram) . tgtMergeObjs
     linkSupportsSingleModule    = yesNo . ccLinkSupportsSingleModule . tgtCCompilerLink
     linkSupportsFilelist        = yesNo . ccLinkSupportsFilelist . tgtCCompilerLink
     linkSupportsCompactUnwind   = yesNo . ccLinkSupportsCompactUnwind . tgtCCompilerLink
     linkIsGnu                   = yesNo . ccLinkIsGnu . tgtCCompilerLink
     arPath  = prgPath . arMkArchive . tgtAr
-    arFlags = unwords . prgFlags . arMkArchive . tgtAr
+    arFlags = escapeArgs . prgFlags . arMkArchive . tgtAr
     arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr
     arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
     ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
@@ -571,3 +572,19 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
+
+-- | Just like 'GHC.ResponseFile.escapeArgs', but use spaces instead of newlines
+-- for splitting elements.
+escapeArgs :: [String] -> String
+escapeArgs = unwords . map escapeArg
+
+escapeArg :: String -> String
+escapeArg = reverse . foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs
