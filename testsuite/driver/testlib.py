@@ -202,32 +202,6 @@ def stage1(name, opts):
 # testsuite/tests/stage1 directory. Validate runs the tests in that
 # directory with `make stage=1`.
 
-# Cache the results of looking to see if we have a library or not.
-# This makes quite a difference, especially on Windows.
-have_lib_cache = {} # type: Dict[str, bool]
-
-def have_library(lib: str) -> bool:
-    """ Test whether the given library is available """
-    if lib in have_lib_cache:
-        got_it = have_lib_cache[lib]
-    else:
-        cmd = strip_quotes(config.ghc_pkg)
-        cmd_line = [cmd, '--no-user-package-db']
-
-        for db in config.test_package_db:
-            cmd_line.append("--package-db="+db)
-
-        cmd_line.extend(['describe', lib])
-
-        print(cmd_line)
-
-        cp = subprocess.run(cmd_line, capture_output=True, env=ghc_env)
-        r = cp.returncode
-        got_it = r == 0
-        have_lib_cache[lib] = got_it
-
-    return got_it
-
 def _req_hadrian_deps(name,opts,deps):
     opts.hadrian_deps.update(deps)
 
