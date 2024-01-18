@@ -7,6 +7,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 module GHC.Types.Unique.Supply (
         -- * Main data type
@@ -48,9 +49,9 @@ import Foreign.Storable
 #define NO_FETCH_ADD
 #endif
 
-#if defined(NO_FETCH_ADD)
+#if defined(javascript_HOST_ARCH)
 import GHC.Exts ( atomicCasWord64Addr#, eqWord64# )
-#else
+#elif !defined(NO_FETCH_ADD)
 import GHC.Exts( fetchAddWordAddr#, word64ToWord#, wordToWord64# )
 #endif
 
@@ -232,9 +233,8 @@ mkSplitUniqSupply c
         (# s4, MkSplitUniqSupply (tag .|. u) x y #)
         }}}}
 
-#if defined(NO_FETCH_ADD)
--- GHC currently does not provide this operation on 32-bit platforms,
--- hence the CAS-based implementation.
+#if defined(javascript_HOST_ARCH)
+-- CAS-based pure Haskell implementation
 fetchAddWord64Addr# :: Addr# -> Word64# -> State# RealWorld
                     -> (# State# RealWorld, Word64# #)
 fetchAddWord64Addr# = go
@@ -246,7 +246,35 @@ fetchAddWord64Addr# = go
             (# s2, res #)
               | 1# <- res `eqWord64#` n0 -> (# s2, n0 #)
               | otherwise -> go ptr inc s2
+
+#elif defined(NO_FETCH_ADD)
+
+-- atomic_inc64 is defined in compiler/cbits/genSym.c. This is of
+-- course not ideal, but we need to live with it for now given the
+-- current situation:
+-- 1. There's no Haskell primop fetchAddWord64Addr# on 32-bit
+--    platforms yet
+-- 2. The Cmm %fetch_add64 primop syntax is only present in ghc 9.8
+--    but we currently bootstrap from older ghc in our CI
+-- 3. The Cmm MO_AtomicRMW operation with 64-bit width is well
+--    supported on 32-bit platforms already, but the plumbing from
+--    either Haskell or Cmm doesn't work yet because of 1 or 2
+-- 4. There's hs_atomic_add64 in ghc-prim cbits that we ought to use,
+--    but it's only available on 32-bit starting from ghc 9.8
+-- 5. The pure Haskell implementation causes mysterious i386
+--    regression in unrelated ghc work that can only be fixed by the C
+--    version here
+
+foreign import ccall unsafe "atomic_inc64" atomic_inc64 :: Addr# -> Word64# -> IO Word64
+
+fetchAddWord64Addr# :: Addr# -> Word64# -> State# RealWorld
+                    -> (# State# RealWorld, Word64# #)
+fetchAddWord64Addr# addr inc s0 =
+    case unIO (atomic_inc64 addr inc) s0 of
+      (# s1, W64# res #) -> (# s1, res #)
+
 #else
+
 fetchAddWord64Addr# :: Addr# -> Word64# -> State# RealWorld
                     -> (# State# RealWorld, Word64# #)
 fetchAddWord64Addr# addr inc s0 =

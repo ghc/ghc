@@ -16,3 +16,14 @@ HsWord64 ghc_unique_counter64 = 0;
 HsInt ghc_unique_inc     = 1;
 #endif
 
+// Only used on 32-bit non-JS platforms
+#if WORD_SIZE_IN_BITS != 64
+StgWord64 atomic_inc64(StgWord64 volatile* p, StgWord64 incr)
+{
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_fetch_add(p, incr, __ATOMIC_SEQ_CST);
+#else
+    return __sync_fetch_and_add(p, incr);
+#endif
+}
+#endif

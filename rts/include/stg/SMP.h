@@ -81,16 +81,6 @@ EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n
  */
 EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
 
-
-/*
- * Atomic 64-bit addition of by the provided quantity
- *
- * atomic_inc64(p, n) {
- *   return ((*p) += n);
- * }
- */
-EXTERN_INLINE StgWord64 atomic_inc64(StgWord64 volatile* p, StgWord64 n);
-
 /*
  * Atomic decrement
  *
@@ -523,16 +513,6 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
 #endif
 }
 
-EXTERN_INLINE StgWord64
-atomic_inc64(StgWord64 volatile* p, StgWord64 incr)
-{
-#if defined(HAVE_C11_ATOMICS)
-    return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
-#else
-    return __sync_add_and_fetch(p, incr);
-#endif
-}
-
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
@@ -685,15 +665,6 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
 {
     return ((*p) += incr);
 }
-
-
-EXTERN_INLINE StgWord64 atomic_inc64(StgWord64 volatile* p, StgWord64 incr);
-EXTERN_INLINE StgWord64
-atomic_inc64(StgWord64 volatile* p, StgWord64 incr)
-{
-    return ((*p) += incr);
-}
-
 
 INLINE_HEADER StgWord
 atomic_dec(StgVolatilePtr p)
