@@ -1643,6 +1643,20 @@ maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 -- | Identity function.
 --
 -- > id x = x
+--
+-- This function might seem useless at first glance, but it can be very useful
+-- in a higher order context.
+--
+-- ==== __Examples__
+--
+-- >>> length $ filter id [True, True, False, True]
+-- 3
+--
+-- >>> Just (Just 3) >>= id
+-- Just 3
+--
+-- >>> foldr id 0 [(^3), (*5), (+2)]
+-- 1000
 id                      :: a -> a
 id x                    =  x
 
@@ -1676,6 +1690,13 @@ breakpointCond _ r = r
 data Opaque = forall a. O a
 -- | @const x y@ always evaluates to @x@, ignoring its second argument.
 --
+-- > const x = \_ -> x
+--
+-- This function might seem useless at first glance, but it can be very useful
+-- in a higher order context.
+--
+-- ==== __Examples__
+--
 -- >>> const 42 "hello"
 -- 42
 --
@@ -1684,7 +1705,22 @@ data Opaque = forall a. O a
 const                   :: a -> b -> a
 const x _               =  x
 
--- | Function composition.
+-- | Right to left function composition.
+--
+-- prop> (f . g) x = f (g x)
+--
+-- prop> f . id = f = id . f
+--
+-- ==== __Examples__
+--
+-- >>> map ((*2) . length) [[], [0, 1, 2], [0]]
+-- [0,6,2]
+--
+-- >>> foldr (.) id [(+1), (*3), (^3)] 2
+-- 25
+--
+-- >>> let (...) = (.).(.) in ((*2)...(+)) 5 10
+-- 30
 {-# INLINE (.) #-}
 -- Make sure it has TWO args only on the left, so that it inlines
 -- when applied to two functions, even if there is no final argument
@@ -1693,8 +1729,17 @@ const x _               =  x
 
 -- | @'flip' f@ takes its (first) two arguments in the reverse order of @f@.
 --
+-- prop> flip f x y = f y x
+--
+-- prop> flip . flip = id
+--
+-- ==== __Examples__
+--
 -- >>> flip (++) "hello" "world"
 -- "worldhello"
+--
+-- >>> let (.>) = flip (.) in (+1) .> show $ 5
+-- "6"
 flip                    :: (a -> b -> c) -> b -> a -> c
 flip f x y              =  f y x
 
@@ -1706,14 +1751,17 @@ flip f x y              =  f y x
 -- (\x -> undefined x) `seq` () and thus would just evaluate to (), but now
 -- it is equivalent to undefined `seq` () which diverges.
 
-{- | @($)@ is the __function application__ operator.
+{- | @'($)'@ is the __function application__ operator.
 
-Applying @($)@ to a function @f@ and an argument @x@ gives the same result as applying @f@ to @x@ directly. The definition is akin to this:
+Applying @'($)'@ to a function @f@ and an argument @x@ gives the same result as applying @f@ to @x@ directly. The definition is akin to this:
 
 @
 ($) :: (a -> b) -> a -> b
 ($) f x = f x
 @
+
+This is @'id'@ specialized from @a -> a@ to @(a -> b) -> (a -> b)@ which by the associativity of @(->)@
+is the same as @(a -> b) -> a -> b@.
 
 On the face of it, this may appear pointless! But it's actually one of the most useful and important operators in Haskell.
 
@@ -1731,7 +1779,7 @@ expr = min 5 $ 1 + 5
 expr = (min 5) (1 + 5)
 @
 
-=== Uses
+==== __Examples__
 
 A common use cases of @($)@ is to avoid parentheses in complex expressions.
 
@@ -1760,7 +1808,7 @@ applyFive = map ($ 5) [(+1), (2^)]
 >>> [6, 32]
 @
 
-=== Technical Remark (Representation Polymorphism)
+==== __Technical Remark (Representation Polymorphism)__
 
 @($)@ is fully representation-polymorphic. This allows it to also be used with arguments of unlifted and even unboxed kinds, such as unboxed integers:
 

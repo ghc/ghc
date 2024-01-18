@@ -39,7 +39,12 @@ infixl 1 &
 -- | @'fix' f@ is the least fixed point of the function @f@,
 -- i.e. the least defined @x@ such that @f x = x@.
 --
--- For example, we can write the factorial function using direct recursion as
+-- When @f@ is strict, this means that because, by the definition of strictness,
+-- @f &#x22a5; = &#x22a5;@ and such the least defined fixed point of any strict function is @&#x22a5;@.
+--
+-- ==== __Examples__
+--
+-- We can write the factorial function using direct recursion as
 --
 -- >>> let fac n = if n <= 1 then 1 else n * fac (n-1) in fac 5
 -- 120
@@ -47,12 +52,31 @@ infixl 1 &
 -- This uses the fact that Haskell’s @let@ introduces recursive bindings. We can
 -- rewrite this definition using 'fix',
 --
--- >>> fix (\rec n -> if n <= 1 then 1 else n * rec (n-1)) 5
--- 120
---
 -- Instead of making a recursive call, we introduce a dummy parameter @rec@;
 -- when used within 'fix', this parameter then refers to 'fix'’s argument, hence
 -- the recursion is reintroduced.
+--
+-- >>> fix (\rec n -> if n <= 1 then 1 else n * rec (n-1)) 5
+-- 120
+--
+-- Using 'fix', we can implement versions of 'Data.List.repeat' as @'fix' '.' '(:)'@
+-- and 'Data.List.cycle' as @'fix' '.' '(++)'@
+--
+-- >>> take 10 $ fix (0:)
+-- [0,0,0,0,0,0,0,0,0,0]
+--
+-- >>> map (fix (\rec n -> if n < 2 then n else rec (n - 1) + rec (n - 2))) [1..10]
+-- [1,1,2,3,5,8,13,21,34,55]
+--
+-- ==== __Implementation Details__
+--
+-- The current implementation of 'fix' uses structural sharing
+--
+-- @'fix' f = let x = f x in x@
+--
+-- A more straightforward but non-sharing version would look like
+--
+-- @'fix' f = f ('fix' f)@
 fix :: (a -> a) -> a
 fix f = let x = f x in x
 
@@ -60,11 +84,20 @@ fix f = let x = f x in x
 -- unary function @u@ to two arguments @x@ and @y@. From the opposite
 -- perspective, it transforms two inputs and combines the outputs.
 --
--- @((+) \``on`\` f) x y = f x + f y@
+-- @(op \``on`\` f) x y = f x \``op`\` f y@
 --
--- Typical usage: @'Data.List.sortBy' ('Prelude.compare' \`on\` 'Prelude.fst')@.
+-- ==== __Examples__
 --
--- Algebraic properties:
+-- >>> sortBy (compare `on` length) [[0, 1, 2], [0, 1], [], [0]]
+-- [[],[0],[0,1],[0,1,2]]
+--
+-- >>> ((+) `on` length) [1, 2, 3] [-1]
+-- 4
+--
+-- >>> ((,) `on` (*2)) 2 3
+-- (4,6)
+--
+-- ==== __Algebraic properties__
 --
 -- * @(*) \`on\` 'id' = (*) -- (if (*) &#x2209; {&#x22a5;, 'const' &#x22a5;})@
 --
@@ -118,8 +151,18 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- convenience.  Its precedence is one higher than that of the forward
 -- application operator '$', which allows '&' to be nested in '$'.
 --
+--
+-- This is a version of @'flip' 'id'@, where 'id' is specialized from @a -> a@ to @(a -> b) -> (a -> b)@
+-- which by the associativity of @(->)@ is @(a -> b) -> a -> b@.
+-- flipping this yields @a -> (a -> b) -> b@ which is the type signature of '&'
+--
+-- ==== __Examples__
+--
 -- >>> 5 & (+1) & show
 -- "6"
+--
+-- >>> sqrt $ [1 / n^2 | n <- [1..1000]] & sum & (*6)
+-- 3.1406380562059946
 --
 -- @since 4.8.0.0
 (&) :: forall r a (b :: TYPE r). a -> (a -> b) -> b
@@ -130,7 +173,15 @@ x & f = f x
 --
 -- It is equivalent to @'flip' ('Data.Bool.bool' 'id')@.
 --
--- Algebraic properties:
+-- ==== __Examples__
+--
+-- >>> map (\x -> applyWhen (odd x) (*2) x) [1..10]
+-- [2,2,6,4,10,6,14,8,18,10]
+--
+-- >>> map (\x -> applyWhen (length x > 6) ((++ "...") . take 3) x) ["Hi!", "This is amazing", "Hope you're doing well today!", ":D"]
+-- ["Hi!","Thi...","Hop...",":D"]
+--
+-- ==== __Algebraic properties__
 --
 -- * @applyWhen 'True' = 'id'@
 --
