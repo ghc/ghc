@@ -176,8 +176,8 @@ resolveObjs = do
 -- Foreign declarations to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
 
-foreign import ccall unsafe "addDLL"                  c_addDLL                  :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
-foreign import ccall unsafe "lookupSymbolInDLL"       c_lookupSymbolInDLL       :: Ptr LoadedDLL -> CString -> IO (Ptr a)
+foreign import ccall unsafe "loadNativeObj"           c_addDLL                  :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
+foreign import ccall unsafe "lookupSymbolInNativeObj" c_lookupSymbolInDLL       :: Ptr LoadedDLL -> CString -> IO (Ptr a)
 foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
 foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int

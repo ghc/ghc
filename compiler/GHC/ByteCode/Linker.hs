@@ -173,12 +173,12 @@ lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
       pkg_id = moduleUnitId $ nameModule nm
       loaded_dlls = maybe [] loaded_pkg_hs_dlls $ lookupUDFM pkgs_loaded pkg_id
 
-      go [] = lookupSymbol interp sym_to_find
       go (dll:dlls) = do
         mb_ptr <- lookupSymbolInDLL interp dll sym_to_find
         case mb_ptr of
           Just ptr -> pure (Just ptr)
           Nothing -> go dlls
+      go [] = pure Nothing
 
   go loaded_dlls
 

@@ -148,6 +148,7 @@ data LoadedPkgInfo
   , loaded_pkg_hs_objs     :: ![LibrarySpec]
   , loaded_pkg_non_hs_objs :: ![LibrarySpec]
   , loaded_pkg_hs_dlls     :: ![RemotePtr LoadedDLL]
+  -- ^ TODO: write Note
   , loaded_pkg_trans_deps  :: UniqDSet UnitId
   }
 
