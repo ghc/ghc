@@ -5,6 +5,7 @@ module Rules.Generate (
     templateRules
     ) where
 
+import Data.Char (isSpace)
 import qualified Data.Set as Set
 import Base
 import qualified Context
@@ -469,7 +470,7 @@ generateSettings = do
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
-        , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
+        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
@@ -599,3 +600,19 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
+
+-- | Just like 'GHC.ResponseFile.escapeArgs', but use spaces instead of newlines
+-- for splitting elements.
+escapeArgs :: [String] -> String
+escapeArgs = unwords . map escapeArg
+
+escapeArg :: String -> String
+escapeArg = reverse . foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs
