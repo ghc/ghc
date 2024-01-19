@@ -468,6 +468,9 @@ dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
 AC_PROG_CC([cc gcc clang])
 AC_PROG_CXX([g++ clang++ c++])
+# Work around #24324
+MOVE_TO_FLAGS([CC],[CFLAGS])
+MOVE_TO_FLAGS([CXX],[CXXFLAGS])
 
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
