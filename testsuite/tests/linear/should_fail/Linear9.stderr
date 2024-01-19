@@ -1,7 +1,7 @@
 
 Linear9.hs:9:17: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘_’
     • In the pattern: _
       In the pattern: (a, _)
       In an equation for ‘incorrectFst’: incorrectFst (a, _) = a
@@ -21,14 +21,14 @@ Linear9.hs:15:20: error: [GHC-18872]
 
 Linear9.hs:18:21: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘_’
     • In the pattern: _
       In the pattern: (a, _)
       In the pattern: ((a, _), _)
 
 Linear9.hs:18:24: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘_’
     • In the pattern: _
       In the pattern: ((a, _), _)
       In an equation for ‘incorrectFstFst’:
@@ -36,7 +36,7 @@ Linear9.hs:18:24: error: [GHC-18872]
 
 Linear9.hs:25:25: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘_’
     • In the pattern: _
       In the pattern: Foo a _
       In an equation for ‘incorrectTestFst’:

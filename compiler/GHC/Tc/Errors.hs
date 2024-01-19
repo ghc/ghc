@@ -1175,7 +1175,7 @@ reportGroup mk_err ctxt items
 
 -- See Note [No deferring for multiplicity errors]
 nonDeferrableOrigin :: CtOrigin -> Bool
-nonDeferrableOrigin NonLinearPatternOrigin  = True
+nonDeferrableOrigin (NonLinearPatternOrigin {}) = True
 nonDeferrableOrigin (UsageEnvironmentOf {}) = True
 nonDeferrableOrigin (FRROrigin {})          = True
 nonDeferrableOrigin _                       = False

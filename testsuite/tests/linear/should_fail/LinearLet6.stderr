@@ -15,7 +15,8 @@ LinearLet6.hs:10:3: error: [GHC-18872]
 
 LinearLet6.hs:15:14: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘Just y’
+          (non-variable lazy pattern aren't linear)
     • In a pattern binding: (Just y) = x
       In the expression: let %1 (Just y) = x in y
       In an equation for ‘h’: h x = let %1 (Just y) = x in y

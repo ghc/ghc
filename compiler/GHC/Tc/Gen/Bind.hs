@@ -804,7 +804,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
     manyIfPat bind@(L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
       = return bind
     manyIfPat (L loc pat@(PatBind {pat_mult=mult_ann, pat_lhs=lhs, pat_ext =(pat_ty,_)}))
-      = do { mult_co_wrap <- tcSubMult NonLinearPatternOrigin ManyTy (getTcMultAnn mult_ann)
+      = do { mult_co_wrap <- tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy (getTcMultAnn mult_ann)
            -- The wrapper checks for correct multiplicities.
            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
            ; let lhs' = mkLHsWrapPat mult_co_wrap lhs pat_ty

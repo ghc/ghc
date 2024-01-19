@@ -22,7 +22,7 @@ module GHC.Tc.Types.Origin (
   isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
-  ClsInstOrQC(..), NakedScFlag(..),
+  ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
 
   TypedThing(..), TyVarBndrs(..),
 
@@ -621,7 +621,7 @@ data CtOrigin
       Module  -- ^ Module in which the instance was declared
       ClsInst -- ^ The declared typeclass instance
 
-  | NonLinearPatternOrigin
+  | NonLinearPatternOrigin NonLinearPatternReason (LPat GhcRn)
   | UsageEnvironmentOf Name
 
   | CycleBreakerOrigin
@@ -642,6 +642,12 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
 
+data NonLinearPatternReason
+  = LazyPatternReason
+  | GeneralisedPatternReason
+  | PatternSynonymReason
+  | ViewPatternReason
+  | OtherPatternReason
 
 -- | The number of superclass selections needed to get this Given.
 -- If @d :: C ty@   has @ScDepth=2@, then the evidence @d@ will look
@@ -881,6 +887,10 @@ pprCtOrigin (ScOrigin (IsQC orig) nkd)
          , whenPprDebug (braces (text "sc-origin:" <> ppr nkd))
          , pprCtOrigin orig ]
 
+pprCtOrigin (NonLinearPatternOrigin reason pat)
+  = hang (ctoHerald <+> text "a non-linear pattern" <+> quotes (ppr pat))
+       2 (pprNonLinearPatternReason reason)
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
@@ -921,7 +931,6 @@ pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO IfThenElseOrigin      = text "an if-then-else expression"
 pprCtO StaticOrigin          = text "a static form"
-pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 
@@ -949,7 +958,14 @@ pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
 pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
 pprCtO (ImpedanceMatching {})       = text "combining required constraints"
+pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
 
+pprNonLinearPatternReason :: HasCallStack => NonLinearPatternReason -> SDoc
+pprNonLinearPatternReason LazyPatternReason = parens (text "non-variable lazy pattern aren't linear")
+pprNonLinearPatternReason GeneralisedPatternReason = parens (text "non-variable pattern bindings that have been generalised aren't linear")
+pprNonLinearPatternReason PatternSynonymReason = parens (text "pattern synonyms aren't linear")
+pprNonLinearPatternReason ViewPatternReason = parens (text "view patterns aren't linear")
+pprNonLinearPatternReason OtherPatternReason = empty
 
 {- *********************************************************************
 *                                                                      *

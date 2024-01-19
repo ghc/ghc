@@ -114,14 +114,14 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
       | xopt LangExt.Strict dflags = xstrict lpat
       | otherwise = not_xstrict lpat
       where
-        xstrict (L _ (LazyPat _ _)) = checkManyPattern pat_ty
+        xstrict p@(L _ (LazyPat _ _)) = checkManyPattern LazyPatternReason p pat_ty
         xstrict (L _ (ParPat _ p)) = xstrict p
         xstrict _ = return WpHole
 
         not_xstrict (L _ (BangPat _ _)) = return WpHole
         not_xstrict (L _ (VarPat _ _)) = return WpHole
         not_xstrict (L _ (ParPat _ p)) = not_xstrict p
-        not_xstrict _ = checkManyPattern pat_ty
+        not_xstrict p = checkManyPattern LazyPatternReason p pat_ty
 
 -----------------
 tcMatchPats :: forall a.
@@ -467,8 +467,8 @@ tc_lpats tys penv pats
 
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
-checkManyPattern :: Scaled a -> TcM HsWrapper
-checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin ManyTy (scaledMult pat_ty)
+checkManyPattern :: NonLinearPatternReason -> LPat GhcRn -> Scaled a -> TcM HsWrapper
+checkManyPattern reason pat pat_ty = tcSubMult (NonLinearPatternOrigin reason pat) ManyTy (scaledMult pat_ty)
 
 
 tc_forall_lpat :: TcTyVar -> Checker (LPat GhcRn) (LPat GhcTc)
@@ -582,7 +582,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (BangPat x pat', res) }
 
   LazyPat x pat -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern LazyPatternReason (noLocA ps_pat) pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (pat', (res, pat_ct))
                 <- tc_lpat pat_ty (makeLazy penv) pat $
@@ -600,14 +600,14 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (mkHsWrapPat mult_wrap (LazyPat x pat') pat_ty, res) }
 
   WildPat _ -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; res <- thing_inside
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
         ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
 
   AsPat x (L nm_loc name) pat -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
@@ -624,7 +624,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
   ViewPat _ expr pat -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern ViewPatternReason (noLocA ps_pat) pat_ty
          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
          --
          -- It should be possible to have view patterns at linear (or otherwise
@@ -790,7 +790,7 @@ Fortunately that's what matchActualFunTy returns anyway.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
   NPat _ (L l over_lit) mb_neg eq -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
           -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
           --
           -- It may be possible to refine linear pattern so that they work in
@@ -843,7 +843,7 @@ AST is used for the subtraction operation.
 -- See Note [NPlusK patterns]
   NPlusKPat _ (L nm_loc name)
                (L loc lit) _ ge minus -> do
-        { mult_wrap <- checkManyPattern pat_ty
+        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; let pat_exp_ty = scaledThing pat_ty
               orig = LiteralOrigin lit
@@ -1225,7 +1225,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
 
         ; when (any isEqPred prov_theta) warnMonoLocalBinds
 
-        ; mult_wrap <- checkManyPattern pat_ty
+        ; mult_wrap <- checkManyPattern PatternSynonymReason nlWildPatName pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 
         ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats

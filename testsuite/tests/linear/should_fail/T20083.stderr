@@ -13,6 +13,6 @@ T20083.hs:6:6: error: [GHC-25897]
 
 T20083.hs:9:5: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern
+        arising from a non-linear pattern ‘_’
     • In the pattern: _
       In an equation for ‘ap2’: ap2 _ = ()
