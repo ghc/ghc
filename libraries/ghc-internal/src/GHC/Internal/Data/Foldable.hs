@@ -555,7 +555,13 @@ class Foldable t where
     elem :: Eq a => a -> t a -> Bool
     elem = any . (==)
 
-    -- | The largest element of a non-empty structure.
+    -- | The largest element of a non-empty structure. This function is
+    -- equivalent to @'foldr1' 'max'@, and its behavior on structures with
+    -- multiple largest elements depends on the relevant implementation of
+    -- 'max'. For the default implementation of 'max' (@max x y = if x <= y
+    -- then y else x@), structure order is used as a tie-breaker: if there are
+    -- multiple largest elements, the rightmost of them is chosen (this is
+    -- equivalent to @'maximumBy' 'compare'@).
     --
     -- This function is non-total and will raise a runtime exception if the
     -- structure happens to be empty.  A structure that supports random access
@@ -583,7 +589,13 @@ class Foldable t where
        getMax . foldMap' (Max #. (Just :: a -> Maybe a))
     {-# INLINEABLE maximum #-}
 
-    -- | The least element of a non-empty structure.
+    -- | The least element of a non-empty structure. This function is
+    -- equivalent to @'foldr1' 'min'@, and its behavior on structures with
+    -- multiple largest elements depends on the relevant implementation of
+    -- 'min'. For the default implementation of 'min' (@min x y = if x <= y
+    -- then x else y@), structure order is used as a tie-breaker: if there are
+    -- multiple least elements, the leftmost of them is chosen (this is
+    -- equivalent to @'minimumBy' 'compare'@).
     --
     -- This function is non-total and will raise a runtime exception if the
     -- structure happens to be empty.  A structure that supports random access
@@ -1288,7 +1300,8 @@ all :: Foldable t => (a -> Bool) -> t a -> Bool
 all p = getAll #. foldMap (All #. p)
 
 -- | The largest element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple largest elements, the rightmost of them is chosen.
 --
 -- ==== __Examples__
 --
@@ -1314,7 +1327,8 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
 {-# INLINE[2] maximumBy #-}
 
 -- | The least element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple least elements, the leftmost of them is chosen.
 --
 -- ==== __Examples__
 --

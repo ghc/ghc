@@ -393,7 +393,29 @@ instance Ord TyCon where
 --
 -- Note that (7.) and (8.) do /not/ require 'min' and 'max' to return either of
 -- their arguments. The result is merely required to /equal/ one of the
--- arguments in terms of '(==)'.
+-- arguments in terms of '(==)'. Users who expect a stronger guarantee are advised
+-- to write their own min and/or max functions.
+--
+-- The nuance of the above distinction is not always fully internalized by
+-- developers, and in the past (tracing back to the Haskell 1.4 Report) the
+-- specification for 'Ord' asserted the stronger property that @(min x y, max x
+-- y) = (x, y)@ or @(y, x)@, or in other words, that 'min' and 'max' /will/
+-- return one of their arguments, using argument order as the tie-breaker if
+-- the arguments are equal by comparison. A few list and
+-- 'Data.Foldable.Foldable' functions have behavior that is best understood
+-- with this assumption in mind: all variations of @minimumBy@ and @maximumBy@
+-- (which can't use 'min' and 'max' in their implementations) are written such
+-- that @minimumBy 'compare'@ and @maximumBy 'compare'@ are respectively
+-- equivalent to @minimum@ and @maximum@ (which do use 'min' and 'max') only if
+-- 'min' and 'max' adhere to this tie-breaking convention. Otherwise, if there
+-- are multiple least or largest elements in a container, @minimum@ and
+-- @maximum@ may not return the /same/ one that @minimumBy 'compare'@ and
+-- @maximumBy 'compare'@ do (though they should return something that is
+-- /equal/). (This is relevant for types with non-extensional equality, like
+-- 'Data.Semigroup.Arg', but also in cases where the precise reference held
+-- matters for memory-management reasons.) Unless there is a reason to deviate,
+-- it is less confusing for implementors of 'Ord' to respect this same
+-- convention (as the default definitions of 'min' and 'max' do).
 --
 -- Minimal complete definition: either 'compare' or '<='.
 -- Using 'compare' can be more efficient for complex types.

@@ -958,10 +958,11 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
--- | The 'maximumBy' function is the non-overloaded version of 'maximum',
--- which takes a comparison function and a list
+-- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
+-- List order is used as a tie-breaker: if there are multiple greatest
+-- elements, the last of them is chosen.
 --
 -- ==== __Examples__
 --
@@ -980,10 +981,11 @@ maximumBy cmp xs        =  foldl1 maxBy xs
                                        GT -> x
                                        _  -> y
 
--- | The 'minimumBy' function is the non-overloaded version of 'minimum',
--- which takes a comparison function and a list
+-- | The 'minimumBy' function takes a comparison function and a list
 -- and returns the least element of the list by the comparison function.
 -- The list must be finite and non-empty.
+-- List order is used as a tie-breaker: if there are multiple least
+-- elements, the first of them is chosen.
 --
 -- ==== __Examples__
 --

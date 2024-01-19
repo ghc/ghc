@@ -808,8 +808,11 @@ scanr1 f (x:xs)         =  f x q : qs
 
 -- | 'maximum' returns the maximum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'GHC.Internal.Data.List.maximumBy', which allows the
--- programmer to supply their own comparison function.
+-- This function is equivalent to @'foldr1' 'max'@, and its behavior on lists
+-- with multiple maxima depends on the relevant implementation of 'max'. For
+-- the default implementation of 'max', list order is used as a tie-breaker: if
+-- there are multiple maxima, the rightmost of them is chosen (this is
+-- equivalent to @'GHC.Internal.Data.List.maximumBy' 'compare'@).
 --
 -- >>> maximum []
 -- *** Exception: Prelude.maximum: empty list
@@ -832,8 +835,11 @@ maximum xs              =  foldl1' max xs
 
 -- | 'minimum' returns the minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'GHC.Internal.Data.List.minimumBy', which allows the
--- programmer to supply their own comparison function.
+-- This function is equivalent to @'foldr1' 'min'@, and its behavior on lists
+-- with multiple minima depends on the relevant implementation of 'min'. For
+-- the default implementation of 'min', list order is used as a tie-breaker: if
+-- there are multiple minima, the leftmost of them is chosen (this is
+-- equivalent to @'GHC.Internal.Data.List.minimumBy' 'compare'@).
 --
 -- >>> minimum []
 -- *** Exception: Prelude.minimum: empty list

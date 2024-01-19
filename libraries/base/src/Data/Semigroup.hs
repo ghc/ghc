@@ -340,7 +340,11 @@ instance Num a => Num (Max a) where
   fromInteger    = Max . fromInteger
 
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
--- placed inside 'Min' and 'Max' to compute an arg min or arg max.
+-- placed inside 'Min' and 'Max' to compute an arg min or arg max. In
+-- the event of ties, the leftmost qualifying 'Arg' is chosen; contrast
+-- with the behavior of 'minimum' and 'maximum' for many other types,
+-- where ties are broken by considering elements to the left in the
+-- structure to be less than elements to the right.
 --
 -- ==== __Examples__
 --
@@ -397,11 +401,25 @@ instance Foldable (Arg a) where
 instance Traversable (Arg a) where
   traverse f (Arg x a) = Arg x `fmap` f a
 
--- | @since 4.9.0.0
+-- |
+-- Note that `Arg`'s 'Eq' instance does not satisfy extensionality:
+--
+-- >>> Arg 0 0 == Arg 0 1
+-- True
+-- >>> let f (Arg _ x) = x in f (Arg 0 0) == f (Arg 0 1)
+-- False
+--
+-- @since 4.9.0.0
 instance Eq a => Eq (Arg a b) where
   Arg a _ == Arg b _ = a == b
 
--- | @since 4.9.0.0
+-- |
+-- Note that `Arg`'s 'Ord' instance has 'min' and 'max' implementations that
+-- differ from the tie-breaking conventions of the default implementation of
+-- 'min' and 'max' in class 'Ord'; 'Arg' breaks ties by favoring the first
+-- argument in both functions.
+--
+-- @since 4.9.0.0
 instance Ord a => Ord (Arg a b) where
   Arg a _ `compare` Arg b _ = compare a b
   min x@(Arg a _) y@(Arg b _)

@@ -130,7 +130,13 @@ class Foldable t => Foldable1 t where
     toNonEmpty :: t a -> NonEmpty a
     toNonEmpty = runNonEmptyDList . foldMap1 singleton
 
-    -- | The largest element of a non-empty structure.
+    -- | The largest element of a non-empty structure. This function is
+    -- equivalent to @'foldr1' 'Data.Ord.max'@, and its behavior on structures
+    -- with multiple largest elements depends on the relevant implementation of
+    -- 'Data.Ord.max'. For the default implementation of 'Data.Ord.max' (@max x
+    -- y = if x <= y then y else x@), structure order is used as a tie-breaker:
+    -- if there are multiple largest elements, the rightmost of them is chosen
+    -- (this is equivalent to @'maximumBy' 'Data.Ord.compare'@).
     --
     -- >>> maximum (32 :| [64, 8, 128, 16])
     -- 128
@@ -139,7 +145,13 @@ class Foldable t => Foldable1 t where
     maximum :: Ord a => t a -> a
     maximum = getMax #. foldMap1' Max
 
-    -- | The least element of a non-empty structure.
+    -- | The least element of a non-empty structure. This function is
+    -- equivalent to @'foldr1' 'Data.Ord.min'@, and its behavior on structures
+    -- with multiple largest elements depends on the relevant implementation of
+    -- 'Data.Ord.min'. For the default implementation of 'Data.Ord.min' (@min x
+    -- y = if x <= y then x else y@), structure order is used as a tie-breaker:
+    -- if there are multiple least elements, the leftmost of them is chosen
+    -- (this is equivalent to @'minimumBy' 'Data.Ord.compare'@).
     --
     -- >>> minimum (32 :| [64, 8, 128, 16])
     -- 8
@@ -362,7 +374,8 @@ foldlMapM1 g f t = g x >>= \y -> foldlM f y xs
   where x:|xs = toNonEmpty t
 
 -- | The largest element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple largest elements, the rightmost of them is chosen.
 --
 -- @since 4.18.0.0
 maximumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a
@@ -372,7 +385,8 @@ maximumBy cmp = foldl1' max'
                         _  -> y
 
 -- | The least element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple least elements, the leftmost of them is chosen.
 --
 -- @since 4.18.0.0
 minimumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a

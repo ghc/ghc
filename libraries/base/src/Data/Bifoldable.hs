@@ -640,7 +640,13 @@ bielem x = biany (== x) (== x)
 biconcat :: Bifoldable t => t [a] [a] -> [a]
 biconcat = bifold
 
--- | The largest element of a non-empty structure.
+-- | The largest element of a non-empty structure. This function is equivalent
+-- to @'bifoldr1' 'max'@, and its behavior on structures with multiple largest
+-- elements depends on the relevant implementation of 'max'. For the default
+-- implementation of 'max' (@max x y = if x <= y then y else x@), structure
+-- order is used as a tie-breaker: if there are multiple largest elements, the
+-- rightmost of them is chosen (this is equivalent to @'bimaximumBy'
+-- 'compare'@).
 --
 -- ==== __Examples__
 --
@@ -670,7 +676,13 @@ bimaximum = fromMaybe (error "bimaximum: empty structure") .
     getMax . bifoldMap mj mj
   where mj = Max #. (Just :: a -> Maybe a)
 
--- | The least element of a non-empty structure.
+-- | The least element of a non-empty structure. This function is equivalent to
+-- @'bifoldr1' 'min'@, and its behavior on structures with multiple least
+-- elements depends on the relevant implementation of 'min'. For the default
+-- implementation of 'min' (@min x y = if x <= y then x else y@), structure
+-- order is used as a tie-breaker: if there are multiple least elements, the
+-- leftmost of them is chosen (this is equivalent to @'biminimumBy'
+-- 'compare'@).
 --
 -- ==== __Examples__
 --
@@ -927,7 +939,8 @@ biall :: Bifoldable t => (a -> Bool) -> (b -> Bool) -> t a b -> Bool
 biall p q = getAll #. bifoldMap (All . p) (All . q)
 
 -- | The largest element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple largest elements, the rightmost of them is chosen.
 --
 -- ==== __Examples__
 --
@@ -956,7 +969,8 @@ bimaximumBy cmp = bifoldr1 max'
                         _  -> y
 
 -- | The least element of a non-empty structure with respect to the
--- given comparison function.
+-- given comparison function. Structure order is used as a tie-breaker: if
+-- there are multiple least elements, the leftmost of them is chosen.
 --
 -- ==== __Examples__
 --
