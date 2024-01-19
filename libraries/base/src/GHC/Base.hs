@@ -512,6 +512,11 @@ instance Monoid a => Monoid (Solo a) where
 instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
         (a,b) <> (a',b') = (a<>a',b<>b')
         stimes n (a,b) = (stimes n a, stimes n b)
+        sconcat xs = let (as, bs) = unzip2 xs
+                     in (sconcat as, sconcat bs)
+          where unzip2 ((a, b) :| abs) =
+                  let (as, bs) = foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([], []) abs
+                  in (a :| as, b :| bs)
 
 -- | @since 2.01
 instance (Monoid a, Monoid b) => Monoid (a,b) where
