@@ -172,8 +172,8 @@ unboxArg arg
   --    data ByteArray          ix = ByteArray        ix ix ByteArray#
   --    data MutableByteArray s ix = MutableByteArray ix ix (MutableByteArray# s)
   | is_product_type &&
-    data_con_arity == 3 &&
-    isJust maybe_arg3_tycon &&
+    data_con_arity == 3,
+    Just arg3_tycon <- maybe_arg3_tycon,
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
   = do case_bndr <- newSysLocalDs ManyTy arg_ty
@@ -196,7 +196,6 @@ unboxArg arg
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
     maybe_arg3_tycon               = tyConAppTyCon_maybe data_con_arg_ty3
-    Just arg3_tycon                = maybe_arg3_tycon
 
 boxResult :: Type
           -> DsM (Type, CoreExpr -> CoreExpr)

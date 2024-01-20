@@ -491,7 +491,7 @@ optimizeFree offset ids = do
   -- this line goes wrong                               vvvvvvv
   let -- ids' = concat $ map (\i -> map (i,) [1..varSize . unaryTypeJSRep . idType $ i]) ids
       idSize :: Id -> Int
-      idSize i = sum $ map varSize (typeJSRep . idType $ i)
+      idSize i = typeSize $ idType i
       ids' = concatMap (\i -> map (i,) [1..idSize i]) ids
       -- 1..varSize] . unaryTypeJSRep . idType $ i]) (typeJSRep ids)
       l    = length ids'

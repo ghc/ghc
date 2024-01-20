@@ -297,13 +297,13 @@ genSetConInfo i d l {- srt -} = do
   emitClosureInfo $ ClosureInfo ei
                                 (CIRegs 0 [PtrV])
                                 (mkFastString $ renderWithContext defaultSDocContext (ppr d))
-                                (fixedLayout $ map unaryTypeJSRep fields)
+                                (fixedLayout fields)
                                 (CICon $ dataConTag d)
                                 sr
   return (mkDataEntry ei)
     where
       -- dataConRepArgTys sometimes returns unboxed tuples. is that a bug?
-      fields = concatMap (map primRepToType . typePrimRep . unwrapType . scaledThing)
+      fields = concatMap (typeJSRep . unwrapType . scaledThing)
                          (dataConRepArgTys d)
         -- concatMap (map slotTyToType . repTypeSlots . repType) (dataConRepArgTys d)
 
