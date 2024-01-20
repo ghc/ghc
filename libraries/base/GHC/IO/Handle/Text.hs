@@ -174,16 +174,28 @@ hGetChar handle =
 
 -- | Computation 'hGetLine' @hdl@ reads a line from the file or
 -- channel managed by @hdl@.
+-- 'hGetLine' does not return the newline as part of the result.
+--
+-- A line is separated by the newline
+-- set with 'System.IO.hSetNewlineMode' or 'nativeNewline' by default.
+-- The read newline character(s) are not returned as part of the result.
+--
+-- If 'hGetLine' encounters end-of-file at any point while reading
+-- in the middle of a line, it is treated as a line terminator and the (partial)
+-- line is returned.
 --
 -- This operation may fail with:
 --
 --  * 'isEOFError' if the end of file is encountered when reading
 --    the /first/ character of the line.
 --
--- If 'hGetLine' encounters end-of-file at any other point while reading
--- in a line, it is treated as a line terminator and the (partial)
--- line is returned.
-
+-- ==== __Examples__
+--
+-- >>> withFile "/home/user/foo" ReadMode hGetLine >>= putStrLn
+-- this is the first line of the file :O
+--
+-- >>> withFile "/home/user/bar" ReadMode (replicateM 3 . hGetLine)
+-- ["this is the first line","this is the second line","this is the third line"]
 hGetLine :: Handle -> IO String
 hGetLine h =
   wantReadableHandle_ "hGetLine" h $ \ handle_ ->
