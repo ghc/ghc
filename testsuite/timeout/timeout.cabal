@@ -2,8 +2,8 @@ Name: timeout
 Version: 1
 Copyright: GHC Team
 License: BSD3
-Author: GHC Team <cvs-ghc@haskell.org>
-Maintainer: GHC Team <cvs-ghc@haskell.org>
+Author: GHC Team <ghc-devs@haskell.org>
+Maintainer: GHC Team <ghc-devs@haskell.org>
 Synopsis: timeout utility
 Description: timeout utility
 Category: Development

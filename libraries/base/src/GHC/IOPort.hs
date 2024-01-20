@@ -9,7 +9,7 @@
 -- Copyright   :  (c) Tamar Christina 2019
 -- License     :  see libraries/base/LICENSE
 --
--- Maintainer  :  cvs-ghc@haskell.org
+-- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
