@@ -6,7 +6,7 @@
 -- Copyright   :  (c) The University of Glasgow, 1994-2000
 -- License     :  see libraries/base/LICENSE
 --
--- Maintainer  :  cvs-ghc@haskell.org
+-- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --

@@ -11,7 +11,7 @@
 -- Module      :  GHC.Prim.PtrEq
 -- License     :  see libraries/ghc-prim/LICENSE
 --
--- Maintainer  :  cvs-ghc@haskell.org
+-- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --

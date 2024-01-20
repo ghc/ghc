@@ -14,7 +14,7 @@
 -- Copyright   :  (c) The University of Glasgow 2009
 -- License     :  see libraries/ghc-prim/LICENSE
 --
--- Maintainer  :  cvs-ghc@haskell.org
+-- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
