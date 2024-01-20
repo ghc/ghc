@@ -799,7 +799,7 @@ There are two kinds of participants in the GHC Jobserver protocol:
     processes through the semaphore ⟨sem⟩ (specified as a string).
     Error if the semaphore doesn't exist.
 
-    Use of ``-jsem`` will override use of :ghc-flag:``-j[⟨n⟩]``,
+    Use of ``-jsem`` will override use of :ghc-flag:`-j[⟨n⟩]`,
     and vice-versa.
 
 .. _multi-home-units:

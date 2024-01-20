@@ -446,8 +446,8 @@ unboxJsArg arg
   --    data ByteArray          ix = ByteArray        ix ix ByteArray#
   --    data MutableByteArray s ix = MutableByteArray ix ix (MutableByteArray# s)
   | is_product_type &&
-    data_con_arity == 3 &&
-    isJust maybe_arg3_tycon &&
+    data_con_arity == 3,
+    Just arg3_tycon <- maybe_arg3_tycon,
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
   = do case_bndr <- newSysLocalDs ManyTy arg_ty
@@ -469,7 +469,6 @@ unboxJsArg arg
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
     maybe_arg3_tycon               = tyConAppTyCon_maybe (scaledThing data_con_arg_ty3)
-    Just arg3_tycon                = maybe_arg3_tycon
 
 
 -- Takes the result of the user-level ccall:
@@ -545,7 +544,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
                 -- The ccall returns a non-() value
   | isUnboxedTupleType prim_res_ty = do
     let
-        Just ls = fmap dropRuntimeRepArgs (tyConAppArgs_maybe prim_res_ty)
+        ls = dropRuntimeRepArgs (tyConAppArgs prim_res_ty)
         arity = 1 + length ls
     args_ids <- mapM (newSysLocalDs ManyTy) ls
     state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
@@ -612,15 +611,13 @@ jsResultWrapper result_ty
   | isPrimitiveType result_ty
   = return (Just result_ty, \e -> e)
   -- Base case 1c: boxed tuples
-  -- fixme: levity args?
-  | Just (tc, args) <- splitTyConApp_maybe result_ty
+  | Just (tc, args) <- maybe_tc_app
   , isBoxedTupleTyCon tc = do
-      let args'   = dropRuntimeRepArgs args
-          innerTy = mkTupleTy Unboxed args'
+      let innerTy = mkTupleTy Unboxed args
       (inner_res, w) <- jsResultWrapper innerTy
-      matched <- mapM (newSysLocalDs ManyTy) args'
+      matched <- mapM (newSysLocalDs ManyTy) args
       let inner e = mkWildCase (w e) (unrestricted innerTy) result_ty
-                               [ Alt (DataAlt (tupleDataCon Unboxed (length args')))
+                               [ Alt (DataAlt (tupleDataCon Unboxed (length args)))
                                      matched
                                      (mkCoreTup (map Var matched))
                                 -- mkCoreConApps (tupleDataCon Boxed (length args)) (map Type args ++ map Var matched)

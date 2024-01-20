@@ -30,10 +30,10 @@ import GHC.Utils.Panic
 
 import GHC.Data.FastString
 
-mkUnarisedIds :: MonadUnique m => FastString -> [UnaryType] -> m [Id]
+mkUnarisedIds :: MonadUnique m => FastString -> [NvUnaryType] -> m [Id]
 mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
 
-mkUnarisedId :: MonadUnique m => FastString -> UnaryType -> m Id
+mkUnarisedId :: MonadUnique m => FastString -> NvUnaryType -> m Id
 mkUnarisedId s t = mkSysLocalM s ManyTy t
 
 -- Checks if id is a top level error application.

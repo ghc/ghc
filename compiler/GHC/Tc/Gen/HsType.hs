@@ -2216,7 +2216,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
   = do { kv_details <- newTauTvDetailsAtLevel hole_lvl
        ; kv_name    <- newMetaTyVarName (fsLit "k")
        ; wc_details <- newTauTvDetailsAtLevel hole_lvl
-       ; wc_name    <- newMetaTyVarName (fsLit wc_nm)
+       ; wc_name    <- newMetaTyVarName wc_nm
        ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
              wc_kind = mkTyVarTy kv
              wc_tv   = mkTcTyVar wc_name wc_kind wc_details
@@ -2235,10 +2235,10 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
   where
      -- See Note [Wildcard names]
      wc_nm = case hole_mode of
-               HM_Sig      -> "w"
-               HM_FamPat   -> "_"
-               HM_VTA      -> "w"
-               HM_TyAppPat -> "_"
+               HM_Sig      -> fsLit "w"
+               HM_FamPat   -> fsLit "_"
+               HM_VTA      -> fsLit "w"
+               HM_TyAppPat -> fsLit "_"
 
      emit_holes = case hole_mode of
                      HM_Sig     -> True

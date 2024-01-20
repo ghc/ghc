@@ -75,7 +75,6 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Woperator-whitespace-ext-conflict`
         * :ghc-flag:`-Wambiguous-fields`
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
-        * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
         * :ghc-flag:`-Wtype-equality-out-of-scope`

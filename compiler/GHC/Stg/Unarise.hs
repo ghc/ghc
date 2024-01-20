@@ -759,13 +759,11 @@ mapTupleIdBinders
 mapTupleIdBinders ids args0 rho0
   = assert (not (any (null . stgArgRep) args0)) $
     let
-      ids_unarised :: [(Id, [PrimRep])]
-      ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
-
-      map_ids :: UnariseEnv -> [(Id, [PrimRep])] -> [StgArg] -> UnariseEnv
+      map_ids :: UnariseEnv -> [Id] -> [StgArg] -> UnariseEnv
       map_ids rho [] _  = rho
-      map_ids rho ((x, x_reps) : xs) args =
+      map_ids rho (x : xs) args =
         let
+          x_reps = typePrimRep (idType x)
           x_arity = length x_reps
           (x_args, args') =
             assert (args `lengthAtLeast` x_arity)
@@ -780,7 +778,7 @@ mapTupleIdBinders ids args0 rho0
         in
           map_ids rho' xs args'
     in
-      map_ids rho0 ids_unarised args0
+      map_ids rho0 ids args0
 
 mapSumIdBinders
   :: InId        -- Binder (in the case alternative).
@@ -1094,7 +1092,7 @@ unariseConArg _ arg@(StgLitArg lit)
   | Just as <- unariseLiteral_maybe lit
   = as
   | otherwise
-  = assert (not (isZeroBitTy (literalType lit))) -- We have no non-rubbish void literals
+  = assert (isNvUnaryRep (typePrimRep (literalType lit))) -- We have no non-rubbish non-unary literals
     [arg]
 
 unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]
@@ -1110,10 +1108,10 @@ unariseConArgBinder = unariseArgBinder True
 
 --------------------------------------------------------------------------------
 
-mkIds :: FastString -> [UnaryType] -> UniqSM [Id]
+mkIds :: FastString -> [NvUnaryType] -> UniqSM [Id]
 mkIds fs tys = mkUnarisedIds fs tys
 
-mkId :: FastString -> UnaryType -> UniqSM Id
+mkId :: FastString -> NvUnaryType -> UniqSM Id
 mkId s t = mkUnarisedId s t
 
 isMultiValBndr :: Id -> Bool

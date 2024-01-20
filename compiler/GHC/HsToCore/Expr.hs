@@ -526,10 +526,9 @@ dsExpr (HsStatic (_, whole_ty) expr@(L loc _)) = do
                             , srcLocCol  $ realSrcSpanStart r
                             )
            _             -> (0, 0)
-        srcLoc = mkCoreConApps (tupleDataCon Boxed 2)
-                     [ Type intTy              , Type intTy
-                     , mkIntExprInt platform line, mkIntExprInt platform col
-                     ]
+        srcLoc = mkCoreTup [ mkIntExprInt platform line
+                           , mkIntExprInt platform col
+                           ]
 
     putSrcSpanDsA loc $ return $
       mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ]

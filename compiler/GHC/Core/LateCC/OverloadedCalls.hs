@@ -107,7 +107,7 @@ overloadedCallsCC =
             let
               cc_name :: FastString
               cc_name =
-                fsLit $ maybe "<no name available>" getOccString (exprName app)
+                maybe (fsLit "<no name available>") getOccFS (exprName app)
 
             cc_srcspan <-
               fmap (Strict.fromMaybe (UnhelpfulSpan UnhelpfulNoLocationInfo)) $

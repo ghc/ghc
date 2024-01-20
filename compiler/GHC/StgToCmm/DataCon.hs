@@ -335,7 +335,7 @@ precomputedStaticConInfo_maybe cfg binder con [arg]
   , platformOS platform /= OSMinGW32 || not (stgToCmmPIE cfg || stgToCmmPIC cfg)
   , Just val <- getClosurePayload arg
   , inRange val
-  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
+  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId label
         val_int = fromIntegral val :: Int
         offsetW = (val_int - fromIntegral min_static_range) * (fixedHdrSizeW profile + 1)
                 -- INTLIKE/CHARLIKE closures consist of a header and one word payload
@@ -366,8 +366,8 @@ precomputedStaticConInfo_maybe cfg binder con [arg]
       | charClosure = fromIntegral (pc_MAX_CHARLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     label
-      | intClosure = "stg_INTLIKE"
-      | charClosure =  "stg_CHARLIKE"
+      | intClosure = fsLit "stg_INTLIKE"
+      | charClosure = fsLit "stg_CHARLIKE"
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
 
 precomputedStaticConInfo_maybe _ _ _ _ = Nothing
