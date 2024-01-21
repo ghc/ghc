@@ -64,13 +64,6 @@ rtsDependencies = do
           | otherwise = common_headers ++ native_headers
     pure $ ((rtsPath -/- "include") -/-) <$> headers
 
-genapplyDependencies :: Expr [FilePath]
-genapplyDependencies = do
-    stage   <- getStage
-    rtsPath <- expr (rtsBuildPath $ succStage stage)
-    ((stage /= Stage3) ?) $ pure $ ((rtsPath -/- "include") -/-) <$>
-        [ "ghcautoconf.h", "ghcplatform.h" ]
-
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
     stage   <- getStage
@@ -101,7 +94,6 @@ generatedDependencies = do
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
             , package rts      ? rtsDependencies
-            , package genapply ? genapplyDependencies
             ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
@@ -147,8 +139,12 @@ generatePackageCode context@(Context stage pkg _ _) = do
             build $ target context HsCpp [primopsSource] [file]
 
     when (pkg == rts) $ do
-        root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
-            build $ target context GenApply [] [file]
+        root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file -> do
+            -- See Note [How genapply gets target info] for details
+            path <- buildPath context
+            let h = path -/- "include/DerivedConstants.h"
+            need [h]
+            build $ target context GenApply [h] [file]
         let go gen file = generate file (semiEmptyTarget stage) gen
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> \_ ->
             need . pure =<< pkgSetupConfigFile context
@@ -603,5 +599,3 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
-
-

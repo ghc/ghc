@@ -1032,8 +1032,15 @@ writeHaskellValue fn rs = atomicWriteFile fn xs
 
 writeHeader :: FilePath -> [(Where, What Snd)] -> IO ()
 writeHeader fn rs = atomicWriteFile fn xs
-    where xs = headers ++ hs ++ unlines body
+    where xs = headers ++ genapplyBits ++ hs ++ unlines body
           headers = "/* This file is created automatically.  Do not edit by hand.*/\n\n"
+          -- See Note [How genapply gets target info] for details
+          genapplyBits = mconcat ["// " ++ _name ++ " " ++ show v ++ "\n" | (_name, v) <- genapplyData]
+          genapplyData = [(_name, v) | (_, GetWord _name (Snd v)) <- rs, _name `elem` genapplyFields ]
+          genapplyFields = [
+            "MAX_Real_Vanilla_REG", "MAX_Real_Float_REG", "MAX_Real_Double_REG", "MAX_Real_Long_REG",
+            "WORD_SIZE", "TAG_BITS", "BITMAP_BITS_SHIFT"
+            ]
           haskellRs = fmap snd $ filter (\r -> fst r `elem` [Haskell,Both]) rs
           cRs       = fmap snd $ filter (\r -> fst r `elem` [C,Both]) rs
           hs = concat
