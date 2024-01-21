@@ -75,8 +75,7 @@
 #endif
 
 #if defined(wasm32_HOST_ARCH)
-#undef  MACHREGS_NO_REGS
-#define MACHREGS_NO_REGS 1
+#define MACHREGS_wasm32   1
 #endif
 
 #if defined(loongarch64_HOST_ARCH)

@@ -599,6 +599,8 @@ the stack. See Note [Overlapping global registers] for implications.
 
 #elif defined(MACHREGS_wasm32)
 
+#define REG_Base           0
+
 #define REG_R1             1
 #define REG_R2             2
 #define REG_R3             3
@@ -630,7 +632,6 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_SpLim          25
 #define REG_Hp             26
 #define REG_HpLim          27
-#define REG_CCCS           28
 
 /* -----------------------------------------------------------------------------
    The loongarch64 register mapping
