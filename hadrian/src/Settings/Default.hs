@@ -26,6 +26,7 @@ import Oracles.Setting
 import Packages
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
+import Settings.Builders.GenApply
 import Settings.Builders.Cabal
 import Settings.Builders.Cc
 import Settings.Builders.Configure
@@ -289,6 +290,7 @@ defaultBuilderArgs = mconcat
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs
+    , genapplyBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
     , ghcPkgBuilderArgs

@@ -17,18 +17,7 @@ import Data.Version.Extra
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat
-  [ package genapply ? do
-      -- TODO: this is here because this -I needs to come before the others.
-      -- Otherwise this would go in Settings.Packages.
-      --
-      -- genapply bakes in the next stage's headers to bake in the target
-      -- config at build time.
-      -- See Note [Genapply target as host for RTS macros].
-      stage <- getStage
-      nextStageRtsBuildDir <- expr $ rtsBuildPath $ succStage stage
-      let nextStageRtsBuildIncludeDir = nextStageRtsBuildDir </> "include"
-      builder Ghc ? arg ("-I" ++ nextStageRtsBuildIncludeDir)
-  , compileAndLinkHs, compileC, compileCxx, findHsDependencies
+  [ compileAndLinkHs, compileC, compileCxx, findHsDependencies
   , toolArgs ]
 
 toolArgs :: Args
@@ -291,4 +280,3 @@ includeGhcArgs = do
             , pure [ "-i" ++ d | d <- abSrcDirs ]
             , cIncludeArgs
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]
-
