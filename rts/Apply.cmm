@@ -43,6 +43,8 @@ import CLOSURE stg_AP_STACK_info;
 import CLOSURE stg_PAP_info;
 import CLOSURE stg_WHITEHOLE_info;
 import CLOSURE stg_ap_0_ret_str;
+import CLOSURE stg_ap_stack_entries;
+import CLOSURE stg_apply_interp_info;
 import CLOSURE stg_restore_cccs_eval_info;
 #endif
 
