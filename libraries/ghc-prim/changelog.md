@@ -113,6 +113,10 @@
 
 - `Unit`, `Tuple0`, `Tuple1`, `Tuple2`, `Tuple3` and so on (up to `Tuple64`)
   are now exported from `GHC.Tuple.Prim` and reexported from `GHC.Tuple`.
+  GHC now uses these as the actual names for tuple data types. As a result,
+  the "brackets with commas" syntax (e.g. `()`, `(,)`, etc.) now becomes just
+  an alias to these names. This change may affect tools and libraries that
+  rely on type names, such as `Generic` and Template Haskell.
 
 ## 0.10.0
 
