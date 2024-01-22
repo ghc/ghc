@@ -33,7 +33,7 @@ INLINE int __hsevent_kill_thread(pthread_t *tid, int sig)
 }
 
 /*
- * Local Variables: 
- * c-file-style: "stroustrup" 
- * End: 
+ * Local Variables:
+ * c-file-style: "stroustrup"
+ * End:
  */

@@ -48,10 +48,10 @@ set_console_buffering__(int fd, int cooked)
     DWORD flgs = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
 
     if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
-	if ( GetConsoleMode(h,&st) &&
-	     SetConsoleMode(h, cooked ? (st | ENABLE_LINE_INPUT) : st & ~flgs)  ) {
-	    return 0;
-	}
+        if ( GetConsoleMode(h,&st) &&
+             SetConsoleMode(h, cooked ? (st | ENABLE_LINE_INPUT) : st & ~flgs)  ) {
+            return 0;
+        }
     }
     return -1;
 }
@@ -64,10 +64,10 @@ set_console_echo__(int fd, int on)
     DWORD flgs = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
 
     if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
-	if ( GetConsoleMode(h,&st) &&
-	     SetConsoleMode(h,( on ? (st | flgs) : (st & ~ENABLE_ECHO_INPUT))) ) {
-	    return 0;
-	}
+        if ( GetConsoleMode(h,&st) &&
+             SetConsoleMode(h,( on ? (st | flgs) : (st & ~ENABLE_ECHO_INPUT))) ) {
+            return 0;
+        }
     }
     return -1;
 }
@@ -79,9 +79,9 @@ get_console_echo__(int fd)
     DWORD  st;
 
     if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
-	if ( GetConsoleMode(h,&st) ) {
-	    return (st & ENABLE_ECHO_INPUT ? 1 : 0);
-	}
+        if ( GetConsoleMode(h,&st) ) {
+              return (st & ENABLE_ECHO_INPUT ? 1 : 0);
+        }
     }
     return -1;
 }

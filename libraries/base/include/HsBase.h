@@ -117,7 +117,7 @@
 
 #if !HAVE_GETRUSAGE && HAVE_SYS_SYSCALL_H
 # include <sys/syscall.h>
-# if defined(SYS_GETRUSAGE)	/* hpux_HOST_OS */
+# if defined(SYS_GETRUSAGE) /* hpux_HOST_OS */
 #  define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
 #  define HAVE_GETRUSAGE 1
 # endif
@@ -327,23 +327,23 @@ INLINE ino_t  __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
 
 #if defined(_WIN32)
 INLINE int __hscore_stat(wchar_t *file, struct_stat *buf) {
-	return _wstati64(file,buf);
+    return _wstati64(file,buf);
 }
 
 INLINE int __hscore_fstat(int fd, struct_stat *buf) {
-	return _fstati64(fd,buf);
+    return _fstati64(fd,buf);
 }
 INLINE int __hscore_lstat(wchar_t *fname, struct_stat *buf )
 {
-	return _wstati64(fname,buf);
+    return _wstati64(fname,buf);
 }
 #else
 INLINE int __hscore_stat(char *file, struct_stat *buf) {
-	return stat(file,buf);
+    return stat(file,buf);
 }
 
 INLINE int __hscore_fstat(int fd, struct_stat *buf) {
-	return fstat(fd,buf);
+    return fstat(fd,buf);
 }
 
 INLINE int __hscore_lstat( const char *fname, struct stat *buf )
@@ -520,11 +520,11 @@ extern int __hs_swopen (const wchar_t* filename, int oflag, int shflag,
 
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
   int result = -1;
-	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
-	  result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
+    if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
+      result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
-	else
-	  result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
+    else
+      result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
 
   /* This call is very important, otherwise the I/O system will not propagate
@@ -536,7 +536,7 @@ INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 }
 #else
 INLINE int __hscore_open(char *file, int how, mode_t mode) {
-	return open(file,how,mode);
+    return open(file,how,mode);
 }
 #endif
 
