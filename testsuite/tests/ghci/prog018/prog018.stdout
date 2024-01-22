@@ -22,4 +22,4 @@ Failed, two modules loaded.
 
 C.hs:6:7: error: [GHC-88464]
     Variable not in scope: variableNotInScope :: ()
-Failed, two modules loaded.
+Failed, two modules reloaded.
