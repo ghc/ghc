@@ -4,14 +4,14 @@
 #include <iconv.h>
 
 iconv_t hs_iconv_open(const char* tocode,
-		      const char* fromcode)
+          const char* fromcode)
 {
-	return iconv_open(tocode, fromcode);
+    return iconv_open(tocode, fromcode);
 }
 
 size_t hs_iconv(iconv_t cd,
-		const char* * inbuf, size_t * inbytesleft,
-		char* * outbuf, size_t * outbytesleft)
+    const char* * inbuf, size_t * inbytesleft,
+    char* * outbuf, size_t * outbytesleft)
 {
     // (void*) cast avoids a warning.  Some iconvs use (const
     // char**inbuf), other use (char **inbuf).
@@ -19,7 +19,7 @@ size_t hs_iconv(iconv_t cd,
 }
 
 int hs_iconv_close(iconv_t cd) {
-	return iconv_close(cd);
+    return iconv_close(cd);
 }
 
 #endif
