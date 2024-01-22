@@ -2,5 +2,5 @@
 Ok, one module loaded.
 True
 [1 of 1] Compiling A                ( A.hs, interpreted )
-Ok, one module loaded.
+Ok, one module reloaded.
 False

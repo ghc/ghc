@@ -194,6 +194,10 @@ WebAssembly backend
 GHCi
 ~~~~
 
+- GHCi now differentiates between adding, unadding, loading, unloading and reloading
+  in its responses to using the respective commands. The output with `-fshow-loaded-modules`
+  is not changed to keep backwards compatibility for tooling.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

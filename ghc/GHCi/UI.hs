@@ -1714,8 +1714,7 @@ changeDirectory dir = do
 trySuccess :: GhciMonad m => m SuccessFlag -> m SuccessFlag
 trySuccess act =
     handleSourceError (\e -> do printErrAndMaybeExit e -- immediately exit fith failure if in ghc -e
-                                return Failed) $ do
-      act
+                                pure Failed) act
 
 -----------------------------------------------------------------------------
 -- :edit
@@ -1913,7 +1912,7 @@ checkModule m = do
                         (text "local  names: " <+> ppr loc)
              _ -> empty
           return True
-  afterLoad (successIf ok) False
+  afterLoad (successIf ok) Check
 
 -----------------------------------------------------------------------------
 -- :doc
@@ -2018,6 +2017,13 @@ instancesCmd s = do
 -----------------------------------------------------------------------------
 -- :load, :add, :unadd, :reload
 
+-- these are mainly used for displaying a more informative response
+data LoadType = Add !Int | Unadd !Int | Load | Reload | Check
+
+isReload :: LoadType -> Bool
+isReload Reload = True
+isReload _      = False
+
 -- | Sets '-fdefer-type-errors' if 'defer' is true, executes 'load' and unsets
 -- '-fdefer-type-errors' again if it has not been set before.
 wrapDeferTypeErrors :: GHC.GhcMonad m => m a -> m a
@@ -2065,7 +2071,7 @@ loadModule' files = do
         clearCaches
 
         GHC.setTargets targets
-        doLoadAndCollectInfo False LoadAllTargets
+        doLoadAndCollectInfo Load LoadAllTargets
 
   if gopt Opt_GhciLeakCheck dflags
     then do
@@ -2088,7 +2094,7 @@ addModule files = do
   -- remove old targets with the same id; e.g. for :add *M
   mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets' ]
   mapM_ GHC.addTarget targets'
-  _ <- doLoadAndCollectInfo False LoadAllTargets
+  _ <- doLoadAndCollectInfo (Add $ length targets') LoadAllTargets
   return ()
   where
     checkTarget :: GhciMonad m => Target -> m Bool
@@ -2120,8 +2126,9 @@ unAddModule :: GhciMonad m => [FilePath] -> m ()
 unAddModule files = do
   files' <- mapM expandPath files
   targets <- mapM (\m -> GHC.guessTarget m Nothing Nothing) files'
-  mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets ]
-  _ <- doLoadAndCollectInfo False LoadAllTargets
+  let removals = [ tid | Target { targetId = tid } <- targets ]
+  mapM_ GHC.removeTarget removals
+  _ <- doLoadAndCollectInfo (Unadd $ length removals) LoadAllTargets
   return ()
 
 -- | @:reload@ command
@@ -2129,7 +2136,7 @@ reloadModule :: GhciMonad m => String -> m ()
 reloadModule m = do
   session <- GHC.getSession
   let home_unit = homeUnitId (hsc_home_unit session)
-  ok <- doLoadAndCollectInfo True (loadTargets home_unit)
+  ok <- doLoadAndCollectInfo Reload (loadTargets home_unit)
   when (failed ok) failIfExprEvalMode
   where
     loadTargets hu | null m    = LoadAllTargets
@@ -2150,11 +2157,11 @@ reloadModuleDefer = wrapDeferTypeErrors . reloadModule
 -- since those commands are designed to be used by editors and
 -- tooling, it's useless to collect this data for normal GHCi
 -- sessions.
-doLoadAndCollectInfo :: GhciMonad m => Bool -> LoadHowMuch -> m SuccessFlag
-doLoadAndCollectInfo retain_context howmuch = do
+doLoadAndCollectInfo :: GhciMonad m => LoadType -> LoadHowMuch -> m SuccessFlag
+doLoadAndCollectInfo load_type howmuch = do
   doCollectInfo <- isOptionSet CollectInfo
 
-  doLoad retain_context howmuch >>= \case
+  doLoad load_type howmuch >>= \case
     Succeeded | doCollectInfo -> do
       mod_summaries <- GHC.mgModSummaries <$> getModuleGraph
       -- MP: :set +c code path only works in single package mode atm, hence
@@ -2164,11 +2171,11 @@ doLoadAndCollectInfo retain_context howmuch = do
       v <- mod_infos <$> getGHCiState
       !newInfos <- collectInfo v loaded
       modifyGHCiState (\st -> st { mod_infos = newInfos })
-      return Succeeded
-    flag -> return flag
+      pure Succeeded
+    flag -> pure flag
 
-doLoad :: GhciMonad m => Bool -> LoadHowMuch -> m SuccessFlag
-doLoad retain_context howmuch = do
+doLoad :: GhciMonad m => LoadType -> LoadHowMuch -> m SuccessFlag
+doLoad load_type howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   discardActiveBreakPoints
@@ -2177,31 +2184,31 @@ doLoad retain_context howmuch = do
   -- Enable buffering stdout and stderr as we're compiling. Keeping these
   -- handles unbuffered will just slow the compilation down, especially when
   -- compiling in parallel.
-  MC.bracket (liftIO $ do hSetBuffering stdout LineBuffering
-                          hSetBuffering stderr LineBuffering)
-             (\_ ->
-              liftIO $ do hSetBuffering stdout NoBuffering
-                          hSetBuffering stderr NoBuffering) $ \_ -> do
+  let setBuffering t = liftIO $ do
+        hSetBuffering stdout t
+        hSetBuffering stderr t
+  MC.bracket_ (setBuffering LineBuffering) (setBuffering NoBuffering) $ do
       hmis <- ifaceCache <$> getGHCiState
       -- If GHCi message gets its own configuration at some stage then this will need to be
       -- modified to 'embedUnknownDiagnostic'.
       ok <- trySuccess $ GHC.loadWithCache (Just hmis) (mkUnknownDiagnostic . GHCiMessage) howmuch
-      afterLoad ok retain_context
-      return ok
+      afterLoad ok load_type
+      pure ok
+
 
 
 afterLoad
   :: GhciMonad m
   => SuccessFlag
-  -> Bool   -- keep the remembered_ctx, as far as possible (:reload)
+  -> LoadType
   -> m ()
-afterLoad ok retain_context = do
+afterLoad ok load_type = do
   revertCAFs  -- always revert CAFs on load.
   discardTickArrays
   loaded_mods <- getLoadedModules
-  modulesLoadedMsg ok loaded_mods
+  modulesLoadedMsg ok loaded_mods load_type
   graph <- GHC.getModuleGraph
-  setContextAfterLoad retain_context (Just graph)
+  setContextAfterLoad (isReload load_type) (Just graph)
 
 setContextAfterLoad :: GhciMonad m => Bool -> Maybe GHC.ModuleGraph -> m ()
 setContextAfterLoad keep_ctxt Nothing = do
@@ -2285,35 +2292,49 @@ keepPackageImports = filterM is_pkg_import
 
 
 
-modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> m ()
-modulesLoadedMsg ok mods = do
+modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> LoadType -> m ()
+modulesLoadedMsg ok mods load_type = do
   dflags <- getDynFlags
-  msg <- if gopt Opt_ShowLoadedModules dflags
-         then do
-               mod_names <- mapM mod_name mods
-               let mod_commas
-                     | null mods = text "none."
-                     | otherwise = hsep (punctuate comma mod_names) <> text "."
-               return $ status <> text ", modules loaded:" <+> mod_commas
-         else do
-               return $ status <> text ","
-                    <+> speakNOf (length mods) (text "module") <+> "loaded."
-
   when (verbosity dflags > 0) $ do
-     rendered_msg <- showSDocForUser' msg
+     mod_names <- mapM mod_name mods
+     rendered_msg <- showSDocForUser' $
+       if gopt Opt_ShowLoadedModules dflags
+         then loaded_msg mod_names
+         else msg
      liftIO $ putStrLn rendered_msg
   where
-    status = case ok of
-                  Failed    -> text "Failed"
-                  Succeeded -> text "Ok"
+    num_mods = length mods
+    none_loaded = num_mods == 0
+
+    loaded_msg names =
+      let mod_commas
+           | null mods = text "none."
+           | otherwise = hsep (punctuate comma names) <> text "."
+      in status <> text ", modules loaded:" <+> mod_commas
+
+    msg  = status <> comma <+> msg' <> dot
+    msg' = case load_type of
+      Reload  -> if none_loaded
+                   then "no modules to be reloaded"
+                   else n_mods num_mods "reloaded"
+      Load    -> if none_loaded
+                   then "unloaded all modules"
+                   else n_mods num_mods "loaded"
+      Check   -> n_mods 1 "checked"
+      Add   n -> n_mods n "added"
+      Unadd n -> n_mods n "unadded"
+    n_mods amount action = speakNOf amount "module" <+> action
+
+    status | Succeeded <- ok = "Ok"
+           | otherwise       = "Failed"
 
     mod_name mod = do
         is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
-        return $ if is_interpreted
-                 then ppr (GHC.ms_mod mod)
-                 else ppr (GHC.ms_mod mod)
-                      <+> parens (text $ normalise $ msObjFilePath mod)
-                      -- Fix #9887
+        pure $ if is_interpreted
+               then ppr (GHC.ms_mod mod)
+               else ppr (GHC.ms_mod mod)
+                    <+> parens (text $ normalise $ msObjFilePath mod)
+                    -- Fix #9887
 
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
 -- and printing 'throwE' strings to 'stderr'. If in expression
