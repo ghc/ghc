@@ -73,6 +73,7 @@
   * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
   * Implement `copyBytes`, `fillBytes`, `moveBytes` and `stimes` for `Data.Array.Byte.ByteArray` using primops ([CLC proposal #188](https://github.com/haskell/core-libraries-committee/issues/188))
   * Add rewrite rules for conversion between `Int64` / `Word64` and `Float` / `Double` on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
+  * `Generic` instances for tuples now expose `Unit`, `Tuple2`, `Tuple3`, ..., `Tuple64` as the actual names for tuple type constructors ([GHC proposal #475](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst)).
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1

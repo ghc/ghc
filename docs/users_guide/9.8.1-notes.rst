@@ -39,6 +39,26 @@ Language
 
     type instance forall j . F1 Int = Any :: j -> j
 
+- GHC proposal `#475 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst>`_
+  has been partially implemented. Namely, tuple data types, which were previously represented using a brackets-with-commas
+  syntax form ((), (,), (,,), and so on) have been renamed to common names of the form ``Unit``, ``Tuple2``, ``Tuple3``,
+  and so on, where the number after ``Tuple`` indicates its arity: ::
+
+    data Unit = ()
+
+    data Tuple2 a b = (a,b)
+    data Tuple3 a b c = (a, b, c)
+    -- and so on, up to Tuple64
+
+  For consistency, we also introduce type aliases: ::
+
+    type Tuple0 = Unit
+    type Tuple1 = Solo
+
+  The renamed tuple data types and the new type aliases can be found in the ``GHC.Tuple`` module. This renaming
+  does not break existing code that directly uses tuple data types, but it does affect tools and libraries
+  that have access to the data type names, such as ``Generic`` and Template Haskell.
+
 Compiler
 ~~~~~~~~
 
