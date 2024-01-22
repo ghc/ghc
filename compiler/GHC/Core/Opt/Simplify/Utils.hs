@@ -74,6 +74,7 @@ import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
+import GHC.Data.Maybe ( orElse )
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
@@ -2358,6 +2359,44 @@ the outer case scrutinises the same variable as the outer case. This
 transformation is called Case Merging.  It avoids that the same
 variable is scrutinised multiple times.
 
+Wrinkles
+
+(MC1) `tryCaseMerge` "looks though" an inner single-alternative case-on-variable.
+     For example
+       case x of {
+          ...outer-alts...
+          DEFAULT -> case y of (a,b) ->
+                     case x of { A -> rhs1; B -> rhs2 }
+    ===>
+       case x of
+         ...outer-alts...
+         a -> case y of (a,b) -> rhs1
+         B -> case y of (a,b) -> rhs2
+
+    This duplicates the `case y` but it removes the case x; so it is a win
+    in terms of execution time (combining the cases on x) at the cost of
+    perhaps duplicating the `case y`.  A case in point is integerEq, which
+    is defined thus
+        integerEq :: Integer -> Integer -> Bool
+        integerEq !x !y = isTrue# (integerEq# x y)
+    which becomes
+        integerEq
+          = \ (x :: Integer) (y_aAL :: Integer) ->
+              case x of x1 { __DEFAULT ->
+              case y of y1 { __DEFAULT ->
+              case x1 of {
+                IS x2 -> case y1 of {
+                           __DEFAULT -> GHC.Types.False;
+                           IS y2     -> tagToEnum# @Bool (==# x2 y2) };
+                IP x2 -> ...
+                IN x2 -> ...
+    We want to merge the outer `case x` with the inner `case x1`.
+
+    This story is not fully robust; it will be defeated by a let-binding,
+    whih we don't want to duplicate.   But accounting for single-alternative
+    case-on-variable is easy to do, and seems useful in common cases so
+    `tryMergeCase` does it.
+
 Note [Eliminate Identity Case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         case e of               ===> e
@@ -2537,24 +2576,25 @@ mkCase, mkCase1, mkCase2, mkCase3
 --      1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
+mkCase mode scrut outer_bndr alts_ty alts
   | sm_case_merge mode
-  , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
-       <- stripTicksTop tickishFloatable deflt_rhs
-  , inner_scrut_var == outer_bndr
+  , Just alts' <- tryMergeCase outer_bndr alts
   = do  { tick (CaseMerge outer_bndr)
+        ; mkCase1 mode scrut outer_bndr alts_ty alts' }
+        -- Warning: don't call mkCase recursively!
+        -- Firstly, there's no point, because inner alts have already had
+        -- mkCase applied to them, so they won't have a case in their default
+        -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
+        -- in munge_rhs may put a case into the DEFAULT branch!
+  | otherwise
+  = mkCase1 mode scrut outer_bndr alts_ty alts
 
-        ; let wrap_alt (Alt con args rhs) = assert (outer_bndr `notElem` args)
-                                            (Alt con args (wrap_rhs rhs))
-                -- Simplifier's no-shadowing invariant should ensure
-                -- that outer_bndr is not shadowed by the inner patterns
-              wrap_rhs rhs = Let (NonRec inner_bndr (Var outer_bndr)) rhs
-                -- The let is OK even for unboxed binders,
-
-              wrapped_alts | isDeadBinder inner_bndr = inner_alts
-                           | otherwise               = map wrap_alt inner_alts
-
-              merged_alts = mergeAlts outer_alts wrapped_alts
+tryMergeCase :: OutId -> [OutAlt] -> Maybe [OutAlt]
+-- See Note [Merge Nested Cases]
+tryMergeCase outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
+  = case go 5 (\e -> e) emptyVarSet deflt_rhs of
+       Nothing         -> Nothing
+       Just inner_alts -> Just (mergeAlts outer_alts inner_alts)
                 -- NB: mergeAlts gives priority to the left
                 --      case x of
                 --        A -> e1
@@ -2563,17 +2603,42 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                 --                      B -> e3
                 -- When we merge, we must ensure that e1 takes
                 -- precedence over e2 as the value for A!
+  where
+    go :: Int -> (OutExpr -> OutExpr) -> VarSet -> OutExpr -> Maybe [OutAlt]
+    -- In the call (go wrap free_bndrs rhs), the `wrap` function has free `free_bndrs`;
+    -- so do not push `wrap` under any binders that would shadow `free_bndrs`
+    --
+    -- The 'n' is just a depth-bound to avoid pathalogical quadratic behaviour with
+    --   case x1 of DEFAULT -> case x2 of DEFAULT -> case x3 of DEFAULT -> ...
+    -- when for each `case` we'll look down the whole chain to see if there is
+    -- another `case` on that same variable.  Also all of these (case xi) evals
+    -- get duplicated in each branch of the outer case, so 'n' controls how much
+    -- duplication we are prepared to put up with.
+    go 0 _ _ _ = Nothing
 
-        ; fmap (mkTicks ticks) $
-          mkCase1 mode scrut outer_bndr alts_ty merged_alts
-        }
-        -- Warning: don't call mkCase recursively!
-        -- Firstly, there's no point, because inner alts have already had
-        -- mkCase applied to them, so they won't have a case in their default
-        -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
-        -- in munge_rhs may put a case into the DEFAULT branch!
+    go n wrap free_bndrs (Tick t rhs)
+       = go n (wrap . Tick t) free_bndrs rhs
+    go _ wrap free_bndrs (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
+       | inner_scrut_var == outer_bndr
+       , let wrap_let rhs' | isDeadBinder inner_bndr = rhs'
+                           | otherwise = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
+                              -- The let is OK even for unboxed binders,
+             free_bndrs' = extendVarSet free_bndrs outer_bndr
+       = Just [ assert (not (any (`elemVarSet` free_bndrs') bndrs)) $
+                Alt con bndrs (wrap (wrap_let rhs))
+              | Alt con bndrs rhs <- inner_alts ]
+    go n wrap free_bndrs (Case (Var inner_scrut) inner_bndr ty inner_alts)
+       | [Alt con bndrs rhs] <- inner_alts -- Wrinkle (MC1)
+       , let wrap_case rhs' = Case (Var inner_scrut) inner_bndr ty $
+                              tryMergeCase inner_bndr alts `orElse` alts
+                where
+                  alts = [Alt con bndrs rhs']
+        = assert (not (outer_bndr `elem` (inner_bndr : bndrs))) $
+         go (n-1) (wrap . wrap_case) (free_bndrs `extendVarSet` inner_scrut) rhs
 
-mkCase mode scrut bndr alts_ty alts = mkCase1 mode scrut bndr alts_ty alts
+    go _ _ _ _ = Nothing
+
+tryMergeCase _ _ = Nothing
 
 --------------------------------------------------
 --      2. Eliminate Identity Case

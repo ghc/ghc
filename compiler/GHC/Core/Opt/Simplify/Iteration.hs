@@ -2827,30 +2827,73 @@ Note [Case-to-let for strictly-used binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have this:
    case <scrut> of r { _ -> ..r.. }
-
-where 'r' is used strictly in (..r..), we can safely transform to
+where 'r' is used strictly in (..r..), we /could/ safely transform to
    let r = <scrut> in ...r...
+As a special case,  we have a plain `seq` like
+   case r of r1 { _ -> ...r1... }
+where `r` is used strictly, we /could/ simply drop the `case` to get
+   ...r....
 
-This is a Good Thing, because 'r' might be dead (if the body just
-calls error), or might be used just once (in which case it can be
-inlined); or we might be able to float the let-binding up or down.
-E.g. #15631 has an example.
+HOWEVER, there are some serious downsides to this transformation, so
+GHC doesn't do it any longer (#24251):
 
-Note that this can change the error behaviour.  For example, we might
-transform
-    case x of { _ -> error "bad" }
-    --> error "bad"
-which is might be puzzling if 'x' currently lambda-bound, but later gets
-let-bound to (error "good").
+* Suppose the Simplifier sees
+     case x of y* { __DEFAULT ->
+     let z = case y of { __DEFAULT -> expr } in
+     z+1 }
+  The "y*" means "y is used strictly in its scope.  Now we may:
+   - Eliminate the inner case because `y` is evaluated.
+  Now the demand-info on `y` is not right, because `y` is no longer used
+  strictly in its scope.  But it is hard to spot that without doing a new
+  demand analysis.  So there is a danger that we will subsequently:
+   - Eliminate the outer case because `y` is used strictly
+  Yikes!  We can't eliminate both!
 
-Nevertheless, the paper "A semantics for imprecise exceptions" allows
-this transformation. If you want to fix the evaluation order, use
-'pseq'.  See #8900 for an example where the loss of this
-transformation bit us in practice.
+* It introduces space leaks (#24251).  Consider
+      go 0 where go x = x `seq` go (x + 1)
+  It is an infinite loop, true, but it should not leak space. Yet if we drop
+  the `seq`, it will.  Another great example is #21741.
 
-See also Note [Empty case alternatives] in GHC.Core.
+* Dropping the outer `case can change the error behaviour.  For example,
+  we might transform
+       case x of { _ -> error "bad" }    -->     error "bad"
+  which is might be puzzling if 'x' currently lambda-bound, but later gets
+  let-bound to (error "good").  Tht is OK accoring to the paper "A semantics for
+  imprecise exceptions", but see #8900 for an example where the loss of this
+  transformation bit us in practice.
 
-Historical notes
+* If we have (case e of x -> f x), where `f` is strict, then it looks as if `x`
+  is strictly used, and we could soundly transform to
+     let x = e in f x
+  But if f's strictness info got worse (which can happen in in obscure cases;
+  see #21392) then we might have turned a non-thunk into a thunk!  Bad.
+
+Lacking this "drop-strictly-used-seq" transformation means we can end up with
+some redundant-looking evals.  For example, consider
+    f x y = case x of DEFAULT ->    -- A redundant-looking eval
+            case y of
+              True  -> case x of { Nothing -> False; Just z  -> z }
+              False -> case x of { Nothing -> True;  Just z  -> z }
+That outer eval will be retained right through to code generation.  But,
+perhaps surprisingly, that is probably a /good/ thing:
+
+   Key point: those inner (case x) expressions will be compiled a simple 'if',
+   because the code generator can see that `x` is, at those points, evaluated
+   and properly tagged.
+
+If we dropped the outer eval, both the inner (case x) expressions would need to
+do a proper eval, pushing a return address, with an info table. See the example
+in #15631 where, in the Description, the (case ys) will be a simple multi-way
+jump.
+
+In fact (#24251), when I stopped GHC implementing the drop-strictly-used-seqs
+transformation, binary sizes fell by 1%, and a few programs actually allocated
+less and ran faster.  A case in point is nofib/imaginary/digits-of-e2. (I'm not
+sure exactly why it improves so much, though.)
+
+Slightly related: Note [Empty case alternatives] in GHC.Core.
+
+Historical notes:
 
 There have been various earlier versions of this patch:
 
@@ -3124,8 +3167,9 @@ doCaseToLet scrut case_bndr
 
   | otherwise  -- Scrut has a lifted type
   = exprIsHNF scrut
-    || isStrUsedDmd (idDemandInfo case_bndr)
-    -- See Note [Case-to-let for strictly-used binders]
+       --    || isStrUsedDmd (idDemandInfo case_bndr)
+       -- We no longer look at the demand on the case binder
+       -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------
 --      3. Catch-all case

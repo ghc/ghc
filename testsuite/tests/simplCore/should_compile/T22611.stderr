@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 544, types: 486, coercions: 0, joins: 0/7}
+  = {terms: 562, types: 505, coercions: 0, joins: 0/10}
 
 $WFound
   = \ @a @m conrep conrep1 ->
@@ -54,13 +54,14 @@ $w$sgo15
                             __DEFAULT ->
                               let {
                                 hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-                              let { zeros = word2Int# (ctz# ds3) } in
-                              (# Just ipv4, uncheckedShiftRL# hi1 zeros,
+                              let { zeros = ctz# ds3 } in
+                              let { zeros1 = word2Int# zeros } in
+                              (# Just ipv4, uncheckedShiftRL# hi1 zeros1,
                                  or#
                                    (uncheckedShiftRL#
                                       (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#))
-                                      zeros)
-                                   (uncheckedShiftL# hi1 (-# 64# zeros)) #);
+                                      zeros1)
+                                   (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
                             0## ->
                               (# Just ipv4, 0##,
                                  uncheckedShiftRL#
@@ -116,12 +117,13 @@ $w$sgo15
                         __DEFAULT ->
                           let {
                             hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-                          let { zeros = word2Int# (ctz# ds3) } in
-                          (# Just ipv4, uncheckedShiftRL# hi1 zeros,
+                          let { zeros = ctz# ds3 } in
+                          let { zeros1 = word2Int# zeros } in
+                          (# Just ipv4, uncheckedShiftRL# hi1 zeros1,
                              or#
                                (uncheckedShiftRL#
-                                  (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros)
-                               (uncheckedShiftL# hi1 (-# 64# zeros)) #);
+                                  (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros1)
+                               (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
                         0## ->
                           (# Just ipv4, 0##,
                              uncheckedShiftRL#
@@ -138,12 +140,13 @@ $w$sgo15
             __DEFAULT ->
               let {
                 hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-              let { zeros = word2Int# (ctz# ds3) } in
-              (# Nothing, uncheckedShiftRL# hi1 zeros,
+              let { zeros = ctz# ds3 } in
+              let { zeros1 = word2Int# zeros } in
+              (# Nothing, uncheckedShiftRL# hi1 zeros1,
                  or#
                    (uncheckedShiftRL#
-                      (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros)
-                   (uncheckedShiftL# hi1 (-# 64# zeros)) #);
+                      (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros1)
+                   (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
             0## ->
               (# Nothing, 0##,
                  uncheckedShiftRL#
@@ -156,7 +159,8 @@ end Rec }
 
 $salterF
   = \ @v @a f1 k1 m ->
-      case $w$sgo15 9223372036854775808## 0## k1 m of
+      case k1 of k2 { __DEFAULT ->
+      case $w$sgo15 9223372036854775808## 0## k2 m of
       { (# ww, ww1, ww2 #) ->
       case f1 ww of {
         NotFound -> NotFound;
@@ -167,16 +171,20 @@ $salterF
                Nothing ->
                  case ww of {
                    Nothing -> m;
-                   Just old -> case $wbogus (##) of { __DEFAULT -> $wgo ww1 ww2 m }
+                   Just old ->
+                     case m of m1 { __DEFAULT ->
+                     case $wbogus (##) of { __DEFAULT -> $wgo ww1 ww2 m1 }
+                     }
                  };
                Just new ->
                  case new of new1 { __DEFAULT ->
                  case ww of {
-                   Nothing -> $winsertAlong ww1 ww2 k1 new1 m;
+                   Nothing -> $winsertAlong ww1 ww2 k2 new1 m;
                    Just ds -> $wreplaceAlong ww1 ww2 new1 m
                  }
                  }
              })
+      }
       }
       }
 
@@ -190,10 +198,12 @@ lvl
 Rec {
 $wfoo
   = \ @v x subst ->
-      case $salterF lvl x subst of {
+      case x of x1 { __DEFAULT ->
+      case subst of subst1 { __DEFAULT ->
+      case $salterF lvl x1 subst1 of {
         NotFound ->
-          case x of wild1 {
-            Left x1 -> $wfoo wild1 subst;
+          case x1 of wild1 {
+            Left x2 -> $wfoo wild1 subst1;
             Right y ->
               $wfoo
                 (Right
@@ -204,9 +214,11 @@ $wfoo
                       1# -> C# (chr# i#)
                     }
                     }))
-                subst
+                subst1
           };
         Found p q -> (# p, q #)
+      }
+      }
       }
 end Rec }
 

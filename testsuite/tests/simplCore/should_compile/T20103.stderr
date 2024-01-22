@@ -1,7 +1,12 @@
 
+T20103.hs:7:24: warning: [GHC-63394] [-Wx-partial (in -Wextended-warnings)]
+    In the use of ‘head’
+    (imported from Prelude, but defined in GHC.List):
+    "This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use "Data.List.NonEmpty"."
+
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 136, types: 88, coercions: 25, joins: 0/0}
+  = {terms: 139, types: 89, coercions: 22, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Int
@@ -31,8 +36,9 @@ lvl4 = GHC.CString.unpackCString# lvl3
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T20103.$trModule2 = "T20103"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
@@ -43,8 +49,9 @@ lvl5 = GHC.CString.unpackCString# T20103.$trModule2
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T20103.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
@@ -110,10 +117,10 @@ lvl16
                  :: CallStack ~R# (?callStack::CallStack)))
 
 Rec {
--- RHS size: {terms: 44, types: 41, coercions: 21, joins: 0/0}
+-- RHS size: {terms: 47, types: 42, coercions: 18, joins: 0/0}
 T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId[StrictWorker([!])], Arity=2, Str=<SL><1L>, Unf=OtherCon []]
+[GblId[StrictWorker([!])], Arity=2, Str=<1L><1L>, Unf=OtherCon []]
 T20103.$wfoo
   = \ ($dIP :: HasCallStack) (ww :: GHC.Prim.Int#) ->
       case ww of ds {
@@ -136,27 +143,25 @@ T20103.$wfoo
                 (GHC.Prim.-# ds 1#)
           };
         0# ->
-          case getCallStack
-                 ($dIP
-                  `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
-                          :: (?callStack::CallStack) ~R# CallStack))
-          of {
+          case $dIP
+               `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
+                       :: (?callStack::CallStack) ~R# CallStack)
+          of wild1
+          { __DEFAULT ->
+          case getCallStack wild1 of {
             [] ->
-              case $dIP
-                   `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
-                           :: (?callStack::CallStack) ~R# CallStack)
-              of wild1 {
-                __DEFAULT -> case lvl16 wild1 of wild2 { };
+              case wild1 of wild2 {
+                __DEFAULT -> case lvl16 wild2 of {};
                 GHC.Stack.Types.FreezeCallStack ds1 ->
                   case GHC.List.head1
                          @([Char], SrcLoc)
-                         (wild1
+                         (wild2
                           `cast` (Sym (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N)
                                   :: CallStack ~R# (?callStack::CallStack)))
-                  of wild2 {
-                  }
+                  of {}
               };
             : x ds1 -> case x of { (x1, ds2) -> GHC.List.$wlenAcc @Char x1 0# }
+          }
           }
       }
 end Rec }
@@ -165,10 +170,10 @@ end Rec }
 foo [InlPrag=[2]] :: HasCallStack => Int -> Int
 [GblId,
  Arity=2,
- Str=<SL><1!P(1L)>,
+ Str=<1L><1!P(1L)>,
  Cpr=1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ ($dIP [Occ=Once1] :: HasCallStack)
                  (eta [Occ=Once1!] :: Int) ->
@@ -186,22 +191,25 @@ foo
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule3 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule3 = GHC.Types.TrNameS T20103.$trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule1 = GHC.Types.TrNameS T20103.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule :: GHC.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule
   = GHC.Types.Module T20103.$trModule3 T20103.$trModule1
 
