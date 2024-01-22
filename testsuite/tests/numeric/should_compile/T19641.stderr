@@ -6,7 +6,7 @@ Result size of Tidy Core
 natural_to_word
   = \ eta ->
       case eta of {
-        NS x1 -> Just (W# x1);
+        NS x2 -> Just (W# x2);
         NB ds -> Nothing
       }
 
@@ -14,7 +14,7 @@ integer_to_int
   = \ eta ->
       case eta of {
         IS ipv -> Just (I# ipv);
-        IP x1 -> Nothing;
+        IP x2 -> Nothing;
         IN ds -> Nothing
       }
 

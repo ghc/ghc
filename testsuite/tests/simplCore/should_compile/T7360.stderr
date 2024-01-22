@@ -1,15 +1,15 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 116, types: 50, coercions: 0, joins: 0/0}
+  = {terms: 119, types: 52, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
 [GblId[DataConWrapper],
  Arity=1,
  Str=<SL>,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (conrep [Occ=Once1!] :: Int) ->
                  case conrep of { GHC.Types.I# unbx [Occ=Once1] ->
@@ -31,8 +31,8 @@ fun1 [InlPrag=NOINLINE[final]] :: Foo -> ()
  Arity=1,
  Str=<1A>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once1] :: Foo) ->
                  case T7360.$wfun1 x of { (# #) -> GHC.Tuple.Prim.() }}]
@@ -43,65 +43,75 @@ fun1
 -- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
 T7360.fun4 :: ()
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=False, ConLike=False, WorkFree=False, Expandable=False,
+         Guidance=IF_ARGS [] 30 10}]
 T7360.fun4
   = case T7360.$wfun1 T7360.Foo1 of { (# #) -> GHC.Tuple.Prim.() }
 
--- RHS size: {terms: 11, types: 7, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 9, coercions: 0, joins: 0/0}
 fun2 :: forall {a}. [a] -> ((), Int)
 [GblId,
  Arity=1,
  Str=<ML>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (x [Occ=Once1] :: [a]) ->
                  (T7360.fun4,
-                  case GHC.List.$wlenAcc @a x 0# of ww1 [Occ=Once1] { __DEFAULT ->
+                  case x of wild [Occ=Once1] { __DEFAULT ->
+                  case GHC.List.$wlenAcc @a wild 0# of ww1 [Occ=Once1] { __DEFAULT ->
                   GHC.Types.I# ww1
+                  }
                   })}]
 fun2
   = \ (@a) (x :: [a]) ->
       (T7360.fun4,
-       case GHC.List.$wlenAcc @a x 0# of ww1 { __DEFAULT ->
+       case x of wild { __DEFAULT ->
+       case GHC.List.$wlenAcc @a wild 0# of ww1 { __DEFAULT ->
        GHC.Types.I# ww1
+       }
        })
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T7360.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule3 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T7360.$trModule2 = "T7360"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule :: GHC.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$trModule
   = GHC.Types.Module T7360.$trModule3 T7360.$trModule1
 
@@ -115,22 +125,25 @@ $krep
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T7360.$tcFoo2 = "Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo :: GHC.Types.TyCon
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tcFoo
   = GHC.Types.TyCon
       1581370841583180512#Word64
@@ -150,22 +163,25 @@ T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo6 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo6 = "'Foo1"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo1
   = GHC.Types.TyCon
       3986951253261644518#Word64
@@ -178,22 +194,25 @@ T7360.$tc'Foo1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo8 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo8 = "'Foo2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo7 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo2
   = GHC.Types.TyCon
       17325079864060690428#Word64
@@ -211,22 +230,25 @@ T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo11 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo11 = "'Foo3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo10 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo3
   = GHC.Types.TyCon
       3674231676522181654#Word64

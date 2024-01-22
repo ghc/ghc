@@ -6,8 +6,9 @@ Result size of Tidy Core
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T22428.f1 :: Integer
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T22428.f1 = GHC.Num.Integer.IS 1#
 
 -- RHS size: {terms: 28, types: 10, coercions: 0, joins: 1/1}
@@ -15,8 +16,9 @@ f :: Integer -> Integer -> Integer
 [GblId,
  Arity=2,
  Str=<SL><1L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 156 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0 0] 156 0}]
 f = \ (x :: Integer) (y :: Integer) ->
       joinrec {
         go [InlPrag=INLINE (sat-args=1), Occ=LoopBreaker, Dmd=SC(S,L)]
@@ -24,20 +26,20 @@ f = \ (x :: Integer) (y :: Integer) ->
         [LclId[JoinId(1)(Just [!])],
          Arity=1,
          Str=<1L>,
-         Unf=Unf{Src=StableUser, TopLvl=False, Value=True, ConLike=True,
-                 WorkFree=True, Expandable=True,
+         Unf=Unf{Src=StableUser, TopLvl=False,
+                 Value=True, ConLike=True, WorkFree=True, Expandable=True,
                  Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)}]
         go (ds :: Integer)
-          = case ds of wild {
-              GHC.Num.Integer.IS x1 ->
-                case x1 of {
-                  __DEFAULT -> jump go (GHC.Num.Integer.integerSub wild T22428.f1);
+          = case ds of x1 {
+              GHC.Num.Integer.IS x2 ->
+                case x2 of {
+                  __DEFAULT -> jump go (GHC.Num.Integer.integerSub x1 T22428.f1);
                   0# -> x
                 };
-              GHC.Num.Integer.IP x1 ->
-                jump go (GHC.Num.Integer.integerSub wild T22428.f1);
-              GHC.Num.Integer.IN x1 ->
-                jump go (GHC.Num.Integer.integerSub wild T22428.f1)
+              GHC.Num.Integer.IP x2 ->
+                jump go (GHC.Num.Integer.integerSub x1 T22428.f1);
+              GHC.Num.Integer.IN x2 ->
+                jump go (GHC.Num.Integer.integerSub x1 T22428.f1)
             }; } in
       jump go y
 
