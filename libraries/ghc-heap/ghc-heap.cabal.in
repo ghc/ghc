@@ -25,7 +25,7 @@ library
   build-depends:    base             >= 4.9.0 && < 5.0
                   , ghc-prim         > 0.2 && < 0.12
                   , rts              == 1.0.*
-                  , containers       >= 0.6.2.1 && < 0.7
+                  , containers       >= 0.6.2.1 && < 0.8
 
   ghc-options:      -Wall
   if !os(ghcjs)

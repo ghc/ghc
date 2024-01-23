@@ -114,7 +114,7 @@ Library
                    bytestring >= 0.9 && < 0.13,
                    binary     == 0.8.*,
                    time       >= 1.4 && < 1.13,
-                   containers >= 0.6.2.1 && < 0.7,
+                   containers >= 0.6.2.1 && < 0.8,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
                    template-haskell == 2.21.*,
