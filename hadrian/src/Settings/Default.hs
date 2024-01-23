@@ -104,6 +104,7 @@ stage0Packages = do
              , hpc
              , hpcBin
              , mtl
+             , osString
              , parsec
              , semaphoreCompat
              , time
