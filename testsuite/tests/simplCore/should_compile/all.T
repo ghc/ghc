@@ -495,3 +495,4 @@ test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -
 test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -v0'])
 test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 -O'])
 test('T23922a', normal, compile, ['-O'])
+test('T24370', normal, compile, ['-O'])

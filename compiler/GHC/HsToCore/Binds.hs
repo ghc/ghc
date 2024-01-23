@@ -849,7 +849,16 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
 
   | otherwise = case decompose fun2 args2 of
-        Nothing -> Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+        Nothing -> -- pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                   --                                    , text "orig_lhs:" <+> ppr orig_lhs
+                   --                                    , text "rhs_fvs:" <+> ppr rhs_fvs
+                   --                                    , text "orig_lhs:" <+> ppr orig_lhs
+                   --                                    , text "lhs1:" <+> ppr lhs1
+                   --                                    , text "lhs2:" <+> ppr lhs2
+                   --                                    , text "fun2:" <+> ppr fun2
+                   --                                    , text "args2:" <+> ppr args2
+                   --                                    ]) $
+                   Left (DsRuleLhsTooComplicated orig_lhs lhs2)
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
@@ -921,7 +930,9 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets (Let (NonRec d r) body)
-     | isDictId d
+     | isDictId d  -- Catches dictionaries, yes, but also catches dictionary
+                   -- /functions/ arising from solving a
+                   -- quantified contraint (#24370)
      = ((d,r):bs, body')
      where (bs, body') = split_lets body
 
