@@ -100,7 +100,14 @@ mkClassPred :: Class -> [Type] -> PredType
 mkClassPred clas tys = mkTyConApp (classTyCon clas) tys
 
 isDictTy :: Type -> Bool
-isDictTy = isClassPred
+-- True of dictionaries (Eq a) and
+--         dictionary functions (forall a. Eq a => Eq [a])
+-- See Note [Type determines value]
+-- See #24370 (and the isDictId call in GHC.HsToCore.Binds.decomposeRuleLhs)
+--     for why it's important to catch dictionary bindings
+isDictTy ty = isClassPred pred
+  where
+    (_, pred) = splitInvisPiTys ty
 
 typeDeterminesValue :: Type -> Bool
 -- See Note [Type determines value]
