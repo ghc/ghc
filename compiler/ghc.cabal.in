@@ -580,7 +580,6 @@ Library
         GHC.JS.JStg.Syntax
         GHC.JS.JStg.Monad
         GHC.JS.Transform
-        GHC.Linker
         GHC.Linker.Config
         GHC.Linker.Deps
         GHC.Linker.Dynamic
