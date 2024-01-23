@@ -117,3 +117,6 @@
 [submodule "utils/hpc"]
 	path = utils/hpc
 	url = https://gitlab.haskell.org/hpc/hpc-bin.git
+[submodule "libraries/os-string"]
+	path = libraries/os-string
+	url = https://gitlab.haskell.org/ghc/packages/os-string

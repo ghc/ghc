@@ -8,7 +8,7 @@ module Packages (
     ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
     ghcToolchain, ghcToolchainBin, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
-    libffi, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
+    libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
@@ -40,7 +40,7 @@ ghcPackages =
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
     , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs
-    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl
+    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl, osString
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout
@@ -58,7 +58,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
   ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
-  parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
+  osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
   timeout,
   lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
@@ -112,6 +112,7 @@ iserv               = util "iserv"
 iservProxy          = util "iserv-proxy"
 libffi              = top  "libffi"
 mtl                 = lib  "mtl"
+osString            = lib  "os-string"
 parsec              = lib  "parsec"
 pretty              = lib  "pretty"
 primitive           = lib  "primitive"
