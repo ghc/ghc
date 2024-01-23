@@ -116,7 +116,7 @@ Library
                    time       >= 1.4 && < 1.13,
                    containers >= 0.6.2.1 && < 0.8,
                    array      >= 0.1 && < 0.6,
-                   filepath   >= 1   && < 1.5,
+                   filepath   >= 1   && < 1.6,
                    template-haskell == 2.21.*,
                    hpc        >= 0.6 && < 0.8,
                    transformers >= 0.5 && < 0.7,
@@ -128,7 +128,7 @@ Library
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.14
+        Build-Depends: Win32  >= 2.3 && < 2.15
     else
         Build-Depends: unix   >= 2.7 && < 2.9
 

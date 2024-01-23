@@ -36,14 +36,14 @@ Executable ghc
                    bytestring >= 0.9 && < 0.13,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
-                   filepath   >= 1   && < 1.5,
+                   filepath   >= 1   && < 1.6,
                    containers >= 0.5 && < 0.8,
                    transformers >= 0.5 && < 0.7,
                    ghc-boot      == @ProjectVersionMunged@,
                    ghc           == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.14
+        Build-Depends: Win32  >= 2.3 && < 2.15
     else
         Build-Depends: unix   >= 2.7 && < 2.9
 

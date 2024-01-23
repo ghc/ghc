@@ -157,6 +157,10 @@ packageArgs = do
 
           ]
 
+        , package unix ? builder (Cabal Flags) ? arg "+os-string"
+        , package directory ? builder (Cabal Flags) ? arg "+os-string"
+        , package win32 ? builder (Cabal Flags) ? arg "+os-string"
+
         --------------------------------- iserv --------------------------------
         -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
         -- refer to the RTS.  This is harmless if you don't use it (adds a bit
