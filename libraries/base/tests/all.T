@@ -232,8 +232,12 @@ test('T9681', normal, compile_fail, [''])
 #   Probably something like 1s is already enough, but I don't know enough to
 #   make an educated guess how long it needs to be guaranteed to reach the C
 #   call."
+#
+# We ignore stderr since the test itself may print "Killed: 9" (see #24361);
+# all we care about is that the test timed out, for which the
+# exit_code check is sufficient.
 test('T8089',
-     [exit_code(99), run_timeout_multiplier(0.01)],
+     [exit_code(99), ignore_stderr, run_timeout_multiplier(0.01)],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('hWaitForInput-accurate-stdin', [js_broken(22349), expect_broken_for(16535, threaded_ways), req_process], compile_and_run, [''])
