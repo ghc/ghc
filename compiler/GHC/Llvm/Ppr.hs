@@ -27,7 +27,7 @@ module GHC.Llvm.Ppr (
     ppLit,
     ppTypeLit,
     ppName,
-    ppPlainName
+    ppPlainName,
 
     ) where
 
@@ -40,7 +40,6 @@ import GHC.Llvm.Types
 import Data.List ( intersperse )
 import GHC.Utils.Outputable
 
-import GHC.Cmm.MachOp ( FMASign(..), pprFMASign )
 import GHC.CmmToLlvm.Config
 import GHC.Utils.Panic
 import GHC.Types.Unique
@@ -289,7 +288,6 @@ ppLlvmExpression opts expr
         AtomicRMW  aop tgt src ordering -> ppAtomicRMW opts aop tgt src ordering
         CmpXChg    addr old new s_ord f_ord -> ppCmpXChg opts addr old new s_ord f_ord
         Phi        tp predecessors  -> ppPhi opts tp predecessors
-        FMAOp      op x y z         -> pprFMAOp opts op x y z
         Asm        asm c ty v se sk -> ppAsm opts asm c ty v se sk
         MExpr      meta expr        -> ppMetaAnnotExpr opts meta expr
 {-# SPECIALIZE ppLlvmExpression :: LlvmCgConfig -> LlvmExpression -> SDoc #-}
@@ -375,13 +373,6 @@ ppCmpOp opts op left right =
         <+> ppName opts left <> comma <+> ppName opts right
 {-# SPECIALIZE ppCmpOp :: LlvmCgConfig -> LlvmCmpOp -> LlvmVar -> LlvmVar -> SDoc #-}
 {-# SPECIALIZE ppCmpOp :: LlvmCgConfig -> LlvmCmpOp -> LlvmVar -> LlvmVar -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
-
-pprFMAOp :: IsLine doc => LlvmCgConfig -> FMASign -> LlvmVar -> LlvmVar -> LlvmVar -> doc
-pprFMAOp opts signs x y z =
-  pprFMASign signs <+> ppLlvmType (getVarType x)
-        <+> ppName opts x <> comma
-        <+> ppName opts y <> comma
-        <+> ppName opts z
 
 ppAssignment :: IsLine doc => LlvmCgConfig -> LlvmVar -> doc -> doc
 ppAssignment opts var expr = ppName opts var <+> equals <+> expr
