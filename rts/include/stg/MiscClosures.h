@@ -590,6 +590,11 @@ RTS_FUN_DECL(stg_traceMarkerzh);
 RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
 RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
 
+RTS_FUN_DECL(stg_castWord64ToDoublezh);
+RTS_FUN_DECL(stg_castDoubleToWord64zh);
+RTS_FUN_DECL(stg_castWord32ToFloatzh);
+RTS_FUN_DECL(stg_castFloatToWord32zh);
+
 /* Other misc stuff */
 // See wiki:commentary/compiler/backends/ppr-c#prototypes
 

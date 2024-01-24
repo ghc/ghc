@@ -1,0 +1,15 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 16, types: 4, coercions: 0, joins: 0/0}
+
+a = W64# (castDoubleToWord64# 1.0##)
+
+b = W32# (castFloatToWord32# 2.0#)
+
+c = D# (castWord64ToDouble# 4621819117588971520#Word64)
+
+d = F# (castWord32ToFloat# 1084227584#Word32)
+
+
+

@@ -347,7 +347,6 @@ Library
           cbits/fs.c
 
       cmm-sources:
-          cbits/CastFloatWord.cmm
           cbits/StackCloningDecoding.cmm
 
     if arch(javascript)

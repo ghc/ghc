@@ -3547,6 +3547,10 @@ module GHC.Base where
   casIntArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> (# State# d, Int# #)
   casMutVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MutVar# d a -> a -> a -> State# d -> (# State# d, Int#, a #)
   casSmallArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> Int# -> a -> a -> State# d -> (# State# d, Int#, a #)
+  castDoubleToWord64# :: Double# -> Word64#
+  castFloatToWord32# :: Float# -> Word32#
+  castWord32ToFloat# :: Word32# -> Float#
+  castWord64ToDouble# :: Word64# -> Double#
   catch# :: forall {q :: RuntimeRep} {k :: Levity} (a :: TYPE q) (b :: TYPE (BoxedRep k)). (State# RealWorld -> (# State# RealWorld, a #)) -> (b -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   catchRetry# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). (State# RealWorld -> (# State# RealWorld, a #)) -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   catchSTM# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) b. (State# RealWorld -> (# State# RealWorld, a #)) -> (b -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
@@ -5664,6 +5668,10 @@ module GHC.Exts where
   casIntArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> (# State# d, Int# #)
   casMutVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MutVar# d a -> a -> a -> State# d -> (# State# d, Int#, a #)
   casSmallArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> Int# -> a -> a -> State# d -> (# State# d, Int#, a #)
+  castDoubleToWord64# :: Double# -> Word64#
+  castFloatToWord32# :: Float# -> Word32#
+  castWord32ToFloat# :: Word32# -> Float#
+  castWord64ToDouble# :: Word64# -> Double#
   catch# :: forall {q :: RuntimeRep} {k :: Levity} (a :: TYPE q) (b :: TYPE (BoxedRep k)). (State# RealWorld -> (# State# RealWorld, a #)) -> (b -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   catchRetry# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). (State# RealWorld -> (# State# RealWorld, a #)) -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   catchSTM# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) b. (State# RealWorld -> (# State# RealWorld, a #)) -> (b -> State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)

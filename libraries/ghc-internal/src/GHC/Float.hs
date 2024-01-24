@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns
            , CPP
-           , GHCForeignImportPrim
            , NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
@@ -1735,6 +1734,19 @@ read it from memory into the destination register and the best way to do that
 is using CMM.
 -}
 
+stgDoubleToWord64 :: Double# -> Word64#
+stgDoubleToWord64 = castDoubleToWord64#
+
+stgWord64ToDouble :: Word64# -> Double#
+stgWord64ToDouble = castWord64ToDouble#
+
+stgFloatToWord32 :: Float# -> Word32#
+stgFloatToWord32 = castFloatToWord32#
+
+stgWord32ToFloat :: Word32# -> Float#
+stgWord32ToFloat = castWord32ToFloat#
+
+
 -- | @'castWord32ToFloat' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
 --
@@ -1742,11 +1754,7 @@ is using CMM.
 
 {-# INLINE castWord32ToFloat #-}
 castWord32ToFloat :: Word32 -> Float
-castWord32ToFloat (W32# w#) = F# (stgWord32ToFloat w#)
-
-foreign import prim "stg_word32ToFloatzh"
-    stgWord32ToFloat :: Word32# -> Float#
-
+castWord32ToFloat (W32# w#) = F# (castWord32ToFloat# w#)
 
 -- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
@@ -1755,12 +1763,7 @@ foreign import prim "stg_word32ToFloatzh"
 
 {-# INLINE castFloatToWord32 #-}
 castFloatToWord32 :: Float -> Word32
-castFloatToWord32 (F# f#) = W32# (stgFloatToWord32 f#)
-
-foreign import prim "stg_floatToWord32zh"
-    stgFloatToWord32 :: Float# -> Word32#
-
-
+castFloatToWord32 (F# f#) = W32# (castFloatToWord32# f#)
 
 -- | @'castWord64ToDouble' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
@@ -1769,25 +1772,16 @@ foreign import prim "stg_floatToWord32zh"
 
 {-# INLINE castWord64ToDouble #-}
 castWord64ToDouble :: Word64 -> Double
-castWord64ToDouble (W64# w) = D# (stgWord64ToDouble w)
+castWord64ToDouble (W64# w) = D# (castWord64ToDouble# w)
 
-foreign import prim "stg_word64ToDoublezh"
-    stgWord64ToDouble :: Word64# -> Double#
-
-
--- | @'castFloatToWord64' f@ does a bit-for-bit copy from a floating-point value
+-- | @'castDoubleToWord64' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
 -- @since 4.11.0.0
 
 {-# INLINE castDoubleToWord64 #-}
 castDoubleToWord64 :: Double -> Word64
-castDoubleToWord64 (D# d#) = W64# (stgDoubleToWord64 d#)
-
-foreign import prim "stg_doubleToWord64zh"
-    stgDoubleToWord64 :: Double# -> Word64#
-
-
+castDoubleToWord64 (D# d#) = W64# (castDoubleToWord64# d#)
 
 -- See Note [Optimising conversions between numeric types]
 -- in GHC.Num.Integer

@@ -1231,6 +1231,14 @@ primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
    {Decode 'Double#' into mantissa and base-2 exponent.}
    with out_of_line = True
 
+primop CastDoubleToWord64Op "castDoubleToWord64#" GenPrimOp
+   Double# -> Word64#
+   {Bitcast a 'Double#' into a 'Word64#'}
+
+primop CastWord64ToDoubleOp "castWord64ToDouble#" GenPrimOp
+   Word64# -> Double#
+   {Bitcast a 'Word64#' into a 'Double#'}
+
 ------------------------------------------------------------------------
 section "Float#"
         {Operations on single-precision (32-bit) floating-point numbers.}
@@ -1376,6 +1384,14 @@ primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
    {Convert to integers.
     First 'Int#' in result is the mantissa; second is the exponent.}
    with out_of_line = True
+
+primop CastFloatToWord32Op "castFloatToWord32#" GenPrimOp
+   Float# -> Word32#
+   {Bitcast a 'Float#' into a 'Word32#'}
+
+primop CastWord32ToFloatOp "castWord32ToFloat#" GenPrimOp
+   Word32# -> Float#
+   {Bitcast a 'Word32#' into a 'Float#'}
 
 ------------------------------------------------------------------------
 section "Fused multiply-add operations"

@@ -1747,6 +1747,10 @@ emitPrimOp cfg primop =
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
   KeepAliveOp -> alwaysExternal
+  CastWord32ToFloatOp -> alwaysExternal
+  CastWord64ToDoubleOp -> alwaysExternal
+  CastDoubleToWord64Op -> alwaysExternal
+  CastFloatToWord32Op -> alwaysExternal
 
  where
   profile  = stgToCmmProfile  cfg

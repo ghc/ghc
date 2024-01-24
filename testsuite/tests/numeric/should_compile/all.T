@@ -21,3 +21,4 @@ test('T19641', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-b
 test('T15547', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
 test('T23019', normal, compile, ['-O'])
 test('T23907', [ when(wordsize(32), expect_broken(23908))], compile, ['-ddump-simpl -O2 -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
+test('T24331', normal, compile, ['-O -ddump-simpl -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])

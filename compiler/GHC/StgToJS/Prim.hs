@@ -498,6 +498,8 @@ genPrim prof bound ty op = case op of
   DoublePowerOp     -> \[r] [x,y] -> pure $ PrimInline $ r |= math_pow [x,y]
   DoubleDecode_2IntOp  -> \[s,h,l,e] [x] -> pure $ PrimInline $ appT [s,h,l,e] "h$decodeDouble2Int" [x]
   DoubleDecode_Int64Op -> \[s1,s2,e] [d] -> pure $ PrimInline $ appT [e,s1,s2] "h$decodeDoubleInt64" [d]
+  CastDoubleToWord64Op -> \[rh,rl] [x]   -> pure $ PrimInline $ appT [rh,rl]   "h$castDoubleToWord64" [x]
+  CastWord64ToDoubleOp -> \[r]     [h,l] -> pure $ PrimInline $ appT [r]       "h$castWord64ToDouble" [h,l]
 
   DoubleFMAdd  -> unhandledPrimop op
   DoubleFMSub  -> unhandledPrimop op
@@ -539,6 +541,9 @@ genPrim prof bound ty op = case op of
   FloatPowerOp      -> \[r] [x,y] -> pure $ PrimInline $ r |= math_fround [math_pow [x,y]]
   FloatToDoubleOp   -> \[r] [x]   -> pure $ PrimInline $ r |= x
   FloatDecode_IntOp -> \[s,e] [x] -> pure $ PrimInline $ appT [s,e] "h$decodeFloatInt" [x]
+  CastFloatToWord32Op -> \[r] [x] -> pure $ PrimInline $ appT [r] "h$castFloatToWord32" [x]
+  CastWord32ToFloatOp -> \[r] [x] -> pure $ PrimInline $ appT [r] "h$castWord32ToFloat" [x]
+
 
   FloatFMAdd  -> unhandledPrimop op
   FloatFMSub  -> unhandledPrimop op

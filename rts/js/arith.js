@@ -621,23 +621,23 @@ function h$__word_encodeFloat(j,e) {
   return Math.fround((j>>>0) * (2 ** (e|0)));
 }
 
-function h$stg_word32ToFloatzh(v) {
+function h$castWord32ToFloat(v) {
   h$convertWord[0] = v;
   return h$convertFloat[0];
 }
 
-function h$stg_floatToWord32zh(v) {
+function h$castFloatToWord32(v) {
   h$convertFloat[0] = v;
   return h$convertWord[0];
 }
 
-function h$stg_word64ToDoublezh(h,l) {
+function h$castWord64ToDouble(h,l) {
   h$convertWord[0] = l;
   h$convertWord[1] = h;
   return h$convertDouble[0];
 }
 
-function h$stg_doubleToWord64zh(v) {
+function h$castDoubleToWord64(v) {
   h$convertDouble[0] = v;
   var l = h$convertWord[0];
   var h = h$convertWord[1];

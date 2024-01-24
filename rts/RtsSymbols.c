@@ -953,6 +953,10 @@ extern char **environ;
       SymI_HasProto(rtsBadAlignmentBarf)                                \
       SymI_HasProto(rtsOutOfBoundsAccess)                               \
       SymI_HasProto(rtsMemcpyRangeOverlap)                              \
+      SymI_HasDataProto(stg_castWord64ToDoublezh)                       \
+      SymI_HasDataProto(stg_castDoubleToWord64zh)                       \
+      SymI_HasDataProto(stg_castWord32ToFloatzh)                        \
+      SymI_HasDataProto(stg_castFloatToWord32zh)                        \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
