@@ -676,8 +676,8 @@ rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl
 rnIfaceCo (IfaceAxiomInstCo n i cs)
     = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
-rnIfaceCo (IfaceUnivCo s r t1 t2)
-    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2
+rnIfaceCo (IfaceUnivCo s r t1 t2 cvs fcvs)
+    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> pure cvs{-!!!-} <*> pure fcvs{-!!!-}
 rnIfaceCo (IfaceSymCo c)
     = IfaceSymCo <$> rnIfaceCo c
 rnIfaceCo (IfaceTransCo c1 c2)

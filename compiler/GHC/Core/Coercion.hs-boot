@@ -10,6 +10,7 @@ import {-# SOURCE #-} GHC.Core.TyCon
 import GHC.Types.Basic ( LeftOrRight )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Data.Pair
 import GHC.Utils.Misc
 
@@ -24,6 +25,7 @@ mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
+mkUnivCoCvs :: UnivCoProvenance -> Role -> Type -> Type -> DCoVarSet -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
 mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion

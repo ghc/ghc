@@ -2465,7 +2465,7 @@ lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
                               , text "res_co:" <+> ppr co2 ])
 
 -- See Note [Bad unsafe coercion]
-lintCoercion co@(UnivCo prov r ty1 ty2)
+lintCoercion co@(UnivCo prov r ty1 ty2 cvs)
   = do { ty1' <- lintType ty1
        ; ty2' <- lintType ty2
        ; let k1 = typeKind ty1'
@@ -2476,7 +2476,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                             && isTYPEorCONSTRAINT k2)
               (checkTypes ty1 ty2)
 
-       ; return (UnivCo prov' r ty1' ty2') }
+       ; return (UnivCo prov' r ty1' ty2' cvs) }  -- !!! shall I add and use checkTyCoVarInScope from !3792? If so, shall I use it also for the other constructors, as in !3792?
    where
      report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1

@@ -20,9 +20,11 @@ import GHC.Data.FastString
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
+import GHC.Data.Maybe (orElse)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
@@ -238,8 +240,9 @@ tidyCo env@(_, subst) co
                                  Just cv' -> CoVarCo cv'
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
-                                tidyType env t1) $! tidyType env t2
+    go (UnivCo p r t1 t2 cvs)
+                             = ((((UnivCo $! (go_prov p)) $! r) $!
+                                 tidyType env t1) $! tidyType env t2) $! mapDVarSet go_cv cvs
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
     go (SelCo d co)          = SelCo d $! go co
@@ -248,6 +251,8 @@ tidyCo env@(_, subst) co
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+
+    go_cv cv = lookupVarEnv subst cv `orElse` cv
 
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co

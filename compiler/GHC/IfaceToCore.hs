@@ -1468,8 +1468,12 @@ tcIfaceCo = go
                                         ForAllCo tv' visL visR k' <$> go c }
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
     go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
-    go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv p <*> pure r
-                                          <*> tcIfaceType t1 <*> tcIfaceType t2
+    go (IfaceUnivCo p r t1 t2 cvs fcvs)
+                                 = assertPpr (null fcvs) (ppr fcvs) $ do
+                                     cvs' <- mapM tcIfaceLclId cvs
+                                     UnivCo <$> tcIfaceUnivCoProv p <*> pure r
+                                            <*> tcIfaceType t1 <*> tcIfaceType t2
+                                            <*> pure (mkDVarSet cvs')
     go (IfaceSymCo c)            = SymCo    <$> go c
     go (IfaceTransCo c1 c2)      = TransCo  <$> go c1
                                             <*> go c2

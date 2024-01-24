@@ -1557,9 +1557,11 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
     go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2)   = do { dv1 <- go_prov dv prov
+    go_co dv (UnivCo prov _ t1 t2 cvs)
+                                     = do { dv1 <- go_prov dv prov
                                           ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t1
-                                          ; collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2 }
+                                          ; dv3 <- collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2
+                                          ; strictFoldDVarSet zt_cv (return dv3) cvs }
     go_co dv (SymCo co)              = go_co dv co
     go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (SelCo _ co)            = go_co dv co
@@ -1598,6 +1600,9 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
                                     (idType cv)
 
     is_bound tv = tv `elemVarSet` bound
+
+    zt_cv :: CoVar -> TcM CandidatesQTvs -> TcM CandidatesQTvs
+    zt_cv cv mdvs = do { dvs <- mdvs; go_cv dvs cv }
 
 {- Note [Order of accumulation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

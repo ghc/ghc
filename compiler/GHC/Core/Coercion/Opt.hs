@@ -24,6 +24,7 @@ import GHC.Core.Unify
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Unique.DSet (emptyUniqDSet)
 import GHC.Types.Unique.Set
 
 import GHC.Data.Pair
@@ -351,9 +352,9 @@ opt_co4 env sym rep r (AxiomInstCo con ind cos)
                                  cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co4 env sym rep r (UnivCo prov _r t1 t2)
-  = assert (r == _r )
-    opt_univ env sym prov (chooseRole rep r) t1 t2
+opt_co4 env sym rep r (UnivCo prov _r t1 t2 cvs)
+  = assert (r == _r)
+    opt_univ env sym prov (chooseRole rep r) t1 t2 cvs
 
 opt_co4 env sym rep r (TransCo co1 co2)
                       -- sym (g `o` h) = sym h `o` sym g
@@ -532,7 +533,7 @@ in GHC.Core.Coercion.
 -- be a phantom, but the output sure will be.
 opt_phantom :: LiftingContext -> SymFlag -> Coercion -> NormalCo
 opt_phantom env sym co
-  = opt_univ env sym (PhantomProv (mkKindCo co)) Phantom ty1 ty2
+  = opt_univ env sym (PhantomProv (mkKindCo co)) Phantom ty1 ty2 emptyUniqDSet{-!!!-}
   where
     Pair ty1 ty2 = coercionKind co
 
@@ -568,8 +569,8 @@ See #19509.
  -}
 
 opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
-         -> Type -> Type -> Coercion
-opt_univ env sym (PhantomProv h) _r ty1 ty2
+         -> Type -> Type -> DCoVarSet -> Coercion
+opt_univ env sym (PhantomProv h) _r ty1 ty2 _cvs{-!!!-}
   | sym       = mkPhantomCo h' ty2' ty1'
   | otherwise = mkPhantomCo h' ty1' ty2'
   where
@@ -577,7 +578,7 @@ opt_univ env sym (PhantomProv h) _r ty1 ty2
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
-opt_univ env sym prov role oty1 oty2
+opt_univ env sym prov role oty1 oty2 cvs
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
@@ -607,7 +608,7 @@ opt_univ env sym prov role oty1 oty2
         (env', tv1', eta') = optForAllCoBndr env sym tv1 eta
         !(vis1', vis2') = swapSym sym (vis1, vis2)
     in
-    mkForAllCo tv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo tv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2' cvs)  -- !!! or (substDCoVarSet (lcTCvSubst env) cvs) ???
 
   | Just (Bndr cv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
   , isCoVar cv1
@@ -628,7 +629,7 @@ opt_univ env sym prov role oty1 oty2
         (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
         !(vis1', vis2') = swapSym sym (vis1, vis2)
     in
-    mkForAllCo cv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo cv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2' cvs)
 
   | otherwise
   = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
@@ -710,8 +711,8 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   = fireTransRule "TrPushInst" in_co1 in_co2 $
     mkInstCo (opt_trans is co1 co2) ty1
 
-opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
-                  in_co2@(UnivCo p2 r2 _tyl2 tyr2)
+opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1 _cvs1{-!!!-})
+                  in_co2@(UnivCo p2 r2 _tyl2 tyr2 _cvs2{-!!!-})
   | Just prov' <- opt_trans_prov p1 p2
   = assert (r1 == r2) $
     fireTransRule "UnivCo" in_co1 in_co2 $

@@ -284,6 +284,9 @@ data ExportFlag   -- See Note [ExportFlag on binders]
   = NotExported   -- ^ Not exported: may be discarded as dead code.
   | Exported      -- ^ Exported: kept alive
 
+instance NFData Var where
+  rnf x = seq x () {-!!!-}
+
 {- Note [ExportFlag on binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ExportFlag of "Exported" on a top-level binder says "keep this

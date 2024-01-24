@@ -41,7 +41,7 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr,
+        substCoVarBndr, substDCoVarSet,
         substTyVar, substTyVars, substTyVarToTyVar,
         substTyCoVars,
         substTyCoBndr, substForAllCoBndr,
@@ -56,7 +56,7 @@ import {-# SOURCE #-} GHC.Core.Type
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
    , mkNomReflCo, mkSubCo, mkSymCo
-   , mkFunCo2, mkForAllCo, mkUnivCo
+   , mkFunCo2, mkForAllCo, mkUnivCoCvs
    , mkAxiomInstCo, mkAppCo, mkGReflCo
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
@@ -895,8 +895,9 @@ subst_co subst co
     go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
-    go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
-                                (go_ty t1)) $! (go_ty t2)
+    go (UnivCo p r t1 t2 cvs)
+                             = ((((mkUnivCoCvs $! go_prov p) $! r) $!
+                                 (go_ty t1)) $! (go_ty t2)) $! substDCoVarSet subst cvs
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
     go (SelCo d co)          = mkSelCo d $! (go co)
@@ -915,6 +916,12 @@ subst_co subst co
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
+
+-- | Perform a substitution within a 'DVarSet' of free variables.
+-- returning the shallow free coercion variables
+substDCoVarSet :: Subst -> DCoVarSet -> DCoVarSet
+substDCoVarSet subst cvs = shallowCoVarsOfCosDSet $ map (substCoVar subst) $
+                           dVarSetElems cvs
 
 substForAllCoBndr :: Subst -> TyCoVar -> KindCoercion
                   -> (Subst, TyCoVar, Coercion)

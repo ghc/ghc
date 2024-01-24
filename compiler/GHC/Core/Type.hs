@@ -273,7 +273,7 @@ import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkNomReflCo, mkGReflCo, mkReflCo
    , mkTyConAppCo, mkAppCo
-   , mkForAllCo, mkFunCo2, mkAxiomInstCo, mkUnivCo
+   , mkForAllCo, mkFunCo2, mkAxiomInstCo, mkUnivCoCvs
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo, mkFunCo, funRole
    , decomposePiCos, coercionKind
@@ -558,8 +558,8 @@ expandTypeSynonyms ty
       = substCoVar subst cv
     go_co subst (AxiomInstCo ax ind args)
       = mkAxiomInstCo ax ind (map (go_co subst) args)
-    go_co subst (UnivCo p r t1 t2)
-      = mkUnivCo (go_prov subst p) r (go subst t1) (go subst t2)
+    go_co subst (UnivCo p r t1 t2 cvs)
+      = mkUnivCoCvs (go_prov subst p) r (go subst t1) (go subst t2) cvs
     go_co subst (SymCo co)
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
@@ -913,7 +913,8 @@ mapTyCo mapper
         -> (go_ty (), go_tys (), go_co (), go_cos ())
 
 {-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
-mapTyCoX :: Monad m => TyCoMapper env m
+mapTyCoX :: forall m env. Monad m
+         => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
@@ -961,6 +962,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_mco !_   MRefl    = return MRefl
     go_mco !env (MCo co) = MCo <$> (go_co env co)
 
+    go_co :: env -> Coercion -> m Coercion
     go_co !env (Refl ty)                  = Refl <$> go_ty env ty
     go_co !env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
     go_co !env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
@@ -968,8 +970,11 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                                            <*> go_co env c1 <*> go_co env c2
     go_co !env (CoVarCo cv)               = covar env cv
     go_co !env (HoleCo hole)              = cohole env hole
-    go_co !env (UnivCo p r t1 t2)         = mkUnivCo <$> go_prov env p <*> pure r
+    go_co !env (UnivCo p r t1 t2 cvs)     = mkUnivCoCvs <$> go_prov env p <*> pure r
                                            <*> go_ty env t1 <*> go_ty env t2
+                                           <*> strictFoldDVarSet (do_cv env)
+                                                 (return emptyDVarSet) cvs
+
     go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
     go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co !env (AxiomRuleCo r cos)        = AxiomRuleCo r <$> go_cos env cos
@@ -1002,6 +1007,10 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov !env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov !_   p@(PluginProv _)    = return p
 
+    do_cv :: env -> CoVar -> m DTyCoVarSet -> m DTyCoVarSet
+    do_cv env v mfvs = do { fvs <- mfvs
+                          ; co  <- covar env v
+                          ; return (tyCoVarsOfCoDSet co `unionDVarSet` fvs) }
 
 {- *********************************************************************
 *                                                                      *

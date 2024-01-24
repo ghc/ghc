@@ -43,7 +43,7 @@ module GHC.Core.Coercion (
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkHomoForAllCos,
         mkPhantomCo,
-        mkHoleCo, mkUnivCo, mkSubCo,
+        mkHoleCo, mkUnivCo, mkUnivCoCvs, mkSubCo,
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
@@ -149,6 +149,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Basic
 import GHC.Types.Unique
+import GHC.Types.Unique.DSet (emptyUniqDSet)
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.SrcLoc
@@ -1099,7 +1100,8 @@ mkUnbranchedAxInstLHS ax = mkAxInstLHS ax 0
 mkHoleCo :: CoercionHole -> Coercion
 mkHoleCo h = HoleCo h
 
--- | Make a universal coercion between two arbitrary types.
+-- | Make a universal coercion between two arbitrary types in the simple
+-- case where uc_fcvs is empty.
 mkUnivCo :: UnivCoProvenance
          -> Role       -- ^ role of the built coercion, "r"
          -> Type       -- ^ t1 :: k1
@@ -1107,7 +1109,24 @@ mkUnivCo :: UnivCoProvenance
          -> Coercion   -- ^ :: t1 ~r t2
 mkUnivCo prov role ty1 ty2
   | ty1 `eqType` ty2 = mkReflCo role ty1
-  | otherwise        = UnivCo prov role ty1 ty2
+  | otherwise        = UnivCo prov role ty1 ty2 emptyUniqDSet{-!!!-}
+-- !!! There are 19 occurrences of mkUnivCo. Shall I make them all take cvs
+-- and explicitly put emptyUniqDSet there and comment why it's correct?
+-- Regardless, I should go through all of them and verity it is correct,
+-- but about future GHC code, plugin writers? This is backward compat
+-- vs a forced change/review of a dogdy API element.
+
+-- | Make a universal coercion between two arbitrary types in the most
+-- general case with the 'DCoVarSet' argument.
+mkUnivCoCvs :: UnivCoProvenance
+            -> Role       -- ^ role of the built coercion, "r"
+            -> Type       -- ^ t1 :: k1
+            -> Type       -- ^ t2 :: k2
+            -> DCoVarSet  -- ^ !!! what's the comment here? "free coercion variables that a plugin made use of when constructing its proof"? anything more general?
+            -> Coercion   -- ^ :: t1 ~r t2
+mkUnivCoCvs prov role ty1 ty2 cvs
+  | ty1 `eqType` ty2 = mkReflCo role ty1  -- !!! cvs not considered in this case?
+  | otherwise        = UnivCo prov role ty1 ty2 cvs
 
 -- | Create a symmetric version of the given 'Coercion' that asserts
 --   equality between the same types but in the other "direction", so
@@ -1120,6 +1139,8 @@ mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
 mkSymCo co                        = SymCo co
+-- !!! why is this case in !3792, but not on master branch? Just an optmization? Shall I include it? Are cvs unchanged in it? Similarly for mkSubCo.
+-- mkSymCo    (UnivCo p r t1 t2 cvs) = UnivCo p r t2 t1 cvs
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
@@ -1269,8 +1290,8 @@ mkCoherenceRightCo r ty co co2
 mkKindCo :: Coercion -> Coercion
 mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
-mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
-mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
+mkKindCo (UnivCo (PhantomProv h) _ _ _ _)    = h
+mkKindCo (UnivCo (ProofIrrelProv h) _ _ _ _) = h
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1394,11 +1415,11 @@ setNominalRole_maybe r co
           pprPanic "setNominalRole_maybe: the coercion should already be nominal" (ppr co)
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
-    setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
+    setNominalRole_maybe_helper (UnivCo prov _ co1 co2 cvs)
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
-      = Just $ UnivCo prov Nominal co1 co2
+      = Just $ UnivCo prov Nominal co1 co2 cvs{-!!!-}
     setNominalRole_maybe_helper _ = Nothing
 
 -- | Make a phantom coercion between two types. The coercion passed
@@ -1520,9 +1541,9 @@ promoteCoercion co = case co of
     AxiomInstCo {} -> mkKindCo co
     AxiomRuleCo {} -> mkKindCo co
 
-    UnivCo (PhantomProv kco)    _ _ _ -> kco
-    UnivCo (ProofIrrelProv kco) _ _ _ -> kco
-    UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
+    UnivCo (PhantomProv kco)    _ _ _ _cvs -> kco  -- !!! is it fine to forget cvs?
+    UnivCo (ProofIrrelProv kco) _ _ _ _cvs -> kco
+    UnivCo (PluginProv _)       _ _ _ _cvs -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -2340,8 +2361,8 @@ seqCo (FunCo r af1 af2 w co1 co2) = r `seq` af1 `seq` af2 `seq`
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (HoleCo h)                = coHoleCoVar h `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
-seqCo (UnivCo p r t1 t2)
-  = seqProv p `seq` r `seq` seqType t1 `seq` seqType t2
+seqCo (UnivCo p r t1 t2 cvs)
+  = seqProv p `seq` r `seq` seqType t1 `seq` seqType t2 `seq` cvs `seq` ()  -- !!! no seqCo for a var set defined already elsewhere? What does "Sequencing on coercions" mean?
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
 seqCo (SelCo n co)              = n `seq` seqCo co
@@ -2405,7 +2426,7 @@ coercionLKind co
                                          , ft_arg = go arg, ft_res = go res }
     go (CoVarCo cv)              = coVarLType cv
     go (HoleCo h)                = coVarLType (coHoleCoVar h)
-    go (UnivCo _ _ ty1 _)        = ty1
+    go (UnivCo _ _ ty1 _ _)      = ty1
     go (SymCo co)                = coercionRKind co
     go (TransCo co1 _)           = go co1
     go (LRCo lr co)              = pickLR lr (splitAppTy (go co))
@@ -2466,7 +2487,7 @@ coercionRKind co
     go (FunCo { fco_afr = af, fco_mult = mult, fco_arg = arg, fco_res = res})
        {- See Note [FunCo] -}    = FunTy { ft_af = af, ft_mult = go mult
                                          , ft_arg = go arg, ft_res = go res }
-    go (UnivCo _ _ _ ty2)        = ty2
+    go (UnivCo _ _ _ ty2 _)      = ty2
     go (SymCo co)                = coercionLKind co
     go (TransCo _ co2)           = go co2
     go (LRCo lr co)              = pickLR lr (splitAppTy (go co))
@@ -2576,7 +2597,7 @@ coercionRole = go
     go (CoVarCo cv)                 = coVarRole cv
     go (HoleCo h)                   = coVarRole (coHoleCoVar h)
     go (AxiomInstCo ax _ _)         = coAxiomRole ax
-    go (UnivCo _ r _ _)             = r
+    go (UnivCo _ r _ _ _)           = r
     go (SymCo co)                   = go co
     go (TransCo co1 _co2)           = go co1
     go (SelCo SelForAll      _co)   = Nominal

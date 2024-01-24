@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -78,7 +77,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Var.Set( DCoVarSet, dVarSetElems, elemVarSet )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -885,7 +884,7 @@ data Coercion
 
   | FunCo  -- FunCo :: "e" -> N/P -> e -> e -> e
            -- See Note [FunCo] for fco_afl, fco_afr
-       { fco_role         :: Role
+        { fco_role         :: Role
         , fco_afl          :: FunTyFlag   -- Arrow for coercionLKind
         , fco_afr          :: FunTyFlag   -- Arrow for coercionRKind
         , fco_mult         :: CoercionN
@@ -912,10 +911,15 @@ data Coercion
     -- The number coercions should match exactly the expectations
     -- of the CoAxiomRule (i.e., the rule is fully saturated).
 
-  | UnivCo UnivCoProvenance Role Type Type
-      -- :: _ -> "e" -> _ -> _ -> e
+  | UnivCo  -- :: _ -> "e" -> _ -> _ -> _ -> e
+      { uc_prov :: UnivCoProvenance
+      , uc_role :: Role
+      , uc_lhs  :: Type
+      , uc_rhs  :: Type
+      , uc_fcvs :: DCoVarSet }
 
   | SymCo Coercion             -- :: e -> e
+
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
   | SelCo CoSel Coercion  -- See Note [SelCo]
@@ -1685,10 +1689,49 @@ Note that
   co2 :: a2 ~ Bool
 
 Here,
-  co3 = UnivCo (ProofIrrelProv co5) Nominal (CoercionTy co1) (CoercionTy co2)
+  co3 = UnivCo (ProofIrrelProv co5) Nominal (CoercionTy co1) (CoercionTy co2) cvs
   where
     co5 :: (a1 ~ Bool) ~ (a2 ~ Bool)
     co5 = TyConAppCo Nominal (~#) [<*>, <*>, co4, <Bool>]
+
+
+The importance of tracking free coercion variables
+--------------------------------------------------
+
+-- !!! Rewrite the below, explaining how plugins need the vars (any other reason to include it? future coersion zapping? any soundness issues apart of plugins?):
+
+It is vital that zapped coercions track their free coercion variables.
+To see why, consider this program:
+
+    data T a where
+      T1 :: Bool -> T Bool
+      T2 :: T Int
+
+    f :: T a -> a -> Bool
+    f = /\a (x:T a) (y:a).
+        case x of
+              T1 (c : a~Bool) (z : Bool) -> not (y |> c)
+              T2 -> True
+
+Now imagine that we zap the coercion `c`, replacing it with a generic UnivCo
+between `a` and Bool. If we didn't record the fact that this coercion was
+previously free in `c`, we may incorrectly float the expression `not (y |> c)`
+out of the case alternative which brings proof of `c` into scope. If this
+happened then `f T2 (I# 5)` would try to interpret `y` as a Bool, at
+which point we aren't far from a segmentation fault or much worse.
+
+Note that we don't need to track
+* the coercion's free *type* variables
+* coercion variables free in kinds (we only need the "shallow" free covars)
+
+This means that we may float past type variables which the original
+proof had as free variables. While surprising, this doesn't jeopardise
+the validity of the coercion, which only depends upon the scoping
+relative to the free coercion variables.
+
+(The free coercion variables are kept as a DCoVarSet in UnivCo,
+since these sets are included in interface files.)
+
 -}
 
 
@@ -1833,8 +1876,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (CoVarCo cv)             = covar env cv
     go_co env (AxiomInstCo _ _ args)   = go_cos env args
     go_co env (HoleCo hole)            = cohole env hole
-    go_co env (UnivCo p _ t1 t2)       = go_prov env p `mappend` go_ty env t1
+    go_co env (UnivCo p _ t1 t2 cvs)   = go_prov env p `mappend` go_ty env t1
                                                        `mappend` go_ty env t2
+                                         `mappend` go_cvs env (dVarSetElems cvs)
     go_co env (SymCo co)               = go_co env co
     go_co env (TransCo c1 c2)          = go_co env c1 `mappend` go_co env c2
     go_co env (AxiomRuleCo _ cos)      = go_cos env cos
@@ -1856,6 +1900,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _)      = mempty
+
+    go_cvs _   []       = mempty
+    go_cvs env (cv:cvs) = covar env cv `mappend` go_cvs env cvs
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -1908,7 +1955,8 @@ coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
+coercionSize (UnivCo p _ t1 t2 _)
+                                 = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (SelCo _ co)        = 1 + coercionSize co

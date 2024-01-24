@@ -19,6 +19,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
+        shallowCoVarsOfCosDSet,
 
         almostDevoidCoVarOfCo,
 
@@ -48,7 +49,7 @@ module GHC.Core.TyCo.FVs
         closeOverKinds,
 
         -- * Raw materials
-        Endo(..), runTyCoVars
+        TyCoAcc(..), Endo(..), runTyCoVars
   ) where
 
 import GHC.Prelude
@@ -66,6 +67,7 @@ import GHC.Utils.FV
 
 import GHC.Types.Var
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet (emptyUniqDSet)
 import GHC.Types.Unique.Set
 
 import GHC.Types.Var.Set
@@ -281,6 +283,9 @@ runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
 runTyCoVars f = appEndo f emptyVarSet
 
+type InScopeBndrs  = TyCoVarSet
+newtype TyCoAcc acc = TCA' { runTCA :: InScopeBndrs -> acc -> acc }
+
 {- *********************************************************************
 *                                                                      *
           Deep free variables
@@ -445,6 +450,36 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
     do_hole is hole  = do_covar is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
+
+------- Same again, but for DCoVarSet ----------
+--    But this time the free vars are shallow
+shallowCoVarsOfCosDSet :: [Coercion] -> DCoVarSet
+shallowCoVarsOfCosDSet _cos = emptyUniqDSet  -- !!!   runTCA (shallow_dcv_cos cos) emptyVarSet emptyDVarSet
+
+{- TODO: !!! lots of other code and refactorings, partially bit-rotten, would need to be taken from !3792
+shallow_dcv_cos :: [Coercion] -> TyCoAcc DCoVarSet
+(_, _, _, shallow_dcv_cos) = foldTyCo shallowCoVarDSetFolder
+
+shallowCoVarDSetFolder :: TyCoFolder TyCoVarSet{-!!!-} (TyCoAcc DCoVarSet)
+shallowCoVarDSetFolder = TyCoFolder { tcf_view = noView
+                                    , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                                    , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tyvar _  = mempty
+    do_covar cv = shallowAddCoVarDSet cv
+
+    do_bndr tcv _vis fvs = extendInScope tcv fvs
+    do_hole hole = do_covar (coHoleCoVar hole)
+
+shallowAddCoVarDSet :: CoVar -> TyCoAcc DCoVarSet
+-- Add a variable to the free vars unless it is in the in-scope
+-- or is already in the in-scope set-
+shallowAddCoVarDSet cv = TCA add_it
+  where
+    add_it is acc | cv `elemVarSet`  is  = acc
+                  | cv `elemDVarSet` acc = acc
+                  | otherwise            = acc `extendDVarSet` cv
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -641,9 +676,10 @@ tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
   = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
     -- See Note [CoercionHoles and coercion free variables]
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
-tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
+tyCoFVsOfCo (UnivCo p _ t1 t2 cvs) fv_cand in_scope acc
   = (tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
-                     `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
+                     `unionFV` tyCoFVsOfType t2
+     `unionFV` mkFVs (dVarSetElems cvs)) fv_cand in_scope acc
 tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (SelCo _ co)        fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
@@ -696,10 +732,11 @@ almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
 almost_devoid_co_var_of_co (AxiomInstCo _ _ cos) cv
   = almost_devoid_co_var_of_cos cos cv
-almost_devoid_co_var_of_co (UnivCo p _ t1 t2) cv
+almost_devoid_co_var_of_co (UnivCo p _ t1 t2 cvs) cv
   = almost_devoid_co_var_of_prov p cv
   && almost_devoid_co_var_of_type t1 cv
   && almost_devoid_co_var_of_type t2 cv
+  && not (cv `elemDVarSet` cvs)
 almost_devoid_co_var_of_co (SymCo co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (TransCo co1 co2) cv
@@ -1112,7 +1149,7 @@ tyConsOfType ty
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
                                    = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
-     go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
+     go_co (UnivCo p _ t1 t2 _cvs{-!!!-})      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
@@ -1314,10 +1351,10 @@ occCheckExpand vs_to_avoid ty
 
     go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
                                              ; return (AxiomInstCo ax ind args') }
-    go_co cxt (UnivCo p r ty1 ty2)      = do { p' <- go_prov cxt p
+    go_co cxt (UnivCo p r ty1 ty2 cvs)  = do { p' <- go_prov cxt p
                                              ; ty1' <- go cxt ty1
                                              ; ty2' <- go cxt ty2
-                                             ; return (UnivCo p' r ty1' ty2') }
+                                             ; return (UnivCo p' r ty1' ty2' cvs{-!!!-}) }
     go_co cxt (SymCo co)                = do { co' <- go_co cxt co
                                              ; return (SymCo co') }
     go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1

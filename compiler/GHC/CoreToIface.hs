@@ -88,6 +88,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Data.Maybe ( isNothing, catMaybes )
+import Data.List ( partition )
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -298,9 +299,14 @@ toIfaceCoercionX fr co
     go (SubCo co)           = IfaceSubCo (go co)
     go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
-    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
+    go (UnivCo p r t1 t2 cvs)
+                            = IfaceUnivCo (go_prov p) r
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
+                                          (map toIfaceCoVar bound_cvs) free_cvs
+      where
+        (free_cvs, bound_cvs) = partition (`elemVarSet` fr) (dVarSetElems cvs)
+
     go co@(TyConAppCo r tc cos)
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
