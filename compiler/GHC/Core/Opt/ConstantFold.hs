@@ -34,6 +34,7 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Float
 
 import GHC.Types.Id.Make ( unboxedUnitExpr )
 import GHC.Types.Id
@@ -656,6 +657,38 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Narrow32WordOp
                                        , removeOp32
                                        , narrowSubsumesAnd WordAndOp Narrow32WordOp 32 ]
+
+   CastWord64ToDoubleOp -> mkPrimOpRule nm 1
+      [ unaryLit $ \_env -> \case
+         LitNumber _ n
+             | v <- castWord64ToDouble (fromInteger n)
+             -- we can't represent those float literals in Core until #18897 is fixed
+             , not (isNaN v || isInfinite v || isNegativeZero v)
+             -> Just (mkDoubleLitDouble v)
+         _   -> Nothing
+      ]
+
+   CastWord32ToFloatOp -> mkPrimOpRule nm 1
+      [ unaryLit $ \_env -> \case
+          LitNumber _ n
+              | v <- castWord32ToFloat (fromInteger n)
+              -- we can't represent those float literals in Core until #18897 is fixed
+              , not (isNaN v || isInfinite v || isNegativeZero v)
+              -> Just (mkFloatLitFloat v)
+          _   -> Nothing
+      ]
+
+   CastDoubleToWord64Op -> mkPrimOpRule nm 1
+      [ unaryLit $ \_env -> \case
+         LitDouble n -> Just (mkWord64LitWord64 (castDoubleToWord64 (fromRational n)))
+         _           -> Nothing
+      ]
+
+   CastFloatToWord32Op -> mkPrimOpRule nm 1
+      [ unaryLit $ \_env -> \case
+          LitFloat n -> Just (mkWord32LitWord32 (castFloatToWord32 (fromRational n)))
+          _          -> Nothing
+      ]
 
    OrdOp          -> mkPrimOpRule nm 1 [ liftLit charToIntLit
                                        , semiInversePrimOp ChrOp ]
