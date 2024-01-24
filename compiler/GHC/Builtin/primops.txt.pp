@@ -3955,10 +3955,25 @@ pseudoop   "coerce"
      more complicated settings, e.g. converting a list of newtypes to a list of
      concrete types.
 
+     When used in conversions involving a newtype wrapper,
+     make sure the newtype constructor is in scope.
+
      This function is representation-polymorphic, but the
      'RuntimeRep' type argument is marked as 'Inferred', meaning
      that it is not available for visible type application. This means
      the typechecker will accept @'coerce' \@'Int' \@Age 42@.
+
+     === __Examples__
+
+     >>> newtype TTL = TTL Int deriving (Eq, Ord, Show)
+     >>> newtype Age = Age Int deriving (Eq, Ord, Show)
+     >>> coerce (Age 42) :: TTL
+     TTL 42
+     >>> coerce (+ (1 :: Int)) (Age 42) :: TTL
+     TTL 43
+     >>> coerce (map (+ (1 :: Int))) [Age 42, Age 24] :: [TTL]
+     [TTL 43,TTL 25]
+
    }
 
 ------------------------------------------------------------------------
