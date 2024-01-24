@@ -718,7 +718,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
-        [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh build_hadrian"
