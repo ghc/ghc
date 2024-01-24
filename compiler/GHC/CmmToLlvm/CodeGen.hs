@@ -12,6 +12,7 @@ import GHC.Platform
 import GHC.Platform.Regs ( activeStgRegs )
 
 import GHC.Llvm
+import GHC.Llvm.Types
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Config
 import GHC.CmmToLlvm.Regs
@@ -1765,31 +1766,49 @@ genMachOp_slow opt op [x, y] = case op of
                     pprPanic "isSMulOK: Not bit type! " $
                         lparen <> ppr word <> rparen
 
-        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encountered"
+        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-binary op encountered"
                        ++ "with two arguments! (" ++ show op ++ ")"
 
-genMachOp_slow _opt op [x, y, z] = case op of
-    MO_FMA var _ -> triLlvmOp getVarType (FMAOp var)
-    _            -> panicOp
-    where
-        triLlvmOp ty op = do
-          platform <- getPlatform
-          runExprData $ do
-            vx <- exprToVarW x
-            vy <- exprToVarW y
-            vz <- exprToVarW z
-
-            if | getVarType vx == getVarType vy
-               , getVarType vx == getVarType vz
-               -> doExprW (ty vx) $ op vx vy vz
-               | otherwise
-               -> pprPanic "triLlvmOp types" (pdoc platform x $$ pdoc platform y $$ pdoc platform z)
-        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered"
-                       ++ "with three arguments! (" ++ show op ++ ")"
+genMachOp_slow _opt op [x, y, z] = do
+  platform <- getPlatform
+  let
+    neg x = CmmMachOp (MO_F_Neg (cmmExprWidth platform x)) [x]
+    panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered"
+                   ++ "with three arguments! (" ++ show op ++ ")"
+  case op of
+    MO_FMA var _ ->
+      case var of
+        -- LLVM only has the fmadd variant.
+        FMAdd   -> genFmaOp x y z
+        -- Other fused multiply-add operations are implemented in terms of fmadd
+        -- This is sound: it does not lose any precision.
+        FMSub   -> genFmaOp x y (neg z)
+        FNMAdd  -> genFmaOp (neg x) y z
+        FNMSub  -> genFmaOp (neg x) y (neg z)
+    _ -> panicOp
 
 -- More than three expressions, invalid!
 genMachOp_slow _ _ _ = panic "genMachOp_slow: More than 3 expressions in MachOp!"
 
+-- | Generate code for a fused multiply-add operation.
+genFmaOp :: CmmExpr -> CmmExpr -> CmmExpr -> LlvmM ExprData
+genFmaOp x y z = runExprData $ do
+  vx <- exprToVarW x
+  vy <- exprToVarW y
+  vz <- exprToVarW z
+  let tx = getVarType vx
+      ty = getVarType vy
+      tz = getVarType vz
+  Panic.massertPpr
+    (tx == ty && tx == tz)
+    (vcat [ text "fma: mismatched arg types"
+          , ppLlvmType tx, ppLlvmType ty, ppLlvmType tz ])
+  let fname = case tx of
+        LMFloat  -> fsLit "llvm.fma.f32"
+        LMDouble -> fsLit "llvm.fma.f64"
+        _ -> pprPanic "fma: type not LMFloat or LMDouble" (ppLlvmType tx)
+  fptr <- liftExprData $ getInstrinct fname ty [tx, ty, tz]
+  doExprW tx $ Call StdCall fptr [vx, vy, vz] [ReadNone, NoUnwind]
 
 -- | Handle CmmLoad expression.
 genLoad :: Atomic -> CmmExpr -> CmmType -> AlignmentSpec -> LlvmM ExprData
