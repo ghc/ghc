@@ -2,11 +2,11 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: f8658053d14911d73b1e32f5b6d13fb7b1c8a5ee
+  DOCKER_REV: 23d72bc7674e643c73256242ba781bea4aef4fb8
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
-  CACHE_REV: 10
+  CACHE_REV: 11
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
