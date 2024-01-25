@@ -99,7 +99,8 @@ pprAlignForSection _platform _seg
 --
 pprSectionAlign :: IsDoc doc => NCGConfig -> Section -> doc
 pprSectionAlign _config (Section (OtherSection _) _) =
-     panic "AArch64.Ppr.pprSectionAlign: unknown section"
+  -- TODO: Valid for RISCV64?
+  panic "AArch64.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
     line (pprSectionHeader config sec)
     $$ pprAlignForSection (ncgPlatform config) seg
@@ -122,6 +123,8 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
       else empty
     )
   where
+    -- TODO: Check if we can  filter more instructions here.
+    -- TODO: Shouldn't this be a more general check on a higher level?
     -- Filter out identity moves. E.g. mov x18, x18 will be dropped.
     optInstrs = filter f instrs
       where f (MOV o1 o2) | o1 == o2 = False
@@ -167,6 +170,7 @@ pprData :: IsDoc doc => NCGConfig -> CmmStatic -> doc
 pprData _config (CmmString str) = line (pprString str)
 pprData _config (CmmFileEmbed path _) = line (pprFileEmbed path)
 
+-- TODO: AFAIK there no Darwin for RISCV, so we may consider to simplify this.
 pprData config (CmmUninitialised bytes)
  = line $ let platform = ncgPlatform config
           in if platformOS platform == OSDarwin
@@ -248,13 +252,13 @@ pprImm p (ImmConstantDiff a b) = pprImm p a <> char '-'
 
 -- aarch64 GNU as uses // for comments.
 asmComment :: SDoc -> SDoc
-asmComment c = whenPprDebug $ text "#" <+> c
+asmComment c = text "#" <+> c
 
 asmDoubleslashComment :: SDoc -> SDoc
-asmDoubleslashComment c = whenPprDebug $ text "//" <+> c
+asmDoubleslashComment c = text "//" <+> c
 
 asmMultilineComment :: SDoc -> SDoc
-asmMultilineComment c = whenPprDebug $ text "/*" $+$ c $+$ text "*/"
+asmMultilineComment c =  text "/*" $+$ c $+$ text "*/"
 
 pprIm :: IsLine doc => Platform -> Imm -> doc
 pprIm platform im = case im of
@@ -553,26 +557,27 @@ pprInstr platform instr = case instr of
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t             -> pprInstr platform (B t)
-  B l | isLabel l -> line $ text "\tjal" <+> text "x0" <> comma <+> getLabel platform l
+  -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
+  B l | isLabel l -> lines_ [ text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform l
+                            , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" ]
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
 
-  BL l _ _ | isLabel l-> line $ text "\tjal" <+> text "x1" <> comma <+> getLabel platform l
+  BL l _ _ | isLabel l-> line $ text "\tcall" <+> getLabel platform l
   BL (TReg r)     _ _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
 
-  BCOND c l r t | isLabel t -> case c of
-    EQ  -> line $ text "\tbeq" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    NE  -> line $ text "\tbne" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    SLT -> line $ text "\tblt" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    SLE -> line $ text "\tbge" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
-    SGE -> line $ text "\tbge" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    SGT -> line $ text "\tblt" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
-    ULT -> line $ text "\tbltu" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    ULE -> line $ text "\tbgeu" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
-    UGE -> line $ text "\tbgeu" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
-    UGT -> line $ text "\tbltu" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
-    _   -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
+  BCOND c l r t | isLabel t ->
+    line $ text "\t" <> pprBcond c <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
 
   BCOND _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
+
+  BCOND_FAR c l r t | isLabel t ->
+    lines_ [ text "\t" <> pprBcond (negateCond c) <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> text "$+16"
+           , text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform t
+           , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" 
+           ]
+
+  BCOND_FAR _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
+
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -715,36 +720,18 @@ floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDouble
 floatOpPrecision p l r = pprPanic "Cannot determine floating point precission" (text "op1" <+> pprOp p l <+> text "op2" <+> pprOp p r)
 
 pprBcond :: IsLine doc => Cond -> doc
-pprBcond c = text "b." <> pprCond c
+pprBcond c = text "b" <> pprCond c
 
 pprCond :: IsLine doc => Cond -> doc
 pprCond c = case c of
-  ALWAYS -> text "al" -- Always
-  EQ     -> text "eq" -- Equal
-  NE     -> text "ne" -- Not Equal
-
-  SLT    -> text "lt" -- Signed less than                  ; Less than, or unordered
-  SLE    -> text "le" -- Signed less than or equal         ; Less than or equal, or unordered
-  SGE    -> text "ge" -- Signed greater than or equal      ; Greater than or equal
-  SGT    -> text "gt" -- Signed greater than               ; Greater than
-
-  ULT    -> text "lo" -- Carry clear/ unsigned lower       ; less than
-  ULE    -> text "ls" -- Unsigned lower or same            ; Less than or equal
-  UGE    -> text "hs" -- Carry set/unsigned higher or same ; Greater than or equal, or unordered
-  UGT    -> text "hi" -- Unsigned higher                   ; Greater than, or unordered
-
-  NEVER  -> text "nv" -- Never
-  VS     -> text "vs" -- Overflow                          ; Unordered (at least one NaN operand)
-  VC     -> text "vc" -- No overflow                       ; Not unordered
-
-  -- Ordered variants.  Respecting NaN.
-  OLT    -> text "mi"
-  OLE    -> text "ls"
-  OGE    -> text "ge"
-  OGT    -> text "gt"
-
-  -- Unordered
-  UOLT   -> text "lt"
-  UOLE   -> text "le"
-  UOGE   -> text "pl"
-  UOGT   -> text "hi"
+    EQ  -> text "eq"
+    NE  -> text "ne"
+    SLT -> text "lt"
+    SLE -> text "le"
+    SGE -> text "ge"
+    SGT -> text "gt"
+    ULT -> text "ltu"
+    ULE -> text "leu"
+    UGE -> text "geu"
+    UGT -> text "gtu"
+    _   -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
