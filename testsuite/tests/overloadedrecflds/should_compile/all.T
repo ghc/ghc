@@ -60,3 +60,4 @@ test('T23557', [extra_files(['T23557_aux.hs'])], multimod_compile, ['T23557', '-
 test('T24293', req_th, compile, [''])
 test('T24293b', req_th, compile, [''])
 test('T24293c', req_th, compile_fail, [''])
+test('T24381', normal, compile, [''])

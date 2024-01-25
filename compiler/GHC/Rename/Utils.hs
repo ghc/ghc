@@ -182,7 +182,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
         where
           (loc,occ) = get_loc_occ n
           mb_local  = lookupLocalRdrOcc local_env occ
-          gres      = lookupGRE global_env (LookupRdrName (mkRdrUnqual occ) (RelevantGREsFOS WantBoth))
+          gres      = lookupGRE global_env (LookupRdrName (mkRdrUnqual occ) (RelevantGREsFOS WantNormal))
                 -- Make an Unqualified RdrName and look that up, so that
                 -- we don't find any GREs that are in scope qualified-only
 
