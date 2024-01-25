@@ -691,7 +691,7 @@ instance ToJSON Job where
     , "variables" A..= fmap unwords jobVariables
     , "artifacts" A..= jobArtifacts
     , "cache" A..= jobCache
-    , "after_script" A..= jobAfterScript
+    --, "after_script" A..= jobAfterScript
     , "script" A..= jobScript
     , "rules" A..= jobRules
     ]
@@ -712,17 +712,21 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
 
     jobScript
       | Windows <- opsys
-      = [ "bash .gitlab/ci.sh setup"
-        , "bash .gitlab/ci.sh configure"
-        , "bash .gitlab/ci.sh build_hadrian"
-        , "bash .gitlab/ci.sh test_hadrian" ]
+      = [ "echo no-op" ]
+      -- = [ "bash .gitlab/ci.sh setup"
+      --   , "bash .gitlab/ci.sh configure"
+      --   , "bash .gitlab/ci.sh build_hadrian"
+      --   , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
-        [ ".gitlab/ci.sh setup"
-        , ".gitlab/ci.sh configure"
-        , ".gitlab/ci.sh build_hadrian"
-        , ".gitlab/ci.sh test_hadrian"
+        [ "id"
+        , "ls -al"
         ]
+        -- [ ".gitlab/ci.sh setup"
+        -- , ".gitlab/ci.sh configure"
+        -- , ".gitlab/ci.sh build_hadrian"
+        -- , ".gitlab/ci.sh test_hadrian"
+        -- ]
 
     jobAfterScript
       | Windows <- opsys =

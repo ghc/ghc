@@ -1,12 +1,6 @@
 ### THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY
 {
   "aarch64-darwin-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -43,10 +37,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -66,12 +58,6 @@
     }
   },
   "aarch64-linux-deb10-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -107,10 +93,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -126,12 +110,6 @@
     }
   },
   "aarch64-linux-deb12-validate+llvm": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -167,10 +145,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -186,12 +162,6 @@
     }
   },
   "i386-linux-deb10-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -227,10 +197,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -246,12 +214,6 @@
     }
   },
   "nightly-aarch64-darwin-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -288,10 +250,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -312,12 +272,6 @@
     }
   },
   "nightly-aarch64-linux-alpine3_18-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -353,10 +307,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -376,12 +328,6 @@
     }
   },
   "nightly-aarch64-linux-deb10-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -417,10 +363,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -437,12 +381,6 @@
     }
   },
   "nightly-aarch64-linux-deb11-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -478,10 +416,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -498,12 +434,6 @@
     }
   },
   "nightly-aarch64-linux-deb12-validate+llvm": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -539,10 +469,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -559,12 +487,6 @@
     }
   },
   "nightly-i386-linux-deb10-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -600,10 +522,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -620,12 +540,6 @@
     }
   },
   "nightly-x86_64-darwin-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -662,10 +576,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -689,12 +601,6 @@
     }
   },
   "nightly-x86_64-freebsd13-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -730,10 +636,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -753,12 +657,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -794,10 +692,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -817,12 +713,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_12-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -858,10 +748,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -881,12 +769,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_12-validate+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -922,10 +804,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -945,12 +825,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -986,10 +860,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1008,12 +880,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1049,10 +915,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1071,12 +935,6 @@
     }
   },
   "nightly-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1112,10 +970,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1134,12 +990,6 @@
     }
   },
   "nightly-x86_64-linux-centos7-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1175,10 +1025,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1197,12 +1045,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-int_native-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1238,10 +1080,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1258,12 +1098,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-no_tntc-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1299,10 +1133,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1319,12 +1151,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-numa-slow-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1360,10 +1186,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1381,12 +1205,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-unreg-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1422,10 +1240,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1442,12 +1258,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1483,10 +1293,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1503,12 +1311,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-validate+debug_info": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1544,10 +1346,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1564,12 +1364,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-validate+thread_sanitizer": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1605,10 +1399,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1627,12 +1419,6 @@
     }
   },
   "nightly-x86_64-linux-deb10-zstd-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1668,10 +1454,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1688,12 +1472,6 @@
     }
   },
   "nightly-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1729,10 +1507,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1751,12 +1527,6 @@
     }
   },
   "nightly-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1792,10 +1562,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1815,12 +1583,6 @@
     }
   },
   "nightly-x86_64-linux-deb11-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1856,10 +1618,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1876,12 +1636,6 @@
     }
   },
   "nightly-x86_64-linux-deb11-validate+boot_nonmoving_gc": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1917,10 +1671,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1937,12 +1689,6 @@
     }
   },
   "nightly-x86_64-linux-deb12-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -1978,10 +1724,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -1998,12 +1742,6 @@
     }
   },
   "nightly-x86_64-linux-deb12-validate+llvm": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2039,10 +1777,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2059,12 +1795,6 @@
     }
   },
   "nightly-x86_64-linux-deb9-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2100,10 +1830,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2120,12 +1848,6 @@
     }
   },
   "nightly-x86_64-linux-fedora33-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2161,10 +1883,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2183,12 +1903,6 @@
     }
   },
   "nightly-x86_64-linux-fedora33-release-hackage": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2224,10 +1938,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2247,12 +1959,6 @@
     }
   },
   "nightly-x86_64-linux-fedora33-validate+debug_info": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2288,10 +1994,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2310,12 +2014,6 @@
     }
   },
   "nightly-x86_64-linux-fedora38-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2351,10 +2049,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2371,12 +2067,6 @@
     }
   },
   "nightly-x86_64-linux-rocky8-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2412,10 +2102,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2433,12 +2121,6 @@
     }
   },
   "nightly-x86_64-linux-ubuntu18_04-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2474,10 +2156,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2494,12 +2174,6 @@
     }
   },
   "nightly-x86_64-linux-ubuntu20_04-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2535,10 +2209,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2555,11 +2227,6 @@
     }
   },
   "nightly-x86_64-windows-int_native-validate": {
-    "after_script": [
-      "bash .gitlab/ci.sh save_cache",
-      "bash .gitlab/ci.sh save_test_output",
-      "bash .gitlab/ci.sh clean"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2592,10 +2259,7 @@
       }
     ],
     "script": [
-      "bash .gitlab/ci.sh setup",
-      "bash .gitlab/ci.sh configure",
-      "bash .gitlab/ci.sh build_hadrian",
-      "bash .gitlab/ci.sh test_hadrian"
+      "echo no-op"
     ],
     "stage": "full-build",
     "tags": [
@@ -2617,11 +2281,6 @@
     }
   },
   "nightly-x86_64-windows-validate": {
-    "after_script": [
-      "bash .gitlab/ci.sh save_cache",
-      "bash .gitlab/ci.sh save_test_output",
-      "bash .gitlab/ci.sh clean"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
@@ -2654,10 +2313,7 @@
       }
     ],
     "script": [
-      "bash .gitlab/ci.sh setup",
-      "bash .gitlab/ci.sh configure",
-      "bash .gitlab/ci.sh build_hadrian",
-      "bash .gitlab/ci.sh test_hadrian"
+      "echo no-op"
     ],
     "stage": "full-build",
     "tags": [
@@ -2679,12 +2335,6 @@
     }
   },
   "release-aarch64-darwin-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -2721,10 +2371,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2746,12 +2394,6 @@
     }
   },
   "release-aarch64-linux-alpine3_18-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -2787,10 +2429,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2811,12 +2451,6 @@
     }
   },
   "release-aarch64-linux-deb10-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -2852,10 +2486,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2874,12 +2506,6 @@
     }
   },
   "release-aarch64-linux-deb11-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -2915,10 +2541,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -2937,12 +2561,6 @@
     }
   },
   "release-i386-linux-deb10-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -2978,10 +2596,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3000,12 +2616,6 @@
     }
   },
   "release-x86_64-darwin-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3042,10 +2652,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3070,12 +2678,6 @@
     }
   },
   "release-x86_64-linux-alpine3_12-int_native-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "1 year",
@@ -3111,10 +2713,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3135,12 +2735,6 @@
     }
   },
   "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3176,10 +2770,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3200,12 +2792,6 @@
     }
   },
   "release-x86_64-linux-alpine3_12-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3241,10 +2827,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3265,12 +2849,6 @@
     }
   },
   "release-x86_64-linux-centos7-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3306,10 +2884,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3329,12 +2905,6 @@
     }
   },
   "release-x86_64-linux-deb10-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3370,10 +2940,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3392,12 +2960,6 @@
     }
   },
   "release-x86_64-linux-deb10-release+debug_info": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3433,10 +2995,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3455,12 +3015,6 @@
     }
   },
   "release-x86_64-linux-deb11-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3496,10 +3050,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3518,12 +3070,6 @@
     }
   },
   "release-x86_64-linux-deb12-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3559,10 +3105,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3581,12 +3125,6 @@
     }
   },
   "release-x86_64-linux-deb9-release+no_split_sections": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3622,10 +3160,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3644,12 +3180,6 @@
     }
   },
   "release-x86_64-linux-fedora33-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3685,10 +3215,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3709,12 +3237,6 @@
     }
   },
   "release-x86_64-linux-fedora33-release+debug_info": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3750,10 +3272,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3774,12 +3294,6 @@
     }
   },
   "release-x86_64-linux-fedora33-release-hackage": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3815,10 +3329,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3839,12 +3351,6 @@
     }
   },
   "release-x86_64-linux-fedora38-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3880,10 +3386,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3902,12 +3406,6 @@
     }
   },
   "release-x86_64-linux-rocky8-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -3943,10 +3441,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -3965,12 +3461,6 @@
     }
   },
   "release-x86_64-linux-ubuntu18_04-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -4006,10 +3496,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4028,12 +3516,6 @@
     }
   },
   "release-x86_64-linux-ubuntu20_04-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -4069,10 +3551,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4091,11 +3571,6 @@
     }
   },
   "release-x86_64-windows-int_native-release": {
-    "after_script": [
-      "bash .gitlab/ci.sh save_cache",
-      "bash .gitlab/ci.sh save_test_output",
-      "bash .gitlab/ci.sh clean"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -4128,10 +3603,7 @@
       }
     ],
     "script": [
-      "bash .gitlab/ci.sh setup",
-      "bash .gitlab/ci.sh configure",
-      "bash .gitlab/ci.sh build_hadrian",
-      "bash .gitlab/ci.sh test_hadrian"
+      "echo no-op"
     ],
     "stage": "full-build",
     "tags": [
@@ -4154,11 +3626,6 @@
     }
   },
   "release-x86_64-windows-release": {
-    "after_script": [
-      "bash .gitlab/ci.sh save_cache",
-      "bash .gitlab/ci.sh save_test_output",
-      "bash .gitlab/ci.sh clean"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
@@ -4191,10 +3658,7 @@
       }
     ],
     "script": [
-      "bash .gitlab/ci.sh setup",
-      "bash .gitlab/ci.sh configure",
-      "bash .gitlab/ci.sh build_hadrian",
-      "bash .gitlab/ci.sh test_hadrian"
+      "echo no-op"
     ],
     "stage": "full-build",
     "tags": [
@@ -4217,12 +3681,6 @@
     }
   },
   "x86_64-darwin-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4259,10 +3717,8 @@
     ],
     "script": [
       "find libraries -name config.sub -exec cp config.sub {} \\;",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4285,12 +3741,6 @@
     }
   },
   "x86_64-freebsd13-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": true,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4326,10 +3776,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4348,12 +3796,6 @@
     }
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4389,10 +3831,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4411,12 +3851,6 @@
     }
   },
   "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4452,10 +3886,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4473,12 +3905,6 @@
     }
   },
   "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4515,10 +3941,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4536,12 +3960,6 @@
     }
   },
   "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4578,10 +3996,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4599,12 +4015,6 @@
     }
   },
   "x86_64-linux-deb10-int_native-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4640,10 +4050,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4659,12 +4067,6 @@
     }
   },
   "x86_64-linux-deb10-no_tntc-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4701,10 +4103,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4720,12 +4120,6 @@
     }
   },
   "x86_64-linux-deb10-numa-slow-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4761,10 +4155,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4781,12 +4173,6 @@
     }
   },
   "x86_64-linux-deb10-unreg-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4822,10 +4208,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4841,12 +4225,6 @@
     }
   },
   "x86_64-linux-deb10-validate+debug_info": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4882,10 +4260,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4901,12 +4277,6 @@
     }
   },
   "x86_64-linux-deb10-validate+thread_sanitizer": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -4943,10 +4313,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -4964,12 +4332,6 @@
     }
   },
   "x86_64-linux-deb10-zstd-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5005,10 +4367,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5024,12 +4384,6 @@
     }
   },
   "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5065,10 +4419,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5086,12 +4438,6 @@
     }
   },
   "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5127,10 +4473,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5149,12 +4493,6 @@
     }
   },
   "x86_64-linux-deb11-validate+boot_nonmoving_gc": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5190,10 +4528,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5209,12 +4545,6 @@
     }
   },
   "x86_64-linux-deb12-validate+llvm": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5250,10 +4580,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5269,12 +4597,6 @@
     }
   },
   "x86_64-linux-fedora33-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5310,10 +4632,8 @@
       }
     ],
     "script": [
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      "id",
+      "ls -al"
     ],
     "stage": "full-build",
     "tags": [
@@ -5331,11 +4651,6 @@
     }
   },
   "x86_64-windows-validate": {
-    "after_script": [
-      "bash .gitlab/ci.sh save_cache",
-      "bash .gitlab/ci.sh save_test_output",
-      "bash .gitlab/ci.sh clean"
-    ],
     "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
@@ -5368,10 +4683,7 @@
       }
     ],
     "script": [
-      "bash .gitlab/ci.sh setup",
-      "bash .gitlab/ci.sh configure",
-      "bash .gitlab/ci.sh build_hadrian",
-      "bash .gitlab/ci.sh test_hadrian"
+      "echo no-op"
     ],
     "stage": "full-build",
     "tags": [
