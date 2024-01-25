@@ -42,6 +42,10 @@ HaddockIssue849:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock HaddockIssue849.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface HaddockIssue849.hi | grep -A 200 'docs:'
 
+HaddockSpanIssueT24378:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock HaddockSpanIssueT24378.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface HaddockSpanIssueT24378.hi | grep -A 200 'docs:'
+
 MagicHashInHaddocks:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock MagicHashInHaddocks.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface MagicHashInHaddocks.hi | grep -A 200 'docs:'

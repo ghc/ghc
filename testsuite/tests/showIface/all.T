@@ -37,3 +37,4 @@ test('MagicHashInHaddocks',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory MagicHashInHaddocks'])
+test('HaddockSpanIssueT24378', normal, makefile_test, [])
