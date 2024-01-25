@@ -458,6 +458,7 @@ instance Enum a => Enum (First a) where
 instance Semigroup (First a) where
   a <> _ = a
   stimes = stimesIdempotent
+  sconcat (x :| _) = x
 
 -- | @since 4.9.0.0
 instance Functor First where

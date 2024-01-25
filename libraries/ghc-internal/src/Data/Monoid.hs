@@ -156,6 +156,10 @@ instance Semigroup (First a) where
         First Nothing <> b = b
         a             <> _ = a
         stimes = stimesIdempotentMonoid
+        sconcat (first@(First m) :| rest)
+          | Nothing <- m = mconcat rest
+          | otherwise    = first
+
 
 -- | @since 2.01
 instance Monoid (First a) where
