@@ -6,11 +6,11 @@ docs:
 '<>', ':=:', 'Bool'
 -}
               identifiers:
-                {DocsInHiFile.hs:2:3-6}
+                {DocsInHiFile.hs:2:6-9}
                 Data.Foldable.elem
-                {DocsInHiFile.hs:2:3-6}
+                {DocsInHiFile.hs:2:6-9}
                 elem
-                {DocsInHiFile.hs:2:11-15}
+                {DocsInHiFile.hs:2:14-18}
                 System.IO.print
                 {DocsInHiFile.hs:4:2-3}
                 GHC.Base.<>

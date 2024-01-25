@@ -1391,7 +1391,7 @@ nested_comment span buf len _buf2 = {-# SCC "nested_comment" #-} do
 nested_doc_comment :: Action
 nested_doc_comment span buf _len _buf2 = {-# SCC "nested_doc_comment" #-} withLexedDocType worker
   where
-    worker input docType _checkNextLine = nested_comment_logic endComment "" input span
+    worker input@(AI start_loc _) docType _checkNextLine = nested_comment_logic endComment "" input (mkPsSpan start_loc (psSpanEnd span))
       where
         endComment input lcomment
           = docCommentEnd input (docType (\d -> NestedDocString d (mkHsDocStringChunk . dropTrailingDec <$> lcomment))) buf span
