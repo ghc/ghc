@@ -2150,12 +2150,17 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
 
-   /* Loading the same object multiple times will lead to chaos
-    * as we will have two ObjectCodes but one underlying dlopen
-    * handle. Fail if this happens.
+   /* If we load the same object multiple times, just return the
+    * already-loaded handle. Note that this is broken if unloadNativeObj
+    * is used, as we don’t do any reference counting; see #24345.
     */
-   if (getObjectLoadStatus_(path) != OBJECT_NOT_LOADED) {
-     copyErrmsg(errmsg, "loadNativeObj_ELF: Already loaded");
+   ObjectCode *existing_oc = lookupObjectByPath(path);
+   if (existing_oc && existing_oc->status != OBJECT_UNLOADED) {
+     if (existing_oc->type == DYNAMIC_OBJECT) {
+       retval = existing_oc->dlopen_handle;
+       goto success;
+     }
+     copyErrmsg(errmsg, "loadNativeObj_ELF: already loaded as non-dynamic object");
      goto dlopen_fail;
    }
 
@@ -2164,6 +2169,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    foreignExportsLoadingObject(nc);
    hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
    nc->dlopen_handle = hdl;
+   nc->status = OBJECT_READY;
    foreignExportsFinishedLoadingObject();
    if (hdl == NULL) {
      /* dlopen failed; save the message in errmsg */

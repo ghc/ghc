@@ -178,7 +178,8 @@ lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
         case mb_ptr of
           Just ptr -> pure (Just ptr)
           Nothing -> go dlls
-      go [] = pure Nothing
+      go [] =
+        lookupSymbol interp sym_to_find
 
   go loaded_dlls
 

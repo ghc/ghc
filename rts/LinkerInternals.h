@@ -507,9 +507,9 @@ HsInt loadArchive_ (pathchar *path);
 #define USE_CONTIGUOUS_MMAP 0
 #endif
 
-
 HsInt isAlreadyLoaded( pathchar *path );
 OStatus getObjectLoadStatus_ (pathchar *path);
+ObjectCode *lookupObjectByPath(pathchar *path);
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, pathchar *archiveMemberName,

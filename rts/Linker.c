@@ -556,19 +556,6 @@ exitLinker( void ) {
 
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 
-static const char *
-internal_dlopen(const char *dll_name)
-{
-  char *errmsg;
-  void *loaded_dll = loadNativeObj(dll_name, &errmsg);
-  if (loaded_dll) {
-    return NULL;
-  } else {
-    ASSERT(errmsg != NULL);
-    return errmsg;
-  }
-}
-
 /*
   Note [RTLD_LOCAL]
   ~~~~~~~~~~~~~~~~~
@@ -656,7 +643,7 @@ internal_dlsym(const char *symbol) {
     return NULL;
 }
 
-void *lookupSymbolInDLL(void *handle, const char *symbol_name)
+void *lookupSymbolInNativeObj(void *handle, const char *symbol_name)
 {
 #if defined(OBJFORMAT_MACHO)
     CHECK(symbol_name[0] == '_');
@@ -670,79 +657,19 @@ void *lookupSymbolInDLL(void *handle, const char *symbol_name)
 }
 #  endif
 
-void *addDLL(pathchar* dll_name, const char **errmsg_ptr)
+const char *addDLL(pathchar* dll_name)
 {
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-   /* ------------------- ELF DLL loader ------------------- */
-
-#define NMATCH 5
-   regmatch_t match[NMATCH];
-   void *handle;
-   const char *errmsg;
-   FILE* fp;
-   size_t match_length;
-#define MAXLINE 1000
-   char line[MAXLINE];
-   int result;
-
-   IF_DEBUG(linker, debugBelch("addDLL: dll_name = '%s'\n", dll_name));
-   handle = internal_dlopen(dll_name, &errmsg);
-
-   if (handle != NULL) {
-      return handle;
+   char *errmsg;
+   if (loadNativeObj(dll_name, &errmsg)) {
+     return NULL;
+   } else {
+     ASSERT(errmsg != NULL);
+     return errmsg;
    }
-
-   // GHC #2615
-   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
-   // contain linker scripts rather than ELF-format object code. This
-   // code handles the situation by recognizing the real object code
-   // file name given in the linker script.
-   //
-   // If an "invalid ELF header" error occurs, it is assumed that the
-   // .so file contains a linker script instead of ELF object code.
-   // In this case, the code looks for the GROUP ( ... ) linker
-   // directive. If one is found, the first file name inside the
-   // parentheses is treated as the name of a dynamic library and the
-   // code attempts to dlopen that file. If this is also unsuccessful,
-   // an error message is returned.
-
-   // see if the error message is due to an invalid ELF header
-   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", errmsg));
-   result = regexec(&re_invalid, errmsg, (size_t) NMATCH, match, 0);
-   IF_DEBUG(linker, debugBelch("result = %i\n", result));
-   if (result == 0) {
-      // success -- try to read the named file as a linker script
-      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
-                                 MAXLINE-1);
-      strncpy(line, (errmsg+(match[1].rm_so)),match_length);
-      line[match_length] = '\0'; // make sure string is null-terminated
-      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
-      if ((fp = __rts_fopen(line, "r")) == NULL) {
-         *errmsg_ptr = errmsg; // return original error if open fails
-         return NULL;
-      }
-      // try to find a GROUP or INPUT ( ... ) command
-      while (fgets(line, MAXLINE, fp) != NULL) {
-         IF_DEBUG(linker, debugBelch("input line = %s", line));
-         if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
-            // success -- try to dlopen the first named file
-            IF_DEBUG(linker, debugBelch("match%s\n",""));
-            line[match[2].rm_eo] = '\0';
-            stgFree((void*)errmsg); // Free old message before creating new one
-            handle = internal_dlopen(line+match[2].rm_so, errmsg_ptr);
-            break;
-         }
-         // if control reaches here, no GROUP or INPUT ( ... ) directive
-         // was found and the original error message is returned to the
-         // caller
-      }
-      fclose(fp);
-   }
-   return handle;
 
 #  elif defined(OBJFORMAT_PEi386)
-   // FIXME
-   return addDLL_PEi386(dll_name, NULL);
+   return addDLL_PEi386(dll_name);
 
 #  else
    barf("addDLL: not implemented on this platform");
@@ -1844,12 +1771,20 @@ HsInt purgeObj (pathchar *path)
     return r;
 }
 
+ObjectCode *lookupObjectByPath(pathchar *path) {
+  for (ObjectCode *o = objects; o; o = o->next) {
+     if (0 == pathcmp(o->fileName, path)) {
+         return o;
+     }
+  }
+  return NULL;
+}
+
 OStatus getObjectLoadStatus_ (pathchar *path)
 {
-    for (ObjectCode *o = objects; o; o = o->next) {
-       if (0 == pathcmp(o->fileName, path)) {
-           return o->status;
-       }
+    ObjectCode *oc = lookupObjectByPath(path);
+    if (oc) {
+      return oc->status;
     }
     return OBJECT_NOT_LOADED;
 }
@@ -1939,8 +1874,71 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 #if defined(OBJFORMAT_ELF)
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
+   IF_DEBUG(linker, debugBelch("loadNativeObj: path = '%s'\n", path));
    ACQUIRE_LOCK(&linker_mutex);
    void *r = loadNativeObj_ELF(path, errmsg);
+
+   if (r) {
+     RELEASE_LOCK(&linker_mutex);
+     return r;
+   }
+
+   // GHC #2615
+   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
+   // contain linker scripts rather than ELF-format object code. This
+   // code handles the situation by recognizing the real object code
+   // file name given in the linker script.
+   //
+   // If an "invalid ELF header" error occurs, it is assumed that the
+   // .so file contains a linker script instead of ELF object code.
+   // In this case, the code looks for the GROUP ( ... ) linker
+   // directive. If one is found, the first file name inside the
+   // parentheses is treated as the name of a dynamic library and the
+   // code attempts to dlopen that file. If this is also unsuccessful,
+   // an error message is returned.
+
+#define NMATCH 5
+   regmatch_t match[NMATCH];
+   FILE* fp;
+   size_t match_length;
+#define MAXLINE 1000
+   char line[MAXLINE];
+   int result;
+
+   // see if the error message is due to an invalid ELF header
+   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", *errmsg));
+   result = regexec(&re_invalid, *errmsg, (size_t) NMATCH, match, 0);
+   IF_DEBUG(linker, debugBelch("result = %i\n", result));
+   if (result == 0) {
+      // success -- try to read the named file as a linker script
+      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
+                                 MAXLINE-1);
+      strncpy(line, (*errmsg+(match[1].rm_so)),match_length);
+      line[match_length] = '\0'; // make sure string is null-terminated
+      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
+      if ((fp = __rts_fopen(line, "r")) == NULL) {
+         RELEASE_LOCK(&linker_mutex);
+         // return original error if open fails
+         return NULL;
+      }
+      // try to find a GROUP or INPUT ( ... ) command
+      while (fgets(line, MAXLINE, fp) != NULL) {
+         IF_DEBUG(linker, debugBelch("input line = %s", line));
+         if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
+            // success -- try to dlopen the first named file
+            IF_DEBUG(linker, debugBelch("match%s\n",""));
+            line[match[2].rm_eo] = '\0';
+            stgFree((void*)*errmsg); // Free old message before creating new one
+            r = loadNativeObj_ELF(line+match[2].rm_so, errmsg);
+            break;
+         }
+         // if control reaches here, no GROUP or INPUT ( ... ) directive
+         // was found and the original error message is returned to the
+         // caller
+      }
+      fclose(fp);
+   }
+
    RELEASE_LOCK(&linker_mutex);
    return r;
 }
@@ -1954,7 +1952,7 @@ loadNativeObj (pathchar *path, char **errmsg)
 }
 #endif
 
-HsInt unloadNativeObj (void *handle)
+static HsInt unloadNativeObj_(void *handle)
 {
     bool unloadedAnyObj = false;
 
@@ -1990,6 +1988,13 @@ HsInt unloadNativeObj (void *handle)
         errorBelch("unloadObjNativeObj_ELF: can't find `%p' to unload", handle);
         return 0;
     }
+}
+
+HsInt unloadNativeObj(void *handle) {
+  ACQUIRE_LOCK(&linker_mutex);
+  HsInt r = unloadNativeObj_(handle);
+  RELEASE_LOCK(&linker_mutex);
+  return r;
 }
 
 /* -----------------------------------------------------------------------------
