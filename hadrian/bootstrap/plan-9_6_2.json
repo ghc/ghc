@@ -301,18 +301,18 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.18.0.0"
       ],
-      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-platform-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-platform-0.1.0.0-inplace",
       "pkg-name": "ghc-platform",
       "pkg-src": {
-        "path": "/home/matt/ghc-clean/hadrian/../libraries/ghc-platform",
+        "path": "/home/matt/ghc-scratch/hadrian/../libraries/ghc-platform",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -329,7 +329,7 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.18.0.0",
@@ -340,13 +340,13 @@
         "text-2.0.2",
         "transformers-0.6.1.0"
       ],
-      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/ghc-toolchain-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-toolchain-0.1.0.0-inplace",
       "pkg-name": "ghc-toolchain",
       "pkg-src": {
-        "path": "/home/matt/ghc-clean/hadrian/../utils/ghc-toolchain",
+        "path": "/home/matt/ghc-scratch/hadrian/../utils/ghc-toolchain",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -354,8 +354,8 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
-      "build-info": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build-info.json",
+      "bin-file": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
+      "build-info": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian/build-info.json",
       "component-name": "exe:hadrian",
       "depends": [
         "Cabal-3.10.1.0",
@@ -377,7 +377,7 @@
         "transformers-0.6.1.0",
         "unordered-containers-0.2.19.1-7787c3bb22d737a5bf8288fcb0729fed0251ae813c48daa4b7d7392c7c7eff03"
       ],
-      "dist-dir": "/home/matt/ghc-clean/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian",
+      "dist-dir": "/home/matt/ghc-scratch/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.6.2/hadrian-0.1.0.0/x/hadrian",
       "exe-depends": [],
       "flags": {
         "selftest": false,
@@ -386,7 +386,7 @@
       "id": "hadrian-0.1.0.0-inplace-hadrian",
       "pkg-name": "hadrian",
       "pkg-src": {
-        "path": "/home/matt/ghc-clean/hadrian/.",
+        "path": "/home/matt/ghc-scratch/hadrian/.",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",

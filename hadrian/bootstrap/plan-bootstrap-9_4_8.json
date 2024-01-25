@@ -6,7 +6,7 @@
     },
     {
       "package": "ghc-prim",
-      "version": "0.9.0"
+      "version": "0.9.1"
     },
     {
       "package": "ghc-bignum",
@@ -14,7 +14,7 @@
     },
     {
       "package": "base",
-      "version": "4.17.0.0"
+      "version": "4.17.2.1"
     },
     {
       "package": "array",
@@ -26,7 +26,7 @@
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.4.4"
+      "version": "9.4.8"
     },
     {
       "package": "pretty",
@@ -38,11 +38,11 @@
     },
     {
       "package": "bytestring",
-      "version": "0.11.3.1"
+      "version": "0.11.5.3"
     },
     {
       "package": "containers",
-      "version": "0.6.6"
+      "version": "0.6.7"
     },
     {
       "package": "binary",
@@ -74,15 +74,15 @@
     },
     {
       "package": "text",
-      "version": "2.0.1"
+      "version": "2.0.2"
     },
     {
       "package": "parsec",
-      "version": "3.1.15.0"
+      "version": "3.1.16.1"
     },
     {
       "package": "process",
-      "version": "1.6.16.0"
+      "version": "1.6.18.0"
     }
   ],
   "dependencies": [

@@ -101,9 +101,9 @@ workflow:
 # which versions of GHC to allow bootstrap with
 .bootstrap_matrix : &bootstrap_matrix
   matrix:
-    - GHC_VERSION: 9.4.7
+    - GHC_VERSION: 9.4.8
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_4:$DOCKER_REV"
-    - GHC_VERSION: 9.6.3
+    - GHC_VERSION: 9.6.4
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_6:$DOCKER_REV"
     - GHC_VERSION: 9.8.1
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_8:$DOCKER_REV"
