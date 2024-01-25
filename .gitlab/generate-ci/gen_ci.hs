@@ -1010,6 +1010,7 @@ job_groups =
      -- Dynamically linked build, suitable for building your own static executables on alpine
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
+     , fastCI (standardBuildsWithConfig Amd64 (Linux Alpine318) (splitSectionsBroken vanilla))
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
