@@ -28,6 +28,7 @@
      and [CLC proposal #258](https://github.com/haskell/core-libraries-committee/issues/258))
   * Add `System.Mem.performMajorGC` ([CLC proposal #230](https://github.com/haskell/core-libraries-committee/issues/230))
   * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
+  * `Foreign.C.Error.errnoToIOError` now uses the reentrant `strerror_r` to render system errors when possible ([CLC proposal #249](https://github.com/haskell/core-libraries-committee/issues/249))
   * Implement `many` and `some` methods of `instance Alternative (Compose f g)` explicitly. ([CLC proposal #181](https://github.com/haskell/core-libraries-committee/issues/181))
   * Change the types of the `GHC.Stack.StackEntry.closureType` and `GHC.InfoProv.InfoProv.ipDesc` record fields to use `GHC.Exts.Heap.ClosureType` rather than an `Int`.
     To recover the old value use `fromEnum`. ([CLC proposal #210](https://github.com/haskell/core-libraries-committee/issues/210))

@@ -330,6 +330,7 @@ Library
           cbits/primFloat.c
           cbits/sysconf.c
           cbits/fs.c
+          cbits/strerror.c
 
       cmm-sources:
           cbits/StackCloningDecoding.cmm
