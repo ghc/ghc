@@ -249,7 +249,10 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Data.Bool
+import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Types.Error
+import GHC.Types.Name.Reader (RdrName(..))
+import GHC.Types.Name.Occurrence (isVarOcc, occNameString)
 import GHC.Utils.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
@@ -258,9 +261,12 @@ import GHC.Data.FastString
 import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
+import GHC.Utils.Error (emptyDiagOpts)
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
+import GHC.Parser (parseIdentifier)
+import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -284,6 +290,7 @@ import Text.ParserCombinators.ReadP as R
 import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified GHC.LanguageExtensions as LangExt
+
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3331,18 +3338,32 @@ setCallerCcFilters arg =
     Left err -> addErr err
 
 setMainIs :: String -> DynP ()
-setMainIs arg
-  | x:_ <- main_fn, isLower x  -- The arg looked like "Foo.Bar.baz"
-  = upd $ \d -> d { mainFunIs = Just main_fn,
-                    mainModuleNameIs = mkModuleName main_mod }
-
-  | x:_ <- arg, isUpper x  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d { mainModuleNameIs = mkModuleName arg }
-
-  | otherwise                   -- The arg looked like "baz"
-  = upd $ \d -> d { mainFunIs = Just arg }
+setMainIs arg = parse parse_main_f arg
   where
-    (main_mod, main_fn) = splitLongestPrefix arg (== '.')
+    parse callback str = case unP parseIdentifier (p_state str) of
+      PFailed _      -> addErr $ "Can't parse -main-is \"" ++ arg ++ "\" as an identifier or module."
+      POk _ (L _ re) -> callback re
+
+    -- dummy parser state.
+    p_state str = initParserState
+              (mkParserOpts mempty emptyDiagOpts [] False False False True)
+              (stringToStringBuffer str)
+              (mkRealSrcLoc (mkFastString []) 1 1)
+
+    parse_main_f (Unqual occ)
+      | isVarOcc occ = upd $ \d -> d { mainFunIs = main_f occ }
+    parse_main_f (Qual (ModuleName mod) occ)
+      | isVarOcc occ = upd $ \d -> d { mainModuleNameIs = mkModuleNameFS mod
+                                     , mainFunIs = main_f occ }
+    -- append dummy "function" to parse A.B as the module A.B
+    -- and not the Data constructor B from the module A
+    parse_main_f _ = parse parse_mod (arg ++ ".main")
+
+    main_f = Just . occNameString
+
+    parse_mod (Qual (ModuleName mod) _) = upd $ \d -> d { mainModuleNameIs = mkModuleNameFS mod }
+    -- we appended ".m" and any parse error was caught. We are Qual or something went very wrong
+    parse_mod _ = error "unreachable"
 
 addLdInputs :: Option -> DynFlags -> DynFlags
 addLdInputs p dflags = dflags{ldInputs = ldInputs dflags ++ [p]}
