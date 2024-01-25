@@ -75,8 +75,8 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   | ty1 `eqCoercion` ty2
   , co1 `compatible_co` co2 = undefined
 
-opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
-                  in_co2@(UnivCo p2 r2 _tyl2 tyr2)
+opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1 _)
+                  in_co2@(UnivCo p2 r2 _tyl2 tyr2 _)
   | Just prov' <- opt_trans_prov p1 p2 = undefined
   where
     -- if the provenances are different, opt'ing will be very confusing
