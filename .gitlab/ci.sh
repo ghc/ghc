@@ -366,17 +366,21 @@ function setup_toolchain() {
 
 function cleanup_submodules() {
   start_section "clean submodules"
-  if [ -d .git ]; then
-    info "Cleaning submodules..."
-    # On Windows submodules can inexplicably get into funky states where git
-    # believes that the submodule is initialized yet its associated repository
-    # is not valid. Avoid failing in this case with the following insanity.
-    git submodule sync || git submodule deinit --force --all
-    git submodule update --init
-    git submodule foreach git clean -xdf
-  else
-    info "Not cleaning submodules, not in a git repo"
-  fi;
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+        if [ -d .git ]; then
+            info "Cleaning submodules..."
+            # On Windows submodules can inexplicably get into funky states where git
+            # believes that the submodule is initialized yet its associated repository
+            # is not valid. Avoid failing in this case with the following insanity.
+            git submodule sync || git submodule deinit --force --all
+            git submodule update --init
+            git submodule foreach git clean -xdf
+        else
+            info "Not cleaning submodules, not in a git repo"
+        fi;
+        ;;
+  esac
   end_section "clean submodules"
 }
 
