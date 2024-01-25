@@ -1415,7 +1415,7 @@ messages and in GHCi:
 
     The structure of the output is described by a `JSON Schema <https://json-schema.org/>`_.
     The schema can be downloaded :download:`here <diagnostics-as-json-schema-1_0.json>`.
-
+    
 .. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
     :shortdesc: Use colors in error messages
     :type: dynamic
@@ -1760,8 +1760,6 @@ Some flags only make sense for particular target platforms.
     :shortdesc: Use native FMA instructions for fused multiply-add floating-point operations
     :type: dynamic
     :category: platform-options
-
-    :default: off by default, except for Aarch64 where it's on by default.
 
     :since: 9.8.1
 
