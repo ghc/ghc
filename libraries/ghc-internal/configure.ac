@@ -41,6 +41,12 @@ AC_CHECK_DECLS([CLOCK_PROCESS_CPUTIME_ID], [], [], [[#include <time.h>]])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize_s ftruncate])
 
+AC_CHECK_FUNCS([strerror_r strerror_s])
+
+if test "$ac_cv_func_strerror_r" = no && test "$ac_cv_func_strerror_s" = no; then
+  AC_MSG_ERROR([Either strerror_r or strerror_s must be available])
+fi
+
 # event-related fun
 # The line below already defines HAVE_KQUEUE and HAVE_POLL, so technically some of the
 # subsequent portions that redefine them could be skipped. However, we keep those portions

@@ -91,6 +91,9 @@ module GHC.Internal.Foreign.C.Error (
 #include "HsBaseConfig.h"
 
 import GHC.Internal.Foreign.Ptr
+#if !defined(javascript_HOST_ARCH)
+import GHC.Internal.Foreign.Marshal.Alloc
+#endif
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Data.Functor            ( void )
@@ -460,6 +463,29 @@ throwErrnoPathIfMinus1_  = throwErrnoPathIf_ (== -1)
 -- conversion of an "errno" value into IO error
 -- --------------------------------------------
 
+errnoToString :: Errno -> IO String
+
+#if defined(javascript_HOST_ARCH)
+foreign import ccall unsafe "base_strerror"
+    c_strerror :: Errno -> IO (Ptr CChar)
+
+errnoToString errno = c_strerror errno >>= peekCString
+
+#else
+foreign import ccall "base_strerror_r"
+    c_strerror_r :: Errno -> Ptr CChar -> CSize -> IO CInt
+
+errnoToString errno =
+    allocaBytes len $ \ptr -> do
+        ret <- c_strerror_r errno ptr len
+        if ret /= 0
+          then return "errnoToString failed"
+          else peekCString ptr
+  where
+    len :: Num a => a
+    len = 512
+#endif
+
 -- | Construct an 'IOError' based on the given 'Errno' value.
 -- The optional information can be used to improve the accuracy of
 -- error messages.
@@ -470,7 +496,7 @@ errnoToIOError  :: String       -- ^ the location where the error occurred
                 -> Maybe String -- ^ optional filename associated with the error
                 -> IOError
 errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
-    str <- strerror errno >>= peekCString
+    str <- errnoToString errno
     return (IOError maybeHdl errType loc str (Just errno') maybeName)
     where
     Errno errno' = errno
@@ -575,6 +601,4 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
         | errno == eWOULDBLOCK     = OtherError
         | errno == eXDEV           = UnsupportedOperation
         | otherwise                = OtherError
-
-foreign import ccall unsafe "string.h" strerror :: Errno -> IO (Ptr CChar)
 

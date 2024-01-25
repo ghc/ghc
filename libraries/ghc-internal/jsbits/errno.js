@@ -22,7 +22,7 @@ function h$unsupported(status, c) {
     return status;
 }
 
-function h$strerror(err) {
+function h$base_strerror(err) {
     if(err === 12456) {
 	RETURN_UBX_TUP2(h$encodeUtf8("operation unsupported on this platform"), 0);
     }
