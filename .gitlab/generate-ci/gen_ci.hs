@@ -785,7 +785,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
 
     jobAllowFailure = False
     jobStage = "full-build"
-    jobNeeds = [""]
+    jobNeeds = []
 
 ---------------------------------------------------------------------------
 -- Job Modifiers
