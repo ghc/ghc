@@ -2968,7 +2968,7 @@ stg_castWord64ToDoublezh(I64 w)
     D_ d;
     P_ ptr;
 
-    STK_CHK_GEN_N (DOUBLE_SIZE_WDS);
+    ASSERT(RESERVED_STACK_WORDS >= DOUBLE_SIZE_WDS);
 
     reserve DOUBLE_SIZE_WDS = ptr {
         I64[ptr] = w;
@@ -2983,7 +2983,7 @@ stg_castDoubleToWord64zh(D_ d)
     I64 w;
     P_ ptr;
 
-    STK_CHK_GEN_N (DOUBLE_SIZE_WDS);
+    ASSERT(RESERVED_STACK_WORDS >= DOUBLE_SIZE_WDS);
 
     reserve DOUBLE_SIZE_WDS = ptr {
         D_[ptr] = d;
@@ -2998,7 +2998,7 @@ stg_castWord32ToFloatzh(W_ w)
     F_ f;
     P_ ptr;
 
-    STK_CHK_GEN_N (1);
+    ASSERT(RESERVED_STACK_WORDS >= 1);
 
     reserve 1 = ptr {
         I32[ptr] = %lobits32(w);
@@ -3013,7 +3013,7 @@ stg_castFloatToWord32zh(F_ f)
     W_ w;
     P_ ptr;
 
-    STK_CHK_GEN_N (1);
+    ASSERT(RESERVED_STACK_WORDS >= 1);
 
     reserve 1 = ptr {
         F_[ptr] = f;
