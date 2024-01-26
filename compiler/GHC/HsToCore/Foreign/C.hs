@@ -401,17 +401,11 @@ mkFExportCBits :: DynFlags
                    Int          -- total size of arguments
                   )
 mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
- = ( header_bits
+ =
+   ( header_bits
    , CStub body [] []
    , type_string,
-    sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info] -- all the args
-         -- NB. the calculation here isn't strictly speaking correct.
-         -- We have a primitive Haskell type (eg. Int#, Double#), and
-         -- we want to know the size, when passed on the C stack, of
-         -- the associated C type (eg. HsInt, HsDouble).  We don't have
-         -- this information to hand, but we know what GHC's conventions
-         -- are for passing around the primitive Haskell types, so we
-         -- use that instead.  I hope the two coincide --SDM
+    aug_arg_size
     )
  where
   platform = targetPlatform dflags
@@ -449,6 +443,19 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   aug_arg_info
     | isNothing maybe_target = stable_ptr_arg : insertRetAddr platform cc arg_info
     | otherwise              = arg_info
+
+  aug_arg_size = sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info]
+         -- NB. the calculation here isn't strictly speaking correct.
+         -- We have a primitive Haskell type (eg. Int#, Double#), and
+         -- we want to know the size, when passed on the C stack, of
+         -- the associated C type (eg. HsInt, HsDouble).  We don't have
+         -- this information to hand, but we know what GHC's conventions
+         -- are for passing around the primitive Haskell types, so we
+         -- use that instead.  I hope the two coincide --SDM
+         -- AK: This seems just wrong, the code here uses widthInBytes, but when
+         -- we pass args on the haskell stack we always extend to multiples of 8
+         -- to my knowledge. Not sure if it matters though so I won't touch this
+         -- for now.
 
   stable_ptr_arg =
         (text "the_stableptr", text "StgStablePtr", undefined,
@@ -605,8 +612,11 @@ insertRetAddr platform CCallConv args
                         -> [(SDoc, SDoc, Type, CmmType)]
               go 6 args = ret_addr_arg platform : args
               go n (arg@(_,_,_,rep):args)
-               | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
-               | otherwise  = arg : go n     args
+                -- Int type fitting into int register
+                | (isBitsType rep && typeWidth rep <= W64 || isGcPtrType rep)
+                = arg : go (n+1) args
+                | otherwise
+                = arg : go n args
               go _ [] = []
           in go 0 args
       _ ->
