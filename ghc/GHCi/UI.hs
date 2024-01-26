@@ -1622,13 +1622,24 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 
 runMain :: GhciMonad m => String -> m ()
 runMain s = case toArgsNoLoc s of
-            Left err   -> liftIO (hPutStrLn stderr err)
-            Right args ->
-                do dflags <- getDynFlags
-                   let main = fromMaybe "main" (mainFunIs dflags)
-                   -- Wrap the main function in 'void' to discard its value instead
-                   -- of printing it (#9086). See Haskell 2010 report Chapter 5.
-                   doWithArgs args $ "Control.Monad.void (" ++ main ++ ")"
+              Left err   -> liftIO (hPutStrLn stderr err)
+              Right args -> doWithMain (doWithArgs args)
+  where
+    doWithMain fun = do
+      dflags  <- getDynFlags
+      let main = fromMaybe "main" (mainFunIs dflags)
+      handleSourceError printErrAndMaybeExit $ do
+        -- doing this will prevent the main to run when it is not in scope
+        -- this might seem useless, but it doesn't suggest other functions
+        -- to be used, which is exactly what we want here. See #23996.
+        _ <- GHC.parseName main
+
+        -- Wrap the main function in 'void' to discard its value instead
+        -- of printing it (#9086). See Haskell 2010 report Chapter 5.
+        fun $ "Control.Monad.void (" ++ main ++ ")"
+
+
+
 
 -----------------------------------------------------------------------------
 -- :run

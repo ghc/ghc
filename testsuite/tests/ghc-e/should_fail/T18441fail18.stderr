@@ -1,5 +1,4 @@
 
-<interactive>:0:53: error: [GHC-88464]
-    Variable not in scope: main :: IO a0
-    Suggested fix: Perhaps use ‘min’ (imported from Prelude)
+<interactive>:1:1: error: [GHC-76037]
+    Not in scope: ‘main’
 1
