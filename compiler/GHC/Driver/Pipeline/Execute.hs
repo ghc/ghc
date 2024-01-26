@@ -950,6 +950,7 @@ llvmOptions llvm_config dflags =
                | otherwise                   = "static"
 
         platform = targetPlatform dflags
+        arch = platformArch platform
 
         attrs :: String
         attrs = intercalate "," $ mattr
@@ -962,7 +963,8 @@ llvmOptions llvm_config dflags =
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
-              ++ ["+fma"     | isFmaEnabled dflags      ]
+              -- For Arch64 +fma is not a option (it's unconditionally available).
+              ++ ["+fma"     | isFmaEnabled dflags && (arch /= ArchAArch64) ]
               ++ ["+bmi"     | isBmiEnabled dflags      ]
               ++ ["+bmi2"    | isBmi2Enabled dflags     ]
 
