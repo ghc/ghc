@@ -89,6 +89,7 @@ data ToolchainSetting
     | ToolchainSetting_TouchCommand
     | ToolchainSetting_LlcCommand
     | ToolchainSetting_OptCommand
+    | ToolchainSetting_LlvmAsCommand
     | ToolchainSetting_DistroMinGW
 
 -- | Look up the value of a 'Setting' in @cfg/system.config@, tracking the
@@ -140,6 +141,7 @@ settingsFileSetting key = lookupSystemConfig $ case key of
     ToolchainSetting_TouchCommand           -> "settings-touch-command"
     ToolchainSetting_LlcCommand             -> "settings-llc-command"
     ToolchainSetting_OptCommand             -> "settings-opt-command"
+    ToolchainSetting_LlvmAsCommand          -> "settings-llvm-as-command"
     ToolchainSetting_DistroMinGW            -> "settings-use-distro-mingw" -- ROMES:TODO: This option doesn't seem to be in ghc-toolchain yet. It corresponds to EnableDistroToolchain
 
 -- | An expression that looks up the value of a 'Setting' in @cfg/system.config@,

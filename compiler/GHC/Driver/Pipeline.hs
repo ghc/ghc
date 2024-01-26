@@ -830,6 +830,12 @@ asPipeline use_cpp pipe_env hsc_env location input_fn =
     StopAs -> return Nothing
     _ -> Just <$> use (T_As use_cpp pipe_env hsc_env location input_fn)
 
+lasPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe ObjFile)
+lasPipeline use_cpp pipe_env hsc_env location input_fn =
+  case stop_phase pipe_env of
+    StopAs -> return Nothing
+    _ -> Just <$> use (T_LlvmAs use_cpp pipe_env hsc_env location input_fn)
+
 viaCPipeline :: P m => Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 viaCPipeline c_phase pipe_env hsc_env location input_fn = do
   out_fn <- use (T_Cc c_phase pipe_env hsc_env location input_fn)
@@ -853,7 +859,7 @@ llvmManglePipeline pipe_env hsc_env location llc_fn = do
     if gopt Opt_NoLlvmMangler (hsc_dflags hsc_env)
       then return llc_fn
       else use (T_LlvmMangle pipe_env hsc_env llc_fn)
-  asPipeline False pipe_env hsc_env location mangled_fn
+  lasPipeline False pipe_env hsc_env location mangled_fn
 
 cmmCppPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
 cmmCppPipeline pipe_env hsc_env input_fn = do

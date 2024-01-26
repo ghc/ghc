@@ -142,6 +142,12 @@ Compiler
 - Late plugins have been added. These are plugins which can access and/or modify
   the core of a module after optimization and after interface creation. See :ghc-ticket:`24254`.
 
+- If you use :ghc-flag:`-fllvm` we now use an assembler from the LLVM toolchain rather than
+  the preconfigured assembler. This is typically ``clang``. The ``LLVMAS`` environment
+  variable can be specified at configure time to instruct GHC which ``clang`` to use.
+  This means that if you are using ``-fllvm`` you now need ``llc``, ``opt`` and ``clang``
+  available.
+
 GHCi
 ~~~~
 

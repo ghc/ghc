@@ -215,6 +215,14 @@ runLlvmLlc logger dflags args = traceSystoolCommand logger "llc" $ do
       args1 = map Option (getOpts dflags opt_lc)
   runSomething logger "LLVM Compiler" p (args0 ++ args1 ++ args)
 
+-- | Run the LLVM Assembler
+runLlvmAs :: Logger -> DynFlags -> [Option] -> IO ()
+runLlvmAs logger dflags args = traceSystoolCommand logger "llvm-as" $ do
+  let (p,args0) = pgm_las dflags
+      args1 = map Option (getOpts dflags opt_las)
+  runSomething logger "LLVM assembler" p (args0 ++ args1 ++ args)
+
+
 runEmscripten :: Logger -> DynFlags -> [Option] -> IO ()
 runEmscripten logger dflags args = traceSystoolCommand logger "emcc" $ do
   let (p,args0) = pgm_a dflags

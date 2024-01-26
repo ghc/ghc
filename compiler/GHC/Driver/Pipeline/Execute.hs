@@ -145,6 +145,8 @@ runPhase (T_LlvmOpt pipe_env hsc_env input_fn) =
   runLlvmOptPhase pipe_env hsc_env input_fn
 runPhase (T_LlvmLlc pipe_env hsc_env input_fn) =
   runLlvmLlcPhase pipe_env hsc_env input_fn
+runPhase (T_LlvmAs cpp pipe_env hsc_env location input_fn) = do
+  runLlvmAsPhase cpp pipe_env hsc_env location input_fn
 runPhase (T_LlvmMangle pipe_env hsc_env input_fn) =
   runLlvmManglePhase pipe_env hsc_env input_fn
 runPhase (T_MergeForeign pipe_env hsc_env input_fn fos) =
@@ -282,8 +284,9 @@ runLlvmOptPhase pipe_env hsc_env input_fn = do
     return output_fn
 
 
-runAsPhase :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
-runAsPhase with_cpp pipe_env hsc_env location input_fn = do
+-- Run either 'clang' or 'gcc' phases
+runGenericAsPhase :: (Logger -> DynFlags -> [Option] -> IO ()) -> [Option] -> Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runGenericAsPhase run_as extra_opts with_cpp pipe_env hsc_env location input_fn = do
         let dflags     = hsc_dflags   hsc_env
         let logger     = hsc_logger   hsc_env
 
@@ -303,7 +306,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                                 includePathsQuoteImplicit cmdline_include_paths]
         let runAssembler inputFilename outputFilename
               = withAtomicRename outputFilename $ \temp_outputFilename ->
-                    runAs
+                    run_as
                        logger dflags
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
@@ -326,12 +329,23 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                           , GHC.SysTools.FileOption "" inputFilename
                           , GHC.SysTools.Option "-o"
                           , GHC.SysTools.FileOption "" temp_outputFilename
-                          ])
+                          ] ++ extra_opts)
 
         debugTraceMsg logger 4 (text "Running the assembler")
         runAssembler input_fn output_fn
 
         return output_fn
+
+-- Invoke `clang` to assemble a .S file produced by LLvm toolchain
+runLlvmAsPhase :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runLlvmAsPhase =
+  runGenericAsPhase runLlvmAs [ GHC.SysTools.Option "-Wno-unused-command-line-argument" ]
+
+-- Invoke 'gcc' to assemble a .S file
+runAsPhase :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runAsPhase =
+  runGenericAsPhase runAs []
+
 
 
 -- Note [JS Backend .o file procedure]

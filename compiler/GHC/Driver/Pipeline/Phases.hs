@@ -47,6 +47,7 @@ data TPhase res where
   T_ForeignJs :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPhase FilePath
   T_LlvmOpt :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmLlc :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
+  T_LlvmAs :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPhase FilePath
   T_LlvmMangle :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_MergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> TPhase FilePath
 

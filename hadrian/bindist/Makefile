@@ -133,6 +133,7 @@ lib/settings : config.mk
 	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
+	@echo ',("LLVM llvm-as command", "$(SettingsLlvmAsCommand)")' >> $@
 	@echo ',("Use inplace MinGW toolchain", "$(SettingsUseDistroMINGW)")' >> $@
 	@echo
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
