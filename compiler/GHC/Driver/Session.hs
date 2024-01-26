@@ -108,6 +108,7 @@ module GHC.Driver.Session (
         sPgm_ranlib,
         sPgm_lo,
         sPgm_lc,
+        sPgm_las,
         sPgm_i,
         sOpt_L,
         sOpt_P,
@@ -136,10 +137,10 @@ module GHC.Driver.Session (
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
         pgm_T, pgm_windres, pgm_ar,
-        pgm_ranlib, pgm_lo, pgm_lc, pgm_i,
+        pgm_ranlib, pgm_lo, pgm_lc, pgm_las, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
-        opt_windres, opt_lo, opt_lc,
+        opt_windres, opt_lo, opt_lc, opt_las,
         updatePlatformConstants,
 
         -- ** Manipulating DynFlags
@@ -416,6 +417,8 @@ pgm_lo                :: DynFlags -> (String,[Option])
 pgm_lo dflags = toolSettings_pgm_lo $ toolSettings dflags
 pgm_lc                :: DynFlags -> (String,[Option])
 pgm_lc dflags = toolSettings_pgm_lc $ toolSettings dflags
+pgm_las               :: DynFlags -> (String,[Option])
+pgm_las dflags = toolSettings_pgm_las $ toolSettings dflags
 pgm_i                 :: DynFlags -> String
 pgm_i dflags = toolSettings_pgm_i $ toolSettings dflags
 opt_L                 :: DynFlags -> [String]
@@ -453,6 +456,8 @@ opt_lo                :: DynFlags -> [String]
 opt_lo dflags= toolSettings_opt_lo $ toolSettings dflags
 opt_lc                :: DynFlags -> [String]
 opt_lc dflags= toolSettings_opt_lc $ toolSettings dflags
+opt_las               :: DynFlags -> [String]
+opt_las dflags = toolSettings_opt_las $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
@@ -1057,6 +1062,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lo  = (f,[]) }
   , make_ord_flag defFlag "pgmlc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lc  = (f,[]) }
+  , make_ord_flag defFlag "pgmlas"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_las  = (f,[]) }
   , make_ord_flag defFlag "pgmlm"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lm  =
           if null f then Nothing else Just (f,[]) }
@@ -1112,6 +1119,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lo  = f : toolSettings_opt_lo s }
   , make_ord_flag defFlag "optlc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lc  = f : toolSettings_opt_lc s }
+  , make_ord_flag defFlag "optlas"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_las  = f : toolSettings_opt_las s }
   , make_ord_flag defFlag "opti"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_i   = f : toolSettings_opt_i s }
   , make_ord_flag defFlag "optL"

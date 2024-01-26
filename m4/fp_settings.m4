@@ -123,6 +123,11 @@ AC_DEFUN([FP_SETTINGS],
     fi
     SettingsOptCommand="$OptCmd"
 
+    if test -z "$LlvmAsCmd"; then
+        LlvmAsCmd="clang"
+    fi
+    SettingsLlvmAsCommand="$LlvmAsCmd"
+
     # Mac-only tools
     if test -z "$OtoolCmd"; then
         OtoolCmd="otool"
@@ -156,5 +161,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
+    AC_SUBST(SettingsLlvmAsCommand)
     AC_SUBST(SettingsUseDistroMINGW)
 ])

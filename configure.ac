@@ -529,6 +529,13 @@ FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
+dnl ** Which LLVM assembler to use?
+dnl --------------------------------------------------------------
+AC_ARG_VAR(LLVMAS,[Use as the path to LLVM's assembler (typically clang) [default=autodetect]])
+FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
+LlvmAsCmd="$LLVMAS"
+AC_SUBST([LlvmAsCmd])
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -1045,7 +1052,8 @@ echo "\
 
    Using LLVM tools
       llc   : $LlcCmd
-      opt   : $OptCmd"
+      opt   : $OptCmd
+      llvm-as : $LlvmAsCmd"
 
 if test "$HSCOLOUR" = ""; then
 echo "

@@ -398,6 +398,7 @@ generateSettings = do
         , ("LLVM target", queryTarget tgtLlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
+        , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)

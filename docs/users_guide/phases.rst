@@ -59,6 +59,13 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the LLVM compiler.
 
+.. ghc-flag:: -pgmlas ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the LLVM assembler
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the LLVM assembler
+
 .. ghc-flag:: -pgms ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the splitter
     :type: dynamic
@@ -217,6 +224,13 @@ the following flags:
     :category: phase-options
 
     Pass ⟨option⟩ to the LLVM compiler.
+
+.. ghc-flag:: -optlas ⟨option⟩
+    :shortdesc: pass ⟨option⟩ to the LLVM assembler
+    :type: dynamic
+    :category: phase-options
+
+    Pass ⟨option⟩ to the LLVM assembler (typically clang).
 
 .. ghc-flag:: -opta ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the assembler
