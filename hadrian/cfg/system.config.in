@@ -85,6 +85,7 @@ settings-install_name_tool-command = @SettingsInstallNameToolCommand@
 settings-touch-command = @SettingsTouchCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
+settings-llvm-as-command = @SettingsLlvmAsCommand@
 settings-use-distro-mingw = @SettingsUseDistroMINGW@
 
 target-has-libm = @TargetHasLibm@

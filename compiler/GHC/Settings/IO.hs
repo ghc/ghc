@@ -149,6 +149,7 @@ initSettings top_dir = do
   -- We just assume on command line
   lc_prog <- getSetting "LLVM llc command"
   lo_prog <- getSetting "LLVM opt command"
+  las_prog <- getSetting "LLVM llvm-as command"
 
   let iserv_prog = libexec "ghc-iserv"
 
@@ -196,6 +197,7 @@ initSettings top_dir = do
       , toolSettings_pgm_ranlib = ranlib_path
       , toolSettings_pgm_lo  = (lo_prog,[])
       , toolSettings_pgm_lc  = (lc_prog,[])
+      , toolSettings_pgm_las = (las_prog, [])
       , toolSettings_pgm_i   = iserv_prog
       , toolSettings_opt_L       = []
       , toolSettings_opt_P       = []
@@ -209,6 +211,7 @@ initSettings top_dir = do
       , toolSettings_opt_windres = []
       , toolSettings_opt_lo      = []
       , toolSettings_opt_lc      = []
+      , toolSettings_opt_las     = []
       , toolSettings_opt_i       = []
 
       , toolSettings_extraGccViaCFlags = extraGccViaCFlags

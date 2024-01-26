@@ -230,5 +230,6 @@ SettingsLibtoolCommand = @SettingsLibtoolCommand@
 SettingsTouchCommand = @SettingsTouchCommand@
 SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
+SettingsLlvmAsCommand = @SettingsLlvmAsCommand@
 SettingsUseDistroMINGW = @SettingsUseDistroMINGW@
 

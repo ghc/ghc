@@ -163,6 +163,13 @@ FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
+dnl ** Which LLVM assembler to use?
+dnl --------------------------------------------------------------
+AC_ARG_VAR(LLVMAS,[Use as the path to LLVM's assembler (typically clang) [default=autodetect]])
+FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
+LlvmAsCmd="$LLVMAS"
+AC_SUBST([LlvmAsCmd])
+
 dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE

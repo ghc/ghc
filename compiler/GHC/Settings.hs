@@ -41,6 +41,7 @@ module GHC.Settings
   , sPgm_ranlib
   , sPgm_lo
   , sPgm_lc
+  , sPgm_las
   , sPgm_i
   , sOpt_L
   , sOpt_P
@@ -118,6 +119,8 @@ data ToolSettings = ToolSettings
     toolSettings_pgm_lo      :: (String, [Option])
   , -- | LLVM: llc static compiler
     toolSettings_pgm_lc      :: (String, [Option])
+    -- | LLVM: assembler
+  , toolSettings_pgm_las     :: (String, [Option])
   , toolSettings_pgm_i       :: String
 
   -- options for particular phases
@@ -137,6 +140,7 @@ data ToolSettings = ToolSettings
     toolSettings_opt_lo            :: [String]
   , -- | LLVM: llc static compiler
     toolSettings_opt_lc            :: [String]
+  , toolSettings_opt_las           :: [String]
   , -- | iserv options
     toolSettings_opt_i             :: [String]
 
@@ -233,6 +237,8 @@ sPgm_lo :: Settings -> (String, [Option])
 sPgm_lo = toolSettings_pgm_lo . sToolSettings
 sPgm_lc :: Settings -> (String, [Option])
 sPgm_lc = toolSettings_pgm_lc . sToolSettings
+sPgm_las :: Settings -> (String, [Option])
+sPgm_las = toolSettings_pgm_las . sToolSettings
 sPgm_i :: Settings -> String
 sPgm_i = toolSettings_pgm_i . sToolSettings
 sOpt_L :: Settings -> [String]
