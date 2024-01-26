@@ -261,3 +261,10 @@ test('T22159',
      [unless(opsys('mingw32'), skip),
       extra_files(['T22159_c.c'])],
      makefile_test, ['T22159'])
+
+test('T24314',
+     [extra_files(['T24314_c.c']),
+      req_c,
+      # libffi-wasm doesn't support more than 4 args yet
+      when(arch('wasm32'), skip)],
+     compile_and_run, ['T24314_c.c'])
