@@ -1,4 +1,6 @@
 
 <interactive>:0:9: error: [GHC-58481]
-    parse error (possibly incorrect indentation or mismatched brackets)
+    Parse error (possibly incorrect indentation or mismatched brackets).
+    Expected one of '_', 'as', 'case', 'hiding', 'if', 'let',
+                    'qualified', 'type', 'export', 'label', ...
 1

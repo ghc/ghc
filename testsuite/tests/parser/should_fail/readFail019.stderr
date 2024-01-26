@@ -1,2 +1,3 @@
 
-readFail019.hs:3:18: error: [GHC-58481] parse error on input ‘in’
+readFail019.hs:3:18: error: [GHC-58481]
+    Parse error on input ‘in’. Expected one of '}', ';'

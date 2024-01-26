@@ -8,7 +8,7 @@ Bad.hs:3:8: error: [GHC-21231]
 Bad.hs:3:8: error: [GHC-21231]
     lexical error in string/character literal at character '\n'
 
-<interactive>:9:1: error: [GHC-58481] parse error on input ‘+’
+<interactive>:9:1: error: [GHC-58481] Parse error on input ‘+’.
 
 Bad.hs:3:8: error: [GHC-21231]
     lexical error in string/character literal at character '\n'

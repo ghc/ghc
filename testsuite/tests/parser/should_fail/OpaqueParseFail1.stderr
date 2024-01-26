@@ -1,3 +1,5 @@
 
 OpaqueParseFail1.hs:4:11: error: [GHC-58481]
-    parse error on input ‘[’
+    Parse error on input ‘[’.
+    Expected one of 'as', 'hiding', 'qualified', 'export', 'label',
+                    'dynamic', 'safe', 'interruptible', 'unsafe', 'family', ...

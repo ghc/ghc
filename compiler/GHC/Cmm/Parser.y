@@ -269,6 +269,7 @@ import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
 import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Types.Error
 import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -293,6 +294,9 @@ import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
 }
 
+%errorresumptive
+%errorhandlertype explist
+%error { parseError }
 %expect 0
 
 %token
@@ -1216,8 +1220,17 @@ isPtrGlobalRegUse (GlobalRegUse reg ty)
     go CurrentNursery = True
     go _              = False
 
-happyError :: PD a
-happyError = PD $ \_ _ s -> unP srcParseFail s
+-- Copied from GHC/Parser/Lexer.srcParseFail
+parseError :: Located CmmToken -> [String] -> PD (Maybe a) -> PD a
+parseError _last_tk expected_toks resume = do
+  -- TODO: Improve error message with expected_toks and _last_tk (maybe get rid of last_loc?)
+  PD $ \_ _ s@PState{ buffer = buf, options = o, last_len = len,
+                      last_loc = last_loc } ->
+    POk s { errors = srcParseErr o buf len (mkSrcSpanPs last_loc) expected_toks `addMessage` errors s} ()
+  mb_a <- resume
+  case mb_a of
+    Nothing -> PD (\_ _ -> PFailed)  -- fatal
+    Just a  -> return a   -- non-fatal
 
 -- -----------------------------------------------------------------------------
 -- Statement-level macros

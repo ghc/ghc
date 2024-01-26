@@ -100,6 +100,9 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.Semigroup as Semi
 }
 
+%errorresumptive
+%errorhandlertype explist
+%error { srcParseFail }
 %expect 0 -- shift/reduce conflicts
 
 {- Note [shift/reduce conflicts]
@@ -1811,6 +1814,7 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
                                        t' <- addTrailingSemiA t (gl $2)
                                        return (sLL $1 $> (fst $ unLoc $1
                                                       , snocOL hs t')) }
+        | catch ';' decl                { sLL $2 $> ((msemiA $2), unitOL $3) } -- The SrcLocs are probably incorrect
         | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
@@ -4001,9 +4005,6 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
         | '|'                    { ([gl $1],1) }
 
 {
-happyError :: P a
-happyError = srcParseFail
-
 getVARID          (L _ (ITvarid    x)) = x
 getCONID          (L _ (ITconid    x)) = x
 getVARSYM         (L _ (ITvarsym   x)) = x

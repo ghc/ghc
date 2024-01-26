@@ -1,3 +1,4 @@
 
 T17549.hs:1:7: error: [GHC-58481]
-    parse error (possibly incorrect indentation or mismatched brackets)
+    Parse error (possibly incorrect indentation or mismatched brackets).
+    Expected one of CONID, QCONID

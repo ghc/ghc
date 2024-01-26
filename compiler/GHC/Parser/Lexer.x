@@ -61,7 +61,7 @@ module GHC.Parser.Lexer (
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..),
    getRealSrcLoc, getPState,
-   failMsgP, failLocMsgP, srcParseFail,
+   failMsgP, failLocMsgP, srcParseFail, srcParseErr,
    getPsErrorMessages, getPsMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
@@ -3319,7 +3319,7 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc) []) s
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -3350,8 +3350,9 @@ srcParseErr
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> SrcSpan
+  -> [String]           -- expected tokens
   -> MsgEnvelope PsMessage
-srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token details)
+srcParseErr options buf len loc expected = mkPlainErrorMsgEnvelope loc (PsErrParse token details)
   where
    token = lexemeToString (offsetBytes (-len) buf) len
    pattern_ = decodePrevNChars 8 buf
@@ -3366,15 +3367,20 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
      , ped_mdo_in_last_100 = mdoInLast100
      , ped_pat_syn_enabled = ps_enabled
      , ped_pattern_parsed  = pattern_ == "pattern "
+     , ped_expected        = expected
      }
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
-srcParseFail :: P a
-srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
-                            last_loc = last_loc } ->
-    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+srcParseFail :: Located Token -> [String] -> P (Maybe a) -> P a
+srcParseFail (L loc _last_tk) expected_toks resume = do
+  P $ \s@PState{ buffer = buf, options = o, last_len = len } ->
+    unP (addError $ srcParseErr o buf len loc expected_toks) s
+  mb_a <- resume
+  case mb_a of
+    Nothing -> P PFailed  -- fatal
+    Just a  -> return a   -- non-fatal
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.

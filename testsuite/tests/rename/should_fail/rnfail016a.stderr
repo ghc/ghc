@@ -1,2 +1,5 @@
 
-rnfail016a.hs:6:7: error: [GHC-58481] parse error on input ‘~’
+rnfail016a.hs:6:7: error: [GHC-58481]
+    Parse error on input ‘~’.
+    Expected one of '_', 'as', 'case', 'hiding', 'if', 'let',
+                    'qualified', 'type', 'export', 'label', ...

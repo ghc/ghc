@@ -1,4 +1,6 @@
 
 <interactive>:1:1: error: [GHC-58481]
-    parse error (possibly incorrect indentation or mismatched brackets)
+    Parse error (possibly incorrect indentation or mismatched brackets).
+    Expected one of '_', 'as', 'hiding', 'qualified', 'forall',
+                    'export', 'label', 'dynamic', 'safe', 'interruptible', ...
 1

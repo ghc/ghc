@@ -1,2 +1,5 @@
 
-T20609d.hs:9:3: error: [GHC-58481] parse error on input ‘forall’
+T20609d.hs:9:3: error: [GHC-58481]
+    Parse error on input ‘forall’.
+    Expected one of 'as', 'hiding', 'qualified', 'export', 'label',
+                    'dynamic', 'safe', 'interruptible', 'unsafe', 'family', ...

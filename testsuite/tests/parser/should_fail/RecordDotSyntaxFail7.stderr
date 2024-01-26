@@ -2,4 +2,6 @@
 [2 of 3] Compiling Main             ( RecordDotSyntaxFail7.hs, RecordDotSyntaxFail7.o )
 
 RecordDotSyntaxFail7.hs:9:16: error: [GHC-58481]
-    parse error on input ‘A.foo’
+    Parse error on input ‘A.foo’.
+    Expected one of 'as', 'hiding', 'qualified', 'export', 'label',
+                    'dynamic', 'safe', 'interruptible', 'unsafe', 'family', ...

@@ -1,3 +1,5 @@
 
 ExportCommaComma.hs:2:38: error: [GHC-58481]
-    parse error on input ‘,’
+    Parse error on input ‘,’.
+    Expected one of 'as', 'hiding', 'module', 'qualified', 'type',
+                    'export', 'label', 'dynamic', 'safe', 'interruptible', ...

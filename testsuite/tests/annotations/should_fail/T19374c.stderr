@@ -1,3 +1,4 @@
 
 T19374c.hs:5:15: error: [GHC-58481]
-    parse error on input ‘T19347c.%%%’
+    Parse error on input ‘T19347c.%%%’.
+    Expected one of ':', '-', '.', VARSYM, CONSYM

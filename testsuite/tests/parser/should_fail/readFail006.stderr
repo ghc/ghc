@@ -1,2 +1,2 @@
 
-readFail006.hs:8:12: error: [GHC-58481] parse error on input ‘@’
+readFail006.hs:8:12: error: [GHC-58481] Parse error on input ‘@’.

@@ -3,4 +3,5 @@ T12610.hs:5:1: warning: [GHC-94817] [-Wtabs (in -Wdefault)]
     Tab character found here.
     Suggested fix: Please use spaces instead.
 
-T12610.hs:5:9: error: [GHC-58481] parse error on input ‘y’
+T12610.hs:5:9: error: [GHC-58481]
+    Parse error on input ‘y’. Expected one of 'in'

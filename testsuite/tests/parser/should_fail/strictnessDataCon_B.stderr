@@ -1,3 +1,5 @@
 
 strictnessDataCon_B.hs:1:42: error: [GHC-58481]
-    parse error on input ‘}’
+    Parse error on input ‘}’.
+    Expected one of '_', 'as', 'hiding', 'qualified', 'export',
+                    'label', 'dynamic', 'safe', 'interruptible', 'unsafe', ...

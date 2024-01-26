@@ -78,4 +78,5 @@ T16270.hs:40:7: error: [GHC-71614]
     A lambda requires at least one parameter
 
 T16270.hs:46:1: error: [GHC-58481]
-    parse error (possibly incorrect indentation or mismatched brackets)
+    Parse error (possibly incorrect indentation or mismatched brackets).
+    Expected one of 'in'

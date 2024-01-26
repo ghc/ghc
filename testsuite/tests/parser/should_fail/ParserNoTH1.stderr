@@ -5,5 +5,7 @@ ParserNoTH1.hs:1:5: warning: [GHC-47082] [-Woperator-whitespace-ext-conflict (in
     Suggested fix: Add whitespace after the ‘$’.
 
 ParserNoTH1.hs:1:5: error: [GHC-58481]
-    parse error on input ‘$’
+    Parse error on input ‘$’.
+    Expected one of '_', 'as', 'case', 'hiding', 'if', 'let',
+                    'qualified', 'type', 'export', 'label', ...
     Suggested fix: Perhaps you intended to use TemplateHaskell

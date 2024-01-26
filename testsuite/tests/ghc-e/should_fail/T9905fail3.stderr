@@ -1,3 +1,4 @@
 
-<interactive>:0:17: error: [GHC-58481] parse error on input ‘+’
+<interactive>:0:17: error: [GHC-58481]
+    Parse error on input ‘+’. Expected one of ')'
 1

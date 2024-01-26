@@ -1,2 +1,3 @@
 
-T20609c.hs:8:13: error: [GHC-58481] parse error on input ‘forall’
+T20609c.hs:8:13: error: [GHC-58481]
+    Parse error on input ‘forall’. Expected one of '::'

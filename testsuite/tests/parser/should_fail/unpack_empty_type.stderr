@@ -1,3 +1,5 @@
 
 unpack_empty_type.hs:3:34: error: [GHC-58481]
-    parse error on input ‘}’
+    Parse error on input ‘}’.
+    Expected one of '_', 'as', 'hiding', 'qualified', 'export',
+                    'label', 'dynamic', 'safe', 'interruptible', 'unsafe', ...

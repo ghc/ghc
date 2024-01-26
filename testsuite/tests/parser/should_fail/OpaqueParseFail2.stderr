@@ -1,3 +1,5 @@
 
 OpaqueParseFail2.hs:4:12: error: [GHC-58481]
-    parse error on input ‘SPECIALISE’
+    Parse error on input ‘SPECIALISE’.
+    Expected one of 'as', 'hiding', 'qualified', 'export', 'label',
+                    'dynamic', 'safe', 'interruptible', 'unsafe', 'family', ...
