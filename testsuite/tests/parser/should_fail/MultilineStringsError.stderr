@@ -1,0 +1,14 @@
+MultilineStringsError.hs:6:3: [GHC-83865]
+     Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: Int
+        Actual: String
+     In the expression:
+        """
+          this is
+          a test
+          """
+      In an equation for ‘x’:
+          x = """
+                this is
+                a test
+                """

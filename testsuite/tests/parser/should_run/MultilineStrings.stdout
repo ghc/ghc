@@ -1,0 +1,47 @@
+-- 1
+"  abc\n\n  def\n\nghi\n    \njkl\n"
+
+-- 2
+"Line 1\n   Line 2\nLine 3\n"
+"Line 1\n   Line 2\nLine 3\n"
+"hello world"
+
+-- 3
+"a b c d e\nf g\n"
+
+-- 4
+"a\nb\nc\n"
+
+-- 5
+"\na\nb\nc\n"
+
+-- 6
+"a\nb\nc"
+"a\nb\nc"
+
+-- 7
+"a\nb\nc\n"
+"  a\n  b\n  c\n"
+"  a\n  b\n  c\n"
+
+-- 8
+"This is a literal multiline string:\n\"\"\"\nHello\n  world!\n\"\"\"\n"
+
+-- 9
+" name\tage\n Alice\t20\n Bob\t30\n\t40\n"
+
+-- 10
+"\\v -> case v of\n  Aeson.Null -> pure PrintStyleInherit\n  Aeson.String \"\" -> pure PrintStyleInherit\n  _ -> PrintStyleOverride <$> Aeson.parseJSON v\n"
+"\\s -> case s of\n  \"\" -> pure PrintStyleInherit\n  _ -> PrintStyleOverride <$> parsePrinterOptType s\n"
+
+-- 11
+"instance Aeson.FromJSON MyEnum where\n  parseJSON =\n    Aeson.withText \"MyEnum\" $ \\s ->\n      either Aeson.parseFail pure $\n        parsePrinterOptType (Text.unpack s)\n\ninstance PrinterOptsFieldType MyEnum where\n  parsePrinterOptType s =\n    case s of\n      \"foo\" -> Right Foo\n      \"bar-baz\" -> Right BarBaz\n\n      _ ->\n        Left . unlines $\n          [ \"unknown value: \" <> show s\n          , \"Valid values are: foo bar-baz\"\n          ]\n"
+
+-- extra
+""
+""
+"a"
+"a\n"
+"\n\n"
+"\\n\n"
+"a\n\n  b\n"

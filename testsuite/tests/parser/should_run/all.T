@@ -21,3 +21,5 @@ test('RecordDotSyntax3', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compil
 test('RecordDotSyntax4', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compile_and_run, ['RecordDotSyntax4', ''])
 test('RecordDotSyntax5', normal, compile_and_run, [''])
 test('ListTuplePunsConstraints', extra_files(['ListTuplePunsConstraints.hs']), ghci_script, ['ListTuplePunsConstraints.script'])
+test('MultilineStrings', normal, compile_and_run, [''])
+test('MultilineStringsOverloaded', normal, compile_and_run, [''])
