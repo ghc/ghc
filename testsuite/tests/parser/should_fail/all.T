@@ -227,3 +227,6 @@ test('ListTuplePunsFail4', extra_files(['ListTuplePunsFail4.hs']), ghci_script, 
 test('ListTuplePunsFail5', extra_files(['ListTuplePunsFail5.hs']), ghci_script, ['ListTuplePunsFail5.script'])
 test('T17879a', normal, compile_fail, [''])
 test('T17879b', normal, compile_fail, [''])
+test('MultilineStringsError', [normalise_whitespace_fun(lambda s: s)], compile_fail, [''])
+test('MultilineStringsSmartQuotes', normal, compile_fail, [''])
+test('MultilineStringsInnerTab', normal, compile_fail, [''])

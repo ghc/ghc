@@ -1,0 +1,3 @@
+
+MultilineStringsInnerTab.hs:8:5: error: [GHC-21231]
+    lexical error in string/character literal at character '\t'
