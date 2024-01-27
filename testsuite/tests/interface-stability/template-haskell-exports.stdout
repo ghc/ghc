@@ -260,6 +260,7 @@ module Language.Haskell.TH where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -859,6 +860,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -1925,6 +1927,7 @@ module Language.Haskell.TH.Syntax where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *
