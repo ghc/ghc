@@ -87,6 +87,32 @@
 	  ><div class="doc"
 	  ><p
 	    >Lifted product of functors.</p
+	    ><h4 class="subheading details-toggle-control details-toggle" data-details-id="ch:Product0"
+	    >Examples</h4
+	    ><details id="ch:Product0"
+	    ><summary class="hide-when-js-enabled"
+	      >Expand</summary
+	      ><pre class="screen"
+	      ><code class="prompt"
+		>&gt;&gt;&gt; </code
+		><strong class="userinput"
+		><code
+		  >fmap (+1) (Pair [1, 2, 3] (Just 0))
+</code
+		  ></strong
+		>Pair [2,3,4] (Just 1)
+</pre
+	      ><pre class="screen"
+	      ><code class="prompt"
+		>&gt;&gt;&gt; </code
+		><strong class="userinput"
+		><code
+		  >Pair &quot;Hello, &quot; (Left 'x') &lt;&gt; Pair &quot;World&quot; (Right 'y')
+</code
+		  ></strong
+		>Pair &quot;Hello, World&quot; (Right 'y')
+</pre
+	      ></details
 	    ></div
 	  ><div class="subs constructors"
 	  ><p class="caption"
