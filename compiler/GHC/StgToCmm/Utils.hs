@@ -87,6 +87,7 @@ import qualified Data.Map as M
 import Data.List (sortBy)
 import Data.Ord
 import Data.Maybe
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import GHC.Core.DataCon
 import GHC.Types.Unique.DFM
@@ -380,12 +381,11 @@ unscramble platform vertices = mapM_ do_component components
         -- Not cyclic, or singleton?  Just do it
         do_component :: SCC Vrtx -> FCode ()
         do_component (AcyclicSCC (_,stmt))  = mk_graph stmt
-        do_component (CyclicSCC [])         = panic "do_component"
-        do_component (CyclicSCC [(_,stmt)]) = mk_graph stmt
+        do_component (NECyclicSCC ((_,stmt) :| [])) = mk_graph stmt
 
                 -- Cyclic?  Then go via temporaries.  Pick one to
                 -- break the loop and try again with the rest.
-        do_component (CyclicSCC ((_,first_stmt) : rest)) = do
+        do_component (NECyclicSCC ((_,first_stmt) :| rest)) = do
             u <- newUnique
             let (to_tmp, from_tmp) = split u first_stmt
             mk_graph to_tmp
