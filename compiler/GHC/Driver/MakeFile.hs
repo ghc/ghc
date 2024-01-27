@@ -30,7 +30,6 @@ import GHC.Utils.Panic
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.PkgQual
-import Data.List (partition)
 import GHC.Utils.TmpFs
 
 import GHC.Iface.Load (cannotFindModule)
@@ -49,6 +48,8 @@ import System.FilePath
 import System.IO
 import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when, forM_ )
+import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe       ( isJust )
 import Data.IORef
 import qualified Data.Set as Set
@@ -392,36 +393,36 @@ dumpModCycles logger module_graph
   where
     topoSort = GHC.topSortModuleGraph True module_graph Nothing
 
-    cycles :: [[ModuleGraphNode]]
+    cycles :: [NonEmpty ModuleGraphNode]
     cycles =
-      [ c | CyclicSCC c <- topoSort ]
+      [ c | NECyclicSCC c <- topoSort ]
 
     pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> text "----------")
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
-pprCycle :: [ModuleGraphNode] -> SDoc
+pprCycle :: NonEmpty ModuleGraphNode -> SDoc
 -- Print a cycle, but show only the imports within the cycle
-pprCycle summaries = pp_group (CyclicSCC summaries)
+pprCycle summaries = pp_group (NECyclicSCC summaries)
   where
     cycle_mods :: [ModuleName]  -- The modules in this cycle
-    cycle_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- summaries]
+    cycle_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- NE.toList summaries]
 
     pp_group :: SCC ModuleGraphNode -> SDoc
     pp_group (AcyclicSCC (ModuleNode _ ms)) = pp_ms ms
     pp_group (AcyclicSCC _) = empty
-    pp_group (CyclicSCC mss)
+    pp_group (NECyclicSCC mss)
         = assert (not (null boot_only)) $
                 -- The boot-only list must be non-empty, else there would
                 -- be an infinite chain of non-boot imports, and we've
                 -- already checked for that in processModDeps
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
-          (boot_only, others) = partition is_boot_only mss
+          (boot_only, others) = NE.partition is_boot_only mss
           is_boot_only (ModuleNode _ ms) = not (any in_group (map snd (ms_imps ms)))
           is_boot_only  _ = False
           in_group (L _ m) = m `elem` group_mods
-          group_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- mss]
+          group_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- NE.toList mss]
 
           loop_breaker = head ([ms | ModuleNode _ ms  <- boot_only])
           all_others   = tail boot_only ++ others
