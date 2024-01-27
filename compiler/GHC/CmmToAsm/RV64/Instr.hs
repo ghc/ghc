@@ -31,6 +31,10 @@ import GHC.Utils.Panic
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack
+import qualified Data.List.NonEmpty as NE
+import Data.Foldable
+import GHC.Cmm.Info (maxRetInfoTableSizeW)
+import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 
 -- | Stack frame header size in bytes.
 --
@@ -119,6 +123,7 @@ regUsageOfInstr platform instr = case instr of
   J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
+  BCOND_FAR _ l r b t        -> usage (regTarget t ++ regOp l ++ regOp r, [])
   BL t ps _rs              -> usage (regTarget t ++ ps, callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
@@ -259,6 +264,7 @@ patchRegsOfInstr instr env = case instr of
     B t            -> B (patchTarget t)
     BL t rs ts     -> BL (patchTarget t) rs ts
     BCOND c o1 o2 t -> BCOND c (patchOp o1) (patchOp o2) (patchTarget t)
+    BCOND_FAR c o1 o2 b t -> BCOND_FAR c (patchOp o1) (patchOp o2) (patchTarget b) (patchTarget t)
 
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
@@ -310,6 +316,7 @@ isJumpishInstr instr = case instr of
     B{} -> True
     BL{} -> True
     BCOND{} -> True
+    BCOND_FAR{} -> True
     _ -> False
 
 -- | Checks whether this instruction is a jump/branch instruction.
@@ -323,6 +330,7 @@ jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ _ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND_FAR _ _ _ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
 
 -- | Change the destination of this jump instruction.
@@ -338,6 +346,7 @@ patchJumpInstr instr patchF
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
         BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
+        BCOND_FAR c o1 o2 b (TBlock bid) -> BCOND_FAR c o1 o2 b (TBlock (patchF bid))
         _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
 -- -----------------------------------------------------------------------------
@@ -659,6 +668,8 @@ data Instr
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
     | BL Target [Reg] [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
+    -- | pseudo-op for far branch targets
+    | BCOND_FAR Cond Operand Operand Target Target
 
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBSY DmbType DmbType
@@ -731,12 +742,14 @@ instrCon i =
       B{} -> "B"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
+      BCOND_FAR{} -> "BCOND_FAR"
       DMBSY{} -> "DMBSY"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"
       FABS{} -> "FABS"
 
+-- TODO: We don't need TLabel.
 data Target
     = TBlock BlockId
     | TLabel CLabel
@@ -910,3 +923,57 @@ isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `
 
 isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
+
+-- | Making far branches
+
+-- Conditional branch instructions can target labels in a range of +/- 4 KiB.
+-- The assembler can transform this into a J instruction targeting +/- 1MiB.
+-- There are rare cases where this is not enough (e.g. the Happy-generated
+-- @Parser.hs@.) We need to manually transfer these into register based jumps
+-- using @ip@ (register reserved for calculations.) The trick is to invert the
+-- condition, do a far jump in the fall-through case or a short jump when the
+-- (inverted) condition is true.
+-- TODO: Remove comments / annotations
+makeFarBranches ::
+  LabelMap RawCmmStatics ->
+  [NatBasicBlock Instr] ->
+  [NatBasicBlock Instr]
+makeFarBranches info_env blocks
+  | NE.last blockAddresses < nearLimit = zipWith (curry blockStatistics) blockAddressList blocks
+  | otherwise = zipWith handleBlock blockAddressList blocks
+  where
+    blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
+    blockAddressList = toList blockAddresses
+    blockLen (BasicBlock _ instrs) = length instrs
+
+    handleBlock addr (BasicBlock id instrs) =
+      BasicBlock id (zipWith (makeFar id) [addr ..] instrs)
+
+    makeFar :: BlockId -> Int -> Instr -> Instr
+    makeFar bid addr orig@(BCOND cond op1 op2 tgt@(TBlock tgtBid))
+      | abs (addr - targetAddr) >= nearLimit =
+       ANN (text "BCOND_FAR targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) $
+          BCOND_FAR cond op1 op2 (TBlock bid) tgt
+      | otherwise =
+          ANN (text "BCOND targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) orig
+      where
+        Just targetAddr = lookupUFM blockAddressMap tgtBid
+    makeFar _bid _addr orig@(BCOND _cond _op1 _op2 (TLabel _l)) = ANN (text "other BCOND: label") orig
+    makeFar _bid _addr orig@(BCOND _cond _op1 _op2 _l) = ANN (text "other BCOND: other") orig
+    makeFar bid addr (ANN desc other) = ANN desc $ makeFar bid addr other
+    makeFar _bid _ other = ANN (text ("makeFar: " ++ instrCon other)) other
+
+    -- 262144 (2^20 / 4) instructions are allowed; let's keep some distance, as
+    -- we have pseudo-insns that are pretty-printed as multiple instructions,
+    -- and it's just not worth the effort to calculate things exactly. The
+    -- conservative guess here is that every instruction does not emit more than
+    -- two in the mean.
+    nearLimit = 131072 - mapSize info_env * maxRetInfoTableSizeW
+
+    blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList
+
+    blockStatistics (stat, BasicBlock blockId instrs) =
+      BasicBlock blockId (COMMENT (text "BasicBlock" <+> text (show blockId) <+> text "Address" <+> int stat) : instrs)
+
+annotateBlock :: NatBasicBlock Instr -> NatBasicBlock Instr
+annotateBlock (BasicBlock id instrs) = BasicBlock id (COMMENT (text "annotateBlock: visited") : instrs)
