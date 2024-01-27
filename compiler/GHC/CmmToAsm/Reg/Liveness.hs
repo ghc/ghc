@@ -60,6 +60,7 @@ import GHC.Data.Bag
 import GHC.Utils.Monad.State.Strict
 
 import Data.List (mapAccumL, sortOn)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import GHC.Utils.Misc
@@ -293,9 +294,9 @@ mapSCCM f (AcyclicSCC x)
  = do   x'      <- f x
         return  $ AcyclicSCC x'
 
-mapSCCM f (CyclicSCC xs)
+mapSCCM f (NECyclicSCC xs)
  = do   xs'     <- mapM f xs
-        return  $ CyclicSCC xs'
+        return  $ NECyclicSCC xs'
 
 
 -- map a function across all the basic blocks in this code
@@ -341,7 +342,7 @@ slurpConflicts platform live
         slurpSCC  info rs (AcyclicSCC b)
                 = slurpBlock info rs b
 
-        slurpSCC  info rs (CyclicSCC bs)
+        slurpSCC  info rs (NECyclicSCC bs)
                 = foldl'  (slurpBlock info) rs bs
 
         slurpBlock info rs (BasicBlock blockId instrs)
@@ -628,7 +629,7 @@ patchEraseLive platform patchF cmm
            in   CmmProc info' label live $ map patchSCC sccs
 
         patchSCC (AcyclicSCC b)  = AcyclicSCC (patchBlock b)
-        patchSCC (CyclicSCC  bs) = CyclicSCC  (map patchBlock bs)
+        patchSCC (NECyclicSCC bs) = NECyclicSCC (fmap patchBlock bs)
 
         patchBlock (BasicBlock id lis)
                 = BasicBlock id $ patchInstrs lis
@@ -897,8 +898,8 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
    in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
 
 livenessSCCs platform blockmap done
-        (CyclicSCC blocks : sccs) =
-        livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
+        (NECyclicSCC blocks : sccs) =
+        livenessSCCs platform blockmap' (NECyclicSCC blocks':done) sccs
  where      (blockmap', blocks')
                 = iterateUntilUnchanged linearLiveness equalBlockMaps
                                       blockmap blocks
@@ -916,8 +917,8 @@ livenessSCCs platform blockmap done
 
             linearLiveness
                 :: Instruction instr
-                => BlockMap (UniqSet RegWithFormat) -> [LiveBasicBlock instr]
-                -> (BlockMap (UniqSet RegWithFormat), [LiveBasicBlock instr])
+                => BlockMap (UniqSet RegWithFormat) -> NonEmpty (LiveBasicBlock instr)
+                -> (BlockMap (UniqSet RegWithFormat), NonEmpty (LiveBasicBlock instr))
 
             linearLiveness = mapAccumL (livenessBlock platform)
 
