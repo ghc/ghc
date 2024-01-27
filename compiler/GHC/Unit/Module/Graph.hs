@@ -122,6 +122,8 @@ import GHC.Unit.Module.ModIface
 import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import GHC.Types.Unique.DSet
 import qualified Data.Set as Set
@@ -457,10 +459,10 @@ filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
     mapMaybeSCC :: (a -> Maybe b) -> SCC a -> Maybe (SCC b)
     mapMaybeSCC f = \case
       AcyclicSCC a -> AcyclicSCC <$> f a
-      CyclicSCC as -> case mapMaybe f as of
+      NECyclicSCC as -> case mapMaybe f (NE.toList as) of
         [] -> Nothing
         [a] -> Just $ AcyclicSCC a
-        as -> Just $ CyclicSCC as
+        a : as -> Just $ NECyclicSCC (a :| as)
 
 --------------------------------------------------------------------------------
 -- * Keys into ModuleGraph
