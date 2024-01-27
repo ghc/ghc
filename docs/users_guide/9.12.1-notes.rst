@@ -13,6 +13,24 @@ Language
 
 - New language extension: :extension:`OrPatterns` implements `GHC Proposal #522
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst>`_).
+- GHC Proposal `#569 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0569-multiline-strings.rst>`_
+  "Multiline string literals" has been implemented.
+  The following code is now accepted by GHC::
+
+    {-# LANGUAGE MultilineStrings #-}
+
+    x :: String
+    x =
+      """
+      This is a
+      multiline
+
+          string
+
+      literal
+      """
+
+  This feature is guarded behind :extension:`MultilineStrings`.
 
 - The ordering of variables used for visible type application has been changed in two cases.
   It is supposed to be left-to-right, but due to an oversight, it was wrong:
