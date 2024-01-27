@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -366,13 +367,18 @@ rnExpr (HsOverLabel src v)
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
                 HsTyLit noExtField (HsStrTy NoSourceText v)
 
-rnExpr (HsLit x lit@(HsString src s))
+rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
             rnExpr (HsOverLit x (mkHsIsString src s))
          else do {
             ; rnLit lit
             ; return (HsLit x (convertLit lit), emptyFVs) } }
+  where
+    stringLike = \case
+      HsString src s -> Just (src, s)
+      HsMultilineString src s -> Just (src, s)
+      _ -> Nothing
 
 rnExpr (HsLit x lit)
   = do { rnLit lit

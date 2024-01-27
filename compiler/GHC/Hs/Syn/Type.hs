@@ -76,6 +76,7 @@ hsLitType :: HsLit (GhcPass p) -> Type
 hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
+hsLitType (HsMultilineString _ _) = stringTy
 hsLitType (HsStringPrim _ _) = addrPrimTy
 hsLitType (HsInt _ _)        = intTy
 hsLitType (HsIntPrim _ _)    = intPrimTy

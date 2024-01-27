@@ -126,6 +126,7 @@ GHC.Parser.HaddockLex
 GHC.Parser.Lexer
 GHC.Parser.PostProcess
 GHC.Parser.PostProcess.Haddock
+GHC.Parser.String
 GHC.Parser.Types
 GHC.Platform
 GHC.Platform.Constants

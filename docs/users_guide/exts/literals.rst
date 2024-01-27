@@ -14,3 +14,4 @@ Literals
     numeric_underscores
     overloaded_strings
     overloaded_labels
+    multiline_strings

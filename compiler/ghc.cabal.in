@@ -637,6 +637,7 @@ Library
         GHC.Parser.HaddockLex
         GHC.Parser.PostProcess
         GHC.Parser.PostProcess.Haddock
+        GHC.Parser.String
         GHC.Parser.Types
         GHC.Parser.Utils
         GHC.Platform

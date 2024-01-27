@@ -43,7 +43,7 @@ is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit,
 is_ident  = is_ctype cIdent
 is_symbol = is_ctype cSymbol
 is_any    = is_ctype cAny
-is_space  = is_ctype cSpace
+is_space  = \c -> c <= '\x7f' && is_ctype cSpace c -- is_space only works for <= '\x7f' (#3751, #5425)
 is_lower  = is_ctype cLower
 is_upper  = is_ctype cUpper
 is_digit  = is_ctype cDigit

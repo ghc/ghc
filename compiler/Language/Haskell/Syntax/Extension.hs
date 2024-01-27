@@ -556,6 +556,7 @@ type family XXParStmtBlock x x'
 type family XHsChar x
 type family XHsCharPrim x
 type family XHsString x
+type family XHsMultilineString x
 type family XHsStringPrim x
 type family XHsInt x
 type family XHsIntPrim x

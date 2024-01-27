@@ -762,3 +762,10 @@ test ('T24582',
       [ collect_compiler_stats('bytes allocated',5) ],
       compile,
       ['-O'])
+
+test ('MultilineStringsPerf',
+      [ collect_compiler_stats('peak_megabytes_allocated', 20),
+        collect_compiler_stats('bytes allocated', 5),
+      ],
+      compile,
+      ['-O'])

@@ -245,6 +245,7 @@ extensionName = \case
   LangExt.TypeAbstractions -> "TypeAbstractions"
   LangExt.ExtendedLiterals -> "ExtendedLiterals"
   LangExt.ListTuplePuns -> "ListTuplePuns"
+  LangExt.MultilineStrings -> "MultilineStrings"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted

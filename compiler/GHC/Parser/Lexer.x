@@ -130,6 +130,7 @@ import GHC.Driver.Flags
 import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.String
 }
 
 -- -----------------------------------------------------------------------------
@@ -665,7 +666,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- to convert it to a String.
 <0> {
   \'                            { lex_char_tok }
-  \"                            { lex_string_tok }
+  \"\"\" / { ifExtension MultilineStringsBit} { lex_string_tok StringTypeMulti }
+  \"                            { lex_string_tok StringTypeSingle }
 }
 
 -- Note [Whitespace-sensitive operator parsing]
@@ -951,6 +953,7 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITmultilinestring SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -2180,22 +2183,37 @@ lex_string_prag_comment mkTok span _buf _len _buf2
 
 -- This stuff is horrible.  I hates it.
 
-lex_string_tok :: Action
-lex_string_tok span buf _len _buf2 = do
-  lexed <- lex_string
-  (AI end bufEnd) <- getInput
-  let
-    tok = case lexed of
-      LexedPrimString s -> ITprimstring (SourceText src) (unsafeMkByteString s)
-      LexedRegularString s -> ITstring (SourceText src) (mkFastString s)
-    src = lexemeToFastString buf (cur bufEnd - cur buf)
-  return $ L (mkPsSpan (psSpanStart span) end) tok
+lex_string_tok :: LexStringType -> Action
+lex_string_tok strType span buf _len _buf2 = do
+  s <- lex_string strType
+
+  i <- getInput
+  case strType of
+    StringTypeSingle ->
+      lex_magic_hash i >>= \case
+        Just i' -> do
+          when (any (> '\xFF') s) $ do
+            pState <- getPState
+            let msg = PsErrPrimStringInvalidChar
+            let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
+            addError err
+
+          setInput i'
+          let (psSpan, src) = getStringLoc (buf, locStart) i'
+          pure $ L psSpan (ITprimstring src (unsafeMkByteString s))
+        Nothing -> do
+          let (psSpan, src) = getStringLoc (buf, locStart) i
+          pure $ L psSpan (ITstring src (mkFastString s))
+    StringTypeMulti -> do
+      let (psSpan, src) = getStringLoc (buf, locStart) i
+      pure $ L psSpan (ITmultilinestring src (mkFastString s))
+  where
+    locStart = psSpanStart span
 
 
 lex_quoted_label :: Action
 lex_quoted_label span buf _len _buf2 = do
-  start <- getInput
-  s <- lex_string_helper "" start
+  s <- lex_string StringTypeSingle
   (AI end bufEnd) <- getInput
   let
     token = ITlabelvarid (SourceText src) (mkFastString s)
@@ -2205,75 +2223,12 @@ lex_quoted_label span buf _len _buf2 = do
   return $ L (mkPsSpan start end) token
 
 
-data LexedString = LexedRegularString String | LexedPrimString String
-
-lex_string :: P LexedString
-lex_string = do
+lex_string :: LexStringType -> P String
+lex_string strType = do
   start <- getInput
-  s <- lex_string_helper "" start
-  magicHash <- getBit MagicHashBit
-  if magicHash
-    then do
-      i <- getInput
-      case alexGetChar' i of
-        Just ('#',i) -> do
-          setInput i
-          when (any (> '\xFF') s) $ do
-            pState <- getPState
-            let msg = PsErrPrimStringInvalidChar
-            let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
-            addError err
-          return $ LexedPrimString s
-        _other ->
-          return $ LexedRegularString s
-    else
-      return $ LexedRegularString s
-
-
-lex_string_helper :: String -> AlexInput -> P String
-lex_string_helper s start = do
-  i <- getInput
-  case alexGetChar' i of
-    Nothing -> lit_error i
-
-    Just ('"',i)  -> do
-      setInput i
-      return (reverse s)
-
-    Just ('\\',i)
-        | Just ('&',i) <- next -> do
-                setInput i; lex_string_helper s start
-        | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
-                           -- is_space only works for <= '\x7f' (#3751, #5425)
-                setInput i; lex_stringgap s start
-        where next = alexGetChar' i
-
-    Just (c, i1) -> do
-        case c of
-          '\\' -> do setInput i1; c' <- lex_escape; lex_string_helper (c':s) start
-          c | isAny c -> do setInput i1; lex_string_helper (c:s) start
-          _other | any isDoubleSmartQuote s -> do
-            -- if the built-up string s contains a smart double quote character, it was
-            -- likely the reason why the string literal was not lexed correctly
-            setInput start -- rewind to the first character in the string literal
-                           -- so we can find the smart quote character's location
-            advance_to_smart_quote_character
-            i2@(AI loc _) <- getInput
-            case alexGetChar' i2 of
-              Just (c, _) -> do add_nonfatal_smart_quote_error c loc; lit_error i
-              Nothing -> lit_error i -- should never get here
-          _other -> lit_error i
-
-
-lex_stringgap :: String -> AlexInput -> P String
-lex_stringgap s start = do
-  i <- getInput
-  c <- getCharOrFail i
-  case c of
-    '\\' -> lex_string_helper s start
-    c | c <= '\x7f' && is_space c -> lex_stringgap s start
-                           -- is_space only works for <= '\x7f' (#3751, #5425)
-    _other -> lit_error i
+  (str, next) <- either fromStringLexError pure $ lexString strType alexGetChar' start
+  setInput next
+  pure str
 
 
 lex_char_tok :: Action
@@ -2294,16 +2249,18 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                    return (L (mkPsSpan loc end2)  ITtyQuote)
 
         Just ('\\', i2@(AI end2 _)) -> do      -- We've seen 'backslash
-                  setInput i2
-                  lit_ch <- lex_escape
-                  i3 <- getInput
-                  mc <- getCharOrFail i3 -- Trailing quote
-                  if mc == '\'' then finish_char_tok buf loc lit_ch
-                  else if isSingleSmartQuote mc then add_smart_quote_error mc end2
-                  else lit_error i3
+                  (lit_ch, i3) <-
+                    either fromStringLexError pure $
+                      resolveEscapeCharacter alexGetChar' i2
+                  case alexGetChar' i3 of
+                    Just ('\'', i4) -> do
+                      setInput i4
+                      finish_char_tok buf loc lit_ch
+                    Just (mc, _) | isSingleSmartQuote mc -> add_smart_quote_error mc end2
+                    _ -> lit_error i3
 
         Just (c, i2@(AI end2 _))
-                | not (isAny c) -> lit_error i1
+                | not (isAnyChar c) -> lit_error i1
                 | otherwise ->
 
                 -- We've seen 'x, where x is a valid character
@@ -2319,139 +2276,54 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                         let (AI end _) = i1
                         return (L (mkPsSpan loc end) ITsimpleQuote)
 
+-- We've already seen the closing quote
+-- Just need to check for trailing #
 finish_char_tok :: StringBuffer -> PsLoc -> Char -> P (PsLocated Token)
-finish_char_tok buf loc ch  -- We've already seen the closing quote
-                        -- Just need to check for trailing #
-  = do  magicHash <- getBit MagicHashBit
-        i@(AI end bufEnd) <- getInput
-        let src = lexemeToFastString buf (cur bufEnd - cur buf)
-        if magicHash then do
-            case alexGetChar' i of
-              Just ('#',i@(AI end bufEnd')) -> do
-                setInput i
-                -- Include the trailing # in SourceText
-                let src' = lexemeToFastString buf (cur bufEnd' - cur buf)
-                return (L (mkPsSpan loc end)
-                          (ITprimchar (SourceText src') ch))
-              _other ->
-                return (L (mkPsSpan loc end)
-                          (ITchar (SourceText src) ch))
-            else do
-              return (L (mkPsSpan loc end) (ITchar (SourceText src) ch))
-
-isAny :: Char -> Bool
-isAny c | c > '\x7f' = isPrint c
-        | otherwise  = is_any c
-
-lex_escape :: P Char
-lex_escape = do
-  i0@(AI loc _) <- getInput
-  c <- getCharOrFail i0
-  case c of
-        'a'   -> return '\a'
-        'b'   -> return '\b'
-        'f'   -> return '\f'
-        'n'   -> return '\n'
-        'r'   -> return '\r'
-        't'   -> return '\t'
-        'v'   -> return '\v'
-        '\\'  -> return '\\'
-        '"'   -> return '\"'
-        '\''  -> return '\''
-        -- the next two patterns build up a Unicode smart quote error (#21843)
-        smart_double_quote | isDoubleSmartQuote smart_double_quote ->
-          add_smart_quote_error smart_double_quote loc
-        smart_single_quote | isSingleSmartQuote smart_single_quote ->
-          add_smart_quote_error smart_single_quote loc
-        '^'   -> do i1 <- getInput
-                    c <- getCharOrFail i1
-                    if c >= '@' && c <= '_'
-                        then return (chr (ord c - ord '@'))
-                        else lit_error i1
-
-        'x'   -> readNum is_hexdigit 16 hexDigit
-        'o'   -> readNum is_octdigit  8 octDecDigit
-        x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
-
-        c1 ->  do
-           i <- getInput
-           case alexGetChar' i of
-            Nothing -> lit_error i0
-            Just (c2,i2) ->
-              case alexGetChar' i2 of
-                Nothing -> do lit_error i0
-                Just (c3,i3) ->
-                   let str = [c1,c2,c3] in
-                   case [ (c,rest) | (p,c) <- silly_escape_chars,
-                                     Just rest <- [stripPrefix p str] ] of
-                          (escape_char,[]):_ -> do
-                                setInput i3
-                                return escape_char
-                          (escape_char,_:_):_ -> do
-                                setInput i2
-                                return escape_char
-                          [] -> lit_error i0
-
-readNum :: (Char -> Bool) -> Int -> (Char -> Int) -> P Char
-readNum is_digit base conv = do
+finish_char_tok buf loc ch = do
   i <- getInput
-  c <- getCharOrFail i
-  if is_digit c
-        then readNum2 is_digit base conv (conv c)
-        else lit_error i
-
-readNum2 :: (Char -> Bool) -> Int -> (Char -> Int) -> Int -> P Char
-readNum2 is_digit base conv i = do
-  input <- getInput
-  read i input
-  where read i input = do
-          case alexGetChar' input of
-            Just (c,input') | is_digit c -> do
-               let i' = i*base + conv c
-               if i' > 0x10ffff
-                  then setInput input >> lexError LexNumEscapeRange
-                  else read i' input'
-            _other -> do
-              setInput input; return (chr i)
+  lex_magic_hash i >>= \case
+    Just i' -> do
+      setInput i'
+      -- Include the trailing # in SourceText
+      let (psSpan, src) = getStringLoc (buf, loc) i'
+      pure $ L psSpan (ITprimchar src ch)
+    Nothing -> do
+      let (psSpan, src) = getStringLoc (buf, loc) i
+      pure $ L psSpan (ITchar src ch)
 
 
-silly_escape_chars :: [(String, Char)]
-silly_escape_chars = [
-        ("NUL", '\NUL'),
-        ("SOH", '\SOH'),
-        ("STX", '\STX'),
-        ("ETX", '\ETX'),
-        ("EOT", '\EOT'),
-        ("ENQ", '\ENQ'),
-        ("ACK", '\ACK'),
-        ("BEL", '\BEL'),
-        ("BS", '\BS'),
-        ("HT", '\HT'),
-        ("LF", '\LF'),
-        ("VT", '\VT'),
-        ("FF", '\FF'),
-        ("CR", '\CR'),
-        ("SO", '\SO'),
-        ("SI", '\SI'),
-        ("DLE", '\DLE'),
-        ("DC1", '\DC1'),
-        ("DC2", '\DC2'),
-        ("DC3", '\DC3'),
-        ("DC4", '\DC4'),
-        ("NAK", '\NAK'),
-        ("SYN", '\SYN'),
-        ("ETB", '\ETB'),
-        ("CAN", '\CAN'),
-        ("EM", '\EM'),
-        ("SUB", '\SUB'),
-        ("ESC", '\ESC'),
-        ("FS", '\FS'),
-        ("GS", '\GS'),
-        ("RS", '\RS'),
-        ("US", '\US'),
-        ("SP", '\SP'),
-        ("DEL", '\DEL')
-        ]
+-- | Get the span and source text for a string from the given start to the given end.
+getStringLoc :: (StringBuffer, PsLoc) -> AlexInput -> (PsSpan, SourceText)
+getStringLoc (bufStart, locStart) (AI locEnd bufEnd) = (psSpan, SourceText src)
+  where
+    psSpan = mkPsSpan locStart locEnd
+    src = lexemeToFastString bufStart (cur bufEnd - cur bufStart)
+
+
+-- Return Just if we found the magic hash, with the next input.
+lex_magic_hash :: AlexInput -> P (Maybe AlexInput)
+lex_magic_hash i = do
+  magicHash <- getBit MagicHashBit
+  if magicHash
+    then
+      case alexGetChar' i of
+        Just ('#', i') -> pure (Just i')
+        _other -> pure Nothing
+    else pure Nothing
+
+fromStringLexError :: StringLexError AlexInput -> P a
+fromStringLexError = \case
+  UnexpectedEOF i squote -> checkSQuote squote >> throw i LexStringCharLitEOF
+  BadCharInitialLex i squote -> checkSQuote squote >> throw i LexStringCharLit
+  EscapeBadChar i -> throw i LexStringCharLit
+  EscapeUnexpectedEOF i -> throw i LexStringCharLitEOF
+  EscapeNumRangeError i -> throw i LexNumEscapeRange
+  EscapeSmartQuoteError c (AI loc _) -> add_smart_quote_error c loc
+  where
+    throw i e = setInput i >> lexError e
+    checkSQuote = \case
+      NoSmartQuote -> pure ()
+      SmartQuote c (AI loc _) -> add_nonfatal_smart_quote_error c loc
 
 -- before calling lit_error, ensure that the current input is pointing to
 -- the position of the error in the buffer.  This is so that we can report
@@ -2459,12 +2331,6 @@ silly_escape_chars = [
 -- errors if they occur.
 lit_error :: AlexInput -> P a
 lit_error i = do setInput i; lexError LexStringCharLit
-
-getCharOrFail :: AlexInput -> P Char
-getCharOrFail i =  do
-  case alexGetChar' i of
-        Nothing -> lexError LexStringCharLitEOF
-        Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
 -- QuasiQuote
@@ -2519,16 +2385,6 @@ quasiquote_error start = do
 
 -- -----------------------------------------------------------------------------
 -- Unicode Smart Quote detection (#21843)
-
-isDoubleSmartQuote :: Char -> Bool
-isDoubleSmartQuote '“' = True
-isDoubleSmartQuote '”' = True
-isDoubleSmartQuote _ = False
-
-isSingleSmartQuote :: Char -> Bool
-isSingleSmartQuote '‘' = True
-isSingleSmartQuote '’' = True
-isSingleSmartQuote _ = False
 
 isSmartQuote :: AlexAccPred ExtsBitmap
 isSmartQuote _ _ _ (AI _ buf) = let c = prevChar buf ' ' in isSingleSmartQuote c || isDoubleSmartQuote c
@@ -3065,6 +2921,7 @@ data ExtBits
   | ListTuplePunsBit
   | ViewPatternsBit
   | RequiredTypeArgumentsBit
+  | MultilineStringsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -3149,6 +3006,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. ListTuplePunsBit            `xoptBit` LangExt.ListTuplePuns
       .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
+      .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
