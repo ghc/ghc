@@ -558,6 +558,7 @@ pprInstr platform instr = case instr of
   -- 4. Branch Instructions ----------------------------------------------------
   J t             -> pprInstr platform (B t)
   -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
+  -- TODO: Take care of long and short branches! (We don't always have to do the long edition)
   B l | isLabel l -> lines_ [ text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform l
                             , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" ]
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
@@ -570,13 +571,16 @@ pprInstr platform instr = case instr of
 
   BCOND _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
 
-  BCOND_FAR c l r t | isLabel t ->
-    lines_ [ text "\t" <> pprBcond (negateCond c) <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> text "$+16"
+  -- This is the far branches trick: Negate the condition and either do a
+  -- register based jump (ignoring the link result in register zero) or just
+  -- branch to the end of the block, jumping over the far jump instructions.
+  BCOND_FAR c l r b t | isLabel t ->
+    lines_ [ text "\t" <> pprBcond (negateCond c) <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform b <> text "_end"
            , text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform t
            , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" 
            ]
 
-  BCOND_FAR _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
+  BCOND_FAR _ _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
 
 
   -- 5. Atomic Instructions ----------------------------------------------------

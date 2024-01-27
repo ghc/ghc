@@ -34,7 +34,7 @@ ncgRV64 config
        ,maxSpillSlots             = RV64.maxSpillSlots config
        ,allocatableRegs           = RV64.allocatableRegs platform
        ,ncgAllocMoreStack         = RV64.allocMoreStack platform
-       ,ncgMakeFarBranches        = const id
+       ,ncgMakeFarBranches        = RV64.makeFarBranches
        ,extractUnwindPoints       = const []
        ,invertCondBranches        = \_ _ -> id
   }

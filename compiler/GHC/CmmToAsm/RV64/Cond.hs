@@ -1,6 +1,6 @@
 module GHC.CmmToAsm.RV64.Cond  where
 
-import GHC.Prelude
+import GHC.Prelude hiding (EQ)
 
 -- FIXME: These conditions originate from the Aarch64 backend.  I'm not even sure
 -- we use all of them there. For RISCV we need to synthesize some of them, as
@@ -66,3 +66,28 @@ data Cond
     | VS     -- oVerflow set
     | VC     -- oVerflow clear
     deriving (Eq, Show)
+
+-- | Negate a condition.
+negateCond :: Cond -> Cond
+negateCond ALWAYS = NEVER
+negateCond NEVER  = ALWAYS
+negateCond EQ     = NE
+negateCond NE     = EQ
+negateCond SLT    = SGE
+negateCond SLE    = SGT
+negateCond SGE    = SLT
+negateCond SGT    = SLE
+negateCond ULT    = UGE
+negateCond ULE    = UGT
+negateCond UGE    = ULT
+negateCond UGT    = ULE
+negateCond OLT    = OGE
+negateCond OLE    = OGT
+negateCond OGE    = OLT
+negateCond OGT    = OLE
+negateCond UOLT   = UOGE
+negateCond UOLE   = UOGT
+negateCond UOGE   = UOLT
+negateCond UOGT   = UOLE
+negateCond VS     = VC
+negateCond VC     = VS

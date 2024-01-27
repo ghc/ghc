@@ -1221,12 +1221,12 @@ genCondJump bid expr = do
       -- Optimized == 0 case.
       CmmMachOp (MO_Eq w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
-        return $ code_x `snocOL` annExpr expr (CBZ (OpReg w reg_x) (TBlock bid))
+        return $ code_x `snocOL` annExpr expr (BCOND EQ zero (OpReg w reg_x) (TBlock bid))
 
       -- Optimized /= 0 case.
       CmmMachOp (MO_Ne w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
-        return $ code_x `snocOL`  annExpr expr (CBNZ (OpReg w reg_x) (TBlock bid))
+        return $ code_x `snocOL`  annExpr expr (BCOND NE zero (OpReg w reg_x) (TBlock bid))
 
       -- Generic case.
       CmmMachOp mop [x, y] -> do
@@ -1244,7 +1244,9 @@ genCondJump bid expr = do
                       truncateReg (formatToWidth format_y) w reg_y  `appOL`
                       code_y `snocOL`
                       annExpr expr (BCOND cmp x' y' (TBlock bid))
-                  _   -> code_x `appOL` code_y `snocOL` annExpr expr (BCOND cmp x' y' (TBlock bid))
+                  _   -> code_x `appOL`
+                         code_y `snocOL`
+                         annExpr expr (BCOND cmp x' y' (TBlock bid))
 
             sbcond w cmp = do
               -- compute both sides.
