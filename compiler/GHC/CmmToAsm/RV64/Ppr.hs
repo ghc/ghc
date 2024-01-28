@@ -49,8 +49,8 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- pprProcAlignment config $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
-        (if ncgDwarfEnabled config
-         then line (pprAsmLabel platform (mkAsmTempEndLabel lbl) <> char ':') else empty) $$
+        ppWhen (ncgDwarfEnabled config)
+          (line (pprBlockEndLabel platform lbl) $$ line (pprProcEndLabel platform lbl)) $$
         pprSizeDecl platform lbl
 
     Just (CmmStaticsRaw info_lbl _) ->
@@ -60,6 +60,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
           then line (pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> char ':')
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
+      ppWhen (ncgDwarfEnabled config) (line (pprProcEndLabel platform info_lbl)) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -105,6 +106,16 @@ pprSectionAlign config sec@(Section seg _) =
     line (pprSectionHeader config sec)
     $$ pprAlignForSection (ncgPlatform config) seg
 
+pprProcEndLabel :: IsLine doc => Platform -> CLabel -- ^ Procedure name
+                -> doc
+pprProcEndLabel platform lbl =
+    pprAsmLabel platform (mkAsmTempProcEndLabel lbl) <> colon
+
+pprBlockEndLabel :: IsLine doc => Platform -> CLabel -- ^ Block name
+                 -> doc
+pprBlockEndLabel platform lbl =
+    pprAsmLabel platform (mkAsmTempEndLabel lbl) <> colon
+
 -- | Output the ELF .size directive.
 pprSizeDecl :: IsDoc doc => Platform -> CLabel -> doc
 pprSizeDecl platform lbl
@@ -118,9 +129,11 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
-    (if  ncgDwarfEnabled config
-      then line (pprAsmLabel platform (mkAsmTempEndLabel asmLbl) <> char ':')
-      else empty
+    ppWhen (ncgDwarfEnabled config) (
+      -- Emit both end labels since this may end up being a standalone
+      -- top-level block
+      line (pprBlockEndLabel platform asmLbl
+         <> pprProcEndLabel platform asmLbl)
     )
   where
     -- TODO: Check if we can  filter more instructions here.
@@ -140,9 +153,8 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform info_lbl $$
            c $$
-           (if ncgDwarfEnabled config
-             then line (pprAsmLabel platform (mkAsmTempEndLabel info_lbl) <> char ':')
-             else empty)
+           ppWhen (ncgDwarfEnabled config)
+              (line (pprBlockEndLabel platform info_lbl))
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See Note [Info Offset]
     infoTableLoc = case instrs of
