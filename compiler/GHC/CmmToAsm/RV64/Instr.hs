@@ -122,6 +122,7 @@ regUsageOfInstr platform instr = case instr of
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
+  B_FAR _t                 -> usage ([], [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
   BCOND_FAR _ l r b t        -> usage (regTarget t ++ regOp l ++ regOp r, [])
   BL t ps _rs              -> usage (regTarget t ++ ps, callerSavedRegisters)
@@ -262,6 +263,7 @@ patchRegsOfInstr instr env = case instr of
     -- 4. Branch Instructions --------------------------------------------------
     J t            -> J (patchTarget t)
     B t            -> B (patchTarget t)
+    B_FAR t            -> B_FAR t
     BL t rs ts     -> BL (patchTarget t) rs ts
     BCOND c o1 o2 t -> BCOND c (patchOp o1) (patchOp o2) (patchTarget t)
     BCOND_FAR c o1 o2 b t -> BCOND_FAR c (patchOp o1) (patchOp o2) (patchTarget b) (patchTarget t)
@@ -314,6 +316,7 @@ isJumpishInstr instr = case instr of
     CBNZ{} -> True
     J{} -> True
     B{} -> True
+    B_FAR{} -> True
     BL{} -> True
     BCOND{} -> True
     BCOND_FAR{} -> True
@@ -328,6 +331,7 @@ jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (B_FAR t) = [t]
 jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ _ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND_FAR _ _ _ _ t) = [ id | TBlock id <- [t]]
@@ -344,6 +348,7 @@ patchJumpInstr instr patchF
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
         J (TBlock bid) -> J (TBlock (patchF bid))
         B (TBlock bid) -> B (TBlock (patchF bid))
+        B_FAR bid -> B_FAR (patchF bid)
         BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
         BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
         BCOND_FAR c o1 o2 b (TBlock bid) -> BCOND_FAR c o1 o2 b (TBlock (patchF bid))
@@ -666,6 +671,8 @@ data Instr
     -- Branching.
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
+    -- | pseudo-op for far branch targets
+    | B_FAR BlockId
     | BL Target [Reg] [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
     -- | pseudo-op for far branch targets
@@ -740,6 +747,7 @@ instrCon i =
       CBNZ{} -> "CBNZ"
       J{} -> "J"
       B{} -> "B"
+      B_FAR{} -> "B_FAR"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
       BCOND_FAR{} -> "BCOND_FAR"
@@ -956,6 +964,14 @@ makeFarBranches info_env blocks
           BCOND_FAR cond op1 op2 (TBlock bid) tgt
       | otherwise =
           ANN (text "BCOND targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) orig
+      where
+        Just targetAddr = lookupUFM blockAddressMap tgtBid
+    makeFar _bid addr orig@(B (TBlock tgtBid))
+      | abs (addr - targetAddr) >= nearLimit =
+       ANN (text "B_FAR targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) $
+          B_FAR tgtBid
+      | otherwise =
+          ANN (text "B targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) orig
       where
         Just targetAddr = lookupUFM blockAddressMap tgtBid
     makeFar _bid _addr orig@(BCOND _cond _op1 _op2 (TLabel _l)) = ANN (text "other BCOND: label") orig

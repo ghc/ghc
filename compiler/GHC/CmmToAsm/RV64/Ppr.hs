@@ -441,9 +441,12 @@ isLabel (TLabel _) = True
 isLabel _ = False
 
 getLabel :: IsLine doc => Platform -> Target -> doc
-getLabel platform (TBlock bid) = pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+getLabel platform (TBlock bid) = pprBlockId platform bid
 getLabel platform (TLabel lbl) = pprAsmLabel platform lbl
 getLabel _platform _other = panic "Cannot turn this into a label"
+
+pprBlockId :: IsLine doc => Platform -> BlockId -> doc
+pprBlockId platform bid = pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 
 pprInstr :: IsDoc doc => Platform -> Instr -> doc
 pprInstr platform instr = case instr of
@@ -558,10 +561,11 @@ pprInstr platform instr = case instr of
   -- 4. Branch Instructions ----------------------------------------------------
   J t             -> pprInstr platform (B t)
   -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
-  -- TODO: Take care of long and short branches! (We don't always have to do the long edition)
-  B l | isLabel l -> lines_ [ text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform l
-                            , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" ]
+  B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
+
+  B_FAR bid  -> lines_ [ text "\tla" <+> pprOp platform ip <> comma <+> pprBlockId platform bid
+                            , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" ]
 
   BL l _ _ | isLabel l-> line $ text "\tcall" <+> getLabel platform l
   BL (TReg r)     _ _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
