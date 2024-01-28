@@ -666,9 +666,12 @@ data Instr
     -- This is a synthetic operation.
     | CSET Operand Operand Operand Cond   -- if(o2 cond o3) op <- 1 else op <- 0
 
+    -- TODO: Unused
     | CBZ Operand Target  -- if op == 0, then branch.
+    -- TODO: Unused
     | CBNZ Operand Target -- if op /= 0, then branch.
     -- Branching.
+    -- TODO: Unused
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
     -- | pseudo-op for far branch targets
