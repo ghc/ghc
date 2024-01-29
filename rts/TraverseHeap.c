@@ -9,10 +9,10 @@
 
 #if defined(PROFILING)
 
-#include <string.h>
 #include "rts/PosixSource.h"
 #include "Rts.h"
 #include "sm/Storage.h"
+#include <string.h>
 
 #include "TraverseHeap.h"
 
