@@ -1388,7 +1388,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
       = setSrcSpanA name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
-        do names <- lookupLocalTcNames sig_ctxt what rdr_name
+        do names <- lookupLocalTcNames sig_ctxt what NoNamespaceSpecifier rdr_name
            return [ L name_loc name | (_, name) <- names ]
     what = text "fixity signature"
 

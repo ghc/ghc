@@ -1985,10 +1985,15 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
-        : warning_category namelist strings
-                {% fmap unitOL $ acsA (\cs -> L (comb3 $1 $2 $3)
-                     (Warning (EpAnn (glMR $1 $2) (fst $ unLoc $3) cs) (unLoc $2)
-                              (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
+        : warning_category namespace_spec namelist strings
+                {% fmap unitOL $ acsA (\cs -> L (comb4 $1 $2 $3 $4)
+                     (Warning (unLoc $2, EpAnn (glMR $1 $3) (fst $ unLoc $4) cs) (unLoc $3)
+                              (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $4))) }
+
+namespace_spec :: { Located NamespaceSpecifier }
+  : 'type'      { sL1 $1 $ TypeNamespaceSpecifier (epTok $1) }
+  | 'data'      { sL1 $1 $ DataNamespaceSpecifier (epTok $1) }
+  | {- empty -} { sL0    $ NoNamespaceSpecifier }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
         : deprecations ';' deprecation
@@ -2009,9 +2014,9 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LWarnDecl GhcPs) }
-        : namelist strings
-             {% fmap unitOL $ acsA (\cs -> sLL $1 $> $ (Warning (EpAnn (glEE $1 $>) (fst $ unLoc $2) cs) (unLoc $1)
-                                          (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $2))) }
+        : namespace_spec namelist strings
+             {% fmap unitOL $ acsA (\cs -> sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, EpAnn (glEE $2 $>) (fst $ unLoc $3) cs) (unLoc $2)
+                                          (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 strings :: { Located ([AddEpAnn],[Located StringLiteral]) }
     : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }

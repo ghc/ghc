@@ -1964,23 +1964,35 @@ instance ExactPrint (WarnDecls GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (WarnDecl GhcPs) where
-  getAnnotationEntry (Warning an _ _) = fromAnn an
-  setAnnotationAnchor (Warning an a b) anc ts cs = Warning (setAnchorEpa an anc ts cs) a b
+  getAnnotationEntry (Warning (_, an) _ _) = fromAnn an
+  setAnnotationAnchor (Warning (ns_spec, an) a b) anc ts cs
+    = Warning (ns_spec, setAnchorEpa an anc ts cs) a b
 
-  exact (Warning an lns  (WarningTxt mb_cat src ls )) = do
+  exact (Warning (ns_spec, an) lns  (WarningTxt mb_cat src ls )) = do
     mb_cat' <- markAnnotated mb_cat
+    ns_spec' <- exactNsSpec ns_spec
     lns' <- markAnnotated lns
     an0 <- markEpAnnL an lidl AnnOpenS -- "["
     ls' <- markAnnotated ls
     an1 <- markEpAnnL an0 lidl AnnCloseS -- "]"
-    return (Warning an1 lns'  (WarningTxt mb_cat' src ls'))
+    return (Warning (ns_spec', an1) lns'  (WarningTxt mb_cat' src ls'))
 
-  exact (Warning an lns (DeprecatedTxt src ls)) = do
+  exact (Warning (ns_spec, an) lns (DeprecatedTxt src ls)) = do
+    ns_spec' <- exactNsSpec ns_spec
     lns' <- markAnnotated lns
     an0 <- markEpAnnL an lidl AnnOpenS -- "["
     ls' <- markAnnotated ls
     an1 <- markEpAnnL an0 lidl AnnCloseS -- "]"
-    return (Warning an1 lns' (DeprecatedTxt src ls'))
+    return (Warning (ns_spec', an1) lns' (DeprecatedTxt src ls'))
+
+exactNsSpec :: (Monad m, Monoid w) => NamespaceSpecifier -> EP w m NamespaceSpecifier
+exactNsSpec NoNamespaceSpecifier = pure NoNamespaceSpecifier
+exactNsSpec (TypeNamespaceSpecifier type_) = do
+  type_' <- markEpToken type_
+  pure (TypeNamespaceSpecifier type_')
+exactNsSpec (DataNamespaceSpecifier data_) = do
+  data_' <- markEpToken data_
+  pure (DataNamespaceSpecifier data_')
 
 -- ---------------------------------------------------------------------
 
