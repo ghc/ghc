@@ -211,6 +211,9 @@ copyRules = do
         prefix -/- "ghc-interp.js"     <~ return "."
         prefix -/- "template-hsc.h" <~ return (pkgPath hsc2hs -/- "data")
 
+        prefix -/- "post-link.mjs"     <~ pure "utils/jsffi"
+        prefix -/- "prelude.js"        <~ pure "utils/jsffi"
+
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
 

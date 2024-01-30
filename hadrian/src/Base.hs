@@ -153,6 +153,8 @@ ghcLibDeps stage iplace = do
         , "settings"
         , "ghc-usage.txt"
         , "ghci-usage.txt"
+        , "post-link.mjs"
+        , "prelude.js"
         ]
     cxxStdLib <- systemCxxStdLibConfPath (PackageDbLoc stage iplace)
     return (cxxStdLib : ps)
