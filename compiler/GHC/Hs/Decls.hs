@@ -81,8 +81,9 @@ module GHC.Hs.Decls (
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
-  WarnDecl(..),  LWarnDecl,
+  WarnDecl(..), NamespaceSpecifier(..), LWarnDecl,
   WarnDecls(..), LWarnDecls,
+  overlappingNamespaceSpecifiers, coveredByNamespaceSpecifier,
   -- ** Annotations
   AnnDecl(..), LAnnDecl,
   AnnProvenance(..), annProvenanceName_maybe,
@@ -120,7 +121,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
 -- others:
-import GHC.Utils.Misc (count)
+import GHC.Utils.Misc (count, (<||>))
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -1280,9 +1281,30 @@ type instance XWarnings      GhcTc = SourceText
 
 type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
-type instance XWarning      (GhcPass _) = EpAnn [AddEpAnn]
+type instance XWarning      (GhcPass _) = (NamespaceSpecifier, EpAnn [AddEpAnn])
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
+data NamespaceSpecifier
+  = NoNamespaceSpecifier
+  | TypeNamespaceSpecifier (EpToken "type")
+  | DataNamespaceSpecifier (EpToken "data")
+  deriving (Data)
+
+overlappingNamespaceSpecifiers :: NamespaceSpecifier -> NamespaceSpecifier -> Bool
+overlappingNamespaceSpecifiers NoNamespaceSpecifier _ = True
+overlappingNamespaceSpecifiers _ NoNamespaceSpecifier = True
+overlappingNamespaceSpecifiers TypeNamespaceSpecifier{} TypeNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers DataNamespaceSpecifier{} DataNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers _ _ = False
+
+coveredByNamespaceSpecifier :: NamespaceSpecifier -> NameSpace -> Bool
+coveredByNamespaceSpecifier NoNamespaceSpecifier = const True
+coveredByNamespaceSpecifier TypeNamespaceSpecifier{} = isTcClsNameSpace <||> isTvNameSpace
+coveredByNamespaceSpecifier DataNamespaceSpecifier{} = isValNameSpace
+instance Outputable NamespaceSpecifier where
+  ppr NoNamespaceSpecifier = empty
+  ppr TypeNamespaceSpecifier{} = text "type"
+  ppr DataNamespaceSpecifier{} = text "data"
 
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
@@ -1296,8 +1318,9 @@ instance OutputableBndrId p
 
 instance OutputableBndrId p
        => Outputable (WarnDecl (GhcPass p)) where
-    ppr (Warning _ thing txt)
+    ppr (Warning (ns_spec, _) thing txt)
       = ppr_category
+              <+> ppr ns_spec
               <+> hsep (punctuate comma (map ppr thing))
               <+> ppr txt
       where

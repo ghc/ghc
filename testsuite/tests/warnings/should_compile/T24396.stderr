@@ -1,0 +1,68 @@
+[1 of 2] Compiling T24396a          ( T24396a.hs, T24396a.o )
+[2 of 2] Compiling T24396b          ( T24396b.hs, T24396b.o )
+
+T24396b.hs:8:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘C1’
+    (imported from T24396a):
+    Deprecated: "Type deprecation"
+
+T24396b.hs:9:6: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘C1’ (imported from T24396a):
+    Deprecated: "Data deprecation"
+
+T24396b.hs:11:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘D2’
+    (imported from T24396a):
+    Deprecated: "Type deprecation"
+
+T24396b.hs:12:6: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘D2’ (imported from T24396a):
+    Deprecated: "Data deprecation"
+
+T24396b.hs:14:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘D3’
+    (imported from T24396a):
+    Deprecated: "Both namespace deprecation"
+
+T24396b.hs:15:6: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘D3’ (imported from T24396a):
+    Deprecated: "Both namespace deprecation"
+
+T24396b.hs:17:7: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘C2’
+    (imported from T24396a):
+    "Type warning"
+
+T24396b.hs:18:6: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘C2’ (imported from T24396a):
+    "Data warning"
+
+T24396b.hs:20:7: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘D5’
+    (imported from T24396a):
+    "Type warning"
+
+T24396b.hs:21:6: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘D5’ (imported from T24396a):
+    "Data warning"
+
+T24396b.hs:23:7: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘D6’
+    (imported from T24396a):
+    "Both namespace warning"
+
+T24396b.hs:24:6: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘D6’ (imported from T24396a):
+    "Both namespace warning"
+
+T24396b.hs:26:14: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘$’
+    (imported from T24396a):
+    "Type operator warning"
+
+T24396b.hs:27:8: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘Solo’ (imported from GHC.Tuple):
+    Deprecated: "The Solo constructor has been renamed to MkSolo to avoid punning."
+
+T24396b.hs:27:13: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘$’ (imported from T24396a): "Value operator warning"

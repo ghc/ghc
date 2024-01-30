@@ -273,7 +273,7 @@ rnSrcWarnDecls _ []
 
 rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
-       ; mapM_ (\ dups -> let ((L loc rdr) :| (lrdr':_)) = dups
+       ; mapM_ (\ dups -> let ((L loc rdr) :| (lrdr':_)) = fmap snd dups
                           in addErrAt (locA loc) (TcRnDuplicateWarningDecls lrdr' rdr))
                warn_rdr_dups
        ; pairs_s <- mapM (addLocM rn_deprec) decls
@@ -283,9 +283,9 @@ rnSrcWarnDecls bndr_set decls'
 
    sig_ctxt = TopSigCtxt bndr_set
 
-   rn_deprec (Warning _ rdr_names txt)
+   rn_deprec (Warning (ns_spec, _) rdr_names txt)
        -- ensures that the names are defined locally
-     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
+     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what ns_spec . unLoc)
                                 rdr_names
           ; txt' <- rnWarningTxt txt
           ; return [(nameOccName nm, txt') | (_, nm) <- names] }
@@ -295,8 +295,13 @@ rnSrcWarnDecls bndr_set decls'
 
    what = text "deprecation"
 
-   warn_rdr_dups = findDupRdrNames
-                   $ concatMap (\(L _ (Warning _ ns _)) -> ns) decls
+   warn_rdr_dups = find_dup_warning_names
+                   $ concatMap (\(L _ (Warning (ns_spec, _) ns _)) -> (ns_spec,) <$> ns) decls
+
+   find_dup_warning_names :: [(NamespaceSpecifier, LocatedN RdrName)] -> [NonEmpty (NamespaceSpecifier, LocatedN RdrName)]
+   find_dup_warning_names = findDupsEq (\ (spec1, x) -> \ (spec2, y) ->
+                              overlappingNamespaceSpecifiers spec1 spec2 &&
+                              rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
 
 rnWarningTxt :: WarningTxt GhcPs -> RnM (WarningTxt GhcRn)
 rnWarningTxt (WarningTxt mb_cat st wst) = do
@@ -311,9 +316,6 @@ rnWarningTxt (DeprecatedTxt st wst) = do
 
 rnLWarningTxt :: LWarningTxt GhcPs -> RnM (LWarningTxt GhcRn)
 rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn
-
-findDupRdrNames :: [LocatedN RdrName] -> [NonEmpty (LocatedN RdrName)]
-findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
 
 -- look for duplicates among the OccNames;
 -- we check that the names are defined above

@@ -28,7 +28,7 @@ import GHC.Tuple.Prim
 
 default () -- Double and Integer aren't available yet
 
-{-# DEPRECATED Solo "The Solo constructor has been renamed to MkSolo to avoid punning." #-}
+{-# DEPRECATED data Solo "The Solo constructor has been renamed to MkSolo to avoid punning." #-}
 pattern Solo :: a -> Solo a
 pattern Solo x = MkSolo x
 {-# COMPLETE Solo #-}

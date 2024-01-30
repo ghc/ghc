@@ -2068,7 +2068,7 @@ lookupSigCtxtOccRn :: HsSigCtxt
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { let also_try_tycons = False
-       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name also_try_tycons
+       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name also_try_tycons NoNamespaceSpecifier
        ; case mb_names of
            Right name NE.:| rest ->
              do { massertPpr (null rest) $
@@ -2085,12 +2085,13 @@ lookupBindGroupOcc :: HsSigCtxt
                    -> Bool -- ^ if the 'RdrName' we are looking up is in
                            -- a value 'NameSpace', should we also look up
                            -- in the type constructor 'NameSpace'?
+                   -> NamespaceSpecifier
                    -> RnM (NE.NonEmpty (Either NotInScopeError Name))
 -- ^ Looks up the 'RdrName', expecting it to resolve to one of the
 -- bound names currently in scope. If not, return an appropriate error message.
 --
 -- See Note [Looking up signature names].
-lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns
+lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
   | Just n <- isExact_maybe rdr_name
   = do { mb_gre <- lookupExactOcc_either n
        ; return $ case mb_gre of
@@ -2105,24 +2106,27 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns
 
   | otherwise
   = case ctxt of
-      HsBootCtxt ns    -> lookup_top (`elemNameSet` ns)
-      TopSigCtxt ns    -> lookup_top (`elemNameSet` ns)
-      RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
+      HsBootCtxt ns    -> lookup_top (elem_name_set_with_namespace ns)
+      TopSigCtxt ns    -> lookup_top (elem_name_set_with_namespace ns)
+      RoleAnnotCtxt ns -> lookup_top (elem_name_set_with_namespace ns)
       LocalBindCtxt ns -> lookup_group ns
       ClsDeclCtxt  cls -> lookup_cls_op cls
       InstDeclCtxt ns  -> if uniqSetAny isUnboundName ns -- #16610
                           then return $ NE.singleton $ Right $ mkUnboundNameRdr rdr_name
-                          else lookup_top (`elemNameSet` ns)
+                          else lookup_top (elem_name_set_with_namespace ns)
   where
+    elem_name_set_with_namespace ns n = check_namespace n && (n `elemNameSet` ns)
 
-    ns = occNameSpace occ
+    check_namespace = coveredByNamespaceSpecifier ns_spec . nameNameSpace
+
+    namespace = occNameSpace occ
     occ = rdrNameOcc rdr_name
     relevant_gres =
       RelevantGREs
         { includeFieldSelectors = WantBoth
         , lookupVariablesForFields = True
         , lookupTyConsAsWell = also_try_tycon_ns }
-    ok_gre = greIsRelevant relevant_gres ns
+    ok_gre = greIsRelevant relevant_gres namespace
 
     finish err gre
       | ok_gre gre
@@ -2180,16 +2184,16 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns
 
 
 ---------------
-lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [(RdrName, Name)]
+lookupLocalTcNames :: HsSigCtxt -> SDoc -> NamespaceSpecifier -> RdrName -> RnM [(RdrName, Name)]
 -- GHC extension: look up both the tycon and data con or variable.
 -- Used for top-level fixity signatures and deprecations.
 -- Complain if neither is in scope.
 -- See Note [Fixity signature lookup]
-lookupLocalTcNames ctxt what rdr
+lookupLocalTcNames ctxt what ns_spec rdr
   = do { this_mod <- getModule
        ; let also_try_tycon_ns = True
        ; nms_eithers <- fmap (guard_builtin_syntax this_mod rdr) <$>
-                        lookupBindGroupOcc ctxt what rdr also_try_tycon_ns
+                        lookupBindGroupOcc ctxt what rdr also_try_tycon_ns ns_spec
        ; let (errs, names) = partitionEithers (NE.toList nms_eithers)
        ; when (null names) $
           addErr (head errs) -- Bleat about one only

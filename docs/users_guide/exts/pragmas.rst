@@ -241,6 +241,24 @@ Alternatively, warnings from all ``WARNING`` and ``DEPRECATED`` pragmas
 regardless of category can be suppressed with
 :ghc-flag:`-Wno-extended-warnings <-Wextended-warnings>`.
 
+When a deprecated name appears in both value and type namespaces (i.e. punning occurs)
+``WARNING`` and ``DEPRECATED`` pragmas will affect both: ::
+
+    {-# LANGUAGE PatternSynonyms #-}
+
+    data D = MkD
+    pattern D = MkD
+    {-# DEPRECATED D "This will deprecate both the type D and the pattern synonym D" #-}
+
+It is possible to specify the namespace of the name to be warned about
+or deprecated using ``type`` and ``data`` specifiers: ::
+
+    {-# LANGUAGE PatternSynonyms #-}
+
+    data D = MkD
+    pattern D = MkD
+    {-# DEPRECATED data D "This will deprecate only the pattern synonym D" #-}
+    {-# DEPRECATED type D "This will deprecate only the type D" #-}
 
 .. _minimal-pragma:
 
@@ -1119,5 +1137,3 @@ are written immediately after the ``instance`` keyword, like this:
 ::
 
     instance {-# OVERLAPPING #-} C t where ...
-
-
