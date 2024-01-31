@@ -1363,6 +1363,7 @@ recommended for everyday use!
 .. rts-flag::  -Dl  DEBUG: linker
 .. rts-flag::  -DL  DEBUG: linker (verbose); implies :rts-flag:`-Dl`
 .. rts-flag::  -Dm  DEBUG: stm
+.. rts-flag::  -Dn  DEBUG: non-moving garbage collector
 .. rts-flag::  -Dz  DEBUG: stack squeezing
 .. rts-flag::  -Dc  DEBUG: program coverage
 .. rts-flag::  -Dr  DEBUG: sparks
