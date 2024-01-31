@@ -792,7 +792,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
-             gen = Generated OtherExpansion SkipPmc
+             gen = Generated SkipPmc
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase PatSyn (nlHsVar scrutinee) $
@@ -941,7 +941,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
+    mk_mg body = mkMatchGroup (Generated SkipPmc) (noLocA [builder_match])
           where
             builder_args  = [L (l2l loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]

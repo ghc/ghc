@@ -933,7 +933,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     -- make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind = mkTopFunBind (Generated OtherExpansion SkipPmc) sel_lname alts
+    sel_bind = mkTopFunBind (Generated SkipPmc) sel_lname alts
       where
         alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                            [] unit_rhs]

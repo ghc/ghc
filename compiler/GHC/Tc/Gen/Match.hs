@@ -169,12 +169,15 @@ tcMatchLambda herald match res_ty
            | otherwise               = matchGroupArity match
 
     match_alt_checker
-           | isDoExpansionGenerated (mg_ext match)
+           | any (match_is_do_gen $ mg_ext match) (fmap unLoc $ unLoc (mg_alts match))
             -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`. Testcase: Typeable1
            = tcBodyNC -- NB: Do not add any error contexts
                       -- It has already been done
            | otherwise
            = tcBody
+
+    match_is_do_gen o m | (StmtCtxt (HsDoStmt{})) <- m_ctxt m = isGenerated o
+    match_is_do_gen _ _ = False
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 

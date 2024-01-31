@@ -1608,7 +1608,6 @@ data HsDoFlavour
   | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
   | ListComp
   | MonadComp
-  deriving (Eq, Data)
 
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of

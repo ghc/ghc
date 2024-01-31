@@ -780,7 +780,7 @@ genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup (Generated OtherExpansion SkipPmc) (wrapGenSpan ms)
+            , fun_matches = mkMatchGroup (Generated SkipPmc) (wrapGenSpan ms)
             , fun_ext = emptyNameSet
             }
 
@@ -798,7 +798,7 @@ genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         -> LHsExpr (GhcPass p)
 genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
   where
-    matches = mkMatchGroup (doExpansionOrigin doFlav)
+    matches = mkMatchGroup (Generated SkipPmc)
                            (wrapGenSpan [genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body])
     pats' = map (parenthesizePat appPrec) pats
 

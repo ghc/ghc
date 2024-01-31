@@ -40,7 +40,7 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-        isSimplePat, isPatSyn,
+        isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat,
@@ -702,10 +702,6 @@ isBoringHsPat = goL
          GhcTc -> case ext of
            CoPat _ pat _      -> go pat
            ExpansionPat _ pat -> go pat
-
-isPatSyn :: LPat GhcTc -> Bool
-isPatSyn (L _ (ConPat {pat_con = L _ (PatSynCon{})})) = True
-isPatSyn _ = False
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

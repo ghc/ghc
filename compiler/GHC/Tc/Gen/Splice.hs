@@ -1976,7 +1976,7 @@ lookupName is_type_name s
 getThSpliceOrigin :: TcM Origin
 getThSpliceOrigin = do
   warn <- goptM Opt_EnableThSpliceWarnings
-  if warn then return FromSource else return (Generated OtherExpansion SkipPmc)
+  if warn then return FromSource else return (Generated SkipPmc)
 
 getThing :: TH.Name -> TcM TcTyThing
 getThing th_name
