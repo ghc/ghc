@@ -1250,7 +1250,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
     , ([1,2],   Opt_DoCleverArgEtaExpansion) -- See Note [Eta expansion of arguments in CorePrep]
     , ([0,1,2], Opt_DoEtaReduction)          -- See Note [Eta-reduction in -O0]
-    , ([0,1,2], Opt_LlvmTBAA)
     , ([0,1,2], Opt_ProfManualCcs )
     , ([2], Opt_DictsStrict)
 
