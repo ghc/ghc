@@ -383,6 +383,7 @@ deriving instance Data (ApplicativeArg GhcRn)
 deriving instance Data (ApplicativeArg GhcTc)
 
 deriving instance Data HsArrowMatchContext
+deriving instance Data HsDoFlavour
 
 deriving instance Data fn => Data (HsStmtContext fn)
 deriving instance Data fn => Data (HsMatchContext fn)

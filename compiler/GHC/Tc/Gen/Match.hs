@@ -75,7 +75,7 @@ import GHC.Driver.DynFlags ( getDynFlags )
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( Arity, isDoExpansionGenerated )
+import GHC.Types.Basic( Arity, isGenerated )
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -153,7 +153,7 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
 
-    tc_body | isDoExpansionGenerated (mg_ext matches)
+    tc_body | isGenerated (mg_ext matches)
               -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
               -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
             = tcBodyNC -- NB: Do not add any error contexts

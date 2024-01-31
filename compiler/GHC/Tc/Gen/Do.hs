@@ -212,7 +212,7 @@ mk_failable_expr doFlav pat@(L loc _) expr fail_op =
 mk_fail_block :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
 mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
-      return $ HsLam noAnn LamSingle $ mkMatchGroup (doExpansionOrigin doFlav)     -- \
+      return $ HsLam noAnn LamCases $ mkMatchGroup (Generated SkipPmc)     -- \
                 (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e               --  pat -> expr
                              , fail_alt_case dflags pat fail_op      --  _   -> fail "fail pattern"
                              ])
@@ -470,6 +470,5 @@ It stores the original statement (with location) and the expanded expression
   However, the expansion lambda `(\p -> e2)` is special as it is generated from a `do`-stmt expansion
   and if a type checker error occurs in the pattern `p` (which is source generated), we need to say
   "in a pattern binding in a do block" and not "in the pattern of a lambda" (cf. Typeable1.hs).
-  We hence use a tag `GenReason` in `Ghc.Tc.Origin`. When typechecking a `HsLam` in `Tc.Gen.Expr.tcExpr`
-  the `match_ctxt` is set to a `StmtCtxt` if `GenOrigin` is a `DoExpansionOrigin`.
+  This warning is governed by `m_ctxt` stored in `Match` which is set to `StmtCtxt (HsDoStmt doFlav)` c.f.
 -}

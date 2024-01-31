@@ -635,9 +635,12 @@ addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
 addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches, mg_ext = ctxt }) = do
   let isOneOfMany = matchesOneOfMany matches
-      isDoExp     = isDoExpansionGenerated $ mg_origin ctxt
+      isDoExp     = any is_match_do_gen $ fmap unLoc matches
   matches' <- mapM (traverse (addTickMatch isOneOfMany is_lam isDoExp)) matches
   return $ mg { mg_alts = L l matches' }
+  where
+    is_match_do_gen m | StmtCtxt{} <- m_ctxt m = isGenerated (mg_origin ctxt)
+    is_match_do_gen _ = False
 
 addTickMatch :: Bool -> Bool -> Bool {-Is this Do Expansion-} ->  Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))

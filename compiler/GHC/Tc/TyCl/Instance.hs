@@ -2218,7 +2218,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                                       , tyConBinderForAllTyFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = L (noAnnSrcSpan loc)
-                    $ mkTopFunBind (Generated OtherExpansion SkipPmc) fn
+                    $ mkTopFunBind (Generated SkipPmc) fn
                         [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Filling in method body"

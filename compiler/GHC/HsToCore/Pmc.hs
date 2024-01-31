@@ -51,7 +51,7 @@ import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Pmc.Desugar
 import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
-import GHC.Types.Basic (Origin(..), isDoExpansionGenerated)
+import GHC.Types.Basic (Origin(..))
 import GHC.Core
 import GHC.Driver.DynFlags
 import GHC.Hs
@@ -68,7 +68,7 @@ import GHC.HsToCore.Monad
 import GHC.Data.Bag
 import GHC.Data.OrdList
 
-import Control.Monad (when, unless, forM_)
+import Control.Monad (when, forM_)
 import qualified Data.Semigroup as Semi
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
@@ -122,6 +122,7 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
     want_pmc (StmtCtxt stmt_ctxt) =
       case stmt_ctxt of
         PatGuard {} -> False
+        HsDoStmt {} -> False
         _           -> True
     want_pmc _ = False
 
@@ -132,7 +133,7 @@ pmcGRHSs
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info
-pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
+pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = mb_discard_warnings $ do
   let combined_loc = foldl1 combineSrcSpans (map getLocA grhss)
       ctxt = DsMatchContext hs_ctxt combined_loc
   !missing <- getLdiNablas
@@ -145,6 +146,14 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   tracePm "}: " (ppr (cr_uncov result))
   formatReportWarnings ReportGRHSs ctxt [] result
   return (ldiGRHSs (cr_ret result))
+  where
+    mb_discard_warnings
+      = if want_pmc hs_ctxt
+        then id
+        else discardWarningsDs
+    want_pmc mctxt | (StmtCtxt (HsDoStmt{})) <- mctxt
+                   = False
+                   | otherwise = True
 
 -- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
 -- with a 'Pat' and one or more 'GRHSs':
@@ -168,13 +177,13 @@ pmcMatches
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
-pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
+pmcMatches origin ctxt@(DsMatchContext match_ctxt _) vars matches = mb_discard_warnings $ {-# SCC "pmcMatches" #-} do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
   -- should be strict in @missing@ anyway!
   !missing <- getLdiNablas
   tracePm "pmcMatches {" $
-          hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
+          hang (vcat [ppr origin, ppr ctxt, ppr ctxt, ppr vars, text "Matches:"])
                2
                ((ppr matches) $$ (text "missing:" <+> ppr missing))
   case NE.nonEmpty matches of
@@ -192,10 +201,20 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
       result  <- {-# SCC "checkMatchGroup" #-}
                  unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
-      unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
-        ({-# SCC "formatReportWarnings" #-}
-        formatReportWarnings ReportMatchGroup ctxt vars result)
+      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
+  where
+    mb_discard_warnings
+      = if want_pmc match_ctxt
+        then id
+        else discardWarningsDs
+    -- We want to discard the warnings that may arise due to
+    -- compiler generated fail blocks for do-expansions and pattern synonyms
+    -- See. Note
+    want_pmc mctxt | (StmtCtxt (HsDoStmt{})) <- mctxt
+                   = False
+                   | otherwise = True
+
 
 {-
 Note [Detecting incomplete record selectors]
