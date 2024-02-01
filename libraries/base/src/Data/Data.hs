@@ -631,6 +631,8 @@ mkDataType str cs = DataType
                         }
 
 -- | Constructs a constructor
+--
+-- @since 4.16.0.0
 mkConstrTag :: DataType -> String -> Int -> [String] -> Fixity -> Constr
 mkConstrTag dt str idx fields fix =
         Constr
