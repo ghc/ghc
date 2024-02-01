@@ -1,4 +1,6 @@
 
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.CmmToAsm.X86.Regs (
         -- squeese functions for the graph allocator
@@ -23,6 +25,7 @@ module GHC.CmmToAsm.X86.Regs (
         instrClobberedRegs,
         allMachRegNos,
         classOfRealReg,
+        regsInClass
         showReg,
 
         -- machine specific
@@ -42,7 +45,11 @@ module GHC.CmmToAsm.X86.Regs (
         ripRel,
         allFPArgRegs,
 
-        allocatableRegs
+        allocatableRegs,
+
+        -- * Sets of 'RealReg's
+        RealRegSet,
+        insertRealRegSet
 )
 
 where
@@ -58,8 +65,19 @@ import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Utils.Panic
 import GHC.Platform
+import qualified GHC.Types.BitSet as BitSet
+import GHC.Utils.Outputable
 
 import qualified Data.Array as A
+
+newtype RealRegSet = RealRegSet (BitSet.BitSet 32)
+    deriving (Show, Outputable, Semigroup, Monoid)
+
+mkRealRegSetFromRegNos :: RegNo -> RealRegSet
+mkRealRegSetFromRegNos = RealRegSet . BitSet.fromList
+
+insertRealRegSet :: RealReg -> RealRegSet -> RealRegSet
+insertRealRegSet (RealRegSingle r) (RealRegSet rs) = RealRegSet $ BitSet.insert r rs
 
 -- | regSqueeze_class reg
 --      Calculate the maximum number of register colors that could be
@@ -68,7 +86,6 @@ import qualified Data.Array as A
 --
 {-# INLINE virtualRegSqueeze #-}
 virtualRegSqueeze :: RegClass -> VirtualReg -> Int
-
 virtualRegSqueeze cls vr
  = case cls of
         RcInteger
@@ -195,33 +212,39 @@ spRel platform n
 -- allocator.
 
 
-data Subplatform = SP_I386 | SP_X86_64
+data X86Platform = XP_i386 | XP_x86_64
 
+x86Platform :: Platform -> X86Platform
+x86Platform platform =
+  if target32Bit platform then XP_i386 else XP_x86_64
 
 firstxmm :: RegNo
 firstxmm  = 16
 
 --  on 32bit platformOSs, only the first 8 XMM/YMM/ZMM registers are available
-lastxmm :: Platform -> RegNo
-lastxmm platform
- | target32Bit platform = firstxmm + 7  -- xmm0 - xmmm7
- | otherwise            = firstxmm + 15 -- xmm0 -xmm15
+lastxmm :: X86Platform -> RegNo
+lastxmm XP_i386   = firstxmm + 7  -- xmm0 - xmm7
+lastxmm XP_x86_64 = firstxmm + 15 -- xmm0 - xmm15
 
-lastint :: Platform -> RegNo
-lastint platform
- | target32Bit platform = 7 -- not %r8..%r15
- | otherwise            = 15
+lastint :: X86Platform -> RegNo
+lastint XP_i386   = 7 -- not %r8..%r15
+lastint XP_x86_64 = 16
 
-intregnos :: Platform -> [RegNo]
-intregnos platform = [0 .. lastint platform]
+intregnos :: X86Platform -> RealRegSet
+intregnos platform = mkRealRegSetFromRegNos [0 .. lastint platform]
 
+xmmregnos :: X86Platform -> RealRegSet
+xmmregnos platform = mkRealRegSetFromRegNos [firstxmm  .. lastxmm platform]
 
+floatregnos :: X86Platform -> RealRegSet
+floatregnos = xmmregnos
 
-xmmregnos :: Platform -> [RegNo]
-xmmregnos platform = [firstxmm  .. lastxmm platform]
-
-floatregnos :: Platform -> [RegNo]
-floatregnos platform = xmmregnos platform
+regsInClass :: X86Platform -> RegClass -> RealRegSet
+regsInClass XP_i386   RcInteger = mkRealRegSetFromRegNos [ 0 .. lastint XP_i386 ]
+regsInClass XP_x86_64 RcInteger = mkRealRegSetFromRegNos [ 0 .. lastint XP_x86_64 ]
+regsInClass XP_i386   RcDouble  = mkRealRegSetFromRegNos [ lastint XP_i386+1 .. lastxmm XP_i386 ]
+regsInClass XP_x86_64 RcDouble  = mkRealRegSetFromRegNos [ lastint XP_x86_64+1 .. lastxmm XP_x86_64 ]
+regsInClass _         RcFloat   = mkRealRegSetFromRegNos []
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
@@ -230,12 +253,12 @@ argRegs :: RegNo -> [Reg]
 argRegs _       = panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
-allMachRegNos :: Platform -> [RegNo]
+allMachRegNos :: X86Platform -> [RegNo]
 allMachRegNos platform = intregnos platform ++ floatregnos platform
 
 -- | Take the class of a register.
 {-# INLINE classOfRealReg #-}
-classOfRealReg :: Platform -> RealReg -> RegClass
+classOfRealReg :: X86Platform -> RealReg -> RegClass
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
@@ -249,17 +272,17 @@ classOfRealReg platform reg
 
 -- | Get the name of the register with this number.
 -- NOTE: fixme, we dont track which "way" the XMM registers are used
-showReg :: Platform -> RegNo -> String
+showReg :: X86Platform -> RegNo -> String
 showReg platform n
-        | n >= firstxmm && n <= lastxmm  platform = "%xmm" ++ show (n-firstxmm)
-        | n >= 8   && n < firstxmm      = "%r" ++ show n
-        | otherwise      = regNames platform A.! n
+        | n >= firstxmm && n <= lastxmm platform = "%xmm" ++ show (n-firstxmm)
+        | n >= 8   && n < firstxmm               = "%r" ++ show n
+        | otherwise                              = regNames platform A.! n
 
-regNames :: Platform -> A.Array Int String
-regNames platform
-    = if target32Bit platform
-      then A.listArray (0,8) ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
-      else A.listArray (0,8) ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp"]
+regNames :: X86Platform -> A.Array Int String
+regNames XP_i386 =
+    A.listArray (0,8) ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
+regNames XP_x86_64 =
+    A.listArray (0,8) ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp"]
 
 
 
@@ -374,25 +397,22 @@ esp = rsp
 xmm :: RegNo -> Reg
 xmm n = regSingle (firstxmm+n)
 
-
-
-
 -- | these are the regs which we cannot assume stay alive over a C call.
-callClobberedRegs       :: Platform -> [Reg]
+callClobberedRegs :: Platform -> [Reg]
 -- caller-saves registers
 callClobberedRegs platform
- | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
+ | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos XP_i386)
  | platformOS platform == OSMinGW32
    = [rax,rcx,rdx,r8,r9,r10,r11]
    -- Only xmm0-5 are caller-saves registers on 64-bit windows.
    -- For details check the Win64 ABI:
    -- https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions
-   ++ map xmm [0  .. 5]
+   ++ map xmm [0 .. 5]
  | otherwise
     -- all xmm regs are caller-saves
     -- caller-saves registers
     = [rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11]
-   ++ map regSingle (floatregnos platform)
+   ++ map regSingle (floatregnos XP_x86_64)
 
 allArgRegs :: Platform -> [(Reg, Reg)]
 allArgRegs platform

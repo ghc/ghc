@@ -36,9 +36,11 @@ import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
 
 class Show freeRegs => FR freeRegs where
     frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
-    frGetFreeRegs :: Platform -> RegClass -> freeRegs -> [RealReg]
+    frRegsOfClass :: Platform -> RegClass -> freeRegs -> freeRegs
+    frGetFreeRegs :: freeRegs -> [RealReg]
     frInitFreeRegs :: Platform -> freeRegs
     frReleaseReg :: Platform -> RealReg -> freeRegs -> freeRegs
+
 
 instance FR X86.FreeRegs where
     frAllocateReg  = \_ -> X86.allocateReg

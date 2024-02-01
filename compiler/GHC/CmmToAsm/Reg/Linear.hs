@@ -744,9 +744,9 @@ clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
 
-        let gpRegs  = frGetFreeRegs platform RcInteger freeregs :: [RealReg]
-            fltRegs = frGetFreeRegs platform RcFloat   freeregs :: [RealReg]
-            dblRegs = frGetFreeRegs platform RcDouble  freeregs :: [RealReg]
+        let gpRegs  = frRegsOfClass platform RcInteger freeregs :: [RealReg]
+            fltRegs = frRegsOfClass platform RcFloat   freeregs :: [RealReg]
+            dblRegs = frRegsOfClass platform RcDouble  freeregs :: [RealReg]
 
         let extra_clobbered = [ r | r <- clobbered
                                   , r `elem` (gpRegs ++ fltRegs ++ dblRegs) ]

@@ -13,26 +13,26 @@ import GHC.Utils.Outputable
 
 import Data.Word
 
-newtype FreeRegs = FreeRegs Word64
+newtype FreeRegs = FreeRegs RealRegSet
     deriving (Show,Outputable)
 
 noFreeRegs :: FreeRegs
-noFreeRegs = FreeRegs 0
+noFreeRegs = FreeRegs mempty
 
 releaseReg :: RealReg -> FreeRegs -> FreeRegs
-releaseReg (RealRegSingle n) (FreeRegs f)
-        = FreeRegs (f .|. (1 `shiftL` n))
+releaseReg (RealRegSingle n) (FreeRegs f) =
+    FreeRegs $ insertRealRegSet n f
 
 initFreeRegs :: Platform -> FreeRegs
-initFreeRegs platform
-        = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
+initFreeRegs platform =
+    foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
-getFreeRegs platform cls (FreeRegs f) = go f 0
+getFreeRegs _platform cls (FreeRegs f) = go f 0
 
   where go 0 _ = []
         go n m
-          | n .&. 1 /= 0 && classOfRealReg platform (RealRegSingle m) == cls
+          | n .&. 1 /= 0 && classOfRealReg SP_x86_64 (RealRegSingle m) == cls
           = RealRegSingle m : (go (n `shiftR` 1) $! (m+1))
 
           | otherwise

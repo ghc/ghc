@@ -11,15 +11,14 @@ import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.Platform
 import GHC.Utils.Outputable
-import qualified GHC.Types.BitSet as BitSet
 
 import Data.Word
 
-newtype FreeRegs = FreeRegs (BitSet.BitSet 32)
+newtype FreeRegs = FreeRegs RealRegSet
     deriving (Show,Outputable)
 
 noFreeRegs :: FreeRegs
-noFreeRegs = FreeRegs BitSet.empty
+noFreeRegs = FreeRegs mempty
 
 releaseReg :: RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle n) (FreeRegs f)
@@ -32,12 +31,16 @@ initFreeRegs platform
 integerRegs :: FreeRegs
 integerRegs =
     FreeRegs $ BitSet.fromList
-    [ classOfRealReg platform (RealRegSingle m) == RcInteger
+    [ classOfRealReg (RealRegSingle m) == RcInteger
     | m <- [0..32]
     ]
 
-getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
-getFreeRegs platform cls (FreeRegs f) = BitSet. go f 0
+regsOfClass :: Platform -> RegClass -> FreeRegs -> FreeRegs
+regsOfClass platform rc (FreeRegs regs) =
+    FreeRegs $ regs `BitSet.intersection` regsInClass rc
+
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg] -- lazily
+getFreeRegs cls (FreeRegs f) = BitSet. go f 0
 
   where go 0 _ = []
         go n m

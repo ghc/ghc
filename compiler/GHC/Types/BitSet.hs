@@ -21,6 +21,7 @@ module GHC.Types.BitSet
     , fromList
     , toList
     , member
+    , insert
     , filter
     , union
     , difference
@@ -137,6 +138,12 @@ instance (HasBitSet n, KnownNat n) => Show (BitSet n) where
 instance (HasBitSet n, KnownNat n) => Outputable (BitSet n) where
     ppr = text . show
 
+instance (HasBitSet n, KnownNat n) => Semigroup (BitSet n) where
+    (<>) = union
+
+instance (HasBitSet n, KnownNat n) => Monoid (BitSet n) where
+    mempty = empty
+
 -- | Fold over all integers from @[0,n)@.
 foldN :: forall n a. KnownNat n
       => Proxy (n :: Nat) -> (Int -> a -> a) -> a -> a
@@ -145,6 +152,9 @@ foldN Proxy f x0 = foldr (.) id (map f [0 .. n-1]) x0
 
 empty :: HasBitSet n => BitSet n
 empty = BitSet zeroBits
+
+insert :: HasBitSet n => Int BitSet n -> BitSet n
+insert n (BitSet bs) = BitSet $ bit n .|. bs
 
 member :: HasBitSet n => Int -> BitSet n -> Bool
 member n (BitSet ws) = testBit ws n
