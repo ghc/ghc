@@ -78,6 +78,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
+import qualified GHC.Types.Unique.Map as UM
+
 import qualified GHC.Data.List.SetOps as ListSetOps
 
 import Data.Monoid
@@ -948,14 +950,32 @@ loadRetArgs free = do
   ids <- mapM (\(i,n,_b) -> (!! (n-1)) <$> genIdStackArgI i) free
   popSkipI 1 ids
 
+-- All identifiers referenced by the expression (does not traverse into nested functions)
+allVars :: JStgExpr -> [Ident]
+allVars (ValExpr v) = case v of
+  (JVar i) -> [i]
+  (JList xs) -> concatMap allVars xs
+  (JHash xs) -> concatMap (allVars . snd) (UM.nonDetUniqMapToList xs)
+  (JInt {})  -> []
+  (JDouble {}) -> []
+  (JStr {}) -> []
+  (JRegEx {}) -> []
+  (JBool {}) -> []
+  (JFunc is _s) -> is
+allVars (InfixExpr _op lh rh) = allVars lh ++ allVars rh
+allVars (ApplExpr f xs) = allVars f ++ concatMap allVars xs
+allVars (IfExpr c t e) = allVars c ++ allVars t ++ allVars e
+allVars (UOpExpr _op x) = allVars x
+allVars (SelExpr e _) = allVars e
+allVars (IdxExpr e i) = allVars e ++ allVars i
+
 -- | allocate multiple, possibly mutually recursive, closures
 allocDynAll :: Bool -> Maybe JStgStat -> [(Ident,JStgExpr,[JStgExpr],CostCentreStack)] -> G JStgStat
-{-
-XXX remove use of template and enable in-place init again
 allocDynAll haveDecl middle [(to,entry,free,cc)]
-  | isNothing middle && to `notElem` (free ^.. template) = do
+  | isNothing middle && to `notElem` concatMap allVars free = do
       ccs <- ccsVarJ cc
-      return $ allocDynamic s haveDecl to entry free ccs -}
+      s <- getSettings
+      return $ allocDynamic s (not haveDecl) to entry free ccs
 allocDynAll haveDecl middle cls = do
   settings <- getSettings
   let

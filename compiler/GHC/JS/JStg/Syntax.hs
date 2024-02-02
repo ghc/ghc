@@ -1,12 +1,9 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE BlockArguments #-}
@@ -265,6 +262,7 @@ data JVal
   | JInt     Integer                    -- ^ A BigInt
   | JStr     FastString                 -- ^ A String
   | JRegEx   FastString                 -- ^ A Regex
+  | JBool    Bool                       -- ^ A Boolean
   | JHash    (UniqMap FastString JStgExpr) -- ^ A JS HashMap: @{"foo": 0}@
   | JFunc    [Ident] JStgStat              -- ^ A function
   deriving (Eq, Typeable, Generic)
@@ -281,7 +279,7 @@ data Op
   | StrictNeqOp     -- ^ Strict InEquality      `!==`
   | GtOp            -- ^ Greater Than:          `>`
   | GeOp            -- ^ Greater Than or Equal: `>=`
-  | LtOp            -- ^ Less Than:             <
+  | LtOp            -- ^ Less Than:              <
   | LeOp            -- ^ Less Than or Equal:     <=
   | AddOp           -- ^ Addition:               +
   | SubOp           -- ^ Subtraction:            -

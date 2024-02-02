@@ -520,8 +520,9 @@ instance Binary Sat.JVal where
   put_ bh (Sat.JInt i)      = putByte bh 4 >> put_ bh i
   put_ bh (Sat.JStr xs)     = putByte bh 5 >> put_ bh xs
   put_ bh (Sat.JRegEx xs)   = putByte bh 6 >> put_ bh xs
-  put_ bh (Sat.JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m)
-  put_ bh (Sat.JFunc is s)  = putByte bh 8 >> put_ bh is >> put_ bh s
+  put_ bh (Sat.JBool b)     = putByte bh 7 >> put_ bh b
+  put_ bh (Sat.JHash m)     = putByte bh 8 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m)
+  put_ bh (Sat.JFunc is s)  = putByte bh 9 >> put_ bh is >> put_ bh s
   get bh = getByte bh >>= \case
     1 -> Sat.JVar    <$> get bh
     2 -> Sat.JList   <$> get bh
@@ -529,8 +530,9 @@ instance Binary Sat.JVal where
     4 -> Sat.JInt    <$> get bh
     5 -> Sat.JStr    <$> get bh
     6 -> Sat.JRegEx  <$> get bh
-    7 -> Sat.JHash . listToUniqMap <$> get bh
-    8 -> Sat.JFunc   <$> get bh <*> get bh
+    7 -> Sat.JBool   <$> get bh
+    8 -> Sat.JHash . listToUniqMap <$> get bh
+    9 -> Sat.JFunc   <$> get bh <*> get bh
     n -> error ("Binary get bh Sat.JVal: invalid tag: " ++ show n)
 
 instance Binary Ident where

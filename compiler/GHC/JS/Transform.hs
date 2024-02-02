@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -71,6 +70,7 @@ identsV = \case
   JInt{}       -> []
   JStr{}       -> []
   JRegEx{}     -> []
+  JBool{}      -> []
   JHash m      -> concatMap identsE (nonDetEltsUniqMap m)
   JFunc args s -> args ++ identsS s
 
@@ -119,6 +119,7 @@ jStgValToJS = \case
   JInt i    -> JS.JInt   i
   JStr s    -> JS.JStr   s
   JRegEx f  -> JS.JRegEx f
+  JBool b   -> JS.JBool  b
   JHash m   -> JS.JHash $ mapUniqMapM satHash m
     where
       satHash (i, x) = (i,) . (i,) $ jStgExprToJS x

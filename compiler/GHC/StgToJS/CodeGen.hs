@@ -135,15 +135,15 @@ genUnits m ss spt_entries foreign_stubs = do
         glbl <- State.gets gsGlobal
         staticInit <-
           initStaticPtrs spt_entries
-        let stat = ( jsOptimize .
-                     jStgStatToJS
+        let stat = ( jStgStatToJS
                    $ mconcat (reverse glbl) <> staticInit)
+        let opt_stat = jsOptimize stat
         let syms = [moduleGlobalSymbol m]
         let oi = ObjBlock
                   { oiSymbols  = syms
                   , oiClInfo   = []
                   , oiStatic   = []
-                  , oiStat     = stat
+                  , oiStat     = opt_stat
                   , oiRaw      = mempty
                   , oiFExports = []
                   , oiFImports = []
@@ -203,21 +203,16 @@ genUnits m ss spt_entries foreign_stubs = do
           bids <- identsForId bnd
           case bids of
             [(identFS -> b1t),(identFS -> b2t)] -> do
-              -- [e1,e2] <- genLit (MachStr str)
               emitStatic b1t (StaticUnboxed (StaticUnboxedString str)) Nothing
               emitStatic b2t (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
-              _extraTl   <- State.gets (ggsToplevelStats . gsGroup)
               si        <- State.gets (ggsStatic . gsGroup)
-              let body = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
-              let stat =  jsOptimize
-                          $ jStgStatToJS body
               let ids = [bnd]
               syms <- (\(identFS -> i) -> [i]) <$> identForId bnd
               let oi = ObjBlock
                         { oiSymbols  = syms
                         , oiClInfo   = []
                         , oiStatic   = si
-                        , oiStat     = stat
+                        , oiStat     = mempty
                         , oiRaw      = ""
                         , oiFExports = []
                         , oiFImports = []
@@ -247,15 +242,15 @@ genUnits m ss spt_entries foreign_stubs = do
           let allDeps  = collectIds unf decl
               topDeps  = collectTopIds decl
               required = hasExport decl
-              stat     = jsOptimize
-                         . jStgStatToJS
+              stat     = jStgStatToJS
                          $ mconcat (reverse extraTl) <> tl
+          let opt_stat = jsOptimize stat
           syms <- mapM (fmap (\(identFS -> i) -> i) . identForId) topDeps
           let oi = ObjBlock
                     { oiSymbols  = syms
                     , oiClInfo   = ci
                     , oiStatic   = si
-                    , oiStat     = stat
+                    , oiStat     = opt_stat
                     , oiRaw      = ""
                     , oiFExports = []
                     , oiFImports = fRefs

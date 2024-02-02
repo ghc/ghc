@@ -243,8 +243,10 @@ jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
       unless (lcNoRts lc_cfg) $ do
         jsm <- initJSM
         withFile (out </> "rts.js") WriteMode $ \h -> do
+          let opt = jsOptimize (runJSM jsm $ jStgStatToJS <$> rts cfg)
           void $
-            hPutJS (csPrettyRender cfg) h (jsOptimize $ runJSM jsm $ jStgStatToJS <$> rts cfg)
+            hPutJS (csPrettyRender cfg) h opt
+
 
       -- link user-provided JS files into lib.js
       (emcc_opts,lib_cc_objs) <- withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
@@ -580,12 +582,14 @@ renderModules h render_pretty mods = do
 
   -- modules themselves
   mod_sizes <- forM compacted_mods $ \m -> do
-    !mod_size <- fromIntegral <$> putJS (cmc_js_code m)
+
+    !mod_size <- fromIntegral <$> (putJS $ cmc_js_code m)
     let !mod_mod  = cmc_module m
     pure (mod_mod, mod_size)
 
   -- commoned up metadata
-  !meta_length <- fromIntegral <$> putJS (jsOptimize meta)
+  let meta_opt = jsOptimize meta
+  !meta_length <- fromIntegral <$> putJS meta_opt
 
   -- module exports
   mapM_ (B.hPut h . cmc_exports) compacted_mods

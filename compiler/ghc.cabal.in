@@ -578,6 +578,8 @@ Library
         GHC.JS.Ident
         GHC.JS.Make
         GHC.JS.Optimizer
+        GHC.JS.Opt.Expr
+        GHC.JS.Opt.Simple
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.JStg.Syntax

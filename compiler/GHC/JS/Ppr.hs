@@ -6,7 +6,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TypeApplications #-}
 
 -- For Outputable instances for JS syntax
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -236,6 +235,7 @@ defRenderJsV r = \case
     | otherwise -> integer i
   JStr   s -> pprStringLit s
   JRegEx s -> char '/' <> ftext s <> char '/'
+  JBool b -> text (if b then "true" else "false")
   JHash m
     | isNullUniqMap m  -> text "{}"
     | otherwise -> braceNest . foldl' (<+?>) empty . punctuate comma .

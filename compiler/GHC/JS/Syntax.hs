@@ -271,6 +271,7 @@ data JVal
   | JInt     Integer      -- ^ A BigInt
   | JStr     FastString   -- ^ A String
   | JRegEx   FastString   -- ^ A Regex
+  | JBool    Bool         -- ^ A Boolean
   | JHash    (UniqMap FastString JExpr) -- ^ A JS HashMap: @{"foo": 0}@
   | JFunc    [Ident] JStat             -- ^ A function
   deriving (Eq, Typeable, Generic)
@@ -344,8 +345,8 @@ var = Var . global
 
 -- | The JS literal 'true'
 true_ :: JExpr
-true_ = var "true"
+true_ = ValExpr (JBool True)
 
 -- | The JS literal 'false'
 false_ :: JExpr
-false_ = var "false"
+false_ = ValExpr (JBool False)

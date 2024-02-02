@@ -78,11 +78,13 @@ bignum_test_2 = BlockStat [FuncStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziI
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$rs") [])]))])]
 
 bignum_test_opt_2 :: JStat
-bignum_test_opt_2 = BlockStat [FuncStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (BlockStat [DeclStat (global $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
+bignum_test_opt_2 = BlockStat [
+  FuncStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (DeclStat (global $ fsLit "a")
               (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
                                                     , ApplStat (var $ fsLit "h$p1") [var $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99"]
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$e") [var $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e"])
-                                                    ]))])]
+                                                    ]))) ]
+
 
 main :: IO ()
 main = mapM_ print

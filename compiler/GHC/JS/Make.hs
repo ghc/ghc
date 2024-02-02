@@ -651,11 +651,11 @@ undefined_ = var "undefined"
 
 -- | The JS literal 'true'
 true_ :: JStgExpr
-true_ = var "true"
+true_ = ValExpr (JBool True)
 
 -- | The JS literal 'false'
 false_ :: JStgExpr
-false_ = var "false"
+false_ = ValExpr (JBool False)
 
 returnStack :: JStgStat
 returnStack = ReturnStat (ApplExpr (var "h$rs") [])

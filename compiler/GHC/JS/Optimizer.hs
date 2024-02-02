@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,6 +46,8 @@ import GHC.JS.Syntax
 
 import Control.Arrow
 
+import qualified GHC.JS.Opt.Simple as Simple
+
 {-
 Note [Unsafe JavaScript optimizations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,9 +87,12 @@ normally be unsafe.
 --                        Top level Driver
 --------------------------------------------------------------------------------
 jsOptimize :: JStat -> JStat
-jsOptimize = go
+jsOptimize s0 = jsOptimizeStat (Simple.simpleOpt s0)
+
+jsOptimizeStat :: JStat -> JStat
+jsOptimizeStat s0 = go s0
   where
-    p_opt = jsOptimize
+    p_opt = jsOptimizeStat
     opt   = jsOptimize'
     e_opt = jExprOptimize
     -- base case
@@ -147,7 +152,7 @@ jExprOptimize (InfixExpr op l r)  = InfixExpr op (jExprOptimize l) (jExprOptimiz
 -- | drive optimizations to anonymous functions and over expressions
 jValOptimize ::  JVal -> JVal
 -- base case
-jValOptimize (JFunc args body) = JFunc args (jsOptimize body)
+jValOptimize (JFunc args body) = JFunc args (jsOptimizeStat body)
 -- recursive cases
 jValOptimize (JList exprs)     = JList (jExprOptimize <$> exprs)
 jValOptimize (JHash hash)      = JHash (jExprOptimize <$> hash)
@@ -157,6 +162,7 @@ jValOptimize x@JDouble{}       = x
 jValOptimize x@JInt{}          = x
 jValOptimize x@JStr{}          = x
 jValOptimize x@JRegEx{}        = x
+jValOptimize x@JBool{}         = x
 
 -- | A block transformation is a function from a stream of syntax to another
 -- stream
@@ -193,11 +199,7 @@ tailLoop = BlockOpt $ \loop next -> \case
     -- this call to jsOptimize is required or else the optimizer will not
     -- properly recur down JStat. See the 'deadCodeElim' test for examples which
     -- were failing before this change
-    (x:xs) -> next (jsOptimize x : loop xs)
-
---------------------------------------------------------------------------------
---                        Single Slot Optimizations
---------------------------------------------------------------------------------
+    (x:xs) -> next (jsOptimizeStat x : loop xs)
 
 {- |
    Catch modify and assign operators:
@@ -212,9 +214,26 @@ tailLoop = BlockOpt $ \loop next -> \case
 -}
 combineOps :: BlockOpt
 combineOps = BlockOpt $ \loop next ->
-  \case
-    -- find a op pattern, and rerun the optimizer on its result unless there is
+    -- find an op pattern, and rerun the optimizer on its result unless there is
     -- nothing to optimize, in which case call the next optimization
+  \case
+    -- var x = expr; return x; ==> return expr;
+    (DeclStat i (Just e) : ReturnStat (ValExpr (JVar i')) : xs)
+      | i == i' -> loop $ ReturnStat e : xs
+
+    -- x = expr; return x; ==> return expr;
+    (AssignStat (ValExpr (JVar i)) AssignOp e : ReturnStat (ValExpr (JVar i')) : xs)
+      | i == i' -> loop $ ReturnStat e : xs
+
+    -- h$sp -= 2; h$sp += 5; ==> h$sp += 3;
+    (op1 : op2 : xs)
+      | Just s1 <- isStackAdjust op1
+      , Just s2 <- isStackAdjust op2 -> loop $ mkStackAdjust (s1 + s2) ++ xs
+
+    -- x = x + 1; ==> ++x;
+    -- x = x - 1; ==> --x;
+    -- x = x + n; ==> x += n;
+    -- x = x - n; ==> x -= n;
     (unchanged@(AssignStat
                   ident@(ValExpr (JVar i))
                   AssignOp
@@ -232,18 +251,13 @@ combineOps = BlockOpt $ \loop next ->
                   (InfixExpr op e (ValExpr (JVar i')))) : xs)
       | i == i' -> case (op, e) of
                      (AddOp, (ValExpr (JInt 1))) -> loop $ UOpStat PreIncOp ident          : xs
-                     (SubOp, (ValExpr (JInt 1))) -> loop $ UOpStat PreDecOp ident          : xs
                      (AddOp, e')                 -> loop $ AssignStat ident AddAssignOp e' : xs
-                     (SubOp, e')                 -> loop $ AssignStat ident SubAssignOp e' : xs
                      _                           -> next $ unchanged : xs
     -- general case, we had nothing to optimize in this case so call the next
     -- optimization
     xs -> next xs
 
 
---------------------------------------------------------------------------------
---                        Dual Slot Optimizations
---------------------------------------------------------------------------------
 -- | Catch 'var i; i = q;' ==> 'var i = q;'
 declareAssign :: BlockOpt
 declareAssign = BlockOpt $
@@ -268,3 +282,30 @@ flattenBlocks :: BlockTrans
 flattenBlocks (BlockStat y : ys) = flattenBlocks y ++ flattenBlocks ys
 flattenBlocks (x:xs)             = x : flattenBlocks xs
 flattenBlocks []                 = []
+
+-- | stack adjustments
+sp :: JExpr
+sp = ValExpr (JVar (TxtI "h$sp"))
+
+isStackAdjust :: JStat -> Maybe Integer
+isStackAdjust (UOpStat op (ValExpr (JVar (TxtI "h$sp"))))
+  | op == PreIncOp || op == PostIncOp = Just 1
+isStackAdjust (UOpStat op (ValExpr (JVar (TxtI "h$sp"))))
+  | op == PreDecOp || op == PostDecOp = Just (-1)
+isStackAdjust (AssignStat (ValExpr (JVar (TxtI "h$sp"))) op (ValExpr (JInt n)))
+  | op == AddAssignOp = Just n
+  | op == SubAssignOp = Just (-n)
+isStackAdjust (AssignStat (ValExpr (JVar (TxtI "h$sp"))) AssignOp (InfixExpr op (ValExpr (JVar (TxtI "h$sp"))) (ValExpr (JInt n))))
+  | op == AddOp = Just n
+  | op == SubOp = Just (-n)
+isStackAdjust (AssignStat (ValExpr (JVar (TxtI "h$sp"))) AssignOp (InfixExpr AddOp (ValExpr (JInt n)) (ValExpr (JVar (TxtI "h$sp")))))
+  = Just n
+isStackAdjust _ = Nothing
+
+mkStackAdjust :: Integer -> [JStat]
+mkStackAdjust 0 = []
+mkStackAdjust 1 = [UOpStat PostIncOp sp]
+mkStackAdjust (-1) = [UOpStat PostDecOp sp]
+mkStackAdjust x
+  | x < 0 = [AssignStat sp AssignOp (InfixExpr SubOp sp (ValExpr (JInt (-x))))]
+  | otherwise = [AssignStat sp AssignOp (InfixExpr AddOp sp (ValExpr (JInt x)))]
