@@ -4,8 +4,10 @@ fixity environment during renaming.
 -}
 
 module GHC.Rename.Fixity
-   ( MiniFixityEnv
+   ( MiniFixityEnv(..)
    , addLocalFixities
+   , lookupMiniFixityEnv
+   , emptyMiniFixityEnv
    , lookupFixityRn
    , lookupFixityRn_help
    , lookupFieldFixityRn
@@ -63,31 +65,60 @@ deprecation declarations, and lookup of names in GHCi.
 -}
 
 --------------------------------
-type MiniFixityEnv = FastStringEnv (Located Fixity)
-        -- Mini fixity env for the names we're about
-        -- to bind, in a single binding group
-        --
-        -- It is keyed by the *FastString*, not the *OccName*, because
-        -- the single fixity decl       infix 3 T
-        -- affects both the data constructor T and the type constructor T
-        --
-        -- We keep the location so that if we find
-        -- a duplicate, we can report it sensibly
+
+-- | Mini fixity env for the names we're about
+-- to bind, in a single binding group
+--
+-- It is keyed by the *FastString*, not the *OccName*, because
+-- the single fixity decl       @infix 3 T@
+-- affects both the data constructor T and the type constructor T
+--
+-- We keep the location so that if we find
+-- a duplicate, we can report it sensibly
+--
+-- Fixity declarations may influence names in a single namespace by using
+-- a type or data specifier, e.g. in:
+--
+-- >  data a :*: b = a :*: b
+-- >  infix 3 type :*:
+--
+-- To handle that correctly, MiniFixityEnv contains separate
+-- fields for type-level and data-level names.
+-- If no namespace specifier is provided, the declaration will
+-- populate both the type-level and data-level fields.
+data MiniFixityEnv = MFE
+  { mfe_data_level_names :: FastStringEnv (Located Fixity)
+  , mfe_type_level_names :: FastStringEnv (Located Fixity)
+  }
 
 --------------------------------
 -- Used for nested fixity decls to bind names along with their fixities.
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
 
 addLocalFixities :: MiniFixityEnv -> [Name] -> RnM a -> RnM a
-addLocalFixities mini_fix_env names thing_inside
+addLocalFixities env names thing_inside
   = extendFixityEnv (mapMaybe find_fixity names) thing_inside
   where
-    find_fixity name
-      = case lookupFsEnv mini_fix_env (occNameFS occ) of
+    find_fixity name = case lookupMiniFixityEnv env name of
           Just lfix -> Just (name, FixItem occ (unLoc lfix))
           Nothing   -> Nothing
       where
         occ = nameOccName name
+
+lookupMiniFixityEnv :: MiniFixityEnv -> Name -> Maybe (Located Fixity)
+lookupMiniFixityEnv MFE{mfe_data_level_names, mfe_type_level_names} name
+  | isValNameSpace namespace = find_fixity_in_env mfe_data_level_names name
+  | otherwise                = find_fixity_in_env mfe_type_level_names name
+  where
+    namespace = nameNameSpace name
+
+    find_fixity_in_env mini_fix_env name
+      = lookupFsEnv mini_fix_env (occNameFS occ)
+      where
+        occ = nameOccName name
+
+emptyMiniFixityEnv :: MiniFixityEnv
+emptyMiniFixityEnv = MFE emptyFsEnv emptyFsEnv
 
 {-
 --------------------------------

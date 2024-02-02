@@ -37,6 +37,7 @@ instance Binary TH.Pat
 instance Binary TH.ArgPat
 instance Binary TH.Exp
 instance Binary TH.Dec
+instance Binary TH.NamespaceSpecifier
 instance Binary TH.Overlap
 instance Binary TH.DerivClause
 instance Binary TH.DerivStrategy

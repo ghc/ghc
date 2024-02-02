@@ -509,13 +509,22 @@ forImpD cc s str n ty
       pure $ ForeignD (ImportF cc s str n ty')
 
 infixLD :: Quote m => Int -> Name -> m Dec
-infixLD prec nm = pure (InfixD (Fixity prec InfixL) nm)
+infixLD prec = infixLWithSpecD prec NoNamespaceSpecifier
 
 infixRD :: Quote m => Int -> Name -> m Dec
-infixRD prec nm = pure (InfixD (Fixity prec InfixR) nm)
+infixRD prec = infixRWithSpecD prec NoNamespaceSpecifier
 
 infixND :: Quote m => Int -> Name -> m Dec
-infixND prec nm = pure (InfixD (Fixity prec InfixN) nm)
+infixND prec = infixNWithSpecD prec NoNamespaceSpecifier
+
+infixLWithSpecD :: Quote m => Int -> NamespaceSpecifier -> Name -> m Dec
+infixLWithSpecD prec ns_spec nm = pure (InfixD (Fixity prec InfixL) ns_spec nm)
+
+infixRWithSpecD :: Quote m => Int -> NamespaceSpecifier -> Name -> m Dec
+infixRWithSpecD prec ns_spec nm = pure (InfixD (Fixity prec InfixR) ns_spec nm)
+
+infixNWithSpecD :: Quote m => Int -> NamespaceSpecifier -> Name -> m Dec
+infixNWithSpecD prec ns_spec nm = pure (InfixD (Fixity prec InfixN) ns_spec nm)
 
 defaultD :: Quote m => [m Type] -> m Dec
 defaultD tys = DefaultD <$> sequenceA tys
@@ -1092,7 +1101,7 @@ withDecDoc doc dec = do
     doc_loc (SigD n _)                                     = Just $ DeclDoc n
     doc_loc (ForeignD (ImportF _ _ _ n _))                 = Just $ DeclDoc n
     doc_loc (ForeignD (ExportF _ _ n _))                   = Just $ DeclDoc n
-    doc_loc (InfixD _ n)                                   = Just $ DeclDoc n
+    doc_loc (InfixD _ _ n)                                 = Just $ DeclDoc n
     doc_loc (DataFamilyD n _ _)                            = Just $ DeclDoc n
     doc_loc (OpenTypeFamilyD (TypeFamilyHead n _ _ _))     = Just $ DeclDoc n
     doc_loc (ClosedTypeFamilyD (TypeFamilyHead n _ _ _) _) = Just $ DeclDoc n

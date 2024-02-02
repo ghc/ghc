@@ -77,12 +77,18 @@ instance Ppr Info where
 ppr_sig :: Name -> Type -> Doc
 ppr_sig v ty = pprName' Applied v <+> dcolon <+> ppr ty
 
-pprFixity :: Name -> Fixity -> Doc
-pprFixity _ f | f == defaultFixity = empty
-pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> pprName' Infix v
+pprFixity :: Name -> Fixity -> NamespaceSpecifier -> Doc
+pprFixity _ f _ | f == defaultFixity = empty
+pprFixity v (Fixity i d) ns_spec
+  = ppr_fix d <+> int i <+> pprNamespaceSpecifier ns_spec <+> pprName' Infix v
     where ppr_fix InfixR = text "infixr"
           ppr_fix InfixL = text "infixl"
           ppr_fix InfixN = text "infix"
+
+pprNamespaceSpecifier :: NamespaceSpecifier -> Doc
+pprNamespaceSpecifier NoNamespaceSpecifier = empty
+pprNamespaceSpecifier TypeNamespaceSpecifier = text "type"
+pprNamespaceSpecifier DataNamespaceSpecifier = text "data"
 
 -- | Pretty prints a pattern synonym type signature
 pprPatSynSig :: Name -> PatSynType -> Doc
@@ -425,7 +431,7 @@ ppr_dec _ (InstanceD o ctxt i ds) =
 ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
 ppr_dec _ (KiSigD f k)  = text "type" <+> pprPrefixOcc f <+> dcolon <+> ppr k
 ppr_dec _ (ForeignD f)  = ppr f
-ppr_dec _ (InfixD fx n) = pprFixity n fx
+ppr_dec _ (InfixD fx ns_spec n) = pprFixity n fx ns_spec
 ppr_dec _ (DefaultD tys) =
         text "default" <+> parens (sep $ punctuate comma $ map ppr tys)
 ppr_dec _ (PragmaD p)   = ppr p

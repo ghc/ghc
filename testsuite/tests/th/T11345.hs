@@ -25,7 +25,7 @@ $(do gadtName   <- newName "GADT2"
                 , (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 ] (AppT (ConT gadtName) (ConT ''Int))
               ] []
-            , InfixD (Fixity 7 InfixR) infixName
+            , InfixD (Fixity 7 InfixR) NoNamespaceSpecifier infixName
             ])
 
 $(return [])

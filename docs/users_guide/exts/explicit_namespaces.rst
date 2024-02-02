@@ -49,3 +49,35 @@ keyword in patterns and expressions::
   r = f (type Integer) 10  -- in an expression
 
 This is used in conjunction with :extension:`RequiredTypeArguments`.
+
+When :extension:`ExplicitNamespaces` is enabled, it is possible to use the
+``type`` and ``data`` keywords to specify the namespace of the name used in
+a fixity signature or a ``WARNING``/``DEPRECATED`` pragma. This can be useful for disambiguating
+between names in different namespaces that may conflict with each other.
+
+Here is an example of using namespace specifiers to set different fixities for
+type-level and term-level operators: ::
+
+  type f $ a = f a
+  f $ a = f a
+
+  infixl 9 type $ -- type-level $ is left-associative with priority 9
+  infixr 0 data $ -- term-level $ is right-associative with priority 0
+
+Similarly, it can be used in pragmas to deprecate only one name in a namespace: ::
+
+  data Solo = MkSolo
+
+  pattern Solo = MkSolo
+  {-# DEPRECATED data Solo "Use `MkSolo` instead" #-}
+
+  type family Head xs where
+    Head (x : _) = x
+
+  pattern Head x <- (head -> x)
+
+  {-# WARNING in "x-partial" data Head "this is a partial type synonym" #-}
+
+It is considered bad practice to use a fixity signature, ``WARNING`` pragma, or
+``DEPRECATED`` pragma for a type-level name without an explicit ``type`` namespace, and
+doing so will become an error in a future version of GHC.

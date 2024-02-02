@@ -23,7 +23,7 @@ module GHC.Rename.Bind (
    -- Other bindings
    rnMethodBinds, renameSigs,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
-   makeMiniFixityEnv, MiniFixityEnv,
+   makeMiniFixityEnv, MiniFixityEnv, emptyMiniFixityEnv,
    HsSigCtxt(..),
 
    -- Utility for hs-boot files
@@ -686,28 +686,47 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
 
 makeMiniFixityEnv :: [LFixitySig GhcPs] -> RnM MiniFixityEnv
 
-makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
+makeMiniFixityEnv decls = foldlM add_one_sig emptyMiniFixityEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
-   add_one_sig env (L loc (FixitySig _ names fixity)) =
-     foldlM add_one env [ (locA loc,locA name_loc,name,fixity)
+   add_one_sig env (L loc (FixitySig ns_spec names fixity)) =
+     foldlM add_one env [ (locA loc,locA name_loc,name,fixity, ns_spec)
                         | L name_loc name <- names ]
 
-   add_one env (loc, name_loc, name,fixity) = do
+   add_one env (loc, name_loc, name, fixity, ns_spec) = do
      { -- this fixity decl is a duplicate iff
        -- the ReaderName's OccName's FastString is already in the env
        -- (we only need to check the local fix_env because
        --  definitions of non-local will be caught elsewhere)
        let { fs = occNameFS (rdrNameOcc name)
-           ; fix_item = L loc fixity };
+           ; fix_item = L loc fixity};
 
-       case lookupFsEnv env fs of
-         Nothing -> return $ extendFsEnv env fs fix_item
+       case search_for_dups ns_spec env fs of
+         Nothing -> return $ extend_mini_fixity_env ns_spec env fs fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $
              addErrAt name_loc (TcRnMultipleFixityDecls loc' name)
            ; return env}
      }
+   search_for_dups ns_spec MFE{mfe_data_level_names, mfe_type_level_names} fs
+    = case ns_spec of
+      NoNamespaceSpecifier -> case lookupFsEnv mfe_data_level_names fs of
+        -- We only need to find a single duplicate to emit an error about
+        -- multiple fixity decls. Therefore, if we find a duplicate in the
+        -- term-level namespace, then there is no need to look in the type-level namespace.
+        Nothing -> lookupFsEnv mfe_type_level_names fs
+        just_dup -> just_dup
+      TypeNamespaceSpecifier{} -> lookupFsEnv mfe_type_level_names fs
+      DataNamespaceSpecifier{} -> lookupFsEnv mfe_data_level_names fs
+
+   extend_mini_fixity_env ns_spec env@MFE{mfe_data_level_names, mfe_type_level_names} fs fix_item
+    = case ns_spec of
+      NoNamespaceSpecifier     -> MFE { mfe_data_level_names = (extendFsEnv mfe_data_level_names fs fix_item)
+                                      , mfe_type_level_names = (extendFsEnv mfe_type_level_names fs fix_item)}
+
+      TypeNamespaceSpecifier{} -> env { mfe_type_level_names = (extendFsEnv mfe_type_level_names fs fix_item)}
+
+      DataNamespaceSpecifier{} -> env { mfe_data_level_names = (extendFsEnv mfe_data_level_names fs fix_item)}
 
 
 -- | Multiplicity annotations are a simple wrapper around types. As such,
@@ -1379,16 +1398,19 @@ rnSrcFixityDecl sig_ctxt = rn_decl
         -- for con-like things; hence returning a list
         -- If neither are in scope, report an error; otherwise
         -- return a fixity sig for each (slightly odd)
-    rn_decl (FixitySig _ fnames fixity)
-      = do names <- concatMapM lookup_one fnames
-           return (FixitySig noExtField names fixity)
+    rn_decl sig@(FixitySig ns_spec fnames fixity)
+      = do unlessXOptM LangExt.ExplicitNamespaces $
+             when (ns_spec /= NoNamespaceSpecifier) $
+             addErr (TcRnNamespacedFixitySigWithoutFlag sig)
+           names <- concatMapM (lookup_one ns_spec) fnames
+           return (FixitySig ns_spec names fixity)
 
-    lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
-    lookup_one (L name_loc rdr_name)
+    lookup_one :: NamespaceSpecifier -> LocatedN RdrName -> RnM [LocatedN Name]
+    lookup_one ns_spec (L name_loc rdr_name)
       = setSrcSpanA name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
-        do names <- lookupLocalTcNames sig_ctxt what NoNamespaceSpecifier rdr_name
+        do names <- lookupLocalTcNames sig_ctxt what ns_spec rdr_name
            return [ L name_loc name | (_, name) <- names ]
     what = text "fixity signature"
 

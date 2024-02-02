@@ -781,15 +781,16 @@ repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig
 
 rep_fix_d :: SrcSpan -> FixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
+rep_fix_d loc (FixitySig ns_spec names (Fixity _ prec dir))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
-                        InfixL -> infixLDName
-                        InfixR -> infixRDName
-                        InfixN -> infixNDName
+                        InfixL -> infixLWithSpecDName
+                        InfixR -> infixRWithSpecDName
+                        InfixN -> infixNWithSpecDName
        ; let do_one name
               = do { MkC name' <- lookupLOcc name
-                   ; dec <- rep2 rep_fn [prec', name']
+                   ; MkC ns_spec' <- repNamespaceSpecifier ns_spec
+                   ; dec <- rep2 rep_fn [prec', ns_spec', name']
                    ; return (loc,dec) }
        ; mapM do_one names }
 
@@ -2676,6 +2677,12 @@ repOverlap mb =
   nothing = coreNothing overlapTyConName
   just    = coreJust overlapTyConName
 
+
+repNamespaceSpecifier :: NamespaceSpecifier -> MetaM (Core (TH.NamespaceSpecifier))
+repNamespaceSpecifier ns_spec = case ns_spec of
+  NoNamespaceSpecifier{} -> dataCon noNamespaceSpecifierDataConName
+  TypeNamespaceSpecifier{} -> dataCon typeNamespaceSpecifierDataConName
+  DataNamespaceSpecifier{} -> dataCon dataNamespaceSpecifierDataConName
 
 repClass :: Core (M TH.Cxt) -> Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
          -> Core [TH.FunDep] -> Core [(M TH.Dec)]

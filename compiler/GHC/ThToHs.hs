@@ -243,14 +243,19 @@ cvtDec (TH.KiSigD nm ki)
         ; let sig' = StandaloneKindSig noAnn nm' ki'
         ; returnJustLA $ Hs.KindSigD noExtField sig' }
 
-cvtDec (TH.InfixD fx nm)
+cvtDec (TH.InfixD fx th_ns_spec nm)
   -- Fixity signatures are allowed for variables, constructors, and types
   -- the renamer automatically looks for types during renaming, even when
   -- the RdrName says it's a variable or a constructor. So, just assume
   -- it's a variable or constructor and proceed.
   = do { nm' <- vcNameN nm
        ; returnJustLA (Hs.SigD noExtField (FixSig noAnn
-                                      (FixitySig noExtField [nm'] (cvtFixity fx)))) }
+                                      (FixitySig ns_spec [nm'] (cvtFixity fx)))) }
+  where
+    ns_spec = case th_ns_spec of
+      TH.NoNamespaceSpecifier -> Hs.NoNamespaceSpecifier
+      TH.TypeNamespaceSpecifier -> Hs.TypeNamespaceSpecifier noAnn
+      TH.DataNamespaceSpecifier -> Hs.DataNamespaceSpecifier noAnn
 
 cvtDec (TH.DefaultD tys)
   = do  { tys' <- traverse cvtType tys

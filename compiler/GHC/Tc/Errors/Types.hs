@@ -4209,6 +4209,14 @@ data TcRnMessage where
       a namespace specifier is used in {-# WARNING ... #-} or {-# DEPRECATED ... #-}
       pragmas without the -XExplicitNamespaces extension enabled
 
+      Example:
+
+        {-# LANGUAGE NoExplicitNamespaces #-}
+        f = id
+        {-# WARNING data f "some warning message" #-}
+
+      Test cases:
+        T24396c
   -}
   TcRnNamespacedWarningPragmaWithoutFlag :: WarnDecl GhcPs -> TcRnMessage
 
@@ -4239,6 +4247,21 @@ data TcRnMessage where
       Test cases: T17694b
   -}
   TcRnIllegalInvisibleTypePattern :: HsTyPat GhcPs -> TcRnMessage
+
+  {-| TcRnNamespacedFixitySigWithoutFlag is an error that occurs when
+      a namespace specifier is used in fixity signatures
+      without the -XExplicitNamespaces extension enabled
+
+      Example:
+
+        {-# LANGUAGE NoExplicitNamespaces #-}
+        f = const
+        infixl 7 data `f`
+
+      Test cases:
+        T14032c
+  -}
+  TcRnNamespacedFixitySigWithoutFlag :: FixitySig GhcPs -> TcRnMessage
 
   deriving Generic
 

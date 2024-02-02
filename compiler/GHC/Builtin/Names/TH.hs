@@ -82,7 +82,7 @@ templateHaskellNames = [
     defaultSigDName, defaultDName,
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
     dataInstDName, newtypeInstDName, tySynInstDName,
-    infixLDName, infixRDName, infixNDName,
+    infixLWithSpecDName, infixRWithSpecDName, infixNWithSpecDName,
     roleAnnotDName, patSynDName, patSynSigDName,
     implicitParamBindDName,
     -- Cxt
@@ -143,6 +143,9 @@ templateHaskellNames = [
     -- Overlap
     overlappableDataConName, overlappingDataConName, overlapsDataConName,
     incoherentDataConName,
+    -- NamespaceSpecifier
+    noNamespaceSpecifierDataConName, typeNamespaceSpecifierDataConName,
+    dataNamespaceSpecifierDataConName,
     -- DerivStrategy
     stockStrategyName, anyclassStrategyName,
     newtypeStrategyName, viaStrategyName,
@@ -388,9 +391,9 @@ funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName, classDNa
     pragAnnDName, pragSCCFunDName, pragSCCFunNamedDName,
     standaloneDerivWithStrategyDName, defaultSigDName, defaultDName,
     dataInstDName, newtypeInstDName, tySynInstDName, dataFamilyDName,
-    openTypeFamilyDName, closedTypeFamilyDName, infixLDName, infixRDName,
-    infixNDName, roleAnnotDName, patSynDName, patSynSigDName,
-    pragCompleteDName, implicitParamBindDName, pragOpaqueDName :: Name
+    openTypeFamilyDName, closedTypeFamilyDName, infixLWithSpecDName,
+    infixRWithSpecDName, infixNWithSpecDName, roleAnnotDName, patSynDName,
+    patSynSigDName, pragCompleteDName, implicitParamBindDName, pragOpaqueDName :: Name
 funDName                         = libFun (fsLit "funD")                         funDIdKey
 valDName                         = libFun (fsLit "valD")                         valDIdKey
 dataDName                        = libFun (fsLit "dataD")                        dataDIdKey
@@ -421,9 +424,9 @@ tySynInstDName                   = libFun (fsLit "tySynInstD")                  
 openTypeFamilyDName              = libFun (fsLit "openTypeFamilyD")              openTypeFamilyDIdKey
 closedTypeFamilyDName            = libFun (fsLit "closedTypeFamilyD")            closedTypeFamilyDIdKey
 dataFamilyDName                  = libFun (fsLit "dataFamilyD")                  dataFamilyDIdKey
-infixLDName                      = libFun (fsLit "infixLD")                      infixLDIdKey
-infixRDName                      = libFun (fsLit "infixRD")                      infixRDIdKey
-infixNDName                      = libFun (fsLit "infixND")                      infixNDIdKey
+infixLWithSpecDName              = libFun (fsLit "infixLWithSpecD")              infixLWithSpecDIdKey
+infixRWithSpecDName              = libFun (fsLit "infixRWithSpecD")              infixRWithSpecDIdKey
+infixNWithSpecDName              = libFun (fsLit "infixNWithSpecD")              infixNWithSpecDIdKey
 roleAnnotDName                   = libFun (fsLit "roleAnnotD")                   roleAnnotDIdKey
 patSynDName                      = libFun (fsLit "patSynD")                      patSynDIdKey
 patSynSigDName                   = libFun (fsLit "patSynSigD")                   patSynSigDIdKey
@@ -665,6 +668,17 @@ overlappingDataConName  = thCon (fsLit "Overlapping")  overlappingDataConKey
 overlapsDataConName     = thCon (fsLit "Overlaps")     overlapsDataConKey
 incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
 
+-- data NamespaceSpecifier = ...
+noNamespaceSpecifierDataConName,
+  typeNamespaceSpecifierDataConName,
+  dataNamespaceSpecifierDataConName :: Name
+noNamespaceSpecifierDataConName =
+  thCon (fsLit "NoNamespaceSpecifier") noNamespaceSpecifierDataConKey
+typeNamespaceSpecifierDataConName =
+  thCon (fsLit "TypeNamespaceSpecifier") typeNamespaceSpecifierDataConKey
+dataNamespaceSpecifierDataConName =
+  thCon (fsLit "DataNamespaceSpecifier") dataNamespaceSpecifierDataConKey
+
 {- *********************************************************************
 *                                                                      *
                      Class keys
@@ -773,6 +787,13 @@ overlappingDataConKey  = mkPreludeDataConUnique 210
 overlapsDataConKey     = mkPreludeDataConUnique 211
 incoherentDataConKey   = mkPreludeDataConUnique 212
 
+-- data NamespaceSpecifier = ...
+noNamespaceSpecifierDataConKey,
+  typeNamespaceSpecifierDataConKey,
+  dataNamespaceSpecifierDataConKey :: Unique
+noNamespaceSpecifierDataConKey = mkPreludeDataConUnique 213
+typeNamespaceSpecifierDataConKey = mkPreludeDataConUnique 214
+dataNamespaceSpecifierDataConKey = mkPreludeDataConUnique 215
 {- *********************************************************************
 *                                                                      *
                      Id keys
@@ -940,10 +961,10 @@ funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
     pragRuleDIdKey, pragAnnDIdKey, defaultSigDIdKey, dataFamilyDIdKey,
     openTypeFamilyDIdKey, closedTypeFamilyDIdKey, dataInstDIdKey,
     newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivWithStrategyDIdKey,
-    infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey, patSynDIdKey,
-    patSynSigDIdKey, pragCompleteDIdKey, implicitParamBindDIdKey,
-    kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey, typeDataDIdKey,
-    pragSCCFunDKey, pragSCCFunNamedDKey :: Unique
+    infixLWithSpecDIdKey, infixRWithSpecDIdKey, infixNWithSpecDIdKey,
+    roleAnnotDIdKey, patSynDIdKey, patSynSigDIdKey, pragCompleteDIdKey,
+    implicitParamBindDIdKey, kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey,
+    typeDataDIdKey, pragSCCFunDKey, pragSCCFunNamedDKey :: Unique
 funDIdKey                         = mkPreludeMiscIdUnique 320
 valDIdKey                         = mkPreludeMiscIdUnique 321
 dataDIdKey                        = mkPreludeMiscIdUnique 322
@@ -966,9 +987,9 @@ dataInstDIdKey                    = mkPreludeMiscIdUnique 338
 newtypeInstDIdKey                 = mkPreludeMiscIdUnique 339
 tySynInstDIdKey                   = mkPreludeMiscIdUnique 340
 closedTypeFamilyDIdKey            = mkPreludeMiscIdUnique 341
-infixLDIdKey                      = mkPreludeMiscIdUnique 342
-infixRDIdKey                      = mkPreludeMiscIdUnique 343
-infixNDIdKey                      = mkPreludeMiscIdUnique 344
+infixLWithSpecDIdKey              = mkPreludeMiscIdUnique 342
+infixRWithSpecDIdKey              = mkPreludeMiscIdUnique 343
+infixNWithSpecDIdKey              = mkPreludeMiscIdUnique 344
 roleAnnotDIdKey                   = mkPreludeMiscIdUnique 345
 standaloneDerivWithStrategyDIdKey = mkPreludeMiscIdUnique 346
 defaultSigDIdKey                  = mkPreludeMiscIdUnique 347

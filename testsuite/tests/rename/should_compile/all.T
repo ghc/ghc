@@ -221,3 +221,5 @@ test('ExportWarnings5', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_a
 test('ExportWarnings6', normal, compile, ['-Wincomplete-export-warnings'])
 test('T22478a', req_th, compile, [''])
 test('RecordWildCardDeprecation', normal, multimod_compile, ['RecordWildCardDeprecation', '-Wno-duplicate-exports'])
+test('T14032b', normal, compile_and_run, [''])
+test('T14032d', normal, compile, [''])
