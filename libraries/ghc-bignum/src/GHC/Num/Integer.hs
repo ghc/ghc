@@ -360,6 +360,24 @@ integerToNaturalThrow (IN _) = raiseUnderflow
 -- Predicates
 ---------------------------------------------------------------------
 
+{- Note [Bangs in Integer functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In this module some functions have banged arguments.  E.g.
+    integerNe !x !y = isTrue# (integerNe# x y)
+This will ensure that both argument are evaluated first, and then pattern
+matching takes place just a multi-way jump.
+
+In some cases (e.g. integerMul, integerSub) this actually makes the function
+strict when it would otherwise not be; but in other cases (e.g integerNe) the
+function is strict in both arguments anyway.  In the latter case it's a bit moot
+whether to have the bangs or not; so this Note just documents that there is no
+Deep Reason why they have to be there.  See Note Note [Case-to-let for
+strictly-used binders] in GHC.Core.Opt.Simplify.Iteration for discussion about
+evals on strictly-used binders.
+
+I have not pointed to this Note from every such use.  There are a lot of them!
+-}
+
 -- | Negative predicate
 integerIsNegative# :: Integer -> Bool#
 integerIsNegative# (IS i#) = i# <# 0#
@@ -369,6 +387,7 @@ integerIsNegative# (IN _)  = 1#
 -- | Negative predicate
 integerIsNegative :: Integer -> Bool
 integerIsNegative !i = isTrue# (integerIsNegative# i)
+   -- Note [Bangs in Integer functions]
 
 -- | Zero predicate
 integerIsZero :: Integer -> Bool
@@ -383,26 +402,32 @@ integerIsOne _       = False
 -- | Not-equal predicate.
 integerNe :: Integer -> Integer -> Bool
 integerNe !x !y = isTrue# (integerNe# x y)
+   -- Note [Bangs in Integer functions]
 
 -- | Equal predicate.
 integerEq :: Integer -> Integer -> Bool
 integerEq !x !y = isTrue# (integerEq# x y)
+   -- See Note [Bangs in Integer functions]
 
 -- | Lower-or-equal predicate.
 integerLe :: Integer -> Integer -> Bool
 integerLe !x !y = isTrue# (integerLe# x y)
+   -- See Note [Bangs in Integer functions]
 
 -- | Lower predicate.
 integerLt :: Integer -> Integer -> Bool
 integerLt !x !y = isTrue# (integerLt# x y)
+   -- See Note [Bangs in Integer functions]
 
 -- | Greater predicate.
 integerGt :: Integer -> Integer -> Bool
 integerGt !x !y = isTrue# (integerGt# x y)
+   -- See Note [Bangs in Integer functions]
 
 -- | Greater-or-equal predicate.
 integerGe :: Integer -> Integer -> Bool
 integerGe !x !y = isTrue# (integerGe# x y)
+   -- See Note [Bangs in Integer functions]
 
 -- | Equal predicate.
 integerEq# :: Integer -> Integer -> Bool#
@@ -473,7 +498,7 @@ instance Ord Integer where
 -- | Subtract one 'Integer' from another.
 integerSub :: Integer -> Integer -> Integer
 {-# NOINLINE integerSub #-}
-integerSub !x      (IS 0#) = x
+integerSub !x      (IS 0#) = x     -- Note [Bangs in Integer functions]
 integerSub (IS x#) (IS y#)
   = case subIntC# x# y# of
     (# z#, 0# #) -> IS z#
@@ -548,7 +573,7 @@ integerAdd (IP x) (IN y)
 -- | Multiply two 'Integer's
 integerMul :: Integer -> Integer -> Integer
 {-# NOINLINE integerMul #-}
-integerMul !_       (IS 0#)  = IS 0#
+integerMul !_       (IS 0#)  = IS 0#  -- Note [Bangs in Integer functions]
 integerMul (IS 0#)  _        = IS 0#
 integerMul x        (IS 1#)  = x
 integerMul (IS 1#)  y        = y
@@ -639,6 +664,7 @@ integerAbs n@(IS i)
 -- negative, zero, or positive, respectively
 integerSignum :: Integer -> Integer
 integerSignum !j = IS (integerSignum# j)
+     -- Note [Bangs in Integer functions]
 
 -- | Return @-1#@, @0#@, and @1#@ depending on whether argument is
 -- negative, zero, or positive, respectively
@@ -711,7 +737,7 @@ integerTestBit !i (W# n) = isTrue# (integerTestBit# i n)
 -- Fake 2's complement for negative values (might be slow)
 integerShiftR# :: Integer -> Word# -> Integer
 {-# NOINLINE integerShiftR# #-}
-integerShiftR# !x      0## = x
+integerShiftR# !x      0## = x   -- Note [Bangs in Integer functions]
 integerShiftR# (IS i)  n   = IS (iShiftRA# i (word2Int# n))
   where
     iShiftRA# a b
@@ -728,11 +754,12 @@ integerShiftR# (IN bn) n   =
 -- Fake 2's complement for negative values (might be slow)
 integerShiftR :: Integer -> Word -> Integer
 integerShiftR !x (W# w) = integerShiftR# x w
+   -- Note [Bangs in Integer functions]
 
 -- | Shift-left operation
 integerShiftL# :: Integer -> Word# -> Integer
 {-# NOINLINE integerShiftL# #-}
-integerShiftL# !x      0## = x
+integerShiftL# !x      0## = x  -- Note [Bangs in Integer functions]
 integerShiftL# (IS 0#) _   = IS 0#
 integerShiftL# (IS 1#) n   = integerBit# n
 integerShiftL# (IS i)  n
@@ -747,6 +774,7 @@ integerShiftL# (IN bn) n   = IN (bigNatShiftL# bn n)
 -- negative Integers is different from negative Int's behavior.
 integerShiftL :: Integer -> Word -> Integer
 integerShiftL !x (W# w) = integerShiftL# x w
+    -- Note [Bangs in Integer functions]
 
 -- | Bitwise OR operation
 --
@@ -913,7 +941,7 @@ integerComplement (IN x) = IP (bigNatSubWordUnsafe# x 1##)
 -- with a division-by-zero fault.
 integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
 {-# NOINLINE integerQuotRem# #-}
-integerQuotRem# !n      (IS 1#) = (# n, IS 0# #)
+integerQuotRem# !n      (IS 1#) = (# n, IS 0# #) -- Note [Bangs in Integer functions]
 integerQuotRem# !n     (IS -1#) = let !q = integerNegate n in (# q, (IS 0#) #)
 integerQuotRem# !_      (IS 0#) = case raiseDivZero of
                                     !_ -> (# IS 0#, IS 0# #)
@@ -951,12 +979,13 @@ integerQuotRem# n@(IS n#) (IP d) -- need to account for (IS minBound)
 -- with a division-by-zero fault.
 integerQuotRem :: Integer -> Integer -> (Integer, Integer)
 integerQuotRem !x !y = case integerQuotRem# x y of
-   (# q, r #) -> (q, r)
+  -- Note [Bangs in Integer functions]
+  (# q, r #) -> (q, r)
 
 
 integerQuot :: Integer -> Integer -> Integer
 {-# NOINLINE integerQuot #-}
-integerQuot !n      (IS 1#)  = n
+integerQuot !n      (IS 1#)  = n  -- Note [Bangs in Integer functions]
 integerQuot !n      (IS -1#) = integerNegate n
 integerQuot !_      (IS 0#)  = raiseDivZero
 integerQuot (IS 0#) _        = IS 0#
@@ -977,7 +1006,7 @@ integerQuot n d = case integerQuotRem# n d of (# q, _ #) -> q
 
 integerRem :: Integer -> Integer -> Integer
 {-# NOINLINE integerRem #-}
-integerRem !_       (IS 1#) = IS 0#
+integerRem !_       (IS 1#) = IS 0#   -- Note [Bangs in Integer functions]
 integerRem _       (IS -1#) = IS 0#
 integerRem _        (IS 0#) = IS (remInt# 0# 0#)
 integerRem (IS 0#) _        = IS 0#
@@ -999,7 +1028,7 @@ integerRem n d = case integerQuotRem# n d of (# _, r #) -> r
 -- with a division-by-zero fault.
 integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
 {-# NOINLINE integerDivMod# #-}
-integerDivMod# !n !d
+integerDivMod# !n !d    -- Note [Bangs in Integer functions]
   | isTrue# (integerSignum# r ==# negateInt# (integerSignum# d))
      = let !q' = integerSub q (IS 1#)
            !r' = integerAdd r d
@@ -1014,12 +1043,13 @@ integerDivMod# !n !d
 -- with a division-by-zero fault.
 integerDivMod :: Integer -> Integer -> (Integer, Integer)
 integerDivMod !n !d = case integerDivMod# n d of
+   -- Note [Bangs in Integer functions]
    (# q,r #) -> (q,r)
 
 
 integerDiv :: Integer -> Integer -> Integer
 {-# NOINLINE integerDiv #-}
-integerDiv !n !d
+integerDiv !n !d  -- Note [Bangs in Integer functions]
    -- same-sign ops can be handled by more efficient 'integerQuot'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerQuot n d
    | True = case integerDivMod# n d of (# q, _ #) -> q
@@ -1027,7 +1057,7 @@ integerDiv !n !d
 
 integerMod :: Integer -> Integer -> Integer
 {-# NOINLINE integerMod #-}
-integerMod !n !d
+integerMod !n !d  -- Note [Bangs in Integer functions]
    -- same-sign ops can be handled by more efficient 'integerRem'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerRem n d
    | True = case integerDivMod# n d of (# _, r #) -> r
