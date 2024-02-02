@@ -34,7 +34,6 @@
 [GHC-90355] is untested (constructor = PsErrLetInFunAppExpr)
 [GHC-01239] is untested (constructor = PsErrIfInFunAppExpr)
 [GHC-04807] is untested (constructor = PsErrProcInFunAppExpr)
-[GHC-33856] is untested (constructor = PsErrSuffixAT)
 [GHC-25078] is untested (constructor = PsErrPrecedenceOutOfRange)
 [GHC-18910] is untested (constructor = PsErrSemiColonsInCondCmd)
 [GHC-66418] is untested (constructor = PsErrParseErrorOnInput)

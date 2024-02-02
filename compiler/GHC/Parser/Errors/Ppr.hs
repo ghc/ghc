@@ -386,7 +386,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "primitive string literal must contain only characters <= \'\\xFF\'"
     PsErrSuffixAT
       -> mkSimpleDecorated $
-           text "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
+           text "The symbol '@' occurs as a suffix." $$
+           text "For an as-pattern, there must not be any whitespace surrounding '@'."
     PsErrPrecedenceOutOfRange i
       -> mkSimpleDecorated $ text "Precedence out of range: " <> int i
     PsErrSemiColonsInCondExpr c st t se e
