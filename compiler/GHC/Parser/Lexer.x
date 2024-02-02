@@ -1784,6 +1784,21 @@ qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
+
+errSuffixAt :: PsSpan -> P a
+errSuffixAt span = do
+    input <- getInput
+    failLocMsgP start (go input start) (\srcSpan -> mkPlainErrorMsgEnvelope srcSpan $ PsErrSuffixAT)
+  where
+    start = psRealLoc (psSpanStart span)
+    go inp loc
+      | Just (c, i) <- alexGetChar inp
+      , let next = advanceSrcLoc loc c =
+          if c == ' '
+          then go i next
+          else next
+      | otherwise = loc
+
 -- See Note [Whitespace-sensitive operator parsing]
 varsym :: OpWs -> Action
 varsym opws@OpWsPrefix = sym $ \span exts s ->
@@ -1817,7 +1832,7 @@ varsym opws@OpWsPrefix = sym $ \span exts s ->
          do { warnOperatorWhitespace opws span s
             ; return (ITvarsym s) }
 varsym opws@OpWsSuffix = sym $ \span _ s ->
-  if | s == fsLit "@" -> failMsgP (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc $ PsErrSuffixAT)
+  if | s == fsLit "@" -> errSuffixAt span
      | s == fsLit "." -> return ITdot
      | otherwise ->
          do { warnOperatorWhitespace opws span s
