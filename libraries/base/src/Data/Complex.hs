@@ -50,17 +50,41 @@ infix  6  :+
 -- -----------------------------------------------------------------------------
 -- The Complex type
 
--- | Complex numbers are an algebraic type.
+-- | A data type representing complex numbers.
 --
--- For a complex number @z@, @'abs' z@ is a number with the magnitude of @z@,
+-- You can read about complex numbers [on wikipedia](https://en.wikipedia.org/wiki/Complex_number).
+--
+-- In haskell, complex numbers are represented as @a :+ b@ which can be thought of
+-- as representing \(a + bi\). For a complex number @z@, @'abs' z@ is a number with the 'magnitude' of @z@,
 -- but oriented in the positive real direction, whereas @'signum' z@
--- has the phase of @z@, but unit magnitude.
---
--- The 'Foldable' and 'Traversable' instances traverse the real part first.
+-- has the 'phase' of @z@, but unit 'magnitude'.
+-- Apart from the loss of precision due to IEEE754 floating point numbers,
+-- it holds that @z == 'abs' z * 'signum' z@.
 --
 -- Note that `Complex`'s instances inherit the deficiencies from the type
 -- parameter's. For example, @Complex Float@'s 'Ord' instance has similar
 -- problems to `Float`'s.
+--
+-- As can be seen in the examples, the 'Foldable'
+-- and 'Traversable' instances traverse the real part first.
+--
+-- ==== __Examples__
+--
+-- >>> (5.0 :+ 2.5) + 6.5
+-- 11.5 :+ 2.5
+--
+-- >>> abs (1.0 :+ 1.0) - sqrt 2.0
+-- 0.0 :+ 0.0
+--
+-- >>> abs (signum (4.0 :+ 3.0))
+-- 1.0 :+ 0.0
+--
+-- >>> foldr (:) [] (1 :+ 2)
+-- [1,2]
+--
+-- >>> mapM print (1 :+ 2)
+-- 1
+-- 2
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
@@ -79,38 +103,113 @@ data Complex a
 -- Functions over Complex
 
 -- | Extracts the real part of a complex number.
+--
+-- ==== __Examples__
+--
+-- >>> realPart (5.0 :+ 3.0)
+-- 5.0
+--
+-- >>> realPart ((5.0 :+ 3.0) * (2.0 :+ 3.0))
+-- 1.0
 realPart :: Complex a -> a
 realPart (x :+ _) =  x
 
 -- | Extracts the imaginary part of a complex number.
+--
+-- ==== __Examples__
+--
+-- >>> imagPart (5.0 :+ 3.0)
+-- 3.0
+--
+-- >>> imagPart ((5.0 :+ 3.0) * (2.0 :+ 3.0))
+-- 21.0
 imagPart :: Complex a -> a
 imagPart (_ :+ y) =  y
 
--- | The conjugate of a complex number.
+-- | The 'conjugate' of a complex number.
+--
+-- prop> conjugate (conjugate x) = x
+--
+-- ==== __Examples__
+--
+-- >>> conjugate (3.0 :+ 3.0)
+-- 3.0 :+ (-3.0)
+--
+-- >>> conjugate ((3.0 :+ 3.0) * (2.0 :+ 2.0))
+-- 0.0 :+ (-12.0)
 {-# SPECIALISE conjugate :: Complex Double -> Complex Double #-}
 conjugate        :: Num a => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
 
--- | Form a complex number from polar components of magnitude and phase.
+-- | Form a complex number from 'polar' components of 'magnitude' and 'phase'.
+--
+-- ==== __Examples__
+--
+-- >>> mkPolar 1 (pi / 4)
+-- 0.7071067811865476 :+ 0.7071067811865475
+--
+-- >>> mkPolar 1 0
+-- 1.0 :+ 0.0
 {-# SPECIALISE mkPolar :: Double -> Double -> Complex Double #-}
 mkPolar          :: Floating a => a -> a -> Complex a
 mkPolar r theta  =  r * cos theta :+ r * sin theta
 
--- | @'cis' t@ is a complex value with magnitude @1@
--- and phase @t@ (modulo @2*'pi'@).
+-- | @'cis' t@ is a complex value with 'magnitude' @1@
+-- and 'phase' @t@ (modulo @2*'pi'@).
+--
+-- @
+-- 'cis' = 'mkPolar' 1
+-- @
+--
+-- ==== __Examples__
+--
+-- >>> cis 0
+-- 1.0 :+ 0.0
+--
+-- The following examples are not perfectly zero due to [IEEE 754](https://en.wikipedia.org/wiki/IEEE_754)
+--
+-- >>> cis pi
+-- (-1.0) :+ 1.2246467991473532e-16
+--
+-- >>> cis (4 * pi) - cis (2 * pi)
+-- 0.0 :+ (-2.4492935982947064e-16)
 {-# SPECIALISE cis :: Double -> Complex Double #-}
 cis              :: Floating a => a -> Complex a
 cis theta        =  cos theta :+ sin theta
 
 -- | The function 'polar' takes a complex number and
--- returns a (magnitude, phase) pair in canonical form:
--- the magnitude is non-negative, and the phase in the range @(-'pi', 'pi']@;
--- if the magnitude is zero, then so is the phase.
+-- returns a ('magnitude', 'phase') pair in canonical form:
+-- the 'magnitude' is non-negative, and the 'phase' in the range @(-'pi', 'pi']@;
+-- if the 'magnitude' is zero, then so is the 'phase'.
+--
+-- @'polar' z = ('magnitude' z, 'phase' z)@
+--
+-- ==== __Examples__
+--
+-- >>> polar (1.0 :+ 1.0)
+-- (1.4142135623730951,0.7853981633974483)
+--
+-- >>> polar ((-1.0) :+ 0.0)
+-- (1.0,3.141592653589793)
+--
+-- >>> polar (0.0 :+ 0.0)
+-- (0.0,0.0)
 {-# SPECIALISE polar :: Complex Double -> (Double,Double) #-}
 polar            :: (RealFloat a) => Complex a -> (a,a)
 polar z          =  (magnitude z, phase z)
 
--- | The non-negative magnitude of a complex number.
+-- | The non-negative 'magnitude' of a complex number.
+--
+-- ==== __Examples__
+--
+-- >>> magnitude (1.0 :+ 1.0)
+-- 1.4142135623730951
+--
+-- >>> magnitude (1.0 + 0.0)
+-- 1.0
+--
+-- >>> magnitude (0.0 :+ (-5.0))
+-- 5.0
 {-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
@@ -119,8 +218,16 @@ magnitude (x:+y) =  scaleFloat k
                           mk = - k
                           sqr z = z * z
 
--- | The phase of a complex number, in the range @(-'pi', 'pi']@.
--- If the magnitude is zero, then so is the phase.
+-- | The 'phase' of a complex number, in the range @(-'pi', 'pi']@.
+-- If the 'magnitude' is zero, then so is the 'phase'.
+--
+-- ==== __Examples__
+--
+-- >>> phase (0.5 :+ 0.5) / pi
+-- 0.25
+--
+-- >>> phase (0 :+ 4) / pi
+-- 0.5
 {-# SPECIALISE phase :: Complex Double -> Double #-}
 phase :: (RealFloat a) => Complex a -> a
 phase (0 :+ 0)   = 0            -- SLPJ July 97 from John Peterson
