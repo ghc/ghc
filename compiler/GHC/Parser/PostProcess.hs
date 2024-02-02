@@ -3060,6 +3060,7 @@ instance MonadP PV where
       let b = ext `xtest` pExtsBitmap (pv_options ctx) in
       PV_Ok acc $! b
   allocateCommentsP ss = PV $ \_ s ->
+    if null (pv_comment_q s) then PV_Ok s emptyComments else  -- fast path
     let (comment_q', newAnns) = allocateComments ss (pv_comment_q s) in
       PV_Ok s {
          pv_comment_q = comment_q'

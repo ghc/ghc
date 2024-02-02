@@ -3235,6 +3235,7 @@ instance MonadP P where
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
   allocateCommentsP ss = P $ \s ->
+    if null (comment_q s) then POk s emptyComments else  -- fast path
     let (comment_q', newAnns) = allocateComments ss (comment_q s) in
       POk s {
          comment_q = comment_q'
