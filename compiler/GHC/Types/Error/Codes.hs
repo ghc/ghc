@@ -603,6 +603,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNamespacedWarningPragmaWithoutFlag"        = 14995
   GhcDiagnosticCode "TcRnInvisPatWithNoForAll"                      = 14964
   GhcDiagnosticCode "TcRnIllegalInvisibleTypePattern"               = 78249
+  GhcDiagnosticCode "TcRnNamespacedFixitySigWithoutFlag"            = 78534
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

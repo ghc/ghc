@@ -294,7 +294,7 @@ renameDeriv inst_infos bagBinds
         -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
         -- auxiliary bindings as if they were defined locally.
         -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-        ; (bndrs, rn_aux_lhs) <- rnLocalValBindsLHS emptyFsEnv aux_val_binds
+        ; (bndrs, rn_aux_lhs) <- rnLocalValBindsLHS emptyMiniFixityEnv aux_val_binds
         ; bindLocalNames bndrs $
     do  { (rn_aux, dus_aux) <- rnLocalValBindsRHS (mkNameSet bndrs) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos

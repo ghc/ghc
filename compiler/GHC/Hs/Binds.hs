@@ -54,6 +54,7 @@ import GHC.Types.Name
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc ((<||>))
 
 import Data.Function
 import Data.List (sortBy)
@@ -719,8 +720,51 @@ type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
 type instance XXSig             GhcTc = IdSig
 
-type instance XFixitySig  (GhcPass p) = NoExtField
+type instance XFixitySig  GhcPs = NamespaceSpecifier
+type instance XFixitySig  GhcRn = NamespaceSpecifier
+type instance XFixitySig  GhcTc = NoExtField
 type instance XXFixitySig (GhcPass p) = DataConCantHappen
+
+-- | Optional namespace specifier for fixity signatures,
+--  WARNINIG and DEPRECATED pragmas.
+--
+-- Examples:
+--
+--   {-# WARNING in "x-partial" data Head "don't use this pattern synonym" #-}
+--                            -- ↑ DataNamespaceSpecifier
+--
+--   {-# DEPRECATED type D "This type was deprecated" #-}
+--                -- ↑ TypeNamespaceSpecifier
+--
+--   infixr 6 data $
+--          -- ↑ DataNamespaceSpecifier
+data NamespaceSpecifier
+  = NoNamespaceSpecifier
+  | TypeNamespaceSpecifier (EpToken "type")
+  | DataNamespaceSpecifier (EpToken "data")
+  deriving (Eq, Data)
+
+-- | Check if namespace specifiers overlap, i.e. if they are equal or
+-- if at least one of them doesn't specify a namespace
+overlappingNamespaceSpecifiers :: NamespaceSpecifier -> NamespaceSpecifier -> Bool
+overlappingNamespaceSpecifiers NoNamespaceSpecifier _ = True
+overlappingNamespaceSpecifiers _ NoNamespaceSpecifier = True
+overlappingNamespaceSpecifiers TypeNamespaceSpecifier{} TypeNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers DataNamespaceSpecifier{} DataNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers _ _ = False
+
+-- | Check if namespace is covered by a namespace specifier:
+--     * NoNamespaceSpecifier covers both namespaces
+--     * TypeNamespaceSpecifier covers the type namespace only
+--     * DataNamespaceSpecifier covers the data namespace only
+coveredByNamespaceSpecifier :: NamespaceSpecifier -> NameSpace -> Bool
+coveredByNamespaceSpecifier NoNamespaceSpecifier = const True
+coveredByNamespaceSpecifier TypeNamespaceSpecifier{} = isTcClsNameSpace <||> isTvNameSpace
+coveredByNamespaceSpecifier DataNamespaceSpecifier{} = isValNameSpace
+instance Outputable NamespaceSpecifier where
+  ppr NoNamespaceSpecifier = empty
+  ppr TypeNamespaceSpecifier{} = text "type"
+  ppr DataNamespaceSpecifier{} = text "data"
 
 -- | A type signature in generated code, notably the code
 -- generated for record selectors. We simply record the desired Id

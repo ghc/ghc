@@ -80,7 +80,8 @@ module Language.Haskell.TH(
         Bang(..), Strict, Foreign(..), Callconv(..), Safety(..), Pragma(..),
         Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
         FunDep(..), TySynEqn(..), TypeFamilyHead(..),
-        Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
+        Fixity(..), FixityDirection(..), NamespaceSpecifier(..), defaultFixity,
+        maxPrecedence,
         PatSynDir(..), PatSynArgs(..),
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),

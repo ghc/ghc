@@ -1905,6 +1905,12 @@ instance Diagnostic TcRnMessage where
     TcRnInvisPatWithNoForAll tp -> mkSimpleDecorated $
       text "Invisible type pattern" <+> ppr tp <+> text "has no associated forall"
 
+    TcRnNamespacedFixitySigWithoutFlag sig@(FixitySig kw _ _) -> mkSimpleDecorated $
+      vcat [ text "Illegal use of the" <+> quotes (ppr kw) <+> text "keyword:"
+           , nest 2 (ppr sig)
+           , text "in a fixity signature"
+           ]
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2534,6 +2540,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalInvisibleTypePattern{}
       -> ErrorWithoutFlag
     TcRnInvisPatWithNoForAll{}
+      -> ErrorWithoutFlag
+    TcRnNamespacedFixitySigWithoutFlag{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3199,6 +3207,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeAbstractions]
     TcRnInvisPatWithNoForAll{}
       -> noHints
+    TcRnNamespacedFixitySigWithoutFlag{}
+      -> [suggestExtension LangExt.ExplicitNamespaces]
 
   diagnosticCode = constructorCode
 

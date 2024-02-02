@@ -81,9 +81,8 @@ module GHC.Hs.Decls (
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
-  WarnDecl(..), NamespaceSpecifier(..), LWarnDecl,
+  WarnDecl(..), LWarnDecl,
   WarnDecls(..), LWarnDecls,
-  overlappingNamespaceSpecifiers, coveredByNamespaceSpecifier,
   -- ** Annotations
   AnnDecl(..), LAnnDecl,
   AnnProvenance(..), annProvenanceName_maybe,
@@ -121,7 +120,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
 -- others:
-import GHC.Utils.Misc (count, (<||>))
+import GHC.Utils.Misc (count)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -1284,27 +1283,6 @@ type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 type instance XWarning      (GhcPass _) = (NamespaceSpecifier, [AddEpAnn])
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
-data NamespaceSpecifier
-  = NoNamespaceSpecifier
-  | TypeNamespaceSpecifier (EpToken "type")
-  | DataNamespaceSpecifier (EpToken "data")
-  deriving (Eq, Data)
-
-overlappingNamespaceSpecifiers :: NamespaceSpecifier -> NamespaceSpecifier -> Bool
-overlappingNamespaceSpecifiers NoNamespaceSpecifier _ = True
-overlappingNamespaceSpecifiers _ NoNamespaceSpecifier = True
-overlappingNamespaceSpecifiers TypeNamespaceSpecifier{} TypeNamespaceSpecifier{} = True
-overlappingNamespaceSpecifiers DataNamespaceSpecifier{} DataNamespaceSpecifier{} = True
-overlappingNamespaceSpecifiers _ _ = False
-
-coveredByNamespaceSpecifier :: NamespaceSpecifier -> NameSpace -> Bool
-coveredByNamespaceSpecifier NoNamespaceSpecifier = const True
-coveredByNamespaceSpecifier TypeNamespaceSpecifier{} = isTcClsNameSpace <||> isTvNameSpace
-coveredByNamespaceSpecifier DataNamespaceSpecifier{} = isValNameSpace
-instance Outputable NamespaceSpecifier where
-  ppr NoNamespaceSpecifier = empty
-  ppr TypeNamespaceSpecifier{} = text "type"
-  ppr DataNamespaceSpecifier{} = text "data"
 
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where

@@ -2455,7 +2455,8 @@ data Dec
   | ForeignD Foreign              -- ^ @{ foreign import ... }
                                   --{ foreign export ... }@
 
-  | InfixD Fixity Name            -- ^ @{ infix 3 foo }@
+  | InfixD Fixity NamespaceSpecifier Name
+                                  -- ^ @{ infix 3 data foo }@
   | DefaultD [Type]               -- ^ @{ default (Integer, Double) }@
 
   -- | pragmas
@@ -2510,6 +2511,18 @@ data Dec
       --
       -- Implicit parameter binding declaration. Can only be used in let
       -- and where clauses which consist entirely of implicit bindings.
+  deriving( Show, Eq, Ord, Data, Generic )
+
+-- | A way to specify a namespace to look in when GHC needs to find
+--   a name's source
+data NamespaceSpecifier
+  = NoNamespaceSpecifier   -- ^ Name may be everything; If there are two
+                           --   names in different namespaces, then consider both
+  | TypeNamespaceSpecifier -- ^ Name should be a type-level entity, such as a
+                           --   data type, type alias, type family, type class,
+                           --   or type variable
+  | DataNamespaceSpecifier -- ^ Name should be a term-level entity, such as a
+                           --   function, data constructor, or pattern synonym
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | Varieties of allowed instance overlap.

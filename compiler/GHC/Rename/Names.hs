@@ -711,7 +711,7 @@ extendGlobalRdrEnvRn new_gres new_fixities
 
     -- If there is a fixity decl for the gre, add it to the fixity env
     extend_fix_env fix_env gre
-      | Just (L _ fi) <- lookupFsEnv new_fixities (occNameFS occ)
+      | Just (L _ fi) <- lookupMiniFixityEnv new_fixities name
       = extendNameEnv fix_env name (FixItem occ fi)
       | otherwise
       = fix_env

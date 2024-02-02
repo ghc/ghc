@@ -76,7 +76,13 @@ Language
 - GHC Proposal `#65 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0065-type-infix.rst>`_
   "Require namespacing fixity declarations for type names and WARNING/DEPRECATED pragmas" has been partially implemented.
   Now, with :extension:`ExplicitNamespaces` enabled, you can specify the
-  namespace of a name that you want to warn about or deprecate: ::
+  namespace of a name in fixity signatures, ``DEPRECATED`` and ``WARNING`` pragmas: ::
+
+    type f $ a = f a
+    f $ a = f a
+
+    infixl 9 type $ -- type-level $ is left-associative with priority 9
+    infixr 0 data $ -- term-level $ is right-associative with priority 0
 
     {-# DEPRECATED type D "Use `()` instead" #-} -- this will deprecate type D, but will not touch pattern synonym
     data D = MkD
@@ -84,7 +90,9 @@ Language
     {-# DEPRECATED data D "Use `MkD` instead" #-} -- this will deprecate pattern synonym only
     pattern D = MkD
 
-  Ditto for ``{-# WARNING ... #-}`` pragmas.
+    pattern Head x <- (head -> x)
+    {-# WARNING in "x-partial" data Head [ "This is a partial synonym,"
+                                         , "it throws an error on empty lists."] #-}
 
 Compiler
 ~~~~~~~~

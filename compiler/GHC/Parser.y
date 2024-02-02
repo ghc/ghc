@@ -2616,8 +2616,8 @@ sigdecl :: { LHsDecl GhcPs }
                                       (mkHsWildCardBndrs $5)
                  ; amsA' (sLL $1 $> $ SigD noExtField sig ) }}
 
-        | infix prec ops
-             {% do { mbPrecAnn <- traverse (\l2 -> do { checkPrecP l2 $3
+        | infix prec namespace_spec ops
+             {% do { mbPrecAnn <- traverse (\l2 -> do { checkPrecP l2 $4
                                                       ; pure (mj AnnVal l2) })
                                        $2
                    ; let (fixText, fixPrec) = case $2 of
@@ -2626,7 +2626,7 @@ sigdecl :: { LHsDecl GhcPs }
                                                 Nothing -> (NoSourceText, maxPrecedence)
                                                 Just l2 -> (fst $ unLoc l2, snd $ unLoc l2)
                    ; amsA' (sLL $1 $> $ SigD noExtField
-                            (FixSig (mj AnnInfix $1 : maybeToList mbPrecAnn) (FixitySig noExtField (fromOL $ unLoc $3)
+                            (FixSig (mj AnnInfix $1 : maybeToList mbPrecAnn) (FixitySig (unLoc $3) (fromOL $ unLoc $4)
                                     (Fixity fixText fixPrec (unLoc $1)))))
                    }}
 

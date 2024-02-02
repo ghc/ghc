@@ -16,6 +16,14 @@
     introduced new type alias `ArgPatQ`. Added new function `pprArgPat`. Constructors
     `Clause` and `LamE`, now use `ArgPat` instead of `Pat`. New functions `clauseArg` and `lamArgE` were added, both of which accept `[m ArgPat]`. (Ghc Proposal #448).
 
+  * Add a new data type `NamespaceSpecifier` to represent `type`/`data` namespace specifiers,
+    which can be used in conjunction with the `ExplicitNamespaces` extension:
+
+    * The `InfixD` constructor of the `Dec` data type now stores a `NamespaceSpecifier`.
+
+    * Add `infixLWithSpecD`, `infixRWithSpecD` and `infixNWithSpecD` functions, which
+      accept a `NamespaceSpecifier` as an argument.
+
 ## 2.21.0.0
 
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of
