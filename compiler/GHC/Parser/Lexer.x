@@ -2182,14 +2182,25 @@ lex_string_prag_comment mkTok span _buf _len _buf2
 
 lex_string_tok :: Action
 lex_string_tok span buf _len _buf2 = do
-  lexed <- lex_string
-  (AI end bufEnd) <- getInput
-  let
-    tok = case lexed of
-      LexedPrimString s -> ITprimstring (SourceText src) (unsafeMkByteString s)
-      LexedRegularString s -> ITstring (SourceText src) (mkFastString s)
-    src = lexemeToFastString buf (cur bufEnd - cur buf)
-  return $ L (mkPsSpan (psSpanStart span) end) tok
+  s <- lex_string
+
+  i <- getInput
+  lex_magic_hash i >>= \case
+    Just i' -> do
+      when (any (> '\xFF') s) $ do
+        pState <- getPState
+        let msg = PsErrPrimStringInvalidChar
+        let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
+        addError err
+
+      setInput i'
+      let (psSpan, src) = getStringLoc (buf, locStart) i'
+      pure $ L psSpan (ITprimstring src (unsafeMkByteString s))
+    Nothing -> do
+      let (psSpan, src) = getStringLoc (buf, locStart) i
+      pure $ L psSpan (ITstring src (mkFastString s))
+  where
+    locStart = psSpanStart span
 
 
 lex_quoted_label :: Action
@@ -2205,29 +2216,8 @@ lex_quoted_label span buf _len _buf2 = do
   return $ L (mkPsSpan start end) token
 
 
-data LexedString = LexedRegularString String | LexedPrimString String
-
-lex_string :: P LexedString
-lex_string = do
-  start <- getInput
-  s <- lex_string_helper "" start
-  magicHash <- getBit MagicHashBit
-  if magicHash
-    then do
-      i <- getInput
-      case alexGetChar' i of
-        Just ('#',i) -> do
-          setInput i
-          when (any (> '\xFF') s) $ do
-            pState <- getPState
-            let msg = PsErrPrimStringInvalidChar
-            let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
-            addError err
-          return $ LexedPrimString s
-        _other ->
-          return $ LexedRegularString s
-    else
-      return $ LexedRegularString s
+lex_string :: P String
+lex_string = getInput >>= lex_string_helper ""
 
 
 lex_string_helper :: String -> AlexInput -> P String
@@ -2319,25 +2309,40 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                         let (AI end _) = i1
                         return (L (mkPsSpan loc end) ITsimpleQuote)
 
+-- We've already seen the closing quote
+-- Just need to check for trailing #
 finish_char_tok :: StringBuffer -> PsLoc -> Char -> P (PsLocated Token)
-finish_char_tok buf loc ch  -- We've already seen the closing quote
-                        -- Just need to check for trailing #
-  = do  magicHash <- getBit MagicHashBit
-        i@(AI end bufEnd) <- getInput
-        let src = lexemeToFastString buf (cur bufEnd - cur buf)
-        if magicHash then do
-            case alexGetChar' i of
-              Just ('#',i@(AI end bufEnd')) -> do
-                setInput i
-                -- Include the trailing # in SourceText
-                let src' = lexemeToFastString buf (cur bufEnd' - cur buf)
-                return (L (mkPsSpan loc end)
-                          (ITprimchar (SourceText src') ch))
-              _other ->
-                return (L (mkPsSpan loc end)
-                          (ITchar (SourceText src) ch))
-            else do
-              return (L (mkPsSpan loc end) (ITchar (SourceText src) ch))
+finish_char_tok buf loc ch = do
+  i <- getInput
+  lex_magic_hash i >>= \case
+    Just i' -> do
+      setInput i'
+      -- Include the trailing # in SourceText
+      let (psSpan, src) = getStringLoc (buf, loc) i'
+      pure $ L psSpan (ITprimchar src ch)
+    Nothing -> do
+      let (psSpan, src) = getStringLoc (buf, loc) i
+      pure $ L psSpan (ITchar src ch)
+
+
+-- | Get the span and source text for a string from the given start to the given end.
+getStringLoc :: (StringBuffer, PsLoc) -> AlexInput -> (PsSpan, SourceText)
+getStringLoc (bufStart, locStart) (AI locEnd bufEnd) = (psSpan, SourceText src)
+  where
+    psSpan = mkPsSpan locStart locEnd
+    src = lexemeToFastString bufStart (cur bufEnd - cur bufStart)
+
+
+-- Return Just if we found the magic hash, with the next input.
+lex_magic_hash :: AlexInput -> P (Maybe AlexInput)
+lex_magic_hash i = do
+  magicHash <- getBit MagicHashBit
+  if magicHash
+    then
+      case alexGetChar' i of
+        Just ('#', i') -> pure (Just i')
+        _other -> pure Nothing
+    else pure Nothing
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
