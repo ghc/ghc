@@ -186,7 +186,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnn NoEpAnns)
-              => HsMatchContext (GhcPass p)
+              => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
@@ -894,18 +894,20 @@ mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                          -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind (Generated OtherExpansion SkipPmc) (L (noAnnSrcSpan loc) fun)
-              [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)) pats expr
-                       emptyLocalBinds]
+                                     [mkMatch ctxt pats expr emptyLocalBinds]
+  where
+    ctxt :: HsMatchContextPs
+    ctxt = mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: LIdP (NoGhcTc p) -> HsMatchContext p
-mkPrefixFunRhs n = FunRhs { mc_fun = n
-                          , mc_fixity = Prefix
+mkPrefixFunRhs :: fn -> HsMatchContext fn
+mkPrefixFunRhs n = FunRhs { mc_fun        = n
+                          , mc_fixity     = Prefix
                           , mc_strictness = NoSrcStrict }
 
 ------------
 mkMatch :: forall p. IsPass p
-        => HsMatchContext (GhcPass p)
+        => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)

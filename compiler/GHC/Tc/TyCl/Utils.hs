@@ -880,6 +880,8 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     locc     = noAnnSrcSpan loc
     lbl      = flLabel fl
     sel_name = flSelector fl
+    sel_lname = L locn sel_name
+    match_ctxt = mkPrefixFunRhs sel_lname
 
     sel_id = mkExportedLocalId rec_details sel_name sel_ty
 
@@ -935,10 +937,9 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind (Generated OtherExpansion SkipPmc) sel_lname alts
       where
-        alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs sel_lname)
-                                           [] unit_rhs]
+        alts | is_naughty = [mkSimpleMatch match_ctxt [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
+    mk_match con = mkSimpleMatch match_ctxt
                                  [L loc' (mk_sel_pat con)]
                                  (L loc' (HsVar noExtField (L locn field_var)))
     mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
@@ -951,15 +952,13 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                         , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
                         , hfbPun = False })
-    sel_lname = L locn sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch CaseAlt
-                            [genWildPat]
+          | otherwise = [mkSimpleMatch match_ctxt [genWildPat]
                             (genLHsApp
                                 (genHsVar (getName rEC_SEL_ERROR_ID))
                                 (genLHsLit msg_lit))]

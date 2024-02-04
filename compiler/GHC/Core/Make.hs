@@ -468,12 +468,12 @@ mkBigCoreTup exprs = mkChunkified mkCoreTup (map wrapBox exprs)
 
 -- | Build the type of a big tuple that holds the specified variables
 -- One-tuples are flattened; see Note [Flattening one-tuples]
-mkBigCoreVarTupTy :: [Id] -> Type
+mkBigCoreVarTupTy :: HasDebugCallStack => [Id] -> Type
 mkBigCoreVarTupTy ids = mkBigCoreTupTy (map idType ids)
 
 -- | Build the type of a big tuple that holds the specified type of thing
 -- One-tuples are flattened; see Note [Flattening one-tuples]
-mkBigCoreTupTy :: [Type] -> Type
+mkBigCoreTupTy :: HasDebugCallStack => [Type] -> Type
 mkBigCoreTupTy tys = mkChunkified mkBoxedTupleTy $
                      map boxTy tys
 
@@ -498,7 +498,7 @@ wrapBox e
   where
     e_ty = exprType e
 
-boxTy :: Type -> Type
+boxTy :: HasDebugCallStack => Type -> Type
 -- ^ `boxTy ty` is the boxed version of `ty`. That is,
 -- if `e :: ty`, then `wrapBox e :: boxTy ty`.
 -- Note that if `ty :: Type`, `boxTy ty` just returns `ty`.

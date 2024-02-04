@@ -735,7 +735,7 @@ Call @match@ with all of this information!
 --                         p2 q2 -> ...
 
 matchWrapper
-  :: HsMatchContext GhcTc              -- ^ For shadowing warning messages
+  :: HsMatchContextRn                  -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
@@ -898,7 +898,7 @@ the expression (in this case, it will end up recursively calling 'matchWrapper'
 on the user-written case statement).
 -}
 
-matchEquations  :: HsMatchContext GhcTc
+matchEquations  :: HsMatchContextRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -912,7 +912,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- situation where we want to match a single expression against a single
 -- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
-            -> HsMatchContext GhcTc     -- ^ Match kind
+            -> HsMatchContextRn         -- ^ Match kind
             -> Mult                     -- ^ Scaling factor of the case expression
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
@@ -935,7 +935,7 @@ matchSimply scrut hs_ctx mult pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat mult rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcTc -> LPat GhcTc -> Mult
+matchSinglePat :: CoreExpr -> HsMatchContextRn -> LPat GhcTc -> Mult
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -956,7 +956,7 @@ matchSinglePat scrut hs_ctx pat mult ty match_result
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
-                  -> HsMatchContext GhcTc -> LPat GhcTc
+                  -> HsMatchContextRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $

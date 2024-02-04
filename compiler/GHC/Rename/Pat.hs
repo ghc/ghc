@@ -227,7 +227,7 @@ isTopRecNameMaker _ = False
 localRecNameMaker :: MiniFixityEnv -> NameMaker
 localRecNameMaker fix_env = LetMk NotTopLevel fix_env
 
-matchNameMaker :: HsMatchContext a -> NameMaker
+matchNameMaker :: HsMatchContext fn -> NameMaker
 matchNameMaker ctxt = LamMk report_unused
   where
     -- Do not report unused names in interactive contexts
@@ -418,7 +418,7 @@ There are various entry points to renaming patterns, depending on
 --   * unused and duplicate checking
 --   * no fixities
 rnPats :: Traversable f
-       => HsMatchContext GhcRn -- for error messages
+       => HsMatchContextRn   -- For error messages
        -> f (LPat GhcPs)
        -> (f (LPat GhcRn) -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
@@ -445,10 +445,10 @@ rnPats ctxt pats thing_inside
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
-{-# SPECIALIZE rnPats :: HsMatchContext GhcRn -> [LPat GhcPs] -> ([LPat GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
-{-# SPECIALIZE rnPats :: HsMatchContext GhcRn -> Identity (LPat GhcPs) -> (Identity (LPat GhcRn) -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
+{-# SPECIALIZE rnPats :: HsMatchContextRn -> [LPat GhcPs] -> ([LPat GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
+{-# SPECIALIZE rnPats :: HsMatchContextRn -> Identity (LPat GhcPs) -> (Identity (LPat GhcRn) -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
 
-rnPat :: HsMatchContext GhcRn -- for error messages
+rnPat :: HsMatchContextRn      -- For error messages
       -> LPat GhcPs
       -> (LPat GhcRn -> RnM (a, FreeVars))
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not

@@ -75,6 +75,7 @@ import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
 import Data.List.NonEmpty (NonEmpty)
+import Data.Void (Void)
 
 {- *********************************************************************
 *                                                                      *
@@ -280,8 +281,8 @@ type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          GhcPs = EpAnn EpAnnHsCase
-type instance XCase          GhcRn = HsMatchContext GhcTc
-type instance XCase          GhcTc = HsMatchContext GhcTc
+type instance XCase          GhcRn = HsMatchContextRn
+type instance XCase          GhcTc = HsMatchContextRn
 
 type instance XIf            GhcPs = EpAnn AnnsIf
 type instance XIf            GhcRn = NoExtField
@@ -1486,7 +1487,7 @@ matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
   | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
-  | otherwise        = panic "matchGroupArity"
+  | otherwise            = panic "matchGroupArity"
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
@@ -1531,7 +1532,7 @@ pprPatBind :: forall bndr p . (OutputableBndrId bndr,
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 pprPatBind pat grhss
  = sep [ppr pat,
-       nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]
+       nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext Void) grhss)]
 
 pprMatch :: (OutputableBndrId idR, Outputable body)
          => Match (GhcPass idR) body -> SDoc
@@ -1580,7 +1581,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                    _     -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
-         => HsMatchContext passL -> GRHSs (GhcPass idR) body -> SDoc
+         => HsMatchContext fn -> GRHSs (GhcPass idR) body -> SDoc
 pprGRHSs ctxt (GRHSs _ grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
@@ -1589,17 +1590,17 @@ pprGRHSs ctxt (GRHSs _ grhss binds)
       (text "where" $$ nest 4 (pprBinds binds))
 
 pprGRHS :: (OutputableBndrId idR, Outputable body)
-        => HsMatchContext passL -> GRHS (GhcPass idR) body -> SDoc
+        => HsMatchContext fn -> GRHS (GhcPass idR) body -> SDoc
 pprGRHS ctxt (GRHS _ [] body)
  =  pp_rhs ctxt body
 
 pprGRHS ctxt (GRHS _ guards body)
  = sep [vbar <+> interpp'SP guards, pp_rhs ctxt body]
 
-pp_rhs :: Outputable body => HsMatchContext passL -> body -> SDoc
+pp_rhs :: Outputable body => HsMatchContext fn -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 
-matchSeparator :: HsMatchContext p -> SDoc
+matchSeparator :: HsMatchContext fn -> SDoc
 matchSeparator FunRhs{}         = text "="
 matchSeparator CaseAlt          = text "->"
 matchSeparator LamAlt{}         = text "->"
@@ -2063,7 +2064,12 @@ pp_dotdot = text " .. "
 ************************************************************************
 -}
 
-instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
+type HsMatchContextPs = HsMatchContext (LIdP GhcPs)
+type HsMatchContextRn = HsMatchContext (LIdP GhcRn)
+
+type HsStmtContextRn = HsStmtContext (LIdP GhcRn)
+
+instance Outputable fn => Outputable (HsMatchContext fn) where
   ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr CaseAlt                 = text "CaseAlt"
   ppr (LamAlt lam_variant)    = text "LamAlt" <+> ppr lam_variant
@@ -2104,14 +2110,12 @@ pprHsArrType HsFirstOrderApp  = text "first order arrow application"
 
 -----------------
 
-instance OutputableBndrId p
-      => Outputable (HsStmtContext (GhcPass p)) where
+instance Outputable fn => Outputable (HsStmtContext fn) where
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: OutputableBndrId p
-                      => HsMatchContext (GhcPass p) -> SDoc
-matchContextErrString (FunRhs{mc_fun=L _ fun})      = text "function" <+> ppr fun
+matchContextErrString :: Outputable fn => HsMatchContext fn -> SDoc
+matchContextErrString (FunRhs{mc_fun=fun})          = text "function" <+> ppr fun
 matchContextErrString CaseAlt                       = text "case"
 matchContextErrString (LamAlt lam_variant)          = lamCaseKeyword lam_variant
 matchContextErrString IfAlt                         = text "multi-way if"
@@ -2150,10 +2154,10 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
-                  OutputableBndrId ctx,
+                  Outputable fn,
                   Outputable body,
                  Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
-              => HsStmtContext (GhcPass ctx)
+              => HsStmtContext fn
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)
@@ -2169,8 +2173,7 @@ pprStmtInCtxt ctxt stmt
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
 
-pprMatchContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
-                => HsMatchContext p -> SDoc
+pprMatchContext :: Outputable fn => HsMatchContext fn -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
@@ -2181,10 +2184,8 @@ pprMatchContext ctxt
     want_an LazyPatCtx                               = True
     want_an _                                        = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
-                    => HsMatchContext p -> SDoc
-pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
-                                                <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
+pprMatchContextNoun :: Outputable fn => HsMatchContext fn -> SDoc
+pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for" <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt                 = text "case alternative"
 pprMatchContextNoun (LamAlt LamSingle)      = text "lambda abstraction"
 pprMatchContextNoun (LamAlt lam_variant)    = lamCaseKeyword lam_variant
@@ -2201,10 +2202,8 @@ pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
 pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
 pprMatchContextNoun LazyPatCtx              = text "irrefutable pattern"
 
-pprMatchContextNouns :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
-                     => HsMatchContext p -> SDoc
-pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for"
-                                               <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
+pprMatchContextNouns :: Outputable fn => HsMatchContext fn -> SDoc
+pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for" <+> quotes (ppr fun)
 pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
 pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
 pprMatchContextNouns (StmtCtxt ctxt)         = text "pattern bindings in"
@@ -2226,8 +2225,7 @@ pprArrowMatchContextNouns (ArrowLamAlt lam_variant) = lamCaseKeyword lam_variant
 pprArrowMatchContextNouns ctxt                      = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
-                                => HsStmtContext p -> SDoc
+pprAStmtContext, pprStmtContext :: Outputable fn => HsStmtContext fn -> SDoc
 pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
 pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
 

@@ -1004,8 +1004,7 @@ cvtLocalDecs declDescr ds
       ((_:_), (_:_)) ->
         failWith ImplicitParamsWithOtherBinds
 
-cvtClause :: HsMatchContext GhcPs
-          -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
+cvtClause :: HsMatchContextPs -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; let pps = map (parenthesizePat appPrec) ps'
@@ -1328,8 +1327,7 @@ cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss
                           ; rec_stmt <- wrapParLA (mkRecStmt noAnn) ss'
                           ; returnLA rec_stmt }
 
-cvtMatch :: HsMatchContext GhcPs
-         -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
+cvtMatch :: HsMatchContextPs -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; let lp = case p' of

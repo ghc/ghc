@@ -1040,7 +1040,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_compile/T11339
   -}
-  TcRnOverloadedSig :: TcIdSigInfo -> TcRnMessage
+  TcRnOverloadedSig :: TcIdSig -> TcRnMessage
 
   {-| TcRnTupleConstraintInst is an error that occurs whenever an instance
       for a tuple constraint is specified.
@@ -2403,7 +2403,7 @@ data TcRnMessage where
                 typecheck/should_fail/T20768_fail
   -}
   TcRnMatchesHaveDiffNumArgs
-    :: !(HsMatchContext GhcTc) -- ^ Pattern match specifics
+    :: !HsMatchContextRn   -- ^ Pattern match specifics
     -> !MatchArgBadMatches
     -> TcRnMessage
 
@@ -2878,7 +2878,7 @@ data TcRnMessage where
                  parser/should_fail/readFail028
   -}
   TcRnLastStmtNotExpr
-    :: HsStmtContext GhcRn
+    :: HsStmtContextRn
     -> UnexpectedStatement
     -> TcRnMessage
 
@@ -2892,7 +2892,7 @@ data TcRnMessage where
                  parser/should_fail/readFail043
   -}
   TcRnUnexpectedStatementInContext
-    :: HsStmtContext GhcRn
+    :: HsStmtContextRn
     -> UnexpectedStatement
     -> Maybe LangExt.Extension
     -> TcRnMessage
@@ -3009,7 +3009,7 @@ data TcRnMessage where
 
      Test cases: rename/should_fail/RnEmptyCaseFail
   -}
-  TcRnEmptyCase :: HsMatchContext GhcRn -> TcRnMessage
+  TcRnEmptyCase :: HsMatchContextRn -> TcRnMessage
 
   {-| TcRnNonStdGuards is a warning thrown when a user uses
       non-standard guards (e.g. patterns in guards) without
@@ -5806,7 +5806,7 @@ data MatchArgsContext
   = EquationArgs
       !Name -- ^ Name of the function
   | PatternArgs
-      !(HsMatchContext GhcTc) -- ^ Pattern match specifics
+      !HsMatchContextRn -- ^ Pattern match specifics
 
 -- | The information necessary to report mismatched
 -- numbers of arguments in a match group.

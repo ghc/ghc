@@ -284,7 +284,7 @@ data SkolemInfoAnon
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
-      (HsMatchContext GhcTc)
+      HsMatchContextRn
              -- e.g.   data T = forall a. Eq a => MkT a
              --        f (MkT x) = ...
              -- The pattern MkT x will allocate an existential type
@@ -1142,7 +1142,7 @@ data FixedRuntimeRepContext
   | FRRArrow !FRRArrowContext
 
   -- | A representation-polymorphic check arising from a call
-  -- to 'matchExpectedFunTys' or 'matchActualFunTySigma'.
+  -- to 'matchExpectedFunTys' or 'matchActualFunTy'.
   --
   -- See 'ExpectedFunTyOrigin' for more details.
   | FRRExpectedFunTy
@@ -1367,7 +1367,7 @@ instance Outputable FRRArrowContext where
 ********************************************************************* -}
 
 -- | In what context are we calling 'matchExpectedFunTys'
--- or 'matchActualFunTySigma'?
+-- or 'matchActualFunTy'?
 --
 -- Used for two things:
 --

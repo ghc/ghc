@@ -319,9 +319,9 @@ tcCmdMatches :: CmdEnv
              -> CmdType
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
-  = tcMatchesCase match_body_checker (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
+  = tcCaseMatches tc_body (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
-    match_body_checker body res_ty' = do { res_ty' <- expTypeToType res_ty'
+    tc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }
 
 -- | Typechecking for 'HsCmdLam' and 'HsCmdLamCase'.
@@ -352,7 +352,7 @@ tcCmdMatchLambda env
     -- Check the patterns, and the GRHSs inside
     tc_match arg_tys cmd_stk' (L mtch_loc (Match { m_pats = pats, m_grhss = grhss }))
       = do { (pats', grhss') <- setSrcSpanA mtch_loc           $
-                                tcPats match_ctxt pats (map ExpFunPatTy arg_tys) $
+                                tcMatchPats match_ctxt pats (map ExpFunPatTy arg_tys) $
                                 tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
            ; return $ L mtch_loc (Match { m_ext = noAnn

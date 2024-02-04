@@ -421,7 +421,7 @@ rebuild_hs_apps fun ctxt (arg : args)
 We cannot have representation-polymorphic or levity-polymorphic
 function arguments. See Note [Representation polymorphism invariants]
 in GHC.Core.  That is checked in 'GHC.Tc.Gen.App.tcInstFun', see the call
-to 'matchActualFunTySigma', which performs the representation-polymorphism
+to 'matchActualFunTy', which performs the representation-polymorphism
 check.
 
 However, some special Ids have representation-polymorphic argument
@@ -1003,15 +1003,15 @@ tcExprWithSig expr hs_ty
     loc = getLocA (dropWildCards hs_ty)
     ctxt = ExprSigCtxt (lhsSigWcTypeContextSpan hs_ty)
 
-tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcSigmaType)
-tcExprSig ctxt expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSig -> TcM (LHsExpr GhcTc, TcSigmaType)
+tcExprSig ctxt expr (TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id
        ; (wrap, expr') <- tcSkolemiseScoped ctxt poly_ty $ \rho_ty ->
                           tcCheckMonoExprNC expr rho_ty
        ; return (mkLHsWrap wrap expr', poly_ty) }
 
-tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
+tcExprSig _ expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
@@ -1102,8 +1102,8 @@ tcInferOverLit lit@(OverLit { ol_val = val
            thing    = NameThing from_name
            mb_thing = Just thing
            herald   = ExpectedFunTyArg thing (HsLit noAnn hs_lit)
-       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTySigma herald mb_thing
-                                                           (1, []) from_ty
+       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing
+                                                      (1, []) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
        -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
@@ -1396,7 +1396,7 @@ Wrinkles
 
       A. Any arguments to such lambda abstractions are guaranteed to have
          a fixed runtime representation. This is enforced in 'tcApp' by
-         'matchActualFunTySigma'.
+         'matchActualFunTy'.
 
       B. If there are fewer arguments than there are bound term variables,
          we will ensure that the appropriate type arguments are instantiated
@@ -1639,7 +1639,7 @@ addStmtCtxt stmt thing_inside
   = do let err_doc = pprStmtInCtxt (HsDoStmt (DoExpr Nothing)) stmt
        addErrCtxt err_doc thing_inside
   where
-    pprStmtInCtxt :: HsStmtContext GhcRn -> StmtLR GhcRn GhcRn (LHsExpr GhcRn) -> SDoc
+    pprStmtInCtxt :: HsStmtContextRn -> StmtLR GhcRn GhcRn (LHsExpr GhcRn) -> SDoc
     pprStmtInCtxt ctxt stmt
       = vcat [ hang (text "In a stmt of"
                      <+> pprAStmtContext ctxt <> colon) 2 (pprStmt stmt)

@@ -304,11 +304,11 @@ badMonadBind elt_ty
        2 (quotes (ppr elt_ty))
 
 -- Print a single clause (for redundant/with-inaccessible-rhs)
-pprEqn :: HsMatchContext GhcTc -> SDoc -> String -> SDoc
+pprEqn :: HsMatchContextRn -> SDoc -> String -> SDoc
 pprEqn ctx q txt = pprContext True ctx (text txt) $ \f ->
   f (q <+> matchSeparator ctx <+> text "...")
 
-pprContext :: Bool -> HsMatchContext GhcTc -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
+pprContext :: Bool -> HsMatchContextRn -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
 pprContext singular kind msg rest_of_msg_fun
   = vcat [text txt <+> msg,
           sep [ text "In" <+> ppr_match <> char ':'

@@ -308,9 +308,9 @@ data HsExpr p
   | HsLam     (XLam p)
               HsLamVariant -- ^ Tells whether this is for lambda, \case, or \cases
               (MatchGroup p (LHsExpr p))
-                       -- ^ LamSingle: one match
+                       -- ^ LamSingle: one match of arity >= 1
                        --   LamCase: many arity-1 matches
-                       --   LamCases: many matches of uniform arity
+                       --   LamCases: many matches of uniform arity >= 1
        --
        -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --       'GHC.Parser.Annotation.AnnRarrow',
@@ -977,10 +977,9 @@ type LMatch id body = XRec id (Match id body)
 -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data Match p body
   = Match {
-        m_ext :: XCMatch p body,
-        m_ctxt :: HsMatchContext p,
-          -- See Note [m_ctxt in Match]
-        m_pats :: [LPat p], -- The patterns
+        m_ext   :: XCMatch p body,
+        m_ctxt  :: HsMatchContext (LIdP (NoGhcTc p)),   -- See Note [m_ctxt in Match]
+        m_pats  :: [LPat p],                            -- The patterns
         m_grhss :: (GRHSs p body)
   }
   | XMatch !(XXMatch p body)
@@ -988,7 +987,6 @@ data Match p body
 {-
 Note [m_ctxt in Match]
 ~~~~~~~~~~~~~~~~~~~~~~
-
 A Match can occur in a number of contexts, such as a FunBind, HsCase, HsLam and
 so on.
 
@@ -1017,9 +1015,6 @@ annotations
     (&&&  ) [] [] =  []
     xs    &&&   [] =  xs
     (  &&&  ) [] ys =  ys
-
-
-
 -}
 
 
@@ -1533,14 +1528,13 @@ data ArithSeqInfo id
 --
 -- Context of a pattern match. This is more subtle than it would seem. See
 -- Note [FunBind vs PatBind].
-data HsMatchContext p
+data HsMatchContext fn
   = FunRhs
     -- ^ A pattern matching on an argument of a
     -- function binding
-      { mc_fun        :: LIdP (NoGhcTc p)    -- ^ function binder of @f@
-                                             -- See Note [mc_fun field of FunRhs]
-                                             -- See #20415 for a long discussion about
-                                             -- this field and why it uses NoGhcTc.
+      { mc_fun        :: fn    -- ^ function binder of @f@
+                               -- See Note [mc_fun field of FunRhs]
+                               -- See #20415 for a long discussion about this field
       , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
       , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                        -- See Note [FunBind vs PatBind]
@@ -1559,42 +1553,51 @@ data HsMatchContext p
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
 
-  | StmtCtxt (HsStmtContext p)  -- ^Pattern of a do-stmt, list comprehension,
-                                -- pattern guard, etc
+  | StmtCtxt (HsStmtContext fn)  -- ^Pattern of a do-stmt, list comprehension,
+                                 --  pattern guard, etc
 
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
   | LazyPatCtx             -- ^An irrefutable pattern
 
-{-
-Note [mc_fun field of FunRhs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The mc_fun field of FunRhs has type `LIdP (NoGhcTc p)`, which means it will be
-a `RdrName` in pass `GhcPs`, a `Name` in `GhcRn`, and (importantly) still a
-`Name` in `GhcTc` -- not an `Id`.  See Note [NoGhcTc] in GHC.Hs.Extension.
+{- Note [mc_fun field of FunRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+HsMatchContext is parameterised over `fn`, the function binder stored in `FunRhs`.
+This makes pretty printing easy.
 
-Why a `Name` in the typechecker phase?  Because:
-* A `Name` is all we need, as it turns out.
-* Using an `Id` involves knot-tying in the monad, which led to #22695.
+In the use of `HsMatchContext` in `Match`, it is parameterised thus:
+    data Match p body = Match { m_ctxt  :: HsMatchContext (LIdP (NoGhcTc p)), ... }
+So in a Match, the mc_fun field `FunRhs` will be a `RdrName` in pass `GhcPs`, a `Name`
+in `GhcRn`, and (importantly) still a `Name` in `GhcTc` -- not an `Id`.
+See Note [NoGhcTc] in GHC.Hs.Extension.
+
+* Why a `Name` in the typechecker phase?  Because:
+  * A `Name` is all we need, as it turns out.
+  * Using an `Id` involves knot-tying in the monad, which led to #22695.
+
+* Why a /located/ name?  Because we want to record the location of the Id
+  on the LHS of /this/ match.  See Note [m_ctxt in Match].  Example:
+    (&&&) [] [] = []
+    xs  &&&  [] = xs
+  The two occurrences of `&&&` have different locations.
+
+* Why parameterise `HsMatchContext` over `fn` rather than over the pass `p`?
+  Because during typechecking (specifically GHC.Tc.Gen.Match.tcMatch) we need to convert
+     HsMatchContext (LIdP (NoGhcTc GhcRn)) --> HsMatchContext (LIdP (NoGhcTc GhcTc))
+  With this parameterisation it's easy; if it was parametersed over `p` we'd  need
+  a recursive traversal of the HsMatchContext.
 
 See #20415 for a long discussion.
-
 -}
 
-isPatSynCtxt :: HsMatchContext p -> Bool
-isPatSynCtxt ctxt =
-  case ctxt of
-    PatSyn -> True
-    _      -> False
-
 -- | Haskell Statement Context.
-data HsStmtContext p
-  = HsDoStmt HsDoFlavour             -- ^ Context for HsDo (do-notation and comprehensions)
-  | PatGuard (HsMatchContext p)      -- ^ Pattern guard for specified thing
-  | ParStmtCtxt (HsStmtContext p)    -- ^ A branch of a parallel stmt
-  | TransStmtCtxt (HsStmtContext p)  -- ^ A branch of a transform stmt
-  | ArrowExpr                        -- ^ do-notation in an arrow-command context
+data HsStmtContext fn
+  = HsDoStmt HsDoFlavour              -- ^ Context for HsDo (do-notation and comprehensions)
+  | PatGuard (HsMatchContext fn)      -- ^ Pattern guard for specified thing
+  | ParStmtCtxt (HsStmtContext fn)    -- ^ A branch of a parallel stmt
+  | TransStmtCtxt (HsStmtContext fn)  -- ^ A branch of a transform stmt
+  | ArrowExpr                         -- ^ do-notation in an arrow-command context
 
 -- | Haskell arrow match context.
 data HsArrowMatchContext
@@ -1610,13 +1613,19 @@ data HsDoFlavour
   | MonadComp
   deriving (Eq, Data)
 
-qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
+qualifiedDoModuleName_maybe :: HsStmtContext fn -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
   HsDoStmt (DoExpr m) -> m
   HsDoStmt (MDoExpr m) -> m
   _ -> Nothing
 
-isComprehensionContext :: HsStmtContext id -> Bool
+isPatSynCtxt :: HsMatchContext fn -> Bool
+isPatSynCtxt ctxt =
+  case ctxt of
+    PatSyn -> True
+    _      -> False
+
+isComprehensionContext :: HsStmtContext fn -> Bool
 -- Uses comprehension syntax [ e | quals ]
 isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
 isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
@@ -1632,7 +1641,7 @@ isDoComprehensionContext ListComp = True
 isDoComprehensionContext MonadComp = True
 
 -- | Is this a monadic context?
-isMonadStmtContext :: HsStmtContext id -> Bool
+isMonadStmtContext :: HsStmtContext fn -> Bool
 isMonadStmtContext (ParStmtCtxt ctxt)   = isMonadStmtContext ctxt
 isMonadStmtContext (TransStmtCtxt ctxt) = isMonadStmtContext ctxt
 isMonadStmtContext (HsDoStmt flavour) = isMonadDoStmtContext flavour
@@ -1646,7 +1655,7 @@ isMonadDoStmtContext DoExpr{}     = True
 isMonadDoStmtContext MDoExpr{}    = True
 isMonadDoStmtContext GhciStmtCtxt = True
 
-isMonadCompContext :: HsStmtContext id -> Bool
+isMonadCompContext :: HsStmtContext fn -> Bool
 isMonadCompContext (HsDoStmt flavour)   = isMonadDoCompContext flavour
 isMonadCompContext (ParStmtCtxt _)   = False
 isMonadCompContext (TransStmtCtxt _) = False
