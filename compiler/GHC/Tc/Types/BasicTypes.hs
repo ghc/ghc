@@ -5,13 +5,11 @@ module GHC.Tc.Types.BasicTypes (
   , TcBinder(..)
 
   -- * Signatures
-  , TcSigFun
-  , TcIdSigInfo(..)
-  , TcSigInfo(..)
-  , TcPatSynInfo(..)
+  , TcSigFun, TcSigInfo(..), TcIdSig(..)
+  , TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..)
   , TcIdSigInst(..)
-  , isPartialSig
-  , hasCompleteSig
+  , isPartialSig, hasCompleteSig
+  , tcSigInfoName, tcIdSigLoc, completeSigPolyId_maybe
 
   -- * TcTyThing
   , TcTyThing(..)
@@ -101,33 +99,50 @@ instance HasOccName TcBinder where
 
 type TcSigFun  = Name -> Maybe TcSigInfo
 
-data TcSigInfo = TcIdSig     TcIdSigInfo
-               | TcPatSynSig TcPatSynInfo
+-- TcSigInfo is simply the range of TcSigFun
+data TcSigInfo = TcIdSig     TcIdSig
+               | TcPatSynSig TcPatSynSig    -- For a pattern synonym
 
-data TcIdSigInfo   -- See Note [Complete and partial type signatures]
-  = CompleteSig    -- A complete signature with no wildcards,
-                   -- so the complete polymorphic type is known.
-      { sig_bndr :: TcId          -- The polymorphic Id with that type
+-- See Note [Complete and partial type signatures]
+data TcIdSig  -- For an Id
+  = TcCompleteSig TcCompleteSig
+  | TcPartialSig  TcPartialSig
 
-      , sig_ctxt :: UserTypeCtxt  -- In the case of type-class default methods,
-                                  -- the Name in the FunSigCtxt is not the same
-                                  -- as the TcId; the former is 'op', while the
-                                  -- latter is '$dmop' or some such
+data TcCompleteSig  -- A complete signature with no wildcards,
+                    -- so the complete polymorphic type is known.
+  = CSig { sig_bndr :: TcId          -- The polymorphic Id with that type
 
-      , sig_loc  :: SrcSpan       -- Location of the type signature
-      }
+         , sig_ctxt :: UserTypeCtxt  -- In the case of type-class default methods,
+                                     -- the Name in the FunSigCtxt is not the same
+                                     -- as the TcId; the former is 'op', while the
+                                     -- latter is '$dmop' or some such
 
-  | PartialSig     -- A partial type signature (i.e. includes one or more
+         , sig_loc  :: SrcSpan       -- Location of the type signature
+         }
+
+data TcPartialSig  -- A partial type signature (i.e. includes one or more
                    -- wildcards). In this case it doesn't make sense to give
                    -- the polymorphic Id, because we are going to /infer/ its
                    -- type, so we can't make the polymorphic Id ab-initio
-      { psig_name  :: Name   -- Name of the function; used when report wildcards
-      , psig_hs_ty :: LHsSigWcType GhcRn  -- The original partial signature in
-                                          -- HsSyn form
-      , sig_ctxt   :: UserTypeCtxt
-      , sig_loc    :: SrcSpan            -- Location of the type signature
-      }
+  = PSig { psig_name  :: Name   -- Name of the function; used when report wildcards
+         , psig_hs_ty :: LHsSigWcType GhcRn  -- The original partial signature in
+                                             -- HsSyn form
+         , psig_ctxt  :: UserTypeCtxt
+         , psig_loc   :: SrcSpan            -- Location of the type signature
+         }
 
+data TcPatSynSig
+  = PatSig {
+        patsig_name           :: Name,
+        patsig_implicit_bndrs :: [InvisTVBinder], -- Implicitly-bound kind vars (Inferred) and
+                                                  -- implicitly-bound type vars (Specified)
+          -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.TyCl.PatSyn
+        patsig_univ_bndrs     :: [InvisTVBinder], -- Bound by explicit user forall
+        patsig_req            :: TcThetaType,
+        patsig_ex_bndrs       :: [InvisTVBinder], -- Bound by explicit user forall
+        patsig_prov           :: TcThetaType,
+        patsig_body_ty        :: TcSigmaType
+    }
 
 {- Note [Complete and partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,7 +161,7 @@ sig_extra_cts is Nothing.
 -}
 
 data TcIdSigInst
-  = TISI { sig_inst_sig :: TcIdSigInfo
+  = TISI { sig_inst_sig :: TcIdSig
 
          , sig_inst_skols :: [(Name, InvisTVBinder)]
                -- Instantiated type and kind variables, TyVarTvs
@@ -187,7 +202,7 @@ data TcIdSigInst
 Note that "sig_inst_tau" might actually be a polymorphic type,
 if the original function had a signature like
    forall a. Eq a => forall b. Ord b => ....
-But that's ok: tcMatchesFun (called by tcRhs) can deal with that
+But that's ok: tcFunBindMatches (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in GHC.Tc.TyCl.Class.
 
 Note [Quantified variables in partial type signatures]
@@ -231,51 +246,59 @@ Here we get
    sig_inst_wcs   = [ _22::k ]
 -}
 
-data TcPatSynInfo
-  = TPSI {
-        patsig_name           :: Name,
-        patsig_implicit_bndrs :: [InvisTVBinder], -- Implicitly-bound kind vars (Inferred) and
-                                                  -- implicitly-bound type vars (Specified)
-          -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.TyCl.PatSyn
-        patsig_univ_bndrs     :: [InvisTVBinder], -- Bound by explicit user forall
-        patsig_req            :: TcThetaType,
-        patsig_ex_bndrs       :: [InvisTVBinder], -- Bound by explicit user forall
-        patsig_prov           :: TcThetaType,
-        patsig_body_ty        :: TcSigmaType
-    }
-
 instance Outputable TcSigInfo where
-  ppr (TcIdSig     idsi) = ppr idsi
-  ppr (TcPatSynSig tpsi) = text "TcPatSynInfo" <+> ppr tpsi
+  ppr (TcIdSig sig)     = ppr sig
+  ppr (TcPatSynSig sig) = ppr sig
 
-instance Outputable TcIdSigInfo where
-    ppr (CompleteSig { sig_bndr = bndr })
-        = ppr bndr <+> dcolon <+> ppr (idType bndr)
-    ppr (PartialSig { psig_name = name, psig_hs_ty = hs_ty })
-        = text "[partial signature]" <+> ppr name <+> dcolon <+> ppr hs_ty
+instance Outputable TcIdSig where
+  ppr (TcCompleteSig sig) = ppr sig
+  ppr (TcPartialSig sig)  = ppr sig
+
+instance Outputable TcCompleteSig where
+  ppr (CSig { sig_bndr = bndr })
+      = ppr bndr <+> dcolon <+> ppr (idType bndr)
+
+instance Outputable TcPartialSig where
+  ppr (PSig { psig_name = name, psig_hs_ty = hs_ty })
+      = text "[partial signature]" <+> ppr name <+> dcolon <+> ppr hs_ty
+
+instance Outputable TcPatSynSig where
+  ppr (PatSig { patsig_name = name}) = ppr name
 
 instance Outputable TcIdSigInst where
-    ppr (TISI { sig_inst_sig = sig, sig_inst_skols = skols
-              , sig_inst_theta = theta, sig_inst_tau = tau })
-        = hang (ppr sig) 2 (vcat [ ppr skols, ppr theta <+> darrow <+> ppr tau ])
-
-instance Outputable TcPatSynInfo where
-    ppr (TPSI{ patsig_name = name}) = ppr name
+  ppr (TISI { sig_inst_sig = sig, sig_inst_skols = skols
+            , sig_inst_theta = theta, sig_inst_tau = tau })
+      = hang (ppr sig) 2 (vcat [ ppr skols, ppr theta <+> darrow <+> ppr tau ])
 
 isPartialSig :: TcIdSigInst -> Bool
-isPartialSig (TISI { sig_inst_sig = PartialSig {} }) = True
-isPartialSig _                                       = False
+isPartialSig (TISI { sig_inst_sig = TcPartialSig {} }) = True
+isPartialSig _                                         = False
 
 -- | No signature or a partial signature
 hasCompleteSig :: TcSigFun -> Name -> Bool
 hasCompleteSig sig_fn name
   = case sig_fn name of
-      Just (TcIdSig (CompleteSig {})) -> True
-      _                               -> False
+      Just (TcIdSig (TcCompleteSig {})) -> True
+      _                                 -> False
 
----------------------------
--- TcTyThing
----------------------------
+tcSigInfoName :: TcSigInfo -> Name
+tcSigInfoName (TcIdSig (TcCompleteSig sig)) = idName (sig_bndr sig)
+tcSigInfoName (TcIdSig (TcPartialSig  sig)) = psig_name sig
+tcSigInfoName (TcPatSynSig sig)             = patsig_name sig
+
+tcIdSigLoc :: TcIdSig -> SrcSpan
+tcIdSigLoc (TcCompleteSig sig) = sig_loc sig
+tcIdSigLoc (TcPartialSig  sig) = psig_loc sig
+
+completeSigPolyId_maybe :: TcSigInfo -> Maybe TcId
+completeSigPolyId_maybe (TcIdSig (TcCompleteSig sig)) = Just (sig_bndr sig)
+completeSigPolyId_maybe _                             = Nothing
+
+{- *********************************************************************
+*                                                                      *
+             TcTyThing
+*                                                                      *
+********************************************************************* -}
 
 -- | A typecheckable thing available in a local context.  Could be
 -- 'AGlobal' 'TyThing', but also lexically scoped variables, etc.

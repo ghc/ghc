@@ -817,7 +817,7 @@ genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnnCO)
-              => HsMatchContext (GhcPass p)
+              => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 genSimpleMatch ctxt pats rhs

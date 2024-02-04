@@ -723,8 +723,8 @@ data VarBndr var argf = Bndr var argf
 --
 -- A 'TyVarBinder' is a binder with only TyVar
 type ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
-type InvisTyBinder  = VarBndr TyCoVar   Specificity
-type ReqTyBinder    = VarBndr TyCoVar   ()
+type InvisTyBinder  = VarBndr TyCoVar Specificity
+type ReqTyBinder    = VarBndr TyCoVar ()
 
 type TyVarBinder    = VarBndr TyVar   ForAllTyFlag
 type InvisTVBinder  = VarBndr TyVar   Specificity

@@ -1276,7 +1276,7 @@ type AnnoBody body
 -- \cases expressions or commands. In that case, or if we encounter an empty
 -- MatchGroup but -XEmptyCases is disabled, we add an error.
 
-rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext GhcRn
+rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1292,14 +1292,14 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
       _ -> not <$> xoptM LangExt.EmptyCase
 
 rnMatch :: AnnoBody body
-        => HsMatchContext GhcRn
+        => HsMatchContextRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> LMatch GhcPs (LocatedA (body GhcPs))
         -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
 
 rnMatch' :: (AnnoBody body)
-         => HsMatchContext GhcRn
+         => HsMatchContextRn
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
          -> Match GhcPs (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1323,7 +1323,7 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
 -}
 
 rnGRHSs :: AnnoBody body
-        => HsMatchContext GhcRn
+        => HsMatchContextRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> GRHSs GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHSs GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1333,13 +1333,13 @@ rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
     return (GRHSs emptyComments grhss' binds', fvGRHSs)
 
 rnGRHS :: AnnoBody body
-       => HsMatchContext GhcRn
+       => HsMatchContextRn
        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
        -> LGRHS GhcPs (LocatedA (body GhcPs))
        -> RnM (LGRHS GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnGRHS ctxt rnBody = wrapLocFstMA (rnGRHS' ctxt rnBody)
 
-rnGRHS' :: HsMatchContext GhcRn
+rnGRHS' :: HsMatchContextRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> GRHS GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHS GhcRn (LocatedA (body GhcRn)), FreeVars)

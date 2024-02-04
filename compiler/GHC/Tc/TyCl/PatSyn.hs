@@ -87,9 +87,9 @@ tcPatSynDecl (L loc psb@(PSB { psb_id = L _ name })) sig_fn prag_fn
                 <+> quotes (ppr name)) $
     -- See Note [Pattern synonym error recovery]
     case sig_fn name of
-      Nothing                 -> tcInferPatSynDecl psb prag_fn
-      Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi prag_fn
-      _                       -> panic "tcPatSynDecl"
+      Nothing                   -> tcInferPatSynDecl psb prag_fn
+      Just (TcPatSynSig patsig) -> tcCheckPatSynDecl psb patsig prag_fn
+      _                         -> panic "tcPatSynDecl"
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,15 +351,15 @@ Hence the call to doNotQuantifyTyVars here.
 -}
 
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
-                  -> TcPatSynInfo
+                  -> TcPatSynSig
                   -> TcPragEnv
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
-                  TPSI{ patsig_implicit_bndrs = implicit_bndrs
-                      , patsig_univ_bndrs = explicit_univ_bndrs, patsig_req  = req_theta
-                      , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_prov = prov_theta
-                      , patsig_body_ty    = sig_body_ty }
+                  PatSig{ patsig_implicit_bndrs = implicit_bndrs
+                        , patsig_univ_bndrs = explicit_univ_bndrs, patsig_req  = req_theta
+                        , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_prov = prov_theta
+                        , patsig_body_ty    = sig_body_ty }
                   prag_fn
   = do { traceTc "tcCheckPatSynDecl" $
          vcat [ ppr implicit_bndrs, ppr explicit_univ_bndrs, ppr req_theta
@@ -563,7 +563,7 @@ We don't know Q's arity from the pattern signature, so we have to wait
 until we see the pattern declaration itself before deciding res_ty is,
 and hence which variables are existential and which are universal.
 
-And that in turn is why TcPatSynInfo has a separate field,
+And that in turn is why TcPatSynSig has a separate field,
 patsig_implicit_bndrs, to capture the implicitly bound type variables,
 because we don't yet know how to split them up.
 

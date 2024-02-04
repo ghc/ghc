@@ -125,7 +125,7 @@ import qualified Data.Set as S
 -}
 
 data DsMatchContext
-  = DsMatchContext (HsMatchContext GhcTc) SrcSpan
+  = DsMatchContext HsMatchContextRn SrcSpan
   deriving ()
 
 instance Outputable DsMatchContext where

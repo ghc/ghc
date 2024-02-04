@@ -1149,7 +1149,7 @@ tcSplitAppTyNoView_maybe ty
   = splitAppTyNoView_maybe ty
 
 -------------
-splitAppTys :: Type -> (Type, [Type])
+splitAppTys :: HasDebugCallStack => Type -> (Type, [Type])
 -- ^ Recursively splits a type as far as is possible, leaving a residual
 -- type being applied to and the type arguments applied to it. Never fails,
 -- even if that means returning an empty list of type applications.
@@ -1600,7 +1600,7 @@ splitTyConApp ty = splitTyConApp_maybe ty `orElse` pprPanic "splitTyConApp" (ppr
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty = splitTyConAppNoView_maybe (coreFullView ty)
 
-splitTyConAppNoView_maybe :: Type -> Maybe (TyCon, [Type])
+splitTyConAppNoView_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- Same as splitTyConApp_maybe but without looking through synonyms
 splitTyConAppNoView_maybe ty
   = case ty of

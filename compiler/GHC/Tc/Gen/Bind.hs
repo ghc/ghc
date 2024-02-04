@@ -23,7 +23,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun )
+import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcFunBindMatches )
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcCheckMonoExpr )
 import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 
@@ -615,16 +615,14 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 ********************************************************************* -}
 
 tcPolyCheck :: TcPragEnv
-            -> TcIdSigInfo     -- Must be a complete signature
+            -> TcCompleteSig
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTc, [Scaled TcId])
 -- There is just one binding,
 --   it is a FunBind
 --   it has a complete type signature,
 tcPolyCheck prag_fn
-            (CompleteSig { sig_bndr  = poly_id
-                         , sig_ctxt  = ctxt
-                         , sig_loc   = sig_loc })
+            (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = sig_loc })
             (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
@@ -642,11 +640,11 @@ tcPolyCheck prag_fn
                 let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
-                --    See Note [Relevant bindings and the binder stack]
+                -- See Note [Relevant bindings and the binder stack]
 
                 setSrcSpanA bind_loc $
-                tcMatchesFun (L nm_loc (idName mono_id)) mult matches
-                             (mkCheckExpType rho_ty)
+                tcFunBindMatches (L nm_loc (idName mono_id)) mult matches
+                                 (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
        -- just so we have somewhere to put the SpecPrags.
@@ -664,8 +662,7 @@ tcPolyCheck prag_fn
 
        ; let bind' = FunBind { fun_id      = L nm_loc poly_id2
                              , fun_matches = matches'
-                             , fun_ext     = (wrap_gen <.> wrap_res, tick)
-                             }
+                             , fun_ext     = (wrap_gen <.> wrap_res, tick) }
 
              export = ABE { abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
@@ -833,8 +830,8 @@ checkMonomorphismRestriction mbis lbinds
     no_mr_name (MBI { mbi_sig = Just sig })
        | TISI { sig_inst_sig = info, sig_inst_theta = theta, sig_inst_wcx = wcx } <- sig
        = case info of
-           CompleteSig { sig_bndr = bndr } -> Just (idName bndr)
-           PartialSig { psig_name = nm }
+           TcCompleteSig (CSig { sig_bndr = bndr }) -> Just (idName bndr)
+           TcPartialSig (PSig { psig_name = nm })
              | null theta, isNothing wcx   -> Nothing  -- f :: _ -> _
              | otherwise                   -> Just nm  -- f :: Num a => a -> _
              -- For the latter case, we don't want the MR:
@@ -862,13 +859,12 @@ checkOverloadedSig :: MonoBindInfo -> TcM ()
 -- The MR applies, but the signature is overloaded, and it's
 -- best to complain about this directly
 -- c.f #11339
-checkOverloadedSig (MBI { mbi_sig = mb_sig })
-  | Just (TISI { sig_inst_sig = orig_sig, sig_inst_theta = theta, sig_inst_wcx = wcx }) <- mb_sig
+checkOverloadedSig (MBI { mbi_sig = Just sig })
+  | TISI { sig_inst_sig = orig_sig, sig_inst_theta = theta, sig_inst_wcx = wcx } <- sig
   , not (null theta && isNothing wcx)
-  = setSrcSpan (sig_loc orig_sig) $
+  = setSrcSpan (tcIdSigLoc orig_sig) $
     failWith $ TcRnOverloadedSig orig_sig
-  | otherwise
-  = return ()
+checkOverloadedSig _ = return ()
 
 {- Note [When the MR applies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -988,7 +984,7 @@ mkInferredPolyId :: WantedConstraints   -- the residual constraints, already emi
                  -> TcM TcId
 mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
   | Just (TISI { sig_inst_sig = sig })  <- mb_sig_inst
-  , CompleteSig { sig_bndr = poly_id } <- sig
+  , TcCompleteSig (CSig { sig_bndr = poly_id }) <- sig
   = return poly_id
 
   | otherwise  -- Either no type sig or partial type sig
@@ -1047,10 +1043,9 @@ chooseInferredQuantifiers _residual inferred_theta tau_tvs qtvs Nothing
        ; return (binders, my_theta) }
 
 chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
-  (Just (TISI { sig_inst_sig   = sig@(PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty })
-              , sig_inst_wcx   = wcx
-              , sig_inst_theta = annotated_theta
-              , sig_inst_skols = annotated_tvs }))
+    (Just (TISI { sig_inst_sig = sig, sig_inst_wcx = wcx
+                , sig_inst_theta = annotated_theta, sig_inst_skols = annotated_tvs }))
+  | TcPartialSig (PSig { psig_name = fn_name, psig_hs_ty = hs_ty }) <- sig
   = -- Choose quantifiers for a partial type signature
     do { let (psig_qtv_nms, psig_qtv_bndrs) = unzip annotated_tvs
        ; psig_qtv_bndrs <- liftZonkM $ mapM zonkInvisTVBinder psig_qtv_bndrs
@@ -1063,14 +1058,15 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
             -- Check whether the quantified variables of the
             -- partial signature have been unified together
             -- See Note [Quantified variables in partial type signatures]
-       ; mapM_ report_dup_tyvar_tv_err  (findDupTyVarTvs psig_qtv_prs)
+       ; mapM_ (report_dup_tyvar_tv_err fn_name hs_ty) $
+         findDupTyVarTvs psig_qtv_prs
 
             -- Check whether a quantified variable of the partial type
             -- signature is not actually quantified.  How can that happen?
             -- See Note [Quantification and partial signatures] Wrinkle 4
             --     in GHC.Tc.Solver
-       ; mapM_ report_mono_sig_tv_err [ pr | pr@(_,tv) <- psig_qtv_prs
-                                           , not (tv `elem` qtvs) ]
+       ; mapM_ (report_mono_sig_tv_err fn_name hs_ty)
+         [ pr | pr@(_,tv) <- psig_qtv_prs, not (tv `elem` qtvs) ]
 
        ; annotated_theta      <- liftZonkM $ zonkTcTypes annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtv_set annotated_theta wcx
@@ -1147,10 +1143,10 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
              -- Return (annotated_theta ++ diff_theta)
              -- See Note [Extra-constraints wildcards]
 
-    report_dup_tyvar_tv_err (n1,n2)
+    report_dup_tyvar_tv_err fn_name hs_ty (n1,n2)
       = addErrTc (TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty)
 
-    report_mono_sig_tv_err (n,tv)
+    report_mono_sig_tv_err fn_name hs_ty (n,tv)
       = addErrTc (TcRnPartialTypeSigBadQuantifier n fn_name m_unif_ty hs_ty)
       where
         m_unif_ty = listToMaybe
@@ -1163,7 +1159,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                       , Just lhs_tv <- [ getTyVar_maybe lhs ]
                       , lhs_tv == tv ]
 
-chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))
+chooseInferredQuantifiers _ _ _ _ (Just sig)
   = pprPanic "chooseInferredQuantifiers" (ppr sig)
 
 mk_inf_msg :: Name -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
@@ -1370,19 +1366,20 @@ tcMonoBinds is_rec sig_fn no_gen
 
         ; ((co_fn, matches'), rhs_ty')
             <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
-                          -- tcInferFRR: the type of a let-binder must have
-                          -- a fixed runtime rep. See #23176
-                       tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
-                          -- We extend the error context even for a non-recursive
-                          -- function so that in type error messages we show the
-                          -- type of the thing whose rhs we are type checking
-                       tcMatchesFun (L nm_loc name) mult matches exp_ty
+                 -- tcInferFRR: the type of a let-binder must have
+                 -- a fixed runtime rep. See #23176
+               tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
+                 -- We extend the error context even for a non-recursive
+                 -- function so that in type error messages we show the
+                 -- type of the thing whose rhs we are type checking.
+                 -- See Note [Relevant bindings and the binder stack]
+               tcFunBindMatches (L nm_loc name) mult matches exp_ty
        ; mono_id <- newLetBndr no_gen name mult rhs_ty'
 
         ; return (unitBag $ L b_loc $
-                     FunBind { fun_id = L nm_loc mono_id,
+                     FunBind { fun_id      = L nm_loc mono_id,
                                fun_matches = matches',
-                               fun_ext = (co_fn, []) },
+                               fun_ext     = (co_fn, []) },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id
@@ -1603,7 +1600,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_a
     bndr_names = collectPatBinders CollNoDictBinders pat
     (nosig_names, sig_names) = partitionWith find_sig bndr_names
 
-    find_sig :: Name -> Either Name (Name, TcIdSigInfo)
+    find_sig :: Name -> Either Name (Name, TcIdSig)
     find_sig name = case sig_fn name of
                       Just (TcIdSig sig) -> Right (name, sig)
                       _                  -> Left name
@@ -1625,7 +1622,7 @@ lookupMBI name
                      , mbi_mono_mult = idMult mono_id }) }
 
 -------------------
-tcLhsSigId :: LetBndrSpec -> (Name, TcIdSigInfo) -> TcM MonoBindInfo
+tcLhsSigId :: LetBndrSpec -> (Name, TcIdSig) -> TcM MonoBindInfo
 tcLhsSigId no_gen (name, sig)
   = do { inst_sig <- tcInstSig sig
        ; mono_id <- newSigLetBndr no_gen name inst_sig
@@ -1637,7 +1634,7 @@ tcLhsSigId no_gen (name, sig)
 ------------
 newSigLetBndr :: LetBndrSpec -> Name -> TcIdSigInst -> TcM TcId
 newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
-  | CompleteSig { sig_bndr = poly_id } <- id_sig
+  | TcCompleteSig (CSig { sig_bndr = poly_id }) <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
   = newLetBndr no_gen name ManyTy tau
@@ -1652,11 +1649,11 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) (idName mono_id)) mult
-                                 matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
+        ; (co_fn, matches') <- tcFunBindMatches (L (noAnnSrcSpan loc) (idName mono_id)) mult
+                               matches (mkCheckExpType $ idType mono_id)
+        ; return ( FunBind { fun_id      = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
-                           , fun_ext = (co_fn, [])
+                           , fun_ext     = (co_fn, [])
                            } ) }
 
 tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
@@ -1849,7 +1846,7 @@ data GeneralisationPlan
 
   | CheckGen            -- One FunBind with a complete signature:
        (LHsBind GhcRn)  --   do explicit generalisation
-       TcIdSigInfo      -- Always CompleteSig
+       TcCompleteSig
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one
@@ -1888,7 +1885,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
     -- except a single function binding with a complete signature
     one_funbind_with_sig
       | [lbind@(L _ (FunBind { fun_id = v }))] <- lbinds
-      , Just (TcIdSig sig@(CompleteSig {})) <- sig_fn (unLoc v)
+      , Just (TcIdSig (TcCompleteSig sig)) <- sig_fn (unLoc v)
       = Just (lbind, sig)
       | otherwise
       = Nothing
@@ -1896,8 +1893,8 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
     binders          = collectHsBindListBinders CollNoDictBinders lbinds
     has_partial_sigs = any has_partial_sig binders
     has_partial_sig nm = case sig_fn nm of
-      Just (TcIdSig (PartialSig {})) -> True
-      _                              -> False
+      Just (TcIdSig (TcPartialSig {})) -> True
+      _                                -> False
     has_mult_anns_and_pats = any has_mult_ann_and_pat lbinds
     has_mult_ann_and_pat (L _ (PatBind{pat_mult=HsNoMultAnn{}})) = False
     has_mult_ann_and_pat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))})) = False

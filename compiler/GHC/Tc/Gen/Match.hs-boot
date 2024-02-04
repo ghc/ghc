@@ -12,8 +12,8 @@ tcGRHSsPat    :: Mult
               -> ExpRhoType
               -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 
-tcMatchesFun :: LocatedN Name
-             -> Mult
-             -> MatchGroup GhcRn (LHsExpr GhcRn)
-             -> ExpSigmaType
-             -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+tcFunBindMatches  :: LocatedN Name
+                  -> Mult
+                  -> MatchGroup GhcRn (LHsExpr GhcRn)
+                  -> ExpSigmaType
+                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))

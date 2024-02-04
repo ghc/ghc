@@ -128,7 +128,7 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
 pmcGRHSs
-  :: HsMatchContext GhcTc         -- ^ Match context, for warning messages
+  :: HsMatchContextRn             -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info

@@ -86,18 +86,18 @@ data DsMessage
 
   -- FIXME(adn) Use a proper type instead of 'SDoc', but unfortunately
   -- 'SrcInfo' gives us an 'SDoc' to begin with.
-  | DsRedundantBangPatterns !(HsMatchContext GhcTc) !SDoc
+  | DsRedundantBangPatterns !HsMatchContextRn !SDoc
 
   -- FIXME(adn) Use a proper type instead of 'SDoc', but unfortunately
   -- 'SrcInfo' gives us an 'SDoc' to begin with.
-  | DsOverlappingPatterns !(HsMatchContext GhcTc) !SDoc
+  | DsOverlappingPatterns !HsMatchContextRn !SDoc
 
   -- FIXME(adn) Use a proper type instead of 'SDoc'
-  | DsInaccessibleRhs !(HsMatchContext GhcTc) !SDoc
+  | DsInaccessibleRhs !HsMatchContextRn !SDoc
 
   | DsMaxPmCheckModelsReached !MaxPmCheckModels
 
-  | DsNonExhaustivePatterns !(HsMatchContext GhcTc)
+  | DsNonExhaustivePatterns !HsMatchContextRn
                             !ExhaustivityCheckType
                             !MaxUncoveredPatterns
                             [Id]

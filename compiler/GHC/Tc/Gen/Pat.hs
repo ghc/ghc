@@ -18,7 +18,7 @@ module GHC.Tc.Gen.Pat
    , newLetBndr
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
-   , tcPats
+   , tcMatchPats
    , addDataConStupidTheta
    , isIrrefutableHsPatRnTcM
    )
@@ -123,11 +123,11 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
         not_xstrict _ = checkManyPattern pat_ty
 
 -----------------
-tcPats :: HsMatchContext GhcTc
-       -> [LPat GhcRn]             -- ^ patterns
-       -> [ExpPatType]             -- ^ types of the patterns
-       -> TcM a                    -- ^ checker for the body
-       -> TcM ([LPat GhcTc], a)
+tcMatchPats :: HsMatchContextRn
+            -> [LPat GhcRn]             -- ^ patterns
+            -> [ExpPatType]             -- ^ types of the patterns
+            -> TcM a                    -- ^ checker for the body
+            -> TcM ([LPat GhcTc], a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -140,13 +140,13 @@ tcPats :: HsMatchContext GhcTc
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside
+tcMatchPats ctxt pats pat_tys thing_inside
   = tc_tt_lpats pat_tys penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
 tcInferPat :: FixedRuntimeRepContext
-           -> HsMatchContext GhcTc
+           -> HsMatchContextRn
            -> LPat GhcRn
            -> TcM a
            -> TcM ((LPat GhcTc, a), TcSigmaTypeFRR)
@@ -156,14 +156,14 @@ tcInferPat frr_orig ctxt pat thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcCheckPat :: HsMatchContext GhcTc
+tcCheckPat :: HsMatchContextRn
            -> LPat GhcRn -> Scaled TcSigmaTypeFRR
            -> TcM a                     -- Checker for body
            -> TcM (LPat GhcTc, a)
 tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
-tcCheckPat_O :: HsMatchContext GhcTc
+tcCheckPat_O :: HsMatchContextRn
              -> CtOrigin              -- ^ origin to use if the type needs inst'ing
              -> LPat GhcRn -> Scaled TcSigmaTypeFRR
              -> TcM a                 -- Checker for body
@@ -190,7 +190,7 @@ data PatEnv
 
 data PatCtxt
   = LamPat   -- Used for lambdas, case etc
-       (HsMatchContext GhcTc)
+      HsMatchContextRn
 
   | LetPat   -- Used only for let(rec) pattern bindings
              -- See Note [Typing patterns in pattern bindings]
@@ -346,21 +346,21 @@ tcMultiple_ tc_pat penv args thing_inside
 tcMultiple :: Checker inp out -> Checker [inp] [out]
 tcMultiple tc_pat penv args thing_inside
   = do  { err_ctxt <- getErrCtxt
-        ; let loop _ []
+        ; let loop []
                 = do { res <- thing_inside
                      ; return ([], res) }
 
-              loop penv (arg:args)
+              loop (arg:args)
                 = do { (p', (ps', res))
                                 <- tc_pat penv arg $
                                    setErrCtxt err_ctxt $
-                                   loop penv args
+                                   loop args
                 -- setErrCtxt: restore context before doing the next pattern
                 -- See Note [Nesting] above
 
                      ; return (p':ps', res) }
 
-        ; loop penv args }
+        ; loop args }
 
 --------------------
 tc_lpat :: Scaled ExpSigmaTypeFRR
@@ -565,7 +565,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
          -- Expression must be a function
         ; let herald = ExpectedFunTyViewPat $ unLoc expr
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
-            <- matchActualFunTySigma herald (Just . HsExprRnThing $ unLoc expr) (1,[]) expr_ty
+            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,[]) expr_ty
                -- See Note [View patterns and polymorphism]
                -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_sigma)
 
@@ -582,7 +582,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                               (Scaled w pat_ty) inf_res_sigma
           -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
           --                (pat_ty -> inf_res_sigma)
-          -- NB: pat_ty comes from matchActualFunTySigma, so it has a
+          -- NB: pat_ty comes from matchActualFunTy, so it has a
           -- fixed RuntimeRep, as needed to call mkWpFun.
         ; let
               expr_wrap = expr_wrap2' <.> expr_wrap1 <.> mult_wrap
@@ -604,7 +604,7 @@ arrow type (t1 -> t2); hence using (tcInferRho expr).
 
 Then, when taking that arrow apart we want to get a *sigma* type
 (forall b. b->(Int,b)), because that's what we want to bind 'x' to.
-Fortunately that's what matchActualFunTySigma returns anyway.
+Fortunately that's what matchActualFunTy returns anyway.
 -}
 
 -- Type signatures in patterns

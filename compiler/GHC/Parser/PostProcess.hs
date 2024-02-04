@@ -58,7 +58,7 @@ module GHC.Parser.PostProcess (
         checkPattern_details,
         incompleteDoBlock,
         ParseContext(..),
-        checkMonadComp,       -- P (HsStmtContext GhcPs)
+        checkMonadComp,
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
@@ -2329,7 +2329,7 @@ data Frame
     -- ^ If-expression: if p then x else y
   | FrameCase LFrame [LFrameMatch]
     -- ^ Case-expression: case x of { p1 -> e1; p2 -> e2 }
-  | FrameDo (HsStmtContext GhcRn) [LFrameStmt]
+  | FrameDo HsStmtContextRn [LFrameStmt]
     -- ^ Do-expression: do { s1; a <- s2; s3 }
   ...
   | FrameExpr (HsExpr GhcPs)   -- unambiguously an expression

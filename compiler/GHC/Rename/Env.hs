@@ -2345,16 +2345,13 @@ by the Opt_QualifiedDo dynamic flag.
 
 -- Lookup operations for a qualified do. If the context is not a qualified
 -- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
-lookupQualifiedDoExpr :: HsStmtContext p -> Name -> RnM (HsExpr GhcRn, FreeVars)
+lookupQualifiedDoExpr :: HsStmtContext fn -> Name -> RnM (HsExpr GhcRn, FreeVars)
 lookupQualifiedDoExpr ctxt std_name
   = first nl_HsVar <$> lookupQualifiedDoName ctxt std_name
 
 -- Like lookupQualifiedDoExpr but for producing SyntaxExpr.
 -- See Note [QualifiedDo].
-lookupQualifiedDo
-  :: HsStmtContext p
-  -> Name
-  -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupQualifiedDo :: HsStmtContext fn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 lookupQualifiedDo ctxt std_name
   = first mkSyntaxExpr <$> lookupQualifiedDoExpr ctxt std_name
 
@@ -2364,10 +2361,7 @@ lookupNameWithQualifier std_name modName
        ; return (qname, unitFV qname) }
 
 -- See Note [QualifiedDo].
-lookupQualifiedDoName
-  :: HsStmtContext p
-  -> Name
-  -> RnM (Name, FreeVars)
+lookupQualifiedDoName :: HsStmtContext fn -> Name -> RnM (Name, FreeVars)
 lookupQualifiedDoName ctxt std_name
   = case qualifiedDoModuleName_maybe ctxt of
       Nothing -> lookupSyntaxName std_name

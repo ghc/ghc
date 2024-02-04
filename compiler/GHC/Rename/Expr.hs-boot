@@ -18,7 +18,7 @@ type AnnoBody body
     )
 
 rnStmts :: --forall thing body.
-           AnnoBody body => HsStmtContext GhcRn
+           AnnoBody body => HsStmtContextRn
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
         -> ([Name] -> RnM (thing, FreeVars))

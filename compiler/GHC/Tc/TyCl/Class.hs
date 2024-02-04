@@ -295,9 +295,9 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
              ctxt = FunSigCtxt sel_name warn_redundant
 
        ; let local_dm_id = mkLocalId local_dm_name ManyTy local_dm_ty
-             local_dm_sig = CompleteSig { sig_bndr = local_dm_id
-                                        , sig_ctxt  = ctxt
-                                        , sig_loc   = getLocA hs_ty }
+             local_dm_sig = CSig { sig_bndr = local_dm_id
+                                 , sig_ctxt = ctxt
+                                 , sig_loc  = getLocA hs_ty }
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $

@@ -8,12 +8,9 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Tc.Gen.Sig(
-       TcSigInfo(..),
-       TcIdSigInfo(..), TcIdSigInst,
-       TcPatSynInfo(..),
-       TcSigFun,
+       TcSigInfo(..), TcIdSig(..), TcSigFun,
 
-       isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
+       isPartialSig, hasCompleteSig, tcSigInfoName, tcIdSigLoc,
        completeSigPolyId_maybe, isCompleteHsSig,
        lhsSigWcTypeContextSpan, lhsSigTypeContextSpan,
 
@@ -94,16 +91,16 @@ especially on value bindings.  Here's an overview.
 * When starting a mutually recursive group, like f/g above, we
   call tcTySig on each signature in the group.
 
-* tcTySig: Sig -> TcIdSigInfo
+* tcTySig: Sig -> TcIdSig
   - For a /complete/ signature, like 'f' above, tcTySig kind-checks
-    the HsType, producing a Type, and wraps it in a CompleteSig, and
+    the HsType, producing a Type, and wraps it in a TcCompleteSig, and
     extend the type environment with this polymorphic 'f'.
 
   - For a /partial/signature, like 'g' above, tcTySig does nothing
     Instead it just wraps the pieces in a PartialSig, to be handled
     later.
 
-* tcInstSig: TcIdSigInfo -> TcIdSigInst
+* tcInstSig: TcIdSig -> TcIdSigInst
   In tcMonoBinds, when looking at an individual binding, we use
   tcInstSig to instantiate the signature forall's in the signature,
   and attribute that instantiated (monomorphic) type to the
@@ -144,28 +141,6 @@ errors were dealt with by the renamer.
 
 -}
 
-
-{- *********************************************************************
-*                                                                      *
-             Utility functions for TcSigInfo
-*                                                                      *
-********************************************************************* -}
-
-tcIdSigName :: TcIdSigInfo -> Name
-tcIdSigName (CompleteSig { sig_bndr = id }) = idName id
-tcIdSigName (PartialSig { psig_name = n })  = n
-
-tcSigInfoName :: TcSigInfo -> Name
-tcSigInfoName (TcIdSig     idsi) = tcIdSigName idsi
-tcSigInfoName (TcPatSynSig tpsi) = patsig_name tpsi
-
-completeSigPolyId_maybe :: TcSigInfo -> Maybe TcId
-completeSigPolyId_maybe sig
-  | TcIdSig sig_info <- sig
-  , CompleteSig { sig_bndr = id } <- sig_info = Just id
-  | otherwise                                 = Nothing
-
-
 {- *********************************************************************
 *                                                                      *
                Typechecking user signatures
@@ -195,7 +170,7 @@ tcTySig (L _ (XSig (IdSig id)))
                     -- NoRRC: do not report redundant constraints
                     -- The user has no control over the signature!
              sig = completeSigFromId ctxt id
-       ; return [TcIdSig sig] }
+       ; return [TcIdSig (TcCompleteSig sig)] }
 
 tcTySig (L loc (TypeSig _ names sig_ty))
   = setSrcSpanA loc $
@@ -212,8 +187,7 @@ tcTySig (L loc (PatSynSig _ names sig_ty))
 tcTySig _ = return []
 
 
-tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
-              -> TcM TcIdSigInfo
+tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name -> TcM TcIdSig
 -- A function or expression type signature
 -- Returns a fully quantified type signature; even the wildcards
 -- are quantified with ordinary skolems that should be instantiated
@@ -229,23 +203,23 @@ tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
-       ; return $
-         CompleteSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
+       ; return $ TcCompleteSig $
+         CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level
                                    -- definition. Which are all unrestricted in
                                    -- the current implementation.
-                     , sig_ctxt  = ctxt_rrc  -- Report redundant constraints
-                     , sig_loc   = loc } }
-                       -- Location of the <type> in   f :: <type>
+              , sig_ctxt  = ctxt_rrc  -- Report redundant constraints
+              , sig_loc   = loc } }   -- Location of the <type> in   f :: <type>
 
   -- Partial sig with wildcards
   | otherwise
-  = return (PartialSig { psig_name = name, psig_hs_ty = hs_sig_ty
-                       , sig_ctxt = ctxt_no_rrc, sig_loc = loc })
+  = return $ TcPartialSig $
+    PSig { psig_name = name, psig_hs_ty = hs_sig_ty
+         , psig_ctxt = ctxt_no_rrc, psig_loc = loc }
   where
-    name   = case mb_name of
+    name = case mb_name of
                Just n  -> n
                Nothing -> mkUnboundName (mkVarOccFS (fsLit "<expression>"))
 
@@ -275,12 +249,12 @@ lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
     go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
     go _ = NoRRC  -- Did not find it
 
-completeSigFromId :: UserTypeCtxt -> Id -> TcIdSigInfo
+completeSigFromId :: UserTypeCtxt -> Id -> TcCompleteSig
 -- Used for instance methods and record selectors
 completeSigFromId ctxt id
-  = CompleteSig { sig_bndr = id
-                , sig_ctxt = ctxt
-                , sig_loc  = getSrcSpan id }
+  = CSig { sig_bndr = id
+         , sig_ctxt = ctxt
+         , sig_loc  = getSrcSpan id }
 
 isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigWcType
@@ -400,7 +374,7 @@ later.  Pattern synonyms are top-level, so there's no problem with
 completely solving them.
 -}
 
-tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
+tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynSig
 -- See Note [Pattern synonym signatures]
 -- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
 tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty}))
@@ -475,13 +449,14 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
               , text "ex_tvs" <+> ppr_tvs (binderVars ex_bndrs)
               , text "prov" <+> ppr prov
               , text "body_ty" <+> ppr body_ty ]
-       ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = kv_bndrs ++ implicit_bndrs
-                      , patsig_univ_bndrs     = univ_bndrs
-                      , patsig_req            = req
-                      , patsig_ex_bndrs       = ex_bndrs
-                      , patsig_prov           = prov
-                      , patsig_body_ty        = body_ty }) }
+       ; return $
+         PatSig { patsig_name = name
+                , patsig_implicit_bndrs = kv_bndrs ++ implicit_bndrs
+                , patsig_univ_bndrs     = univ_bndrs
+                , patsig_req            = req
+                , patsig_ex_bndrs       = ex_bndrs
+                , patsig_prov           = prov
+                , patsig_body_ty        = body_ty } }
   where
     ctxt = PatSynCtxt name
 
@@ -513,9 +488,9 @@ ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 ********************************************************************* -}
 
 
-tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
+tcInstSig :: TcIdSig -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
-tcInstSig hs_sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcInstSig hs_sig@(TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { (tv_prs, theta, tau) <- tcInstTypeBndrs (idType poly_id)
               -- See Note [Pattern bindings and complete signatures]
@@ -527,9 +502,9 @@ tcInstSig hs_sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
                       , sig_inst_theta = theta
                       , sig_inst_tau   = tau }) }
 
-tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
-                             , sig_ctxt = ctxt
-                             , sig_loc = loc })
+tcInstSig hs_sig@(TcPartialSig (PSig { psig_hs_ty = hs_ty
+                                     , psig_ctxt = ctxt
+                                     , psig_loc = loc }))
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
        ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty

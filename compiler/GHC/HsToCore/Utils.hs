@@ -459,7 +459,7 @@ For uniformity, calls to 'error' in both cases are wrapped even if -XLinearTypes
 is disabled.
 -}
 
-mkFailExpr :: HsMatchContext GhcTc -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContextRn -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
@@ -736,7 +736,7 @@ work out well:
 -- to select Many as the multiplicity of every let-expression introduced.
 mkSelectorBinds :: [[CoreTickish]]       -- ^ ticks to add, possibly
                 -> LPat GhcTc            -- ^ The pattern
-                -> HsMatchContext GhcTc  -- ^ Where the pattern occurs
+                -> HsMatchContextRn      -- ^ Where the pattern occurs
                 -> CoreExpr              -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
                 -- ^ Id the rhs is bound to, for desugaring strict

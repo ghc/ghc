@@ -117,7 +117,7 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
@@ -262,7 +262,7 @@ tcExpr e@(HsIPVar _ x) res_ty
   origin = IPOccOrigin x
 
 tcExpr e@(HsLam x lam_variant matches) res_ty
-  = do { (wrap, matches') <- tcMatchLambda herald matches res_ty
+  = do { (wrap, matches') <- tcLambdaMatches herald matches res_ty
        ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
   where
     herald = ExpectedFunTyLam lam_variant e
@@ -365,7 +365,7 @@ tcExpr (HsCase ctxt scrut matches) res_ty
           mult <- newFlexiTyVarTy multiplicityTy
 
           -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
-          -- would also be possible (tcMatchesCase accepts sigma-types)
+          -- would also be possible (tcCaseMatches accepts sigma-types)
           -- Interesting litmus test: do these two behave the same?
           --     case id        of {..}
           --     case (\v -> v) of {..}
@@ -373,7 +373,7 @@ tcExpr (HsCase ctxt scrut matches) res_ty
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; hasFixedRuntimeRep_syntactic FRRCase scrut_ty
-        ; (mult_co_wrap, matches') <- tcMatchesCase tcBody (Scaled mult scrut_ty) matches res_ty
+        ; (mult_co_wrap, matches') <- tcCaseMatches tcBody (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase ctxt (mkLHsWrap mult_co_wrap scrut') matches') }
 
 tcExpr (HsIf x pred b1 b2) res_ty
@@ -895,8 +895,8 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTysRho herald orig Nothing
-                                   (length arg_shapes) sigma_ty
+           <- matchActualFunTys herald orig Nothing
+                                (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_mults ->

@@ -67,9 +67,12 @@ module GHC.Tc.Types(
         ArrowCtxt(..),
 
         -- TcSigInfo
-        TcSigFun, TcSigInfo(..), TcIdSigInfo(..),
-        TcIdSigInst(..), TcPatSynInfo(..),
+        TcSigFun,
+        TcSigInfo(..), TcIdSig(..),
+        TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..),
+        TcIdSigInst(..),
         isPartialSig, hasCompleteSig,
+        tcIdSigLoc, tcSigInfoName, completeSigPolyId_maybe,
 
         -- Misc other types
         TcId,

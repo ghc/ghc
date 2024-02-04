@@ -2056,10 +2056,9 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                     -- WantRCC <=> check for redundant constraints in the
                     --          user-specified instance signature
              inner_meth_id  = mkLocalId inner_meth_name ManyTy sig_ty
-             inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
-                                          , sig_ctxt = ctxt
-                                          , sig_loc  = getLocA hs_sig_ty }
-
+             inner_meth_sig = CSig { sig_bndr = inner_meth_id
+                                   , sig_ctxt = ctxt
+                                   , sig_loc  = getLocA hs_sig_ty }
 
        ; (tc_bind, [Scaled _ inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 

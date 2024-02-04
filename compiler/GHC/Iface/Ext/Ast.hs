@@ -928,28 +928,34 @@ instance ( HiePass p
          ) => ToHie (LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span m ) = concatM $ makeNodeA m span : case m of
     Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
-      [ toHie mctx
+      [ toHieHsMatchContext @p mctx
       , let rhsScope = mkScope $ grhss_span grhss
           in toHie $ patScopes Nothing rhsScope NoScope pats
       , toHie grhss
       ]
 
-instance HiePass p => ToHie (HsMatchContext (GhcPass p)) where
-  toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name'
-    where
+toHieHsMatchContext :: forall p. HiePass p => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
+                                           -> HieM [HieAST Type]
+toHieHsMatchContext ctxt
+  = case ctxt of
+      FunRhs{mc_fun=name} -> toHie $ C MatchBind (get_name name)
+      StmtCtxt a          -> toHieHsStmtContext @p a
+      _                   -> pure []
+  where
       -- See a paragraph about Haddock in #20415.
-      name' :: LocatedN Name
-      name' = case hiePass @p of
-        HieRn -> name
-        HieTc -> name
-  toHie (StmtCtxt a) = toHie a
-  toHie _ = pure []
+    get_name :: LIdP (NoGhcTc (GhcPass p)) -> LocatedN Name
+    get_name name = case hiePass @p of
+                      HieRn -> name
+                      HieTc -> name
 
-instance HiePass p => ToHie (HsStmtContext (GhcPass p)) where
-  toHie (PatGuard a) = toHie a
-  toHie (ParStmtCtxt a) = toHie a
-  toHie (TransStmtCtxt a) = toHie a
-  toHie _ = pure []
+toHieHsStmtContext :: forall p. HiePass p => HsStmtContext (LIdP (NoGhcTc (GhcPass p)))
+                                          -> HieM [HieAST Type]
+toHieHsStmtContext ctxt
+  = case ctxt of
+      PatGuard a      -> toHieHsMatchContext @p a
+      ParStmtCtxt a   -> toHieHsStmtContext  @p a
+      TransStmtCtxt a -> toHieHsStmtContext  @p a
+      _               -> pure []
 
 instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
   toHie (PS rsp scope pscope lpat@(L ospan opat)) =

@@ -65,13 +65,13 @@ allPmCheckWarnings =
   ]
 
 -- | Check whether the redundancy checker should run (redundancy only)
-overlapping :: DynFlags -> HsMatchContext id -> Bool
+overlapping :: DynFlags -> HsMatchContext fn -> Bool
 -- See Note [Inaccessible warnings for record updates]
 overlapping _      RecUpd = False
 overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
-exhaustive :: DynFlags -> HsMatchContext id -> Bool
+exhaustive :: DynFlags -> HsMatchContext fn -> Bool
 exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
 
 -- | Check whether unnecessary bangs should be warned about
@@ -81,7 +81,7 @@ redundantBang dflags = wopt Opt_WarnRedundantBangPatterns dflags
 -- | Denotes whether an exhaustiveness check is supported, and if so,
 -- via which 'WarningFlag' it's controlled.
 -- Returns 'Nothing' if check is not supported.
-exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
+exhaustiveWarningFlag :: HsMatchContext fn -> Maybe WarningFlag
 exhaustiveWarningFlag FunRhs{}           = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag CaseAlt            = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag IfAlt              = Just Opt_WarnIncompletePatterns
@@ -109,14 +109,14 @@ arrowMatchContextExhaustiveWarningFlag = \ case
 -- | Check whether any part of pattern match checking is enabled for this
 -- 'HsMatchContext' (does not matter whether it is the redundancy check or the
 -- exhaustiveness check).
-isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
+isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext fn -> Bool
 isMatchContextPmChecked dflags origin ctxt
   =  requiresPMC origin
   && (overlapping dflags ctxt || exhaustive dflags ctxt)
 
 -- | Check whether exhaustivity checks are enabled for this 'HsMatchContext',
 -- when dealing with a single pattern (using the 'matchSinglePatVar' function).
-isMatchContextPmChecked_SinglePat :: DynFlags -> Origin -> HsMatchContext id -> LPat GhcTc -> Bool
+isMatchContextPmChecked_SinglePat :: DynFlags -> Origin -> HsMatchContext fn -> LPat GhcTc -> Bool
 isMatchContextPmChecked_SinglePat dflags origin ctxt pat
   | not (needToRunPmCheck dflags origin)
   = False

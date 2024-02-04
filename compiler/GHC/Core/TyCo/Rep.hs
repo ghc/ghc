@@ -48,7 +48,7 @@ module GHC.Core.TyCo.Rep (
         mkFunTy, mkNakedFunTy,
         mkVisFunTy, mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
-        tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTys,
+        tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTy, tcMkScaledFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
         mkVisFunTyMany, mkVisFunTysMany,
@@ -735,22 +735,6 @@ mkInvisFunTys args res
   where
     af = invisArg (typeTypeOrConstraint res)
 
-tcMkVisFunTy :: Mult -> Type -> Type -> Type
--- Always TypeLike, user-specified multiplicity.
--- Does not have the assert-checking in mkFunTy: used by the typechecker
--- to avoid looking at the result kind, which may not be zonked
-tcMkVisFunTy mult arg res
-  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
-          , ft_arg = arg, ft_res = res }
-
-tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
--- Always TypeLike, invisible argument
--- Does not have the assert-checking in mkFunTy: used by the typechecker
--- to avoid looking at the result kind, which may not be zonked
-tcMkInvisFunTy res_torc arg res
-  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
-          , ft_arg = arg, ft_res = res }
-
 mkVisFunTy :: HasDebugCallStack => Mult -> Type -> Type -> Type
 -- Always TypeLike, user-specified multiplicity.
 mkVisFunTy = mkFunTy visArgTypeLike
@@ -777,14 +761,6 @@ mkScaledFunTys tys ty = foldr (mkScaledFunTy af) ty tys
   where
     af = visArg (typeTypeOrConstraint ty)
 
-tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
--- All visible args
--- Result type must be TypeLike
--- No mkFunTy assert checking; result kind may not be zonked
-tcMkScaledFunTys tys ty = foldr mk ty tys
-  where
-    mk (Scaled mult arg) res = tcMkVisFunTy mult arg res
-
 ---------------
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
@@ -809,11 +785,11 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
 
-mkPiTy :: PiTyBinder -> Type -> Type
+mkPiTy :: HasDebugCallStack => PiTyBinder -> Type -> Type
 mkPiTy (Anon ty1 af) ty2  = mkScaledFunTy af ty1 ty2
 mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
 
-mkPiTys :: [PiTyBinder] -> Type -> Type
+mkPiTys :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
@@ -823,6 +799,31 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- what 'mkNakedTyConTy' is for.
 mkNakedTyConTy :: TyCon -> Type
 mkNakedTyConTy tycon = TyConApp tycon []
+
+tcMkVisFunTy :: Mult -> Type -> Type -> Type
+-- Always TypeLike result, user-specified multiplicity.
+-- Does not have the assert-checking in mkFunTy: used by the typechecker
+-- to avoid looking at the result kind, which may not be zonked
+tcMkVisFunTy mult arg res
+  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
+          , ft_arg = arg, ft_res = res }
+
+tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
+-- Always invisible (constraint) argument, result specified by res_torc
+-- Does not have the assert-checking in mkFunTy: used by the typechecker
+-- to avoid looking at the result kind, which may not be zonked
+tcMkInvisFunTy res_torc arg res
+  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
+          , ft_arg = arg, ft_res = res }
+
+tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
+-- All visible args
+-- Result type must be TypeLike
+-- No mkFunTy assert checking; result kind may not be zonked
+tcMkScaledFunTys tys ty = foldr tcMkScaledFunTy ty tys
+
+tcMkScaledFunTy :: Scaled Type -> Type -> Type
+tcMkScaledFunTy (Scaled mult arg) res = tcMkVisFunTy mult arg res
 
 {-
 %************************************************************************
