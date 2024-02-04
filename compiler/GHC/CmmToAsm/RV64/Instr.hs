@@ -124,7 +124,7 @@ regUsageOfInstr platform instr = case instr of
   B t                      -> usage (regTarget t, [])
   B_FAR _t                 -> usage ([], [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BCOND_FAR _ l r b t        -> usage (regTarget t ++ regOp l ++ regOp r, [])
+  BCOND_FAR _ l r _ t        -> usage (regTarget t ++ regOp l ++ regOp r, [])
   BL t ps _rs              -> usage (regTarget t ++ ps, callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
@@ -944,13 +944,12 @@ isEncodeableInWidth = isNbitEncodeable . widthInBits
 -- using @ip@ (register reserved for calculations.) The trick is to invert the
 -- condition, do a far jump in the fall-through case or a short jump when the
 -- (inverted) condition is true.
--- TODO: Remove comments / annotations
 makeFarBranches ::
   LabelMap RawCmmStatics ->
   [NatBasicBlock Instr] ->
   [NatBasicBlock Instr]
 makeFarBranches info_env blocks
-  | NE.last blockAddresses < nearLimit = zipWith (curry blockStatistics) blockAddressList blocks
+  | NE.last blockAddresses < nearLimit = blocks
   | otherwise = zipWith handleBlock blockAddressList blocks
   where
     blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
@@ -963,24 +962,22 @@ makeFarBranches info_env blocks
     makeFar :: BlockId -> Int -> Instr -> Instr
     makeFar bid addr orig@(BCOND cond op1 op2 tgt@(TBlock tgtBid))
       | abs (addr - targetAddr) >= nearLimit =
-       ANN (text "BCOND_FAR targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) $
-          BCOND_FAR cond op1 op2 (TBlock bid) tgt
+          annotate addr targetAddr $
+            BCOND_FAR cond op1 op2 (TBlock bid) tgt
       | otherwise =
-          ANN (text "BCOND targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) orig
+          annotate addr targetAddr orig
       where
         Just targetAddr = lookupUFM blockAddressMap tgtBid
     makeFar _bid addr orig@(B (TBlock tgtBid))
       | abs (addr - targetAddr) >= nearLimit =
-       ANN (text "B_FAR targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) $
-          B_FAR tgtBid
+          annotate addr targetAddr $
+            B_FAR tgtBid
       | otherwise =
-          ANN (text "B targetAddr:" <+> int targetAddr <+> text ", offset:" <+> int (addr - targetAddr) <+> text ", nearLimit:" <+> int nearLimit) orig
+          annotate addr targetAddr orig
       where
         Just targetAddr = lookupUFM blockAddressMap tgtBid
-    makeFar _bid _addr orig@(BCOND _cond _op1 _op2 (TLabel _l)) = ANN (text "other BCOND: label") orig
-    makeFar _bid _addr orig@(BCOND _cond _op1 _op2 _l) = ANN (text "other BCOND: other") orig
     makeFar bid addr (ANN desc other) = ANN desc $ makeFar bid addr other
-    makeFar _bid _ other = ANN (text ("makeFar: " ++ instrCon other)) other
+    makeFar _bid _ other = other
 
     -- 262144 (2^20 / 4) instructions are allowed; let's keep some distance, as
     -- we have pseudo-insns that are pretty-printed as multiple instructions,
@@ -991,8 +988,17 @@ makeFarBranches info_env blocks
 
     blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList
 
-    blockStatistics (stat, BasicBlock blockId instrs) =
-      BasicBlock blockId (COMMENT (text "BasicBlock" <+> text (show blockId) <+> text "Address" <+> int stat) : instrs)
-
-annotateBlock :: NatBasicBlock Instr -> NatBasicBlock Instr
-annotateBlock (BasicBlock id instrs) = BasicBlock id (COMMENT (text "annotateBlock: visited") : instrs)
+    -- We may want to optimize the limit in future. So, annotate the most
+    -- important values of the decision.
+    annotate :: Int -> Int -> Instr -> Instr
+    annotate addr targetAddr instr =
+      ANN
+        ( text (instrCon instr)
+            <+> text "targetAddr" <> colon
+            <+> int targetAddr <> comma
+            <+> text "offset" <> colon
+            <+> int (addr - targetAddr) <> comma
+            <+> text "nearLimit" <> colon
+            <+> int nearLimit
+        )
+        instr
