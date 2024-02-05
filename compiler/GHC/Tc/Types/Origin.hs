@@ -130,8 +130,6 @@ data UserTypeCtxt
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
-  | RuleSigCtxt FastString Name    -- LHS of a RULE forall
-                        --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Class or types in a default declaration
   | InstDeclCtxt Bool   -- An instance declaration
@@ -154,6 +152,9 @@ data UserTypeCtxt
                         --      data <S> => T a = MkT a
   | DerivClauseCtxt     -- A 'deriving' clause
   | TyVarBndrKindCtxt Name  -- The kind of a type variable being bound
+  | RuleBndrTypeCtxt Name   -- The type of a term variable being bound in a RULE
+                            -- or SPECIALISE pragma
+                            --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
@@ -195,11 +196,10 @@ redundantConstraintsSpan _ = noSrcSpan
 
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
-pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt _ n) = text "the type signature for" <+> quotes (ppr n)
-pprUserTypeCtxt (ExprSigCtxt _)   = text "an expression type signature"
-pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
+pprUserTypeCtxt (FunSigCtxt n _)   = text "the type signature for" <+> quotes (ppr n)
+pprUserTypeCtxt (InfSigCtxt n)     = text "the inferred type for" <+> quotes (ppr n)
+pprUserTypeCtxt (ExprSigCtxt _)    = text "an expression type signature"
+pprUserTypeCtxt KindSigCtxt        = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
 pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
@@ -218,6 +218,7 @@ pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declarati
 pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
 pprUserTypeCtxt (DerivClauseCtxt) = text "a `deriving' clause"
 pprUserTypeCtxt (TyVarBndrKindCtxt n) = text "the kind annotation on the type variable" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleBndrTypeCtxt n)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (DataKindCtxt n)  = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TySynKindCtxt n) = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TyFamResKindCtxt n) = text "the result kind for" <+> quotes (ppr n)
@@ -299,6 +300,7 @@ data SkolemInfoAnon
   | IPSkol [HsIPName]   -- Binding site of an implicit parameter
 
   | RuleSkol RuleName   -- The LHS of a RULE
+  | SpecESkol Name      -- A SPECIALISE pragma
 
   | InferSkol [(Name,TcType)]
                         -- We have inferred a type for these (mutually recursive)
@@ -370,6 +372,7 @@ pprSkolInfo (InstSkol (IsQC {}) sz) = vcat [ text "a quantified context"
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
+pprSkolInfo (SpecESkol name)  = text "a SPECIALISE pragma for" <+> quotes (ppr name)
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , text "in" <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")

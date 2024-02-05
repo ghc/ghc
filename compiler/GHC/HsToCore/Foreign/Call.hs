@@ -22,32 +22,37 @@ where
 import GHC.Prelude
 
 import GHC.Core
-
-import GHC.HsToCore.Monad
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Types.SourceText
-import GHC.Types.Id.Make
-import GHC.Types.ForeignCall
 import GHC.Core.DataCon
-import GHC.HsToCore.Utils
-
-import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
-import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
-import GHC.Builtin.Types
+import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
+
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Utils
+
+import GHC.Types.SourceText
+import GHC.Types.Id.Make
+import GHC.Types.ForeignCall
 import GHC.Types.Basic
 import GHC.Types.Literal
+import GHC.Types.RepType (typePrimRep1)
+
+import GHC.Tc.Utils.TcType
+
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 import GHC.Builtin.Names
+
 import GHC.Driver.DynFlags
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
-import GHC.Types.RepType (typePrimRep1)
 
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,

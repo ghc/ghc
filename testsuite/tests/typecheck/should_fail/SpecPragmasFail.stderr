@@ -1,0 +1,6 @@
+SpecPragmasFail.hs:7:16: error: [GHC-83865]
+    • Couldn't match type ‘Integer’ with ‘Int’
+      Expected: Int -> Int
+        Actual: Integer -> Integer
+    • In the expression: foo @Integer :: Int -> Int
+

@@ -62,8 +62,10 @@ module GHC.Parser.PostProcess (
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
-        mkRuleBndrs, mkRuleTyVarBndrs,
+        mkRuleBndrs,
+        ruleBndrsOrDef,
         checkRuleTyVarBndrNames,
+        mkSpecSig,
         checkRecordSyntax,
         checkEmptyGADTs,
         addFatalError, hintBangPat,
@@ -1006,29 +1008,84 @@ type LRuleTyTmVar = LocatedAn NoEpAnns RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar AnnTyVarBndr (LocatedN RdrName) (Maybe (LHsType GhcPs))
 -- ^ Essentially a wrapper for a @RuleBndr GhcPs@
 
--- turns RuleTyTmVars into RuleBnrs - this is straightforward
-mkRuleBndrs :: [LRuleTyTmVar] -> [LRuleBndr GhcPs]
-mkRuleBndrs = fmap (fmap cvt_one)
-  where cvt_one (RuleTyTmVar ann v Nothing) = RuleBndr ann v
-        cvt_one (RuleTyTmVar ann v (Just sig)) =
-          RuleBndrSig ann v (mkHsPatSigType noAnn sig)
+ruleBndrsOrDef :: Maybe (RuleBndrs GhcPs) -> RuleBndrs GhcPs
+ruleBndrsOrDef (Just bndrs) = bndrs
+ruleBndrsOrDef Nothing      = mkRuleBndrs noAnn Nothing []
 
--- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
-mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
-mkRuleTyVarBndrs = fmap (setLHsTyVarBndrNameSpace tvName . cvt_one)
-  where cvt_one (L l (RuleTyTmVar ann v msig))
+mkRuleBndrs :: HsRuleBndrsAnn -> Maybe [LRuleTyTmVar] -> [LRuleTyTmVar] -> RuleBndrs GhcPs
+mkRuleBndrs ann tvbs tmbs
+  = RuleBndrs { rb_ext = ann
+              , rb_tyvs = fmap (fmap (setLHsTyVarBndrNameSpace tvName . cvt_tv)) tvbs
+              , rb_tmvs = fmap (fmap cvt_tm) tmbs }
+  where
+    -- cvt_tm turns RuleTyTmVars into RuleBnrs - this is straightforward
+    cvt_tm (RuleTyTmVar ann v Nothing)    = RuleBndr ann v
+    cvt_tm (RuleTyTmVar ann v (Just sig)) = RuleBndrSig ann v (mkHsPatSigType noAnn sig)
+
+    -- cvt_tv turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
+    cvt_tv (L l (RuleTyTmVar ann v msig))
           = L (l2l l) (HsTvb ann () (HsBndrVar noExtField v) (cvt_sig msig))
-        cvt_sig Nothing    = HsBndrNoKind noExtField
-        cvt_sig (Just sig) = HsBndrKind   noExtField sig
+    cvt_sig Nothing    = HsBndrNoKind noExtField
+    cvt_sig (Just sig) = HsBndrKind   noExtField sig
 
+checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P ()
 -- See Note [Parsing explicit foralls in Rules] in Parser.y
-checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
-checkRuleTyVarBndrNames = mapM_ check . mapMaybe (hsTyVarLName . unLoc)
-  where check (L loc (Unqual occ)) =
-          when (occNameFS occ `elem` [fsLit "family",fsLit "role"])
-            (addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
-               (PsErrParseErrorOnInput occ))
-        check _ = panic "checkRuleTyVarBndrNames"
+checkRuleTyVarBndrNames bndrs
+   = sequence_ [ check lname | L _ (RuleTyTmVar _ lname _) <- bndrs ]
+  where
+    check (L loc (Unqual occ)) =
+          when (occNameFS occ `elem` [fsLit "family",fsLit "role"]) $
+          addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+                          PsErrParseErrorOnInput occ
+    check _ = panic "checkRuleTyVarBndrNames"
+
+-- | Deal with both old-form and new-form specialise pragmas, using the new
+-- 'SpecSigE' form unless there are multiple comma-separated type signatures,
+-- in which case we use the old-form.
+--
+-- See Note [Overview of SPECIALISE pragmas] in GHC.Tc.Gen.Sig.
+mkSpecSig :: InlinePragma
+          -> AnnSpecSig
+          -> Maybe (RuleBndrs GhcPs)
+          -> LHsExpr GhcPs
+          -> Maybe (TokDcolon, OrdList (LHsSigType GhcPs))
+          -> P (Sig GhcPs)
+mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
+  = case m_sigtypes_ascr of
+      Nothing
+        -- New form, no trailing type signature, e.g {-# SPECIALISE f @Int #-}
+        -> pure $
+           SpecSigE activation_anns
+                    (ruleBndrsOrDef m_rule_binds) expr inl_prag
+
+      Just (colon_ann, sigtype_ol)
+
+        -- Singleton, e.g.  {-# SPECIALISE f :: ty #-}
+        -- Use the SpecSigE route
+        | [sigtype] <- sigtype_list
+        -> pure $
+           SpecSigE activation_anns
+                    (ruleBndrsOrDef m_rule_binds)
+                    (L (getLoc expr)  -- ToDo: not really the right location for (e::ty)
+                       (ExprWithTySig colon_ann expr (mkHsWildCardBndrs sigtype)))
+                    inl_prag
+
+        -- So we must have the old form  {# SPECIALISE f :: ty1, ty2, ty3 #-}
+        -- Use the old SpecSig route
+        | Nothing <- m_rule_binds
+        , L _ (HsVar _ var) <- expr
+        -> do addPsMessage sigs_loc PsWarnSpecMultipleTypeAscription
+              pure $
+                SpecSig activation_anns var sigtype_list inl_prag
+
+        | otherwise ->
+            addFatalError $
+              mkPlainErrorMsgEnvelope sigs_loc PsErrSpecExprMultipleTypeAscription
+
+        where
+          sigtype_list = fromOL sigtype_ol
+          sigs_loc =
+            getHasLoc colon_ann `combineSrcSpans` getHasLoc (last sigtype_list)
 
 checkRecordSyntax :: (MonadP m, Outputable a) => LocatedA a -> m (LocatedA a)
 checkRecordSyntax lr@(L loc r)

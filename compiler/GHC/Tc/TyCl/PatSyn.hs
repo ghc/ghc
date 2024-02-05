@@ -37,8 +37,9 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( typeKind, tidyForAllTyBinders, tidyTypes, tidyType, isManyTy, mkTYPEapp )
+import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Core.TyCo.Tidy( tidyForAllTyBinders, tidyTypes, tidyType )
 import GHC.Core.Predicate
 
 import GHC.Types.Name

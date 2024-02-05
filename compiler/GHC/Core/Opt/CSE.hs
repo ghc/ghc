@@ -638,6 +638,9 @@ Notes:
   doing this if there are no RULES; and other things being
   equal it delays optimisation to delay inlining (#17409)
 
+* There can be a subtle order-dependency, as described in #25526;
+  it may matter whether we end up with f=g or g=f.
+
 
 ---- Historical note ---
 

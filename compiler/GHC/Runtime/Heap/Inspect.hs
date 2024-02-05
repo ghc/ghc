@@ -44,6 +44,7 @@ import GHCi.Message ( fromSerializableException )
 
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
 import GHC.Types.RepType
 import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
