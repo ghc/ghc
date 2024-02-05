@@ -1217,8 +1217,8 @@ floatToDigits base x =
 -- Converting from an Integer to a RealFloat
 ------------------------------------------------------------------------
 
-{-# SPECIALISE integerToBinaryFloat' :: Integer -> Float,
-                                        Integer -> Double #-}
+{-# SPECIALISE integerToBinaryFloat' :: Integer -> Float #-}
+{-# SPECIALISE integerToBinaryFloat' :: Integer -> Double #-}
 -- | Converts a positive integer to a floating-point value.
 --
 -- The value nearest to the argument will be returned.
@@ -1386,8 +1386,8 @@ Float or Double exploiting the known floatRadix and avoiding
 divisions as much as possible.
 -}
 
-{-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
-                            Int -> Int -> Integer -> Integer -> Double #-}
+{-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float #-}
+{-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Double #-}
 fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
 -- Invariant: n and d strictly positive
 fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =

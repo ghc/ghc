@@ -1159,15 +1159,15 @@ simplExprF :: SimplEnv
            -> SimplM (SimplFloats, OutExpr)
 
 simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
-  = {- pprTrace "simplExprF" (vcat
-      [ ppr e
-      , text "cont =" <+> ppr cont
-      , text "inscope =" <+> ppr (seInScope env)
-      , text "tvsubst =" <+> ppr (seTvSubst env)
-      , text "idsubst =" <+> ppr (seIdSubst env)
-      , text "cvsubst =" <+> ppr (seCvSubst env)
-      ]) $ -}
-    simplExprF1 env e cont
+--  = pprTrace "simplExprF" (vcat
+--      [ ppr e
+--      , text "cont =" <+> ppr cont
+--      , text "inscope =" <+> ppr (seInScope env)
+--      , text "tvsubst =" <+> ppr (seTvSubst env)
+--      , text "idsubst =" <+> ppr (seIdSubst env)
+--      , text "cvsubst =" <+> ppr (seCvSubst env)
+--      ]) $
+  = simplExprF1 env e cont
 
 simplExprF1 :: HasDebugCallStack
             => SimplEnv -> InExpr -> SimplCont
@@ -2514,7 +2514,7 @@ field of the ArgInfo record is the state of a little state-machine:
   If we inline `f` before simplifying `BIG` well use preInlineUnconditionally,
   and we'll simplify BIG once, at x's occurrence, rather than twice.
 
-* GHC.Core.Opt.Simplify.Utils. mkRewriteCall: if there are no rules, and no
+* GHC.Core.Opt.Simplify.Utils.mkRewriteCall: if there are no rules, and no
   unfolding, we can skip both TryRules and TryInlining, which saves work.
 
 Note [Avoid redundant simplification]

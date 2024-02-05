@@ -45,8 +45,7 @@ main = do
                        () |]
       let hs_t = fromRight (error "convertToHsType") $
                  convertToHsType (Generated OtherExpansion SkipPmc) noSrcSpan th_t
-      (messages, mres) <-
-        tcRnType hsc_env SkolemiseFlexi True hs_t
+      (messages, mres) <- tcRnTypeSkolemising hsc_env hs_t
       let (warnings, errors) = partitionMessages messages
       case mres of
         Nothing -> do

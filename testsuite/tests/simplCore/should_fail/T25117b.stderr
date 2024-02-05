@@ -1,0 +1,5 @@
+T25117b.hs:7:27: error: [GHC-62037]
+    SPECIALISE expression doesn't support multiple type ascriptions
+    Suggested fix:
+      Split the SPECIALISE pragma into multiple pragmas, one for each type signature
+

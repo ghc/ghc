@@ -83,12 +83,29 @@ instance Diagnostic DsMessage where
                StrictBinds       -> "strict bindings"
          in mkSimpleDecorated $
               hang (text "Top-level" <+> text desc <+> text "aren't allowed:") 2 (ppr bind)
-    DsUselessSpecialiseForClassMethodSelector poly_id
-      -> mkSimpleDecorated $
-           text "Ignoring useless SPECIALISE pragma for class selector:" <+> quotes (ppr poly_id)
-    DsUselessSpecialiseForNoInlineFunction poly_id
-      -> mkSimpleDecorated $
-          text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
+    DsUselessSpecialisePragma poly_nm is_dfun rea ->
+      mkSimpleDecorated $
+        what <+> pragma <+> text "pragma" <+> why
+      where
+        quoted_nm = quotes (ppr poly_nm)
+        what =
+          if uselessSpecialisePragmaKeepAnyway rea
+          then text "Seemingly useless"
+          else text "Ignoring useless"
+        pragma = if is_dfun
+                 then text "SPECIALISE instance"
+                 else text "SPECIALISE"
+        why = case rea of
+          UselessSpecialiseForClassMethodSelector ->
+            text "for class selector:" <+> quoted_nm
+          UselessSpecialiseForNoInlineFunction ->
+            text "for NOINLINE function:" <+> quoted_nm
+          UselessSpecialiseNoSpecialisation ->
+            if is_dfun
+              -- Omit the Name for a DFunId, as it will be internal and not
+              -- very illuminating to users who don't know what a DFunId is.
+            then empty
+            else text "for:" <+> quoted_nm
     DsOrphanRule rule
       -> mkSimpleDecorated $ text "Orphan rule:" <+> ppr rule
     DsRuleLhsTooComplicated orig_lhs lhs2
@@ -109,7 +126,7 @@ instance Diagnostic DsMessage where
                        , text "is not bound in RULE lhs"])
                 2 (vcat [ text "Orig bndrs:" <+> ppr orig_bndrs
                         , text "Orig lhs:" <+> ppr orig_lhs
-                        , text "optimised lhs:" <+> ppr lhs2 ])
+                        , text "Optimised lhs:" <+> ppr lhs2 ])
 
            pp_bndr b
             | isTyVar b = text "type variable" <+> quotes (ppr b)
@@ -224,8 +241,7 @@ instance Diagnostic DsMessage where
     DsNonExhaustivePatterns _ (ExhaustivityCheckType mb_flag) _ _ _
       -> maybe WarningWithoutFlag WarningWithFlag mb_flag
     DsTopLevelBindsNotAllowed{}                 -> ErrorWithoutFlag
-    DsUselessSpecialiseForClassMethodSelector{} -> WarningWithoutFlag
-    DsUselessSpecialiseForNoInlineFunction{}    -> WarningWithoutFlag
+    DsUselessSpecialisePragma{}                 -> WarningWithFlag Opt_WarnUselessSpecialisations
     DsOrphanRule{}                              -> WarningWithFlag Opt_WarnOrphans
     DsRuleLhsTooComplicated{}                   -> WarningWithoutFlag
     DsRuleIgnoredDueToConstructor{}             -> WarningWithoutFlag
@@ -260,8 +276,7 @@ instance Diagnostic DsMessage where
     DsMaxPmCheckModelsReached{}                 -> [SuggestIncreaseMaxPmCheckModels]
     DsNonExhaustivePatterns{}                   -> noHints
     DsTopLevelBindsNotAllowed{}                 -> noHints
-    DsUselessSpecialiseForClassMethodSelector{} -> noHints
-    DsUselessSpecialiseForNoInlineFunction{}    -> noHints
+    DsUselessSpecialisePragma{}                 -> noHints
     DsOrphanRule{}                              -> noHints
     DsRuleLhsTooComplicated{}                   -> noHints
     DsRuleIgnoredDueToConstructor{}             -> noHints
