@@ -78,10 +78,10 @@ filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
 filterSigNames :: (IdP (GhcPass p) -> Bool) -> Sig (GhcPass p) -> Maybe (Sig (GhcPass p))
 filterSigNames p orig@(SpecSig _ n _ _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig _ n _)          = ifTrueJust (p $ unLoc n) orig
-filterSigNames p (FixSig _ (FixitySig _ ns ty)) =
+filterSigNames p (FixSig _ (FixitySig ns_spec ns ty)) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (FixSig noAnn (FixitySig noExtField filtered ty))
+    filtered -> Just (FixSig noAnn (FixitySig ns_spec filtered ty))
 filterSigNames _ orig@(MinimalSig _ _)      = Just orig
 filterSigNames p (TypeSig _ ns ty) =
   case filter (p . unLoc) ns of
