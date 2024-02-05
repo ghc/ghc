@@ -16,6 +16,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.Opt.ConstantFold (primOpRules)
 import GHC.Core.TyCo.Rep ( scaledThing )
 import GHC.Core.Type
+import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
 import GHC.Core.FVs (mkRuleInfo)
 
 import GHC.Builtin.PrimOps

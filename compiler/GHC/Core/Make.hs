@@ -65,7 +65,7 @@ import GHC.Types.Unique.Supply
 import GHC.Core
 import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec )
 import GHC.Core.Type
-import GHC.Core.Predicate    ( isCoVarType )
+import GHC.Core.Predicate    ( scopedSort, isCoVarType )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion     ( isCoVar )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )

@@ -63,7 +63,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.TyCo.Tidy ( tidyCo )
+import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Types ( heqTyCon )

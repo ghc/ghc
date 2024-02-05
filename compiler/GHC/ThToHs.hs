@@ -913,27 +913,23 @@ cvtPragmaD (OpaqueP nm)
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameN nm
        ; ty' <- cvtSigType ty
-       ; let src TH.NoInline  = fsLit "{-# SPECIALISE NOINLINE"
-             src TH.Inline    = fsLit "{-# SPECIALISE INLINE"
-             src TH.Inlinable = fsLit "{-# SPECIALISE INLINE"
-       ; let (inline', dflt, srcText) = case inline of
-               Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
-                                toSrcTxt inline1)
-               Nothing      -> (NoUserInlinePrag,   AlwaysActive,
-                                SourceText $ fsLit "{-# SPECIALISE")
-               where
-                toSrcTxt a = SourceText $ src a
-       ; let ip = InlinePragma { inl_src    = srcText
-                               , inl_inline = inline'
-                               , inl_rule   = Hs.FunLike
-                               , inl_act    = cvtPhases phases dflt
-                               , inl_sat    = Nothing }
+       ; let ip = cvtInlinePhases inline phases
        ; returnJustLA $ Hs.SigD noExtField $ SpecSig noAnn nm' [ty'] ip }
 
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtSigType ty
        ; returnJustLA $ Hs.SigD noExtField $
          SpecInstSig (noAnn, (SourceText $ fsLit "{-# SPECIALISE")) ty' }
+
+cvtPragmaD (SpecialiseEP ty_bndrs tm_bndrs exp inline phases)
+  = do { ty_bndrs' <- traverse cvtTvs ty_bndrs
+       ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
+       ; let ip = cvtInlinePhases inline phases
+       ; exp'      <- cvtl exp
+       ; let bndrs' = RuleBndrs { rb_ext = noAnn, rb_tyvs = ty_bndrs', rb_tmvs = tm_bndrs' }
+       ; returnJustLA $ Hs.SigD noExtField $
+           SpecSigE noAnn bndrs' exp' ip
+       }
 
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -947,8 +943,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
                    HsRule { rd_ext  = (noAnn, quotedSourceText nm)
                           , rd_name = rd_name'
                           , rd_act  = act
-                          , rd_tyvs = ty_bndrs'
-                          , rd_tmvs = tm_bndrs'
+                          , rd_bndrs = RuleBndrs { rb_ext = noAnn, rb_tyvs = ty_bndrs', rb_tmvs = tm_bndrs' }
                           , rd_lhs  = lhs'
                           , rd_rhs  = rhs' }
        ; returnJustLA $ Hs.RuleD noExtField
@@ -1015,6 +1010,24 @@ cvtRuleBndr (TypedRuleVar n ty)
   = do { n'  <- vNameN n
        ; ty' <- cvtType ty
        ; returnLA $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType noAnn ty' }
+
+cvtInlinePhases :: Maybe Inline -> Phases -> InlinePragma
+cvtInlinePhases inline phases =
+  let src TH.NoInline  = fsLit "{-# SPECIALISE NOINLINE"
+      src TH.Inline    = fsLit "{-# SPECIALISE INLINE"
+      src TH.Inlinable = fsLit "{-# SPECIALISE INLINE"
+      (inline', dflt, srcText) = case inline of
+        Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
+                         toSrcTxt inline1)
+        Nothing      -> (NoUserInlinePrag,   AlwaysActive,
+                         SourceText $ fsLit "{-# SPECIALISE")
+        where
+         toSrcTxt a = SourceText $ src a
+  in InlinePragma { inl_src    = srcText
+                  , inl_inline = inline'
+                  , inl_rule   = Hs.FunLike
+                  , inl_act    = cvtPhases phases dflt
+                  , inl_sat    = Nothing }
 
 ---------------------------------------------------
 --              Declarations

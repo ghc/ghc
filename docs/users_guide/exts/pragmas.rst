@@ -692,24 +692,32 @@ The :pragma:`RULES` pragma lets you specify rewrite rules. It is described in
    single: pragma, SPECIALIZE
    single: overloading, death to
 
-.. pragma:: SPECIALIZE ⟨name⟩ :: ⟨type⟩
+.. pragma:: SPECIALIZE ⟨expr⟩
 
-    Ask that GHC specialize a polymorphic value to a particular type.
+    Ask that GHC create a copy of a function with specific arguments; most
+    commonly, a copy of an overloaded function with specific class
+    dictionary arguments.
 
 (UK spelling also accepted.) For key overloaded functions, you can
-create extra versions (NB: at the cost of larger code) specialised to particular
-types. Thus, if you have an overloaded function:
+create extra versions (NB: at the cost of larger code), specialised to specific
+arguments. Thus, if you have an overloaded function:
 
 ::
 
       hammeredLookup :: Ord key => [(key, value)] -> key -> value
 
 If it is heavily used on lists with ``Widget`` keys, you could
-specialise it as follows:
+specialise it with either of the following forms (the second syntax,
+introduced in GHC 9.14, additionally requires :extension:`TypeApplications`):
 
 ::
 
       {-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
+      {-# SPECIALIZE hammeredLookup @Widget #-}
+
+Instead of taking an unknown ``Ord key`` dictionary at runtime, the specialised
+version of ``hammeredLookup`` will use the specific implementation of ``Ord Widget``,
+which is likely to produce more efficient code.
 
 -  A ``SPECIALIZE`` pragma for a function can be put anywhere its type
    signature could be put. Moreover, you can also ``SPECIALIZE`` an
@@ -755,15 +763,14 @@ specialise it as follows:
    specialisation is done too early, the optimisation rules might fail
    to fire.
 
--  The type in a ``SPECIALIZE`` pragma can be any type that is less
-   polymorphic than the type of the original function. In concrete
-   terms, if the original function is ``f`` then the pragma
+-  The ``SPECIALIZE`` pragma is valid only if the expression is well-typed.
+   For example, a specialize pragma of the form
 
    ::
 
          {-# SPECIALIZE f :: <type> #-}
 
-   is valid if and only if the definition
+   is valid only if the definition
 
    ::
 
@@ -777,6 +784,7 @@ specialise it as follows:
 
          f :: Eq a => a -> b -> b
          {-# SPECIALISE f :: Int -> b -> b #-}
+         {-# SPECIALISE f @Float #-}
 
          g :: (Eq a, Ix b) => a -> b -> b
          {-# SPECIALISE g :: (Eq a) => a -> Int -> Int #-}
@@ -789,12 +797,28 @@ specialise it as follows:
    fire very well. If you use this kind of specialisation, let us know
    how well it works.
 
+-  Since GHC 9.14, it is also possible to specialise a function at specific
+   value arguments, e.g.: ::
+
+         fn :: Bool -> Int -> Double
+         fn b i = ...
+           where
+             ... = if b then helper1 else helper2
+         {-# SPECIALISE fn True #-}
+         {-# SPECIALISE fn False #-}
+
+   This will make two copies of ``fn``, one for ``True`` and one for ``False``.
+   These will then be optimised to make direct calls to ``helper1`` or ``helper2``,
+   respectively, instead of dispatching on ``b`` at runtime.
+   Call sites (that use a literal ``True`` or ``False``) will be rewritten
+   to use the specialised versions.
+
 .. _specialize-inline:
 
 ``SPECIALIZE INLINE``
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. pragma:: SPECIALIZE INLINE ⟨name⟩ :: ⟨type⟩
+.. pragma:: SPECIALIZE INLINE ⟨expr⟩
 
     :where: top-level
 

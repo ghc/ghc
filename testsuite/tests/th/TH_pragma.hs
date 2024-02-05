@@ -10,3 +10,7 @@ $( [d| foo :: Int -> Int
 $( [d| bar :: Num a => a -> a
        {-# SPECIALISE INLINE [~1] bar :: Float -> Float #-}
        bar x = x * 10        |] )
+
+$( [d| baz :: Num a => a -> a
+       {-# SPECIALISE INLINE [~1] baz @Double #-}
+       baz x = x * 10        |] )

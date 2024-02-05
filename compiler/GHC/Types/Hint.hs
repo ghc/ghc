@@ -504,6 +504,11 @@ data GhcHint
   {-| Suggest add parens to pattern `e -> p :: t` -}
   | SuggestParenthesizePatternRHS
 
+  {-| Suggest splitting up a SPECIALISE pragmas with multiple type ascriptions
+      into several individual SPECIALISE pragmas.
+  -}
+  | SuggestSplittingIntoSeveralSpecialisePragmas
+
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.
 --   There's no `Via` case because we never assume that.

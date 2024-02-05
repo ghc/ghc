@@ -2068,6 +2068,7 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
     go FamInstSkol          FamInstSkol          = True
     go BracketSkol          BracketSkol          = True
     go (RuleSkol n1)        (RuleSkol n2)        = n1==n2
+    go (SpecESkol n1)       (SpecESkol n2)       = n1==n2
     go (PatSkol c1 _)       (PatSkol c2 _)       = getName c1 == getName c2
        -- Too tedious to compare the HsMatchContexts
     go (InferSkol ids1)     (InferSkol ids2)     = equalLength ids1 ids2 &&

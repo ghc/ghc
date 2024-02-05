@@ -64,6 +64,7 @@ import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
+import GHC.Core.TyCo.Tidy
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.FVs( orphNamesOfTypes )
@@ -1355,10 +1356,12 @@ instance Diagnostic TcRnMessage where
                   PatSynBind {} -> text "Pattern synonyms"
                                    -- Associated pattern synonyms are not implemented yet
                   _ -> pprPanic "rnMethodBind" (ppr bind)
+
     TcRnOrphanCompletePragma -> mkSimpleDecorated $
       text "Orphan COMPLETE pragmas not supported" $$
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
+
     TcRnEmptyCase ctxt -> mkSimpleDecorated message
       where
         pp_ctxt = case ctxt of
@@ -1400,6 +1403,9 @@ instance Diagnostic TcRnMessage where
            , text "Combine alternative minimal complete definitions with `|'" ]
       where
         sigs = sig1 : sig2 : otherSigs
+    TcRnSpecSigShape spec_e -> mkSimpleDecorated $
+      hang (text "Illegal form of SPECIALISE pragma:")
+         2 (ppr spec_e)
     TcRnUnexpectedStandaloneDerivingDecl -> mkSimpleDecorated $
       text "Illegal standalone deriving declaration"
     TcRnUnusedVariableInRuleDecl name var -> mkSimpleDecorated $
@@ -2402,6 +2408,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnOrphanCompletePragma{}
       -> ErrorWithoutFlag
+    TcRnSpecSigShape{}
+      -> ErrorWithoutFlag
     TcRnEmptyCase{}
       -> ErrorWithoutFlag
     TcRnNonStdGuards{}
@@ -3073,6 +3081,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalClassBinding{}
       -> noHints
     TcRnOrphanCompletePragma{}
+      -> noHints
+    TcRnSpecSigShape{}
       -> noHints
     TcRnEmptyCase ctxt -> case ctxt of
       LamAlt LamCases -> noHints -- cases syntax doesn't support empty case.
@@ -5606,6 +5616,7 @@ pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
 pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"
 pprHsDocContext DerivDeclCtx          = text "a deriving declaration"
 pprHsDocContext (RuleCtx name)        = text "the rewrite rule" <+> doubleQuotes (ftext name)
+pprHsDocContext (SpecECtx name)       = text "the SPECIALISE pragma for" <+> quotes (ppr name)
 pprHsDocContext (TyDataCtx tycon)     = text "the data type declaration for" <+> quotes (ppr tycon)
 pprHsDocContext (FamPatCtx tycon)     = text "a type pattern of family instance for" <+> quotes (ppr tycon)
 pprHsDocContext (TySynCtx name)       = text "the declaration for type synonym" <+> quotes (ppr name)
