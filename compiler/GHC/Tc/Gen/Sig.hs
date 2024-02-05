@@ -567,8 +567,9 @@ mkPragEnv sigs binds
     prs = mapMaybe get_sig sigs
 
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
-    get_sig sig@(L _ (SpecSig _ (L _ nm) _ _))   = Just (nm, add_arity nm sig)
-    get_sig sig@(L _ (InlineSig _ (L _ nm) _))   = Just (nm, add_arity nm sig)
+    get_sig sig@(L _ (SpecSig _ (L _ nm) _ _)) = Just (nm, add_arity nm sig)
+    get_sig sig@(L _ (SpecSigE nm _ _))        = Just (nm, add_arity nm sig)
+    get_sig sig@(L _ (InlineSig _ (L _ nm) _)) = Just (nm, add_arity nm sig)
     get_sig sig@(L _ (SCCFunSig _ (L _ nm) _)) = Just (nm, sig)
     get_sig _ = Nothing
 
@@ -584,6 +585,7 @@ mkPragEnv sigs binds
 addInlinePragArity :: Arity -> LSig GhcRn -> LSig GhcRn
 addInlinePragArity ar (L l (InlineSig x nm inl))  = L l (InlineSig x nm (add_inl_arity ar inl))
 addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_inl_arity ar inl))
+addInlinePragArity ar (L l (SpecSigE x e inl))    = L l (SpecSigE x e (add_inl_arity ar inl))
 addInlinePragArity _ sig = sig
 
 add_inl_arity :: Arity -> InlinePragma -> InlinePragma
@@ -798,6 +800,17 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
+
+-- Example: {-# SPECIALISE f True #-}
+-- We typecheck, and generate (SpecPragE (f ())
+-- Then when desugaring we generate
+--      $sf = (\f. f True) <f-rhs>
+--      RULE f True = 
+
+tcSpecPrag poly_id prag@(SpecSigE nm spec_e inl)
+  = do { (spec_e', _rho) <- tcInferRhow spec_e
+       ; return (SpecPragE spec_e' inl) }
+
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 

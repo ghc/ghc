@@ -443,6 +443,13 @@ data Sig pass
                                    -- If it's just defaultInlinePragma, then we said
                                    --    SPECIALISE, not SPECIALISE_INLINE
 
+  | SpecSigE    (XSpecSigE pass)
+                (LHsExpr pass)     -- Expression to specialise
+                InlinePragma
+                -- The expression should be of form
+                --     f a1 ... an [ :: sig ]
+                -- with an optional type signature
+
         -- | A specialisation pragma for instance declarations only
         --
         -- > {-# SPECIALISE instance Eq [Int] #-}
@@ -508,8 +515,9 @@ isTypeLSig (unXRec @p -> XSig {})       = True
 isTypeLSig _                    = False
 
 isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
-isSpecLSig (unXRec @p -> SpecSig {}) = True
-isSpecLSig _                 = False
+isSpecLSig (unXRec @p -> SpecSig {})  = True
+isSpecLSig (unXRec @p -> SpecSigE {}) = True
+isSpecLSig _                          = False
 
 isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
 isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
@@ -518,6 +526,7 @@ isSpecInstLSig _                      = False
 isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies pragmas
 isPragLSig (unXRec @p -> SpecSig {})   = True
+isPragLSig (unXRec @p -> SpecSigE {})  = True
 isPragLSig (unXRec @p -> InlineSig {}) = True
 isPragLSig (unXRec @p -> SCCFunSig {}) = True
 isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
