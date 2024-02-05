@@ -41,8 +41,11 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 import GHC.Core.Class
-import GHC.Types.Var
+import GHC.Core.Predicate( scopedSort )
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
+
+import GHC.Types.Var
+
 import GHC.Iface.Type
 
 import GHC.Types.Var.Set

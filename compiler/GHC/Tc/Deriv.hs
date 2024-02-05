@@ -20,52 +20,56 @@ import GHC.Hs
 import GHC.Driver.Session
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Deriv.Infer
 import GHC.Tc.Deriv.Utils
-import GHC.Tc.TyCl.Class( instDeclCtxt3, tcATDefault )
-import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
+import GHC.Tc.TyCl.Class( instDeclCtxt3, tcATDefault )
 import GHC.Tc.Validity( checkValidInstHead )
-import GHC.Core.InstEnv
-import GHC.Tc.Utils.Instantiate
-import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.HsType
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr ( pprTyVars )
-import GHC.Unit.Module.Warnings
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Env
 
 import GHC.Rename.Bind
 import GHC.Rename.Env
 import GHC.Rename.Module ( addTcgDUs )
 import GHC.Rename.Utils
 
+import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv
 import GHC.Core.Unify( tcUnifyTy )
 import GHC.Core.Class
 import GHC.Core.Type
-import GHC.Utils.Error
 import GHC.Core.DataCon
-import GHC.Data.Maybe
+import GHC.Core.TyCon
+import GHC.Core.Predicate( tyCoVarsOfTypesWellScoped )
+
 import GHC.Types.Hint (AssumedDerivingStrategy(..))
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Set as NameSet
-import GHC.Core.TyCon
-import GHC.Tc.Utils.TcType
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Builtin.Names
 import GHC.Types.SrcLoc
+
+import GHC.Unit.Module.Warnings
+import GHC.Builtin.Names
+
+import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Data.Bag
+import GHC.Data.Maybe
 import GHC.Data.BooleanFormula ( isUnsatisfied )
 
 import Control.Monad

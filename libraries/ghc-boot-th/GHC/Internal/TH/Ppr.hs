@@ -653,21 +653,20 @@ instance Ppr Pragma where
        <+> sep [ pprName' Applied n <+> dcolon
                , nest 2 $ ppr ty ]
        <+> text "#-}"
+    ppr (SpecialiseEP ty_bndrs tm_bndrs spec_e inline phases)
+       = sep [ text "{-# SPECIALISE"
+                 <+> maybe empty ppr inline
+                 <+> ppr phases
+             , nest 2 $ sep [ ppr_ty_forall ty_bndrs <+> ppr_tm_forall ty_bndrs tm_bndrs
+                            , nest 2 (ppr spec_e) ]
+                        <+> text "#-}" ]
     ppr (SpecialiseInstP inst)
        = text "{-# SPECIALISE instance" <+> ppr inst <+> text "#-}"
     ppr (RuleP n ty_bndrs tm_bndrs lhs rhs phases)
        = sep [ text "{-# RULES" <+> pprString n <+> ppr phases
-             , nest 4 $ ppr_ty_forall ty_bndrs <+> ppr_tm_forall ty_bndrs
+             , nest 4 $ ppr_ty_forall ty_bndrs <+> ppr_tm_forall ty_bndrs tm_bndrs
                                                <+> ppr lhs
              , nest 4 $ char '=' <+> ppr rhs <+> text "#-}" ]
-      where ppr_ty_forall Nothing      = empty
-            ppr_ty_forall (Just bndrs) = text "forall"
-                                         <+> fsep (map ppr bndrs)
-                                         <+> char '.'
-            ppr_tm_forall Nothing | null tm_bndrs = empty
-            ppr_tm_forall _ = text "forall"
-                              <+> fsep (map ppr tm_bndrs)
-                              <+> char '.'
     ppr (AnnP tgt expr)
        = text "{-# ANN" <+> target1 tgt <+> ppr expr <+> text "#-}"
       where target1 ModuleAnnotation    = text "module"
@@ -681,6 +680,17 @@ instance Ppr Pragma where
     ppr (SCCP nm str)
        = text "{-# SCC" <+> pprName' Applied nm <+> maybe empty pprString str <+> text "#-}"
 
+ppr_ty_forall :: Maybe [TyVarBndr ()] -> Doc
+ppr_ty_forall Nothing      = empty
+ppr_ty_forall (Just bndrs) = text "forall"
+                             <+> fsep (map ppr bndrs)
+                             <+> char '.'
+
+ppr_tm_forall :: Maybe [TyVarBndr ()] -> [RuleBndr] -> Doc
+ppr_tm_forall Nothing []       = empty
+ppr_tm_forall _       tm_bndrs = text "forall"
+                                 <+> fsep (map ppr tm_bndrs)
+                                 <+> char '.'
 ------------------------------
 instance Ppr Inline where
     ppr NoInline  = text "NOINLINE"

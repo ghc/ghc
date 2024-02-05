@@ -61,10 +61,14 @@ data ZonkEnv
 --
 -- See Note [Un-unified unification variables]
 data ZonkFlexi
-  = DefaultFlexi    -- ^ Default unbound unification variables to Any
-  | SkolemiseFlexi  -- ^ Skolemise unbound unification variables
-                    --   See Note [Zonking the LHS of a RULE]
+  = DefaultFlexi       -- ^ Default unbound unification variables to Any
+
+  | SkolemiseFlexi     -- ^ Skolemise unbound unification variables
+      (IORef [TyVar])  --   See Note [Zonking the LHS of a RULE]
+                       --   Records the tyvars thus skolemised
+
   | RuntimeUnkFlexi -- ^ Used in the GHCi debugger
+
   | NoFlexi         -- ^ Panic on unfilled meta-variables
                     -- See Note [Error on unconstrained meta-variables]
                     -- in GHC.Tc.Utils.TcMType

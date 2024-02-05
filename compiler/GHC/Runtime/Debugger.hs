@@ -33,6 +33,7 @@ import GHC.Runtime.Context
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Iface.Env    ( newInteractiveBinder )
 import GHC.Core.Type
+import GHC.Core.TyCo.Tidy( tidyOpenType )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error

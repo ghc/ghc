@@ -75,6 +75,7 @@ import GHC.Tc.Zonk.Monad
 
 import GHC.Core.InstEnv (ClsInst(is_tys))
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion

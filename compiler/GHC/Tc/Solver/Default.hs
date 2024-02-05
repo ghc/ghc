@@ -31,6 +31,7 @@ import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.TyCon    ( TyCon )
+import GHC.Core.TyCo.Tidy
 
 import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
 import GHC.Types.Unique.Set
