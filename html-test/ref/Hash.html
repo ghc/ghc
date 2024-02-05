@@ -99,13 +99,13 @@
 	    ><li class="src short"
 	    ><a href="#"
 	      >new</a
-	      > :: (<a href="#" title="Data.Eq"
+	      > :: (<a href="#" title="Prelude"
 	      >Eq</a
 	      > key, <a href="#" title="Hash"
 	      >Hash</a
-	      > key) =&gt; <a href="#" title="Data.Int"
+	      > key) =&gt; <a href="#" title="Prelude"
 	      >Int</a
-	      > -&gt; <a href="#" title="System.IO"
+	      > -&gt; <a href="#" title="Prelude"
 	      >IO</a
 	      > (<a href="#" title="Hash"
 	      >HashTable</a
@@ -113,11 +113,11 @@
 	    ><li class="src short"
 	    ><a href="#"
 	      >insert</a
-	      > :: (<a href="#" title="Data.Eq"
+	      > :: (<a href="#" title="Prelude"
 	      >Eq</a
 	      > key, <a href="#" title="Hash"
 	      >Hash</a
-	      > key) =&gt; key -&gt; val -&gt; <a href="#" title="System.IO"
+	      > key) =&gt; key -&gt; val -&gt; <a href="#" title="Prelude"
 	      >IO</a
 	      > ()</li
 	    ><li class="src short"
@@ -125,9 +125,9 @@
 	      >lookup</a
 	      > :: <a href="#" title="Hash"
 	      >Hash</a
-	      > key =&gt; key -&gt; <a href="#" title="System.IO"
+	      > key =&gt; key -&gt; <a href="#" title="Prelude"
 	      >IO</a
-	      > (<a href="#" title="Data.Maybe"
+	      > (<a href="#" title="Prelude"
 	      >Maybe</a
 	      > val)</li
 	    ><li class="src short"
@@ -141,7 +141,7 @@
 	      ><li
 		><a href="#"
 		  >hash</a
-		  > :: a -&gt; <a href="#" title="Data.Int"
+		  > :: a -&gt; <a href="#" title="Prelude"
 		  >Int</a
 		  ></li
 		></ul
@@ -175,7 +175,7 @@
  The type <code
 	      >key</code
 	      > should be an instance of <code
-	      ><a href="#" title="Data.Eq"
+	      ><a href="#" title="Prelude"
 		>Eq</a
 		></code
 	      >.</p
@@ -191,13 +191,13 @@
 	><p class="src"
 	  ><a id="v:new" class="def"
 	    >new</a
-	    > :: (<a href="#" title="Data.Eq"
+	    > :: (<a href="#" title="Prelude"
 	    >Eq</a
 	    > key, <a href="#" title="Hash"
 	    >Hash</a
-	    > key) =&gt; <a href="#" title="Data.Int"
+	    > key) =&gt; <a href="#" title="Prelude"
 	    >Int</a
-	    > -&gt; <a href="#" title="System.IO"
+	    > -&gt; <a href="#" title="Prelude"
 	    >IO</a
 	    > (<a href="#" title="Hash"
 	    >HashTable</a
@@ -213,11 +213,11 @@
 	><p class="src"
 	  ><a id="v:insert" class="def"
 	    >insert</a
-	    > :: (<a href="#" title="Data.Eq"
+	    > :: (<a href="#" title="Prelude"
 	    >Eq</a
 	    > key, <a href="#" title="Hash"
 	    >Hash</a
-	    > key) =&gt; key -&gt; val -&gt; <a href="#" title="System.IO"
+	    > key) =&gt; key -&gt; val -&gt; <a href="#" title="Prelude"
 	    >IO</a
 	    > () <a href="#" class="selflink"
 	    >#</a
@@ -233,9 +233,9 @@
 	    >lookup</a
 	    > :: <a href="#" title="Hash"
 	    >Hash</a
-	    > key =&gt; key -&gt; <a href="#" title="System.IO"
+	    > key =&gt; key -&gt; <a href="#" title="Prelude"
 	    >IO</a
-	    > (<a href="#" title="Data.Maybe"
+	    > (<a href="#" title="Prelude"
 	    >Maybe</a
 	    > val) <a href="#" class="selflink"
 	    >#</a
@@ -244,13 +244,13 @@
 	  ><p
 	    >Looks up a key in the hash table, returns <code
 	      ><code
-		><a href="#" title="Data.Maybe"
+		><a href="#" title="Prelude"
 		  >Just</a
 		  ></code
 		> val</code
 	      > if the key
  was found, or <code
-	      ><a href="#" title="Data.Maybe"
+	      ><a href="#" title="Prelude"
 		>Nothing</a
 		></code
 	      > otherwise.</p
@@ -283,7 +283,7 @@
 	    ><p class="src"
 	    ><a id="v:hash" class="def"
 	      >hash</a
-	      > :: a -&gt; <a href="#" title="Data.Int"
+	      > :: a -&gt; <a href="#" title="Prelude"
 	      >Int</a
 	      > <a href="#" class="selflink"
 	      >#</a
@@ -293,7 +293,7 @@
 	      >hashes the value of type <code
 		>a</code
 		> into an <code
-		><a href="#" title="Data.Int"
+		><a href="#" title="Prelude"
 		  >Int</a
 		  ></code
 		></p
@@ -339,7 +339,7 @@
 			  >hash</a
 			  > :: <a href="#" title="Prelude"
 			  >Float</a
-			  > -&gt; <a href="#" title="Data.Int"
+			  > -&gt; <a href="#" title="Prelude"
 			  >Int</a
 			  > <a href="#" class="selflink"
 			  >#</a
@@ -355,7 +355,7 @@
 		      ></span
 		      > <a href="#" title="Hash"
 		      >Hash</a
-		      > <a href="#" title="Data.Int"
+		      > <a href="#" title="Prelude"
 		      >Int</a
 		      ></span
 		    > <a href="#" class="selflink"
@@ -379,9 +379,9 @@
 			><p class="src"
 			><a href="#"
 			  >hash</a
-			  > :: <a href="#" title="Data.Int"
+			  > :: <a href="#" title="Prelude"
 			  >Int</a
-			  > -&gt; <a href="#" title="Data.Int"
+			  > -&gt; <a href="#" title="Prelude"
 			  >Int</a
 			  > <a href="#" class="selflink"
 			  >#</a
@@ -423,7 +423,7 @@
 			><p class="src"
 			><a href="#"
 			  >hash</a
-			  > :: (a, b) -&gt; <a href="#" title="Data.Int"
+			  > :: (a, b) -&gt; <a href="#" title="Prelude"
 			  >Int</a
 			  > <a href="#" class="selflink"
 			  >#</a
