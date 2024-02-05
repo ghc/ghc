@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-
@@ -15,7 +16,8 @@ lower levels it is preserved with @let@/@letrec@s).
 -}
 
 module GHC.HsToCore.Binds
-   ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
+   ( dsTopLHsBinds, dsLHsBinds
+   , dsImpSpecs, decomposeRuleLhs
    , dsHsWrapper, dsHsWrappers
    , dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
    , dsWarnOrphanRule
@@ -42,7 +44,7 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
-import GHC.Core.SimpleOpt    ( simpleOptExpr )
+import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 import GHC.Core.Make
@@ -63,6 +65,7 @@ import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 import GHC.Tc.Types.Evidence
 
 import GHC.Types.Id
+import GHC.Types.Id.Info (IdDetails(..))
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -75,7 +78,6 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.Graph.Directed
 import GHC.Data.Bag
-import qualified Data.Set as S
 
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
@@ -84,6 +86,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Monad
+
 
 {-**********************************************************************
 *                                                                      *
@@ -786,6 +789,214 @@ The restrictions are:
 
   4. Unlifted binds may not be recursive. Checked in second clause of ds_val_bind.
 
+Note [Desugaring new-form SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"New-form" SPECIALISE pragmas generate a SpecPragE record in the typechecker,
+which is desugared in this module by `dsSpec`.  For the context see
+Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
+
+Suppose we have f :: forall p q. (Ord p, Eq q) => p -> q -> q, and a pragma
+
+  {-# SPECIALISE forall x. f @[a] @[Int] x [3,4] #-}
+
+In `dsSpec` the `SpecPragE` will look something like this:
+
+  SpecPragE { spe_fn_id = f
+            , spe_bndrs = @a (d:Ord a) (x:[a])
+            , spe_call  = let d2:Ord [a] = $dfOrdList d
+                              d3:Eq [Int] = $dfEqList $dfEqInt
+                          in f @[a] @[Int] d2 d3 x [3,4] }
+We want to get
+
+    RULE  forall a (d2:Ord a) (d3:Eq [Int]) (x:[a]).
+             f @[a] @[Int] d2 d3 x [3,4] = $sf d2 x
+
+    $sf :: forall a. Ord [a] => a -> Int
+    $sf = /\a. \d2 x.
+             let d3 = $dfEqList $dfEqInt
+             in <f-rhs> @[a] @[Int] d2 d3 x [3,4]
+
+Notice that
+
+(SP1) If the expression in the SPECIALISE pragma had a type signature, such as
+     SPECIALISE f :: Eq b => Int -> b -> b
+  then the desugared expression may have type abstractions and applications
+  "in the way", like this:
+     (/\b. (\d:Eq b). let d1 = $dfOrdInt in f @Int @b d1 d) @b (d2:Eq b)
+  The lambdas come from the type signature, which is then re-instantiated,
+  hence the applications of those lambdas.
+
+  We use the simple optimiser to simplify this to
+     let { d = d2; d1 = $dfOrdInt } in f @Int @b (d2:Eq b)
+
+  Important: do no inlining in this "simple optimiser" phase:
+  use `simpleOptExprNoInline`. E.g. we don't want to turn
+     let { d1=d; d2=d } in f d1 d2    -->    f d d
+  because the latter is harder to match.
+
+(SP2) $sf does not simply quantify over (d:Ord a). Instead, to figure out what
+  it should quantify over, and to include the 'd3' binding in the body of $sf,
+  we use the function `prepareSpecLHS`. It takes the simplified LHS `core_call`,
+  and uses the dictionary bindings to figure out the RULE LHS and RHS.
+
+  This is described in Note [prepareSpecLHS].
+
+Note [prepareSpecLHS]
+~~~~~~~~~~~~~~~~~~~~~
+To compute the appropriate RULE LHS and RHS for a new-form specialise pragma,
+as described in Note [Desugaring new-form SPECIALISE pragmas], we use a function
+called prepareSpecLHS.
+It takes as input a list of (type and evidence) binders, and a Core expression.
+For example, suppose its input is of the following form:
+
+  spe_bndrs = @a (d:Ord a)
+  spe_call =
+    let
+      -- call these bindings the call_binds
+      d1 :: Num Int
+      d1 = $dfNumInt
+      d2 :: Ord [a]
+      d2 = $dfOrdList d
+      d3 :: Eq a
+      d3 = $p1Ord d3
+      d4 :: Ord (F a)
+      d4 = d |> co1
+      d5 :: Ord (G a)
+      d5 = d4 |> co2
+    in
+      f @[a] @Int d1 d2 d3 d5
+
+The goal of prepareSpecLHS is then to generate the following two things:
+
+  - A specialisation, of the form:
+
+      $sf <spec_args> =
+        let <spec_binds>
+        in <f-rhs> @[a] @Int d1 d2 d3 d5
+
+  - A rule, of the form:
+
+      RULE forall a d1 d2 d3 d5. f @[a] @Int d1 d2 d3 d5 =
+        let <rule_binds>
+        in $sf <spec_args>
+
+That is, we must compute 'spec_args', 'rule_binds' and 'spec_binds'. A first
+approach might be:
+
+  - take spec_args = spe_bndrs,
+  - spec_binds = call_binds.
+
+If we did so, the RULE would look like:
+
+  RULE forall a d1 d2 d3 d5. f @[a] @Int d1 d2 d3 d5 =
+    let d = <???>
+    in $sf @a d
+
+The problem is: how do we recover 'd' from 'd1', 'd2', 'd3', 'd5'? Essentially,
+we need to run call_binds in reverse. In this example, we had:
+
+  d1 :: Num Int
+  d1 = $dfNumInt
+  d2 :: Ord [a]
+  d2 = $dfOrdList d
+  d3 :: Eq a
+  d3 = $p1Ord d3
+  d4 :: Ord (F a)
+  d4 = d |> co1
+  d5 :: Ord (G a)
+  d5 = d4 |> co2
+
+Let's try to recover (d: Ord a) from 'd1', 'd2', 'd4', 'd5':
+
+  - d1 is a constant binding, so it doesn't help us.
+  - d2 uses a top-level instance, which we can't run in reverse; we can't
+    obtain Ord a from Ord [a].
+  - d3 uses a superclass selector which prevents us from making progress.
+  - d5 is defined using d4, and both involve a cast.
+    In theory we could define d = d5 |> sym (co1 ; co2), but this gets
+    pretty complicated.
+
+This demonstrates the following:
+
+  1. The bindings can't necessarily be "run in reverse".
+  2. Even if the bindings theoretically can be "run in reverse", it is not
+     straightforward to do so.
+
+Now, we could strive to make the let-bindings reversible. We already do this
+to some extent for quantified constraints, as explained in
+Note [Fully solving constraints for specialisation] in GHC.Tc.Gen.Sig,
+using the TcSSpecPrag solver mode described in Note [TcSSpecPrag] in GHC.Tc.Solver.Monad.
+However, given (2), we don't bother ensuring that e.g. we don't use top-level
+class instances like in d2 above. Instead, we handle these bindings in
+prepareSpecLHS as follows:
+
+  (a) Go through the bindings in order.
+
+    (1) Bindings like
+          d1 = $dfNumInt
+        depend only on constants and move to the specialised function body.
+        That is crucial -- it makes those specialised methods available in the
+        specialised body. These are the `spec_const_binds`.
+
+        Note that these binds /can/ depend on locally-quantified /type/ variables.
+        For example, if we have
+          instance Monad (ST s) where ...
+        then the dictionary for (Monad (ST s)) is effectively a constant dictionary.
+        This is important to get specialisation for such types. Example in test T8331.
+
+    (2) Other bindings, like
+          d2:Ord [a] = $dfOrdList d
+          d3 = d
+        depend on a locally-quantifed evidence variable `d`.
+        Surprisingly, /we want to drop these bindings entirely!/
+        This is because, as explained above, it is too difficult to run these
+        in reverse. Instead, we drop them, and re-compute which dictionaries
+        we will quantify over.
+
+    (3) Finally, inside those dictionary bindings we should find the call of the
+        function itself
+            f @[a] @[Int] d2 d3 x [3,4]
+        'prepareSpecLHS' takes the call apart and returns its arguments.
+
+  (b) Now, (a)(2) means that the RULE does not quantify over 'd' any more; it
+      quantifies over 'd1' 'd2' 'd3' 'd5'. So we recompute the `rule_bndrs`
+      from scratch.
+
+      Moreover, the specialised function also no longer quantifies over 'd',
+      it quantifies over 'd2' 'd3' 'd5'. This set of binders is computed by
+      taking the RULE binders and subtracting off the binders from
+      the `spec_const_binds`.
+
+[Shortcoming] This whole approach does have one downside, compared to running
+the let-bindings in reverse: it doesn't allow us to common-up dictionaries.
+Consider for example:
+
+  g :: forall a b. ( Eq a, Ord b ) => a -> b -> Bool
+  {-# SPECIALISE g :: forall c. Ord c => c -> c -> Bool #-}
+
+The input to prepareSpecLHS will be (more or less):
+
+  spe_bndrs: @c (d:Ord c)
+  spe_call =
+    let
+      d1 :: Eq c
+      d1 = $p1Ord d
+      d2 :: Ord c
+      d2 = d
+    in
+      g @c @c d1 d2
+
+The approach described in (2) will thus lead us to generate:
+
+  RULE g @c @c d1 d2 = $sg @c d1 d2
+  $sg @c d1 d2 = <g-rhs> @c @c d1 d2
+
+when we would rather avoid passing both dictionaries, and instead generate:
+
+  RULE g @c @c d1 d2 = let { d = d2 } in $sg @c d
+  $sg @c d = let { d1 = $p1Ord d; d2 = d } in <g-rhs> @c @c d1 d2
+
+For now, we accept this infelicity.
 -}
 
 ------------------------
@@ -793,117 +1004,268 @@ dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
         -> DsM ( OrdList (Id,CoreExpr)  -- Binding for specialised Ids
                , [CoreRule] )           -- Rules for the Global Ids
--- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Bind
+-- See Note [Overview of SPECIALISE pragmas] in GHC.Tc.Gen.Sig
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
-  = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
+  = do { pairs <- mapMaybeM (dsLSpec poly_rhs) sps
        ; let (spec_binds_s, rules) = unzip pairs
        ; return (concatOL spec_binds_s, rules) }
 
-dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
-                                -- Nothing => RULE is for an imported Id
-                                --            rhs is in the Id's unfolding
-       -> Located TcSpecPrag
+dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
+dsImpSpecs imp_specs
+ = do { spec_prs <- mapMaybeM spec_one imp_specs
+      ; let (spec_binds, spec_rules) = unzip spec_prs
+      ; return (concatOL spec_binds, spec_rules) }
+ where
+   spec_one (L loc prag) = putSrcSpanDs loc $
+                           dsSpec (get_rhs prag) prag
+
+   get_rhs (SpecPrag poly_id _ _)              = get_rhs1 poly_id
+   get_rhs (SpecPragE { spe_fn_id = poly_id }) = get_rhs1 poly_id
+
+   get_rhs1 poly_id
+    | Just unfolding <- maybeUnfoldingTemplate (realIdUnfolding poly_id)
+    = unfolding    -- Imported Id; this is its unfolding
+                   -- Use realIdUnfolding so we get the unfolding
+                   -- even when it is a loop breaker.
+                   -- We want to specialise recursive functions!
+    | otherwise = pprPanic "dsImpSpecs" (ppr poly_id)
+                  -- The type checker has checked that it *has* an unfolding
+
+dsLSpec :: CoreExpr -> Located TcSpecPrag
+        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
+dsLSpec poly_rhs (L loc prag)
+  = putSrcSpanDs loc $ dsSpec poly_rhs prag
+
+dsSpec :: CoreExpr   -- RHS to be specialised
+       -> TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
-  | isJust (isClassOpId_maybe poly_id)
-  = putSrcSpanDs loc $
-    do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
-       ; return Nothing  }  -- There is no point in trying to specialise a class op
-                            -- Moreover, classops don't (currently) have an inl_sat arity set
-                            -- (it would be Just 0) and that in turn makes makeCorePair bleat
-
-  | no_act_spec && isNeverActive rule_act
-  = putSrcSpanDs loc $
-    do { diagnosticDs (DsUselessSpecialiseForNoInlineFunction poly_id)
-       ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
-                            -- See Note [Activation pragmas for SPECIALISE]
-
-  | otherwise
-  = putSrcSpanDs loc $
-    do { uniq <- newUnique
-       ; let poly_name = idName poly_id
-             spec_occ  = mkSpecOcc (getOccName poly_name)
-             spec_name = mkInternalName uniq spec_occ (getSrcSpan poly_name)
-             (spec_bndrs, spec_app) = collectHsWrapBinders spec_co
+dsSpec poly_rhs (SpecPrag poly_id spec_co spec_inl)
+  -- SpecPrag case: See Note [Handling old-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
+  | (spec_bndrs, spec_app) <- collectHsWrapBinders spec_co
                -- spec_co looks like
                --         \spec_bndrs. [] spec_args
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
-
-       ; dsHsWrapper spec_app $ \core_app -> do
-
-       { let ds_lhs  = core_app (Var poly_id)
-             spec_ty = mkLamTypes spec_bndrs (exprType ds_lhs)
-       ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
-         --                         , text "spec_co:" <+> ppr spec_co
-         --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
-         dflags <- getDynFlags
-       ; case decomposeRuleLhs dflags spec_bndrs ds_lhs (mkVarSet spec_bndrs) of {
+  = dsHsWrapper spec_app $ \core_app ->
+    do { dflags <- getDynFlags
+       ; case decomposeRuleLhs dflags spec_bndrs (core_app (Var poly_id))
+                                                 (mkVarSet spec_bndrs) of {
            Left msg -> do { diagnosticDs msg; return Nothing } ;
-           Right (rule_bndrs, _fn, rule_lhs_args) -> do
+           Right (rule_bndrs, poly_id, rule_lhs_args) ->
+                finishSpecPrag (idName poly_id) poly_rhs
+                               rule_bndrs poly_id rule_lhs_args
+                               spec_bndrs core_app spec_inl } }
 
-       { this_mod <- getModule
-       ; let fn_unf    = realIdUnfolding poly_id
-             simpl_opts = initSimpleOpts dflags
-             spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id    = mkLocalId spec_name ManyTy spec_ty -- Specialised binding is toplevel, hence Many.
-                            `setInlinePragma` inl_prag
-                            `setIdUnfolding`  spec_unf
+dsSpec poly_rhs (
+  SpecPragE
+    { spe_fn_nm = poly_nm
+    , spe_fn_id = poly_id
+    , spe_inl   = inl
+    , spe_bndrs = bndrs
+    , spe_call  = the_call
+    })
+  -- SpecPragE case: See Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
+  = do { ds_call <- unsetGOptM Opt_EnableRewriteRules $ -- Note [Desugaring RULE left hand sides]
+                    unsetWOptM Opt_WarnIdentities     $
+                    zapUnspecables $
+                      dsLExpr the_call
 
-             rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
-                               poly_id rule_bndrs rule_lhs_args
-                               (mkVarApps (Var spec_id) spec_bndrs)
-             spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
+       -- Simplify the (desugared) call; see wrinkle (SP1)
+       -- in Note [Desugaring new-form SPECIALISE pragmas]
+       ; dflags  <- getDynFlags
+       ; let simpl_opts = initSimpleOpts dflags
+             core_call  = simpleOptExprNoInline simpl_opts ds_call
 
-       ; dsWarnOrphanRule rule
+       ; case prepareSpecLHS poly_id bndrs core_call of {
+            Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
+                           ; return Nothing } ;
 
-       ; tracePm "dsSpec" (vcat
-            [ text "fun:" <+> ppr poly_id
-            , text "spec_co:" <+> ppr spec_co
-            , text "spec_bndrs:" <+>  ppr spec_bndrs
-            , text "ds_lhs:" <+> ppr ds_lhs
-            , text "args:" <+>  ppr rule_lhs_args ])
-       ; return (Just (unitOL (spec_id, spec_rhs), rule))
-            -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
-            --     makeCorePair overwrites the unfolding, which we have
-            --     just created using specUnfolding
-       } } } }
+            Just (bndr_set, spec_const_binds, lhs_args) ->
+
+    do { let const_bndrs = mkVarSet (bindersOfBinds spec_const_binds)
+             all_bndrs   = bndr_set `unionVarSet` const_bndrs
+                  -- all_bndrs: all binders in core_call that should be quantified
+
+             -- rule_bndrs; see (SP3) in Note [Desugaring new-form SPECIALISE pragmas]
+             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` all_bndrs) lhs_args)
+             spec_bndrs = filterOut (`elemVarSet` const_bndrs) rule_bndrs
+
+             mk_spec_body fn_body = mkLets spec_const_binds  $
+                                    mkCoreApps fn_body lhs_args
+
+       ; tracePm "dsSpec" (vcat [ text "poly_id" <+> ppr poly_id
+                                , text "bndrs"   <+> ppr bndrs
+                                , text "lhs_args" <+> ppr lhs_args
+                                , text "bndr_set" <+> ppr bndr_set
+                                , text "all_bndrs"   <+> ppr all_bndrs
+                                , text "rule_bndrs" <+> ppr rule_bndrs
+                                , text "const_bndrs"   <+> ppr const_bndrs
+                                , text "spec_bndrs" <+> ppr spec_bndrs
+                                , text "core_call fvs" <+> ppr (exprFreeVars core_call)
+                                , text "spec_const_binds" <+> ppr spec_const_binds
+                                , text "ds_call" <+> ppr ds_call
+                                , text "core_call" <+> ppr core_call ])
+
+       ; finishSpecPrag poly_nm poly_rhs
+                        rule_bndrs poly_id lhs_args
+                        spec_bndrs mk_spec_body inl } } }
+
+prepareSpecLHS :: Id -> [EvVar] -> CoreExpr
+               -> Maybe (VarSet, [CoreBind], [CoreExpr])
+-- See Note [prepareSpecLHS]
+prepareSpecLHS poly_id evs the_call
+  = go (mkVarSet evs) [] the_call
   where
-    is_local_id = isJust mb_poly_rhs
-    poly_rhs | Just rhs <-  mb_poly_rhs
-             = rhs          -- Local Id; this is its rhs
-             | Just unfolding <- maybeUnfoldingTemplate (realIdUnfolding poly_id)
-             = unfolding    -- Imported Id; this is its unfolding
-                            -- Use realIdUnfolding so we get the unfolding
-                            -- even when it is a loop breaker.
-                            -- We want to specialise recursive functions!
-             | otherwise = pprPanic "dsImpSpecs" (ppr poly_id)
-                            -- The type checker has checked that it *has* an unfolding
+    go :: VarSet        -- Quantified variables, or dependencies thereof
+       -> [CoreBind]    -- Reversed list of constant evidence bindings
+       -> CoreExpr
+       -> Maybe (IdSet, [CoreBind], [CoreExpr])
+    go qevs acc (Cast e _)
+      = go qevs acc e
+    go qevs acc (Let bind e)
+      | not (all isDictId bndrs)   -- A normal 'let' is too complicated
+      = Nothing
 
-    id_inl = idInlinePragma poly_id
+      -- (a) (1) in Note [prepareSpecLHS]
+      | all (transfer_to_spec_rhs qevs) $
+        rhssOfBind bind            -- One of the `const_binds`
+      = go qevs (bind:acc) e
 
-    -- See Note [Activation pragmas for SPECIALISE]
-    inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
-             | not is_local_id  -- See Note [Specialising imported functions]
-                                 -- in OccurAnal
-             , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
-             | otherwise                               = id_inl
-     -- Get the INLINE pragma from SPECIALISE declaration, or,
-     -- failing that, from the original Id
+      -- (a) (2) in Note [prepareSpecLHS]
+      | otherwise
+      = go (qevs `extendVarSetList` bndrs) acc e
+      where
+        bndrs = bindersOf bind
 
-    spec_prag_act = inlinePragmaActivation spec_inl
+    go qevs acc e
+      | (Var fun, args) <- collectArgs e
+      -- (a) (3) in Note [prepareSpecLHS]
+      = assertPpr (fun == poly_id) (ppr fun $$ ppr poly_id) $
+        Just (qevs, reverse acc, args)
+      | otherwise
+      = Nothing
+
+    transfer_to_spec_rhs qevs rhs
+      = isEmptyVarSet $ exprSomeFreeVars is_quant_id rhs
+      where
+        is_quant_id v = isId v && v `elemVarSet` qevs
+      -- See (a) (2) in Note [prepareSpecLHS]
+
+finishSpecPrag :: Name -> CoreExpr                    -- RHS to specialise
+               -> [Var] -> Id -> [CoreExpr]           -- RULE LHS pattern
+               -> [Var] -> (CoreExpr -> CoreExpr) -> InlinePragma   -- Specialised form
+               -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
+finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
+                                spec_bndrs mk_spec_body spec_inl
+  | Just reason <- mb_useless
+  = do { diagnosticDs $ DsUselessSpecialisePragma poly_nm is_dfun reason
+       ; if uselessSpecialisePragmaKeepAnyway reason
+         then Just <$> finish_prag
+         else return Nothing }
+
+  | otherwise
+  = Just <$> finish_prag
+
+  where
+    -- The RULE looks like
+    --    RULE "USPEC" forall rule_bndrs. f rule_args = $sf spec_bndrs
+    -- The specialised function looks like
+    --    $sf spec_bndrs = mk_spec_body <f's original rhs>
+    -- We also use mk_spec_body to specialise the methods in f's stable unfolding
+    -- NB: spec_bindrs is a subset of rule_bndrs
+    finish_prag
+      = do { this_mod <- getModule
+           ; uniq     <- newUnique
+           ; dflags   <- getDynFlags
+           ; let poly_name  = idName poly_id
+                 spec_occ   = mkSpecOcc (getOccName poly_name)
+                 spec_name  = mkInternalName uniq spec_occ (getSrcSpan poly_name)
+
+                 simpl_opts = initSimpleOpts dflags
+                 fn_unf     = realIdUnfolding poly_id
+                 spec_unf   = specUnfolding simpl_opts spec_bndrs mk_spec_body rule_args fn_unf
+                 spec_id    = mkLocalId spec_name ManyTy spec_ty
+                                -- Specialised binding is toplevel, hence Many.
+                                `setInlinePragma` specFunInlinePrag poly_id id_inl spec_inl
+                                `setIdUnfolding`  spec_unf
+
+                 rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
+                                   poly_id rule_bndrs rule_args
+                                   (mkVarApps (Var spec_id) spec_bndrs)
+
+                 rule_ty  = exprType (mkApps (Var poly_id) rule_args)
+                 spec_ty  = mkLamTypes spec_bndrs rule_ty
+                 spec_rhs = mkLams spec_bndrs (mk_spec_body poly_rhs)
+
+           ; dsWarnOrphanRule rule
+
+           ; tracePm "dsSpec" (vcat
+                [ text "fun:" <+> ppr poly_id
+                , text "spec_bndrs:" <+> ppr spec_bndrs
+                , text "args:" <+>  ppr rule_args ])
+           ; return (unitOL (spec_id, spec_rhs), rule) }
+                -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
+                --     makeCorePair overwrites the unfolding, which we have
+                --     just created using specUnfolding
+
+    -- Is this SPECIALISE pragma useless?
+    mb_useless :: Maybe UselessSpecialisePragmaReason
+    mb_useless
+      | isJust (isClassOpId_maybe poly_id)
+      -- There is no point in trying to specialise a class op
+      -- Moreover, classops don't (currently) have an inl_sat arity set
+      -- (it would be Just 0) and that in turn makes makeCorePair bleat
+      = Just UselessSpecialiseForClassMethodSelector
+
+      | no_act_spec, isNeverActive rule_act
+      -- Function is NOINLINE, and the specialisation inherits that
+      -- See Note [Activation pragmas for SPECIALISE]
+      = Just UselessSpecialiseForNoInlineFunction
+
+      | all is_nop_arg rule_args, not (isInlinePragma spec_inl)
+      -- The specialisation does nothing.
+      -- But don't complain if it is SPECIALISE INLINE (#4444)
+      = Just UselessSpecialiseNoSpecialisation
+
+      | otherwise
+      = Nothing
 
     -- See Note [Activation pragmas for SPECIALISE]
     -- no_act_spec is True if the user didn't write an explicit
     -- phase specification in the SPECIALISE pragma
+    id_inl        = idInlinePragma poly_id
+    inl_prag_act  = inlinePragmaActivation id_inl
+    spec_prag_act = inlinePragmaActivation spec_inl
     no_act_spec = case inlinePragmaSpec spec_inl of
                     NoInline _   -> isNeverActive  spec_prag_act
                     Opaque _     -> isNeverActive  spec_prag_act
                     _            -> isAlwaysActive spec_prag_act
-    rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
-             | otherwise   = spec_prag_act                   -- Specified by user
+    rule_act | no_act_spec = inl_prag_act    -- Inherit
+             | otherwise   = spec_prag_act   -- Specified by user
 
+    is_nop_arg (Type {})     = True
+    is_nop_arg (Coercion {}) = True
+    is_nop_arg (Cast e _)    = is_nop_arg e
+    is_nop_arg (Tick _ e)    = is_nop_arg e
+    is_nop_arg (Var x)       = x `elem` spec_bndrs
+    is_nop_arg _             = False
+
+    is_dfun = case idDetails poly_id of
+      DFunId {} -> True
+      _ -> False
+
+specFunInlinePrag :: Id -> InlinePragma
+                  -> InlinePragma -> InlinePragma
+-- See Note [Activation pragmas for SPECIALISE]
+specFunInlinePrag poly_id id_inl spec_inl
+  | not (isDefaultInlinePragma spec_inl)    = spec_inl
+  | isGlobalId poly_id  -- See Note [Specialising imported functions]
+                        -- in OccurAnal
+  , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
+  | otherwise                               = id_inl
+     -- Get the INLINE pragma from SPECIALISE declaration, or,
+     -- failing that, from the original Id
 
 dsWarnOrphanRule :: CoreRule -> DsM ()
 dsWarnOrphanRule rule
@@ -996,6 +1358,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                    --                                    , text "args2:" <+> ppr args2
                    --                                    ]) $
                    Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
@@ -1011,38 +1374,35 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
             -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
             --                                    , text "orig_lhs:" <+> ppr orig_lhs
             --                                    , text "lhs1:"     <+> ppr lhs1
-            --                                    , text "extra_bndrs:" <+> ppr extra_bndrs
+            --                                    , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
+            --                                    , text "extra_dicts:" <+> ppr extra_dicts
             --                                    , text "fn_id:" <+> ppr fn_id
             --                                    , text "args:"   <+> ppr args
             --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
             --                                    ]) $
-            Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
+            Right (trimmed_bndrs ++ extra_dicts, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
-                lhs_fvs = exprsFreeVars args
+                lhs_fvs       = exprsFreeVars args
                 all_fvs       = lhs_fvs `unionVarSet` rhs_fvs
                 trimmed_bndrs = filter (`elemVarSet` all_fvs) orig_bndrs
                 unbound       = filterOut (`elemVarSet` lhs_fvs) trimmed_bndrs
                     -- Needed on RHS but not bound on LHS
 
-                -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
-                -- and extra dict binders: Note [Free dictionaries on rule LHS]
-                extra_bndrs = scopedSort extra_tvs ++ extra_dicts
-                  where
-                    extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
+                -- extra_dicts: see Note [Free dictionaries on rule LHS]
+-- ToDo: extra_dicts is needed. E.g. the SPECIALISE rules for `ap` in GHC.Base
+                extra_dicts
+                  = [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
+                    | d <- exprsSomeFreeVarsList is_extra args ]
 
-                -- isEvVar: this includes coercions, matching what
-                --          happens in `split_lets` (isDictId, isCoVar)
-                extra_dicts =
-                  [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
-                    | d <- extra_vars, isEvVar d ]
-                extra_vars  =
-                  [ v
-                  | v <- exprsFreeVarsList args
-                  , not (v `elemVarSet` orig_bndr_set)
-                  , not (v == fn_id) ]
-                    -- fn_id: do not quantify over the function itself, which may
-                    -- itself be a dictionary (in pathological cases, #10251)
+                is_extra v
+                  = isEvVar v
+                      -- isEvVar: includes coercions, matching what
+                      --          happens in `split_lets` (isDictId, isCoVar)
+                    && not (v `elemVarSet` orig_bndr_set)
+                    && not (v == fn_id)
+                       -- fn_id: do not quantify over the function itself, which may
+                       -- itself be a dictionary (in pathological cases, #10251)
 
  where
    simpl_opts    = initSimpleOpts dflags
@@ -1107,7 +1467,7 @@ Consider #22471
 
 We get two dicts on the LHS, one from `1` and one from `+`.
 For reasons described in Note [The SimplifyRule Plan] in
-GHC.Tc.Gen.Rule, we quantify separately over those dictionaries:
+GHC.Tc.Gen.Sig, we quantify separately over those dictionaries:
    forall f (d1::Num Int) (d2 :: Num Int).
    foo (\xs. (+) d1 (fromInteger d2 1) xs) = ...
 
@@ -1121,32 +1481,6 @@ There are several things going on here.
 * drop_dicts: see Note [Drop dictionary bindings on rule LHS]
 * simpleOptExpr: see Note [Simplify rule LHS]
 * extra_dict_bndrs: see Note [Free dictionaries on rule LHS]
-
-Note [Free tyvars on rule LHS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  data T a = C
-
-  foo :: T a -> Int
-  foo C = 1
-
-  {-# RULES "myrule"  foo C = 1 #-}
-
-After type checking the LHS becomes (foo alpha (C alpha)), where alpha
-is an unbound meta-tyvar.  The zonker in GHC.Tc.Zonk.Type is careful not to
-turn the free alpha into Any (as it usually does).  Instead it turns it
-into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in "GHC.Tc.Zonk.Type".
-
-Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
-in the zonker, because the HsExpr data type is very large.  But it's /easy/
-to do it here in the desugarer.
-
-Moreover, we have to do something rather similar for dictionaries;
-see Note [Free dictionaries on rule LHS].   So that's why we look for
-type variables free on the LHS, and quantify over them.
-
-This relies on there not being any in-scope tyvars, which is true for
-user-defined RULEs, which are always top-level.
 
 Note [Free dictionaries on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1182,9 +1516,9 @@ drop_dicts drops dictionary bindings on the LHS where possible.
    quantify over it. That makes 'd' free in the LHS, but that is later
    picked up by extra_dict_bndrs (see Note [Unused spec binders]).
 
-   NB 1: We can only drop the binding if the RHS doesn't bind
-         one of the orig_bndrs, which we assume occur on RHS.
-         Example
+   NB 1: We can only drop the binding if the RHS of the binding doesn't
+         mention one of the orig_bndrs, which we assume occur on RHS of
+         the rule.  Example
             f :: (Eq a) => b -> a -> a
             {-# SPECIALISE f :: Eq a => b -> [a] -> [a] #-}
          Here we want to end up with
@@ -1192,7 +1526,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
          Of course, the ($dfEqlist d) in the pattern makes it less likely
          to match, but there is no other way to get d:Eq a
 
-   NB 2: We do drop_dicts *before* simplOptEpxr, so that we expect all
+   NB 2: We do drop_dicts *before* simplOptExpr, so that we expect all
          the evidence bindings to be wrapped around the outside of the
          LHS.  (After simplOptExpr they'll usually have been inlined.)
          dsHsWrapper does dependency analysis, so that civilised ones
@@ -1376,28 +1710,33 @@ dsEvBinds ev_binds thing_inside
                thing_inside (core_bind:core_binds) }
     go [] thing_inside = thing_inside []
 
-    ds_component unspecables (AcyclicSCC node) = (NonRec v rhs, new_unspecables)
+    ds_component mb_unspecables (AcyclicSCC node) = (NonRec v rhs, new_unspecables)
       where
         ((v, rhs), (this_canonical, deps)) = unpack_node node
-        transitively_unspecable = is_unspecable this_canonical || any is_unspecable_dep deps
-        is_unspecable_dep dep = dep `S.member` unspecables
-        new_unspecables
-            | transitively_unspecable = S.singleton v
-            | otherwise = mempty
-    ds_component unspecables (CyclicSCC nodes) = (Rec pairs, new_unspecables)
+        new_unspecables = case mb_unspecables of
+           Nothing                                -> []
+           Just unspecs | transitively_unspecable -> [v]
+                        | otherwise               -> []
+              where
+                transitively_unspecable = is_unspecable this_canonical
+                                          || any (`elemVarSet` unspecs) deps
+
+    ds_component mb_unspecables (CyclicSCC nodes) = (Rec pairs, new_unspecables)
       where
         (pairs, direct_canonicity) = unzip $ map unpack_node nodes
 
-        is_unspecable_remote dep = dep `S.member` unspecables
-        transitively_unspecable = or [ is_unspecable this_canonical || any is_unspecable_remote deps
-                                     | (this_canonical, deps) <- direct_canonicity ]
+        new_unspecables = case mb_unspecables of
+           Nothing                                -> []
+           Just unspecs | transitively_unspecable -> map fst pairs
+                        | otherwise               -> []
+              where
+                 transitively_unspecable
+                   = or [ is_unspecable this_canonical
+                          || any (`elemVarSet` unspecs) deps
+                        | (this_canonical, deps) <- direct_canonicity ]
             -- Bindings from a given SCC are transitively specialisable if
             -- all are specialisable and all their remote dependencies are
             -- also specialisable; see Note [Desugaring non-canonical evidence]
-
-        new_unspecables
-            | transitively_unspecable = S.fromList [ v | (v, _) <- pairs]
-            | otherwise = mempty
 
     unpack_node DigraphNode { node_key = v, node_payload = (canonical, rhs), node_dependencies = deps }
        = ((v, rhs), (canonical, deps))

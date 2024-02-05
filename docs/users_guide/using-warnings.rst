@@ -422,6 +422,20 @@ of ``-W(no-)*``.
     such as a `LANGUAGE` or `OPTIONS_GHC` pragma, appears in the body of
     the module instead.
 
+.. ghc-flag:: -Wdeprecated-pragmas
+    :shortdesc: warn about deprecated pragmas
+    :type: dynamic
+    :reverse: -Wno-deprecated-pragmas
+    :category:
+
+    :since: 9.14
+
+    :default: on
+
+    Emits a warning when using a deprecated form of a SPECIALISE pragma which
+    uses multiple comma-separated type signatures (deprecated and scheduled
+    to be removed in GHC 9.18).
+
 .. ghc-flag:: -Wmissed-specialisations
     :shortdesc: warn when specialisation of an imported, overloaded function
         fails.
@@ -475,6 +489,27 @@ of ``-W(no-)*``.
     :reverse: -Wno-all-missed-specializations
 
     Alias for :ghc-flag:`-Wall-missed-specialisations`
+
+.. ghc-flag:: -Wuseless-specialisations
+    :shortdesc: warn on useless SPECIALISE pragmas
+    :type: dynamic
+    :reverse: -Wno-useless-specialisations
+    :category:
+
+    :since: 9.14
+
+    :default: on
+
+    Emits a warning if GHC detects a useless SPECIALISE pragma, such as a
+    SPECIALISE pragma on a non-overloaded function, for example
+    ``{-# SPECIALISE id :: Int -> Int #-}``.
+
+.. ghc-flag:: -Wuseless-specializations
+    :shortdesc: alias for :ghc-flag:`-Wuseless-specialisations`
+    :type: dynamic
+    :reverse: -Wno-useless-specializations
+
+    Alias for :ghc-flag:`-Wuseless-specialisations`
 
 .. ghc-flag:: -Wextended-warnings
     :shortdesc: warn about uses of functions & types that have WARNING or

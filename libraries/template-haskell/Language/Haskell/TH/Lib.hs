@@ -122,7 +122,9 @@ module Language.Haskell.TH.Lib (
     -- **** Pragmas
     ruleVar, typedRuleVar,
     valueAnnotation, typeAnnotation, moduleAnnotation,
-    pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
+    pragInlD, pragSpecD, pragSpecInlD,
+    pragSpecED, pragSpecInlED,
+    pragSpecInstD, pragRuleD, pragAnnD,
     pragLineD, pragCompleteD,
 
     -- **** Pattern Synonyms

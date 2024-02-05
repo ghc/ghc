@@ -491,6 +491,22 @@ data PsMessage
    --               T24159_pat_parse_error_6
    | PsErrTypeSyntaxInPat !PsErrTypeSyntaxDetails
 
+   -- | 'PsErrSpecExprMultipleTypeAscription' is an error that occurs when
+   -- a user attempts to use the new form SPECIALISE pragma syntax with
+   -- multiple type signatures, e.g.
+   --
+   -- @{-# SPECIALISE foo 3 :: Float -> Float; Double -> Double #-}
+   | PsErrSpecExprMultipleTypeAscription
+
+   -- | 'PsWarnSpecMultipleTypeAscription' is a warning that occurs when
+   -- a user uses the old-form SPECIALISE pragma syntax with
+   -- multiple type signatures, e.g.
+   --
+   -- @{-# SPECIALISE bar :: Float -> Float; Double -> Double #-}
+   --
+   -- This constructor is deprecated and will be removed in GHC 9.18.
+   | PsWarnSpecMultipleTypeAscription
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

@@ -559,6 +559,14 @@ instance Diagnostic PsMessage where
     PsErrIllegalOrPat pat
       -> mkSimpleDecorated $ vcat [text "Illegal or-pattern:" <+> ppr (unLoc pat)]
 
+    PsErrSpecExprMultipleTypeAscription
+      -> mkSimpleDecorated $
+           text "SPECIALISE expression doesn't support multiple type ascriptions"
+
+    PsWarnSpecMultipleTypeAscription
+      -> mkSimpleDecorated $
+           text "SPECIALISE pragmas with multiple type ascriptions are deprecated, and will be removed in GHC 9.18"
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -677,6 +685,8 @@ instance Diagnostic PsMessage where
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
     PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
     PsErrTypeSyntaxInPat{}                        -> ErrorWithoutFlag
+    PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
+    PsWarnSpecMultipleTypeAscription{}            -> WarningWithFlag Opt_WarnDeprecatedPragmas
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -846,6 +856,8 @@ instance Diagnostic PsMessage where
     PsErrInvalidPun {}                            -> [suggestExtension LangExt.ListTuplePuns]
     PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
     PsErrTypeSyntaxInPat{}                        -> noHints
+    PsErrSpecExprMultipleTypeAscription {}        -> [SuggestSplittingIntoSeveralSpecialisePragmas]
+    PsWarnSpecMultipleTypeAscription{}            -> [SuggestSplittingIntoSeveralSpecialisePragmas]
 
   diagnosticCode = constructorCode @GHC
 

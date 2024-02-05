@@ -55,6 +55,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core ( isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr ( debugPprType )
+import GHC.Core.TyCo.Tidy ( tidyType )
 import GHC.Core.Class( Class )
 import GHC.Core.Coercion.Axiom
 

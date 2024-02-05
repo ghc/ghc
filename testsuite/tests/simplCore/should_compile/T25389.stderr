@@ -1,0 +1,103 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 34, types: 46, coercions: 2, joins: 0/0}
+
+-- RHS size: {terms: 3, types: 2, coercions: 1, joins: 0/0}
+T25389.$WEx1 [InlPrag=INLINE[final] CONLIKE]
+  :: Int %1 -> Example True
+[GblId[DataConWrapper],
+ Arity=1,
+ Str=<L>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (conrep [Occ=Once1] :: Int) ->
+                 T25389.Ex1
+                   @True @~(<True>_N :: True GHC.Internal.Prim.~# True) conrep}]
+T25389.$WEx1
+  = \ (conrep [Occ=Once1] :: Int) ->
+      T25389.Ex1
+        @True @~(<True>_N :: True GHC.Internal.Prim.~# True) conrep
+
+-- RHS size: {terms: 1, types: 1, coercions: 1, joins: 0/0}
+T25389.$WEx2 [InlPrag=INLINE[final] CONLIKE] :: Example False
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
+         Tmpl= T25389.Ex2
+                 @False @~(<False>_N :: False GHC.Internal.Prim.~# False)}]
+T25389.$WEx2
+  = T25389.Ex2
+      @False @~(<False>_N :: False GHC.Internal.Prim.~# False)
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+expensive :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (v [Occ=Once1!] :: Int) ->
+                 case v of { GHC.Internal.Types.I# x [Occ=Once1] ->
+                 GHC.Internal.Types.I# (GHC.Internal.Prim.*# x 2#)
+                 }}]
+expensive
+  = \ (v :: Int) ->
+      case v of { GHC.Internal.Types.I# x ->
+      GHC.Internal.Types.I# (GHC.Internal.Prim.*# x 2#)
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T25389.op1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T25389.op1 = GHC.Internal.Types.I# 0#
+
+-- RHS size: {terms: 5, types: 9, coercions: 0, joins: 0/0}
+T25389.op_$sop [InlPrag=INLINE (sat-args=1)]
+  :: Example False -> Int
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (e [Occ=Once1!] :: Example False) ->
+                 case e of { Ex2 _ [Occ=Dead] -> T25389.op1 }}]
+T25389.op_$sop
+  = \ (e :: Example False) ->
+      case e of { Ex2 co [Dmd=B] -> T25389.op1 }
+
+-- RHS size: {terms: 9, types: 16, coercions: 0, joins: 0/0}
+op :: forall (b :: Bool). Example b -> Int
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@(b :: Bool)) (e [Occ=Once1!] :: Example b) ->
+                 case e of {
+                   Ex1 _ [Occ=Dead] i [Occ=Once1] -> expensive i;
+                   Ex2 _ [Occ=Dead] -> T25389.op1
+                 }}]
+op
+  = \ (@(b :: Bool)) (e :: Example b) ->
+      case e of {
+        Ex1 co [Dmd=B] i -> expensive i;
+        Ex2 co [Dmd=B] -> T25389.op1
+      }
+
+
+------ Local rules for imported ids --------
+"USPEC op @'False" forall. op @False = T25389.op_$sop
+
+

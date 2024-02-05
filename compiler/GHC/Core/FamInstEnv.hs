@@ -42,6 +42,7 @@ import GHC.Core( IsOrphan, chooseOrphanAnchor )
 import GHC.Core.Unify
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Core.TyCon
 import GHC.Core.Coercion

@@ -1,0 +1,75 @@
+
+==================== Tidy Core rules ====================
+"USPEC f1 @Word @[e]"
+    forall (@e) ($dEq :: Eq [e]) ($dNum :: Num Word).
+      f1 @Word @[e] $dNum $dEq
+      = \ _ [Occ=Dead] _ [Occ=Dead] -> I# 111#
+"USPEC f1_qc @_ @(g e) @Word"
+    forall (@e)
+           (@(g :: * -> *))
+           ($dNum :: Num Word)
+           ($dEq :: Eq (g e))
+           (df :: forall x. Eq x => Eq (g x)).
+      f1_qc @g @(g e) @Word df $dEq $dNum
+      = \ _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> C# 'q'#
+"USPEC f2 @_ @_ @Word"
+    forall (@c) ($dNum :: Num Word) ($dEq :: Eq c) ($dEq1 :: Eq c).
+      f2 @c @c @Word $dEq1 $dEq $dNum
+      = \ _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> I# 2#
+"USPEC f3 @Int @_"
+    forall (@(g :: * -> *))
+           (df :: forall x. Eq x => Eq (g x))
+           ($dEq :: Eq Int).
+      f3 @Int @g $dEq df
+      = f3_$sf3 @g df
+"USPEC f3 @_ @[]"
+    forall (@c) (df :: forall x. Eq x => Eq [x]) ($dEq :: Eq c).
+      f3 @c @[] $dEq df
+      = f3_$sf1 @c $dEq
+"USPEC f4 @_ @(ST s)"
+    forall (@s) (@b) ($dMonad :: Monad (ST s)) ($dEq :: Eq b).
+      f4 @b @(ST s) $dEq $dMonad
+      = $fApplicativeST_$cpure @s @b
+"USPEC f4_qc @Int @_ @_"
+    forall (@(n :: * -> *))
+           (@(r :: (* -> *) -> * -> *))
+           (df :: forall (m :: * -> *). Monad m => Monad (r m))
+           ($dEq :: Eq Int).
+      f4_qc @Int @r @n $dEq df
+      = \ _ [Occ=Dead] -> ()
+"USPEC f5 @(D Int)"
+    forall ($dEq :: Eq (D Int)). f5 @(D Int) $dEq = f5_$sf5
+"USPEC f5_qc @Int @D"
+    forall (df :: forall x. (Eq x, Eq (T x)) => Eq (D x))
+           ($dEq :: Eq (T Int))
+           ($dEq1 :: Eq Int).
+      f5_qc @Int @D $dEq1 $dEq df
+      = f5_$sf5
+"USPEC f5_qc @Int @_"
+    forall (@(g :: * -> *))
+           (df :: forall x. (Eq x, Eq (T x)) => Eq (g x))
+           ($dEq :: Eq (T Int))
+           ($dEq1 :: Eq Int).
+      f5_qc @Int @g $dEq1 $dEq df
+      = f5_qc_$sf5_qc @g df
+"USPEC f6 @_ @_ @Word"
+    forall (@c) ($dNum :: Num Word) ($dOrd :: Ord c) ($dEq :: Eq c).
+      f6 @c @c @Word $dEq $dOrd $dNum
+      = \ _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> C# 'c'#
+"USPEC f6_qc @_ @_ @Word"
+    forall (@(h :: * -> *))
+           ($dNum :: Num Word)
+           (df :: forall y. Eq y => Ord (h y))
+           (df1 :: forall x. Eq x => Eq (h x)).
+      f6_qc @h @h @Word df1 df $dNum
+      = \ _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> C# 'd'#
+"USPEC f7 @Int"
+    forall ($dEq :: Eq Int) ($dCls :: Cls (TF Int)).
+      f7 @Int $dCls $dEq
+      = \ (x [Occ=Once1] :: Int) -> x
+"USPEC qcfd @C @G"
+    forall (df :: forall a b. C (a, b)) ($dF :: F C G).
+      qcfd @C @G $dF df
+      = qcfd_x
+
+

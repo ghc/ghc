@@ -71,3 +71,4 @@ test('T23573', [extra_files(["T23573.hs", "T23573A.hs", "T23573B.hs"])], multimo
 test('T23465', normal, compile, ['-ddump-parsed'])
 test('WarnNoncanonical', normal, compile, [''])
 test('T24396', [extra_files(["T24396a.hs", "T24396b.hs"])], multimod_compile, ['T24396b', ''])
+test('SpecMultipleTys', normal, compile, ['']) # compile_fail from GHC 9.18

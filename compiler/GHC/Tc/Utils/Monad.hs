@@ -98,7 +98,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvBind, addTopEvBinds,
+  addTcEvBind, addTcEvBinds, addTopEvBinds,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
@@ -1793,6 +1793,19 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
 addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
   = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
+
+addTcEvBinds :: EvBindsVar -> EvBindMap -> TcM ()
+-- ^ Add a collection of binding to the TcEvBinds by side effect
+addTcEvBinds _ new_ev_binds
+  | isEmptyEvBindMap new_ev_binds
+  = return ()
+addTcEvBinds (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) new_ev_binds
+  = do { traceTc "addTcEvBinds" $ ppr u $$
+                                  ppr new_ev_binds
+       ; old_bnds <- readTcRef ev_ref
+       ; writeTcRef ev_ref (old_bnds `unionEvBindMap` new_ev_binds) }
+addTcEvBinds (CoEvBindsVar { ebv_uniq = u }) new_ev_binds
+  = pprPanic "addTcEvBinds CoEvBindsVar" (ppr new_ev_binds $$ ppr u)
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =

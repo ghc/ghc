@@ -9,3 +9,6 @@ foo :: Num a => a -> T a
 foo = undefined
 
 {-# SPECIALISE foo :: Int -> Bool #-}
+{- # SPECIALISE (foo :: Int -> Bool) # -}
+{- # SPECIALISE forall x. foo (x::Int) :: Bool # -}
+{- # SPECIALISE forall x. (foo :: Int -> Bool) x # -}

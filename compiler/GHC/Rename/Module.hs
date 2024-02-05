@@ -24,25 +24,23 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader
+
 import GHC.Rename.HsType
 import GHC.Rename.Bind
 import GHC.Rename.Doc
 import GHC.Rename.Env
 import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
-                        , checkShadowedRdrNames, warnUnusedTypePatterns
-                        , newLocalBndrsRn
+                        , warnUnusedTypePatterns
                         , noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin ( TypedThing(..) )
 
-import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
@@ -50,23 +48,29 @@ import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
+
+import GHC.Types.FieldLabel
+import GHC.Types.Name.Reader
+import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Utils.Outputable
-import GHC.Types.Basic (VisArity)
-import GHC.Types.Basic  ( TypeOrKind(..) )
-import GHC.Data.FastString
+import GHC.Types.Basic  ( VisArity, TypeOrKind(..), RuleName )
+import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
+import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
+
 import GHC.Driver.DynFlags
+import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
+
 import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
-import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
+import GHC.Utils.Outputable
+
+import GHC.Data.FastString
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
-import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
-import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.DataCon ( isSrcStrict )
@@ -1159,65 +1163,23 @@ rnHsRuleDecls (HsRules { rds_ext = (_, src)
                          , rds_rules = rn_rules }, fvs) }
 
 rnHsRuleDecl :: RuleDecl GhcPs -> RnM (RuleDecl GhcRn, FreeVars)
-rnHsRuleDecl (HsRule { rd_ext  = (_, st)
-                     , rd_name = rule_name
-                     , rd_act  = act
-                     , rd_tyvs = tyvs
-                     , rd_tmvs = tmvs
-                     , rd_lhs  = lhs
-                     , rd_rhs  = rhs })
-  = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
-       ; checkDupRdrNames rdr_names_w_loc
-       ; checkShadowedRdrNames rdr_names_w_loc
-       ; names <- newLocalBndrsRn rdr_names_w_loc
-       ; let doc = RuleCtx (unLoc rule_name)
-       ; bindRuleTyVars doc tyvs $ \ tyvs' ->
-         bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
+rnHsRuleDecl (HsRule { rd_ext   = (_, st)
+                     , rd_name  = lrule_name@(L _ rule_name)
+                     , rd_act   = act
+                     , rd_bndrs = bndrs
+                     , rd_lhs   = lhs
+                     , rd_rhs   = rhs })
+  = bindRuleBndrs (RuleCtx rule_name) bndrs $ \tm_names bndrs' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
-       ; return (HsRule { rd_ext  = (HsRuleRn fv_lhs' fv_rhs', st)
-                        , rd_name = rule_name
-                        , rd_act  = act
-                        , rd_tyvs = tyvs'
-                        , rd_tmvs = tmvs'
-                        , rd_lhs  = lhs'
-                        , rd_rhs  = rhs' }, fv_lhs' `plusFV` fv_rhs') } }
-  where
-    get_var :: RuleBndr GhcPs -> LocatedN RdrName
-    get_var (RuleBndrSig _ v _) = v
-    get_var (RuleBndr _ v)      = v
-
-bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
-               -> [LRuleBndr GhcPs] -> [Name]
-               -> ([LRuleBndr GhcRn] -> RnM (a, FreeVars))
-               -> RnM (a, FreeVars)
-bindRuleTmVars doc tyvs vars names thing_inside
-  = go vars names $ \ vars' ->
-    bindLocalNamesFV names (thing_inside vars')
-  where
-    go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
-      = go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndr noAnn (L loc n)) : vars')
-
-    go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
-       (n : ns) thing_inside
-      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
-        go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndrSig noAnn (L loc n) bsig') : vars')
-
-    go [] [] thing_inside = thing_inside []
-    go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
-
-    bind_free_tvs = case tyvs of Nothing -> AlwaysBind
-                                 Just _  -> NeverBind
-
-bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
-               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
-               -> RnM (b, FreeVars)
-bindRuleTyVars doc (Just bndrs) thing_inside
-  = bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs (thing_inside . Just)
-bindRuleTyVars _ _ thing_inside = thing_inside Nothing
+       ; checkValidRule rule_name tm_names lhs' fv_lhs'
+       ; return (HsRule { rd_ext   = (HsRuleRn fv_lhs' fv_rhs', st)
+                        , rd_name  = lrule_name
+                        , rd_act   = act
+                        , rd_bndrs = bndrs'
+                        , rd_lhs   = lhs'
+                        , rd_rhs   = rhs' }
+                , fv_lhs' `plusFV` fv_rhs') }
 
 {-
 Note [Rule LHS validity checking]
@@ -1244,7 +1206,7 @@ with the LHS wrapped in parens. But Template Haskell does (#24621)!
 So we should accommodate them.
 -}
 
-checkValidRule :: FastString -> [Name] -> LHsExpr GhcRn -> NameSet -> RnM ()
+checkValidRule :: RuleName -> [Name] -> LHsExpr GhcRn -> NameSet -> RnM ()
 checkValidRule rule_name ids lhs' fv_lhs'
   = do  {       -- Check for the form of the LHS
           case (validRuleLhs ids lhs') of

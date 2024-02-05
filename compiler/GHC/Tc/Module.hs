@@ -16,7 +16,8 @@
 --
 -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/type-checker
 module GHC.Tc.Module (
-        tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
+        tcRnStmt, tcRnExpr, TcRnExprMode(..),
+        tcRnType, tcRnTypeSkolemising,
         tcRnImportDecls,
         tcRnLookupRdrName,
         getModuleInterface,
@@ -71,7 +72,7 @@ import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
-import GHC.Tc.Gen.Rule
+import GHC.Tc.Gen.Sig( tcRules )
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.Utils.TcMType
@@ -115,6 +116,7 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.TyCo.Ppr( debugPprType )
+import GHC.Core.TyCo.Tidy( tidyTopType )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
@@ -184,6 +186,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Foldable ( for_ )
 import Data.Traversable ( for )
+import Data.IORef( newIORef )
 
 
 
@@ -2679,6 +2682,16 @@ tcRnImportDecls hsc_env import_decls
        ; return (tcg_rdr_env gbl_env) }
   where
     zap_rdr_env gbl_env = gbl_env { tcg_rdr_env = emptyGlobalRdrEnv }
+
+
+tcRnTypeSkolemising :: HscEnv
+                    -> LHsType GhcPs
+                    -> IO (Messages TcRnMessage, Maybe (Type, Kind))
+-- tcRnTypeSkolemising skolemisese any free unification variables,
+-- and normalises the type
+tcRnTypeSkolemising env ty
+  = do { skol_tv_ref <- liftIO (newIORef [])
+       ; tcRnType env (SkolemiseFlexi skol_tv_ref) True ty }
 
 -- tcRnType just finds the kind of a type
 tcRnType :: HscEnv

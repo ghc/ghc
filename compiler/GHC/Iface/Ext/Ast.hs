@@ -1832,6 +1832,10 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
           [ toHie $ (C Use) name
           , toHie $ map (TS (ResolvedScopes [])) typs
           ]
+        SpecSigE _ bndrs spec_e _ ->
+          [ toHieRuleBndrs (locA sp) (mkScope spec_e) bndrs
+          , toHie spec_e
+          ]
         SpecInstSig _ typ ->
           [ toHie $ TS (ResolvedScopes []) typ
           ]
@@ -2175,18 +2179,25 @@ instance ToHie (LocatedA (RuleDecls GhcRn)) where
         ]
 
 instance ToHie (LocatedA (RuleDecl GhcRn)) where
-  toHie (L span r@(HsRule _ rname _ tybndrs bndrs exprA exprB)) = concatM
+  toHie (L span r@(HsRule { rd_name = rname, rd_bndrs = bndrs
+                          , rd_lhs = exprA, rd_rhs = exprB }))
+    = concatM
         [ makeNodeA r span
         , locOnly $ getLocA rname
-        , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs
-        , toHie $ map (RS $ mkScope (locA span)) bndrs
+        , toHieRuleBndrs (locA span) scope bndrs
         , toHie exprA
         , toHie exprB
         ]
-    where scope = bndrs_sc `combineScopes` exprA_sc `combineScopes` exprB_sc
-          bndrs_sc = maybe NoScope mkScope (listToMaybe bndrs)
-          exprA_sc = mkScope exprA
-          exprB_sc = mkScope exprB
+    where
+      scope = mkScope exprA `combineScopes` mkScope exprB
+
+toHieRuleBndrs :: SrcSpan -> Scope -> RuleBndrs GhcRn -> HieM [HieAST Type]
+toHieRuleBndrs span body_sc (RuleBndrs { rb_tyvs = tybndrs, rb_tmvs = bndrs })
+    = concatM [ toHie $ fmap (tvScopes (ResolvedScopes []) full_sc) tybndrs
+              , toHie $ map (RS $ mkScope (locA span)) bndrs ]
+    where
+      full_sc = bndrs_sc `combineScopes` body_sc
+      bndrs_sc = maybe NoScope mkScope (listToMaybe bndrs)
 
 instance ToHie (RScoped (LocatedAn NoEpAnns (RuleBndr GhcRn))) where
   toHie (RS sc (L span bndr)) = concatM $ makeNodeA bndr span : case bndr of

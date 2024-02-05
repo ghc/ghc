@@ -1785,12 +1785,7 @@ inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
 
 inlinePragmaSource :: InlinePragma -> SourceText
-inlinePragmaSource prag = case inl_inline prag of
-                            Inline    x      -> x
-                            Inlinable y      -> y
-                            NoInline  z      -> z
-                            Opaque    q      -> q
-                            NoUserInlinePrag -> NoSourceText
+inlinePragmaSource prag = inlineSpecSource (inl_inline prag)
 
 inlineSpecSource :: InlineSpec -> SourceText
 inlineSpecSource spec = case spec of

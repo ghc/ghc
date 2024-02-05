@@ -24,24 +24,11 @@ T19296.hs:13:6: warning: [GHC-30606] [-Wredundant-constraints]
 13 | h :: (Eq a, Ord b) => a -> b -> b
    |      ^^^^^^^^^^^^^
 
-T19296.hs:21:1: warning: [GHC-40548]
-    Forall'd constraint ‘Eq a’ is not bound in RULE lhs
-      Orig bndrs: [a, $dEq]
-      Orig lhs: let {
-                  $dOrd :: Ord Int
-                  [LclId]
-                  $dOrd = GHC.Internal.Classes.$fOrdInt } in
-                spec @Int @a $dOrd
-      optimised lhs: spec @Int @a $dOrd
-   |
-21 | {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 T19296.hs:21:24: warning: [GHC-30606] [-Wredundant-constraints]
     • Redundant constraint: Eq a
-      In the type signature for:
-           spec :: forall a. Eq a => a -> Int -> Int
-    • In the pragma: {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
+      In an expression type signature:
+           forall a. Eq a => a -> Int -> Int
+    • In the expression: spec :: Eq a => a -> Int -> Int
    |
 21 | {-# SPECIALISE spec :: Eq a => a -> Int -> Int #-}
    |                        ^^^^

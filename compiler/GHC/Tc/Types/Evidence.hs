@@ -15,7 +15,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds,
+  EvBindMap(..), emptyEvBindMap, extendEvBinds, unionEvBindMap,
   lookupEvBind, evBindMapBinds,
   foldEvBindMap, nonDetStrictFoldEvBindMap,
   filterEvBindMap,
@@ -373,10 +373,15 @@ data EvBindsVar
     }
 
 instance Data.Data TcEvBinds where
-  -- Placeholder; we can't travers into TcEvBinds
+  -- Placeholder; we can't traverse into TcEvBinds
   toConstr _   = abstractConstr "TcEvBinds"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = Data.mkNoRepType "TcEvBinds"
+instance Data.Data EvBind where
+  -- Placeholder; we can't traverse into EvBind
+  toConstr _   = abstractConstr "TcEvBind"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = Data.mkNoRepType "EvBind"
 
 {- Note [Coercion evidence only]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -427,6 +432,11 @@ extendEvBinds bs ev_bind
   = EvBindMap { ev_bind_varenv = extendDVarEnv (ev_bind_varenv bs)
                                                (eb_lhs ev_bind)
                                                ev_bind }
+
+-- | Union two evidence binding maps
+unionEvBindMap :: EvBindMap -> EvBindMap -> EvBindMap
+unionEvBindMap (EvBindMap env1) (EvBindMap env2) =
+  EvBindMap { ev_bind_varenv = plusDVarEnv env1 env2 }
 
 isEmptyEvBindMap :: EvBindMap -> Bool
 isEmptyEvBindMap (EvBindMap m) = isEmptyDVarEnv m

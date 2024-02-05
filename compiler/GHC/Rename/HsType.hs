@@ -825,6 +825,7 @@ wildCardsAllowed env
        ExprWithTySigCtx {} -> True
        PatCtx {}           -> True
        RuleCtx {}          -> True
+       SpecECtx {}         -> True
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True

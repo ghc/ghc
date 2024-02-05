@@ -1,0 +1,5 @@
+T10251.hs:19:5: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE instance pragma.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
+

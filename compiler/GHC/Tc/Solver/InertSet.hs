@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -24,6 +25,8 @@ module GHC.Tc.Solver.InertSet (
     InertEqs,
     foldTyEqs, delEq, findEq,
     partitionInertEqs, partitionFunEqs,
+    filterInertEqs, filterFunEqs,
+    inertGivens,
     foldFunEqs, addEqToCans,
 
     -- * Inert Dicts
@@ -73,10 +76,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Bag
 
-import Data.List.NonEmpty ( NonEmpty(..), (<|) )
-import Data.Function ( on )
-
 import Control.Monad      ( forM_ )
+import Data.List.NonEmpty ( NonEmpty(..), (<|) )
+import Data.Function      ( on )
 
 {-
 ************************************************************************
@@ -389,7 +391,6 @@ emptyInert
        , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap }
-
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1377,6 +1378,17 @@ addInertEqs :: EqCt -> InertEqs -> InertEqs
 addInertEqs eq_ct@(EqCt { eq_lhs = TyVarLHS tv }) eqs = addTyEq eqs tv eq_ct
 addInertEqs other _ = pprPanic "extendInertEqs" (ppr other)
 
+-- | Filter InertEqs according to a predicate
+filterInertEqs :: (EqCt -> Bool) -> InertEqs -> InertEqs
+filterInertEqs f = mapMaybeDVarEnv g
+  where
+    g xs =
+      let filtered = filter f xs
+      in
+        if null filtered
+        then Nothing
+        else Just filtered
+
 ------------------------
 
 addCanFunEq :: InertFunEqs -> TyCon -> [TcType] -> EqCt -> InertFunEqs
@@ -1400,7 +1412,16 @@ addFunEqs eq_ct@(EqCt { eq_lhs = TyFamLHS tc args }) fun_eqs
   = addCanFunEq fun_eqs tc args eq_ct
 addFunEqs other _ = pprPanic "extendFunEqs" (ppr other)
 
-
+-- | Filter entries in InertFunEqs that satisfy the predicate
+filterFunEqs :: (EqCt -> Bool) -> InertFunEqs -> InertFunEqs
+filterFunEqs f = mapMaybeTcAppMap g
+  where
+    g xs =
+      let filtered = filter f xs
+      in
+        if null filtered
+        then Nothing
+        else Just filtered
 
 {- *********************************************************************
 *                                                                      *
@@ -2214,3 +2235,44 @@ Wrong!  The level-check ensures that the inner implicit parameter wins.
 (Actually I think that the order in which the work-list is processed means
 that this chain of events won't happen, but that's very fragile.)
 -}
+
+{- *********************************************************************
+*                                                                      *
+               Extracting Givens from the inert set
+*                                                                      *
+********************************************************************* -}
+
+
+-- | Extract only Given constraints from the inert set.
+inertGivens :: InertSet -> InertSet
+inertGivens is@(IS { inert_cans = cans }) =
+  is { inert_cans = givens_cans
+     , inert_solved_dicts = emptyDictMap
+     }
+  where
+
+    isGivenEq :: EqCt -> Bool
+    isGivenEq eq = isGiven (ctEvidence (CEqCan eq))
+    isGivenDict :: DictCt -> Bool
+    isGivenDict dict = isGiven (ctEvidence (CDictCan dict))
+    isGivenIrred :: IrredCt -> Bool
+    isGivenIrred irred = isGiven (ctEvidence (CIrredCan irred))
+
+    -- Filter the inert constraints for Givens
+    (eq_givens_list, _) = partitionInertEqs isGivenEq (inert_eqs cans)
+    (funeq_givens_list, _) = partitionFunEqs isGivenEq (inert_funeqs cans)
+    dict_givens = filterDicts isGivenDict (inert_dicts cans)
+    safehask_givens = filterDicts isGivenDict (inert_safehask cans)
+    irreds_givens = filterBag isGivenIrred (inert_irreds cans)
+
+    eq_givens = foldr addInertEqs emptyTyEqs eq_givens_list
+    funeq_givens = foldr addFunEqs emptyFunEqs funeq_givens_list
+
+    givens_cans =
+      cans
+        { inert_eqs      = eq_givens
+        , inert_funeqs   = funeq_givens
+        , inert_dicts    = dict_givens
+        , inert_safehask = safehask_givens
+        , inert_irreds   = irreds_givens
+        }

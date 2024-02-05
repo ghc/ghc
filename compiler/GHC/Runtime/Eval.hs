@@ -72,6 +72,7 @@ import GHC.Core.FamInstEnv ( FamInst, orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Tidy( tidyType, tidyOpenTypes )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
@@ -121,12 +122,11 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 
-import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
+import GHC.Tc.Module ( runTcInteractive, tcRnTypeSkolemising, loadUnqualIfaces )
 import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Env (tcGetInstEnvs)
 import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Zonk.Env ( ZonkFlexi (SkolemiseFlexi) )
 
 import GHC.IfaceToCore
 
@@ -1072,8 +1072,9 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ hoistTcRnMessage $ tcRnType hsc_env SkolemiseFlexi True ty
-
+    ioMsgMaybe $ hoistTcRnMessage $
+                 tcRnTypeSkolemising hsc_env ty
+      -- I'm not sure what to do about those zonked skolems
   return ty
 
 -- Get all the constraints required of a dictionary binding

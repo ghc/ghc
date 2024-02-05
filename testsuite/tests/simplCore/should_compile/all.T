@@ -502,6 +502,7 @@ test('T23491d', [extra_files(['T23491.hs']), grep_errmsg(r'Static argument')], m
 test('T23074', normal, compile, ['-O -ddump-rules'])
 test('T23272', [only_ways(['ghci']), extra_hc_opts('-fno-unoptimized-core-for-interpreter -O')], ghci_script, ['T23272.script'])
 test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -v0'])
+test('DsSpecPragmas', normal, compile, ['-O -ddump-rules'])
 
 # The -ddump-simpl of T22404 should have no let-bindings
 test('T22404', [only_ways(['optasm']), check_errmsg(r'let') ], compile, ['-ddump-simpl -dsuppress-uniques'])
@@ -532,4 +533,6 @@ test('T24725a', [ grep_errmsg(r'testedRule')], compile, ['-O -ddump-rule-firings
 test('T25033', normal, compile, ['-O'])
 test('T25160', normal, compile, ['-O -ddump-rules'])
 test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], multimod_compile, ['T25197', '-O2 -v0'])
+test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])

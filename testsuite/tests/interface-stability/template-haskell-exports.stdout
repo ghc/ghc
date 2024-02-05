@@ -345,7 +345,7 @@ module Language.Haskell.TH where
     ppr_list :: [a] -> GHC.Boot.TH.PprLib.Doc
     {-# MINIMAL ppr #-}
   type Pragma :: *
-  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
+  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   type Pred :: *
   type Pred = Type
   type PredQ :: *
@@ -612,7 +612,9 @@ module Language.Haskell.TH where
   pragLineD :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> GHC.Internal.Base.String -> m Dec
   pragRuleD :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> [m RuleBndr] -> m Exp -> m Exp -> Phases -> m Dec
   pragSpecD :: forall (m :: * -> *). Quote m => Name -> m Type -> Phases -> m Dec
+  pragSpecED :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe [m (TyVarBndr ())] -> [m RuleBndr] -> m Exp -> Phases -> m Dec
   pragSpecInlD :: forall (m :: * -> *). Quote m => Name -> m Type -> Inline -> Phases -> m Dec
+  pragSpecInlED :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe [m (TyVarBndr ())] -> [m RuleBndr] -> m Exp -> Inline -> Phases -> m Dec
   pragSpecInstD :: forall (m :: * -> *). Quote m => m Type -> m Dec
   prefixPatSyn :: forall (m :: * -> *). Quote m => [Name] -> m PatSynArgs
   prim :: Callconv
@@ -1117,7 +1119,9 @@ module Language.Haskell.TH.Lib where
   pragLineD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Dec
   pragRuleD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
   pragSpecD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
   pragSpecInlD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecInlED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
   pragSpecInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   prefixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
   prim :: GHC.Internal.TH.Syntax.Callconv
@@ -1459,7 +1463,9 @@ module Language.Haskell.TH.Lib.Internal where
   pragSCCFunD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
   pragSCCFunNamedD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Dec
   pragSpecD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
   pragSpecInlD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecInlED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
   pragSpecInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   prefixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
   prim :: GHC.Internal.TH.Syntax.Callconv
@@ -2023,7 +2029,7 @@ module Language.Haskell.TH.Syntax where
   type PkgName :: *
   newtype PkgName = PkgName GHC.Internal.Base.String
   type Pragma :: *
-  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
+  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   type Pred :: *
   type Pred = Type
   type role Q nominal

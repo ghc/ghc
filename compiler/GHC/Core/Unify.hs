@@ -34,6 +34,7 @@ import GHC.Types.Name( Name, mkSysTvName, mkSystemVarName )
 import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
+import GHC.Core.Predicate( scopedSort )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType )

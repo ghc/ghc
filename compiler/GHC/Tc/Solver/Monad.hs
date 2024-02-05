@@ -14,11 +14,14 @@
 module GHC.Tc.Solver.Monad (
 
     -- The TcS monad
-    TcS, runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
+    TcS(..), TcSEnv(..), TcSMode(..),
+    runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
+    runTcSSpecPrag,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
+    emitImplication,
     emitFunDepWanteds,
 
     selectNextWorkItem,
@@ -76,6 +79,7 @@ module GHC.Tc.Solver.Monad (
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
     insertFunEq, addInertForAll,
+    updInertDicts, updInertIrreds,
     emitWorkNC, emitWork,
     lookupInertDict,
 
@@ -170,6 +174,7 @@ import GHC.Builtin.Names ( unsatisfiableClassNameKey )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
+import GHC.Core.TyCo.Tidy
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom( TypeEqn )
 import GHC.Core.Predicate
@@ -210,6 +215,7 @@ import Data.Maybe ( isJust )
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
+--import GHC.Tc.Solver.Solve (solveWanteds)
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -369,6 +375,31 @@ The main logic that allows us to pick local instances, even in the presence of
 duplicates, is explained in Note [Use only the best matching quantified constraint]
 in GHC.Tc.Solver.Dict.
 -}
+
+updInertDicts :: DictCt -> TcS ()
+updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
+  = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
+
+       ; if |  isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
+            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
+               -- Update /both/ inert_cans /and/ inert_solved_dicts.
+               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
+               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
+                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
+            |  otherwise
+            -> return ()
+
+       -- Add the new constraint to the inert set
+       ; updInertCans (updDicts (addDict dict_ct)) }
+  where
+    not_ip_for :: Type -> DictCt -> Bool
+    not_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
+      = not (mentionsIP str_ty cls tys)
+
+updInertIrreds :: IrredCt -> TcS ()
+updInertIrreds irred
+  = do { tc_lvl <- getTcLevel
+       ; updInertCans $ addIrredToCans tc_lvl irred }
 
 {- *********************************************************************
 *                                                                      *
@@ -580,7 +611,7 @@ getInertGivens :: TcS [Ct]
 getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldIrreds ((:) . CIrredCan) (inert_irreds inerts)
-                     $ foldDicts  ((:) . CDictCan) (inert_dicts inerts)
+                     $ foldDicts  ((:) . CDictCan)  (inert_dicts inerts)
                      $ foldFunEqs ((:) . CEqCan)    (inert_funeqs inerts)
                      $ foldTyEqs  ((:) . CEqCan)    (inert_eqs inerts)
                      $ []
@@ -679,6 +710,7 @@ getUnsolvedInerts
       | otherwise     = cts
       where
         ct = mk_ct thing
+
 
 getHasGivenEqs :: TcLevel             -- TcLevel of this implication
                -> TcS ( HasGivenEqs   -- are there Given equalities?
@@ -825,6 +857,31 @@ for it, so TcS carries a mutable location where the binding can be
 added.  This is initialised from the innermost implication constraint.
 -}
 
+-- | See Note [TcSMode]
+data TcSMode
+  = TcSVanilla    -- ^ Normal constraint solving
+  | TcSEarlyAbort -- ^ Abort early on insoluble constraints
+  | TcSSpecPrag -- ^ Fully solve all constraints
+  deriving (Eq)
+
+{- Note [TcSMode]
+~~~~~~~~~~~~~~~~~
+The constraint solver can operate in different modes:
+
+* TcSVanilla: Normal constraint solving mode. This is the default.
+
+* TcSEarlyAbort: Abort (fail in the monad) as soon as we come across an
+  insoluble constraint. This is used to fail-fast when checking for hole-fits.
+  See Note [Speeding up valid hole-fits].
+
+* TcSSpecPrag: Solve constraints fully or not at all. This is described in
+  Note [TcSSpecPrag].
+
+  This mode is currently used in one place only: when solving constraints
+  arising from specialise pragmas.
+  See Note [Fully solving constraints for specialisation] in GHC.Tc.Gen.Sig.
+-}
+
 data TcSEnv
   = TcSEnv {
       tcs_ev_binds    :: EvBindsVar,
@@ -844,13 +901,11 @@ data TcSEnv
 
       tcs_inerts    :: IORef InertSet, -- Current inert set
 
-      -- Whether to throw an exception if we come across an insoluble constraint.
-      -- Used to fail-fast when checking for hole-fits. See Note [Speeding up
-      -- valid hole-fits].
-      tcs_abort_on_insoluble :: Bool,
+      -- | The mode of operation for the constraint solver.
+      -- See Note [TcSMode]
+      tcs_mode :: TcSMode,
 
-      -- See Note [WorkList priorities] in GHC.Tc.Solver.InertSet
-      tcs_worklist  :: IORef WorkList -- Current worklist
+      tcs_worklist :: IORef WorkList
     }
 
 ---------------
@@ -921,9 +976,9 @@ addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Monad" doc
 
 tryEarlyAbortTcS :: TcS ()
--- Abort (fail in the monad) if the abort_on_insoluble flag is on
+-- Abort (fail in the monad) if the mode is TcSEarlyAbort
 tryEarlyAbortTcS
-  = mkTcS (\env -> when (tcs_abort_on_insoluble env) TcM.failM)
+  = mkTcS (\env -> when (tcs_mode env == TcSEarlyAbort) TcM.failM)
 
 -- | Emit a warning within the 'TcS' monad at the location given by the 'CtLoc'.
 ctLocWarnTcS :: CtLoc -> TcRnMessage -> TcS ()
@@ -993,7 +1048,59 @@ runTcS tcs
 runTcSEarlyAbort :: TcS a -> TcM a
 runTcSEarlyAbort tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds' True True ev_binds_var tcs }
+       ; runTcSWithEvBinds' True TcSEarlyAbort ev_binds_var tcs }
+
+-- | Run the 'TcS' monad in 'TcSSpecPrag' mode, which either fully solves
+-- individual Wanted quantified constraints or leaves them alone.
+--
+-- See Note [TcSSpecPrag].
+runTcSSpecPrag :: EvBindsVar -> TcS a -> TcM a
+runTcSSpecPrag ev_binds_var tcs
+  = runTcSWithEvBinds' True TcSSpecPrag ev_binds_var tcs
+
+{- Note [TcSSpecPrag]
+~~~~~~~~~~~~~~~~~~~~~
+The TcSSpecPrag mode is a specialized constraint solving mode that guarantees
+that Wanted quantified constraints are either:
+  - Fully solved with no free evidence variables, or
+  - Left completely untouched (no simplification at all)
+
+Examples:
+
+  * [W] forall x. Eq x => Eq (f x).
+
+    In TcSSpecPrag mode, we **do not** process this quantified constraint by
+    creating a new implication constraint; we leave it alone instead.
+
+  * [W] Eq (Maybe Int).
+
+    This constraint is solved fully, using two top-level Eq instances.
+
+  * [W] forall x. Eq x => Eq [x].
+
+    This constraint is solved fully as well, using the Eq instance for lists.
+
+This functionality is crucially used by the specialiser, for which taking an
+irreversible constraint solving steps is actively harmful, as described in
+Note [Fully solving constraints for specialisation] in GHC.Tc.Gen.Sig.
+
+Note that currently we **do not** refrain from using top-level instances,
+even though we also can't run them in reverse; this isn't a problem for the
+specialiser (which is currently the sole consumer of this functionality).
+
+The implementation is as follows: in TcSFullySolveMode, when we are about to
+solve a Wanted quantified constraint by emitting an implication, we call the
+special function `solveCompletelyIfRequired`. This function recursively calls
+the solver but in TcSVanilla mode (i.e. full-blown solving, with no restrictions).
+If this recursive call manages to solve all the remaining constraints fully,
+then we proceed with that outcome (i.e. we continue with that inert set, etc).
+Otherwise, we discard everything that happened in the recursive call, and
+continue with the original quantified constraint unchanged.
+
+In the future, we could consider re-using this functionality for the short-cut
+solver (see Note [Shortcut solving] in GHC.Tc.Solver.Dict), but we would have to
+be wary of the performance implications.
+-}
 
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
@@ -1006,7 +1113,7 @@ runTcSEqualities thing_inside
 runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
 runTcSInerts inerts tcs = do
   ev_binds_var <- TcM.newTcEvBinds
-  runTcSWithEvBinds' False False ev_binds_var $ do
+  runTcSWithEvBinds' False TcSVanilla ev_binds_var $ do
     setInertSet inerts
     a <- tcs
     new_inerts <- getInertSet
@@ -1015,17 +1122,17 @@ runTcSInerts inerts tcs = do
 runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds = runTcSWithEvBinds' True False
+runTcSWithEvBinds = runTcSWithEvBinds' True TcSVanilla
 
-runTcSWithEvBinds' :: Bool -- ^ Restore type variable cycles afterwards?
+runTcSWithEvBinds' :: Bool  -- True <=> restore type equality cycles
                            -- Don't if you want to reuse the InertSet.
                            -- See also Note [Type equality cycles]
                            -- in GHC.Tc.Solver.Equality
-                   -> Bool
+                   -> TcSMode
                    -> EvBindsVar
                    -> TcS a
                    -> TcM a
-runTcSWithEvBinds' restore_cycles abort_on_insoluble ev_binds_var tcs
+runTcSWithEvBinds' restore_cycles mode ev_binds_var tcs
   = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
@@ -1036,7 +1143,7 @@ runTcSWithEvBinds' restore_cycles abort_on_insoluble ev_binds_var tcs
                           , tcs_unif_lvl           = unif_lvl_var
                           , tcs_count              = step_count
                           , tcs_inerts             = inert_var
-                          , tcs_abort_on_insoluble = abort_on_insoluble
+                          , tcs_mode               = mode
                           , tcs_worklist           = wl_var }
 
              -- Run the computation
@@ -1098,7 +1205,7 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                    , tcs_inerts             = old_inert_var
                    , tcs_count              = count
                    , tcs_unif_lvl           = unif_lvl
-                   , tcs_abort_on_insoluble = abort_on_insoluble
+                   , tcs_mode               = mode
                    } ->
     do { inerts <- TcM.readTcRef old_inert_var
        ; let nest_inert = inerts { inert_cycle_breakers = pushCycleBreakerVarStack
@@ -1113,7 +1220,7 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                                , tcs_ev_binds           = ref
                                , tcs_unified            = unified_var
                                , tcs_inerts             = new_inert_var
-                               , tcs_abort_on_insoluble = abort_on_insoluble
+                               , tcs_mode               = mode
                                , tcs_worklist           = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
@@ -1128,7 +1235,7 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
 #endif
        ; return res }
 
-nestTcS ::  TcS a -> TcS a
+nestTcS :: TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
 -- evidence bindings, and solved dictionaries
 -- But have no effect on the InertCans, or on the inert_famapp_cache

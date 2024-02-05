@@ -361,11 +361,17 @@ data ArgSpec
                                       -- Coercion is optimised
 
 instance Outputable ArgInfo where
-  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds })
+  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds, ai_rewrite = rewrite })
     = text "ArgInfo" <+> braces
          (sep [ text "fun =" <+> ppr fun
               , text "dmds(first 10) =" <+> ppr (take 10 dmds)
-              , text "args =" <+> ppr args ])
+              , text "args =" <+> ppr args
+              , text "rewrite =" <+> ppr rewrite ])
+
+instance Outputable RewriteCall where
+  ppr (TryRules ac _rules) = text "TryRules" <+> ppr ac
+  ppr TryInlining          = text "TryInlining"
+  ppr TryNothing           = text "TryNothing"
 
 instance Outputable ArgSpec where
   ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg

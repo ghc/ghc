@@ -54,7 +54,7 @@ import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Iface.Syntax ( IfaceDefault, fromIfaceWarnings )
 import GHC.Builtin.Names
 import GHC.Parser.PostProcess ( setRdrNameSpace )
-import GHC.Core.Type
+import GHC.Core.TyCo.Tidy
 import GHC.Core.PatSyn
 import GHC.Core.TyCon ( TyCon, tyConName )
 import qualified GHC.LanguageExtensions as LangExt

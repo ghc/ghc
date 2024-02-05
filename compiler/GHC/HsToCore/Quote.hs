@@ -799,29 +799,37 @@ repDefD (L loc (DefaultDecl _ _ tys)) = do { tys1 <- repLTys tys
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
                         , rd_act = act
-                        , rd_tyvs = m_ty_bndrs
-                        , rd_tmvs = tm_bndrs
+                        , rd_bndrs = bndrs
                         , rd_lhs = lhs
                         , rd_rhs = rhs }))
+  = fmap (locA loc, ) <$>
+      repRuleBinders bndrs $ \ ty_bndrs' tm_bndrs' ->
+        do { n'   <- coreStringLit $ unLoc n
+           ; act' <- repPhases act
+           ; lhs' <- repLE lhs
+           ; rhs' <- repLE rhs
+           ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act' }
+
+repRuleBinders :: RuleBndrs GhcRn
+               -> (Core (Maybe [M (TH.TyVarBndr ())]) -> Core [M TH.RuleBndr] -> MetaM (Core (M a)))
+               -> MetaM (Core (M a))
+repRuleBinders (RuleBndrs { rb_tyvs = m_ty_bndrs, rb_tmvs = tm_bndrs }) thing_inside
   = do { let ty_bndrs = fromMaybe [] m_ty_bndrs
-       ; rule <- addHsTyVarBinds FreshNamesOnly ty_bndrs $ \ ex_bndrs ->
-         do { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
-            ; ss <- mkGenSyms tm_bndr_names
-            ; rule <- addBinds ss $
-                      do { elt_ty <- wrapName tyVarBndrUnitTyConName
-                         ; ty_bndrs' <- return $ case m_ty_bndrs of
-                             Nothing -> coreNothing' (mkListTy elt_ty)
-                             Just _  -> coreJust' (mkListTy elt_ty) ex_bndrs
-                         ; tm_bndrs' <- repListM ruleBndrTyConName
-                                                repRuleBndr
-                                                tm_bndrs
-                         ; n'   <- coreStringLit $ unLoc n
-                         ; act' <- repPhases act
-                         ; lhs' <- repLE lhs
-                         ; rhs' <- repLE rhs
-                         ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act' }
-           ; wrapGenSyms ss rule  }
-       ; return (locA loc, rule) }
+       ; addHsTyVarBinds FreshNamesOnly ty_bndrs $ \ ex_bndrs ->
+          do { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
+             ; ss <- mkGenSyms tm_bndr_names
+             ; x <- addBinds ss $
+                 do { elt_ty <- wrapName tyVarBndrUnitTyConName
+                    ; ty_bndrs' <- return $ case m_ty_bndrs of
+                        Nothing -> coreNothing' (mkListTy elt_ty)
+                        Just _  -> coreJust' (mkListTy elt_ty) ex_bndrs
+                    ; tm_bndrs' <- repListM ruleBndrTyConName
+                                           repRuleBndr
+                                           tm_bndrs
+                    ; thing_inside ty_bndrs' tm_bndrs'
+                    }
+              ; wrapGenSyms ss x }
+        }
 
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
 ruleBndrNames (L _ (RuleBndr _ n))      = [unLoc n]
@@ -992,8 +1000,11 @@ rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d (locA loc) fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
-rep_sig (L loc (SpecInstSig _ ty))  = rep_specialiseInst ty (locA loc)
-rep_sig (L _   (MinimalSig {}))       = notHandled ThMinimalPragmas
+rep_sig (L loc (SpecSigE _nm bndrs expr ispec))
+  = fmap (\ d -> [(locA loc, d)]) $
+    rep_specialiseE bndrs expr ispec
+rep_sig (L loc (SpecInstSig _ ty))   = rep_specialiseInst ty (locA loc)
+rep_sig (L _   (MinimalSig {}))      = notHandled ThMinimalPragmas
 rep_sig (L loc (SCCFunSig _ nm str)) = rep_sccFun nm str (locA loc)
 rep_sig (L loc (CompleteMatchSig _ cls mty))
   = rep_complete_sig cls mty (locA loc)
@@ -1094,22 +1105,37 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
+rep_inline_phases :: InlinePragma -> MetaM (Maybe (Core TH.Inline), Core TH.Phases)
+rep_inline_phases (InlinePragma { inl_act = act, inl_inline = inl })
+  = do { phases <- repPhases act
+       ; inl <- if noUserInlineSpec inl
+                -- SPECIALISE
+                then return Nothing
+                -- SPECIALISE INLINE
+                else Just <$> repInline inl
+       ; return (inl, phases) }
+
 rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma
                -> SrcSpan
                -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_specialise nm ty ispec loc
+  -- Old form SPECIALISE pragmas
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- repHsSigType ty
-       ; phases <- repPhases $ inl_act ispec
-       ; let inline = inl_inline ispec
-       ; pragma <- if noUserInlineSpec inline
-                   then -- SPECIALISE
-                     repPragSpec nm1 ty1 phases
-                   else -- SPECIALISE INLINE
-                     do { inline1 <- repInline inline
-                        ; repPragSpecInl nm1 ty1 inline1 phases }
+       ; (inl, phases) <- rep_inline_phases ispec
+       ; pragma <- repPragSpec nm1 ty1 inl phases
        ; return [(loc, pragma)]
        }
+
+rep_specialiseE :: RuleBndrs GhcRn -> LHsExpr GhcRn -> InlinePragma
+                -> MetaM (Core (M TH.Dec))
+rep_specialiseE bndrs e ispec
+  -- New form SPECIALISE pragmas
+  = repRuleBinders bndrs $ \ ty_bndrs tm_bndrs ->
+      do { (inl, phases) <- rep_inline_phases ispec
+         ; exp <- repLE e
+         ; repPragSpecE ty_bndrs tm_bndrs exp inl phases
+         }
 
 rep_specialiseInst :: LHsSigType GhcRn -> SrcSpan
                    -> MetaM [(SrcSpan, Core (M TH.Dec))]
@@ -2747,15 +2773,26 @@ repPragInl (MkC nm) (MkC inline) (MkC rm) (MkC phases)
 repPragOpaque :: Core TH.Name -> MetaM (Core (M TH.Dec))
 repPragOpaque (MkC nm) = rep2 pragOpaqueDName [nm]
 
-repPragSpec :: Core TH.Name -> Core (M TH.Type) -> Core TH.Phases
+repPragSpec :: Core TH.Name -> Core (M TH.Type) -> Maybe (Core (TH.Inline))
+            -> Core TH.Phases
             -> MetaM (Core (M TH.Dec))
-repPragSpec (MkC nm) (MkC ty) (MkC phases)
-  = rep2 pragSpecDName [nm, ty, phases]
+repPragSpec (MkC nm) (MkC ty) mb_inl (MkC phases)
+  = case mb_inl of
+      Nothing ->
+        rep2 pragSpecDName [nm, ty, phases]
+      Just (MkC inl) ->
+        rep2 pragSpecInlDName [nm, ty, inl, phases]
 
-repPragSpecInl :: Core TH.Name -> Core (M TH.Type) -> Core TH.Inline
-               -> Core TH.Phases -> MetaM (Core (M TH.Dec))
-repPragSpecInl (MkC nm) (MkC ty) (MkC inline) (MkC phases)
-  = rep2 pragSpecInlDName [nm, ty, inline, phases]
+repPragSpecE :: Core (Maybe [M (TH.TyVarBndr ())]) -> Core [(M TH.RuleBndr)]
+             -> Core (M TH.Exp)
+             -> Maybe (Core TH.Inline) -> Core TH.Phases
+             -> MetaM (Core (M TH.Dec))
+repPragSpecE (MkC ty_bndrs) (MkC tm_bndrs) (MkC expr) mb_inl (MkC phases)
+  = case mb_inl of
+      Nothing ->
+        rep2 pragSpecEDName    [ty_bndrs, tm_bndrs, expr, phases]
+      Just (MkC inl) ->
+        rep2 pragSpecInlEDName [ty_bndrs, tm_bndrs, expr, inl, phases]
 
 repPragSpecInst :: Core (M TH.Type) -> MetaM (Core (M TH.Dec))
 repPragSpecInst (MkC ty) = rep2 pragSpecInstDName [ty]

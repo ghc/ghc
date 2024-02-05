@@ -1,3 +1,5 @@
+T8537.hs:20:5: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘fmap’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
 
-T8537.hs:20:5: warning: [GHC-35827]
-    SPECIALISE pragma for non-overloaded function ‘fmap’

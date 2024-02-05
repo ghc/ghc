@@ -59,8 +59,9 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
+import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
 import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
 import GHC.Builtin.Types.Prim
@@ -912,9 +913,11 @@ mkExport prag_fn residual insoluble qtvs theta
         ; poly_id <- mkInferredPolyId residual insoluble qtvs theta poly_name mb_sig mono_ty
 
         -- NB: poly_id has a zonked type
-        ; poly_id <- addInlinePrags poly_id prag_sigs
-        ; spec_prags <- tcSpecPrags poly_id prag_sigs
-                -- tcPrags requires a zonked poly_id
+        ; poly_id    <- addInlinePrags poly_id prag_sigs
+        ; spec_prags <- tcExtendIdEnv1 poly_name poly_id $
+                        tcSpecPrags poly_id prag_sigs
+                        -- tcSpecPrags requires a zonked poly_id.  It also needs poly_id to
+                        -- be in the type env (so we can typecheck the SPECIALISE expression)
 
         -- See Note [Impedance matching]
         -- NB: we have already done checkValidType, including an ambiguity check,
@@ -1279,27 +1282,6 @@ and the proof is the impedance matcher.
 The impedance matcher can do defaulting: in the above example, we default
 to Integer because of Num. See #7173. If we're dealing with a nondefaultable
 class, impedance matching can fail. See #23427.
-
-Note [SPECIALISE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-There is no point in a SPECIALISE pragma for a non-overloaded function:
-   reverse :: [a] -> [a]
-   {-# SPECIALISE reverse :: [Int] -> [Int] #-}
-
-But SPECIALISE INLINE *can* make sense for GADTS:
-   data Arr e where
-     ArrInt :: !Int -> ByteArray# -> Arr Int
-     ArrPair :: !Int -> Arr e1 -> Arr e2 -> Arr (e1, e2)
-
-   (!:) :: Arr e -> Int -> e
-   {-# SPECIALISE INLINE (!:) :: Arr Int -> Int -> Int #-}
-   {-# SPECIALISE INLINE (!:) :: Arr (a, b) -> Int -> (a, b) #-}
-   (ArrInt _ ba)     !: (I# i) = I# (indexIntArray# ba i)
-   (ArrPair _ a1 a2) !: i      = (a1 !: i, a2 !: i)
-
-When (!:) is specialised it becomes non-recursive, and can usefully
-be inlined.  Scary!  So we only warn for SPECIALISE *without* INLINE
-for a non-overloaded function.
 
 ************************************************************************
 *                                                                      *

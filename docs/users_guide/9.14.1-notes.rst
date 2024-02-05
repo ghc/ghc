@@ -11,6 +11,23 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
+* `GHC proposal 493: allow expressions in SPECIALISE pragmas <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst>`_
+  has been implemented. SPECIALISE pragmas now allow arbitrary expressions such as: ::
+
+    {-# SPECIALISE f @Int False :: Int -> Char #-}
+
+  The ability to specify multiple specialisations in a single SPECIALISE pragma,
+  with syntax of the form (note the comma between the type signatures): ::
+
+    {-# SPECIALISE g : Int -> Int, Float -> Float #-}
+
+  has been deprecated, and is scheduled to be removed in GHC 9.18.
+  This deprecation is controlled by the newly introduced ``-Wdeprecated-pragmas``
+  flag in ``-Wdefault``.
+
+* A new flag, `-Wuseless-specialisations`, controls warnings emitted when GHC
+  determines that a SPECIALISE pragma would have no effect.
+
 * ``-Wincomplete-record-selectors`` is now part of `-Wall`, as specified
   by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>`_.
   Hence, if a library is compiled with ``-Werror``, compilation may now fail. Solution: fix the library.
@@ -102,6 +119,11 @@ Cmm
 
   - The `ParStmtBlock` list argument of the `ParStmt` constructor of `StmtLR` is now `NonEmpty`.
 
+* As part of the implementation of `GHC proposal 493 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst>`_,
+  the `SpecSig` constructor of `Sig` has been deprecated. It is replaced by
+  the constructor `SpecSigE` which supports expressions at the head, rather than
+  a lone variable.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -125,6 +147,13 @@ Cmm
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- As part of the implementation of `GHC proposal 493 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst>`_,
+  the ``SpecialiseP`` constructor of the Template Haskell ``Pragma`` type, as
+  well as the helpers ``pragSpecD`` and ``pragSpecInlD``, have been deprecated.
+
+  They are replaced, respectively, by ``SpecialiseEP``, ``pragSpecED`` and
+  ``pragSpecInlED``.
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~

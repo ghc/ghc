@@ -330,7 +330,7 @@ instance HasTrailing AnnSig where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing HsRuleAnn where
+instance HasTrailing HsRuleBndrsAnn where
   trailing _ = []
   setTrailing a _ = a
 
@@ -1140,17 +1140,15 @@ lhsCaseAnnOf k parent = fmap (\new -> parent { hsCaseAnnOf = new })
 
 -- ---------------------------------------------------------------------
 
--- data HsRuleAnn
---   = HsRuleAnn
---        { ra_tyanns :: Maybe (TokForall, EpToken ".")
---        , ra_tmanns :: Maybe (TokForall, EpToken ".")
---        , ra_equal  :: EpToken "="
---        , ra_rest :: ActivationAnn
---        } deriving (Data, Eq)
+-- data HsRuleBndrsAnn
+--   = HsRuleBndrsAnn
+--        { rb_tyanns :: Maybe (TokForall, EpToken ".")
+--        , rb_tmanns :: Maybe (TokForall, EpToken ".")
+--        }
 
-lra_tyanns :: Lens HsRuleAnn (Maybe (TokForall, EpToken "."))
-lra_tyanns k parent = fmap (\new -> parent { ra_tyanns = new })
-                               (k (ra_tyanns parent))
+lrb_tyanns :: Lens HsRuleBndrsAnn (Maybe (TokForall, EpToken "."))
+lrb_tyanns k parent = fmap (\new -> parent { rb_tyanns = new })
+                               (k (rb_tyanns parent))
 
 ff :: Maybe (a,b) -> (Maybe a,Maybe b)
 ff Nothing = (Nothing, Nothing)
@@ -1167,30 +1165,21 @@ lff k parent = fmap (\new -> gg new)
                     (k (ff parent))
 
 -- (.) :: Lens' a b -> Lens' b c -> Lens' a c
-lra_tyanns_fst :: Lens HsRuleAnn (Maybe TokForall)
-lra_tyanns_fst = lra_tyanns . lff . lfst
+lrb_tyanns_fst :: Lens HsRuleBndrsAnn (Maybe TokForall)
+lrb_tyanns_fst = lrb_tyanns . lff . lfst
 
-lra_tyanns_snd :: Lens HsRuleAnn (Maybe (EpToken "."))
-lra_tyanns_snd = lra_tyanns . lff . lsnd
+lrb_tyanns_snd :: Lens HsRuleBndrsAnn (Maybe (EpToken "."))
+lrb_tyanns_snd = lrb_tyanns . lff . lsnd
 
-lra_tmanns :: Lens HsRuleAnn (Maybe (TokForall, EpToken "."))
-lra_tmanns k parent = fmap (\new -> parent { ra_tmanns = new })
-                               (k (ra_tmanns parent))
+lrb_tmanns :: Lens HsRuleBndrsAnn (Maybe (TokForall, EpToken "."))
+lrb_tmanns k parent = fmap (\new -> parent { rb_tmanns = new })
+                               (k (rb_tmanns parent))
 
-lra_tmanns_fst :: Lens HsRuleAnn (Maybe TokForall)
-lra_tmanns_fst = lra_tmanns . lff . lfst
+lrb_tmanns_fst :: Lens HsRuleBndrsAnn (Maybe TokForall)
+lrb_tmanns_fst = lrb_tmanns . lff . lfst
 
-lra_tmanns_snd :: Lens HsRuleAnn (Maybe (EpToken "."))
-lra_tmanns_snd = lra_tmanns . lff . lsnd
-
-lra_equal :: Lens HsRuleAnn (EpToken "=")
-lra_equal k parent = fmap (\new -> parent { ra_equal = new })
-                                (k (ra_equal parent))
-
-lra_rest :: Lens HsRuleAnn ActivationAnn
-lra_rest k parent = fmap (\new -> parent { ra_rest = new })
-                                (k (ra_rest parent))
-
+lrb_tmanns_snd :: Lens HsRuleBndrsAnn (Maybe (EpToken "."))
+lrb_tmanns_snd = lrb_tmanns . lff . lsnd
 
 -- ---------------------------------------------------------------------
 -- data GrhsAnn
@@ -2016,33 +2005,14 @@ instance ExactPrint (RuleDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsRule (an,nsrc) (L ln n) act mtybndrs termbndrs lhs rhs) = do
+  exact (HsRule ((ann_act, ann_eq),nsrc) (L ln n) act bndrs lhs rhs) = do
     (L ln' _) <- markAnnotated (L ln (nsrc, n))
-    an0 <- markActivationL an lra_rest act
-    (an1, mtybndrs') <-
-      case mtybndrs of
-        Nothing -> return (an0, Nothing)
-        Just bndrs -> do
-          an1 <-  markLensFun an0 lra_tyanns_fst (\mt -> mapM markEpUniToken mt)  -- AnnForall
-          bndrs' <- mapM markAnnotated bndrs
-          an2 <- markLensFun an1 lra_tyanns_snd (\mt -> mapM markEpToken mt)  -- AnnDot
-          return (an2, Just bndrs')
-
-    an2 <- markLensFun an1 lra_tmanns_fst (\mt -> mapM markEpUniToken mt) -- AnnForall
-    termbndrs' <- mapM markAnnotated termbndrs
-    an3 <- markLensFun an2 lra_tmanns_snd (\mt -> mapM markEpToken mt)  -- AnnDot
-
+    ann_act' <- markActivation ann_act act
+    bndrs' <- markAnnotated bndrs
     lhs' <- markAnnotated lhs
-    an4 <- markLensFun an3 lra_equal markEpToken
+    ann_eq' <- markEpToken ann_eq
     rhs' <- markAnnotated rhs
-    return (HsRule (an4,nsrc) (L ln' n) act mtybndrs' termbndrs' lhs' rhs')
-
-
-markActivationL :: (Monad m, Monoid w)
-  => a -> Lens a ActivationAnn -> Activation -> EP w m a
-markActivationL a l act = do
-  new <- markActivation (view l a) act
-  return (set l new a)
+    return (HsRule ((ann_act', ann_eq'),nsrc) (L ln' n) act bndrs' lhs' rhs')
 
 markActivation :: (Monad m, Monoid w)
   => ActivationAnn -> Activation -> EP w m ActivationAnn
@@ -2110,6 +2080,26 @@ instance ExactPrint Role where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
   exact = withPpr
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (RuleBndrs GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact (RuleBndrs an0 mtybndrs termbndrs) = do
+    (an2, mtybndrs') <-
+      case mtybndrs of
+        Nothing -> return (an0, Nothing)
+        Just bndrs -> do
+          an1 <- markLensFun an0 lrb_tyanns_fst (traverse markEpUniToken) -- AnnForall
+          bndrs' <- mapM markAnnotated bndrs
+          an2 <- markLensFun an1 lrb_tyanns_snd (traverse markEpToken) -- AnnDot
+          return (an2, Just bndrs')
+
+    an3 <- markLensFun an2 lrb_tmanns_fst (traverse markEpUniToken) -- AnnForall
+    termbndrs' <- mapM markAnnotated termbndrs
+    an4 <- markLensFun an3 lrb_tmanns_snd (traverse markEpToken) -- AnnDot
+    return (RuleBndrs an4 mtybndrs' termbndrs')
 
 -- ---------------------------------------------------------------------
 
@@ -2676,10 +2666,19 @@ instance ExactPrint (Sig GhcPs) where
     o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
     act' <- markActivation act (inl_act inl)
     ln' <- markAnnotated ln
-    dc' <- markEpUniToken dc
+    dc' <- traverse markEpUniToken dc
     typs' <- markAnnotated typs
     c' <- markEpToken c
     return (SpecSig (AnnSpecSig o' c' dc' act') ln' typs' inl)
+
+  exact (SpecSigE (AnnSpecSig o c dc act) bndrs expr inl) = do
+    o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
+    act' <- markActivation act (inl_act inl)
+    bndrs' <- markAnnotated bndrs
+    dc' <- traverse markEpUniToken dc
+    expr' <- markAnnotated expr
+    c' <- markEpToken c
+    return (SpecSigE (AnnSpecSig o' c' dc' act') bndrs' expr' inl)
 
   exact (SpecInstSig ((o,i,c),src) typ) = do
     o' <- markAnnOpen'' o src "{-# SPECIALISE"

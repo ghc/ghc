@@ -1,3 +1,5 @@
+T10504.hs:5:1: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘myfun’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
 
-T10504.hs:5:1: warning: [GHC-35827]
-    SPECIALISE pragma for non-overloaded function ‘myfun’

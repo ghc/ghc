@@ -14,3 +14,11 @@ TH_pragma.hs:(10,2)-(12,33): Splicing declarations
     bar :: Num a => a -> a
     {-# SPECIALISE INLINE [~1] bar :: Float -> Float #-}
     bar x = (x * 10)
+TH_pragma.hs:(14,2)-(16,33): Splicing declarations
+    [d| baz :: Num a => a -> a
+        {-# SPECIALISE INLINE [~1] baz @Double #-}
+        baz x = x * 10 |]
+  ======>
+    baz :: Num a => a -> a
+    {-# SPECIALISE INLINE [~1] baz @Double #-}
+    baz x = (x * 10)

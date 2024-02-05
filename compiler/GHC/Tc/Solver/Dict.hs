@@ -62,7 +62,6 @@ import Control.Monad.Trans.Maybe( MaybeT, runMaybeT )
 import Control.Monad.Trans.Class( lift )
 import Control.Monad
 
-
 {- *********************************************************************
 *                                                                      *
 *                      Class Canonicalization
@@ -100,26 +99,6 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
 
        ; simpleStage (updInertDicts dict_ct)
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
-
-updInertDicts :: DictCt -> TcS ()
-updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
-  = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
-
-       ; if |  isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
-            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
-               -- Update /both/ inert_cans /and/ inert_solved_dicts.
-               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
-               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
-                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
-            |  otherwise
-            -> return ()
-
-       -- Add the new constraint to the inert set
-       ; updInertCans (updDicts (addDict dict_ct)) }
-  where
-    not_ip_for :: Type -> DictCt -> Bool
-    not_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not (mentionsIP str_ty cls tys)
 
 canDictCt :: CtEvidence -> Class -> [Type] -> SolverStage DictCt
 -- Once-only processing of Dict constraints:

@@ -261,6 +261,13 @@ deriving instance Data (RuleBndr GhcPs)
 deriving instance Data (RuleBndr GhcRn)
 deriving instance Data (RuleBndr GhcTc)
 
+deriving instance Data (RuleBndrs GhcPs)
+deriving instance Data (RuleBndrs GhcRn)
+deriving instance Data (RuleBndrs GhcTc)
+
+deriving instance Data TcSpecPrags
+deriving instance Data TcSpecPrag
+
 -- deriving instance (DataId p)     => Data (WarnDecls p)
 deriving instance Data (WarnDecls GhcPs)
 deriving instance Data (WarnDecls GhcRn)

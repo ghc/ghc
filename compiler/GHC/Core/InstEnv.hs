@@ -927,11 +927,8 @@ Here are the moving parts:
 * That info is recorded in the `cir_is_coherent` field of `OneInst`, and thence
   transferred to the `ep_is_coherent` field of the `EvBind` for the dictionary.
 
-* `GHC.HsToCore.Binds.dsHsWrapper` desugars the evidence application (f d) into
-  (nospec f d) if `d` is incoherent. It has to do a dependency analysis to
-  determine transitive dependencies, but we need to do that anyway.
-  See Note [Desugaring non-canonical evidence] in GHC.HsToCore.Binds.
-
+* In the desugarer we exploit this info:
+  see Note [Desugaring non-canonical evidence] in GHC.HsToCore.Expr.
   See also Note [nospecId magic] in GHC.Types.Id.Make.
 -}
 

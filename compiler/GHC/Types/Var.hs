@@ -572,7 +572,7 @@ information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
      False           True          FTF_T_C
      True            False         FTF_C_T
      True            True          FTF_C_C
-where isPredTy is defined in GHC.Core.Type, and sees if t1's
+where isPredTy is defined in GHC.Core.Predicate, and sees if t1's
 kind is Constraint.  See GHC.Core.Type.chooseFunTyFlag, and
 GHC.Core.TyCo.Rep Note [Types for coercions, predicates, and evidence]
 
