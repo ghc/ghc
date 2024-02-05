@@ -824,7 +824,6 @@ Library
         GHC.Tc.Gen.HsType
         GHC.Tc.Gen.Match
         GHC.Tc.Gen.Pat
-        GHC.Tc.Gen.Rule
         GHC.Tc.Gen.Sig
         GHC.Tc.Gen.Splice
         GHC.Tc.Instance.Class

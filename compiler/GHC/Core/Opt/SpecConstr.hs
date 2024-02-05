@@ -35,7 +35,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
-import GHC.Core.Predicate ( typeDeterminesValue )
+import GHC.Core.Predicate ( scopedSort, typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity

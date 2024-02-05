@@ -2606,6 +2606,7 @@ data TcRnMessage where
                 typecheck/should_compile/T10504
   -}
   TcRnNonOverloadedSpecialisePragma :: !(LIdP GhcRn) -> TcRnMessage
+    -- NB: this constructor is deprecated and will be removed in GHC 9.18 (#25540)
 
   {-| TcRnSpecialiseNotVisible is a warning that occurs when the subject of a
      SPECIALISE pragma has a definition that is not visible from the current module.
@@ -3186,6 +3187,14 @@ data TcRnMessage where
      Test cases: rename/should_fail/RnMultipleMinimalPragmaFail
   -}
   TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
+
+  {-| TcRnSpecSigShape is an error that occurs when the user writes a SPECIALISE
+      pragma that isn't just a function application.
+
+      Example:
+        {-# SPECIALISE let x=True in x #-}
+  -}
+  TcRnSpecSigShape :: LHsExpr GhcPs -> TcRnMessage
 
   {-| 'TcRnIllegalInvisTyVarBndr' is an error that occurs
       when invisible type variable binders in type declarations
@@ -5994,6 +6003,7 @@ data HsDocContext
   | ForeignDeclCtx (LocatedN RdrName)
   | DerivDeclCtx
   | RuleCtx FastString
+  | SpecECtx RdrName
   | TyDataCtx (LocatedN RdrName)
   | TySynCtx (LocatedN RdrName)
   | TyFamilyCtx (LocatedN RdrName)

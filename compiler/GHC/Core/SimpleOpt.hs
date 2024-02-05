@@ -8,7 +8,7 @@ module GHC.Core.SimpleOpt (
         SimpleOpts (..), defaultSimpleOpts,
 
         -- ** Simple expression optimiser
-        simpleOptPgm, simpleOptExpr, simpleOptExprWith,
+        simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
 
         -- ** Join points
         joinPointBinding_maybe, joinPointBindings_maybe,
@@ -114,6 +114,8 @@ data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
+   , so_inline :: !Bool             -- ^ False <=> do no inlining whatsoever,
+                                    --    even for trivial or used-once things
    }
 
 -- | Default options for the Simple optimiser.
@@ -122,6 +124,7 @@ defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
    , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
    , so_eta_red = False
+   , so_inline  = True
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -158,6 +161,17 @@ simpleOptExpr opts expr
 
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
+
+simpleOptExprNoInline :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
+-- A variant of simpleOptExpr, but without
+-- occurrence analysis or inlining of any kind.
+-- Result: we don't inline evidence bindings, which is useful for the specialiser
+simpleOptExprNoInline opts expr
+  = simple_opt_expr init_env expr
+  where
+    init_opts  = opts { so_inline = False }
+    init_env   = (emptyEnv init_opts) { soe_subst = init_subst }
+    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
@@ -468,7 +482,7 @@ simple_bind_pair :: SimpleOptEnv
     -- (simple_bind_pair subst in_var out_rhs)
     --   either extends subst with (in_var -> out_rhs)
     --   or     returns Nothing
-simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
+simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opts })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
                  top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
@@ -510,6 +524,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
     pre_inline_unconditionally :: Bool
     pre_inline_unconditionally
+       | not (so_inline opts)     = False    -- Not if so_inline is False
        | isExportedId in_bndr     = False
        | stable_unf               = False
        | not active               = False    -- Note [Inline prag in simplOpt]
@@ -561,13 +576,14 @@ simple_out_bind_pair :: SimpleOptEnv
                      -> InId -> Maybe OutId -> OutExpr
                      -> OccInfo -> Bool -> Bool -> TopLevelFlag
                      -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
-simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
+simple_out_bind_pair env@(SOE { soe_subst = subst, soe_opts = opts })
+                     in_bndr mb_out_bndr out_rhs
                      occ_info active stable_unf top_level
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- Type and coercion bindings are caught earlier
     -- See Note [Core type and coercion invariant]
     post_inline_unconditionally
-  = ( env' { soe_subst = extendIdSubst (soe_subst env) in_bndr out_rhs }
+  = ( env' { soe_subst = extendIdSubst subst in_bndr out_rhs }
     , Nothing)
 
   | otherwise
@@ -580,6 +596,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
 
     post_inline_unconditionally :: Bool
     post_inline_unconditionally
+       | not (so_inline opts)  = False -- Not if so_inline is False
        | isExportedId in_bndr  = False -- Note [Exported Ids and trivial RHSs]
        | stable_unf            = False -- Note [Stable unfoldings and postInlineUnconditionally]
        | not active            = False --     in GHC.Core.Opt.Simplify.Utils
@@ -852,7 +869,7 @@ too.  Achieving all this is surprisingly tricky:
 (MC1) We must compulsorily unfold MkAge to a cast.
       See Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
 
-(MC2) We must compulsorily unfolding coerce on the rule LHS, yielding
+(MC2) We must compulsorily unfold coerce on the rule LHS, yielding
         forall a b (dict :: Coercible * a b).
           map @a @b (\(x :: a) -> case dict of
             MkCoercible (co :: a ~R# b) -> x |> co) = ...
@@ -869,7 +886,6 @@ too.  Achieving all this is surprisingly tricky:
   Unfortunately, this still abstracts over a Coercible dictionary. We really
   want it to abstract over the ~R# evidence. So, we have Desugar.unfold_coerce,
   which transforms the above to
-  Desugar)
 
     forall a b (co :: a ~R# b).
       let dict = MkCoercible @* @a @b co in
@@ -894,7 +910,7 @@ too.  Achieving all this is surprisingly tricky:
 
 (MC4) The map/coerce rule is the only compelling reason for having a RULE that
   quantifies over a coercion variable, something that is otherwise Very Deeply
-  Suspicous.  See Note [Casts in the template] in GHC.Core.Rules. Ugh!
+  Suspicious.  See Note [Casts in the template] in GHC.Core.Rules. Ugh!
 
 This is all a fair amount of special-purpose hackery, but it's for
 a good cause. And it won't hurt other RULES and such that it comes across.

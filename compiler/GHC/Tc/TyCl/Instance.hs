@@ -2043,7 +2043,17 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                 tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
-       ; spec_prags     <- tcSpecPrags global_meth_id prags
+       ; spec_prags     <- tcExtendIdEnv1 (idName sel_id) global_meth_id $
+                           -- tcExtendIdEnv1: tricky point: a SPECIALISE pragma in prags
+                           -- mentions sel_name but the pragma is really for global_meth_id.
+                           -- So we bind sel_name to global_meth_id, just in the pragmas.
+                           -- Example:
+                           --    instance C [a] where
+                           --       op :: forall b. Ord b => b -> a -> a
+                           --       {-# SPECIALISE op @Int #-}
+                           -- The specialisation is for the `op` for this instance decl, not
+                           -- for the global selector-id, of course.
+                           tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
               export = ABE { abe_poly  = global_meth_id
@@ -2215,7 +2225,7 @@ mk_meth_spec_prags :: Id -> [LTcSpecPrag] -> [LTcSpecPrag] -> TcSpecPrags
         --   * spec_prags_from_inst: derived from {-# SPECIALISE instance :: <blah> #-}
         --     These ones have the dfun inside, but [perhaps surprisingly]
         --     the correct wrapper.
-        -- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Bind
+        -- See Note [Handling old-form SPECIALISE pragmas] in GHC.Tc.Gen.Bind
 mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
   = SpecPrags (spec_prags_for_me ++ spec_prags_from_inst)
   where

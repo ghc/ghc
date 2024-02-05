@@ -1,4 +1,3 @@
-
 T2494.hs:15:14: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a’
       Expected: Maybe (m a) -> Maybe (m a)
@@ -13,11 +12,11 @@ T2494.hs:15:14: error: [GHC-25897]
       In the second argument of ‘foo’, namely ‘(foo g x)’
       In the expression: foo f (foo g x)
     • Relevant bindings include
-        f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
-          (bound at T2494.hs:13:11)
+        x :: Maybe a (bound at T2494.hs:14:65)
         g :: forall (m :: * -> *). Monad m => Maybe (m b) -> Maybe (m b)
           (bound at T2494.hs:14:11)
-        x :: Maybe a (bound at T2494.hs:14:65)
+        f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
+          (bound at T2494.hs:13:11)
 
 T2494.hs:15:30: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a’
@@ -33,8 +32,9 @@ T2494.hs:15:30: error: [GHC-25897]
       In the first argument of ‘foo’, namely ‘(f . g)’
       In the expression: foo (f . g) x
     • Relevant bindings include
-        f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
-          (bound at T2494.hs:13:11)
+        x :: Maybe a (bound at T2494.hs:14:65)
         g :: forall (m :: * -> *). Monad m => Maybe (m b) -> Maybe (m b)
           (bound at T2494.hs:14:11)
-        x :: Maybe a (bound at T2494.hs:14:65)
+        f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
+          (bound at T2494.hs:13:11)
+

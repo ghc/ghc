@@ -39,10 +39,6 @@ solveIrred irred
        ; simpleStage (updInertIrreds irred)
        ; stopWithStage (irredCtEvidence irred) "Kept inert IrredCt" }
 
-updInertIrreds :: IrredCt -> TcS ()
-updInertIrreds irred
-  = do { tc_lvl <- getTcLevel
-       ; updInertCans $ addIrredToCans tc_lvl irred }
 
 {- *********************************************************************
 *                                                                      *

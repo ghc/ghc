@@ -31,15 +31,17 @@ import GHC.Core.InstEnv         ( LookupInstanceErrReason )
 import GHC.Hs.Extension         ( GhcRn )
 import GHC.Types.Error          ( DiagnosticCode(..), UnknownDiagnostic (..)
                                 , diagnosticCode, UnknownDiagnosticFor )
+
+import GHC.Iface.Errors.Types
+import GHC.Driver.Errors.Types   ( DriverMessage )
+import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
+import GHC.HsToCore.Errors.Types ( DsMessage, UselessSpecialisePragmaReason )
+import GHC.Tc.Errors.Types
 import GHC.Unit.Module.Warnings ( WarningTxt )
 import GHC.Utils.Panic.Plain
 
 -- Import all the structured error data types
-import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessage )
-import GHC.HsToCore.Errors.Types ( DsMessage )
-import GHC.Iface.Errors.Types
-import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
-import GHC.Tc.Errors.Types
+import GHC.Driver.Errors.Types   ( GhcMessage )
 
 import Data.Kind    ( Type, Constraint )
 import GHC.Exts     ( proxy# )
@@ -220,8 +222,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DsMaxPmCheckModelsReached"                     = 61505
   GhcDiagnosticCode "DsNonExhaustivePatterns"                       = 62161
   GhcDiagnosticCode "DsTopLevelBindsNotAllowed"                     = 48099
-  GhcDiagnosticCode "DsUselessSpecialiseForClassMethodSelector"     = 93315
-  GhcDiagnosticCode "DsUselessSpecialiseForNoInlineFunction"        = 38524
   GhcDiagnosticCode "DsOrphanRule"                                  = 58181
   GhcDiagnosticCode "DsRuleLhsTooComplicated"                       = 69441
   GhcDiagnosticCode "DsRuleIgnoredDueToConstructor"                 = 00828
@@ -238,6 +238,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DsAnotherRuleMightFireFirst"                   = 87502
   GhcDiagnosticCode "DsIncompleteRecordSelector"                    = 17335
 
+    -- Constructors of 'UselessSpecialisePragmaReason'
+  GhcDiagnosticCode "UselessSpecialiseForClassMethodSelector"       = 93315
+  GhcDiagnosticCode "UselessSpecialiseForNoInlineFunction"          = 38524
+  GhcDiagnosticCode "UselessSpecialiseNoSpecialisation"             = 66582
 
   -- Parser diagnostic codes
   GhcDiagnosticCode "PsErrParseLanguagePragma"                      = 68686
@@ -363,6 +367,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrInvalidPun"                               = 52943
   GhcDiagnosticCode "PsErrIllegalOrPat"                             = 29847
   GhcDiagnosticCode "PsErrTypeSyntaxInPat"                          = 32181
+  GhcDiagnosticCode "PsErrSpecExprMultipleTypeAscription"           = 62037
+  GhcDiagnosticCode "PsWarnSpecMultipleTypeAscription"              = 73026
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850
@@ -598,6 +604,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMisplacedSigDecl"                          = 87866
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
+  GhcDiagnosticCode "TcRnSpecSigShape"                              = 93944
   GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = Outdated 36038
   GhcDiagnosticCode "TcRnUnexpectedStandaloneDerivingDecl"          = 95159
   GhcDiagnosticCode "TcRnUnusedVariableInRuleDecl"                  = 65669
@@ -1049,6 +1056,11 @@ type family ConRecursInto con where
 
   ConRecursInto "PsUnknownMessage"         = 'Just (UnknownDiagnosticFor PsMessage)
   ConRecursInto "PsHeaderMessage"          = 'Just PsHeaderMessage
+
+  ----------------------------------
+  -- Constructors of DsMessage
+
+  ConRecursInto "DsUselessSpecialisePragma" = 'Just UselessSpecialisePragmaReason
 
   ----------------------------------
   -- Constructors of TcRnMessage

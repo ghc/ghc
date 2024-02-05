@@ -1477,28 +1477,12 @@ data RuleDecl pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
-       , rd_act  :: Activation
-       , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
-           -- ^ Forall'd type vars
-       , rd_tmvs :: [LRuleBndr pass]
-           -- ^ Forall'd term vars, before typechecking; after typechecking
-           --    this includes all forall'd vars
-       , rd_lhs  :: XRec pass (HsExpr pass)
-       , rd_rhs  :: XRec pass (HsExpr pass)
+       , rd_act   :: Activation
+       , rd_bndrs :: RuleBndrs pass
+       , rd_lhs   :: XRec pass (HsExpr pass)
+       , rd_rhs   :: XRec pass (HsExpr pass)
        }
   | XRuleDecl !(XXRuleDecl pass)
-
--- | Located Rule Binder
-type LRuleBndr pass = XRec pass (RuleBndr pass)
-
--- | Rule Binder
-data RuleBndr pass
-  = RuleBndr (XCRuleBndr pass)  (LIdP pass)
-  | RuleBndrSig (XRuleBndrSig pass) (LIdP pass) (HsPatSigType pass)
-  | XRuleBndr !(XXRuleBndr pass)
-
-collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
-collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
 
 {-
 ************************************************************************

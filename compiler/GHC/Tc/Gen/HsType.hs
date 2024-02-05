@@ -68,7 +68,7 @@ module GHC.Tc.Gen.HsType (
         tcMult,
 
         -- Pattern type signatures
-        tcHsPatSigType, tcHsTyPat,
+        tcHsPatSigType, tcHsTyPat, tcRuleBndrSig,
         HoleMode(..),
 
         -- Utils
@@ -4399,8 +4399,26 @@ tcHsPatSigType ctxt hole_mode
   (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
         , hsps_body = hs_ty })
   ctxt_kind
-  = tc_type_in_pat ctxt hole_mode hs_ty sig_wcs sig_ns ctxt_kind
+  = tc_type_in_pat ctxt Nothing hole_mode hs_ty sig_wcs sig_ns ctxt_kind
 
+tcRuleBndrSig :: Name
+              -> SkolemInfo
+              -> HsPatSigType GhcRn          -- The type signature
+              -> TcM ( [(Name, TcTyVar)]     -- Wildcards
+                     , [(Name, TcTyVar)]     -- The new bit of type environment, binding
+                                             -- the scoped type variables
+                     , TcType)       -- The type
+-- Used for type-checking type signatures in
+--     RULE forall bndrs  e.g. forall (x::Int). f x = x
+-- See Note [Pattern signature binders and scoping] in GHC.Hs.Type
+--
+-- This may emit constraints
+-- See Note [Recipe for checking a signature]
+tcRuleBndrSig name skol_info
+    (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
+          , hsps_body = hs_ty })
+  = tc_type_in_pat (RuleBndrTypeCtxt name) (Just skol_info)
+                   HM_Sig hs_ty sig_wcs sig_ns OpenKind
 
 -- Typecheck type patterns, in data constructor patterns, e.g
 --    f (MkT @a @(Maybe b) ...) = ...
@@ -4423,7 +4441,7 @@ tcHsTyPat hs_pat@(HsTP{hstp_ext = hstp_rn, hstp_body = hs_ty}) expected_kind
   where
     all_ns = imp_ns ++ exp_ns
     HsTPRn{hstp_nwcs = wcs, hstp_imp_tvs = imp_ns, hstp_exp_tvs = exp_ns} = hstp_rn
-    tc_unif_in_pat = tc_type_in_pat TypeAppCtxt HM_TyAppPat
+    tc_unif_in_pat = tc_type_in_pat TypeAppCtxt Nothing HM_TyAppPat
 
 -- `tc_bndr_in_pat` is used in type patterns to handle the binders case.
 -- See Note [Type patterns: binders and unifiers]
@@ -4476,6 +4494,7 @@ tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
 --
 -- * In patterns `tc_type_in_pat` is used to check pattern signatures.
 tc_type_in_pat :: UserTypeCtxt
+               -> Maybe SkolemInfo    -- Just sk for RULE and SPECIALISE pragmas only
                -> HoleMode -- HM_Sig when in a SigPat, HM_TyAppPat when in a ConPat checking type applications.
                -> LHsType GhcRn          -- The type in pattern
                -> [Name]                 -- All named wildcards in type
@@ -4485,9 +4504,10 @@ tc_type_in_pat :: UserTypeCtxt
                       , [(Name, TcTyVar)]     -- The new bit of type environment, binding
                                               -- the scoped type variables
                       , TcType)       -- The type
-tc_type_in_pat ctxt hole_mode hs_ty wcs ns ctxt_kind
+tc_type_in_pat ctxt mb_skol hole_mode hs_ty wcs ns ctxt_kind
   = addSigCtxt ctxt (UserLHsType hs_ty) $
-    do { tkv_prs <- mapM new_implicit_tv ns
+    do { tkvs <- mapM new_implicit_tv ns
+       ; let tkv_prs = ns `zip` tkvs
        ; mode <- mkHoleMode TypeLevel hole_mode
        ; (wcs, ty)
             <- addTypeCtxt hs_ty                $
@@ -4517,14 +4537,11 @@ tc_type_in_pat ctxt hole_mode hs_ty wcs ns ctxt_kind
   where
     new_implicit_tv name
       = do { kind <- newMetaKindVar
-           ; tv   <- case ctxt of
-                       RuleSigCtxt rname _  -> do
-                        skol_info <- mkSkolemInfo (RuleSkol rname)
-                        newSkolemTyVar skol_info name kind
-                       _              -> newPatTyVar name kind
-                       -- See Note [Typechecking pattern signature binders]
-             -- NB: tv's Name may be fresh (in the case of newPatTyVar)
-           ; return (name, tv) }
+           ; case mb_skol of
+                Just skol_info -> newSkolemTyVar skol_info name kind
+                Nothing        -> newPatTyVar name kind }
+                -- See Note [Typechecking pattern signature binders]
+                -- NB: tv's Name may be fresh (in the case of newPatTyVar)
 
 -- See Note [Type patterns: binders and unifiers]
 tyPatToBndr :: HsTyPat GhcRn -> Maybe (HsTyVarBndr () GhcRn)

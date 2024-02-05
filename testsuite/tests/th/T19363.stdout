@@ -9,9 +9,9 @@ infix 5 `f_6`
 (%%_7) :: [a_8] -> [a_8] -> [a_8]
 (%%_7) = (GHC.Internal.Base.++)
 {-# INLINE (%%_7) #-}
-{-# SPECIALISE (%%_7) ::
-                 GHC.Internal.Base.String ->
-                 GHC.Internal.Base.String -> GHC.Internal.Base.String #-}
+{-# SPECIALISE
+    (%%_7) :: GHC.Internal.Base.String ->
+              GHC.Internal.Base.String -> GHC.Internal.Base.String #-}
 {-# ANN (%%_7) "blah" #-}
 g_9 ((:**_2) {(^**_3) = x_10}) = x_10
 pattern a_11 `H_12` b_13 = (a_11, b_13)

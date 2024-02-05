@@ -20,7 +20,7 @@ module GHC.Rename.Bind (
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
 
    -- Other bindings
-   rnMethodBinds, renameSigs,
+   rnMethodBinds, renameSigs, bindRuleBndrs,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv, emptyMiniFixityEnv,
    HsSigCtxt(..),
@@ -44,14 +44,10 @@ import GHC.Rename.Pat
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( mapFvRn
-                        , checkDupRdrNames
-                        , warnUnusedLocalBinds
-                        , checkUnusedRecordWildcard
-                        , checkDupAndShadowedNames, bindLocalNamesFV
-                        , addNoNestedForallsContextsErr, checkInferredVars )
+import GHC.Rename.Utils
 import GHC.Driver.DynFlags
 import GHC.Unit.Module
+
 import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name
@@ -60,16 +56,22 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Data.List.SetOps    ( findDupsEq )
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
 import GHC.Data.Graph.Directed ( SCC(..) )
+
+import GHC.Types.Unique.Set
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
 import GHC.Types.CompleteMatch
-import GHC.Types.Unique.Set
+
 import GHC.Data.Maybe          ( orElse, mapMaybe )
+import GHC.Data.List.SetOps    ( findDupsEq )
+
 import GHC.Data.OrdList
+
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -1119,6 +1121,13 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
+renameSig _ctxt (SpecSigE _ bndrs spec_e inl)
+  = do { fn_rdr <- checkSpecESigShape spec_e
+       ; fn_name <- lookupOccRn fn_rdr  -- Checks that the head isn't forall-bound
+       ; bindRuleBndrs (SpecECtx fn_rdr) bndrs $ \_ bndrs' ->
+         do { (spec_e', fvs) <- rnLExpr spec_e
+            ; return (SpecSigE fn_name bndrs' spec_e' inl, fvs) } }
+
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (InlineSig noAnn new_v s, emptyFVs) }
@@ -1157,6 +1166,21 @@ renameSig _ctxt (CompleteMatchSig (_, s) bf mty)
 
        return (rn_sig, emptyFVs)
 
+
+checkSpecESigShape :: LHsExpr GhcPs -> RnM RdrName
+-- Checks the shape of a SPECIALISE
+-- That it looks like  (f a1 .. an [ :: ty ])
+checkSpecESigShape spec_e = go_l spec_e
+  where
+    go_l (L _ e) = go e
+
+    go :: HsExpr GhcPs -> RnM RdrName
+    go (ExprWithTySig _ fn _) = go_l fn
+    go (HsApp _ fn _)         = go_l fn
+    go (HsAppType _ fn _)     = go_l fn
+    go (HsVar _ (L _ fn))     = return fn
+    go (HsPar _ e)            = go_l e
+    go _ = failWithTc (TcRnSpecSigShape spec_e)
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1203,10 +1227,8 @@ okHsSig ctxt (L _ sig)
      (InlineSig {}, HsBootCtxt {}) -> False
      (InlineSig {}, _)             -> True
 
-     (SpecSig {}, TopSigCtxt {})    -> True
-     (SpecSig {}, LocalBindCtxt {}) -> True
-     (SpecSig {}, InstDeclCtxt {})  -> True
-     (SpecSig {}, _)                -> False
+     (SpecSig {},  ctxt) -> ok_spec_ctxt ctxt
+     (SpecSigE {}, ctxt) -> ok_spec_ctxt ctxt
 
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
@@ -1224,6 +1246,12 @@ okHsSig ctxt (L _ sig)
      (XSig {}, InstDeclCtxt {}) -> True
      (XSig {}, _)               -> False
 
+ok_spec_ctxt ::HsSigCtxt -> Bool
+-- Contexts where SPECIALISE can occur
+ok_spec_ctxt (TopSigCtxt {})    = True
+ok_spec_ctxt (LocalBindCtxt {}) = True
+ok_spec_ctxt (InstDeclCtxt {})  = True
+ok_spec_ctxt _                  = False
 
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (LocatedN RdrName, Sig GhcPs)]
@@ -1275,6 +1303,54 @@ localCompletePragmas sigs = mapMaybe (getCompleteSig . unLoc) $ reverse sigs
   -- backwards wrt. declaration order. So we reverse them here, because it makes
   -- a difference for incomplete match suggestions.
 
+bindRuleBndrs :: HsDocContext -> RuleBndrs GhcPs
+              -> ([Name] -> RuleBndrs GhcRn -> RnM (a,FreeVars))
+              -> RnM (a,FreeVars)
+bindRuleBndrs doc (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
+  = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
+       ; checkDupRdrNames rdr_names_w_loc
+       ; checkShadowedRdrNames rdr_names_w_loc
+       ; names <- newLocalBndrsRn rdr_names_w_loc
+       ; bindRuleTyVars doc tyvs             $ \ tyvs' ->
+         bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
+         thing_inside names (RuleBndrs { rb_ext = noExtField
+                                       , rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
+  where
+    get_var :: RuleBndr GhcPs -> LocatedN RdrName
+    get_var (RuleBndrSig _ v _) = v
+    get_var (RuleBndr _ v)      = v
+
+
+bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
+               -> [LRuleBndr GhcPs] -> [Name]
+               -> ([LRuleBndr GhcRn] -> RnM (a, FreeVars))
+               -> RnM (a, FreeVars)
+bindRuleTmVars doc tyvs vars names thing_inside
+  = go vars names $ \ vars' ->
+    bindLocalNamesFV names (thing_inside vars')
+  where
+    go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
+      = go vars ns $ \ vars' ->
+        thing_inside (L l (RuleBndr noAnn (L loc n)) : vars')
+
+    go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
+       (n : ns) thing_inside
+      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
+        go vars ns $ \ vars' ->
+        thing_inside (L l (RuleBndrSig noAnn (L loc n) bsig') : vars')
+
+    go [] [] thing_inside = thing_inside []
+    go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
+
+    bind_free_tvs = case tyvs of Nothing -> AlwaysBind
+                                 Just _  -> NeverBind
+
+bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
+               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
+               -> RnM (b, FreeVars)
+bindRuleTyVars doc (Just bndrs) thing_inside
+  = bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs (thing_inside . Just)
+bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 
 {-
 ************************************************************************

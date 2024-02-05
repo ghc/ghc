@@ -27,3 +27,4 @@ test('WarningCategory6', [extra_files(['WarningCategory1.hs', 'WarningCategory1_
 test('WarningCategory7', [extra_files(['WarningCategory1.hs', 'WarningCategory1_B.hs', 'WarningCategoryModule.hs'])], multimod_compile_fail, ['WarningCategory1', '-v0 -Werror -w -Wall'])
 test('WarningCategoryInvalid', normal, compile_fail, [''])
 test('T24396c', normal, compile_fail, [''])
+test('SpecEMultipleTys', normal, compile_fail, [''])

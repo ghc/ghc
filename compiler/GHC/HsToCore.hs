@@ -52,7 +52,7 @@ import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Coercion
-import GHC.Core.Predicate( mkNomEqPred )
+import GHC.Core.Predicate( scopedSort, mkNomEqPred )
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
@@ -69,7 +69,7 @@ import GHC.Data.SizedSeq ( sizeSS )
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Logger
@@ -277,12 +277,6 @@ deSugar hsc_env
         ; return (msgs, Just mod_guts)
         }}}}
 
-dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
-dsImpSpecs imp_specs
- = do { spec_prs <- mapMaybeM (dsSpec Nothing) imp_specs
-      ; let (spec_binds, spec_rules) = unzip spec_prs
-      ; return (concatOL spec_binds, spec_rules) }
-
 combineEvBinds :: [CoreBind] -> [(Id,CoreExpr)] -> [CoreBind]
 -- Top-level bindings can include coercion bindings, but not via superclasses
 -- See Note [Top-level evidence]
@@ -427,11 +421,14 @@ Reason
 dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule { rd_name = name
                       , rd_act  = rule_act
-                      , rd_tmvs = vars
+                      , rd_bndrs = RuleBndrs { rb_ext = bndrs }
                       , rd_lhs  = lhs
                       , rd_rhs  = rhs }))
   = putSrcSpanDs (locA loc) $
-    do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
+    do  { let bndrs' = scopedSort bndrs
+                 -- The scopedSort is because the binders may not
+                 -- be in dependency order; see wrinkle (FTV1) in
+                 -- Note [Free tyvars on rule LHS] in GHC.Tc.Zonk.Type
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities     $

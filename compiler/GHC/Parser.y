@@ -1927,10 +1927,10 @@ rule    :: { LRuleDecl GhcPs }
          {%runPV (unECP $4) >>= \ $4 ->
            runPV (unECP $6) >>= \ $6 ->
            amsA' (sLL $1 $> $ HsRule
-                                   { rd_ext =(((fstOf3 $3) (epTok $5) (fst $2)), getSTRINGs $1)
+                                   { rd_ext =((fst $2, epTok $5), getSTRINGs $1)
                                    , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
-                                   , rd_act = (snd $2) `orElse` AlwaysActive
-                                   , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
+                                   , rd_act = snd $2 `orElse` AlwaysActive
+                                   , rd_bndrs = ruleBndrsOrDef $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
@@ -1966,19 +1966,22 @@ rule_explicit_activation :: { ( ActivationAnn
                                 { ( ActivationAnn (epTok $1) (epTok $3) $2 Nothing
                                   , NeverActive) }
 
-rule_foralls :: { (EpToken "=" -> ActivationAnn -> HsRuleAnn, Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
-        : 'forall' rule_vars '.' 'forall' rule_vars '.'    {% let tyvs = mkRuleTyVarBndrs $2
-                                                              in hintExplicitForall $1
-                                                              >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)
-                                                              >> return (\an_eq an_act -> HsRuleAnn
-                                                                          (Just (epUniTok $1,epTok $3))
-                                                                          (Just (epUniTok $4,epTok $6))
-                                                                          an_eq an_act,
-                                                                         Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { (\an_eq an_act -> HsRuleAnn Nothing (Just (epUniTok $1,epTok $3)) an_eq an_act,
-                                                              Nothing, mkRuleBndrs $2) }
+rule_foralls :: { Maybe (RuleBndrs GhcPs) }
+        : 'forall' rule_vars '.' 'forall' rule_vars '.'
+              {% hintExplicitForall $1
+                 >> checkRuleTyVarBndrNames $2
+                 >> let ann = HsRuleBndrsAnn
+                                (Just (epUniTok $1,epTok $3))
+                                (Just (epUniTok $4,epTok $6))
+                     in return (Just (mkRuleBndrs ann  (Just $2) $5)) }
+
+        | 'forall' rule_vars '.'
+           { Just (mkRuleBndrs (HsRuleBndrsAnn Nothing (Just (epUniTok $1,epTok $3)))
+                               Nothing $2) }
+
         -- See Note [%shift: rule_foralls -> {- empty -}]
-        | {- empty -}            %shift                    { (\an_eq an_act -> HsRuleAnn Nothing Nothing an_eq an_act, Nothing, []) }
+        | {- empty -}            %shift
+           { Nothing }
 
 rule_vars :: { [LRuleTyTmVar] }
         : rule_var rule_vars                    { $1 : $2 }
@@ -2766,16 +2769,21 @@ sigdecl :: { LHsDecl GhcPs }
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
                 ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, epTok $4), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
-        | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
-             {% amsA' (
-                 let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInlinePrag, FunLike) (snd $2)
-                  in sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (epTok $6) (epUniTok $4) (fst $2)) $3 (fromOL $5) inl_prag)) }
+        | '{-# SPECIALISE' activation rule_foralls infixexp sigtypes_maybe '#-}'
+             {% runPV (unECP $4) >>= \ $4 -> do
+                let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
+                                              (NoUserInlinePrag, FunLike)
+                                              (snd $2)
+                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) (fmap fst $5) (fst $2)) $3 $4 $5
+                amsA' $ sLL $1 $> $ SigD noExtField spec }
 
-        | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% amsA' (sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (epTok $6) (epUniTok $4) (fst $2)) $3 (fromOL $5)
-                               (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
-                                               (getSPEC_INLINE $1) (snd $2)))) }
+        | '{-# SPECIALISE_INLINE' activation rule_foralls infixexp sigtypes_maybe '#-}'
+             {% runPV (unECP $4) >>= \ $4 -> do
+                let inl_prag = mkInlinePragma (getSPEC_INLINE_PRAGs $1)
+                                              (getSPEC_INLINE $1)
+                                              (snd $2)
+                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) (fmap fst $5) (fst $2)) $3 $4 $5
+                amsA' $ sLL $1 $> $ SigD noExtField spec }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 {% amsA' (sLL $1 $> $ SigD noExtField (SpecInstSig ((glR $1,epTok $2,epTok $4), (getSPEC_PRAGs $1)) $3)) }
@@ -2783,6 +2791,10 @@ sigdecl :: { LHsDecl GhcPs }
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ((glR $1,epTok $3), (getMINIMAL_PRAGs $1)) $2)) }
+
+sigtypes_maybe :: { Maybe (TokDcolon, OrdList (LHsSigType GhcPs)) }
+        : '::' sigtypes1         { Just (epUniTok $1, $2) }
+        | {- empty -}            { Nothing }
 
 activation :: { (ActivationAnn,Maybe Activation) }
         -- See Note [%shift: activation -> {- empty -}]

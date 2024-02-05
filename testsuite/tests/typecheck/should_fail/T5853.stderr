@@ -1,4 +1,3 @@
-
 T5853.hs:15:52: error: [GHC-25897]
     • Could not deduce ‘Subst fa2 (Elem fb) ~ fb’
         arising from a use of ‘<$>’
@@ -13,6 +12,7 @@ T5853.hs:15:52: error: [GHC-25897]
     • In the expression: (f . g) <$> xs
       When checking the rewrite rule "map/map"
     • Relevant bindings include
-        f :: Elem fa1 -> Elem fb (bound at T5853.hs:15:19)
-        g :: Elem fa2 -> Elem fa1 (bound at T5853.hs:15:21)
         xs :: fa2 (bound at T5853.hs:15:23)
+        g :: Elem fa2 -> Elem fa1 (bound at T5853.hs:15:21)
+        f :: Elem fa1 -> Elem fb (bound at T5853.hs:15:19)
+

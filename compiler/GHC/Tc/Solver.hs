@@ -16,7 +16,7 @@ module GHC.Tc.Solver(
        tcNormalise,
        approximateWC,    -- Exported for plugins to use
 
-       captureTopConstraints,
+       captureTopConstraints, emitResidualConstraints,
 
        simplifyTopWanteds,
 
@@ -231,7 +231,7 @@ simplifyAndEmitFlatConstraints wanted
                                         -- it's OK to use unkSkol    |  we must increase the TcLevel,
                                         -- because we don't bind     |  as explained in
                                         -- any skolem variables here |  Note [Wrapping failing kind equalities]
-                         ; emitImplication implic
+                         ; TcM.emitImplication implic
                          ; failM }
            Just (simples, errs)
               -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)
@@ -968,14 +968,17 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
              ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
-             ; skol_info <- mkSkolemInfo (InferSkol [ (name, mkPhiTy full_theta ty)
-                                                    | (name, ty) <- name_taus ])
+                   skol_info  = InferSkol [ (name, mkPhiTy full_theta ty)
+                                          | (name, ty) <- name_taus ]
+                 -- mkPhiTy: we don't add the quantified variables here, because
+                 -- they are also bound in ic_skols and we want them to be tidied
+                 -- uniformly.
        }
 
 
        -- Now emit the residual constraint
-       ; emitResidualConstraints rhs_tclvl ev_binds_var
-                                 name_taus co_vars qtvs bound_theta_vars
+       ; emitResidualConstraints rhs_tclvl skol_info ev_binds_var
+                                 co_vars qtvs bound_theta_vars
                                  wanted_transformed
 
          -- All done!
@@ -992,13 +995,12 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
     partial_sigs = filter isPartialSig sigs
 
 --------------------
-emitResidualConstraints :: TcLevel -> EvBindsVar
-                        -> [(Name, TcTauType)]
+emitResidualConstraints :: TcLevel -> SkolemInfoAnon -> EvBindsVar
                         -> CoVarSet -> [TcTyVar] -> [EvVar]
                         -> WantedConstraints -> TcM ()
 -- Emit the remaining constraints from the RHS.
-emitResidualConstraints rhs_tclvl ev_binds_var
-                        name_taus co_vars qtvs full_theta_vars wanteds
+emitResidualConstraints rhs_tclvl skol_info ev_binds_var
+                        co_vars qtvs full_theta_vars wanteds
   | isEmptyWC wanteds
   = return ()
 
@@ -1031,13 +1033,6 @@ emitResidualConstraints rhs_tclvl ev_binds_var
 
         ; emitConstraints (emptyWC { wc_simple = outer_simple
                                    , wc_impl   = implics }) }
-  where
-    full_theta = map idType full_theta_vars
-    skol_info = InferSkol [ (name, mkPhiTy full_theta ty)
-                          | (name, ty) <- name_taus ]
-    -- We don't add the quantified variables here, because they are
-    -- also bound in ic_skols and we want them to be tidied
-    -- uniformly.
 
 --------------------
 findInferredDiff :: TcThetaType -> TcThetaType -> TcM TcThetaType
@@ -1286,7 +1281,7 @@ decideQuantification
   :: TopLevelFlag
   -> TcLevel
   -> InferMode
-  -> SkolemInfo
+  -> SkolemInfoAnon
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [TcIdSigInst]         -- Partial type signatures (if any)
   -> WantedConstraints     -- Candidate theta; already zonked
@@ -1818,13 +1813,13 @@ defaultTyVarsAndSimplify rhs_tclvl candidates
 
 ------------------
 decideQuantifiedTyVars
-   :: SkolemInfo
+   :: SkolemInfoAnon
    -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
    -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
-decideQuantifiedTyVars skol_info name_taus psigs candidates
+decideQuantifiedTyVars skol_info_anon name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
@@ -1843,20 +1838,19 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
        -- The psig_tys are first in seed_tys, then candidates, then tau_tvs.
        -- This makes candidateQTyVarsOfTypes produces them in that order, so that the
         -- final qtvs quantifies in the same- order as the partial signatures do (#13524)
-       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-             <- candidateQTyVarsOfTypes $
-                psig_tys ++ candidates ++ tau_tys
-       ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
-             dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
+       ; dvs <- candidateQTyVarsOfTypes (psig_tys ++ candidates ++ tau_tys)
+       ; let dvs_plus = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
 
        ; traceTc "decideQuantifiedTyVars" (vcat
-           [ text "candidates =" <+> ppr candidates
-           , text "cand_kvs =" <+> ppr cand_kvs
-           , text "cand_tvs =" <+> ppr cand_tvs
-           , text "seed_tys =" <+> ppr seed_tvs
+           [ text "tau_tys =" <+> ppr tau_tys
+           , text "candidates =" <+> ppr candidates
+           , text "dvs =" <+> ppr dvs
+           , text "tau_tys =" <+> ppr tau_tys
+           , text "seed_tvs =" <+> ppr seed_tvs
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
+       ; skol_info <- mkSkolemInfo skol_info_anon
        ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
 
 ------------------

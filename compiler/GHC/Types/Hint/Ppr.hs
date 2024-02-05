@@ -288,6 +288,8 @@ instance Outputable GhcHint where
         (hsep [text "deriving", ppr strat, text "instance", ppr deriv_sig])
     SuggestParenthesizePatternRHS
       -> text "Parenthesize the RHS of the view pattern"
+    SuggestSplittingIntoSeveralSpecialisePragmas
+      -> text "Split the SPECIALISE pragma into multiple pragmas, one for each type signature"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

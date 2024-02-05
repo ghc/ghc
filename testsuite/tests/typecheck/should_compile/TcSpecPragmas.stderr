@@ -1,0 +1,15 @@
+TcSpecPragmas.hs:37:1: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘bar’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
+
+TcSpecPragmas.hs:42:1: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘baz’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
+
+TcSpecPragmas.hs:54:1: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘tyEq’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
+

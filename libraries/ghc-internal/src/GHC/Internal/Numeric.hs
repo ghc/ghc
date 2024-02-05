@@ -174,13 +174,16 @@ showInt n0 cs0
 -- mutual module deps.
 
 {-# SPECIALIZE showEFloat ::
-        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Float  -> ShowS #-}
+{-# SPECIALIZE showEFloat ::
         Maybe Int -> Double -> ShowS #-}
 {-# SPECIALIZE showFFloat ::
-        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Float  -> ShowS #-}
+{-# SPECIALIZE showFFloat ::
         Maybe Int -> Double -> ShowS #-}
 {-# SPECIALIZE showGFloat ::
-        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Float  -> ShowS #-}
+{-# SPECIALIZE showGFloat ::
         Maybe Int -> Double -> ShowS #-}
 
 -- | Show a signed 'RealFloat' value

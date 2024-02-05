@@ -7,12 +7,12 @@ f3_0 x_1 = 3
 g1_0 x_1 = 1
 g2_0 x_1 = 2
 g3_0 x_1 = 3
-{-# SPECIALISE g1_0 ::
-                 GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
-{-# SPECIALISE [2] g2_0 ::
-                     GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
-{-# SPECIALISE INLINE [~2] g3_0 ::
-                             GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
+{-# SPECIALISE
+    g1_0 :: GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
+{-# SPECIALISE [2]
+    g2_0 :: GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
+{-# SPECIALISE INLINE [~2]
+    g3_0 :: GHC.Internal.Types.Int -> GHC.Internal.Types.Int #-}
 data T_0 a_1 = T_2 a_1
 instance GHC.Internal.Classes.Eq a_0 => GHC.Internal.Classes.Eq (T_1 a_0)
     where {{-# SPECIALISE instance GHC.Internal.Classes.Eq (T_1 GHC.Internal.Types.Int) #-};

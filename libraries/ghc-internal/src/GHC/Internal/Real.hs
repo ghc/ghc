@@ -746,10 +746,9 @@ x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
         | y0 == 0   = 1
         | otherwise = powImpl x0 y0
 
-{-# SPECIALISE powImpl ::
-        Integer -> Integer -> Integer,
-        Integer -> Int -> Integer,
-        Int -> Int -> Int #-}
+{-# SPECIALISE powImpl :: Integer -> Integer -> Integer #-}
+{-# SPECIALISE powImpl :: Integer -> Int -> Integer #-}
+{-# SPECIALISE powImpl :: Int -> Int -> Int #-}
 {-# INLINABLE powImpl #-}    -- See Note [Inlining (^)]
 powImpl :: (Num a, Integral b) => a -> b -> a
 -- powImpl : x0 ^ y0 = (x ^ y)
@@ -757,10 +756,9 @@ powImpl x y | even y    = powImpl (x * x) (y `quot` 2)
             | y == 1    = x
             | otherwise = powImplAcc (x * x) (y `quot` 2) x -- See Note [Half of y - 1]
 
-{-# SPECIALISE powImplAcc ::
-        Integer -> Integer -> Integer -> Integer,
-        Integer -> Int -> Integer -> Integer,
-        Int -> Int -> Int -> Int #-}
+{-# SPECIALISE powImplAcc :: Integer -> Integer -> Integer -> Integer #-}
+{-# SPECIALISE powImplAcc :: Integer -> Int -> Integer -> Integer #-}
+{-# SPECIALISE powImplAcc :: Int -> Int -> Int -> Int #-}
 {-# INLINABLE powImplAcc #-}    -- See Note [Inlining (^)]
 powImplAcc :: (Num a, Integral b) => a -> b -> a -> a
 -- powImplAcc : x0 ^ y0 = (x ^ y) * z

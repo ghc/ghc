@@ -30,7 +30,11 @@ module GHC.Core.Predicate (
   isIPPred_maybe,
 
   -- Evidence variables
-  DictId, isEvVar, isDictId
+  DictId, isEvVar, isDictId,
+
+  -- * Well-scoped free variables
+  scopedSort, tyCoVarsOfTypeWellScoped,
+  tyCoVarsOfTypesWellScoped
 
   ) where
 
@@ -39,9 +43,11 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.FVs( tyCoVarsOfTypeList, tyCoVarsOfTypesList )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
@@ -247,6 +253,14 @@ of it.  So we are careful not to generate it in the first place:
 see Note [Equality superclasses in quantified constraints]
 in GHC.Tc.Solver.Dict.
 -}
+
+isPredTy :: HasDebugCallStack => Type -> Bool
+-- Precondition: expects a type that classifies values
+-- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
+-- Returns True for types of kind (CONSTRAINT _), False for ones of kind (TYPE _)
+isPredTy ty = case typeTypeOrConstraint ty of
+                  TypeLike       -> False
+                  ConstraintLike -> True
 
 -- | Does this type classify a core (unlifted) Coercion?
 -- At either role nominal or representational
@@ -492,3 +506,113 @@ isEvVar var = isEvVarType (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (varType id)
+
+
+{- *********************************************************************
+*                                                                      *
+                 scopedSort
+
+       This function lives here becuase it uses isEvVar
+*                                                                      *
+********************************************************************* -}
+
+{- Note [ScopedSort]
+~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  foo :: Proxy a -> Proxy (b :: k) -> Proxy (a :: k2) -> ()
+
+This function type is implicitly generalised over [a, b, k, k2]. These
+variables will be Specified; that is, they will be available for visible
+type application. This is because they are written in the type signature
+by the user.
+
+However, we must ask: what order will they appear in? In cases without
+dependency, this is easy: we just use the lexical left-to-right ordering
+of first occurrence. With dependency, we cannot get off the hook so
+easily.
+
+We thus state:
+
+ * These variables appear in the order as given by ScopedSort, where
+   the input to ScopedSort is the left-to-right order of first occurrence.
+
+Note that this applies only to *implicit* quantification, without a
+`forall`. If the user writes a `forall`, then we just use the order given.
+
+ScopedSort is defined thusly (as proposed in #15743):
+  * Work left-to-right through the input list, with a cursor.
+  * If variable v at the cursor is depended on by any earlier variable w,
+    move v immediately before the leftmost such w.
+
+INVARIANT: The prefix of variables before the cursor form a valid telescope.
+
+Note that ScopedSort makes sense only after type inference is done and all
+types/kinds are fully settled and zonked.
+
+-}
+
+-- | Do a topological sort on a list of tyvars,
+--   so that binders occur before occurrences
+-- E.g. given  @[ a::k, k::Type, b::k ]@
+-- it'll return a well-scoped list @[ k::Type, a::k, b::k ]@.
+--
+-- This is a deterministic sorting operation
+-- (that is, doesn't depend on Uniques).
+--
+-- It is also meant to be stable: that is, variables should not
+-- be reordered unnecessarily. This is specified in Note [ScopedSort]
+-- See also Note [Ordering of implicit variables] in "GHC.Rename.HsType"
+
+scopedSort :: [Var] -> [Var]
+scopedSort = go [] []
+  where
+    go :: [Var] -- already sorted, in reverse order
+       -> [TyCoVarSet] -- each set contains all the variables which must be placed
+                       -- before the tv corresponding to the set; they are accumulations
+                       -- of the fvs in the sorted Var's types
+
+                       -- This list is in 1-to-1 correspondence with the sorted Vars
+                       -- INVARIANT:
+                       --   all (\tl -> all (`subVarSet` head tl) (tail tl)) (tails fv_list)
+                       -- That is, each set in the list is a superset of all later sets.
+
+       -> [Var] -- yet to be sorted
+       -> [Var]
+    go acc _fv_list [] = reverse acc
+    go acc  fv_list (tv:tvs)
+      = go acc' fv_list' tvs
+      where
+        (acc', fv_list') = insert tv acc fv_list
+
+    insert :: Var           -- var to insert
+           -> [Var]         -- sorted list, in reverse order
+           -> [TyCoVarSet]  -- list of fvs, as above
+           -> ([Var], [TyCoVarSet])   -- augmented lists
+    -- Generally we put the new Var at the front of the accumulating list
+    -- (leading to a stable sort) unless there is are reason to put it later.
+    insert v []     []         = ([v], [tyCoVarsOfType (varType v)])
+    insert v (a:as) (fvs:fvss)
+      | (isTyVar v && isId a) ||          -- TyVars precede Ids
+        (isEvVar v && isId a && not (isEvVar a)) || -- DictIds precede non-DictIds
+        (v `elemVarSet` fvs)
+          -- (a) put Ids after TyVars, and (b) respect dependencies
+      , (as', fvss') <- insert v as fvss
+      = (a:as', fvs `unionVarSet` fv_v : fvss')
+
+      | otherwise  -- Put `v` at the front
+      = (v:a:as, fvs `unionVarSet` fv_v : fvs : fvss)
+      where
+        fv_v = tyCoVarsOfType (varType v)
+
+       -- lists not in correspondence
+    insert _ _ _ = panic "scopedSort"
+
+-- | Get the free vars of a type in scoped order
+tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
+tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
+
+-- | Get the free vars of types in scoped order
+tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
+tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+
