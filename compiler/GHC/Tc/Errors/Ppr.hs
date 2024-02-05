@@ -1889,6 +1889,17 @@ instance Diagnostic TcRnMessage where
             | otherwise
             = text "they are not unfilled metavariables"
 
+    TcRnNamespacedWarningPragmaWithoutFlag warning@(Warning (kw, _) _ txt) -> mkSimpleDecorated $
+      vcat [ text "Illegal use of the" <+> quotes (ppr kw) <+> text "keyword:"
+           , nest 2 (ppr warning)
+           , text "in a" <+> pragma_type <+> text "pragma"
+           ]
+      where
+        pragma_type = case txt of
+          WarningTxt{} -> text "WARNING"
+          DeprecatedTxt{} -> text "DEPRECATED"
+
+  diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2511,6 +2522,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalTypeExpr{}
       -> ErrorWithoutFlag
     TcRnInvalidDefaultedTyVar{}
+      -> ErrorWithoutFlag
+    TcRnNamespacedWarningPragmaWithoutFlag{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3170,6 +3183,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnInvalidDefaultedTyVar{}
       -> noHints
+    TcRnNamespacedWarningPragmaWithoutFlag{}
+      -> [suggestExtension LangExt.ExplicitNamespaces]
 
   diagnosticCode = constructorCode
 

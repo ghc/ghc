@@ -283,10 +283,13 @@ rnSrcWarnDecls bndr_set decls'
 
    sig_ctxt = TopSigCtxt bndr_set
 
-   rn_deprec (Warning (ns_spec, _) rdr_names txt)
+   rn_deprec w@(Warning (ns_spec, _) rdr_names txt)
        -- ensures that the names are defined locally
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what ns_spec . unLoc)
                                 rdr_names
+          ; unlessXOptM LangExt.ExplicitNamespaces $
+            when (ns_spec /= NoNamespaceSpecifier) $
+            addErr (TcRnNamespacedWarningPragmaWithoutFlag w)
           ; txt' <- rnWarningTxt txt
           ; return [(nameOccName nm, txt') | (_, nm) <- names] }
   -- Use the OccName from the Name we looked up, rather than from the RdrName,
