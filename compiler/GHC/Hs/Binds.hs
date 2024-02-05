@@ -711,6 +711,11 @@ type instance XClassOpSig       (GhcPass p) = AnnSig
 type instance XFixSig           (GhcPass p) = [AddEpAnn]
 type instance XInlineSig        (GhcPass p) = [AddEpAnn]
 type instance XSpecSig          (GhcPass p) = [AddEpAnn]
+
+type instance XSpecSigE         GhcPs = [AddEpAnn]
+type instance XSpecSigE         GhcRn = Name
+type instance XSpecSigE         GhcTc = NoExtField
+
 type instance XSpecInstSig      (GhcPass p) = ([AddEpAnn], SourceText)
 type instance XMinimalSig       (GhcPass p) = ([AddEpAnn], SourceText)
 type instance XSCCFunSig        (GhcPass p) = ([AddEpAnn], SourceText)
@@ -825,19 +830,34 @@ ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (FixSig _ fix_sig)   = ppr fix_sig
-ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
-  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc (pprSpec (unLoc var)
-                                             (interpp'SP ty) inl)
+
+ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_src = src, inl_inline = spec }))
+  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc $
+    pprSpec (unLoc var) (interpp'SP ty) inl
     where
       pragmaSrc = case spec of
-        NoUserInlinePrag -> "{-# " ++ extractSpecPragName (inl_src inl)
-        _                -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
+        NoUserInlinePrag -> "{-# " ++ extractSpecPragName src
+        _                -> "{-# " ++ extractSpecPragName src  ++ "_INLINE"
+
+ppr_sig (SpecSigE _ spec_e inl@(InlinePragma { inl_src = src, inl_inline = spec }))
+  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc $
+    pp_inl <+> ppr spec_e
+  where
+    -- SPECIALISE or SPECIALISE_INLINE
+    pragmaSrc = case spec of
+      NoUserInlinePrag -> "{-# " ++ extractSpecPragName src
+      _                -> "{-# " ++ extractSpecPragName src  ++ "_INLINE"
+
+    pp_inl | isDefaultInlinePragma inl = empty
+           | otherwise = pprInline inl
+
 ppr_sig (InlineSig _ var inl)
   = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
     where
       ppr_pfx = case inlinePragmaSource inl of
         SourceText src -> ftext src
         NoSourceText   -> text "{-#" <+> inlinePragmaName (inl_inline inl)
+
 ppr_sig (SpecInstSig (_, src) ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
 ppr_sig (MinimalSig (_, src) bf)
@@ -872,6 +892,7 @@ hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
 hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
+hsSigDoc (SpecSigE _ _ inl)     = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
 hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
 -- Using the 'inlinePragmaName' function ensures that the pragma name for any
 -- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted

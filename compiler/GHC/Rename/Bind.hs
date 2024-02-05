@@ -1110,6 +1110,11 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
+renameSig ctxt sig@(SpecSigE _ spec_e inl)
+  = do { (spec_e', fvs) <- rnLExpr spec_e
+       ; fn <- checkSpecSig spec_e'
+       ; return (SpecSigE fn spec_e' inl, fvs) }
+
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
         ; return (InlineSig noAnn new_v s, emptyFVs) }
@@ -1147,6 +1152,21 @@ renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
 
        return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
 
+
+checkSpecSig :: LHsExpr GhcRn -> RnM Name
+-- Checks the shape of a SPECIALISE
+-- That it looks like  (f a1 .. an [ :: ty ])
+checkSpecSig spec_e = go_l spec_e
+  where
+    go_l (L _ e) = go e
+
+    go (ExprWithSig _ fn _) = go_l fn
+    go (HsApp _ fn _)       = go_l fn
+    go (HsAppType _ fn _)   = go_l fn
+    go (HsVar fn)           = return fn
+    go (HsPar e)            = go_l e
+    go _ = do { addErr (TcRnSpecSigShape spec_e)
+              ; return (mkUnboundName (mkVarOccFS (fsLit "SPECIALISE-lhs"))) })
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1193,10 +1213,8 @@ okHsSig ctxt (L _ sig)
      (InlineSig {}, HsBootCtxt {}) -> False
      (InlineSig {}, _)             -> True
 
-     (SpecSig {}, TopSigCtxt {})    -> True
-     (SpecSig {}, LocalBindCtxt {}) -> True
-     (SpecSig {}, InstDeclCtxt {})  -> True
-     (SpecSig {}, _)                -> False
+     (SpecSig {},  ctxt) -> ok_spec_ctxt ctxt
+     (SpecSigE {}, ctxt) -> ok_spec_ctxt ctxt
 
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
@@ -1214,6 +1232,12 @@ okHsSig ctxt (L _ sig)
      (XSig {}, InstDeclCtxt {}) -> True
      (XSig {}, _)               -> False
 
+ok_spec_ctxt ::HsSigCtxt -> Bool
+-- Contexts where SPECIALISE can occur
+ok_spec_ctxt (TopSigCtxt {})    = True
+ok_spec_ctxt (LocalBindCtxt {}) = True
+ok_spec_ctxt (InstDeclCtxt {})  = True
+ok_spec_ctxt _                  = False
 
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (LocatedN RdrName, Sig GhcPs)]
