@@ -60,7 +60,7 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Ppr     ( pprTyVars )
-import GHC.Core.TyCo.Tidy    ( tidyAvoiding )
+import GHC.Core.TyCo.Tidy
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.DataCon

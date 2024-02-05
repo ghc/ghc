@@ -62,6 +62,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make
 import GHC.Types.Var( isInvisibleAnonPiTyBinder )
+import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
@@ -76,7 +77,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import Control.Monad
-import qualified Data.Set as S
 
 {-
 ************************************************************************
@@ -692,8 +692,7 @@ ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_ar
   = ds_app_rec_sel sel_id sel_id core_args
 
 ds_app (HsVar _ lfun) hs_args core_args
-  = do { tracePm "ds_app" (ppr lfun <+> ppr core_args)
-       ; ds_app_var lfun hs_args core_args }
+  = ds_app_var lfun hs_args core_args
 
 ds_app e _hs_args core_args
   = do { core_e <- dsExpr e
@@ -789,15 +788,15 @@ ds_app_finish :: Id -> [CoreExpr] -> DsM CoreExpr
 -- See Note [nospecId magic] in GHC.Types.Id.Make for what `nospec` does.
 -- See Note [Desugaring non-canonical evidence]
 ds_app_finish fun_id core_args
-  = do { unspecables <- getUnspecables
+  = do { mb_unspecables <- getUnspecables
        ; let fun_ty = idType fun_id
              free_dicts = exprsFreeVarsList
                             [ e | (e,pi_bndr) <- core_args `zip` fst (splitPiTys fun_ty)
                                 , isInvisibleAnonPiTyBinder pi_bndr ]
-             is_unspecable_var v = v `S.member` unspecables
 
-             fun | not (S.null unspecables)  -- Fast path
-                 , any (is_unspecable_var) free_dicts
+             fun | Just unspecables <- mb_unspecables
+                 , not (isEmptyVarSet unspecables)  -- Fast path
+                 , any (`elemVarSet` unspecables) free_dicts
                  = Var nospecId `App` Type fun_ty `App` Var fun_id
                  | otherwise
                  = Var fun_id
@@ -916,8 +915,8 @@ Note [Desugaring non-canonical evidence]
 When constructing an application
     f @ty1 ty2 .. dict1 dict2 .. arg1 arg2 ..
 if the evidence `dict_i` is canonical, we simply build that application.
-But if any of the `dict_i` are /non-canonical/, we wrap the appication in `nospec`,
-thus
+But if any of the `dict_i` are /non-canonical/, we wrap the application
+in `nospec`, thus
     nospec @fty f @ty1 @ty2 .. dict1 dict2 .. arg1 arg2 ..
 where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
 doesn't attempt to common up this evidence term with other evidence terms
@@ -942,7 +941,7 @@ How do we decide if the arguments are non-canonical dictionaries?
 
 Wrinkle:
 
-(NC1) We don't do this in the LHS of a RULE.  In paritcular, if we have
+(NC1) We don't do this in the LHS of a RULE.  In particular, if we have
      f :: (Num a, HasCallStack) => a -> a
      {-# SPECIALISE f :: Int -> Int #-}
   then making a rule like
@@ -954,7 +953,8 @@ Wrinkle:
   We definitely can't desugar that LHS into this!
       nospec (f @Int d1) d2
 
-  This is done by zapping the unspecables in `dsRule`.
+  This is done by zapping the unspecables in `dsRule` to Nothing.  That `Nothing`
+  says not to collect unspecables at all.
 
 
 Note [Desugaring explicit lists]

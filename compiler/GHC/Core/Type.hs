@@ -69,8 +69,6 @@ module GHC.Core.Type (
         mkCharLitTy, isCharLitTy,
         isLitTy,
 
-        isPredTy,
-
         getRuntimeRep, splitRuntimeRep_maybe, kindRep_maybe, kindRep,
         getLevity, levityType_maybe,
 
@@ -177,10 +175,6 @@ module GHC.Core.Type (
         closeOverKindsDSet, closeOverKindsList,
         closeOverKinds,
 
-        -- * Well-scoped lists of variables
-        scopedSort, tyCoVarsOfTypeWellScoped,
-        tyCoVarsOfTypesWellScoped,
-
         -- * Forcing evaluation of types
         seqType, seqTypes,
 
@@ -222,17 +216,6 @@ module GHC.Core.Type (
         substTyCoBndr, substTyVarToTyVar,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        -- * Tidying type related things up for printing
-        tidyType,      tidyTypes,
-        tidyOpenType,  tidyOpenTypes,
-        tidyOpenTypeX, tidyOpenTypesX,
-        tidyVarBndr, tidyVarBndrs,
-        tidyFreeTyCoVars,
-        tidyFreeTyCoVarX, tidyFreeTyCoVarsX,
-        tidyTyCoVarOcc,
-        tidyTopType,
-        tidyForAllTyBinder, tidyForAllTyBinders,
-
         -- * Kinds
         isTYPEorCONSTRAINT,
         isConcreteType,
@@ -248,7 +231,6 @@ import GHC.Types.Basic
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 
 -- friends:
@@ -2759,14 +2741,6 @@ typeTypeOrConstraint ty
           -> torc
           | otherwise
           -> pprPanic "typeOrConstraint" (ppr ty <+> dcolon <+> ppr (typeKind ty))
-
-isPredTy :: HasDebugCallStack => Type -> Bool
--- Precondition: expects a type that classifies values
--- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
--- Returns True for types of kind (CONSTRAINT _), False for ones of kind (TYPE _)
-isPredTy ty = case typeTypeOrConstraint ty of
-                  TypeLike       -> False
-                  ConstraintLike -> True
 
 -- | Does this classify a type allowed to have values? Responds True to things
 -- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.

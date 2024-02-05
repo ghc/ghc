@@ -3376,7 +3376,7 @@ without treating the explicitly-quantified ones specially. Wrinkles:
     no role.
 
 See also Note [Re-quantify type variables in rules] in
-GHC.Tc.Gen.Rule, which explains a /very/ similar design when
+GHC.Tc.Gen.Sig, which explains a /very/ similar design when
 generalising over the type of a rewrite rule.
 
 -}

@@ -19,6 +19,7 @@ module GHC.Core.TyCo.Tidy
 import GHC.Prelude
 import GHC.Data.FastString
 
+import GHC.Core.Predicate( scopedSort )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Types.Name hiding (varName)

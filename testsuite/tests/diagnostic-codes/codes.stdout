@@ -9,10 +9,10 @@
     - add test cases to exercise any newly uncovered diagnostic codes,
     - accept the expected output of the 'codes' test by passing the '-a' flag to Hadrian.
 
-[GHC-93315] is untested (constructor = DsUselessSpecialiseForClassMethodSelector)
 [GHC-58181] is untested (constructor = DsOrphanRule)
 [GHC-69441] is untested (constructor = DsRuleLhsTooComplicated)
 [GHC-19551] is untested (constructor = DsAggregatedViewExpressions)
+[GHC-93315] is untested (constructor = UselessSpecialiseForClassMethodSelector)
 [GHC-09848] is untested (constructor = PsErrCmmParser)
 [GHC-95644] is untested (constructor = PsErrBangPatWithoutSpace)
 [GHC-45106] is untested (constructor = PsErrInvalidInfixHole)
@@ -61,6 +61,7 @@
 [GHC-01570] is untested (constructor = TcRnExpectedValueId)
 [GHC-96665] is untested (constructor = TcRnMultipleInlinePragmas)
 [GHC-88293] is untested (constructor = TcRnUnexpectedPragmas)
+[GHC-35827] is untested (constructor = TcRnNonOverloadedSpecialisePragma)
 [GHC-85337] is untested (constructor = TcRnSpecialiseNotVisible)
 [GHC-91382] is untested (constructor = TcRnIllegalKindSignature)
 [GHC-72520] is untested (constructor = TcRnIgnoreSpecialisePragmaOnDefMethod)
@@ -119,3 +120,5 @@
 [GHC-75721] is untested (constructor = CannotRepresentType)
 [GHC-17599] is untested (constructor = AddTopDeclsUnexpectedDeclarationSplice)
 [GHC-86934] is untested (constructor = ClassPE)
+
+

@@ -31,6 +31,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Tidy
 
 import GHC.Types.Id
 import GHC.Types.Var.Env

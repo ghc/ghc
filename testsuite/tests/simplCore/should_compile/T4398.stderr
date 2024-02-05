@@ -1,6 +1,6 @@
-
 T4398.hs:6:11: warning: [GHC-40548]
     Forall'd constraint ‘Ord a’ is not bound in RULE lhs
       Orig bndrs: [a, $dOrd, x, y]
       Orig lhs: f @a ((\ ($dOrd :: Ord a) -> x) $dOrd) y
-      optimised lhs: f @a x y
+      Optimised lhs: f @a x y
+

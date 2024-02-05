@@ -14,26 +14,33 @@ module GHC.HsToCore.Types (
 import GHC.Prelude (Int)
 
 import Data.IORef
-import qualified Data.Set as S
 
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Name.Reader (GlobalRdrEnv)
+
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
+
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv)
+
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.HsToCore.Errors.Types
+
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
 import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
 import GHC.Driver.Hooks (DsForeignsHook)
 import GHC.Data.OrdList (OrdList)
+
 import GHC.Types.ForeignStubs (ForeignStubs)
 import GHC.Types.CompleteMatch
+
+import Data.Maybe( Maybe )
 
 {-
 ************************************************************************
@@ -80,9 +87,11 @@ data DsLclEnv
   -- ^ See Note [Long-distance information] in "GHC.HsToCore.Pmc".
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
-  , dsl_unspecables :: S.Set EvVar
-  -- ^ See Note [Desugaring non-canonical evidence]: this field collects
-  -- all un-specialisable evidence variables in scope.
+
+  , dsl_unspecables :: Maybe VarSet
+  -- ^ See Note [Desugaring non-canonical evidence]
+  -- This field collects all un-specialisable evidence variables in scope.
+  -- Nothing <=> don't collect this info (used for the LHS of Rules)
   }
 
 -- Inside [| |] brackets, the desugarer looks

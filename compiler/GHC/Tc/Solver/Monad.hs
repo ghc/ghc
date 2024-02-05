@@ -168,6 +168,7 @@ import GHC.Builtin.Names ( unsatisfiableClassNameKey )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
+import GHC.Core.TyCo.Tidy
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom( TypeEqn )
 import GHC.Core.Predicate
