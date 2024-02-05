@@ -44,19 +44,45 @@ function h$hs_remWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_timesWord64(h1,l1,h2,l2) {
-  var a = W64(h1,l1);
-  var b = W64(h2,l2);
-  var r = BigInt.asUintN(64, a * b);
-  TRACE_ARITH("Word64: " + a + " * " + b + " ==> " + r)
-  RETURN_W64(r);
+  var ah = l1 >> 16;
+  var al = l1 & 0xFFFF;
+  var bh = l2 >> 16;
+  var bl = l2 & 0xFFFF;
+
+  var ch = h1 >> 16;
+  var cl = h1 & 0xFFFF;
+  var dh = h2 >> 16;
+  var dl = h2 & 0xFFFF;
+
+  var r0 = al * bl;
+  var r1 = r0 >>> 16;
+  r0 &= 0xFFFF;
+
+  r1 += al * bh + ah * bl;
+  var r2 = r1 >> 16;
+  r1 &= 0xFFFF;
+
+  r2 += ah * bh + cl * bl + al * dl;
+  var r3 = (r2 >> 16) & 0xFFFF;
+  r2 &= 0xFFFF;
+
+  r3 += ah * dl + cl * bh + ch * bl + al * dh;
+  r3 &= 0xFFFF;
+
+  const rh = (r3 << 16 | r2) >>> 0;
+  const rl = (r1 << 16 | r0) >>> 0;
+
+  TRACE_ARITH("Word64: " + (h1,l1) + " * " + (h2,l2) + " ==> " + (rh,rl))
+
+  RETURN_UBX_TUP2(rh, rl);
 }
 
 function h$hs_minusWord64(h1,l1,h2,l2) {
-  var a = (BigInt(h1) << BigInt(32)) | BigInt(l1>>>0);
-  var b = (BigInt(h2) << BigInt(32)) | BigInt(l2>>>0);
-  var r = BigInt.asUintN(64, a - b);
-  TRACE_ARITH("Word64: " + a + " - " + b + " ==> " + r)
-  RETURN_W64(r);
+  var l  = l1-l2;
+  var rl = l>>>0;
+  var rh = (h1-h2-(l!=rl?1:0))>>>0;
+  TRACE_ARITH("Word64: " + (h1,l1) + " - " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_plusWord64(h1,l1,h2,l2) {
@@ -68,11 +94,37 @@ function h$hs_plusWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_timesInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r)
-  RETURN_I64(r);
+  var ah = l1 >> 16;
+  var al = l1 & 0xFFFF;
+  var bh = l2 >> 16;
+  var bl = l2 & 0xFFFF;
+
+  var ch = h1 >> 16;
+  var cl = h1 & 0xFFFF;
+  var dh = h2 >> 16;
+  var dl = h2 & 0xFFFF;
+
+  var r0 = al * bl;
+  var r1 = r0 >>> 16;
+  r0 &= 0xFFFF;
+
+  r1 += al * bh + ah * bl;
+  var r2 = r1 >> 16;
+  r1 &= 0xFFFF;
+
+  r2 += ah * bh + cl * bl + al * dl;
+  var r3 = (r2 >> 16) & 0xFFFF;
+  r2 &= 0xFFFF;
+
+  r3 += ah * dl + cl * bh + ch * bl + al * dh;
+  r3 &= 0xFFFF;
+
+  const rh = (r3 << 16 | r2) | 0;
+  const rl = (r1 << 16 | r0) >>> 0;
+
+  TRACE_ARITH("Int64: " + (h1,l1) + " * " + (h2,l2) + " ==> " + (rh,rl))
+
+  RETURN_UBX_TUP2(rh, rl);
 }
 
 function h$hs_quotInt64(h1,l1,h2,l2) {
@@ -92,18 +144,18 @@ function h$hs_remInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_plusInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a + b);
-  TRACE_ARITH("Int64: " + a + " + " + b + " ==> " + r)
-  RETURN_I64(r);
+  var l  = l1+l2;
+  var rl = l>>>0;
+  var rh = (h1+h2+(l!=rl?1:0))|0;
+  TRACE_ARITH("Int64: " + (h1,l1) + " + " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh, rl);
 }
 
 function h$hs_minusInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a - b);
-  TRACE_ARITH("Int64: " + a + " - " + b + " ==> " + r)
+  var l  = l1-l2;
+  var rl = l>>>0;
+  var rh = (h1-h2-(l!=rl?1:0))|0;
+  TRACE_ARITH("Int64: " + (h1,l1) + " - " + (h2,l2) + " ==> " + (rh,rl))
   RETURN_I64(r);
 }
 
