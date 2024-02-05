@@ -1,3 +1,5 @@
+{-# LANGUAGE ExplicitNamespaces #-}
+
 module T24396a where
 
 class C1

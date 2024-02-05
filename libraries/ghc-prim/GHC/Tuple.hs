@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, PatternSynonyms #-}
+{-# LANGUAGE NoImplicitPrelude, PatternSynonyms, ExplicitNamespaces #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Tuple

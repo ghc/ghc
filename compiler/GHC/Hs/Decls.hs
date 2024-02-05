@@ -1288,7 +1288,7 @@ data NamespaceSpecifier
   = NoNamespaceSpecifier
   | TypeNamespaceSpecifier (EpToken "type")
   | DataNamespaceSpecifier (EpToken "data")
-  deriving (Data)
+  deriving (Eq, Data)
 
 overlappingNamespaceSpecifiers :: NamespaceSpecifier -> NamespaceSpecifier -> Bool
 overlappingNamespaceSpecifiers NoNamespaceSpecifier _ = True

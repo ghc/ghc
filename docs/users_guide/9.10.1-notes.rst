@@ -75,9 +75,10 @@ Language
 
 - GHC Proposal `#65 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0065-type-infix.rst>`_
   "Require namespacing fixity declarations for type names and WARNING/DEPRECATED pragmas" has been partially implemented.
-  Now you can specify namespace of a name that you want to warn about or deprecate: ::
+  Now, with :extension:`ExplicitNamespaces` enabled, you can specify the
+  namespace of a name that you want to warn about or deprecate: ::
 
-    {-# DEPRACATED type D "Use `()` instead" #-} -- this will deprecate type D, but will not touch pattern synonym
+    {-# DEPRECATED type D "Use `()` instead" #-} -- this will deprecate type D, but will not touch pattern synonym
     data D = MkD
 
     {-# DEPRECATED data D "Use `MkD` instead" #-} -- this will deprecate pattern synonym only

@@ -4205,6 +4205,13 @@ data TcRnMessage where
       -> NE.NonEmpty TcTyVar  -- ^ The invalid type variables of the proposal
       -> TcRnMessage
 
+  {-| TcRnNamespacedWarningPragmaWithoutFlag is an error that occurs when
+      a namespace specifier is used in {-# WARNING ... #-} or {-# DEPRECATED ... #-}
+      pragmas without the -XExplicitNamespaces extension enabled
+
+  -}
+  TcRnNamespacedWarningPragmaWithoutFlag :: WarnDecl GhcPs -> TcRnMessage
+
   deriving Generic
 
 
