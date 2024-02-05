@@ -791,6 +791,9 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 --    b. Or, we are typechecking the second argument which would be a generated lambda
 --       so we set the location to be whatever the location in the context is
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
+-- For future: we need a cleaner way of doing this bit of adding the right error context.
+-- There is a delicate dance of looking at source locations and reconstructing
+-- whether the piece of code is a `do`-expanded code or some other expanded code.
 addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
        ; case ctxt of

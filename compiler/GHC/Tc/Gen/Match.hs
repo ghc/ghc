@@ -364,10 +364,9 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
                   ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty }
         }
 
-tcDoStmts mDoExpr@(MDoExpr _) (L l stmts) res_ty
-  = do  { stmts' <- tcStmts (HsDoStmt mDoExpr) tcDoStmt stmts res_ty
-        ; res_ty <- readExpType res_ty
-        ; return (HsDo res_ty mDoExpr (L l stmts')) }
+tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
+  = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
+        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty  }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
