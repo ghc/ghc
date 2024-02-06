@@ -52,6 +52,8 @@
 /compiler/GHC/Core/Opt/            @simonpj @sgraf
 /compiler/GHC/ThToHs.hs            @rae
 /compiler/GHC/Wasm/                @nrnrnr
+/compiler/GHC/JS/                  @luite @doyougnu @hsyl20 @JoshMeredith
+/compiler/GHC/StgToJS/             @luite @doyougnu @hsyl20 @JoshMeredith
 
 [Core libraries]
 /libraries/base/                  @hvr
