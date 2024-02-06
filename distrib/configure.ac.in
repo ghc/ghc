@@ -109,6 +109,9 @@ dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
 AC_PROG_CXX([g++ clang++ c++])
+# Work around #24324
+MOVE_TO_FLAGS([CC],[CFLAGS])
+MOVE_TO_FLAGS([CXX],[CXXFLAGS])
 
 dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
 AC_PROG_CPP
