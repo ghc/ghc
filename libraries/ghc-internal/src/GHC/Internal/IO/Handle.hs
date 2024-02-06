@@ -74,6 +74,7 @@ import GHC.Internal.Real
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
 
+
 -- ---------------------------------------------------------------------------
 -- Closing a handle
 
@@ -468,6 +469,9 @@ hTell handle =
 -- handle.  Each of these operations returns `True' if the handle has
 -- the specified property, and `False' otherwise.
 
+-- | @'hIsOpen' hdl@ returns whether the handle is open.
+-- If the 'haType' of @hdl@ is 'ClosedHandle' or 'SemiClosedHandle' this returns 'False'
+-- and 'True' otherwise.
 hIsOpen :: Handle -> IO Bool
 hIsOpen handle =
     withHandle_ "hIsOpen" handle $ \ handle_ -> do
@@ -476,6 +480,9 @@ hIsOpen handle =
       SemiClosedHandle     -> return False
       _                    -> return True
 
+-- | @'hIsOpen' hdl@ returns whether the handle is closed.
+-- If the 'haType' of @hdl@ is 'ClosedHandle' this returns 'True'
+-- and 'False' otherwise.
 hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
     withHandle_ "hIsClosed" handle $ \ handle_ -> do
@@ -493,6 +500,7 @@ hIsClosed handle =
        return (not (ho || hc))
 -}
 
+-- | @'hIsReadable' hdl@ returns whether it is possible to read from the handle.
 hIsReadable :: Handle -> IO Bool
 hIsReadable (DuplexHandle _ _ _) = return True
 hIsReadable handle =
@@ -502,6 +510,7 @@ hIsReadable handle =
       SemiClosedHandle     -> ioe_semiclosedHandle
       htype                -> return (isReadableHandleType htype)
 
+-- | @'hIsWritable' hdl@ returns whether it is possible to write to the handle.
 hIsWritable :: Handle -> IO Bool
 hIsWritable (DuplexHandle _ _ _) = return True
 hIsWritable handle =
@@ -524,6 +533,7 @@ hGetBuffering handle =
            -- of a semi-closed handle to be queried.   -- sof 6/98
           return (haBufferMode handle_)  -- could be stricter..
 
+-- | @'hIsSeekable' hdl@ returns whether it is possible to 'hSeek' with the given handle.
 hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
     withHandle_ "hIsSeekable" handle $ \ handle_@Handle__{..} -> do
@@ -775,4 +785,3 @@ showHandle' filepath is_duplex h =
       where
        def :: Int
        def = bufSize buf
-

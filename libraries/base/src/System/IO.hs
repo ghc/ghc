@@ -199,3 +199,16 @@ import GHC.Internal.System.IO
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
 -- failure with 'GHC.Internal.System.IO.Error.isAlreadyInUseError'.
+
+-- $stdio_examples
+-- Note: Some of the examples in this module do not work "as is" in ghci.
+-- This is because using 'stdin' in combination with lazy IO
+-- does not work well in interactive mode.
+--
+-- lines starting with @>@ indicate 'stdin' and @^D@ signales EOF.
+--
+-- >>> foo
+-- > input
+-- output
+-- > input^D
+-- output
