@@ -430,10 +430,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       case EM_AARCH64: IF_DEBUG(linker,debugBelch( "aarch64" )); break;
 #endif
 #if defined(EM_RISCV)
-      case EM_RISCV:  IF_DEBUG(linker,debugBelch( "riscv" ));
-          errorBelch("%s: RTS linker not implemented on riscv",
-                     oc->fileName);
-          return 0;
+      case EM_RISCV:  IF_DEBUG(linker,debugBelch( "riscv" )); break;
 #endif
 #if defined(EM_LOONGARCH)
       case EM_LOONGARCH:  IF_DEBUG(linker,debugBelch( "loongarch64" ));
@@ -1991,7 +1988,7 @@ ocResolve_ELF ( ObjectCode* oc )
     (void) shnum;
     (void) shdr;
 
-#if defined(aarch64_HOST_ARCH)
+#if defined(aarch64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
     /* use new relocation design */
     if(relocateObjectCode( oc ))
         return 0;
