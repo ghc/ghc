@@ -550,6 +550,7 @@ struct StgTRecHeader_ {
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk MUT_FIELD;
   TRecState                  state;
+  StgWord                    n_entries;
   struct hashtable          *tvar_table;
   StgWord                    tvar_table_epoch;
 };

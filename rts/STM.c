@@ -108,6 +108,8 @@
 #define NACQ_ASSERT(_X) ASSERT(_X)
 #endif
 
+#define SMALL_TRANSACTION_THRESHOLD 100
+
 static StgWord stm_gc_epoch = 0;
 
 static void free_tvar_table(StgTRecHeader *trec);
@@ -425,6 +427,7 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
 
   result -> enclosing_trec = enclosing_trec;
   result -> current_chunk = new_stg_trec_chunk(cap);
+  result -> n_entries = 0;
   result -> tvar_table = NULL;
   result -> tvar_table_epoch = -1;
 
@@ -496,6 +499,7 @@ static StgTRecHeader *alloc_stg_trec_header(Capability *cap,
     cap -> free_trec_headers = result -> enclosing_trec;
     result -> enclosing_trec = enclosing_trec;
     result -> current_chunk -> next_entry_idx = 0;
+    result -> n_entries = 0;
     result -> tvar_table = NULL;
     result -> tvar_table_epoch = -1;;
     if (enclosing_trec == NO_TREC) {
@@ -638,7 +642,10 @@ static void add_tvar (Capability *cap,
   new_entry -> tvar = tvar;
   new_entry -> expected_value = expected_value;
   new_entry -> new_value = new_value;
-  insertHashTable(trec->tvar_table, (StgWord) tvar, new_entry);
+  trec->n_entries++;
+  if (trec->tvar_table) {
+    insertHashTable(trec->tvar_table, (StgWord) tvar, new_entry);
+  }
 }
 
 /*......................................................................*/
@@ -1090,18 +1097,39 @@ static void rebuild_tvar_table(StgTRecHeader *trec) {
   });
 }
 
+static TRecEntry *lookup_trec_entry(StgTRecHeader *trec, StgTVar *tvar) {
+  if (trec->n_entries < SMALL_TRANSACTION_THRESHOLD) {
+    // In the case of small transactions we don't bother building
+    // a TVar table and instead resort to linear search.
+    FOR_EACH_ENTRY(trec, e, {
+      if (e->tvar == tvar) {
+        return e;
+      }
+    });
+    return NULL;
+  } else {
+    if (trec->tvar_table_epoch != stm_gc_epoch) {
+      rebuild_tvar_table(trec);
+    }
+
+    TRecEntry *result = lookupHashTable(trec->tvar_table, (StgWord) tvar);
+    if (result) {
+      return result;
+    } else {
+      return NULL;
+    }
+  }
+}
+
 static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeader **in) {
   TRACE("%p : get_entry_for TVar %p", trec, tvar);
   ASSERT(trec != NO_TREC);
 
   do {
-    if (trec->tvar_table_epoch != stm_gc_epoch) {
-      rebuild_tvar_table(trec);
-    }
-    TRecEntry *result = lookupHashTable(trec->tvar_table, (StgWord) tvar);
-    if (result) {
+    TRecEntry *e = lookup_trec_entry(trec, tvar);
+    if (e) {
       *in = trec;
-      return result;
+      return e;
     }
     trec = trec -> enclosing_trec;
   } while (trec != NO_TREC);
