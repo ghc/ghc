@@ -2896,6 +2896,13 @@ commonly used commands.
     the :ghci-cmd:`:ignore` or the ``⟨ignoreCount⟩`` parameter of the
     :ghci-cmd:`:continue` command.
 
+.. ghci-cmd:: :set timeout; ⟨timelimit⟩
+
+    Makes all expressions and commands that take longer than ⟨timelimit⟩ 
+    to evaluate throw a GhciTimedOut exception. The timelimit is interpreted 
+    in seconds. 
+
+
 .. ghci-cmd:: :seti; [⟨option⟩ ...]
 
     Like :ghci-cmd:`:set`, but options set with :ghci-cmd:`:seti` affect only

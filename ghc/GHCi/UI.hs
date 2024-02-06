@@ -111,13 +111,13 @@ import GHC.Types.Error
 import System.Console.Haskeline as Haskeline
 
 import Control.Applicative hiding (empty)
+import Control.Concurrent(myThreadId, killThread, forkIO, threadDelay)
 import Control.DeepSeq (deepseq)
 import Control.Monad as Monad
 import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
-
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
@@ -430,6 +430,7 @@ defFullHelpText =
   "                               set the function to handle the continuation prompt\n" ++
   "   :set editor <cmd>           set the command used for :edit\n" ++
   "   :set stop [<n>] <cmd>       set the command to run when a breakpoint is hit\n" ++
+  "   :set timeout <number>       set the maximum allowed amount of seconds for evaluation to take\n" ++
   "   :unset <option> ...         unset options\n" ++
   "\n" ++
   "  Options for ':set' and ':unset':\n" ++
@@ -456,6 +457,7 @@ defFullHelpText =
   "   :show paths                 show the currently active search paths\n" ++
   "   :show language              show the currently active language flags\n" ++
   "   :show targets               show the current set of targets\n" ++
+  "   :show timeout               show the current timeout length\n" ++
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, editor, stop]\n" ++
   "   :showi language             show language flags for interactive evaluation\n" ++
@@ -487,6 +489,9 @@ default_prompt_cont = generatePromptFunctionFromString "ghci| "
 
 default_args :: [String]
 default_args = []
+
+default_timeout :: String
+default_timeout = "0"
 
 interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
@@ -568,6 +573,7 @@ interactiveUI config srcs maybe_exprs = do
                    editor             = default_editor,
                    options            = [],
                    multiMode          = in_multi,
+                   time_limit         = Nothing,
                    localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is
@@ -1086,6 +1092,64 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
         unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
 
+
+{-
+Note [Where to Time]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Annoyingly, its not immediately clear what actions within ghci
+should be wrapped with the withTimeLimit function. For a while
+I thought wrapping `runOneCommand`, called from `runCommands`
+and `scriptLoop` made the most sense. And indeed, wrapping
+that function does properly cause things to timeout. But
+it also caused ghci to timeout while idling...
+
+In the end it was `doCommand`, nested within `runOneCommand`
+that needed wrapping for the timeout to work as expected.
+Maybe that'll be enough for now and ever more, but if
+anything else ends up needing to be wrapped, be sure
+to add it to the Note!
+
+The current state does mean that if you call a script
+with ghci :script cmd, the timeout will apply to *individual*
+statements within that script, and not the script as a
+whole. Is that correct? Its a decision, anyway.
+-}
+
+data GhciTimedOut = GhciTimedOut deriving Show
+instance Exception GhciTimedOut
+
+-- | Wraps a single run input action into a timout action, if the timelimit field has been set.
+-- Otherwise it just runs the action without doing anything.
+-- See Note [Where to Time]
+withTimeLimit :: (MonadIO m, MonadCatch m, GhciMonad m) => a -> m a -> m a
+withTimeLimit time_out_value cmd = do
+  maybe_limit <- time_limit <$> getGHCiState
+  case maybe_limit of
+    Nothing -> cmd
+    Just limit  -> do
+      result_or_timeout <- timeout limit cmd -- puts the IO action inside GhciMonad
+      let r = fromMaybe time_out_value result_or_timeout
+      pure r where
+
+      -- | transitively duping System.Timeout(timeout), because we need a lifted version
+      -- transitively, because really this is a dupe of time-out's Control.Timeout(timeout)
+      -- Luckily time-out is in Public Domain
+      timeout :: (MonadIO m, MonadCatch m) => Int -> m a -> m (Maybe a)
+      timeout time action = do
+        tidMain <- liftIO myThreadId
+        -- We might want to keep a single thread alive to reuse?
+        tidTemp <- liftIO $ forkIO $ delay time >> throwTo tidMain GhciTimedOut
+        result  <- catchTimeout action `MC.onException` liftIO (killThread tidTemp)
+        when (isJust result) $ liftIO $ killThread tidTemp
+        return result
+      ms = maxBound `div` 1000000
+      catchTimeout :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a)
+      catchTimeout action = catch (Just <$> action) $ \ GhciTimedOut -> return Nothing
+      delay t = if t <= 0
+        then pure ()
+        else threadDelay (1000000 * min t ms) >> delay (t - min t ms) -- ^ there has to be a better way.
+
+
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
 -- Otherwise the result is Just b where b is True if the command succeeded;
@@ -1105,7 +1169,7 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       ghciHandle (\e -> lift $ eh e >>= return . Just) $
         handleSourceError printErrorAndFail $
-          cmd_wrapper st $ doCommand c
+          withTimeLimit (Just False) $ cmd_wrapper st $ doCommand c -- See Note [Where to Time]
                -- source error's are handled by runStmt
                -- is the handler necessary here?
   where
@@ -2323,7 +2387,6 @@ exceptT = ExceptT . pure
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
-
 typeOfExpr :: GhciMonad m => String -> m ()
 typeOfExpr str = handleSourceError printErrAndMaybeExit $
     case break isSpace str of
@@ -2979,6 +3042,7 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
+    Right ("timeout", rest) -> setTimeout $ dropWhile isSpace rest
     _ -> case toArgsNoLoc str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> () <$ keepGoing' setOptions wds
@@ -3124,6 +3188,13 @@ setParsedPromptString fSetPrompt s = do
     Nothing ->
       fSetPrompt $ generatePromptFunctionFromString s
 
+setTimeout :: GhciMonad m => String -> m ()
+setTimeout str = handleSourceError printErrAndMaybeExit $ set_time (readMaybe str) where
+  set_time (Just l)
+    | l > 0  = modifyGHCiState (\st -> st{ time_limit = Just l })
+    | l == 0 = modifyGHCiState (\st -> st{ time_limit = Nothing })
+  set_time _ = throwGhcException (CmdLineError "syntax: :set timeout <natural number>")
+
 setOptions wds =
    do -- first, deal with the GHCi opts (+s, +t, etc.)
       let (plus_opts, minus_opts)  = partitionWith isPlus wds
@@ -3219,6 +3290,7 @@ unsetOptions str
            , ("prompt-cont", setPromptCont default_prompt_cont)
            , ("editor" , liftIO findEditor >>= setEditor)
            , ("stop"   , setStop default_stop)
+           , ("timeout", setTimeout default_timeout)
            ]
 
          no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
@@ -3255,7 +3327,7 @@ unsetOpt str
         Nothing -> liftIO (putStrLn ("unknown option: '" ++ str ++ "'"))
         Just o  -> unsetOption o
 
-strToGHCiOpt :: String -> (Maybe GHCiOption)
+strToGHCiOpt :: String -> Maybe GHCiOption
 strToGHCiOpt "m" = Just Multiline
 strToGHCiOpt "s" = Just ShowTiming
 strToGHCiOpt "t" = Just ShowType
@@ -3269,7 +3341,6 @@ optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
 optToStr CollectInfo = "c"
-
 
 -- ---------------------------------------------------------------------------
 -- :show
@@ -3312,6 +3383,7 @@ showCmd str = do
             , hidden "languages"  $ showLanguages -- backwards compat
             , hidden "lang"       $ showLanguages -- useful abbreviation
             , action "targets"    $ showTargets
+            , action "timeout"    $ showTimeout
             ]
 
     case words str of
@@ -3503,6 +3575,13 @@ showTargets = mapM_ showTarget =<< GHC.getTargets
     showTarget Target { targetId = TargetFile f _ } = liftIO (putStrLn f)
     showTarget Target { targetId = TargetModule m } =
       liftIO (putStrLn $ moduleNameString m)
+
+showTimeout :: GhciMonad m => m ()
+showTimeout = do
+  maybe_limit <- time_limit <$> getGHCiState
+  case maybe_limit of
+    Nothing -> printForUser $ text "unrestricted"
+    Just l  -> printForUser $ speakNOf l "second"
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -3718,9 +3797,9 @@ completeSeti = wrapCompleter flagWordBreakChars $ \w -> do
 
 completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
-    where opts = ["args", "prog", "editor", "stop",
+    where opts = [ "args", "prog", "editor", "stop",
                      "modules", "bindings", "linker", "breaks",
-                     "context", "packages", "paths", "language", "imports"]
+                     "context", "packages", "paths", "language", "imports", "timeout"]
 
 completeShowiOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) ["language"])
