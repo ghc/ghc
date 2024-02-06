@@ -162,21 +162,29 @@ data HandleType
  | AppendHandle
  | ReadWriteHandle
 
+-- | @'isReadableHandleType' hdlType@ returns 'True' if
+-- @hdlType@ is one of 'ReadHandle' and 'ReadWriteHandle'.
 isReadableHandleType :: HandleType -> Bool
 isReadableHandleType ReadHandle         = True
 isReadableHandleType ReadWriteHandle    = True
 isReadableHandleType _                  = False
 
+-- | @'isWritableHandleType' hdlType@ returns 'True' if
+-- @hdlType@ is one of 'AppendHandle', 'WriteHandle' and 'ReadWriteHandle'.
 isWritableHandleType :: HandleType -> Bool
 isWritableHandleType AppendHandle    = True
 isWritableHandleType WriteHandle     = True
 isWritableHandleType ReadWriteHandle = True
 isWritableHandleType _               = False
 
+-- | @'isReadWriteHandleType' hdlType@ returns 'True' if
+-- @hdlType@ is 'ReadWriteHandle'.
 isReadWriteHandleType :: HandleType -> Bool
 isReadWriteHandleType ReadWriteHandle{} = True
 isReadWriteHandleType _                 = False
 
+-- | @'isAppendHandleType' hdlType@ returns 'True' if
+-- @hdlType@ is 'AppendHandle'.
 isAppendHandleType :: HandleType -> Bool
 isAppendHandleType AppendHandle = True
 isAppendHandleType _            = False
@@ -450,4 +458,3 @@ instance Show Handle where
 
 showHandle :: FilePath -> String -> String
 showHandle file = showString "{handle: " . showString file . showString "}"
-
