@@ -333,7 +333,7 @@ AC_SUBST(TablesNextToCode)
 dnl ** Does target have runtime linker support?
 dnl --------------------------------------------------------------
 case "$target" in
-    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*|wasm*|javascript-*|loongarch64-*)
+    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|wasm*|javascript-*|loongarch64-*)
         TargetHasRTSLinker=NO
         ;;
     *)

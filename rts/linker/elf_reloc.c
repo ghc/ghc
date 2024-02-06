@@ -4,8 +4,8 @@
 
 #if defined(OBJFORMAT_ELF)
 
-/* we currently only use this abstraction for elf/aarch64 */
-#if defined(aarch64_HOST_ARCH)
+/* we currently only use this abstraction for elf/aarch64 and elf/riscv64 */
+#if defined(aarch64_HOST_ARCH) | defined(riscv64_HOST_ARCH)
 
 bool
 relocateObjectCode(ObjectCode * oc) {
