@@ -257,24 +257,49 @@ import GHC.Internal.Text.Read
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.Show
 import GHC.Internal.MVar
-
--- -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 -- Standard IO
 
 -- | Write a character to the standard output device
--- (same as 'hPutChar' 'stdout').
-
+--
+-- 'putChar' is implemented as @'hPutChar' 'stdout'@.
+--
+-- This operation may fail with the same errors as 'hPutChar'.
+--
+-- ==== __Examples__
+--
+-- Note that the following do not put a newline.
+--
+-- >>> putChar 'x'
+-- x
+--
+-- >>> putChar '\0042'
+-- *
 putChar         :: Char -> IO ()
 putChar c       =  hPutChar stdout c
 
 -- | Write a string to the standard output device
--- (same as 'hPutStr' 'stdout').
-
+--
+-- 'putStr' is implemented as @'hPutStr' 'stdout'@.
+--
+-- This operation may fail with the same errors, and has the same issues with concurrency, as 'hPutStr'!
+--
+-- ==== __Examples__
+--
+-- Note that the following do not put a newline.
+--
+-- >>> putStr "Hello, World!"
+-- Hello, World!
+--
+-- >>> putStr "\0052\0042\0050"
+-- 4*2
+--
 putStr          :: String -> IO ()
 putStr s        =  hPutStr stdout s
 
 -- | The same as 'putStr', but adds a newline character.
-
+--
+-- This operation may fail with the same errors, and has the same issues with concurrency, as 'hPutStr'!
 putStrLn        :: String -> IO ()
 putStrLn s      =  hPutStrLn stdout s
 
@@ -284,94 +309,242 @@ putStrLn s      =  hPutStrLn stdout s
 -- converts values to strings for output using the 'show' operation and
 -- adds a newline.
 --
--- For example, a program to print the first 20 integers and their
+-- 'print' is implemented as @'putStrLn' '.' 'show'@
+--
+-- This operation may fail with the same errors, and has the same issues with concurrency, as 'hPutStr'!
+--
+-- ==== __Examples__
+--
+-- >>> print [1, 2, 3]
+-- [1,2,3]
+--
+-- Be careful when using 'print' for outputting strings,
+-- as this will invoke 'show' and cause strings to be printed
+-- with quotation marks and non-ascii symbols escaped.
+--
+-- >>> print "λ :D"
+-- "\995 :D"
+--
+-- A program to print the first 8 integers and their
 -- powers of 2 could be written as:
 --
--- > main = print ([(n, 2^n) | n <- [0..19]])
-
+-- >>> print [(n, 2^n) | n <- [0..8]]
+-- [(0,1),(1,2),(2,4),(3,8),(4,16),(5,32),(6,64),(7,128),(8,256)]
 print           :: Show a => a -> IO ()
 print x         =  putStrLn (show x)
 
--- | Read a character from the standard input device
--- (same as 'hGetChar' 'stdin').
-
+-- | Read a single character from the standard input device.
+--
+-- 'getChar' is implemented as @'hGetChar' 'stdin'@.
+--
+-- This operation may fail with the same errors as 'hGetChar'.
+--
+-- ==== __Examples__
+--
+-- >>> getChar
+-- a'a'
+--
+-- >>> getChar
+-- >
+-- '\n'
 getChar         :: IO Char
 getChar         =  hGetChar stdin
 
--- | Read a line from the standard input device
--- (same as 'hGetLine' 'stdin').
-
+-- | Read a line from the standard input device.
+--
+-- 'getLine' is implemented as @'hGetLine' 'stdin'@.
+--
+-- This operation may fail with the same errors as 'hGetLine'.
+--
+-- ==== __Examples__
+--
+-- >>> getLine
+-- > Hello World!
+-- "Hello World!"
+--
+-- >>> getLine
+-- >
+-- ""
 getLine         :: IO String
 getLine         =  hGetLine stdin
 
 -- | The 'getContents' operation returns all user input as a single string,
--- which is read lazily as it is needed
--- (same as 'hGetContents' 'stdin').
-
+-- which is read lazily as it is needed.
+--
+-- 'getContents' is implemented as @'hGetContents' 'stdin'@.
+--
+-- This operation may fail with the same errors as 'hGetContents'.
+--
+-- ==== __Examples__
+--
+-- >>> getContents >>= putStr
+-- > aaabbbccc :D
+-- aaabbbccc :D
+-- > I hope you have a great day
+-- I hope you have a great day
+-- > ^D
+--
+-- >>> getContents >>= print . length
+-- > abc
+-- > <3
+-- > def ^D
+-- 11
 getContents     :: IO String
 getContents     =  hGetContents stdin
 
 -- | The 'getContents'' operation returns all user input as a single string,
 -- which is fully read before being returned
--- (same as 'hGetContents'' 'stdin').
+--
+-- 'getContents'' is implemented as @'hGetContents'' 'stdin'@.
+--
+-- This operation may fail with the same errors as 'hGetContents''.
+--
+-- ==== __Examples__
+--
+-- >>> getContents' >>= putStr
+-- > aaabbbccc :D
+-- > I hope you have a great day
+-- aaabbbccc :D
+-- I hope you have a great day
+--
+-- >>> getContents' >>= print . length
+-- > abc
+-- > <3
+-- > def ^D
+-- 11
 --
 -- @since base-4.15.0.0
-
 getContents'    :: IO String
 getContents'    =  hGetContents' stdin
 
--- | The 'interact' function takes a function of type @String->String@
--- as its argument.  The entire input from the standard input device is
--- passed to this function as its argument, and the resulting string is
--- output on the standard output device.
-
+-- | @'interact' f@ takes the entire input from 'stdin' and applies @f@ to it.
+-- The resulting string is written to the 'stdout' device.
+--
+-- Note that this operation is lazy, which allows to produce output
+-- even before all input has been consumed.
+--
+-- This operation may fail with the same errors as 'getContents' and 'putStr'.
+--
+-- ==== __Examples__
+--
+-- >>> interact (\str -> str ++ str)
+-- > hi :)
+-- hi :)
+-- > ^D
+-- hi :)
+--
+-- >>> interact (const ":D")
+-- :D
+--
+-- >>> interact (show . words)
+-- > hello world!
+-- > I hope you have a great day
+-- > ^D
+-- ["hello","world!","I","hope","you","have","a","great","day"]
 interact        ::  (String -> String) -> IO ()
 interact f      =   do s <- getContents
                        putStr (f s)
 
 -- | The 'readFile' function reads a file and
 -- returns the contents of the file as a string.
+--
 -- The file is read lazily, on demand, as with 'getContents'.
-
+--
+-- This operation may fail with the same errors as 'hGetContents' and 'openFile'.
+--
+-- ==== __Examples__
+--
+-- >>> readFile "~/hello_world"
+-- "Greetings!"
+--
+-- >>> take 5 <$> readFile "/dev/zero"
+-- "\NUL\NUL\NUL\NUL\NUL"
 readFile        :: FilePath -> IO String
 readFile name   =  openFile name ReadMode >>= hGetContents
 
 -- | The 'readFile'' function reads a file and
 -- returns the contents of the file as a string.
--- The file is fully read before being returned, as with 'getContents''.
+--
+-- This is identical to 'readFile', but the file is fully read before being returned,
+-- as with 'getContents''.
 --
 -- @since base-4.15.0.0
-
 readFile'       :: FilePath -> IO String
 -- There's a bit of overkill here—both withFile and
 -- hGetContents' will close the file in the end.
 readFile' name  =  withFile name ReadMode hGetContents'
 
--- | The computation 'writeFile' @file str@ function writes the string @str@,
+-- | The computation @'writeFile' file str@ function writes the string @str@,
 -- to the file @file@.
+--
+-- This operation may fail with the same errors as 'hPutStr' and 'withFile'.
+--
+-- ==== __Examples__
+--
+-- >>> writeFile "hello" "world" >> readFile "hello"
+-- "world"
+--
+-- >>> writeFile "~/" "D:"
+-- *** Exception: ~/: withFile: inappropriate type (Is a directory)
 writeFile :: FilePath -> String -> IO ()
 writeFile f txt = withFile f WriteMode (\ hdl -> hPutStr hdl txt)
 
--- | The computation 'appendFile' @file str@ function appends the string @str@,
+-- | The computation @'appendFile' file str@ function appends the string @str@,
 -- to the file @file@.
 --
 -- Note that 'writeFile' and 'appendFile' write a literal string
 -- to a file.  To write a value of any printable type, as with 'print',
 -- use the 'show' function to convert the value to a string first.
 --
--- > main = appendFile "squares" (show [(x,x*x) | x <- [0,0.1..2]])
-
+-- This operation may fail with the same errors as 'hPutStr' and 'withFile'.
+--
+-- ==== __Examples__
+--
+-- The following example could be more efficently written by acquiring a handle
+-- instead with 'openFile' and using the computations capable of writing to handles
+-- such as 'hPutStr'.
+--
+-- >>> let fn = "hello_world"
+-- >>> in writeFile fn "hello" >> appendFile fn " world!" >> (readFile fn >>= putStrLn)
+-- "hello world!"
+--
+-- >>> let fn = "foo"; output = readFile' fn >>= putStrLn
+-- >>> in output >> appendFile fn (show [1,2,3]) >> output
+-- this is what's in the file
+-- this is what's in the file[1,2,3]
 appendFile      :: FilePath -> String -> IO ()
 appendFile f txt = withFile f AppendMode (\ hdl -> hPutStr hdl txt)
 
 -- | The 'readLn' function combines 'getLine' and 'readIO'.
-
+--
+-- This operation may fail with the same errors as 'getLine' and 'readIO'.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (+ 5) readLn
+-- > 25
+-- 30
+--
+-- >>> readLn :: IO String
+-- > this is not a string literal
+-- *** Exception: user error (Prelude.readIO: no parse)
 readLn :: Read a => IO a
 readLn = getLine >>= readIO
 
 -- | The 'readIO' function is similar to 'read' except that it signals
 -- parse failure to the 'IO' monad instead of terminating the program.
-
+--
+-- This operation may fail with:
+--
+--  * 'GHC.Internal.System.IO.Error.isUserError' if there is no unambiguous parse.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (+ 1) (readIO "1")
+-- 2
+--
+-- >>> readIO "not quite ()" :: IO ()
+-- *** Exception: user error (Prelude.readIO: no parse)
 readIO          :: Read a => String -> IO a
 readIO s        =  case (do { (x,t) <- reads s ;
                               ("","") <- lex t ;
@@ -380,7 +553,7 @@ readIO s        =  case (do { (x,t) <- reads s ;
                         []     -> ioError (userError "Prelude.readIO: no parse")
                         _      -> ioError (userError "Prelude.readIO: ambiguous parse")
 
--- | The Unicode encoding of the current locale
+-- | The encoding of the current locale.
 --
 -- This is the initial locale encoding: if it has been subsequently changed by
 -- 'GHC.Internal.IO.Encoding.setLocaleEncoding' this value will not reflect that change.
@@ -393,21 +566,22 @@ localeEncoding = initLocaleEncoding
 -- This operation may fail with:
 --
 --  * 'GHC.Internal.System.IO.Error.isEOFError' if the end of file has been reached.
-
 hReady          :: Handle -> IO Bool
 hReady h        =  hWaitForInput h 0
 
 -- | Computation 'hPrint' @hdl t@ writes the string representation of @t@
--- given by the 'shows' function to the file or channel managed by @hdl@
+-- given by the 'show' function to the file or channel managed by @hdl@
 -- and appends a newline.
 --
--- This operation may fail with:
+-- This operation may fail with the same errors as 'hPutStrLn'
 --
---  * 'GHC.Internal.System.IO.Error.isFullError' if the device is full; or
+-- ==== __Examples__
 --
---  * 'GHC.Internal.System.IO.Error.isPermissionError' if another system resource limit
---    would be exceeded.
-
+-- >>> hPrint stdout [1,2,3]
+-- [1,2,3]
+--
+-- >>> hPrint stdin [4,5,6]
+-- *** Exception: <stdin>: hPutStr: illegal operation (handle is not open for writing)
 hPrint          :: Show a => Handle -> a -> IO ()
 hPrint hdl      =  hPutStrLn hdl . show
 
@@ -415,9 +589,50 @@ hPrint hdl      =  hPutStrLn hdl . show
 -- ---------------------------------------------------------------------------
 -- fixIO
 
--- | The implementation of 'GHC.Internal.Control.Monad.Fix.mfix' for 'IO'. If the function
--- passed to 'fixIO' inspects its argument, the resulting action will throw
--- 'FixIOException'.
+-- | The implementation of 'Control.Monad.Fix.mfix' for 'IO'.
+--
+-- This operation may fail with:
+--
+-- * 'FixIOException' if the function passed to 'fixIO' inspects its argument.
+--
+-- ==== __Examples__
+--
+-- the IO-action is only executed once. The recursion is only on the values.
+--
+-- >>> take 3 <$> fixIO (\x -> putStr ":D" >> (:x) <$> readLn @Int)
+-- :D
+-- 2
+-- [2,2,2]
+--
+-- If we are strict in the value, just as with 'Data.Function.fix', we do not get termination:
+--
+-- >>> fixIO (\x -> putStr x >> pure ('x' : x))
+-- * hangs forever *
+--
+-- We can tie the knot of a structure within 'IO' using 'fixIO':
+--
+-- @
+-- data Node = MkNode Int (IORef Node)
+--
+-- foo :: IO ()
+-- foo = do
+--   p \<- fixIO (\p -> newIORef (MkNode 0 p))
+--   q <- output p
+--   r <- output q
+--   _ <- output r
+--   pure ()
+--
+-- output :: IORef Node -> IO (IORef Node)
+-- output ref = do
+--   MkNode x p <- readIORef ref
+--   print x
+--   pure p
+-- @
+--
+-- >>> foo
+-- 0
+-- 0
+-- 0
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
@@ -465,7 +680,6 @@ fixIO k = do
 -- @O_EXCL@ flags are used to prevent this attack, but note that
 -- @O_EXCL@ is sometimes not supported on NFS filesystems, so if you
 -- rely on this behaviour it is best to use local filesystems only.
---
 openTempFile :: FilePath   -- ^ Directory in which to create the file
              -> String     -- ^ File name template. If the template is \"foo.ext\" then
                            -- the created file will be \"fooXXX.ext\" where XXX is some
