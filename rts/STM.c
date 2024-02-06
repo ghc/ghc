@@ -93,6 +93,7 @@
 #include "Threads.h"
 #include "sm/Storage.h"
 #include "SMPClosureOps.h"
+#include "Hash.h"
 
 #include <stdio.h>
 
@@ -106,6 +107,10 @@
 #define ACQ_ASSERT(_X) /*Nothing*/
 #define NACQ_ASSERT(_X) ASSERT(_X)
 #endif
+
+static StgWord stm_gc_epoch = 0;
+
+static void free_tvar_table(StgTRecHeader *trec);
 
 /*......................................................................*/
 
@@ -420,6 +425,8 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
 
   result -> enclosing_trec = enclosing_trec;
   result -> current_chunk = new_stg_trec_chunk(cap);
+  result -> tvar_table = NULL;
+  result -> tvar_table_epoch = -1;
 
   if (enclosing_trec == NO_TREC) {
     result -> state = TREC_ACTIVE;
@@ -489,6 +496,8 @@ static StgTRecHeader *alloc_stg_trec_header(Capability *cap,
     cap -> free_trec_headers = result -> enclosing_trec;
     result -> enclosing_trec = enclosing_trec;
     result -> current_chunk -> next_entry_idx = 0;
+    result -> tvar_table = NULL;
+    result -> tvar_table_epoch = -1;;
     if (enclosing_trec == NO_TREC) {
       result -> state = TREC_ACTIVE;
     } else {
@@ -511,6 +520,7 @@ static void free_stg_trec_header(Capability *cap,
   }
   trec -> current_chunk -> prev_chunk = END_STM_CHUNK_LIST;
   trec -> enclosing_trec = cap -> free_trec_headers;
+  free_tvar_table(trec);
   cap -> free_trec_headers = trec;
 #endif
 }
@@ -618,6 +628,19 @@ static TRecEntry *get_new_entry(Capability *cap,
   return result;
 }
 
+static void add_tvar (Capability *cap,
+                      StgTRecHeader *trec,
+                      StgTVar *tvar,
+                      StgClosure *expected_value,
+                      StgClosure *new_value
+                     ) {
+  TRecEntry *new_entry = get_new_entry(cap, trec);
+  new_entry -> tvar = tvar;
+  new_entry -> expected_value = expected_value;
+  new_entry -> new_value = new_value;
+  insertHashTable(trec->tvar_table, (StgWord) tvar, new_entry);
+}
+
 /*......................................................................*/
 
 static void merge_update_into(Capability *cap,
@@ -646,11 +669,7 @@ static void merge_update_into(Capability *cap,
 
   if (!found) {
     // No entry so far in this trec
-    TRecEntry *ne;
-    ne = get_new_entry(cap, t);
-    ne -> tvar = tvar;
-    ne -> expected_value = expected_value;
-    ne -> new_value = new_value;
+    add_tvar(cap, t, tvar, expected_value, new_value);
   }
 }
 
@@ -703,11 +722,7 @@ static void merge_read_into(Capability *cap,
 
   if (!found) {
     // No entry found
-    TRecEntry *ne;
-    ne = get_new_entry(cap, trec);
-    ne -> tvar = tvar;
-    ne -> expected_value = expected_value;
-    ne -> new_value = expected_value;
+    add_tvar(cap, trec, tvar, expected_value, expected_value);
   }
 }
 
@@ -879,9 +894,11 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
 void stmPreGCHook (Capability *cap) {
   lock_stm(NO_TREC);
   TRACE("stmPreGCHook");
+
   cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
   cap->free_trec_chunks = END_STM_CHUNK_LIST;
   cap->free_trec_headers = NO_TREC;
+  stm_gc_epoch ++;
   unlock_stm(NO_TREC);
 }
 
@@ -1056,26 +1073,40 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
-static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeader **in) {
-  TRecEntry *result = NULL;
+static void free_tvar_table(StgTRecHeader *trec) {
+  if (trec->tvar_table) {
+    freeHashTable(trec->tvar_table, NULL);
+  }
+  trec->tvar_table = NULL;
+  trec->tvar_table_epoch = -1;
+}
 
+static void rebuild_tvar_table(StgTRecHeader *trec) {
+  free_tvar_table(trec);
+  trec->tvar_table = allocHashTable();
+  trec->tvar_table_epoch = stm_gc_epoch;
+  FOR_EACH_ENTRY(trec, e, {
+    insertHashTable(trec->tvar_table, (StgWord) e->tvar, e);
+  });
+}
+
+static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeader **in) {
   TRACE("%p : get_entry_for TVar %p", trec, tvar);
   ASSERT(trec != NO_TREC);
 
   do {
-    FOR_EACH_ENTRY(trec, e, {
-      if (e -> tvar == tvar) {
-        result = e;
-        if (in != NULL) {
-          *in = trec;
-        }
-        BREAK_FOR_EACH;
-      }
-    });
+    if (trec->tvar_table_epoch != stm_gc_epoch) {
+      rebuild_tvar_table(trec);
+    }
+    TRecEntry *result = lookupHashTable(trec->tvar_table, (StgWord) tvar);
+    if (result) {
+      *in = trec;
+      return result;
+    }
     trec = trec -> enclosing_trec;
-  } while (result == NULL && trec != NO_TREC);
+  } while (trec != NO_TREC);
 
-  return result;
+  return NULL;
 }
 
 /*......................................................................*/
@@ -1323,19 +1354,13 @@ StgClosure *stmReadTVar(Capability *cap,
       result = entry -> new_value;
     } else {
       // Entry found in another trec
-      TRecEntry *new_entry = get_new_entry(cap, trec);
-      new_entry -> tvar = tvar;
-      new_entry -> expected_value = entry -> expected_value;
-      new_entry -> new_value = entry -> new_value;
-      result = new_entry -> new_value;
+      add_tvar(cap, trec, tvar, entry->expected_value, entry->new_value);
+      result = entry -> new_value;
     }
   } else {
     // No entry found
     StgClosure *current_value = read_current_value(trec, tvar);
-    TRecEntry *new_entry = get_new_entry(cap, trec);
-    new_entry -> tvar = tvar;
-    new_entry -> expected_value = current_value;
-    new_entry -> new_value = current_value;
+    add_tvar(cap, trec, tvar, current_value, current_value);
     result = current_value;
   }
 
@@ -1368,18 +1393,12 @@ void stmWriteTVar(Capability *cap,
       entry -> new_value = new_value;
     } else {
       // Entry found in another trec
-      TRecEntry *new_entry = get_new_entry(cap, trec);
-      new_entry -> tvar = tvar;
-      new_entry -> expected_value = entry -> expected_value;
-      new_entry -> new_value = new_value;
+      add_tvar(cap, trec, tvar, entry->expected_value, new_value);
     }
   } else {
     // No entry found
     StgClosure *current_value = read_current_value(trec, tvar);
-    TRecEntry *new_entry = get_new_entry(cap, trec);
-    new_entry -> tvar = tvar;
-    new_entry -> expected_value = current_value;
-    new_entry -> new_value = new_value;
+    add_tvar(cap, trec, tvar, current_value, new_value);
   }
 
   TRACE("%p : stmWriteTVar done", trec);

@@ -20,6 +20,9 @@
  */
 #define MUT_FIELD
 
+// Declared in rts/Hash.h
+struct hashtable;
+
 /* -----------------------------------------------------------------------------
    The profiling header
    -------------------------------------------------------------------------- */
@@ -547,6 +550,8 @@ struct StgTRecHeader_ {
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk MUT_FIELD;
   TRecState                  state;
+  struct hashtable          *tvar_table;
+  StgWord                    tvar_table_epoch;
 };
 
 /* A stack frame delimiting an STM transaction */
