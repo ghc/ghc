@@ -440,14 +440,15 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 
     /* Free table segments */
     while (segment >= 0) {
-        while (index >= 0) {
-            HashList *next;
-            for (HashList *hl = table->dir[segment][index]; hl != NULL; hl = next) {
-                next = hl->next;
-                if (freeDataFun != NULL)
+        if (freeDataFun) {
+            while (index >= 0) {
+                HashList *next;
+                for (HashList *hl = table->dir[segment][index]; hl != NULL; hl = next) {
+                    next = hl->next;
                     (*freeDataFun)((void *) hl->data);
+                }
+                index--;
             }
-            index--;
         }
         stgFree(table->dir[segment]);
         segment--;
