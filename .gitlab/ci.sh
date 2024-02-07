@@ -556,6 +556,8 @@ function install_bindist() {
           --prefix="$instdir" \
           "${args[@]+"${args[@]}"}"
       make_install_destdir "$TOP"/destdir "$instdir"
+      # And check the `--info` of the installed compiler, sometimes useful in CI log.
+      "$instdir"/bin/ghc --info
       ;;
   esac
   popd
