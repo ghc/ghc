@@ -328,7 +328,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
   let obj_roots = S.fromList . filter obj_is_root $ concatMap (M.keys . bi_exports . lbi_info) (M.elems objs_block_info)
       obj_units = map moduleUnitId $ nub (M.keys objs_block_info)
 
-  let (rts_wired_units, rts_wired_functions) = rtsDeps units
+  let (rts_wired_units, rts_wired_functions) = rtsDeps
 
   -- all the units we want to link together, without their dependencies
   let root_units = filter (/= ue_currentUnit unit_env)
@@ -818,8 +818,8 @@ diffDeps pkgs (deps_pkgs,deps_funs) =
     linked_pkgs  = S.fromList pkgs
 
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
-rtsDeps pkgs = diffDeps pkgs $
+rtsDeps :: ([UnitId], Set ExportedFun)
+rtsDeps =
   ( [ghcInternalUnitId, primUnitId]
   , S.fromList $ concat
       [ mkInternalFuns "GHC.Conc.Sync"
