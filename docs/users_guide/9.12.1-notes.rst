@@ -26,6 +26,14 @@ Language
 Compiler
 ~~~~~~~~
 
+- Constructor ``PluginProv`` of type ``UnivCoProvenance``, relevant
+for typing plugins, gets an extra ``DCoVarSet`` argument.
+The argument is intended to contain the in-scope coercion variables
+that the the proof represented by the coercion makes use of.
+See ``Note [The importance of tracking free coercion variables]``
+in ``GHC.Core.TyCo.Rep``, :ref:`constraint-solving-with-plugins`
+and the migration guide.
+
 
 GHCi
 ~~~~

@@ -1120,7 +1120,7 @@ To achieve this, we use a variant of the 'typed' lens from 'generic-lens'
     first, and decide whether to recur into it using the
     HasTypeQ type family.
   - The two different behaviours are controlled by two main instances (*) and (**).
-    - (*) recurs into a subtype, when we have a type family equation such as:
+    - (*) recurses into a subtype, when we have a type family equation such as:
 
         ConRecursInto "TcRnCannotDeriveInstance" = 'Just DeriveInstanceErrReason
 

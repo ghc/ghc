@@ -19,6 +19,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
+        coVarsOfCosDSet,
 
         almostDevoidCoVarOfCo,
 
@@ -446,6 +447,13 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
+------- Same again, but for DCoVarSet ----------
+--    But this time the free vars are shallow
+
+coVarsOfCosDSet :: [Coercion] -> DCoVarSet
+coVarsOfCosDSet cos = fvDVarSetSome isCoVar (tyCoFVsOfCos cos)
+
+
 {- *********************************************************************
 *                                                                      *
           Closing over kinds
@@ -660,7 +668,8 @@ tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfProv :: UnivCoProvenance -> FV
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+tyCoFVsOfProv (PluginProv _ cvs)  _ _ (have, haveSet) =
+  (dVarSetElems cvs ++ have, dVarSetToVarSet cvs `unionVarSet` haveSet)
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -730,7 +739,7 @@ almost_devoid_co_var_of_prov (PhantomProv co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
   = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov (PluginProv _) _ = True
+almost_devoid_co_var_of_prov (PluginProv _ cvs) cv = not (cv `elemDVarSet` cvs)
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
@@ -1129,7 +1138,7 @@ tyConsOfType ty
 
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
-     go_prov (PluginProv _)      = emptyUniqSet
+     go_prov (PluginProv _ _)    = emptyUniqSet
 
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
 
@@ -1340,4 +1349,4 @@ occCheckExpand vs_to_avoid ty
     ------------------
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
-    go_prov _   p@(PluginProv _)    = return p
+    go_prov _   p@(PluginProv _ _)  = return p

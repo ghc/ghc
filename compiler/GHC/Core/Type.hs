@@ -579,7 +579,7 @@ expandTypeSynonyms ty
 
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
-    go_prov _     p@(PluginProv _)    = p
+    go_prov _     p@(PluginProv _ _)  = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -911,7 +911,8 @@ mapTyCo mapper
         -> (go_ty (), go_tys (), go_co (), go_cos ())
 
 {-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
-mapTyCoX :: Monad m => TyCoMapper env m
+mapTyCoX :: forall m env. Monad m
+         => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
@@ -923,6 +924,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_hole = cohole })
   = (go_ty, go_tys, go_co, go_cos)
   where
+    -- See Note [Use explicit recursion in mapTyCo]
     go_tys !_   []       = return []
     go_tys !env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
 
@@ -953,12 +955,14 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
+    -- See Note [Use explicit recursion in mapTyCo]
     go_cos !_   []       = return []
     go_cos !env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
 
     go_mco !_   MRefl    = return MRefl
     go_mco !env (MCo co) = MCo <$> (go_co env co)
 
+    go_co :: env -> Coercion -> m Coercion
     go_co !env (Refl ty)                  = Refl <$> go_ty env ty
     go_co !env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
     go_co !env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
@@ -998,8 +1002,28 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
     go_prov !env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov !env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
-    go_prov !_   p@(PluginProv _)    = return p
+    go_prov !env (PluginProv s cvs)  = PluginProv s <$> go_fcvs env (dVarSetElems cvs)
 
+    -- See Note [Use explicit recursion in mapTyCo]
+    go_fcvs :: env -> [CoVar] -> m DTyCoVarSet
+    go_fcvs _   []       = return emptyDVarSet
+    go_fcvs env (cv:cvs) = do { co   <- covar env cv
+                              ; cvs' <- go_fcvs env cvs
+                              ; return (tyCoVarsOfCoDSet co `unionDVarSet` cvs') }
+
+{- Note [Use explicit recursion in mapTyCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use explicit recursion in `mapTyCo`, rather than calling, say, `strictFoldDVarSet`,
+for exactly the same reason as in Note [Use explicit recursion in foldTyCo] in
+GHC.Core.TyCo.Rep. We are in a monadic context, and using too-clever higher order
+functions makes the strictness analyser produce worse results.
+
+We could probably use `foldr`, since it is inlined bodily, fairly early; but
+I'm doing the simple thing and inlining it by hand.
+
+See !12037 for performance glitches caused by using `strictFoldDVarSet` (which is
+definitely not inlined bodily).
+-}
 
 {- *********************************************************************
 *                                                                      *

@@ -1932,6 +1932,13 @@ checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
 
 -------------------
+checkTyCoVarInScope :: Subst -> TyCoVar -> LintM ()
+checkTyCoVarInScope subst tcv
+  = checkL (tcv `isInScope` subst) $
+    hang (text "The type or coercion variable" <+> pprBndr LetBind tcv)
+       2 (text "is out of scope")
+
+-------------------
 lintType :: Type -> LintM LintedType
 
 -- If you edit this function, you may need to update the GHC formalism
@@ -1948,12 +1955,8 @@ lintType (TyVarTy tv)
            -- In GHCi we may lint an expression with a free
            -- type variable.  Then it won't be in the
            -- substitution, but it should be in scope
-           Nothing | tv `isInScope` subst
-                   -> return (TyVarTy tv)
-                   | otherwise
-                   -> failWithL $
-                      hang (text "The type variable" <+> pprBndr LetBind tv)
-                         2 (text "is out of scope")
+           Nothing -> do { checkTyCoVarInScope subst tv
+                         ; return (TyVarTy tv) }
      }
 
 lintType ty@(AppTy t1 t2)
@@ -2325,15 +2328,8 @@ lintCoercion (CoVarCo cv)
   = do { subst <- getSubst
        ; case lookupCoVar subst cv of
            Just linted_co -> return linted_co ;
-           Nothing
-              | cv `isInScope` subst
-                   -> return (CoVarCo cv)
-              | otherwise
-                   ->
-                      -- lintCoBndr always extends the substitution
-                      failWithL $
-                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
-                         2 (text "is out of scope")
+           Nothing        -> do { checkTyCoVarInScope subst cv
+                                ; return (CoVarCo cv) }
      }
 
 
@@ -2532,7 +2528,12 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; check_kinds kco k1 k2
             ; return (ProofIrrelProv kco') }
 
-     lint_prov _ _ prov@(PluginProv _) = return prov
+     lint_prov _ _ (PluginProv s cvs)
+        = do { subst <- getSubst
+             ; mapM_ (checkTyCoVarInScope subst) (dVarSetElems cvs)
+               -- Don't bother to return substituted fvs;
+               -- they don't matter to Lint
+             ; return (PluginProv s cvs) }
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco

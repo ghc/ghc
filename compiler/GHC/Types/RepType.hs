@@ -535,7 +535,7 @@ and returns the PrimRep IntRep. (See the definition of runtimeRepSimpleDataCons 
 GHC.Builtin.Types and its helper function mk_runtime_rep_dc.) Example 2 passes the promoted
 list as the one argument to the extracted function. The extracted function is defined
 as prim_rep_fun within tupleRepDataCon in GHC.Builtin.Types. It takes one argument, decomposes
-the promoted list (with extractPromotedList), and then recurs back to runtimeRepPrimRep
+the promoted list (with extractPromotedList), and then recurses back to runtimeRepPrimRep
 to process the LiftedRep and WordRep, concatenating the results.
 
 -}

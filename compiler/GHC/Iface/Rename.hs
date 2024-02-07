@@ -678,6 +678,8 @@ rnIfaceCo (IfaceAxiomInstCo n i cs)
     = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
 rnIfaceCo (IfaceUnivCo s r t1 t2)
     = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2
+        -- Renaming affects only type constructors, not coercion variables,
+        -- so no need to recurse into the provenance.
 rnIfaceCo (IfaceSymCo c)
     = IfaceSymCo <$> rnIfaceCo c
 rnIfaceCo (IfaceTransCo c1 c2)

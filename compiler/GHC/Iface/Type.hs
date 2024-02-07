@@ -154,7 +154,7 @@ type IfaceKind     = IfaceType
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
 -- before being printed. See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
 data IfaceType
-  = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
+  = IfaceFreeTyVar TyVar                -- See Note [Free TyVars and CoVars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceAppArgs
@@ -284,7 +284,7 @@ instance Outputable IfaceTyConSort where
   ppr (IfaceSumTyCon n)        = text "sum:" <> ppr n
   ppr IfaceEqualityTyCon       = text "equality"
 
-{- Note [Free tyvars in IfaceType]
+{- Note [Free TyVars and CoVars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
 an IfaceType and pretty printing that.  This eliminates a lot of
@@ -432,7 +432,7 @@ data IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
-       -- There are only a fixed number of CoAxiomRules, so it suffices
+       -- ^ There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
        -- See Note [Adding built-in type families] in GHC.Builtin.Types.Literals
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
@@ -443,13 +443,16 @@ data IfaceCoercion
   | IfaceInstCo       IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
-  | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
+  | IfaceFreeCoVar    CoVar    -- ^ See Note [Free TyVars and CoVars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 
 data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
-  | IfacePluginProv String
+  | IfacePluginProv String [IfLclName] [Var]
+    -- ^ Local covars and open (free) covars resp
+    -- See Note [Free TyVars and CoVars in IfaceType]
+
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -670,7 +673,7 @@ substIfaceType env ty
 
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
-    go_prov co@(IfacePluginProv _)   = co
+    go_prov co@(IfacePluginProv _ _ _) = co
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
@@ -1023,7 +1026,7 @@ ppr_ty ctxt_prec ty
   | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -1955,7 +1958,7 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
     split_co co' = ([], co')
 
--- Why these three? See Note [Free tyvars in IfaceType]
+-- Why these three? See Note [Free TyVars and CoVars in IfaceType]
 ppr_co _ (IfaceFreeCoVar covar) = ppr covar
 ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
@@ -2010,8 +2013,8 @@ pprIfaceUnivCoProv (IfacePhantomProv co)
   = text "phantom" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
-pprIfaceUnivCoProv (IfacePluginProv s)
-  = text "plugin" <+> doubleQuotes (text s)
+pprIfaceUnivCoProv (IfacePluginProv s cvs fcvs)
+  = hang (text "plugin") 2 (sep [doubleQuotes (text s), ppr cvs, ppr fcvs])
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -2173,6 +2176,7 @@ ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 instance Binary IfaceType where
     put_ _ (IfaceFreeTyVar tv)
        = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+           -- See Note [Free TyVars and CoVars in IfaceType]
 
     put_ bh (IfaceForAllTy aa ab) = do
             putByte bh 0
@@ -2321,9 +2325,10 @@ instance Binary IfaceCoercion where
           put_ bh b
   put_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
+           -- See Note [Free TyVars and CoVars in IfaceType]
   put_ _  (IfaceHoleCo cv)
        = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
-          -- See Note [Holes in IfaceCoercion]
+           -- See Note [Holes in IfaceCoercion]
 
   get bh = do
       tag <- getByte bh
@@ -2393,9 +2398,12 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfaceProofIrrelProv a) = do
           putByte bh 2
           put_ bh a
-  put_ bh (IfacePluginProv a) = do
+  put_ bh (IfacePluginProv a cvs fcvs) = do
           putByte bh 3
           put_ bh a
+          -- See Note [Free TyVars and CoVars in IfaceType]
+          assertPpr (null fcvs) (ppr cvs $$ ppr fcvs) $
+            put_ bh cvs
 
   get bh = do
       tag <- getByte bh
@@ -2405,7 +2413,8 @@ instance Binary IfaceUnivCoProv where
            2 -> do a <- get bh
                    return $ IfaceProofIrrelProv a
            3 -> do a <- get bh
-                   return $ IfacePluginProv a
+                   cvs <- get bh
+                   return $ IfacePluginProv a cvs []
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 
