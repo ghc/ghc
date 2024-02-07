@@ -328,7 +328,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
   let obj_roots = S.fromList . filter obj_is_root $ concatMap (M.keys . bi_exports . lbi_info) (M.elems objs_block_info)
       obj_units = map moduleUnitId $ nub (M.keys objs_block_info)
 
-  let (rts_wired_units, rts_wired_functions) = rtsDeps units
+  let (rts_wired_units, rts_wired_functions) = rtsDeps
 
   -- all the units we want to link together, without their dependencies
   let root_units = filter (/= ue_currentUnit unit_env)
@@ -802,24 +802,9 @@ readArObject ar_state mod ar_file = do
 
   go_entries entries
 
-
--- | A helper function to read system dependencies that are hardcoded
-diffDeps
-  :: [UnitId]                    -- ^ Packages that are already Linked
-  -> ([UnitId], Set ExportedFun) -- ^ New units and functions to link
-  -> ([UnitId], Set ExportedFun) -- ^ Diff
-diffDeps pkgs (deps_pkgs,deps_funs) =
-  ( filter linked_pkg deps_pkgs
-  , S.filter linked_fun deps_funs
-  )
-  where
-    linked_fun f = moduleUnitId (funModule f) `S.member` linked_pkgs
-    linked_pkg p = S.member p linked_pkgs
-    linked_pkgs  = S.fromList pkgs
-
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
-rtsDeps pkgs = diffDeps pkgs $
+rtsDeps :: ([UnitId], Set ExportedFun)
+rtsDeps =
   ( [baseUnitId, primUnitId]
   , S.fromList $ concat
       [ mkBaseFuns "GHC.Conc.Sync"
