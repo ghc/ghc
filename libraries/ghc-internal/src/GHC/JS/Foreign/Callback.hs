@@ -26,6 +26,7 @@ import qualified GHC.Exts as Exts
 import           Data.Typeable
 
 import           Unsafe.Coerce
+import           GHC.Base
 
 data OnBlocked = ContinueAsync | ThrowWouldBlock deriving (Eq)
 

@@ -144,6 +144,7 @@ import GHC.JS.Prim
 import GHC.Exts
 import GHC.IO
 import Unsafe.Coerce
+import GHC.Base
 
 type O = JSVal -- object
 type K = JSVal -- key

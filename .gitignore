@@ -206,8 +206,8 @@ _darcs/
 /utils/ghc-pkg/ghc-pkg.cabal
 utils/lndir/fs.*
 utils/unlit/fs.*
-libraries/ghc-internals/include/fs.h
-libraries/ghc-internals/cbits/fs.c
+libraries/ghc-internal/include/fs.h
+libraries/ghc-internal/cbits/fs.c
 missing-win32-tarballs
 
 /extra-gcc-opts

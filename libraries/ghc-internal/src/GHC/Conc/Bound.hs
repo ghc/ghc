@@ -1,36 +1,4 @@
 {-# LANGUAGE CPP #-}
---
--- JavaScript platform doesn't support bound threads
-#if !defined(javascript_HOST_ARCH)
-#define SUPPORT_BOUND_THREADS
-#endif
-
-#if !defined(SUPPORT_BOUND_THREADS)
-{-# LANGUAGE RankNTypes #-}
-
-import GHC.Base
-import GHC.Conc.Sync (ThreadId)
-
-forkOS :: IO () -> IO ThreadId
-forkOS _ = error "forkOS not supported on this architecture"
-
-forkOSWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
-forkOSWithUnmask _ = error "forkOS not supported on this architecture"
-
-isCurrentThreadBound :: IO Bool
-isCurrentThreadBound = pure False
-
-runInBoundThread :: IO a -> IO a
-runInBoundThread action = action
-
-runInUnboundThread :: IO a -> IO a
-runInUnboundThread action = action
-
-rtsSupportsBoundThreads :: Bool
-rtsSupportsBoundThreads = False
-
-#else
-
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
@@ -62,6 +30,36 @@ module GHC.Conc.Bound
     , runInUnboundThread
     , rtsSupportsBoundThreads
     ) where
+--
+-- JavaScript platform doesn't support bound threads
+#if !defined(javascript_HOST_ARCH)
+#define SUPPORT_BOUND_THREADS
+#endif
+
+#if !defined(SUPPORT_BOUND_THREADS)
+
+import GHC.Base
+import GHC.Conc.Sync (ThreadId)
+
+forkOS :: IO () -> IO ThreadId
+forkOS _ = error "forkOS not supported on this architecture"
+
+forkOSWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkOSWithUnmask _ = error "forkOS not supported on this architecture"
+
+isCurrentThreadBound :: IO Bool
+isCurrentThreadBound = pure False
+
+runInBoundThread :: IO a -> IO a
+runInBoundThread action = action
+
+runInUnboundThread :: IO a -> IO a
+runInUnboundThread action = action
+
+rtsSupportsBoundThreads :: Bool
+rtsSupportsBoundThreads = False
+
+#else
 
 import Foreign.StablePtr
 import Foreign.C.Types

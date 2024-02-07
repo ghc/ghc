@@ -48,6 +48,9 @@ import qualified GHC.Exception as Ex
 import qualified GHC.Exts as Exts
 import qualified GHC.CString as GHC
 import           GHC.IO
+import           Data.Bool
+import           GHC.Base
+import           GHC.Show
 
 {-
   JSVal is a boxed type that can be used as FFI
