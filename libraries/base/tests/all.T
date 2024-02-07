@@ -81,8 +81,9 @@ test('length001',
      # stack limit and mark it as failing under a few conditions.
      [extra_run_opts('+RTS -K8m -RTS'),
      expect_fail_for(['normal', 'threaded1', 'llvm', 'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
-     # JS doesn't support stack limit so the test sometimes passes just fine. We decrease the timeout duration to force the failure.
-     when(js_arch(), run_timeout_multiplier(0.2))],
+     # JS doesn't support stack limit so the test sometimes passes just fine. Therefore the test is
+     # marked as fragile.
+     when(js_arch(), fragile(22921)),
      compile_and_run, [''])
 
 test('ratio001', 	normal, compile_and_run, [''])
