@@ -234,6 +234,8 @@ start of each alternative.  Of course we certainly have to do so if
 the case forces an evaluation, or if there is a primitive op which can
 trigger GC.
 
+NB: things are not settled here: see #8326.
+
 A more interesting situation is this (a Plan-B situation)
 
         !P!;
@@ -652,20 +654,10 @@ cgCase scrut bndr alt_type alts
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For boolean conditionals it seems that we have always done NoGcInAlts.
-That is, we have always done the GC check before the conditional.
-This is enshrined in the special case for
-   case tagToEnum# (a>b) of ...
-See Note [case on bool]
-
-It's odd, and it's flagrantly inconsistent with the rules described
-Note [Compiling case expressions].  However, after eliminating the
-tagToEnum# (#13397) we will have:
-   case (a>b) of ...
-Rather than make it behave quite differently, I am testing for a
-comparison operator here in the general case as well.
-
-ToDo: figure out what the Right Rule should be.
+For comparison operators (`is_cmp_op`) it seems that we have always done
+NoGcInAlts.  It's odd, and it's flagrantly inconsistent with the rules described
+Note [Compiling case expressions].  However, that's the way it has been for ages
+(there was some long-gone history involving tagToEnum#; see #13397, #8317, #8326).
 
 Note [scrut sequel]
 ~~~~~~~~~~~~~~~~~~~
