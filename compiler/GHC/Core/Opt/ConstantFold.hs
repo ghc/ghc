@@ -3518,7 +3518,7 @@ tx_con_dtt _ alt = pprPanic "caseRules/dataToTag: bad alt" (ppr alt)
 {- Note [caseRules for tagToEnum]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to transform
-   case tagToEnum x of
+   case tagToEnum# x of
      False -> e1
      True  -> e2
 into
@@ -3526,13 +3526,13 @@ into
      0# -> e1
      1# -> e2
 
-This rule eliminates a lot of boilerplate. For
+See #8317.   This rule eliminates a lot of boilerplate. For
   if (x>y) then e2 else e1
 we generate
-  case tagToEnum (x ># y) of
+  case tagToEnum# (x ># y) of
     False -> e1
     True  -> e2
-and it is nice to then get rid of the tagToEnum.
+and it is nice to then get rid of the tagToEnum#.
 
 Beware (#14768): avoid the temptation to map constructor 0 to
 DEFAULT, in the hope of getting this
@@ -3550,8 +3550,9 @@ We don't want to get this!
       DEFAULT -> e1
       DEFAULT -> e2
 
-Instead, we deal with turning one branch into DEFAULT in GHC.Core.Opt.Simplify.Utils
-(add_default in mkCase3).
+Instead, when possible, we turn one branch into DEFAULT in
+GHC.Core.Opt.Simplify.Utils.mkCase2; see Note [Literal cases]
+in that module.
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

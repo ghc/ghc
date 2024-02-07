@@ -2510,27 +2510,6 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
 
-{- Disabled until we fix #8326
-  | fn `hasKey` tagToEnumKey   -- See Note [Optimising tagToEnum#]
-  , [_type_arg, val_arg] <- args
-  , Select dup bndr ((_,[],rhs1) : rest_alts) se cont <- call_cont
-  , isDeadBinder bndr
-  = do { let enum_to_tag :: CoreAlt -> CoreAlt
-                -- Takes   K -> e  into   tagK# -> e
-                -- where tagK# is the tag of constructor K
-             enum_to_tag (DataAlt con, [], rhs)
-               = assert (isEnumerationTyCon (dataConTyCon con) )
-                (LitAlt tag, [], rhs)
-              where
-                tag = mkLitInt (sePlatform env) (toInteger (dataConTag con - fIRST_TAG))
-             enum_to_tag alt = pprPanic "tryRules: tagToEnum" (ppr alt)
-
-             new_alts = (DEFAULT, [], rhs1) : map enum_to_tag rest_alts
-             new_bndr = setIdType bndr intPrimTy
-                 -- The binder is dead, but should have the right type
-      ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
--}
-
   | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (seMode env)) fn
                                         (argInfoAppArgs args) rules
@@ -2705,25 +2684,6 @@ Note, however, that the rule RHS is /already/ occ-analysed; see
 Note [OccInfo in unfoldings and rules] in GHC.Core.  There is something
 unsatisfactory about doing it twice; but the rule RHS is usually very
 small, and this is simple.
-
-Note [Optimising tagToEnum#]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have an enumeration data type:
-
-  data Foo = A | B | C
-
-Then we want to transform
-
-   case tagToEnum# x of   ==>    case x of
-     A -> e1                       DEFAULT -> e1
-     B -> e2                       1#      -> e2
-     C -> e3                       2#      -> e3
-
-thereby getting rid of the tagToEnum# altogether.  If there was a DEFAULT
-alternative we retain it (remember it comes first).  If not the case must
-be exhaustive, and we reflect that in the transformed version by adding
-a DEFAULT.  Otherwise Lint complains that the new case is not exhaustive.
-See #8317.
 
 Note [Rules for recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
