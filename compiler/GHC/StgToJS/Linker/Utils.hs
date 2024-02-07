@@ -122,41 +122,41 @@ genCommonCppDefs profiling = mconcat
 
   -- GHCJS.Prim.JSVal
   , if profiling
-      then "#define MK_JSVAL(x) (h$c1(h$baseZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM))\n"
-      else "#define MK_JSVAL(x) (h$c1(h$baseZCGHCziJSziPrimziJSVal_con_e, (x)))\n"
+      then "#define MK_JSVAL(x) (h$c1(h$ghczminternalZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM))\n"
+      else "#define MK_JSVAL(x) (h$c1(h$ghczminternalZCGHCziJSziPrimziJSVal_con_e, (x)))\n"
   ,  "#define JSVAL_VAL(x) ((x).d1)\n"
 
   -- GHCJS.Prim.JSException
   , if profiling
-      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
-      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
+      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghczminternalZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
+      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghczminternalZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
 
   -- Exception dictionary for JSException
-  , "#define HS_JSEXCEPTION_EXCEPTION h$baseZCGHCziJSziPrimzizdfExceptionJSException\n"
+  , "#define HS_JSEXCEPTION_EXCEPTION h$ghczminternalZCGHCziJSziPrimzizdfExceptionJSException\n"
 
   -- SomeException
   , if profiling
-      then "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$baseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except),h$CCS_SYSTEM))\n"
-      else "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$baseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except)))\n"
+      then "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$ghczminternalZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except),h$CCS_SYSTEM))\n"
+      else "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$ghczminternalZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except)))\n"
 
   -- GHC.Ptr.Ptr
   , if profiling
-      then "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
-      else "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
+      then "#define MK_PTR(val,offset) (h$c2(h$ghczminternalZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
+      else "#define MK_PTR(val,offset) (h$c2(h$ghczminternalZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
 
   -- Put Addr# in ByteArray# or at Addr# (same thing)
   , "#define PUT_ADDR(a,o,va,vo) if (!(a).arr) (a).arr = []; (a).arr[o] = va; (a).dv.setInt32(o,vo,true);\n"
   , "#define GET_ADDR(a,o,ra,ro) var ra = (((a).arr && (a).arr[o]) ? (a).arr[o] : null_); var ro = (a).dv.getInt32(o,true);\n"
 
   -- Data.Maybe.Maybe
-  , "#define HS_NOTHING h$baseZCGHCziMaybeziNothing\n"
-  , "#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziMaybeziNothing_con_e)\n"
-  , "#define IS_JUST(cl) ((cl).f === h$baseZCGHCziMaybeziJust_con_e)\n"
+  , "#define HS_NOTHING h$ghczminternalZCGHCziMaybeziNothing\n"
+  , "#define IS_NOTHING(cl) ((cl).f === h$ghczminternalZCGHCziMaybeziNothing_con_e)\n"
+  , "#define IS_JUST(cl) ((cl).f === h$ghczminternalZCGHCziMaybeziJust_con_e)\n"
   , "#define JUST_VAL(jj) ((jj).d1)\n"
   -- "#define HS_NOTHING h$nothing\n"
   , if profiling
-      then "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))\n"
-      else "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val)))\n"
+      then "#define MK_JUST(val) (h$c1(h$ghczminternalZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))\n"
+      else "#define MK_JUST(val) (h$c1(h$ghczminternalZCGHCziMaybeziJust_con_e, (val)))\n"
 
   -- Data.List
   , "#define HS_NIL h$ghczmprimZCGHCziTypesziZMZN\n"
