@@ -127,7 +127,8 @@ import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
-                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\),
+                   stripPrefix )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Maybe
@@ -322,10 +323,8 @@ keepGoing' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
 keepGoing' a str = do
   in_multi <- inMultiMode
   if in_multi
-    then
-      liftIO $ hPutStrLn stderr "Command is not supported (yet) in multi-mode"
-    else
-      a str
+    then reportError GhciCommandNotSupportedInMultiMode
+    else a str
   return CmdSuccess
 
 -- For commands which are actually support in multi-mode, initially just :reload
@@ -338,11 +337,11 @@ inMultiMode = multiMode <$> getGHCiState
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoingPaths a str
  = do case toArgsNoLoc str of
-          Left err -> liftIO $ hPutStrLn stderr err >> return CmdSuccess
+          Left err -> reportError (GhciInvalidArgumentString err) >> return CmdSuccess
           Right args -> keepGoing' a args
 
 defShortHelpText :: String
-defShortHelpText = "use :? for help.\n"
+defShortHelpText = "use :? for help."
 
 defFullHelpText :: String
 defFullHelpText =
@@ -970,69 +969,58 @@ generatePromptFunctionFromString :: String -> PromptFunction
 generatePromptFunctionFromString promptS modules_names line =
         processString promptS
   where
-        processString :: String -> GHCi SDoc
-        processString ('%':'s':xs) =
-            liftM2 (<>) (return modules_list) (processString xs)
-            where
-              modules_list = hsep . map text . ordNub $ modules_names
-        processString ('%':'l':xs) =
-            liftM2 (<>) (return $ ppr line) (processString xs)
-        processString ('%':'d':xs) =
-            liftM2 (<>) (liftM text formatted_time) (processString xs)
-            where
-              formatted_time = liftIO $ formatCurrentTime "%a %b %d"
-        processString ('%':'t':xs) =
-            liftM2 (<>) (liftM text formatted_time) (processString xs)
-            where
-              formatted_time = liftIO $ formatCurrentTime "%H:%M:%S"
-        processString ('%':'T':xs) = do
-            liftM2 (<>) (liftM text formatted_time) (processString xs)
-            where
-              formatted_time = liftIO $ formatCurrentTime "%I:%M:%S"
-        processString ('%':'@':xs) = do
-            liftM2 (<>) (liftM text formatted_time) (processString xs)
-            where
-              formatted_time = liftIO $ formatCurrentTime "%I:%M %P"
-        processString ('%':'A':xs) = do
-            liftM2 (<>) (liftM text formatted_time) (processString xs)
-            where
-              formatted_time = liftIO $ formatCurrentTime "%H:%M"
-        processString ('%':'u':xs) =
-            liftM2 (<>) (liftM text user_name) (processString xs)
-            where
-              user_name = liftIO $ getUserName
-        processString ('%':'w':xs) =
-            liftM2 (<>) (liftM text current_directory) (processString xs)
-            where
-              current_directory = liftIO $ getCurrentDirectory
-        processString ('%':'o':xs) =
-            liftM ((text os) <>) (processString xs)
-        processString ('%':'a':xs) =
-            liftM ((text arch) <>) (processString xs)
-        processString ('%':'N':xs) =
-            liftM ((text compilerName) <>) (processString xs)
-        processString ('%':'V':xs) =
-            liftM ((text $ showVersion compilerVersion) <>) (processString xs)
-        processString ('%':'c':'a':'l':'l':xs) = do
-            -- Input has just been validated by parseCallEscape
-            let (cmd NE.:| args, afterClosed) = fromJust $ parseCallEscape xs
-            respond <- liftIO $ do
+        processString xs
+          | ('%':rest) <- xs = processPromptPattern rest >>= uncurry carry_on
+          | (x  :rest) <- xs = carry_on (char x) rest
+          | otherwise = pure empty
+
+        carry_on :: GhciMonad m => SDoc -> String -> m SDoc
+        carry_on doc rest = do
+          next <- processString rest
+          pure $ doc <> next
+
+        processPromptPattern :: GhciMonad m => String -> m (SDoc, String)
+        processPromptPattern str
+          | Just rest <- stripPrefix "call" str = do
+              -- Input has just been validated by parseCallEscape
+              let (cmd NE.:| args, afterClosed) = fromJust $ parseCallEscape rest
+              respond <- do
                 (code, out, err) <-
-                    readProcessWithExitCode
-                    cmd args ""
-                    `catchIO` \e -> return (ExitFailure 1, "", show e)
+                  liftIO $ readProcessWithExitCode cmd args ""
+                      `catchIO` \e -> pure (ExitFailure 1, "", show e)
                 case code of
-                    ExitSuccess -> return out
-                    _ -> do
-                        hPutStrLn stderr err
-                        return ""
-            liftM ((text respond) <>) (processString afterClosed)
-        processString ('%':'%':xs) =
-            liftM ((char '%') <>) (processString xs)
-        processString (x:xs) =
-            liftM (char x <>) (processString xs)
-        processString "" =
-            return empty
+                    ExitSuccess -> pure out
+                    _ -> do reportError (GhciPromptCallError err)
+                            pure ""
+              pure (text respond, afterClosed)
+          | (x:rest) <- str = (\doc -> (doc, rest)) <$> (processChar x)
+          | otherwise = pure (empty, "")
+
+        processChar :: GhciMonad m => Char -> m SDoc
+        processChar = \case
+          's' -> pure . hsep . map text . ordNub $ modules_names
+          'l' -> pure $ ppr line
+          'd' -> time_pattern "%a %b %d"
+          't' -> time_pattern "%H:%M:%S"
+          'T' -> time_pattern "%I:%M:%S"
+          '@' -> time_pattern "%I:%M %P"
+          'A' -> time_pattern "%H:%M"
+          'u' -> as_string getUserName
+          'w' -> as_string getCurrentDirectory
+          'o' -> text' os
+          'a' -> text' arch
+          'N' -> text' compilerName
+          'V' -> text' (showVersion compilerVersion)
+          '%' -> pure $ char '%'
+
+        text' :: GhciMonad m => String -> m SDoc
+        text' = pure . text
+
+        time_pattern :: GhciMonad m => String -> m SDoc
+        time_pattern = as_string . formatCurrentTime
+
+        as_string :: GhciMonad m => IO String -> m SDoc
+        as_string = liftIO . fmap text
 
 mkPrompt :: GHCi String
 mkPrompt = do
@@ -1453,12 +1441,10 @@ specialCommand str = do
   case maybe_cmd of
     GotCommand cmd -> (cmdAction cmd) (dropWhile isSpace rest)
     BadCommand ->
-      do liftIO $ hPutStr stderr ("unknown command ':" ++ cmd ++ "'\n"
-                           ++ htxt)
+      do reportError (GhciUnknownCommand cmd htxt)
          return CmdFailure
     NoLastCommand ->
-      do liftIO $ hPutStr stderr ("there is no last command to perform\n"
-                           ++ htxt)
+      do reportError (GhciNoLastCommandAvailable htxt)
          return CmdFailure
 
 shellEscape :: MonadIO m => String -> m CmdExecOutcome
@@ -1635,9 +1621,6 @@ runMain s = case toArgsNoLoc s of
         -- of printing it (#9086). See Haskell 2010 report Chapter 5.
         fun $ "Control.Monad.void (" ++ main ++ ")"
 
-
-
-
 -----------------------------------------------------------------------------
 -- :run
 
@@ -1676,6 +1659,11 @@ toArgsNoLoc str = map unLoc <$> toArgs fake_loc str
   where
     fake_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
     -- this should never be seen, because it's discarded with the `map unLoc`
+
+toArgsNoLocWithErrorHandler :: GhciMonad m => String -> ([String] -> m ()) -> m ()
+toArgsNoLocWithErrorHandler str f = case toArgsNoLoc str of
+  Left err -> reportError $ GhciInvalidArgumentString err
+  Right ok -> f ok
 
 -----------------------------------------------------------------------------
 -- :cd
@@ -1777,13 +1765,8 @@ chooseEditFile =
 -- :def
 
 defineMacro :: GhciMonad m => Bool{-overwrite-} -> String -> m ()
-defineMacro _ (':':_) = (liftIO $ hPutStrLn stderr
-                          "macro name cannot start with a colon")
-                            >> failIfExprEvalMode
-defineMacro _ ('!':_) = (liftIO $ hPutStrLn stderr
-                          "macro name cannot start with an exclamation mark")
-                            >> failIfExprEvalMode
-                          -- little code duplication allows to grep error msg
+defineMacro _ (':':_) = reportError (GhciInvalidMacroStart "a colon") >> failIfExprEvalMode
+defineMacro _ ('!':_) = reportError (GhciInvalidMacroStart "an exclamation mark") >> failIfExprEvalMode -- TODO
 defineMacro overwrite s = do
   let (macro_name, definition) = break isSpace s
   macros <- ghci_macros <$> getGHCiState
@@ -2082,16 +2065,16 @@ addModule files = do
       result <- liftIO $
         Finder.findImportedModule hsc_env m (ThisPkg (homeUnitId home_unit))
       case result of
-        Found _ _ -> return True
-        _ -> do liftIO $ hPutStrLn stderr ("Module " ++ moduleNameString m ++ " not found")
+        Found _ _ -> pure True
+        _ -> do reportError (GhciModuleNotFound (moduleNameString m))
                 failIfExprEvalMode
-                return False
+                pure False
 
     checkTargetFile :: GhciMonad m => String -> m Bool
     checkTargetFile f = do
       exists <- liftIO (doesFileExist f)
       unless exists $ do
-        liftIO $ hPutStrLn stderr $ "File " ++ f ++ " not found"
+        reportError (GhciFileNotFound f)
         failIfExprEvalMode
       return exists
 
@@ -2966,15 +2949,10 @@ setCmd ""   = showOptions False
 setCmd "-a" = showOptions True
 setCmd str
   = case getCmd str of
-    Right ("args",    rest) ->
-        case toArgsNoLoc rest of
-            Left err -> liftIO (hPutStrLn stderr err)
-            Right args -> setArgs args
-    Right ("prog",    rest) ->
-        case toArgsNoLoc rest of
-            Right [prog] -> setProg prog
-            _ -> liftIO (hPutStrLn stderr "syntax: :set prog <progname>")
-
+    Right ("args",    rest) -> toArgsNoLocWithErrorHandler rest setArgs
+    Right ("prog",    rest) -> toArgsNoLocWithErrorHandler rest $ \case
+        [prog] -> setProg prog
+        _      -> reportError $ GhciCommandSyntaxError "set prog" ["progname"]
     Right ("prompt",           rest) ->
         setPromptString setPrompt (dropWhile isSpace rest)
                         "syntax: set prompt <string>"
@@ -2990,17 +2968,12 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
-    _ -> case toArgsNoLoc str of
-         Left err -> liftIO (hPutStrLn stderr err)
-         Right wds -> () <$ keepGoing' setOptions wds
+    _ -> toArgsNoLocWithErrorHandler str (void . keepGoing' setOptions)
 
 setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
 setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
-setiCmd str  =
-  case toArgsNoLoc str of
-    Left err -> liftIO (hPutStrLn stderr err)
-    Right wds -> newDynFlags True wds
+setiCmd str  = toArgsNoLocWithErrorHandler str (newDynFlags True)
 
 showOptions :: GhciMonad m => Bool -> m ()
 showOptions show_all

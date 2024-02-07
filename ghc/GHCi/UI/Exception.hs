@@ -1,8 +1,10 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
-module GHCi.UI.Exception(printGhciException, GHCiMessage(..)) where
+{-# LANGUAGE OverloadedStrings #-}
+module GHCi.UI.Exception(printGhciException, GHCiMessage(..), GhciCommandError(..)) where
 
 import GHC.Prelude
 
@@ -19,8 +21,9 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Errors.Types
 
-import GHC.Types.Error
 import GHC.Types.SourceError
+import GHC.Types.Error
+import GHC.Types
 
 import GHC.Unit.State
 
@@ -28,6 +31,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Outputable
 
 import Control.Monad.IO.Class
+import GHC.Generics
 
 
 -- | Print the all diagnostics in a 'SourceError'.  Specialised for GHCi error reporting
@@ -139,3 +143,54 @@ ghciDiagnosticMessage ghc_opts msg =
               quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
               text "to expose it." $$
               text "(Note: this unloads all the modules in the current scope.)"
+
+
+
+data GhciCommandError
+  = GhciCommandNotSupportedInMultiMode
+  | GhciInvalidArgumentString String
+  | GhciInvalidMacroStart String
+  | GhciMacroAlreadyDefined
+  | GhciMacroIsNotDefined
+  | GhciMacroOverwritesBuiltin
+  | GhciFileNotFound String
+  | GhciModuleNotFound String --ModuleName
+  | GhciCommandSyntaxError String [String]
+  | GhciInvalidPromptString
+  | GhciPromptCallError String
+  | GhciUnknownCommand String String
+  | GhciNoLastCommandAvailable String
+  | GhciUnknownFlag String [String]
+  deriving Generic
+
+instance Outputable GhciCommandError where
+  ppr = \case
+    GhciCommandNotSupportedInMultiMode
+      -> text "Command is not supported (yet) in multi-mode"
+    GhciInvalidArgumentString str
+      -> text str
+    GhciCommandSyntaxError cmd args
+      -> text "Syntax" <> colon $+$
+           nest 2 (colon <> text cmd <+> hsep (map (angleBrackets . text) args))
+    GhciUnknownCommand cmd help
+      -> text "Unknown command" <+> quotes (colon <> text cmd) $+$
+           text help -- TODO
+    GhciNoLastCommandAvailable help
+      -> text "There is no last command to perform" $+$
+           text help -- TODO
+    GhciInvalidMacroStart str
+      -> text "Macro name cannot start with" <+> text str
+    GhciModuleNotFound modN
+      -> text "Module" <+> text modN <+> text "not found"
+    GhciFileNotFound f
+      -> text "File" <+> text f <+> text "not found"
+    GhciUnknownFlag flag suggestions
+      -> text "Unrecognised flag" <:> text flag $$
+           case suggestions of
+             [] -> empty
+             suggs -> text "did you mean one of" <> colon $$ nest 2 (vcat (map text suggs))
+    GhciPromptCallError err
+      -> text err
+    where
+      l <:> r = l <> colon <+> r
+

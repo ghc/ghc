@@ -27,6 +27,7 @@ module GHCi.UI.Monad (
         printForUserNeverQualify,
         printForUserGlobalRdrEnv,
         printForUser, printForUserPartWay, prettyLocations,
+        reportError,
 
         compileGHCiExpr,
         initInterpBuffering,
@@ -40,6 +41,7 @@ import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
 import GHC.Utils.Outputable
+import GHC.Utils.Ppr.Colour
 import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
@@ -56,7 +58,7 @@ import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
-import GHCi.UI.Exception (printGhciException)
+import GHCi.UI.Exception (printGhciException, GhciCommandError)
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
@@ -81,6 +83,10 @@ import Data.Map.Strict (Map)
 import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Types.Error ( DiagnosticCode(..) )
+import Debug.Trace
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -383,13 +389,23 @@ printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   name_ppr_ctx <- GHC.getNamePprCtx
   dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
+  liftIO $ Ppr.printForUserColoured dflags stdout name_ppr_ctx AllTheWay doc
 
 printForUserPartWay :: GhcMonad m => SDoc -> m ()
 printForUserPartWay doc = do
   name_ppr_ctx <- GHC.getNamePprCtx
   dflags <- GHC.getInteractiveDynFlags
   liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx DefaultDepth doc
+
+-- TODO
+reportError :: GhciMonad m => GhciCommandError -> m ()
+reportError err = printForUser . coloured colBold $
+                   (coloured colRedFg (text "error")) <> colon <+> prefix $$
+                       nest 2 (ppr err) $$ text ""
+  where
+    code = constructorCode err
+    prefix = maybe empty (brackets . ppr . set_ghci_ns) code
+    set_ghci_ns c = c { diagnosticCodeNameSpace = "GHCi" }
 
 -- | Run a single Haskell expression
 runStmt

@@ -6,6 +6,7 @@ module GHC.Driver.Ppr
    , showPpr
    , showPprUnsafe
    , printForUser
+   , printForUserColoured
    )
 where
 
@@ -34,6 +35,12 @@ showSDocForUser dflags unit_state name_ppr_ctx doc = renderWithContext (initSDoc
       doc' = pprWithUnitState unit_state doc
 
 printForUser :: DynFlags -> Handle -> NamePprCtx -> Depth -> SDoc -> IO ()
-printForUser dflags handle name_ppr_ctx depth doc
+printForUser = printForUser' False
+
+printForUserColoured :: DynFlags -> Handle -> NamePprCtx -> Depth -> SDoc -> IO ()
+printForUserColoured = printForUser' True
+
+printForUser' :: Bool -> DynFlags -> Handle -> NamePprCtx -> Depth -> SDoc -> IO ()
+printForUser' colour dflags handle name_ppr_ctx depth doc
   = printSDocLn ctx (PageMode False) handle doc
-    where ctx = initSDocContext dflags (mkUserStyle name_ppr_ctx depth)
+    where ctx = initSDocContext dflags (setStyleColoured colour $ mkUserStyle name_ppr_ctx depth)

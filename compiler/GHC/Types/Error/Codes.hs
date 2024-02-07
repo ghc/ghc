@@ -883,6 +883,22 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TermVariablePE"                                = 45510
   GhcDiagnosticCode "TypeVariablePE"                                = 47557
 
+  -- GHCi errors
+  GhcDiagnosticCode "GhciCommandNotSupportedInMultiMode"            = 83514
+  GhcDiagnosticCode "GhciInvalidArgumentString"                     = 68894
+  GhcDiagnosticCode "GhciInvalidMacroStart"                         = 64996
+  GhcDiagnosticCode "GhciMacroAlreadyDefined"                       = 93909
+  GhcDiagnosticCode "GhciMacroIsNotDefined"                         = 40561
+  GhcDiagnosticCode "GhciMacroOverwritesBuiltin"                    = 86201
+  GhcDiagnosticCode "GhciFileNotFound"                              = 31901
+  GhcDiagnosticCode "GhciModuleNotFound"                            = 23305
+  GhcDiagnosticCode "GhciCommandSyntaxError"                        = 72682
+  GhcDiagnosticCode "GhciInvalidPromptString"                       = 50882
+  GhcDiagnosticCode "GhciPromptCallError"                           = 22747
+  GhcDiagnosticCode "GhciUnknownCommand"                            = 54713
+  GhcDiagnosticCode "GhciNoLastCommandAvailable"                    = 29130
+  GhcDiagnosticCode "GhciUnknownFlag"                               = 15670
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
