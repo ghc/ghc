@@ -98,7 +98,7 @@ Consequences:
   (in GHC.IfaceToCore). For example, IfaceClosedSynFamilyTyCon
   stores a [IfaceAxBranch] that is used only for pretty-printing.
 
-- See Note [Free tyvars in IfaceType] in GHC.Iface.Type
+- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
 
 See #7730, #8776 for details   -}
 

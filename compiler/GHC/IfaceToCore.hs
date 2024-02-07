@@ -1493,7 +1493,10 @@ tcIfaceCo = go
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
-tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
+tcIfaceUnivCoProv (IfacePluginProv str cvs fcvs) =
+  assertPpr (null fcvs) (ppr fcvs) $ do
+    cvs' <- mapM tcIfaceLclId cvs
+    return $ PluginProv str $ mkDVarSet cvs'
 
 {-
 ************************************************************************

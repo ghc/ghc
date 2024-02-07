@@ -33,7 +33,7 @@ module GHC.Types.Unique.DSet (
         lookupUniqDSet,
         uniqDSetToList,
         partitionUniqDSet,
-        mapUniqDSet
+        mapUniqDSet, strictFoldUniqDSet
     ) where
 
 import GHC.Prelude
@@ -125,7 +125,15 @@ partitionUniqDSet p = coerce . partitionUDFM p . getUniqDSet
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set
 mapUniqDSet :: Uniquable b => (a -> b) -> UniqDSet a -> UniqDSet b
-mapUniqDSet f = mkUniqDSet . map f . uniqDSetToList
+mapUniqDSet f (UniqDSet m) = UniqDSet $ unsafeCastUDFMKey $ mapUDFM f m
+  -- Simply apply `f` to each element, retaining all the structure unchanged.
+  -- The identification of keys and elements prevents a derived Functor
+  -- instance, but `unsafeCastUDFMKey` makes it possible to apply the strict
+  -- mapping from DFM.
+
+strictFoldUniqDSet :: (a -> r -> r) -> r -> UniqDSet a -> r
+strictFoldUniqDSet k r s = foldl' (\ !r e -> k e r) r $
+                           uniqDSetToList s
 
 -- Two 'UniqDSet's are considered equal if they contain the same
 -- uniques.

@@ -636,7 +636,7 @@ opt_univ env sym prov role oty1 oty2
   where
     prov' = case prov of
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
-      PluginProv _       -> prov
+      PluginProv s cvs   -> PluginProv s $ substDCoVarSet (liftingContextSubst env) cvs
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
@@ -734,7 +734,8 @@ opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
       = Just $ PhantomProv $ opt_trans is kco1 kco2
     opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
       = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
-    opt_trans_prov (PluginProv str1)     (PluginProv str2)     | str1 == str2 = Just p1
+    opt_trans_prov (PluginProv str1 cvs1) (PluginProv str2 cvs2)
+      | str1 == str2 = Just (PluginProv str1 (cvs1 `unionDVarSet` cvs2))
     opt_trans_prov _ _ = Nothing
 
 -- Push transitivity down through matching top-level constructors.
