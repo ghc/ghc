@@ -39,6 +39,8 @@ import GHC.Tc.Types.Constraint
   )
 import GHC.Tc.Types.Evidence
   ( EvBindsVar, EvTerm(EvExpr), Role(Nominal) )
+import GHC.Types.Unique.DSet
+  ( emptyUniqDSet )
 
 -- common
 import Common
@@ -78,6 +80,6 @@ solveCt ( PluginDefs {..} ) ct@( classifyPredType . ctPred -> EqPred NomEq lhs r
   , let
       evTerm :: EvTerm
       evTerm = EvExpr . Coercion
-             $ mkUnivCo ( PluginProv "TyFamPlugin" ) Nominal lhs rhs
+             $ mkUnivCo ( PluginProv "TyFamPlugin" emptyUniqDSet) Nominal lhs rhs  -- Empty is fine. This plugin does not use "givens".
   = pure $ Just ( evTerm, ct )
 solveCt _ ct = pure Nothing

@@ -45,6 +45,8 @@ import GHC.Tc.Types.Constraint
   )
 import GHC.Tc.Types.Evidence
   ( EvTerm(EvExpr), Role(Nominal) )
+import GHC.Types.Unique.DSet
+  ( emptyUniqDSet )
 import GHC.Types.Unique.FM
   ( UniqFM, listToUFM )
 
@@ -85,5 +87,5 @@ mkTyFamReduction :: TyCon -> [ Type ] -> Type -> Reduction
 mkTyFamReduction tyCon args res = Reduction co res
   where
     co :: Coercion
-    co = mkUnivCo ( PluginProv "RewritePlugin" ) Nominal
+    co = mkUnivCo ( PluginProv "RewritePlugin" emptyUniqDSet) Nominal  -- Empty is fine. This plugin does not use "givens".
            ( mkTyConApp tyCon args ) res

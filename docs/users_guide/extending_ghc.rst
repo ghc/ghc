@@ -760,10 +760,33 @@ This evidence is ignored for Given constraints, which GHC
 "solves" simply by discarding them; typically this is used when they are
 uninformative (e.g. reflexive equations). For Wanted constraints, the
 evidence will form part of the Core term that is generated after
-typechecking, and can be checked by ``-dcore-lint``. It is possible for
-the plugin to create equality axioms for use in evidence terms, but GHC
-does not check their consistency, and inconsistent axiom sets may lead
-to segfaults or other runtime misbehaviour.
+typechecking, and can be checked by ``-dcore-lint``.
+
+When solving a Wanted equality constraint (of type ``t1 ~N# t2``
+or ``t1 ~R# t2`` for nominal and representation equalities respectively),
+the evidence (of type ``EvTerm``) will take the form ``EvExpr (Coercion co)``,
+where the coercion ``co`` has type ``co :: t1 ~N# t2`` or ``co :: t1 ~R# t2``
+respectively.
+
+It is up to the plugin to construct a suitable coercion ``co``.
+However, one possibility is to construct one of form ::
+
+    UnivCo (PluginProv "my-plugin" gcvs) role t1 t2
+
+A ``UnivCo`` of this form says "trust me: my-plugin has solved this Wanted
+using (only) ``gcvs``".
+
+Here
+
+* The ``role`` should be the role of the original equality constraint
+  (nominal or representational).
+* The ``gcvs`` is a set of "given coercion variables"; these are the coercion
+  variable bound by enclosing Given constraints, which the plugin has used
+  to justify solving the Wanted.
+
+For soundness, it is very important to include the ``gcvs``; otherwise
+GHC may transform the program into a form that seg-faults.
+See #23923 for a long dicussion.
 
 Evidence is required also when creating new Given constraints, which are
 usually implied by old ones. It is not uncommon that the evidence of a new

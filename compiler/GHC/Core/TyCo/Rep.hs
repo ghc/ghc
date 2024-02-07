@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -78,7 +77,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Var.Set( DCoVarSet, dVarSetElems, elemVarSet )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -886,7 +885,7 @@ data Coercion
 
   | FunCo  -- FunCo :: "e" -> N/P -> e -> e -> e
            -- See Note [FunCo] for fco_afl, fco_afr
-       { fco_role         :: Role
+        { fco_role         :: Role
         , fco_afl          :: FunTyFlag   -- Arrow for coercionLKind
         , fco_afr          :: FunTyFlag   -- Arrow for coercionRKind
         , fco_mult         :: CoercionN
@@ -1527,15 +1526,19 @@ data UnivCoProvenance
                                  --   considered equivalent. See Note [ProofIrrelProv].
                                  -- Can be used in Nominal or Representational coercions
 
-  | PluginProv String  -- ^ From a plugin, which asserts that this coercion
-                       --   is sound. The string is for the use of the plugin.
+  | PluginProv String !DCoVarSet
+      -- ^ From a plugin, which asserts that this coercion is sound.
+      --   The string and the variable set are for the use by the plugin.
+      --   E.g., the set may contain the in-scope coercion variables
+      --   that the the proof represented by the coercion makes use of.
+      --   See Note [The importance of tracking free coercion variables].
 
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
-  ppr (PhantomProv _)    = text "(phantom)"
-  ppr (ProofIrrelProv _) = text "(proof irrel.)"
-  ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
+  ppr (PhantomProv _)      = text "(phantom)"
+  ppr (ProofIrrelProv _)   = text "(proof irrel.)"
+  ppr (PluginProv str cvs) = parens (text "plugin" <+> brackets (text str) <+> ppr cvs)
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
@@ -1690,6 +1693,50 @@ Here,
   where
     co5 :: (a1 ~ Bool) ~ (a2 ~ Bool)
     co5 = TyConAppCo Nominal (~#) [<*>, <*>, co4, <Bool>]
+
+
+Note [The importance of tracking free coercion variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is vital that `UnivCo` (a coercion that lacks a proper proof)
+tracks its free coercion variables. To see why, consider this program:
+
+    type S :: Nat -> Nat
+
+    data T (a::Nat) where
+      T1 :: T 0
+      T2 :: ...
+
+    f :: T a -> S (a+1) -> S 1
+    f = /\a (x:T a) (y:a).
+        case x of
+          T1 (gco : a ~# 0) -> y |> wco
+
+For this to typecheck we need `wco :: S (a+1) ~# S 1`, given that `gco : a ~# 0`.
+To prove that we need to know that `a+1 = 1` if `a=0`, which a plugin might know.
+So it solves `wco` by providing a `UnivCo (PluginProv "my-plugin" gcvs) (a+1) 1`.
+
+    But the `gcvs` in `PluginProv` must mention `gco`.
+
+Why? Otherwise we might float the entire expression (y |> wco) out of the
+the case alternative for `T1` which brings `gco` into scope. If this
+happens then we aren't far from a segmentation fault or much worse.
+See #23923 for a real-world example of this happening.
+
+So it is /crucial/ for the `PluginProv` to mention, in `gcvs`, the coercion
+variables used by the plugin to justify the `UnivCo` that it builds.
+
+Note that we don't need to track
+* the coercion's free *type* variables
+* coercion variables free in kinds (we only need the "shallow" free covars)
+
+This means that we may float past type variables which the original
+proof had as free variables. While surprising, this doesn't jeopardise
+the validity of the coercion, which only depends upon the scoping
+relative to the free coercion variables.
+
+(The free coercion variables are kept as a DCoVarSet in UnivCo,
+since these sets are included in interface files.)
+
 -}
 
 
@@ -1856,7 +1903,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
 
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
-    go_prov _   (PluginProv _)      = mempty
+    go_prov _   (PluginProv _ cvs)  = go_cvs env cvs
+
+    go_cvs env cvs = foldl' (\acc cv -> acc `mappend` covar env cv) mempty (dVarSetElems cvs)
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -1922,7 +1971,7 @@ coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
 provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
-provSize (PluginProv _)      = 1
+provSize (PluginProv _ _)    = 1
 
 {-
 ************************************************************************

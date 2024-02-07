@@ -97,7 +97,7 @@ module GHC.Core.Coercion (
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
         liftCoSubstVarBndrUsing, isMappedByLC, extendLiftingContextCvSubst,
 
-        mkSubstLiftingContext, zapLiftingContext,
+        mkSubstLiftingContext, liftingContextSubst, zapLiftingContext,
         substForAllCoBndrUsingLC, lcLookupCoVar, lcInScopeSet,
 
         LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
@@ -1397,7 +1397,7 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
-                     PluginProv _     -> False  -- who knows? This choice is conservative.
+                     PluginProv _ _   -> False  -- who knows? This choice is conservative.
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1522,7 +1522,7 @@ promoteCoercion co = case co of
 
     UnivCo (PhantomProv kco)    _ _ _ -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
-    UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
+    UnivCo (PluginProv _ _)     _ _ _ -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -1979,6 +1979,9 @@ mkLiftingContext pairs
 mkSubstLiftingContext :: Subst -> LiftingContext
 mkSubstLiftingContext subst = LC subst emptyVarEnv
 
+liftingContextSubst :: LiftingContext -> Subst
+liftingContextSubst (LC subst _) = subst
+
 -- | Extend a lifting context with a new mapping.
 extendLiftingContext :: LiftingContext  -- ^ original LC
                      -> TyCoVar         -- ^ new variable to map...
@@ -2354,7 +2357,7 @@ seqCo (AxiomRuleCo _ cs)        = seqCos cs
 seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
-seqProv (PluginProv _)      = ()
+seqProv (PluginProv _ cvs)  = seqDVarSet cvs
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()

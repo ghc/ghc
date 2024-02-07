@@ -21,6 +21,7 @@ module GHC.Utils.FV (
         delFVs,
         filterFV,
         mapUnionFV,
+        fvDVarSetSome,
     ) where
 
 import GHC.Prelude
@@ -195,3 +196,7 @@ mkFVs :: [Var] -> FV
 mkFVs vars fv_cand in_scope acc =
   mapUnionFV unitFV vars fv_cand in_scope acc
 {-# INLINE mkFVs #-}
+
+fvDVarSetSome :: InterestingVarFun -> FV -> DVarSet
+fvDVarSetSome interesting_var fv =
+  mkDVarSet $ fst $ fv interesting_var emptyVarSet ([], emptyVarSet)
