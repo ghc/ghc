@@ -240,13 +240,17 @@ packageGhcArgs = do
     package <- getPackage
     ghc_ver <- readVersion <$> (expr . ghcVersionStage =<< getStage)
     pkgId   <- expr $ pkgIdentifier package
+    pkgName <- expr $ pkgPackageName package
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , arg "-package-env -"
             , packageDatabaseArgs
             -- We want to pass -this-unit-id for executables as well for multi-repl to
             -- work with executable packages but this is buggy on GHC-9.0.2
-            , (isLibrary package || (ghc_ver >= makeVersion [9,2,1])) ?  arg ("-this-unit-id " ++ pkgId)
+            , (isLibrary package || (ghc_ver >= makeVersion [9,2,1])) ? mconcat
+                [ arg ("-this-unit-id " ++ pkgId)
+                , arg ("-this-package-name " ++ pkgName)
+                ]
             , map ("-package-id " ++) <$> getContextData depIds ]
 
 includeGhcArgs :: Args

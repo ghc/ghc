@@ -10,16 +10,23 @@
 -- Cabal files.
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
-    pkgVersion, pkgIdentifier, pkgSynopsis, pkgDescription, pkgDependencies,
+    pkgPackageName, pkgVersion, pkgIdentifier, pkgSynopsis, pkgDescription, pkgDependencies,
     pkgGenericDescription, cabalArchString, cabalOsString,
     ) where
 
 import Development.Shake
-import Distribution.PackageDescription (GenericPackageDescription)
+import Distribution.PackageDescription (GenericPackageDescription, unPackageName, PackageDescription (package))
+import qualified Distribution.Types.PackageId as Cabal
+import qualified Distribution.Types.GenericPackageDescription as Cabal
 
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Package
+
+-- | The name of the package as written in the package's cabal file.
+pkgPackageName :: Package -> Action String
+pkgPackageName =
+    fmap (unPackageName . Cabal.pkgName . package . Cabal.packageDescription) . pkgGenericDescription
 
 -- | Read a Cabal file and return the package version. The Cabal file is tracked.
 pkgVersion :: Package -> Action String
@@ -48,7 +55,8 @@ pkgDescription = fmap description . readPackageData
 -- returns a crude overapproximation of actual dependencies. The Cabal file is
 -- tracked.
 pkgDependencies :: Package -> Action [PackageName]
-pkgDependencies = fmap (map pkgName . packageDependencies) . readPackageData
+pkgDependencies =
+    fmap (map Hadrian.Package.pkgName . packageDependencies) . readPackageData
 
 -- | Read a Cabal file and return the 'GenericPackageDescription'. The Cabal
 -- file is tracked.
