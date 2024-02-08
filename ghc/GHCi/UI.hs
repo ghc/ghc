@@ -1116,7 +1116,7 @@ instance Exception GhciTimedOut
 -- | Wraps a single run input action into a timout action, if the timelimit field has been set.
 -- Otherwise it just runs the action without doing anything.
 -- See Note [Where to Time]
-withTimeLimit :: (MonadIO m, MonadCatch m, GhciMonad m) => m (Maybe Bool) -> m (Maybe bool)
+withTimeLimit :: (MonadIO m, MonadCatch m, GhciMonad m) => m (Maybe Bool) -> m (Maybe Bool)
 withTimeLimit cmd = do
   maybe_limit <- time_limit <$> getGHCiState
   case maybe_limit of
