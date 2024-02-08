@@ -424,7 +424,6 @@
   "nightly-aarch64-linux-deb11-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -433,8 +432,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-linux-deb11-validate.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "junit.xml"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -458,7 +456,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -477,8 +475,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb11-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "CONFIGURE_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb11-validate",
       "XZ_OPT": "-9"
     }
@@ -2664,7 +2661,6 @@
   "release-aarch64-linux-deb11-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2673,8 +2669,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-aarch64-linux-deb11-release+no_split_sections.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "junit.xml"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2698,7 +2693,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2717,10 +2712,9 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb11-release+no_split_sections",
       "BUILD_FLAVOUR": "release+no_split_sections",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb11-release+no_split_sections",
       "XZ_OPT": "-9"
     }
