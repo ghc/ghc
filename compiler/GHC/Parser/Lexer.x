@@ -87,7 +87,7 @@ import qualified GHC.Data.Strict as Strict
 import Control.Monad
 import Control.Applicative
 import Data.Char
-import Data.List (stripPrefix, isInfixOf, partition)
+import Data.List (stripPrefix, isInfixOf, partition, unfoldr)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
@@ -130,6 +130,7 @@ import GHC.Driver.Flags
 import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.String
 }
 
 -- -----------------------------------------------------------------------------
@@ -2205,8 +2206,7 @@ lex_string_tok span buf _len _buf2 = do
 
 lex_quoted_label :: Action
 lex_quoted_label span buf _len _buf2 = do
-  start <- getInput
-  s <- lex_string_helper "" start
+  s <- lex_string
   (AI end bufEnd) <- getInput
   let
     token = ITlabelvarid (SourceText src) (mkFastString s)
@@ -2217,53 +2217,56 @@ lex_quoted_label span buf _len _buf2 = do
 
 
 lex_string :: P String
-lex_string = getInput >>= lex_string_helper ""
+lex_string = do
+  start <- getInput
+  case lexString [] start of
+    Right (lexedStr, next) -> do
+      setInput next
+      either fromStringLexError pure $ resolveLexedString lexedStr
+    Left (e, s, i) -> do
+      -- see if we can find a smart quote in the string we've found so far.
+      -- if the built-up string s contains a smart double quote character, it was
+      -- likely the reason why the string literal was not lexed correctly
+      case filter (\(LexedChar c _) -> isDoubleSmartQuote c) s of
+        LexedChar c (AI loc _) : _ -> add_nonfatal_smart_quote_error c loc
+        _ -> pure ()
 
+      -- regardless whether we found a smart quote, throw a lexical error
+      setInput i >> lexError e
+  where
+    -- Given the (reversed) string we've seen so far and the current location,
+    -- return Right with the fully lexed string and the subsequent location,
+    -- or Left with the string we've seen so far and the location where lexing
+    -- failed.
+    lexString acc0 i0 = do
+      let acc = reverse acc0
+      case alexGetChar' i0 of
+        Just ('"', i1) -> Right (acc, i1)
 
-lex_string_helper :: String -> AlexInput -> P String
-lex_string_helper s start = do
-  i <- getInput
-  case alexGetChar' i of
-    Nothing -> lit_error i
+        Just (c0, i1) -> do
+          let acc1 = LexedChar c0 i0 : acc0
+          case c0 of
+            '\\' -> do
+              case alexGetChar' i1 of
+                Just (c1, i2)
+                  | is_space' c1 -> lexStringGap (LexedChar c1 i1 : acc1) i2
+                  | otherwise -> lexString (LexedChar c1 i1 : acc1) i2
+                Nothing -> Left (LexStringCharLit, acc, i1)
+            _ | isAny c0 -> lexString acc1 i1
+            _ -> Left (LexStringCharLit, acc, i0)
 
-    Just ('"',i)  -> do
-      setInput i
-      return (reverse s)
+        Nothing -> Left (LexStringCharLit, acc, i0)
 
-    Just ('\\',i)
-        | Just ('&',i) <- next -> do
-                setInput i; lex_string_helper s start
-        | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
-                           -- is_space only works for <= '\x7f' (#3751, #5425)
-                setInput i; lex_stringgap s start
-        where next = alexGetChar' i
-
-    Just (c, i1) -> do
-        case c of
-          '\\' -> do setInput i1; c' <- lex_escape; lex_string_helper (c':s) start
-          c | isAny c -> do setInput i1; lex_string_helper (c:s) start
-          _other | any isDoubleSmartQuote s -> do
-            -- if the built-up string s contains a smart double quote character, it was
-            -- likely the reason why the string literal was not lexed correctly
-            setInput start -- rewind to the first character in the string literal
-                           -- so we can find the smart quote character's location
-            advance_to_smart_quote_character
-            i2@(AI loc _) <- getInput
-            case alexGetChar' i2 of
-              Just (c, _) -> do add_nonfatal_smart_quote_error c loc; lit_error i
-              Nothing -> lit_error i -- should never get here
-          _other -> lit_error i
-
-
-lex_stringgap :: String -> AlexInput -> P String
-lex_stringgap s start = do
-  i <- getInput
-  c <- getCharOrFail i
-  case c of
-    '\\' -> lex_string_helper s start
-    c | c <= '\x7f' && is_space c -> lex_stringgap s start
-                           -- is_space only works for <= '\x7f' (#3751, #5425)
-    _other -> lit_error i
+    lexStringGap acc0 i0 = do
+      let acc = reverse acc0
+      case alexGetChar' i0 of
+        Just (c0, i1) -> do
+          let acc1 = LexedChar c0 i0 : acc0
+          case c0 of
+            '\\' -> lexString acc1 i1
+            _ | is_space' c0 -> lexStringGap acc1 i1
+            _ -> Left (LexStringCharLit, acc, i0)
+        Nothing -> Left (LexStringCharLitEOF, acc, i0)
 
 
 lex_char_tok :: Action
@@ -2284,13 +2287,19 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                    return (L (mkPsSpan loc end2)  ITtyQuote)
 
         Just ('\\', i2@(AI end2 _)) -> do      -- We've seen 'backslash
-                  setInput i2
-                  lit_ch <- lex_escape
-                  i3 <- getInput
-                  mc <- getCharOrFail i3 -- Trailing quote
-                  if mc == '\'' then finish_char_tok buf loc lit_ch
-                  else if isSingleSmartQuote mc then add_smart_quote_error mc end2
-                  else lit_error i3
+                  (LexedChar lit_ch _, rest) <-
+                    either fromStringLexError pure $
+                      resolveEscapeCharacter (LexedChar '\\' i1) (asLexedString i2)
+                  i3 <-
+                    case rest of
+                      LexedChar _ i3 : _ -> pure i3
+                      [] -> lexError LexStringCharLitEOF
+                  case alexGetChar' i3 of
+                    Just ('\'', i4) -> do
+                      setInput i4
+                      finish_char_tok buf loc lit_ch
+                    Just (mc, _) | isSingleSmartQuote mc -> add_smart_quote_error mc end2
+                    _ -> lit_error i3
 
         Just (c, i2@(AI end2 _))
                 | not (isAny c) -> lit_error i1
@@ -2348,115 +2357,27 @@ isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
         | otherwise  = is_any c
 
-lex_escape :: P Char
-lex_escape = do
-  i0@(AI loc _) <- getInput
-  c <- getCharOrFail i0
-  case c of
-        'a'   -> return '\a'
-        'b'   -> return '\b'
-        'f'   -> return '\f'
-        'n'   -> return '\n'
-        'r'   -> return '\r'
-        't'   -> return '\t'
-        'v'   -> return '\v'
-        '\\'  -> return '\\'
-        '"'   -> return '\"'
-        '\''  -> return '\''
-        -- the next two patterns build up a Unicode smart quote error (#21843)
-        smart_double_quote | isDoubleSmartQuote smart_double_quote ->
-          add_smart_quote_error smart_double_quote loc
-        smart_single_quote | isSingleSmartQuote smart_single_quote ->
-          add_smart_quote_error smart_single_quote loc
-        '^'   -> do i1 <- getInput
-                    c <- getCharOrFail i1
-                    if c >= '@' && c <= '_'
-                        then return (chr (ord c - ord '@'))
-                        else lit_error i1
+-- is_space only works for <= '\x7f' (#3751, #5425)
+--
+-- TODO: why not put this logic in is_space directly?
+is_space' :: Char -> Bool
+is_space' c | c > '\x7f' = False
+            | otherwise  = is_space c
 
-        'x'   -> readNum is_hexdigit 16 hexDigit
-        'o'   -> readNum is_octdigit  8 octDecDigit
-        x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
+-- | Returns a LexedString that, when iterated, lazily streams
+-- successive characters from the AlexInput.
+asLexedString :: AlexInput -> LexedString AlexInput
+asLexedString = unfoldr toLexedChar
+  where
+    toLexedChar i =
+      case alexGetChar' i of
+        Just (c, i') -> Just (LexedChar c i, i')
+        Nothing -> Nothing
 
-        c1 ->  do
-           i <- getInput
-           case alexGetChar' i of
-            Nothing -> lit_error i0
-            Just (c2,i2) ->
-              case alexGetChar' i2 of
-                Nothing -> do lit_error i0
-                Just (c3,i3) ->
-                   let str = [c1,c2,c3] in
-                   case [ (c,rest) | (p,c) <- silly_escape_chars,
-                                     Just rest <- [stripPrefix p str] ] of
-                          (escape_char,[]):_ -> do
-                                setInput i3
-                                return escape_char
-                          (escape_char,_:_):_ -> do
-                                setInput i2
-                                return escape_char
-                          [] -> lit_error i0
-
-readNum :: (Char -> Bool) -> Int -> (Char -> Int) -> P Char
-readNum is_digit base conv = do
-  i <- getInput
-  c <- getCharOrFail i
-  if is_digit c
-        then readNum2 is_digit base conv (conv c)
-        else lit_error i
-
-readNum2 :: (Char -> Bool) -> Int -> (Char -> Int) -> Int -> P Char
-readNum2 is_digit base conv i = do
-  input <- getInput
-  read i input
-  where read i input = do
-          case alexGetChar' input of
-            Just (c,input') | is_digit c -> do
-               let i' = i*base + conv c
-               if i' > 0x10ffff
-                  then setInput input >> lexError LexNumEscapeRange
-                  else read i' input'
-            _other -> do
-              setInput input; return (chr i)
-
-
-silly_escape_chars :: [(String, Char)]
-silly_escape_chars = [
-        ("NUL", '\NUL'),
-        ("SOH", '\SOH'),
-        ("STX", '\STX'),
-        ("ETX", '\ETX'),
-        ("EOT", '\EOT'),
-        ("ENQ", '\ENQ'),
-        ("ACK", '\ACK'),
-        ("BEL", '\BEL'),
-        ("BS", '\BS'),
-        ("HT", '\HT'),
-        ("LF", '\LF'),
-        ("VT", '\VT'),
-        ("FF", '\FF'),
-        ("CR", '\CR'),
-        ("SO", '\SO'),
-        ("SI", '\SI'),
-        ("DLE", '\DLE'),
-        ("DC1", '\DC1'),
-        ("DC2", '\DC2'),
-        ("DC3", '\DC3'),
-        ("DC4", '\DC4'),
-        ("NAK", '\NAK'),
-        ("SYN", '\SYN'),
-        ("ETB", '\ETB'),
-        ("CAN", '\CAN'),
-        ("EM", '\EM'),
-        ("SUB", '\SUB'),
-        ("ESC", '\ESC'),
-        ("FS", '\FS'),
-        ("GS", '\GS'),
-        ("RS", '\RS'),
-        ("US", '\US'),
-        ("SP", '\SP'),
-        ("DEL", '\DEL')
-        ]
+fromStringLexError :: StringLexError AlexInput -> P a
+fromStringLexError = \case
+  SmartQuoteError c (AI loc _) -> add_smart_quote_error c loc
+  StringLexError _ i e -> setInput i >> lexError e
 
 -- before calling lit_error, ensure that the current input is pointing to
 -- the position of the error in the buffer.  This is so that we can report
@@ -2524,16 +2445,6 @@ quasiquote_error start = do
 
 -- -----------------------------------------------------------------------------
 -- Unicode Smart Quote detection (#21843)
-
-isDoubleSmartQuote :: Char -> Bool
-isDoubleSmartQuote '“' = True
-isDoubleSmartQuote '”' = True
-isDoubleSmartQuote _ = False
-
-isSingleSmartQuote :: Char -> Bool
-isSingleSmartQuote '‘' = True
-isSingleSmartQuote '’' = True
-isSingleSmartQuote _ = False
 
 isSmartQuote :: AlexAccPred ExtsBitmap
 isSmartQuote _ _ _ (AI _ buf) = let c = prevChar buf ' ' in isSingleSmartQuote c || isDoubleSmartQuote c
