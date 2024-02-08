@@ -666,7 +666,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- to convert it to a String.
 <0> {
   \'                            { lex_char_tok }
-  \"                            { lex_string_tok }
+  \"\"\" / { ifExtension MultilineStringsBit} { lex_string_tok StringTypeMulti }
+  \"                            { lex_string_tok StringTypeSingle }
 }
 
 -- Note [Whitespace-sensitive operator parsing]
@@ -952,6 +953,7 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITmultilinestring SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -2181,32 +2183,37 @@ lex_string_prag_comment mkTok span _buf _len _buf2
 
 -- This stuff is horrible.  I hates it.
 
-lex_string_tok :: Action
-lex_string_tok span buf _len _buf2 = do
-  s <- lex_string
+lex_string_tok :: LexStringType -> Action
+lex_string_tok strType span buf _len _buf2 = do
+  s <- lex_string strType
 
   i <- getInput
-  lex_magic_hash i >>= \case
-    Just i' -> do
-      when (any (> '\xFF') s) $ do
-        pState <- getPState
-        let msg = PsErrPrimStringInvalidChar
-        let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
-        addError err
+  case strType of
+    StringTypeSingle ->
+      lex_magic_hash i >>= \case
+        Just i' -> do
+          when (any (> '\xFF') s) $ do
+            pState <- getPState
+            let msg = PsErrPrimStringInvalidChar
+            let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
+            addError err
 
-      setInput i'
-      let (psSpan, src) = getStringLoc (buf, locStart) i'
-      pure $ L psSpan (ITprimstring src (unsafeMkByteString s))
-    Nothing -> do
+          setInput i'
+          let (psSpan, src) = getStringLoc (buf, locStart) i'
+          pure $ L psSpan (ITprimstring src (unsafeMkByteString s))
+        Nothing -> do
+          let (psSpan, src) = getStringLoc (buf, locStart) i
+          pure $ L psSpan (ITstring src (mkFastString s))
+    StringTypeMulti -> do
       let (psSpan, src) = getStringLoc (buf, locStart) i
-      pure $ L psSpan (ITstring src (mkFastString s))
+      pure $ L psSpan (ITmultilinestring src (mkFastString s))
   where
     locStart = psSpanStart span
 
 
 lex_quoted_label :: Action
 lex_quoted_label span buf _len _buf2 = do
-  s <- lex_string
+  s <- lex_string StringTypeSingle
   (AI end bufEnd) <- getInput
   let
     token = ITlabelvarid (SourceText src) (mkFastString s)
@@ -2216,13 +2223,13 @@ lex_quoted_label span buf _len _buf2 = do
   return $ L (mkPsSpan start end) token
 
 
-lex_string :: P String
-lex_string = do
+lex_string :: LexStringType -> P String
+lex_string strType = do
   start <- getInput
   case lexString [] start of
     Right (lexedStr, next) -> do
       setInput next
-      either fromStringLexError pure $ resolveLexedString lexedStr
+      either fromStringLexError pure $ resolveLexedString strType lexedStr
     Left (e, s, i) -> do
       -- see if we can find a smart quote in the string we've found so far.
       -- if the built-up string s contains a smart double quote character, it was
@@ -2241,7 +2248,7 @@ lex_string = do
     lexString acc0 i0 = do
       let acc = reverse acc0
       case alexGetChar' i0 of
-        Just ('"', i1) -> Right (acc, i1)
+        _ | Just i1 <- lexDelimiter i0 -> Right (acc, i1)
 
         Just (c0, i1) -> do
           let acc1 = LexedChar c0 i0 : acc0
@@ -2253,9 +2260,21 @@ lex_string = do
                   | otherwise -> lexString (LexedChar c1 i1 : acc1) i2
                 Nothing -> Left (LexStringCharLit, acc, i1)
             _ | isAny c0 -> lexString acc1 i1
+            _ | strType == StringTypeMulti && c0 `elem` ['\n', '\t'] -> lexString acc1 i1
             _ -> Left (LexStringCharLit, acc, i0)
 
         Nothing -> Left (LexStringCharLit, acc, i0)
+
+    lexDelimiter i0 =
+      case strType of
+        StringTypeSingle -> do
+          ('"', i1) <- alexGetChar' i0
+          Just i1
+        StringTypeMulti -> do
+          ('"', i1) <- alexGetChar' i0
+          ('"', i2) <- alexGetChar' i1
+          ('"', i3) <- alexGetChar' i2
+          Just i3
 
     lexStringGap acc0 i0 = do
       let acc = reverse acc0
@@ -2979,6 +2998,7 @@ data ExtBits
   | OrPatternsBit
   | ExtendedLiteralsBit
   | ListTuplePunsBit
+  | MultilineStringsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -3061,6 +3081,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. OrPatternsBit               `xoptBit` LangExt.OrPatterns
       .|. ExtendedLiteralsBit         `xoptBit` LangExt.ExtendedLiterals
       .|. ListTuplePunsBit            `xoptBit` LangExt.ListTuplePuns
+      .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

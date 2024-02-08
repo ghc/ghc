@@ -25,6 +25,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
+import GHC.Data.FastString (unpackFS)
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
@@ -46,6 +47,7 @@ import Language.Haskell.Syntax.Lit
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
 type instance XHsString     (GhcPass _) = SourceText
+type instance XHsMultilineString (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
@@ -132,6 +134,7 @@ hsLitNeedsParens p = go
     go (HsChar {})        = False
     go (HsCharPrim {})    = False
     go (HsString {})      = False
+    go (HsMultilineString {}) = False
     go (HsStringPrim {})  = False
     go (HsInt _ x)        = p > topPrec && il_neg x
     go (HsInteger _ x _)  = p > topPrec && x < 0
@@ -155,6 +158,7 @@ convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
 convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
 convertLit (HsString a x)     = HsString a x
+convertLit (HsMultilineString a x) = HsMultilineString a x
 convertLit (HsStringPrim a x) = HsStringPrim a x
 convertLit (HsInt a x)        = HsInt a x
 convertLit (HsIntPrim a x)    = HsIntPrim a x
@@ -192,6 +196,17 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
+    ppr (HsMultilineString st s) =
+      case st of
+        NoSourceText -> pprHsString s
+        SourceText src ->
+          vcat $ map text $ splitOn '\n' (unpackFS src)
+      where
+        splitOn c s =
+          let (firstLine, rest) = break (== c) s
+           in case rest of
+                "" -> [firstLine]
+                _ : rest -> firstLine : splitOn c rest
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
@@ -231,6 +246,7 @@ pmPprHsLit :: HsLit (GhcPass x) -> SDoc
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
+pmPprHsLit (HsMultilineString st s) = pprWithSourceText st (pprHsString s)
 pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
 pmPprHsLit (HsInt _ i)        = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i

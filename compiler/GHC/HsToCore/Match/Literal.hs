@@ -121,6 +121,7 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
+    HsMultilineString _ str -> mkStringExprFS str
     HsInteger _ i _  -> return (mkIntegerExpr platform i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     HsRat _ fl ty    -> dsFractionalLitToRational fl ty
@@ -474,6 +475,7 @@ getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
 getSimpleIntegralLit HsChar{}           = Nothing
 getSimpleIntegralLit HsCharPrim{}       = Nothing
 getSimpleIntegralLit HsString{}         = Nothing
+getSimpleIntegralLit HsMultilineString{} = Nothing
 getSimpleIntegralLit HsStringPrim{}     = Nothing
 getSimpleIntegralLit HsRat{}            = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing
