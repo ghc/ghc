@@ -151,10 +151,10 @@ Compiler
 GHCi
 ~~~~
 
-- Added the :set timeout <number> command. When called it will timeout ghci commands and expressions that
-  take too long <number> is interpreted in seconds and needs to be a natural number.
-  Can be unset by calling :unset timeout or :set timeout 0. See :ghc-ticket:`24040`.
-
+- Added the :set timeout <timelimit> command. Once the timeout is set, ghci will 
+  timeout any command that takes more than <timelimit> seconds to evaluate. Note 
+  that <timelimit> has to be a natural number. 
+  Can be unset by calling :unset timeout.
 
 Runtime system
 ~~~~~~~~~~~~~~

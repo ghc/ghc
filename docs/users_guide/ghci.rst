@@ -2899,8 +2899,10 @@ commonly used commands.
 .. ghci-cmd:: :set timeout; ⟨timelimit⟩
 
     Makes all expressions and commands that take longer than ⟨timelimit⟩ 
-    to evaluate throw a GhciTimedOut exception. The timelimit is interpreted 
-    in seconds. 
+    to evaluate throw a GhciTimedOut exception. ⟨timelimit⟩ has to be a 
+    natural and is interpreted in seconds.
+
+    Default: unlimited. 
 
 
 .. ghci-cmd:: :seti; [⟨option⟩ ...]

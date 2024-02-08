@@ -1,16 +1,16 @@
 :load T24040
-:set timeout 5
-delayNSeconds 10
-delayNSeconds 2
-:unset timeout
-delayNSeconds 10
 :set timeout 1
-delayNSeconds 5
-delayNSeconds 2
-:unset timeout 
+delayNSeconds 0
+delayNSeconds 3
+:unset timeout
 delayNSeconds 5
 :set timeout 5
+delayNSeconds 7
+delayNSeconds 9
+:unset timeout 
+delayNSeconds 11
+:set timeout 7
 :reload
-delayNSeconds 10
+delayNSeconds 13
 delayNSeconds 2
 :unset timeout
