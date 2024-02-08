@@ -1079,7 +1079,8 @@ concurrent_marking:
     traceConcSweepEnd();
 #if defined(DEBUG)
     if (RtsFlags.DebugFlags.nonmoving_gc)
-        nonmovingPrintAllocatorCensus(true);
+        // only collect live words if the mutator isn't running.
+        nonmovingPrintAllocatorCensus(!concurrent);
 #endif
 #if defined(TRACING)
     if (RtsFlags.TraceFlags.nonmoving_gc)
