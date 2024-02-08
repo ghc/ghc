@@ -4,6 +4,7 @@ module GHC.Parser.String (
   LexedString,
   LexedChar (..),
   StringLexError (..),
+  LexStringType (..),
   resolveLexedString,
   resolveEscapeCharacter,
 
@@ -14,9 +15,11 @@ module GHC.Parser.String (
 
 import GHC.Prelude
 
-import Control.Monad (guard, unless, when, (>=>))
+import Control.Monad (forM_, guard, unless, when, (>=>))
 import Data.Char (chr, isSpace, ord)
-import Data.Maybe (listToMaybe, mapMaybe)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.Maybe (listToMaybe, mapMaybe, maybeToList)
 import GHC.Parser.CharClass (
   hexDigit,
   is_decdigit,
@@ -26,6 +29,8 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
+
+data LexStringType = StringTypeSingle | StringTypeMulti deriving (Eq)
 
 data LexedChar loc = LexedChar !Char !loc
 type LexedString loc = [LexedChar loc]
@@ -39,14 +44,23 @@ unLexedString = map unLexedChar
 -- | Apply the given StringProcessors to the given LexedString left-to-right,
 -- and return the processed string.
 resolveLexedString ::
+  LexStringType ->
   LexedString loc ->
   Either (StringLexError loc) String
-resolveLexedString = fmap unLexedString . foldr (>=>) pure processString
+resolveLexedString strType = fmap unLexedString . foldr (>=>) pure processString
   where
     processString =
-      [ collapseStringGaps
-      , resolveEscapeCharacters
-      ]
+      case strType of
+        StringTypeSingle ->
+          [ collapseStringGaps
+          , resolveEscapeCharacters
+          ]
+        StringTypeMulti ->
+          [ collapseStringGaps
+          , resolveMultilineString
+          , checkInnerTabs
+          , resolveEscapeCharacters
+          ]
 
 data StringLexError loc
   = SmartQuoteError !Char !loc
@@ -71,8 +85,6 @@ collapseStringGaps s0 = pure (go s0)
             backslash : c : go s
 
       c : s -> c : go s
-
-    isLexedSpace = isSpace . unLexedChar
 
 resolveEscapeCharacters :: StringProcessor loc
 resolveEscapeCharacters = go
@@ -198,6 +210,18 @@ parseLongEscape (LexedChar c _) s = listToMaybe $ mapMaybe tryParse longEscapeCo
       , ("DEL", '\DEL')
       ]
 
+-- | Error if string contains any tab characters.
+--
+-- Normal strings don't lex tab characters in the first place, but we
+-- have to allow them in multiline strings for leading indentation. So
+-- we allow them in the initial lexing pass, then check for any remaining
+-- tabs after replacing leading tabs in resolveMultilineString.
+checkInnerTabs :: StringProcessor loc
+checkInnerTabs s = do
+  forM_ s $ \(LexedChar c loc) ->
+    when (c == '\t') $ Left $ StringLexError c loc LexStringCharLit
+  pure s
+
 -- -----------------------------------------------------------------------------
 -- Unicode Smart Quote detection (#21843)
 
@@ -212,3 +236,126 @@ isSingleSmartQuote = \case
   '‘' -> True
   '’' -> True
   _ -> False
+
+{-
+Note [Multiline string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Multiline string literals were added following the acceptance of the
+proposal: https://github.com/ghc-proposals/ghc-proposals/pull/569
+
+Multiline string literals are syntax sugar for normal string literals,
+with an extra post processing step. This all happens in the Lexer; that
+is, HsMultilineString will contain the post-processed string. This matches
+the same behavior as HsString, which contains the normalized string
+(see Note [Literal source text]).
+
+The string is post-processed with the following steps:
+1. Collapse string gaps
+2. Split the string by newlines
+3. Convert leading tabs into spaces
+    * In each line, any tabs preceding non-whitespace characters are replaced with spaces up to the next tab stop
+4. Remove common whitespace prefix in every line (see below)
+5. If a line contains only whitespace, remove all of the whitespace
+6. Join the string back with `\n` delimiters
+7. If the first character of the string is a newline, remove it
+8. Interpret escaped characters
+
+The common whitespace prefix can be informally defined as "The longest
+prefix of whitespace shared by all lines in the string, excluding the
+first line and any whitespace-only lines".
+
+It's more precisely defined with the following algorithm:
+
+1. Take a list representing the lines in the string
+2. Ignore the following elements in the list:
+    * The first line (we want to ignore everything before the first newline)
+    * Empty lines
+    * Lines with only whitespace characters
+3. Calculate the longest prefix of whitespace shared by all lines in the remaining list
+-}
+
+-- | A lexed line, with the string and the location info of the ending newline
+-- character, if one exists
+data LexedLine loc = LexedLine !(LexedString loc) (Maybe loc)
+
+mapLine :: (LexedString loc -> LexedString loc) -> LexedLine loc -> LexedLine loc
+mapLine f (LexedLine line nl) = LexedLine (f line) nl
+
+mapLines :: (LexedString loc -> LexedString loc) -> [LexedLine loc] -> [LexedLine loc]
+mapLines f = map (mapLine f)
+
+filterLines :: (LexedString loc -> Bool) -> [LexedLine loc] -> [LexedLine loc]
+filterLines f = filter (\(LexedLine line _) -> f line)
+
+splitLines :: LexedString loc -> [LexedLine loc]
+splitLines =
+  foldr
+    ( curry $ \case
+        (LexedChar '\n' loc, ls) -> LexedLine [] (Just loc) : ls
+        (c, l : ls) -> mapLine (c :) l : ls
+        (c, []) -> LexedLine [c] Nothing : [] -- should not happen
+    )
+    [emptyLine]
+  where
+    emptyLine = LexedLine [] Nothing
+
+joinLines :: [LexedLine loc] -> LexedString loc
+joinLines = concatMap (\(LexedLine line nl) -> line ++ maybeToList (LexedChar '\n' <$> nl))
+
+-- | See Note [Multiline string literals]
+resolveMultilineString :: StringProcessor loc
+resolveMultilineString = pure . process
+  where
+    (.>) :: (a -> b) -> (b -> c) -> (a -> c)
+    (.>) = flip (.)
+
+    process =
+         splitLines
+      .> convertLeadingTabs
+      .> rmCommonWhitespacePrefix
+      .> stripOnlyWhitespace
+      .> joinLines
+      .> rmFirstNewline
+
+    convertLeadingTabs =
+      let convertLine col = \case
+            [] -> []
+            c@(LexedChar ' ' _) : cs -> c : convertLine (col + 1) cs
+            LexedChar '\t' loc : cs ->
+              let fill = 8 - (col `mod` 8)
+               in replicate fill (LexedChar ' ' loc) ++ convertLine (col + fill) cs
+            c : cs -> c : cs
+       in mapLines (convertLine 0)
+
+    rmCommonWhitespacePrefix = \case
+      [] -> []
+      -- exclude the first line from this calculation
+      firstLine : strLines ->
+        let excludeWsOnlyLines = filterLines (not . all isLexedSpace)
+            commonWSPrefix =
+              case NonEmpty.nonEmpty (excludeWsOnlyLines strLines) of
+                Nothing -> 0
+                Just strLines' ->
+                  minimum1 $
+                    flip NonEmpty.map strLines' $ \(LexedLine line _) ->
+                      length $ takeWhile isLexedSpace line
+         in firstLine : mapLines (drop commonWSPrefix) strLines
+
+    stripOnlyWhitespace =
+      let stripWsOnlyLine line = if all isLexedSpace line then [] else line
+       in mapLines stripWsOnlyLine
+
+    rmFirstNewline = \case
+      LexedChar '\n' _ : s -> s
+      s -> s
+
+    -- TODO: replace with Foldable1.minimum when GHC 9.6+ required to build
+    minimum1 :: Ord a => NonEmpty a -> a
+    minimum1 = minimum
+
+-- -----------------------------------------------------------------------------
+-- Helpers
+
+isLexedSpace :: LexedChar loc -> Bool
+isLexedSpace = isSpace . unLexedChar
