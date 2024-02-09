@@ -72,6 +72,7 @@ data Setting = CursesIncludeDir
              | SystemGhc
              | TargetPlatformFull
              | BourneShell
+             | EmsdkVersion
 
 -- TODO compute solely in Hadrian, removing these variables' definitions
 -- from aclocal.m4 whenever they can be calculated from other variables
@@ -128,6 +129,7 @@ setting key = lookupSystemConfig $ case key of
     SystemGhc          -> "system-ghc"
     TargetPlatformFull -> "target-platform-full"
     BourneShell        -> "bourne-shell"
+    EmsdkVersion       -> "emsdk-version"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.

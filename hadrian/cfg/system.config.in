@@ -129,3 +129,5 @@ use-lib-dl        = @UseLibdl@
 use-lib-bfd       = @UseLibbfd@
 use-lib-pthread   = @UseLibpthread@
 need-libatomic    = @NeedLibatomic@
+
+emsdk-version     = @ConfiguredEmsdkVersion@
