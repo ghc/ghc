@@ -42,8 +42,9 @@ int64_t SignExtend64(uint64_t X, unsigned B) {
 
 // Make sure that V can be represented as an N bit signed integer.
 void checkInt(inst_t *loc, int64_t v, int n) {
-  if (v != SignExtend64(v, n))
-    debugBelch("Relocation at %x is out of range: 0x%lx - 0x%x", *loc, v, n);
+  if (v != SignExtend64(v, n)){
+    debugBelch("Relocation at 0x%x is out of range. value: 0x%lx (%ld), sign-extended value: 0x%lx (%ld), max bits 0x%x (%d)", *loc, v, v, SignExtend64(v, n), SignExtend64(v, n), n, n);
+  }
 }
 // RISCV is little-endian by definition.
 void write8le(uint8_t *p, uint8_t v) { *p = v; }
