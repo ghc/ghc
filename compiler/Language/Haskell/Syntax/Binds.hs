@@ -445,6 +445,7 @@ data Sig pass
                                    --    SPECIALISE, not SPECIALISE_INLINE
 
   | SpecSigE    (XSpecSigE pass)
+                (RuleBndrs pass)
                 (LHsExpr pass)     -- Expression to specialise
                 InlinePragma
                 -- The expression should be of form

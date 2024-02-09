@@ -71,7 +71,7 @@ import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
-import GHC.Tc.Gen.Rule
+import GHC.Tc.Gen.Sig( tcRules )
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.Utils.TcMType

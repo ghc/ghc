@@ -1110,10 +1110,11 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
-renameSig ctxt sig@(SpecSigE _ spec_e inl)
-  = do { (spec_e', fvs) <- rnLExpr spec_e
+renameSig ctxt sig@(SpecSigE _ bndrs spec_e inl)
+  = bindrRuleBndrs bndrs $ \_ bndrs' ->
+    do { (spec_e', fvs) <- rnLExpr spec_e
        ; fn <- checkSpecSig spec_e'
-       ; return (SpecSigE fn spec_e' inl, fvs) }
+       ; return (SpecSigE fn bndrs' spec_e' inl, fvs) }
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
@@ -1277,6 +1278,55 @@ checkDupMinimalSigs sigs
   = case filter isMinimalLSig sigs of
       sig1 : sig2 : otherSigs -> dupMinimalSigErr sig1 sig2 otherSigs
       _ -> return ()
+
+bindRuleBndrs :: RuleName -> RuleBndrs GhcPs
+              -> ([Name] -> RuleBndrs GhcRn -> RnM (a,FreeVars))
+              -> RnM (a,FreeVars)
+bindRuleBndrs rule_name (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
+  = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
+             doc = RuleCtx rule_name
+       ; checkDupRdrNames rdr_names_w_loc
+       ; checkShadowedRdrNames rdr_names_w_loc
+       ; names <- newLocalBndrsRn rdr_names_w_loc
+       ; bindRuleTyVars doc tyvs             $ \ tyvs' ->
+         bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
+         thing_inside (RuleBndrs { rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
+  where
+    get_var :: RuleBndr GhcPs -> LocatedN RdrName
+    get_var (RuleBndrSig _ v _) = v
+    get_var (RuleBndr _ v)      = v
+
+
+bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
+               -> [LRuleBndr GhcPs] -> [Name]
+               -> ([LRuleBndr GhcRn] -> RnM (a, FreeVars))
+               -> RnM (a, FreeVars)
+bindRuleTmVars doc tyvs vars names thing_inside
+  = go vars names $ \ vars' ->
+    bindLocalNamesFV names (thing_inside vars')
+  where
+    go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
+      = go vars ns $ \ vars' ->
+        thing_inside (L l (RuleBndr noAnn (L loc n)) : vars')
+
+    go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
+       (n : ns) thing_inside
+      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
+        go vars ns $ \ vars' ->
+        thing_inside (L l (RuleBndrSig noAnn (L loc n) bsig') : vars')
+
+    go [] [] thing_inside = thing_inside []
+    go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
+
+    bind_free_tvs = case tyvs of Nothing -> AlwaysBind
+                                 Just _  -> NeverBind
+
+bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
+               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
+               -> RnM (b, FreeVars)
+bindRuleTyVars doc (Just bndrs) thing_inside
+  = bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs (thing_inside . Just)
+bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 
 {-
 ************************************************************************

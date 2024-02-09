@@ -25,7 +25,7 @@ import GHC.Hs
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Rename.HsType
-import GHC.Rename.Bind
+import GHC.Rename.Bind( bindRuleBndrs )
 import GHC.Rename.Doc
 import GHC.Rename.Env
 import GHC.Rename.Utils ( mapFvRn, bindLocalNames
@@ -1153,22 +1153,15 @@ rnHsRuleDecls (HsRules { rds_ext = (_, src)
 
 rnHsRuleDecl :: RuleDecl GhcPs -> RnM (RuleDecl GhcRn, FreeVars)
 rnHsRuleDecl (HsRule { rd_ext  = (_, st)
-                     , rd_name = rule_name
+                     , rd_name = L _ rule_name
                      , rd_act  = act
-                     , rd_tyvs = tyvs
-                     , rd_tmvs = tmvs
+                     , rd_bndr = bndrs
                      , rd_lhs  = lhs
                      , rd_rhs  = rhs })
-  = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
-       ; checkDupRdrNames rdr_names_w_loc
-       ; checkShadowedRdrNames rdr_names_w_loc
-       ; names <- newLocalBndrsRn rdr_names_w_loc
-       ; let doc = RuleCtx (unLoc rule_name)
-       ; bindRuleTyVars doc tyvs $ \ tyvs' ->
-         bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
+  = bindRuleBndrs rule_name bndrs $ \tm_names bndrs' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
+       ; checkValidRule rule_name tm_names lhs' fv_lhs'
        ; return (HsRule { rd_ext  = (HsRuleRn fv_lhs' fv_rhs', st)
                         , rd_name = rule_name
                         , rd_act  = act
@@ -1176,41 +1169,6 @@ rnHsRuleDecl (HsRule { rd_ext  = (_, st)
                         , rd_tmvs = tmvs'
                         , rd_lhs  = lhs'
                         , rd_rhs  = rhs' }, fv_lhs' `plusFV` fv_rhs') } }
-  where
-    get_var :: RuleBndr GhcPs -> LocatedN RdrName
-    get_var (RuleBndrSig _ v _) = v
-    get_var (RuleBndr _ v)      = v
-
-bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
-               -> [LRuleBndr GhcPs] -> [Name]
-               -> ([LRuleBndr GhcRn] -> RnM (a, FreeVars))
-               -> RnM (a, FreeVars)
-bindRuleTmVars doc tyvs vars names thing_inside
-  = go vars names $ \ vars' ->
-    bindLocalNamesFV names (thing_inside vars')
-  where
-    go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
-      = go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndr noAnn (L loc n)) : vars')
-
-    go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
-       (n : ns) thing_inside
-      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
-        go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndrSig noAnn (L loc n) bsig') : vars')
-
-    go [] [] thing_inside = thing_inside []
-    go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
-
-    bind_free_tvs = case tyvs of Nothing -> AlwaysBind
-                                 Just _  -> NeverBind
-
-bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
-               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
-               -> RnM (b, FreeVars)
-bindRuleTyVars doc (Just bndrs) thing_inside
-  = bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs (thing_inside . Just)
-bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 
 {-
 Note [Rule LHS validity checking]

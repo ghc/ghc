@@ -1105,7 +1105,7 @@ Consider #22471
 
 We get two dicts on the LHS, one from `1` and one from `+`.
 For reasons described in Note [The SimplifyRule Plan] in
-GHC.Tc.Gen.Rule, we quantify separately over those dictionaries:
+GHC.Tc.Gen.Sig, we quantify separately over those dictionaries:
    forall f (d1::Num Int) (d2 :: Num Int).
    foo (\xs. (+) d1 (fromInteger d2 1) xs) = ...
 
