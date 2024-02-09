@@ -149,6 +149,12 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
   int exp_shift = -1;
   switch (ELF64_R_TYPE(rel->r_info)) {
+  case R_RISCV_32:
+    write32le((inst_t*) P, addend);
+    break;
+  case R_RISCV_64:
+    write64le((uint64_t*) P, addend);
+    break;
   case R_RISCV_GOT_HI20:
   case R_RISCV_PCREL_HI20:
   case R_RISCV_TLS_GD_HI20:
@@ -216,7 +222,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
     // I guess we don't need to implement these relaxations (optimizations).
     break;
   default:
-    debugBelch("Missing relocation 0x%x\n", ELF64_R_TYPE(rel->r_info));
+    debugBelch("Missing relocation 0x%lx\n", ELF64_R_TYPE(rel->r_info));
     abort();
   }
   return EXIT_SUCCESS;
