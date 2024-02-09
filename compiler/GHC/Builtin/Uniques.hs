@@ -308,7 +308,7 @@ Allocation of unique supply characters:
         v,u: for renumbering value-, and usage- vars.
         B:   builtin
         C-E: pseudo uniques     (used in native-code generator)
-        I:   GHCi evaluation
+        I:   GHCi and GHC.Core.Semantics evaluation
         X:   uniques from mkLocalUnique
         _:   unifiable tyvars   (above)
         0-9: prelude things below

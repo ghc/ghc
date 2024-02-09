@@ -65,7 +65,6 @@ import Data.Foldable (foldlM)
 import GHC.Types.Unique.FM
 import Data.IORef
 import System.IO.Unsafe
-import GHC.Types.Unique
 
 {-
 ************************************************************************
@@ -375,7 +374,7 @@ dmdAnalBindLetUp :: TopLevelFlag
                  -> AnalM DmdType
 dmdAnalBindLetUp top_lvl env id rhs anal_body = do
   -- See Note [Bringing a new variable into scope]
-  body_ty <- anal_body (addInScopeAnalEnv env id)
+  body_ty <- anal_body (addInScopeAnalEnv top_lvl env id)
 
   -- See Note [Finalising boxity for demand signatures]
   let S2 body_ty' id_dmd = findBndrDmd env body_ty id
@@ -461,11 +460,11 @@ dmdAnalStar env (n :* sd) e = do
   pure $! discardArgDmds $ multDmdType n' dmd_ty
 
 -- Main Demand Analysis machinery
-dmdAnal, dmdAnal' :: AnalEnv
+dmdAnal'', dmdAnal' :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> AnalM DmdType
 
-dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
+dmdAnal'' env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
 dmdAnal' env sd (Var var)  = pure $! dmdTransform env var sd
@@ -514,14 +513,14 @@ dmdAnal' env dmd (Lam var body)
     let !lam_ty = addDemand dmd body_ty'
     return $! multDmdType n lam_ty
   where
-    body_env = addInScopeAnalEnv env var -- See Note [Bringing a new variable into scope]
+    body_env = addInScopeAnalEnv NotTopLevel env var -- See Note [Bringing a new variable into scope]
 
 dmdAnal' env dmd (Case scrut case_bndr _ty [Alt alt_con bndrs rhs])
   -- Only one alternative.
   -- If it's a DataAlt, it should be the only constructor of the type and we
   -- can consider its field demands when analysing the scrutinee.
   | want_precise_field_dmds alt_con = do
-    let rhs_env = addInScopeAnalEnvs env (case_bndr:bndrs)
+    let rhs_env = addInScopeAnalEnvs NotTopLevel env (case_bndr:bndrs)
           -- See Note [Bringing a new variable into scope]
     rhs_ty <- dmdAnal rhs_env dmd rhs
     let S2 alt_ty1 fld_dmds      = findBndrsDmds env rhs_ty bndrs
@@ -634,7 +633,7 @@ forcesRealWorld fam_envs ty
 
 dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> CoreAlt -> AnalM DmdType
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs) = do
-  let rhs_env = addInScopeAnalEnvs env (case_bndr:bndrs)
+  let rhs_env = addInScopeAnalEnvs NotTopLevel env (case_bndr:bndrs)
         -- See Note [Bringing a new variable into scope]
   rhs_ty <- dmdAnal rhs_env dmd rhs
   let S2 alt_ty dmds = findBndrsDmds env rhs_ty bndrs
@@ -1012,7 +1011,7 @@ dmdTransform env var sd
     res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
-  | Just (sig, top_lvl) <- lookupSigEnv env var
+  | Just (_,sig, top_lvl) <- lookupSigEnv env var
   , let fn_ty = dmdTransformSig sig sd
   = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr sd, ppr fn_ty]) $
     case top_lvl of
@@ -1077,7 +1076,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs = do
       -- See Note [Unboxed demand on function bodies returning small products]
       = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
 
-  rhs_dmd_ty <- _dmdAnalNew env rhs_dmd rhs
+  rhs_dmd_ty <- dmdAnal env rhs_dmd rhs
 
   let
     (lam_bndrs, _) = collectBinders rhs
@@ -2209,7 +2208,7 @@ dmdFix top_lvl env let_sd pairs
         -- foldlM: Use the new signature to do the next pair
         -- The occurrence analyser has arranged them in a good order
         -- so this can significantly reduce the number of iterations needed
-      let sigs' = expectJust "dmdFix.step" $ traverse (fmap fst . lookupSigEnv env') bndrs
+      let sigs' = expectJust "dmdFix.step" $ traverse (fmap sndOf3 . lookupSigEnv env') bndrs
       -- annotation done in dmdAnalRhsSig
       -- zipWithEqualM_ "dmdFix.step" (annotateSig (ae_opts env)) bndrs sigs'
       pure $! S3 env' sigs' weak_fv'
@@ -2429,7 +2428,7 @@ data AnalEnv = AE
         -- The DmdEnv gives the demand on the free vars of the function
         -- when it is given enough args to satisfy the strictness signature
 
-type SigEnv = IdEnv (DmdSig, TopLevelFlag)
+type SigEnv = IdEnv (Id, DmdSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
   ppr env = text "AE" <+> braces (vcat
@@ -2464,23 +2463,23 @@ extendAnalEnvs top_lvl env vars sigs
 
 extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> [DmdSig] -> SigEnv
 extendSigEnvs top_lvl env vars sigs
-  = extendVarEnvList env (zipWith (\v s -> (v, (s, top_lvl))) vars sigs)
+  = extendVarEnvList env (zipWith (\v s -> (v, (v, s, top_lvl))) vars sigs)
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> DmdSig -> AnalEnv
 extendAnalEnv top_lvl env x sig
   = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) x sig }
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> DmdSig -> SigEnv
-extendSigEnv top_lvl sigs x sig = extendVarEnv sigs x (sig, top_lvl)
+extendSigEnv top_lvl sigs x sig = extendVarEnv sigs x (x, sig, top_lvl)
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe (DmdSig, TopLevelFlag)
+lookupSigEnv :: AnalEnv -> Id -> Maybe (Id, DmdSig, TopLevelFlag)
 lookupSigEnv env x = lookupVarEnv (ae_sigs env) x
 
-addInScopeAnalEnv :: AnalEnv -> Var -> AnalEnv
-addInScopeAnalEnv env id = env { ae_sigs = delVarEnv (ae_sigs env) id }
+addInScopeAnalEnv :: TopLevelFlag -> AnalEnv -> Var -> AnalEnv
+addInScopeAnalEnv top_lvl env id = extendAnalEnv top_lvl env id nopSig
 
-addInScopeAnalEnvs :: AnalEnv -> [Var] -> AnalEnv
-addInScopeAnalEnvs env ids = env { ae_sigs = delVarEnvList (ae_sigs env) ids }
+addInScopeAnalEnvs :: TopLevelFlag -> AnalEnv -> [Var] -> AnalEnv
+addInScopeAnalEnvs top_lvl env ids = extendAnalEnvs top_lvl env ids (repeat nopSig)
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> WithDmdType [Demand]
 -- Return the demands on the Ids in the [Var]
@@ -2740,16 +2739,19 @@ sPair2DmdType (S2 val env) = DmdType env val
 instance Trace DmdD where
   step (Lookup x) d = \env sd -> d env sd >>= \t ->
     case (t, lookupSigEnv env x) of
-      (S2 val env, Just (_,NotTopLevel)) -> pure $! S2 val (addVarDmdEnv env x (C_11 :* sd))
-      (S2 val env, Just (_,TopLevel))
+      (S2 val env, Just (_,_,NotTopLevel)) -> -- pprTrace "local" (ppr x <+> ppr sd) $
+        pure $! S2 val (addVarDmdEnv env x (C_11 :* sd))
+      (S2 val env, Just (_,_,TopLevel))
         -- Top-level things will be used multiple times or not at
         -- all anyway, hence the multDmd below: It means we don't
         -- have to track whether @x@ is used strictly or at most
         -- once, because ultimately it never will.
         | isInterestingTopLevelFn x
-        -> pure $! S2 val (addVarDmdEnv env x (C_0N `multDmd` (C_11 :* sd))) -- discard strictness
+        -> -- pprTrace "interesting" (ppr x <+> ppr sd) $
+        pure $! S2 val (addVarDmdEnv env x (C_0N `multDmd` (C_11 :* sd))) -- discard strictness
         -- otherwise, fall through; we'll annotate with topDmd at the binding site.
-      _ -> pure t
+      _ -> -- pprTrace "fall" (ppr x <+> ppr sd) $
+        pure t
   step _ d = d
 
 botDmdD, nopDmdD :: DmdD
@@ -2763,7 +2765,7 @@ instance Domain DmdD where
   keepAlive ds env _ = do
     -- This is called for denotations of free variables of Coercions, RULE RHSs
     -- and unfoldings
-    fvs <- plusDmdEnvs <$> traverse (\d -> squeezeSubDmd env d topSubDmd) ds
+    fvs <- plusDmdEnvs <$> traverse (\d -> squeezeDmd env d topDmd) ds
     pure $! S2 [] fvs -- Nop value
   stuck = botDmdD
   erased = nopDmdD
@@ -2772,15 +2774,15 @@ instance Domain DmdD where
   global x = -- pprTrace "dmdAnal:global" (ppr x <+> ppr (idDmdSig x)) $
              sig2DmdHnf (idDmdSig x)
   classOp x _cls _env sd = do
-    pprTraceM "dmdAnal:classOp" (ppr x <+> ppr (idDmdSig x))
+    -- pprTraceM "dmdAnal:classOp" (ppr x <+> ppr (idDmdSig x))
     pure $! dmdType2SPair (dmdTransformDictSelSig (idDmdSig x) sd)
-  fun x f env sd | isTyVar x = f nopDmdD (addInScopeAnalEnv env x) sd
+  fun x f env sd | isTyVar x = f nopDmdD (addInScopeAnalEnv NotTopLevel env x) sd
                  | otherwise = do
     let body_env = extendAnalEnv NotTopLevel env x nopSig -- Ultimately, we will not store nopDmdD here. This is just for compatibility with existing code
     let (n,body_sd) = peelCallDmd sd
     S2 val fvs <- f (mkSurrogate x) body_env body_sd
     let S2 body_ty' dmd = findBndrDmd env (DmdType fvs val) x
-    pprTraceM "dmdAnal:Lam" (ppr x <+> ppr dmd $$ ppr sd <+> ppr body_ty')
+    -- pprTraceM "dmdAnal:Lam" (ppr x <+> ppr dmd $$ ppr sd <+> ppr body_ty')
     annotate da_demands x dmd
     let !lam_ty = addDemand dmd body_ty'
     let DmdType fvs val = multDmdType n lam_ty
@@ -2789,9 +2791,9 @@ instance Domain DmdD where
     let call_sd = mkCalledOnceDmds (dataConRepArity dc) sd
     let DmdType _env dmds = dmdTransformDataConSig (dataConRepStrictness dc) call_sd
     let value_ds = dropList (dataConUnivAndExTyCoVars dc) ds
-    massert (equalLength value_ds dmds)
+    massertPpr (equalLength value_ds dmds) (ppr dc <+> ppr (dataConRepArity dc) <+> ppr sd <+> ppr dmds <+> ppr (length value_ds))
     fvs <- plusDmdEnvs <$> zipWithM (squeezeDmd env) value_ds dmds
-    pprTraceM "dmdAnal:Con" (ppr dc <+> ppr sd <+> ppr dmds $$ ppr fvs)
+    -- pprTraceM "dmdAnal:Con" (ppr dc <+> ppr sd <+> ppr dmds $$ ppr fvs)
     pure $! S2 [] fvs
   applyTy f = f
   apply f a env sd = do
@@ -2800,19 +2802,19 @@ instance Domain DmdD where
     let (arg_dmd, res_ty) = splitDmdTy fun_ty
     arg_fvs <- squeezeDmd env a arg_dmd
     let combined_ty = res_ty `plusDmdType` arg_fvs
---    pprTraceM "dmdAnal:app" vcat $
---         [ text "sd =" <+> ppr sd
---         , text "fun dmd_ty =" <+> ppr fun_ty
---         , text "arg dmd =" <+> ppr arg_dmd
---         , text "arg dmd_ty =" <+> ppr arg_fvs
---         , text "res dmd_ty =" <+> ppr res_ty
---         , text "overall res dmd_ty =" <+> ppr combined_ty ]
+    -- pprTraceM "dmdAnal:app" $ vcat
+    --      [ text "sd =" <+> ppr sd
+    --      , text "fun dmd_ty =" <+> ppr fun_ty
+    --      , text "arg dmd =" <+> ppr arg_dmd
+    --      , text "arg dmd_ty =" <+> ppr arg_fvs
+    --      , text "res dmd_ty =" <+> ppr res_ty
+    --      , text "overall res dmd_ty =" <+> ppr combined_ty ]
     pure $! dmdType2SPair combined_ty
   seq_ a b env sd = do
     fvs <- sSnd <$> a env seqSubDmd
     dmd_ty <- sPair2DmdType <$> b env sd
     pure $! dmdType2SPair (dmd_ty `plusDmdType` fvs) -- plain and simple :)
-  select d test_scrut case_bndr alts env sd
+  select d scrut case_bndr alts env sd
     | [(alt_con, bndrs, rhs)] <- alts, want_precise_field_dmds alt_con = do
         let rhs_env = extendAnalEnvs NotTopLevel env (case_bndr:bndrs) (repeat nopSig)
               -- See Note [Bringing a new variable into scope]
@@ -2837,7 +2839,7 @@ instance Domain DmdD where
 
         let alt_ty3
               -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-              | test_scrut (exprMayThrowPreciseException (ae_fam_envs env))
+              | exprMayThrowPreciseException (ae_fam_envs env) scrut
               = deferAfterPreciseException alt_ty2
               | otherwise
               = alt_ty2
@@ -2880,17 +2882,17 @@ instance Domain DmdD where
         let fam_envs = ae_fam_envs env
             alt_ty2
               -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-              | test_scrut (exprMayThrowPreciseException fam_envs)
+              | exprMayThrowPreciseException fam_envs scrut
               = deferAfterPreciseException alt_ty1
               | otherwise
               = alt_ty1
             res_ty = scrut_ty `plusDmdType` discardArgDmds alt_ty2
 
-      --    pprTraceM "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
-      --                                    , text "scrut_ty" <+> ppr scrut_ty
-      --                                    , text "alt_ty1" <+> ppr alt_ty1
-      --                                    , text "alt_ty2" <+> ppr alt_ty2
-      --                                    , text "res_ty" <+> ppr res_ty ])
+        -- pprTraceM "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
+        --                                 , text "scrut_ty" <+> ppr scrut_ty
+        --                                 , text "alt_ty1" <+> ppr alt_ty1
+        --                                 , text "alt_ty2" <+> ppr alt_ty2
+        --                                 , text "res_ty" <+> ppr res_ty ])
         pure $! dmdType2SPair res_ty
     where
       want_precise_field_dmds (DataAlt dc)
@@ -2919,8 +2921,10 @@ squeezeDmd env d (n :* sd) = do
 -- the results when evaluating the arg. TODO think about it more
 squeezeDmdShared :: AnalEnv -> DmdD -> Demand -> AnalM DmdEnv
 squeezeDmdShared env d (n :* sd) = do
-  env <- squeezeSubDmd env d sd
-  pure $! oneifyCard n `multDmdEnv` env
+  fvs <- squeezeSubDmd env d sd
+  -- pprTraceM "squeezeDmdShared" (ppr n <+> text ":*" <+> ppr sd $$ ppr fvs)
+  pure $! oneifyCard n `multDmdEnv` fvs
+
 
 instance HasBind DmdD where
   bind (BindArg x)    arg  body env sd = do
@@ -3089,9 +3093,9 @@ bindFix top_lvl pairs rhss env let_sd
     -- For convenience, we also pass the bndr's DmdSig instead of fetching it
     -- from AnalEnv on every iteration.
     loop :: Int -> [DmdSig] -> AnalM (SPair [DmdSig] WeakDmds)
-    loop n sigs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
-                      --                                   | (id,_) <- sigs]) $
-                      loop' n sigs
+    loop n sigs = -- pprTrace "bindFix" (ppr n <+> vcat [ ppr x <+> ppr sig
+                  --                                    | (x,sig) <- zip bndrs sigs]) $
+                  loop' n sigs
 
     loop' n sigs | n == 10   = abort
                  | otherwise = do
@@ -3127,19 +3131,15 @@ updateListAt 0 x (_:xs) = x:xs
 updateListAt n x (y:xs) = y:updateListAt (n-1) x xs
 updateListAt _ _ [] = panic "oops"
 
-_dmdAnalNew :: AnalEnv
+dmdAnal :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> AnalM DmdType
-_dmdAnalNew env sd e = sPair2DmdType <$> eval e (mapUFM_Directly f (ae_sigs env)) env sd
+dmdAnal env sd e = do
+  let _old = discardAnnotations $ dmdAnal'' env sd e
+  _new <- sPair2DmdType <$> eval e (mapVarEnv f (ae_sigs env)) env sd
+  -- warnPprTraceM (_new /= _old) "URGH" (ppr e $$ ppr sd $$ text "old:" <+> ppr _old $$ text "new:" <+> ppr _new)
+  -- pprTraceM "_dmdAnal" (ppr e $$ ppr sd <+> arrow <+> ppr _new)
+  -- dmdAnal'' env sd e
+  pure $! _old
   where
-    f x (sig, top_lvl) env sd = do
-      -- We imitate `step (Lookup x)` here, for a top-level thing.
-      S2 val fvs <- sig2DmdHnf sig env sd
-      pure $! case top_lvl of
-        NotTopLevel -> S2 val (addVarDmdEnv_Directly fvs x (C_11 :* sd))
-        TopLevel    -> S2 val (addVarDmdEnv_Directly fvs x (C_0N `multDmd` (C_11 :* sd))) -- discard strictness
-
-    addVarDmdEnv_Directly :: DmdEnv -> Unique -> Demand -> DmdEnv
-    -- like addVarDmdEnv, but working on a Unique (which is all we have)
-    addVarDmdEnv_Directly (DE fvs div) x dmd
-      = DE (addToUFM_Directly fvs x (dmd `plusDmd` (lookupVarEnv_Directly fvs x `orElse` defaultFvDmd div))) div
+    f (x, sig, _top_lvl) = step (Lookup x) (sig2DmdHnf sig)

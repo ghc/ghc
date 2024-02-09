@@ -14,8 +14,6 @@ module GHC.Core.Semantics where
 
 import GHC.Prelude
 
-import GHC.Builtin.Uniques
-
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Core.DataCon
@@ -43,6 +41,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.FVs
 import GHC.Core.Class
 import GHC.Types.Id.Info
+import GHC.Types.Unique
 
 data Event = Lookup Id | LookupArg CoreExpr | Update | App1 | App2 | Case1 | Case2 | Let1
 
@@ -63,7 +62,7 @@ class Domain d where
   con :: DataCon -> [d] -> d
   apply :: d -> d -> d
   applyTy :: d -> d -- URGHHH otherwise we have no easy way to discern Type Apps
-  select :: d -> ((CoreExpr -> Bool) -> Bool) -> Id -> [DAlt d] -> d
+  select :: d -> CoreExpr -> Id -> [DAlt d] -> d
   keepAlive :: [d] -> d -- Used for coercion FVs, unfolding and RULE FVs. No simple semantic description for those; pretend that they may or may not be seq'd.
   seq_ :: d -> d -> d -- The primitive one. Just like `select a (const False) wildCardId [(DEFAULT, [], \_a _ds -> b)]`, but we don't have available the type of the LHS.
 type DAlt d = (AltCon, [Id], d -> [d] -> d)
@@ -82,6 +81,16 @@ feignBndr n (Named (Bndr tcv _)) = tcv `setVarName` n
 
 feignId :: Name -> Type -> Id
 feignId n ty = mkLocalIdOrCoVar n ManyTy ty
+
+mkPap :: (Trace d, Domain d) => [PiTyBinder] -> ([d] -> d) -> d
+mkPap arg_bndrs app_head = go [] (zipWith feignBndr localNames arg_bndrs)
+  where
+    go ds []     = app_head (reverse ds)
+    go ds (x:xs) = fun x (\d -> step App2 $ go (d:ds) xs) -- cf. the Lam case of eval
+
+x1,x2 :: Name
+localNames :: [Name]
+localNames@(x1:x2:_) = [ mkSystemName (mkUniqueInt 'I' i) (mkVarOcc "local") | i <- [0..] ]
 
 -- The following does not work, because we need the `idType` of `a` in `select`:
 -- seq_ :: Domain d => d -> d -> d
@@ -129,35 +138,37 @@ keepAliveUnfRules :: Domain d => Id -> IdEnv d -> d
 -- ^ `keepAlive` the free Ids of an Id's unfolding and RULE RHSs.
 keepAliveUnfRules x = keepAliveVars (nonDetEltsUniqSet $ bndrRuleAndUnfoldingIds x)
 
+evalConApp :: (Trace d, Domain d, HasBind d) => DataCon -> [d] -> d
+evalConApp dc args = case compareLength rep_ty_bndrs args of
+  EQ -> con dc args
+  GT -> stuck                                             -- oversaturated  => stuck
+  LT -> mkPap rest_bndrs $ \etas -> con dc (args ++ etas) -- undersaturated => PAP
+  where
+    rep_ty_bndrs = fst $ splitPiTys (dataConRepType dc) -- TODO: Cache this in DataCon?
+    rest_bndrs = dropList args rep_ty_bndrs
+
 evalVar :: (Trace d, Domain d, HasBind d) => Var -> IdEnv d -> (d -> d) -> d
 evalVar x env k = case idDetails x of
-  _ | isTyVar x    -> erased
-  DataConWorkId dc -> k (con dc []) -- TODO
+  _ | isTyVar x    -> k erased
+  DataConWorkId dc -> k (evalConApp dc [])
   DataConWrapId _  -> -- pprTrace "unfolding wrapper" (ppr x $$ ppr (unfoldingTemplate (idUnfolding x))) $
                       k (eval (unfoldingTemplate (idUnfolding x)) emptyVarEnv)
   PrimOpId op _    -> k (primOp x op)
   ClassOpId cls _  -> k (classOp x cls)
   _ | isGlobalId x -> k (global x)
-  _                -> case lookupVarEnv env x of
-                        Just d -> k d
-                        _      -> stuck -- Scoping error. Actually ruled out by the Core type system
+  _                -> maybe stuck k (lookupVarEnv env x)
 
 eval :: (Trace d, Domain d, HasBind d) => CoreExpr -> IdEnv d -> d
 eval (Coercion co) env = keepAliveCo co env
 eval (Type _ty) _ = erased
 eval (Lit l) _ = lit l
 eval (Tick _t e) env = eval e env
-eval (Cast e _co) env = eval e env
+eval (Cast e co) env = keepAliveCo co env `seq_` eval e env
 eval (Var x) env = evalVar x env id
 eval (Lam x e) env = fun x (\d -> step App2 (eval e (extendVarEnv env x d)))
 eval e@App{} env
   | Var v <- f, Just dc <- isDataConWorkId_maybe v
-  = anfiseMany as env $ \es -> case compare (dataConRepArity dc) (length es) of
-      EQ -> con dc es
-      GT -> stuck                                         -- oversaturated  => stuck
-      LT -> mkPap rest_bndrs $ \etas -> con dc (es ++ etas) -- undersaturated => PAP
-        where
-          rest_bndrs = dropList es (fst $ splitPiTys (dataConRepType dc))
+  = anfiseMany as env (evalConApp dc)
   | otherwise
   = anfiseMany (f:as) env $ \(df:das) -> -- NB: anfise is a no-op for Vars
       go df (zipWith (\d a -> (d, isTypeArg a)) das as)
@@ -182,20 +193,37 @@ eval (Let b@(Rec binds) body) env =
     xs = map fst binds
     new_env ds = extendVarEnvList env (zipWith (\x d -> (x, step (Lookup x) d)) xs ds)
 eval (Case e b _ty alts) env = step Case1 $
-  select (eval e env) ($ e) b
+  select (eval e env) e b
          [ (con, xs, cont xs rhs) | Alt con xs rhs <- alts ]
   where
-    cont xs rhs scrut ds = step Case2 $ eval rhs (extendVarEnvList env (zipEqual "eval Case{}" (b:xs) (scrut:ds)))
+    cont xs rhs scrut ds = step Case2 $
+      eval rhs (extendVarEnvList env (zipEqual "eval Case{}" (b:xs) (scrut:ds)))
+        -- TODO: Do we want (step (Lookup b) scrut)? I think not, because Case
+        -- does not actually allocate itself. On the other hand, not all Values
+        -- are currently heap-bound... e.g., case Just x of b -> b would not do
+        -- a lookup transition at all, despite `Just x` living on the heap...
+        -- Urgh, think about it later.
+        -- Literature does not often handle case binders.
+        -- Fast Curry and Frame-limited re-use do not, for example.
+        -- But the former unconditionally let-binds values, thus absolving of
+        -- the problem. Perhaps we should do the same. It's what CorePrep does,
+        -- after all.
 
-mkPap :: (Trace d, Domain d) => [PiTyBinder] -> ([d] -> d) -> d
-mkPap arg_bndrs f = go [] (zipWith feignBndr localNames arg_bndrs)
-  where
-    go ds []     = f (reverse ds)
-    go ds (x:xs) = fun x (\d -> step App2 $ go (d:ds) xs)
-
-x1,x2 :: Name
-localNames :: [Name]
-localNames@(x1:x2:_) = [ mkSystemName (mkBuiltinUnique i) (mkVarOcc "local") | i <- [0..] ]
+--evalProgram :: (Trace d, Domain d, HasBind d) => [CoreRule] -> CoreProgram -> [d]
+--evalProgram rules binds
+--  where
+--    go [] =
+--    keep_alive_roots :: AnalEnv -> [Id] -> DmdEnv
+--    -- See Note [Absence analysis for stable unfoldings and RULES]
+--    -- Here we keep alive "roots", e.g., exported ids and stuff mentioned in
+--    -- orphan RULES
+--    keep_alive_roots env ids = plusDmdEnvs (map (demandRoot env) (filter is_root ids))
+--
+--    is_root :: Id -> Bool
+--    is_root id = isExportedId id || elemVarSet id rule_fvs
+--
+--    rule_fvs :: IdSet
+--    rule_fvs = rulesRhsFreeIds rules
 
 
 -- By-need semantics, from the paper
