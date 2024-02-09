@@ -337,6 +337,7 @@ bindistRules = do
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
     root -/- "bindist" -/- "ghc-*" -/- "configure" %> \configurePath -> do
+        need ["distrib" -/- "configure.ac"]
         ghcRoot <- topDirectory
         copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
         copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
@@ -360,8 +361,7 @@ bindistRules = do
     -- creating the archive).
     forM_ bindistInstallFiles $ \file ->
         root -/- "bindist" -/- "ghc-*" -/- file %> \dest -> do
-            ghcRoot <- topDirectory
-            copyFile (ghcRoot -/- fixup file) dest
+            copyFile (fixup file) dest
 
   where
     fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f

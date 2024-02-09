@@ -134,20 +134,9 @@ CrossCompiling        = @CrossCompiling@
 CrossCompilePrefix    = @CrossCompilePrefix@
 GhcUnregisterised     = @Unregisterised@
 
-# ArchSupportsSMP should be set iff there is support for that arch in
-# rts/include/stg/SMP.h
-ifeq "$(TargetArch_CPP)" "arm"
-# We don't support load/store barriers pre-ARMv7. See #10433.
-ArchSupportsSMP=$(if $(filter $(ARM_ISA),ARMv5 ARMv6),NO,YES)
-else ifeq "$(TargetArch_CPP)" "javascript"
-ArchSupportsSMP=NO
-else
-ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le s390x aarch64 riscv64)))
-endif
-
 # The THREADED_RTS requires `BaseReg` to be in a register and the
 # `GhcUnregisterised` mode doesn't allow that.
-GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
+GhcWithSMP := @GhcWithSMP@
 
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.

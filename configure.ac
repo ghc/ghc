@@ -379,15 +379,7 @@ then
 else
   TargetPlatformFull="${target_alias}"
 fi
-if test "$CrossCompiling" = "YES"
-then
-  # Use value passed by user from --target=
-  CrossCompilePrefix="${TargetPlatformFull}-"
-else
-  CrossCompilePrefix=""
-fi
 AC_SUBST(CrossCompiling)
-AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
 
 dnl ** Which gcc to use?
@@ -623,9 +615,6 @@ FP_LD_NO_WARN_DUPLICATE_LIBRARIES([target], [CONF_GCC_LINKER_OPTS_STAGE2])
 FP_MERGE_OBJECTS_SUPPORTS_RESPONSE_FILES
 
 GHC_LLVM_TARGET_SET_VAR
-# we intend to pass trough --targets to llvm as is.
-LLVMTarget_CPP=`    echo "$LlvmTarget"`
-AC_SUBST(LLVMTarget_CPP)
 # The target is substituted into the distrib/configure.ac file
 AC_SUBST(LlvmTarget)
 
@@ -951,12 +940,10 @@ PREP_TARGET_FILE
 FIND_GHC_TOOLCHAIN([hadrian/cfg])
 
 AC_CONFIG_FILES(
-[ mk/project.mk
-  hadrian/cfg/system.config
+[ hadrian/cfg/system.config
   hadrian/ghci-cabal
   hadrian/ghci-multi-cabal
   hadrian/ghci-stack
-  distrib/configure.ac
   hadrian/cfg/default.host.target
   hadrian/cfg/default.target
 ])

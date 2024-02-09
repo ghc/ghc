@@ -123,7 +123,7 @@ lib/settings : config.mk
 	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@
 	@echo ',("target has libm", "$(TargetHasLibm)")' >> $@
 	@echo ',("Unregisterised", "$(GhcUnregisterised)")' >> $@
-	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
+	@echo ',("LLVM target", "$(LLVMTarget)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM llvm-as command", "$(SettingsLlvmAsCommand)")' >> $@

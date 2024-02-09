@@ -23,18 +23,11 @@ bootstrap_llvm_target=@LlvmTarget@
 TargetHasLibm=@TargetHasLibm@
 AC_SUBST(TargetHasLibm)
 
-FFIIncludeDir=@FFIIncludeDir@
-FFILibDir=@FFILibDir@
-AC_SUBST(FFILibDir)
-AC_SUBST(FFIIncludeDir)
-
-LibdwIncludeDir=@LibdwIncludeDir@
-LibdwLibDir=@LibdwLibDir@
-AC_SUBST(LibdwLibDir)
-AC_SUBST(LibdwIncludeDir)
-
 UseLibffiForAdjustors=@UseLibffiForAdjustors@
 AC_SUBST(UseLibffiForAdjustors)
+
+GhcWithSMP=@GhcWithSMP@
+AC_SUBST(GhcWithSMP)
 
 # We have to run these unconditionally as FPTOOLS_SET_PLATFORMS_VARS wants the
 # values it computes.
@@ -59,13 +52,11 @@ if test "$target" != "$host" ; then
 fi
 LeadingUnderscore="@LeadingUnderscore@"
 CrossCompilePrefix="@CrossCompilePrefix@"
-TargetPlatformFull="${target}"
 TablesNextToCode="@TablesNextToCode@"
 
 AC_SUBST(LeadingUnderscore)
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
-AC_SUBST(TargetPlatformFull)
 AC_SUBST(TablesNextToCode)
 
 Unregisterised="@Unregisterised@"

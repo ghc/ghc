@@ -1,5 +1,5 @@
 # WARNING: mk/project.mk is automatically generated from mk/project.mk.in by
-# ./configure.  Make sure you are editing mk/project.mk.in, not mk/project.mk.
+# Hadrian.  Make sure you are editing mk/project.mk.in, not mk/project.mk.
 
 ################################################################################
 #
@@ -25,8 +25,7 @@
 # random .o-file stuff might change even if the .hi syntax doesn't
 
 ProjectName       = @ProjectName@
-ProjectTags       =
-ProjectVersion    = @ProjectVersion@$(ProjectTags)
+ProjectVersion    = @ProjectVersion@
 ProjectVersionInt = @ProjectVersionInt@
 ProjectPatchLevel = @ProjectPatchLevel@
 ProjectPatchLevel1 = @ProjectPatchLevel1@
@@ -81,54 +80,20 @@ ProjectGitCommitId = @ProjectGitCommitId@
 # You have to do a lot of work by hand to cross compile: see the
 # section on "Porting GHC" in the Building Guide.
 
-HOSTPLATFORM            = @HostPlatform@
 TARGETPLATFORM          = @TargetPlatform@
-BUILDPLATFORM           = @BuildPlatform@
 
-HostPlatform_CPP        = @HostPlatform_CPP@
-HostArch_CPP            = @HostArch_CPP@
 HostOS_CPP              = @HostOS_CPP@
-HostVendor_CPP          = @HostVendor_CPP@
 
 TargetPlatform_CPP      = @TargetPlatform_CPP@
 TargetArch_CPP          = @TargetArch_CPP@
 TargetOS_CPP            = @TargetOS_CPP@
-TargetVendor_CPP        = @TargetVendor_CPP@
-LLVMTarget_CPP          = @LLVMTarget_CPP@
-
-BuildPlatform_CPP       = @BuildPlatform_CPP@
-BuildArch_CPP           = @BuildArch_CPP@
-BuildOS_CPP             = @BuildOS_CPP@
-BuildVendor_CPP         = @BuildVendor_CPP@
-
-@HostPlatform_CPP@_HOST           = 1
-@TargetPlatform_CPP@_TARGET       = 1
-@BuildPlatform_CPP@_BUILD         = 1
-
-@HostArch_CPP@_HOST_ARCH          = 1
-@TargetArch_CPP@_TARGET_ARCH      = 1
-@BuildArch_CPP@_BUILD_ARCH        = 1
-
-@HostOS_CPP@_HOST_OS              = 1
-@TargetOS_CPP@_TARGET_OS          = 1
-@BuildOS_CPP@_BUILD_OS            = 1
-
-@HostVendor_CPP@_HOST_VENDOR      = 1
-@TargetVendor_CPP@_TARGET_VENDOR  = 1
-@BuildVendor_CPP@_BUILD_VENDOR    = 1
+LLVMTarget              = @LLVMTarget@
 
 ################################################################################
 #
 #       Global configuration options
 #
 ################################################################################
-
-# Pin a suffix on executables? If so, what (Windows only).
-exeext0=@exeext_host@
-exeext1=@exeext_target@
-exeext2=@exeext_target@
-exeext3=@exeext_target@
-soext=@soext_target@
 
 # Windows_Host=YES if on a Windows platform
 ifneq "$(findstring $(HostOS_CPP), mingw32)" ""
@@ -142,18 +107,4 @@ ifneq "$(findstring $(HostOS_CPP), darwin)" ""
 Darwin_Host=YES
 else
 Darwin_Host=NO
-endif
-
-# Windows_Target=YES if we are targeting a Windows platform
-ifneq "$(findstring $(TargetOS_CPP), mingw32)" ""
-Windows_Target=YES
-else
-Windows_Target=NO
-endif
-
-# Is the stage0 compiler affected by Bug #9439?
-GHC_LLVM_AFFECTED_BY_9439 = @GHC_LLVM_AFFECTED_BY_9439@
-
-ifeq "$(TargetArch_CPP)" "arm"
-ARM_ISA=@ARM_ISA@
 endif

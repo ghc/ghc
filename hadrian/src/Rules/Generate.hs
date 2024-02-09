@@ -371,6 +371,57 @@ templateRules = do
     [ interpolateVar "LlvmMinVersion" $ replaceEq '.' ',' <$> setting LlvmMinVersion
     , interpolateVar "LlvmMaxVersion" $ replaceEq '.' ',' <$> setting LlvmMaxVersion
     ]
+  bindistRules
+
+bindistRules :: Rules ()
+bindistRules = do
+  templateRule ("mk" -/- "project.mk") $ mconcat
+    [ interpolateSetting "ProjectName" ProjectName
+    , interpolateSetting "ProjectVersion" ProjectVersion
+    , interpolateSetting "ProjectVersionInt" ProjectVersionInt
+    , interpolateSetting "ProjectPatchLevel" ProjectPatchLevel
+    , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
+    , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
+    , interpolateSetting "ProjectGitCommitId" ProjectGitCommitId
+
+    , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
+
+    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
+    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget targetPlatformTriple
+    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget queryArch
+    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
+    , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
+    ]
+  templateRule ("distrib" -/- "configure.ac") $ mconcat
+    [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
+    , interpolateVar "CrossCompilePrefix" $ do
+        crossCompiling <- interp $ getFlag CrossCompiling
+        tpf <- setting TargetPlatformFull
+        pure $ if crossCompiling then tpf <> "-" else ""
+    , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
+    , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
+    , interpolateSetting "LlvmMinVersion" LlvmMinVersion
+    , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
+    , interpolateSetting "ProjectVersion" ProjectVersion
+    , interpolateVar "SettingsUseDistroMINGW" $ settingsFileSetting ToolchainSetting_DistroMinGW
+    , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
+    , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
+    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
+    , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
+    , interpolateVar "TargetWordSize" $ getTarget wordSize
+    , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
+    , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
+    , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
+    ]
+  where
+    interp = interpretInContext (semiEmptyTarget Stage2)
+    getTarget = interp . queryTarget
+
+-- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
+-- the resulting 'String' is a valid C preprocessor identifier.
+cppify :: String -> String
+cppify = replaceEq '-' '_' . replaceEq '.' '_'
 
 
 -- Generators
@@ -486,10 +537,11 @@ generateSettings settingsFile = do
     arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr
     arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
     ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
-    isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness
-    wordSize    = show . wordSize2Bytes . tgtWordSize
     mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
 
+isBigEndian, wordSize :: Toolchain.Target -> String
+isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness
+wordSize    = show . wordSize2Bytes . tgtWordSize
 
 -- | Generate @Config.hs@ files.
 generateConfigHs :: Expr String
