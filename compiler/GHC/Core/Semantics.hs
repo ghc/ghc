@@ -32,7 +32,7 @@ import GHC.Utils.Outputable
 import Control.Monad
 import Control.Monad.Trans.State
 import Data.Word
-import GHC.Core.Utils hiding (findAlt, bindNonRec)
+import GHC.Core.Utils hiding (findAlt)
 import GHC.Core.Type
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types
@@ -43,7 +43,7 @@ import GHC.Core.Class
 import GHC.Types.Id.Info
 import GHC.Types.Unique
 
-data Event = Lookup Id | Update | App1 | App2 | Case1 | Case2 | Let1
+data Event = Lookup Id | LookupArg CoreExpr | Update | App1 | App2 | Case1 | Case2 | Let1
 
 class Trace d where
   step :: Event -> d -> d
@@ -59,7 +59,7 @@ class Domain d where
   classOp :: Id -> Class -> d
   primOp :: Id -> PrimOp -> d
   fun :: Id -> (d -> d) -> d
-  con :: HasCallStack => DataCon -> [d] -> d
+  con :: DataCon -> [d] -> d
   apply :: d -> d -> d
   applyTy :: d -> d -- URGHHH otherwise we have no easy way to discern Type Apps
   select :: d -> CoreExpr -> Id -> [DAlt d] -> d
@@ -67,18 +67,13 @@ class Domain d where
   seq_ :: d -> d -> d -- The primitive one. Just like `select a (const False) wildCardId [(DEFAULT, [], \_a _ds -> b)]`, but we don't have available the type of the LHS.
 type DAlt d = (AltCon, [Id], d -> [d] -> d)
 
-data BindHint = BindArg | BindNonRec | BindRec
+
+data BindHint = BindArg Id | BindLet CoreBind
 class HasBind d where
-  bind :: BindHint -> [(Id, CoreExpr, IdEnv d -> d)] -> (IdEnv d -> d) -> (IdEnv d -> d)
-    -- NB: The passing of syntax bears no semantic sigificance:
+  bind :: BindHint -> [[d] -> d] -> ([d] -> d) -> d
+    -- NB: The `BindHint` bears no semantic sigificance:
     --     `HasBind (D (ByNeed T))` does not look at it.
     --     Still useful for analyses!
-    -- TODO: since we do not intend to have multiple evaluation strategies, we
-    --       could just move `bind` to `Domain`. Do that?
-
--- | To be used with `bind`
-extend :: Trace d => Id -> d -> IdEnv d -> IdEnv d
-extend x d env = extendVarEnv env x (step (Lookup x) d)
 
 feignBndr :: Name -> PiTyBinder -> Var
 feignBndr n (Anon (Scaled mult ty) _) = mkLocalIdOrCoVar n mult ty
@@ -114,13 +109,11 @@ anfise _ (Coercion co) env k = keepAliveCo co env `seq_` k erased
 anfise _ (Type _ty) _ k = k erased
 anfise x (Tick _t e) env k = anfise x e env k
 anfise x (Cast e co) env k = keepAliveCo co env `seq_` anfise x e env k
-anfise x e env k = bind BindArg [(x_id, e, \_ -> step (Lookup x_id) (eval e env))]
-                   (\env -> let d = evalVar x_id env id in
-                            if isUnliftedType (idType x_id) -- && not (exprOkForSpeculation e) -- We evaluate even if ok-for-spec; can always discard those evals later
-                              then d `seq_` k d
-                              else k d)
-                   env
-                   where x_id = feignId x (exprType e)
+anfise x e env k = bind (BindArg (feignId x (exprType e))) [\_ -> eval e env]
+                   (\ds -> let d = step (LookupArg e) (only ds) in
+                           if isUnliftedType (exprType e) && not (exprOkForSpeculation e)
+                             then d `seq_` k d
+                             else k d)
 
 anfiseMany :: (Trace d, Domain d, HasBind d) => [CoreExpr] -> IdEnv d -> ([d] -> d) -> d
 anfiseMany es env k = go (zip localNames es) []
@@ -185,17 +178,20 @@ eval e@App{} env
     go df ((d,is_ty):ds) = go (step App1 $ app df is_ty d) ds
     app df {-isTypeArg=-}True  _da = applyTy df -- There must be a better way...
     app df               False da  = apply   df da
-eval (Let (NonRec x rhs) body) env =
-  bind BindNonRec
+eval (Let b@(NonRec x rhs) body) env =
+  bind (BindLet b)
        -- See Note [Absence analysis for stable unfoldings and RULES]
-       [(x,rhs,\_ -> step (Lookup x) (keepAliveUnfRules x env `seq_` eval rhs env))]
-       (\env' -> step Let1 (eval body env'))
-       env
-eval (Let (Rec binds) body) env =
-  bind BindRec
-       [(x, rhs, \env' -> step (Lookup x) (keepAliveUnfRules x env' `seq_` eval rhs env'))  | (x,rhs) <- binds]
-       (\env' -> step Let1 (eval body env'))
-       env
+       [\_  -> keepAliveUnfRules x env `seq_`
+               eval rhs env]
+       (\ds -> step Let1 (eval body (extendVarEnv env x (step (Lookup x) (only ds)))))
+eval (Let b@(Rec binds) body) env =
+  bind (BindLet b)
+       [\ds -> keepAliveUnfRules x env `seq_`
+               eval rhs  (new_env ds)  | (x,rhs) <- binds]
+       (\ds -> step Let1 (eval body (new_env ds)))
+  where
+    xs = map fst binds
+    new_env ds = extendVarEnvList env (zipWith (\x d -> (x, step (Lookup x) d)) xs ds)
 eval (Case e b _ty alts) env = step Case1 $
   select (eval e env) e b
          [ (con, xs, cont xs rhs) | Alt con xs rhs <- alts ]
@@ -316,11 +312,11 @@ freeList μ = [a..]
   where a = case WM.lookupMax μ of Just (a,_) -> a+1; _ -> 0
 
 instance (Monad τ, forall v. Trace (τ v)) => HasBind (D (ByNeed τ)) where
-  bind _hint rhss body env = do
+  bind _hint rhss body = do
     as <- take (length rhss) . freeList <$> ByNeed get
-    let env' = extendVarEnvList env (zip (map fstOf3 rhss) (map fetch as))
-    ByNeed $ modify (\μ -> foldr (\(a,(_x,_e,eval)) -> WM.insert a (memo a (eval env'))) μ (zip as rhss))
-    body env'
+    let ds = map fetch as
+    ByNeed $ modify (\μ -> foldr (\(a,rhs) -> WM.insert a (memo a (rhs ds))) μ (zip as rhss))
+    body ds
 
 evalByNeed :: CoreExpr -> T (Value (ByNeed T), Heap (ByNeed T))
 evalByNeed e = runStateT (runByNeed (eval e emptyVarEnv)) WM.empty
@@ -328,6 +324,7 @@ evalByNeed e = runStateT (runByNeed (eval e emptyVarEnv)) WM.empty
 -- Boilerplate
 instance Outputable Event where
   ppr (Lookup n) = text "Lookup" <> parens (ppr n)
+  ppr (LookupArg e) = text "LookupArg" <> parens (ppr e)
   ppr Update = text "Update"
   ppr App1 = text "App1"
   ppr App2 = text "App2"

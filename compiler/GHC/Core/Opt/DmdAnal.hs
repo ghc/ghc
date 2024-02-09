@@ -10,7 +10,6 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ViewPatterns #-}
 
 
 module GHC.Core.Opt.DmdAnal
@@ -2927,69 +2926,46 @@ squeezeDmdShared env d (n :* sd) = do
   pure $! oneifyCard n `multDmdEnv` fvs
 
 
-bindLetUp :: Id -> DmdD -> (IdEnv DmdD -> DmdD) -> IdEnv DmdD -> DmdD
-bindLetUp x rhs body env ae sd = do
-  let body_ae = extendAnalEnv NotTopLevel ae x nopSig
-  let body_env = extendVarEnv env x (mkSurrogate x)
-  -- See Note [Bringing a new variable into scope]
-  body_ty <- sPair2DmdType <$> body body_env body_ae sd
-
-  -- See Note [Finalising boxity for demand signatures]
-  let S2 body_ty' id_dmd = findBndrDmd ae body_ty x
-  let id_dmd'            = finaliseLetBoxity ae (idType x) id_dmd
-  annotate da_demands x id_dmd'
-  rhs_ty <- squeezeDmdShared ae rhs id_dmd' --perhaps inline squeezeDmdShared
-  -- pprTraceM "dmdAnal:LetUp" (ppr x <+> ppr id_dmd <+> ppr id_dmd' $$ ppr rhs_ty)
-  pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
-
 instance HasBind DmdD where
-  bind BindArg (only -> (x,e,arg)) body env ae sd = do
+  bind (BindArg x)    arg  body env sd = do
     -- TODO this is pretty much bindLetUp, with some differences:
-    --   1. we don't need to annotate
-    --   2. no need to call finaliseLetBoxity
-    --   3. take care of unlifted args, which we don't need for let due to the
-    --      let-can-float invariant
-    let body_env = extendVarEnv env x (mkSurrogate x)
-    let body_ae = extendAnalEnv NotTopLevel ae x nopSig
+    --   1. we need a surrogate to track eval of x
+    --   2. we don't need to annotate
+    --   3. no need to call finaliseLetBoxity
+    let body_env = extendAnalEnv NotTopLevel env x nopSig
     -- See Note [Bringing a new variable into scope]
-    body_ty <- sPair2DmdType <$> body body_env body_ae sd
+    body_ty <- sPair2DmdType <$> body [mkSurrogate x] body_env sd
 
     -- See Note [Finalising boxity for demand signatures]
-    let S2 body_ty' id_dmd = findBndrDmd ae body_ty x
-    rhs_fvs <- case id_dmd of
-      _n :* sd
-        | isUnliftedType (idType x), Poly _ n <- sd, isAbs n, exprOkForSpeculation e
-        -> arg env ae sd >> pure nopDmdEnv
-      _ -> squeezeDmdShared ae (arg env) id_dmd
-    -- pprTraceM "bindArg" (ppr (x, id_dmd) <+> ppr e $$ text "rhs_fvs =" <+> ppr rhs_fvs)
-    pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_fvs)
-  bind BindNonRec (only -> (x,_e,rhs)) body env ae sd
-    | useLetUp NotTopLevel x = bindLetUp               x rhs body env ae_rhs sd
-    where ae_rhs = enterDFun bind ae
-  bind _ rhss body env ae sd = bindLetDown NotTopLevel rhss  body env ae_rhs sd
-    where ae_rhs = enterDFun bind ae
+    let S2 body_ty' id_dmd = findBndrDmd env body_ty x
+    rhs_ty <- squeezeDmdShared env (only arg []) id_dmd
+    pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
+  bind (BindLet bind) rhss body env sd = case bind of
+    NonRec x _
+      | useLetUp NotTopLevel x -> bindLetUp               x    (only rhss []) body env_rhs sd
+    _                          -> bindLetDown NotTopLevel bind rhss           body env_rhs sd
+    where
+      env_rhs = enterDFun bind env
 
 sig2DmdHnf :: DmdSig -> DmdHnf
 sig2DmdHnf sig _env sd = pure (dmdType2SPair (dmdTransformSig sig sd))
 
-bindLetDown :: TopLevelFlag -> RecFlag -> [(Id, CoreExpr, IdEnv DmdD -> DmdD)] -> (IdEnv DmdD -> DmdD) -> IdEnv DmdD -> DmdD
-bindLetDown top_lvl rec_flag rhss body env ae sd = case rec_flag of
-  NonRecursive | (x,e,rhs) <- only rhss -> do
-    S2 sig weak_fv <- bindRhsSig NonRecursive x e (rhs env) ae sd
+bindLetDown :: TopLevelFlag -> CoreBind -> [[DmdD] -> DmdD] -> ([DmdD] -> DmdD) -> DmdD
+bindLetDown top_lvl bind rhss body env sd = case bind of
+  NonRec x e | let rhs = only rhss -> do
+    S2 sig weak_fv <- bindRhsSig NonRecursive x e (rhs []) env sd
     do_rest [x] [sig] weak_fv
-  Recursive -> do
-    S2 sigs weak_fv <- bindFix top_lvl rhss env ae sd
-    -- pprTraceM "found fix" (ppr (zip (map fst pairs) sigs))
-    do_rest (map fstOf3 rhss) sigs weak_fv
+  Rec pairs -> do
+    S2 sigs weak_fv <- bindFix top_lvl pairs rhss env sd
+    do_rest (map fst pairs) sigs weak_fv
   where
     do_rest bndrs sigs weak_fv = do
-      let env' = extendVarEnvList env (zipWith (\x sig -> step (Lookup x) (sig2DmdHnf sig)) bndrs sigs)
-      let ae' = extendAnalEnvs top_lvl ae bndrs sigs
-      body_ty <- sPair2DmdType <$> body env' ae' sd
+      let env' = extendAnalEnvs top_lvl env bndrs sigs
+      body_ty <- sPair2DmdType <$> body (map sig2DmdHnf sigs) env' sd -- TODO surrogates
       let dmd_ty = addWeakFVs body_ty weak_fv
         -- see Note [Lazy and unleashable free variables]
-      let S2 final_ty id_dmds = findBndrsDmds ae' dmd_ty bndrs
-      -- pprTraceM "bindLetDown" (ppr (zip3 bndrs id_dmds sigs))
+      let S2 final_ty id_dmds = findBndrsDmds env' dmd_ty bndrs
+      -- pprTraceM "dmdAnalBindLetDown" (ppr bndrs <+> ppr id_dmds)
       zipWithM_ (annotateBindDemand top_lvl) bndrs id_dmds
       pure $! dmdType2SPair final_ty
         -- If the actual demand is better than the vanilla call
@@ -3006,13 +2982,28 @@ bindLetDown top_lvl rec_flag rhss body env ae sd = case rec_flag of
         -- bother to re-analyse the RHS.
 
 
+bindLetUp :: Id -> DmdD -> ([DmdD] -> DmdD) -> DmdD
+bindLetUp x rhs body env sd = do
+  let body_env = extendAnalEnv NotTopLevel env x nopSig
+  -- See Note [Bringing a new variable into scope]
+  body_ty <- sPair2DmdType <$> body [nopDmdD] body_env sd
+
+  -- See Note [Finalising boxity for demand signatures]
+  let S2 body_ty' id_dmd = findBndrDmd env body_ty x
+  let id_dmd'            = finaliseLetBoxity env (idType x) id_dmd
+  annotate da_demands x id_dmd'
+  rhs_ty <- squeezeDmdShared env rhs id_dmd' --perhaps inline squeezeDmdShared
+  pprTraceM "dmdAnal:LetUp" (ppr x <+> ppr id_dmd <+> ppr id_dmd' $$ ppr rhs_ty)
+  pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
+
+
 bindRhsSig
-  :: RecFlag -> Id -> CoreExpr -> DmdD -> IdEnv DmdD
+  :: RecFlag -> Id -> CoreExpr -> DmdD
   -> AnalEnv -> SubDemand -> AnalM (SPair DmdSig WeakDmds)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
-bindRhsSig rec_flag x e rhs ae let_sd = do
+bindRhsSig rec_flag x e rhs env let_sd = do
   let
     body_sd
       | isJoinId x
@@ -3020,19 +3011,19 @@ bindRhsSig rec_flag x e rhs ae let_sd = do
       -- See Note [Invariants on join points] invariant 2b, in GHC.Core
       --     threshold_arity matches the join arity of the join point
       -- See Note [Unboxed demand on function bodies returning small products]
-      = unboxedWhenSmall ae rec_flag (resultType_maybe x) let_sd
+      = unboxedWhenSmall env rec_flag (resultType_maybe x) let_sd
       | otherwise
       -- See Note [Unboxed demand on function bodies returning small products]
-      = unboxedWhenSmall ae rec_flag (resultType_maybe x) topSubDmd
+      = unboxedWhenSmall env rec_flag (resultType_maybe x) topSubDmd
     threshold_arity = thresholdArity x e
     rhs_sd = mkCalledOnceDmds threshold_arity body_sd
 
-  rhs_dmd_ty <- sPair2DmdType <$> rhs ae rhs_sd
+  rhs_dmd_ty <- sPair2DmdType <$> rhs env rhs_sd
 
   let
     (lam_bndrs, _) = collectBinders e
     DmdType rhs_env rhs_dmds = rhs_dmd_ty
-    final_rhs_dmds = finaliseArgBoxities ae x threshold_arity rhs_dmds
+    final_rhs_dmds = finaliseArgBoxities env x threshold_arity rhs_dmds
                                          (de_div rhs_env) lam_bndrs
   -- Attach the demands to the outer lambdas of this expression
   -- NB: zipWithM_, not zipWithEqualM_, in contrast to annotateBndrsDemands.
@@ -3057,12 +3048,12 @@ bindRhsSig rec_flag x e rhs ae let_sd = do
                 NonRecursive -> rhs_env
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet ae (bndrRuleAndUnfoldingIds x)
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds x)
 
     -- See Note [Lazy and unleashable free variables]
     !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
     sig        = mkDmdSigForArity threshold_arity (DmdType sig_env final_rhs_dmds)
-    opts       = ae_opts ae
+    opts       = ae_opts env
 
   -- pprTraceM "bindRhsSig" (ppr x $$ ppr let_sd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs)
   annotateSig opts x sig
@@ -3074,11 +3065,11 @@ bindFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> SubDemand
        -> AnalM (SPair [DmdSig] WeakDmds)
-bindFix top_lvl pairs rhss ae let_sd
+bindFix top_lvl pairs rhss env let_sd
   = do sigs <- read_sigs; loop 1 sigs
   where
     bndrs = map fst pairs
-    next_env sigs = extendAnalEnvs top_lvl ae bndrs sigs
+    next_env sigs = extendAnalEnvs top_lvl env bndrs sigs
 
     -- See Note [Initialising strictness]
     read_sigs = do
