@@ -216,6 +216,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
     // I guess we don't need to implement these relaxations (optimizations).
     break;
   default:
+    debugBelch("Missing relocation 0x%x\n", ELF64_R_TYPE(rel->r_info));
     abort();
   }
   return EXIT_SUCCESS;
@@ -229,7 +230,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
  * @param addend  The existing addend. Either explicit or implicit.
  * @return The new computed addend.
  */
-static int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
+int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
                              int64_t addend) {
 
   /* Position where something is relocated */
@@ -240,7 +241,6 @@ static int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   CHECK(P <= (uint64_t)section->start + section->size);
   /* Address of the symbol */
   addr_t S = (addr_t)symbol->addr;
-  CHECK(0x0 != S);
   /* GOT slot for the symbol */
   addr_t GOT_S = (addr_t)symbol->got_addr;
 
@@ -271,10 +271,6 @@ static int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_CALL:
   case R_RISCV_CALL_PLT:
     return S + A - P;
-  case R_RISCV_ALIGN:
-    // I guess we don't need to implement this relaxation. Otherwise, this
-    // should return the number of blank bytes to insert via NOPs.
-    return 0;
   case R_RISCV_ADD8:
   case R_RISCV_ADD16:
   case R_RISCV_ADD32:
@@ -285,7 +281,13 @@ static int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_SUB32:
   case R_RISCV_SUB64:
     return S + A; // Subtract from V when value is set
+  case R_RISCV_RELAX:
+  case R_RISCV_ALIGN:
+    // I guess we don't need to implement this relaxation. Otherwise, this
+    // should return the number of blank bytes to insert via NOPs.
+    break;
   default:
+    debugBelch("Unimplemented relocation: %x", ELF64_R_TYPE(rel->r_info));
     abort(/* unhandled rel */);
   }
 }
@@ -333,7 +335,6 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
                                      ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
       CHECK(0x0 != symbol);
-      CHECK(0x0 != symbol->addr);
 
       /* take explicit addend */
       int64_t addend = rel->r_addend;
