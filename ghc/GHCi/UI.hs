@@ -141,7 +141,7 @@ import Data.Version ( showVersion )
 import qualified Data.Semigroup as S
 import Prelude hiding ((<>))
 
-import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
+import GHC.Utils.Exception as Exception hiding (catch, mask, handle, catches, Handler)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
 import GHC.Unit.Env
@@ -174,6 +174,11 @@ import GHC.TopHandler ( topHandler )
 
 import GHCi.Leak
 import qualified GHC.Unit.Module.Graph as GHC
+import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Utils.Ppr.Colour
+
+import Debug.Trace
+
 
 -----------------------------------------------------------------------------
 
@@ -319,7 +324,7 @@ keepGoing a str = keepGoing' (lift . a) str
 keepGoingMulti :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoingMulti a str = keepGoingMulti' (lift . a) str
 
-keepGoing' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
+keepGoing' :: GhciMonad m => (a -> ExceptGhciError m ()) -> a -> m CmdExecOutcome
 keepGoing' a str = do
   in_multi <- inMultiMode
   if in_multi
@@ -328,7 +333,7 @@ keepGoing' a str = do
   return CmdSuccess
 
 -- For commands which are actually support in multi-mode, initially just :reload
-keepGoingMulti' :: GhciMonad m => (String -> m ()) -> String -> m CmdExecOutcome
+keepGoingMulti' :: GhciMonad m => (String -> ExceptGhciError m ()) -> String -> m CmdExecOutcome
 keepGoingMulti' a str = a str >> return CmdSuccess
 
 inMultiMode :: GhciMonad m => m Bool
@@ -625,7 +630,7 @@ specified at the command line.
 The ghci config file has not yet been processed.
 -}
 
-resetLastErrorLocations :: GhciMonad m => m ()
+resetLastErrorLocations :: GhciMonad m => ExceptGhciError m ()
 resetLastErrorLocations = do
     st <- getGHCiState
     liftIO $ writeIORef (lastErrorLocations st) []
@@ -865,7 +870,7 @@ checkPerms file =
     return ok
 #endif
 
-incrementLineNo :: GhciMonad m => m ()
+incrementLineNo :: GhciMonad m => ExceptGhciError m ()
 incrementLineNo = modifyGHCiState incLineNo
   where
     incLineNo st = st { line_number = line_number st + 1 }
@@ -1012,6 +1017,7 @@ generatePromptFunctionFromString promptS modules_names line =
           'N' -> text' compilerName
           'V' -> text' (showVersion compilerVersion)
           '%' -> pure $ char '%'
+          _   -> error "lol" -- TODO
 
         text' :: GhciMonad m => String -> m SDoc
         text' = pure . text
@@ -1042,7 +1048,7 @@ queryQueue = do
                return (Just c)
 
 -- Reconfigurable pretty-printing Ticket #5461
-installInteractivePrint :: GhciMonad m => Maybe String -> Bool -> m ()
+installInteractivePrint :: GhciMonad m => Maybe String -> Bool -> ExceptGhciError m ()
 installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
@@ -1062,20 +1068,21 @@ runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> InputT GHCi (Maybe String)
              -> InputT GHCi ()
 runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
-    b <- handle (\e -> case fromException e of
-                          Just UserInterrupt -> return $ Just False
-                          _ -> case fromException e of
-                                 Just ghce ->
-                                   do liftIO (print (ghce :: GhcException))
-                                      return Nothing
-                                 _other ->
-                                   liftIO (Exception.throwIO e))
-            (unmask $ runOneCommand eh gCmd)
+    b <- catches (unmask $ runOneCommand eh gCmd)
+           [ Handler $ \(ex :: GhcException)     -> liftIO (print ex) >> pure Nothing    -- TODO
+           , Handler $ \(ex :: SomeException)    -> case fromException ex of
+               Just UserInterrupt -> pure $ Just False
+               _                  -> liftIO $ Exception.throwIO ex
+           ]
     case b of
-      Nothing -> return ()
+      Nothing -> pure ()
       Just success -> do
         unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
+  where
+
+{- JADE_TODO
+-}
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
@@ -1233,7 +1240,7 @@ checkInputForLayout stmt getStmt = do
                then Lexer.activeContext
                else Lexer.lexer False return >> goToEnd
 
-enqueueCommands :: GhciMonad m => [String] -> m ()
+enqueueCommands :: GhciMonad m => [String] -> ExceptGhciError m ()
 enqueueCommands cmds = do
   -- make sure we force any exceptions in the commands while we're
   -- still inside the exception handler, otherwise bad things will
@@ -1342,7 +1349,7 @@ runStmt input step = do
         la' = L (noAnnSrcSpan loc)
       in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey (unitBag (la' bind)) [])))
 
-    setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
+    setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> ExceptGhciError m () -- #17500
     setDumpFilePrefix ic = do
         dflags <- GHC.getInteractiveDynFlags
         GHC.setInteractiveDynFlags dflags { dumpPrefix = modStr ++ "." }
@@ -1405,7 +1412,7 @@ toBreakIdAndLocation (Just inf) = do
                                   breakModule loc == ibi_tick_mod inf,
                                   breakTick loc == ibi_tick_index inf ]
 
-printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
+printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> ExceptGhciError m ()
 printStoppedAtBreakInfo res names = do
   printForUser $ pprStopped res
   --  printTypeOfNames session names
@@ -1414,14 +1421,14 @@ printStoppedAtBreakInfo res names = do
   docs <- mapM pprTypeAndContents [i | AnId i <- tythings]
   printForUserPartWay $ vcat docs
 
-printTypeOfNames :: GHC.GhcMonad m => [Name] -> m ()
+printTypeOfNames :: GHC.GhcMonad m => [Name] -> ExceptGhciError m ()
 printTypeOfNames names
  = mapM_ (printTypeOfName ) $ sortBy compareNames names
 
 compareNames :: Name -> Name -> Ordering
 compareNames = on compare getOccString S.<> on SrcLoc.leftmost_smallest getSrcSpan
 
-printTypeOfName :: GHC.GhcMonad m => Name -> m ()
+printTypeOfName :: GHC.GhcMonad m => Name -> ExceptGhciError m ()
 printTypeOfName n
    = do maybe_tything <- GHC.lookupName n
         case maybe_tything of
@@ -1541,11 +1548,11 @@ getCurrentBreakModule = do
 --
 -----------------------------------------------------------------------------
 
-noArgs :: MonadIO m => m () -> String -> m ()
+noArgs :: MonadIO m => ExceptGhciError m () -> String -> m ()
 noArgs m "" = m
 noArgs _ _  = liftIO $ putStrLn "This command takes no arguments"
 
-withSandboxOnly :: GHC.GhcMonad m => String -> m () -> m ()
+withSandboxOnly :: GHC.GhcMonad m => String -> ExceptGhciError m () -> m ()
 withSandboxOnly cmd this = do
    dflags <- getDynFlags
    if not (gopt Opt_GhciSandbox dflags)
@@ -1556,7 +1563,7 @@ withSandboxOnly cmd this = do
 -----------------------------------------------------------------------------
 -- :help
 
-help :: GhciMonad m => String -> m ()
+help :: GhciMonad m => String -> ExceptGhciError m ()
 help _ = do
     txt <- long_help `fmap` getGHCiState
     liftIO $ putStr txt
@@ -1564,15 +1571,15 @@ help _ = do
 -----------------------------------------------------------------------------
 -- :info
 
-info :: GHC.GhcMonad m => Bool -> String -> m ()
-info _ "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
+info :: GhciMonad m => Bool -> String -> ExceptGhciError m ()
+info _ "" = reportError (GhciCommandSyntaxError "i" ["thing-you-want-info-about"])
 info allInfo s  = handleSourceError printGhciException $ do
     forM_ (words s) $ \thing -> do
       sdoc <- infoThing allInfo thing
       rendered <- showSDocForUser' sdoc
       liftIO (putStrLn rendered)
 
-infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
+infoThing :: GhciMonad m => Bool -> String -> m SDoc
 infoThing allInfo str = do
     names     <- GHC.parseName str
     mb_stuffs <- mapM (GHC.getInfo allInfo) names
@@ -1624,12 +1631,12 @@ runMain s = case toArgsNoLoc s of
 -----------------------------------------------------------------------------
 -- :run
 
-runRun :: GhciMonad m => String -> m ()
+runRun :: GhciMonad m => String -> ExceptGhciError m ()
 runRun s = case toCmdArgs s of
            Left err          -> liftIO (hPutStrLn stderr err)
            Right (cmd, args) -> doWithArgs args cmd
 
-doWithArgs :: GhciMonad m => [String] -> String -> m ()
+doWithArgs :: GhciMonad m => [String] -> String -> ExceptGhciError m ()
 doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
                                        show args ++ " (" ++ cmd ++ ")"]
 
@@ -1660,7 +1667,7 @@ toArgsNoLoc str = map unLoc <$> toArgs fake_loc str
     fake_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
     -- this should never be seen, because it's discarded with the `map unLoc`
 
-toArgsNoLocWithErrorHandler :: GhciMonad m => String -> ([String] -> m ()) -> m ()
+toArgsNoLocWithErrorHandler :: GhciMonad m => String -> ([String] -> ExceptGhciError m ()) -> m ()
 toArgsNoLocWithErrorHandler str f = case toArgsNoLoc str of
   Left err -> reportError $ GhciInvalidArgumentString err
   Right ok -> f ok
@@ -1668,7 +1675,7 @@ toArgsNoLocWithErrorHandler str f = case toArgsNoLoc str of
 -----------------------------------------------------------------------------
 -- :cd
 
-changeDirectory :: GhciMonad m => String -> m ()
+changeDirectory :: GhciMonad m => String -> ExceptGhciError m ()
 changeDirectory "" = do
   -- :cd on its own changes to the user's home directory
   either_dir <- liftIO $ tryIO getHomeDirectory
@@ -1703,14 +1710,14 @@ trySuccess act =
 -----------------------------------------------------------------------------
 -- :edit
 
-editFile :: GhciMonad m => String -> m ()
+editFile :: GhciMonad m => String -> ExceptGhciError m ()
 editFile str =
   do file <- if null str then chooseEditFile else expandPath str
      st <- getGHCiState
      errs <- liftIO $ readIORef $ lastErrorLocations st
      let cmd = editor st
      when (null cmd)
-       $ throwGhcException (CmdLineError "editor not set, use :set editor")
+       $ reportError GhciNoSetEditor
      lineOpt <- liftIO $ do
          let sameFile p1 p2 = liftA2 (==) (canonicalizePath p1) (canonicalizePath p2)
               `catchIO` (\_ -> return False)
@@ -1764,7 +1771,7 @@ chooseEditFile =
 -----------------------------------------------------------------------------
 -- :def
 
-defineMacro :: GhciMonad m => Bool{-overwrite-} -> String -> m ()
+defineMacro :: GhciMonad m => Bool{-overwrite-} -> String -> ExceptGhciError m ()
 defineMacro _ (':':_) = reportError (GhciInvalidMacroStart "a colon") >> failIfExprEvalMode
 defineMacro _ ('!':_) = reportError (GhciInvalidMacroStart "an exclamation mark") >> failIfExprEvalMode -- TODO
 defineMacro overwrite s = do
@@ -1779,12 +1786,9 @@ defineMacro overwrite s = do
   else do
     isCommand <- isJust <$> lookupCommand' macro_name
     let check_newname
-          | macro_name `elem` defined = throwGhcException (CmdLineError
-            ("macro '" ++ macro_name ++ "' is already defined. " ++ hint))
-          | isCommand = throwGhcException (CmdLineError
-            ("macro '" ++ macro_name ++ "' overwrites builtin command. " ++ hint))
-          | otherwise = return ()
-        hint = " Use ':def!' to overwrite."
+          | macro_name `elem` defined = reportError (GhciMacroAlreadyDefined macro_name)
+          | isCommand                 = reportError (GhciMacroOverwritesBuiltin macro_name)
+          | otherwise = pure ()
 
     unless overwrite check_newname
     -- compile the expression
@@ -1829,7 +1833,7 @@ runMacro fun s = do
 -----------------------------------------------------------------------------
 -- :undef
 
-undefineMacro :: GhciMonad m => String -> m ()
+undefineMacro :: GhciMonad m => String -> ExceptGhciError m ()
 undefineMacro str = mapM_ undef (words str)
  where undef macro_name = do
         cmds <- ghci_macros <$> getGHCiState
@@ -1846,7 +1850,7 @@ undefineMacro str = mapM_ undef (words str)
 -----------------------------------------------------------------------------
 -- :cmd
 
-cmdCmd :: GhciMonad m => String -> m ()
+cmdCmd :: GhciMonad m => String -> ExceptGhciError m ()
 cmdCmd str = handleSourceError printErrAndMaybeExit $ do
     step <- getGhciStepIO
     expr <- GHC.parseExpr str
@@ -1872,11 +1876,33 @@ getGhciStepIO = do
   return $ noLocA $ ExprWithTySig noAnn body tySig
 
 -----------------------------------------------------------------------------
+-- :check
+
+checkModule :: GhciMonad m => String -> ExceptGhciError m ()
+checkModule m = do
+  let modl = GHC.mkModuleName m
+  ok <- handleSourceError (\e -> printErrAndMaybeExit e >> return False) $ do
+          r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
+          dflags <- getDynFlags
+          liftIO $ putStrLn $ showSDoc dflags $
+           case GHC.moduleInfo r of
+             cm | Just scope <- GHC.modInfoTopLevelScope cm ->
+                let
+                    (loc, glob) = assert (all isExternalName scope) $
+                                  partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
+                in
+                        (text "global names: " <+> ppr glob) $$
+                        (text "local  names: " <+> ppr loc)
+             _ -> empty
+          return True
+  afterLoad (successIf ok) Check
+
+-----------------------------------------------------------------------------
 -- :doc
 
-docCmd :: GHC.GhcMonad m => String -> m ()
+docCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 docCmd "" =
-  throwGhcException (CmdLineError "syntax: ':doc <thing-you-want-docs-for>'")
+  throwGhcException (CmdLineError "syntax: ':doc <thing-you-want-docs-for>'") -- TODO
 docCmd s  = do
   -- TODO: Maybe also get module headers for module names
   names <- GHC.parseName s
@@ -2001,10 +2027,10 @@ loadModule fs = do
   either (liftIO . Exception.throwIO) return result
 
 -- | @:load@ command
-loadModule_ :: GhciMonad m => [FilePath] -> m ()
+loadModule_ :: GhciMonad m => [FilePath] -> ExceptGhciError m ()
 loadModule_ fs = void $ loadModule (zip3 fs (repeat Nothing) (repeat Nothing))
 
-loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
+loadModuleDefer :: GhciMonad m => [FilePath] -> ExceptGhciError m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
 
 loadModule' :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
@@ -2042,7 +2068,7 @@ loadModule' files = do
       load_module
 
 -- | @:add@ command
-addModule :: GhciMonad m => [FilePath] -> m ()
+addModule :: GhciMonad m => [FilePath] -> ExceptGhciError m ()
 addModule files = do
   revertCAFs -- always revert CAFs on load/add.
   files' <- mapM expandPath files
@@ -2079,7 +2105,7 @@ addModule files = do
       return exists
 
 -- | @:unadd@ command
-unAddModule :: GhciMonad m => [FilePath] -> m ()
+unAddModule :: GhciMonad m => [FilePath] -> ExceptGhciError m ()
 unAddModule files = do
   files' <- mapM expandPath files
   targets <- mapM (\m -> GHC.guessTarget m Nothing Nothing) files'
@@ -2089,7 +2115,7 @@ unAddModule files = do
   return ()
 
 -- | @:reload@ command
-reloadModule :: GhciMonad m => String -> m ()
+reloadModule :: GhciMonad m => String -> ExceptGhciError m ()
 reloadModule m = do
   session <- GHC.getSession
   let home_unit = homeUnitId (hsc_home_unit session)
@@ -2099,7 +2125,7 @@ reloadModule m = do
     loadTargets hu | null m    = LoadAllTargets
                    | otherwise = LoadUpTo (mkModule hu (GHC.mkModuleName m))
 
-reloadModuleDefer :: GhciMonad m => String -> m ()
+reloadModuleDefer :: GhciMonad m => String -> ExceptGhciError m ()
 reloadModuleDefer = wrapDeferTypeErrors . reloadModule
 
 -- | Load/compile targets and (optionally) collect module-info
@@ -2158,7 +2184,7 @@ afterLoad
   :: GhciMonad m
   => SuccessFlag
   -> LoadType
-  -> m ()
+  -> ExceptGhciError m ()
 afterLoad ok load_type = do
   revertCAFs  -- always revert CAFs on load.
   discardTickArrays
@@ -2167,7 +2193,7 @@ afterLoad ok load_type = do
   graph <- GHC.getModuleGraph
   setContextAfterLoad (isReload load_type) (Just graph)
 
-setContextAfterLoad :: GhciMonad m => Bool -> Maybe GHC.ModuleGraph -> m ()
+setContextAfterLoad :: GhciMonad m => Bool -> Maybe GHC.ModuleGraph -> ExceptGhciError m ()
 setContextAfterLoad keep_ctxt Nothing = do
   setContextKeepingPackageModules keep_ctxt []
 setContextAfterLoad keep_ctxt (Just graph) = do
@@ -2217,7 +2243,7 @@ setContextKeepingPackageModules
   => Bool                 -- True  <=> keep all of remembered_ctx
                           -- False <=> just keep package imports
   -> [InteractiveImport]  -- new context
-  -> m ()
+  -> ExceptGhciError m ()
 setContextKeepingPackageModules keep_ctx trans_ctx = do
 
   st <- getGHCiState
@@ -2296,15 +2322,17 @@ modulesLoadedMsg ok mods load_type = do
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
 -- and printing 'throwE' strings to 'stderr'. If in expression
 -- evaluation mode - throw GhcException and exit.
-runExceptGhciMonad :: GhciMonad m => ExceptT SDoc m () -> m ()
+runExceptGhciMonad :: GhciMonad m => ExceptGhciError m () -> m ()
 runExceptGhciMonad act = handleSourceError printGhciException $
                          either handleErr pure =<<
                          runExceptT act
   where
-    handleErr sdoc = do
-        rendered <- showSDocForUserQualify sdoc
-        liftIO $ hPutStrLn stderr rendered
-        failIfExprEvalMode
+    handleErr err = printCommandError err >> failIfExprEvalMode -- JADE_TODO
+    printCommandError err =
+      printForUser . coloured colBold $ (coloured colRedFg (text "error")) <> colon <+> prefix err $$
+        nest 2 (ppr err) $$ text ""
+    prefix = maybe empty (brackets . ppr . set_ghci_ns) . constructorCode
+    set_ghci_ns c = c { diagnosticCodeNameSpace = "GHCi" }
 
 -- | Inverse of 'runExceptT' for \"pure\" computations
 -- (c.f. 'except' for 'Except')
@@ -2314,7 +2342,7 @@ exceptT = ExceptT . pure
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
 
-typeOfExpr :: GhciMonad m => String -> m ()
+typeOfExpr :: GhciMonad m => String -> ExceptGhciError m ()
 typeOfExpr str = handleSourceError printErrAndMaybeExit $
     case break isSpace str of
       ("+v", _)    -> printForUser (text "`:type +v' has gone; use `:type' instead")
@@ -2329,7 +2357,7 @@ typeOfExpr str = handleSourceError printErrAndMaybeExit $
 -----------------------------------------------------------------------------
 -- | @:type-at@ command
 
-typeAtCmd :: GhciMonad m => String -> m ()
+typeAtCmd :: GhciMonad m => String -> ExceptGhciError m ()
 typeAtCmd str = runExceptGhciMonad $ do
     (span',sample) <- exceptT $ parseSpanArg str
     infos      <- lift $ mod_infos <$> getGHCiState
@@ -2342,7 +2370,7 @@ typeAtCmd str = runExceptGhciMonad $ do
 -----------------------------------------------------------------------------
 -- | @:uses@ command
 
-usesCmd :: GhciMonad m => String -> m ()
+usesCmd :: GhciMonad m => String -> ExceptGhciError m ()
 usesCmd str = runExceptGhciMonad $ do
     (span',sample) <- exceptT $ parseSpanArg str
     infos  <- lift $ mod_infos <$> getGHCiState
@@ -2352,7 +2380,7 @@ usesCmd str = runExceptGhciMonad $ do
 -----------------------------------------------------------------------------
 -- | @:loc-at@ command
 
-locAtCmd :: GhciMonad m => String -> m ()
+locAtCmd :: GhciMonad m => String -> ExceptGhciError m ()
 locAtCmd str = runExceptGhciMonad $ do
     (span',sample) <- exceptT $ parseSpanArg str
     infos    <- lift $ mod_infos <$> getGHCiState
@@ -2362,7 +2390,7 @@ locAtCmd str = runExceptGhciMonad $ do
 -----------------------------------------------------------------------------
 -- | @:all-types@ command
 
-allTypesCmd :: GhciMonad m => String -> m ()
+allTypesCmd :: GhciMonad m => String -> ExceptGhciError m ()
 allTypesCmd _ = runExceptGhciMonad $ do
     infos <- lift $ mod_infos <$> getGHCiState
     forM_ (M.elems infos) $ \mi ->
@@ -2380,7 +2408,7 @@ allTypesCmd _ = runExceptGhciMonad $ do
 -- Helpers for locAtCmd/typeAtCmd/usesCmd
 
 -- | Parse a span: <module-name/filepath> <sl> <sc> <el> <ec> <string>
-parseSpanArg :: String -> Either SDoc (RealSrcSpan,String)
+parseSpanArg :: String -> Either GhciCommandError (RealSrcSpan,String)
 parseSpanArg s = do
     (fp,s0) <- readAsString (skipWs s)
     s0'     <- skipWs1 s0
@@ -2404,13 +2432,13 @@ parseSpanArg s = do
 
     return (span',trailer)
   where
-    readAsInt :: String -> Either SDoc (Int,String)
-    readAsInt "" = Left "Premature end of string while expecting Int"
+    readAsInt :: String -> Either GhciCommandError (Int,String)
+    readAsInt "" = left' SpanPrematureEnd
     readAsInt s0 = case reads s0 of
         [s_rest] -> Right s_rest
-        _        -> Left ("Couldn't read" <+> text (show s0) <+> "as Int")
+        _        -> left' $ SpanNoReadAs (show s0) "Int"
 
-    readAsString :: String -> Either SDoc (String,String)
+    readAsString :: String -> Either GhciCommandError (String,String)
     readAsString s0
       | '"':_ <- s0 = case reads s0 of
           [s_rest] -> Right s_rest
@@ -2418,11 +2446,13 @@ parseSpanArg s = do
       | s_rest@(_:_,_) <- breakWs s0 = Right s_rest
       | otherwise = leftRes
       where
-        leftRes = Left ("Couldn't read" <+> text (show s0) <+> "as String")
+        leftRes = left' $ SpanNoReadAs (show s0) "String"
 
-    skipWs1 :: String -> Either SDoc String
+    skipWs1 :: String -> Either GhciCommandError String
     skipWs1 (c:cs) | isWs c = Right (skipWs cs)
-    skipWs1 s0 = Left ("Expected whitespace in" <+> text (show s0))
+    skipWs1 s0 = left' $ SpanExpectedWS (show s0)
+
+    left' = Left . GhciArgumentParseError
 
     isWs    = (`elem` [' ','\t'])
     skipWs  = dropWhile isWs
@@ -2453,7 +2483,7 @@ showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
 -----------------------------------------------------------------------------
 -- | @:kind@ command
 
-kindOfType :: GhciMonad m => Bool -> String -> m ()
+kindOfType :: GhciMonad m => Bool -> String -> ExceptGhciError m ()
 kindOfType norm str = handleSourceError printErrAndMaybeExit $ do
     (ty, kind) <- GHC.typeKind norm str
     printForUser $ vcat [ text str <+> dcolon <+> pprSigmaType kind
@@ -2493,7 +2523,8 @@ words' s = case dropWhile isSpace s of
   go acc (c : cs) | isSpace c = acc [] : words' cs
                   | otherwise = go (acc . (c :)) cs
 
-runScript :: String    -- ^ filename
+runScript :: ()
+           => String    -- ^ filename
            -> InputT GHCi ()
 runScript filename = do
   filename' <- expandPath filename
@@ -2523,7 +2554,7 @@ runScript filename = do
 
 -- Displaying Safe Haskell properties of a module
 
-isSafeCmd :: GHC.GhcMonad m => String -> m ()
+isSafeCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 isSafeCmd m =
     case words m of
         [s] | looksLikeModuleName s -> do
@@ -2533,7 +2564,7 @@ isSafeCmd m =
                  isSafeModule md
         _ -> throwGhcException (CmdLineError "syntax:  :issafe <module>")
 
-isSafeModule :: GHC.GhcMonad m => Module -> m ()
+isSafeModule :: GHC.GhcMonad m => Module -> ExceptGhciError m ()
 isSafeModule m = do
     mb_mod_info <- GHC.getModuleInfo m
     when (isNothing mb_mod_info)
@@ -2583,7 +2614,7 @@ isSafeModule m = do
 
 -- Browsing a module's contents
 
-browseCmd :: GHC.GhcMonad m => Bool -> String -> m ()
+browseCmd :: GHC.GhcMonad m => Bool -> String -> ExceptGhciError m ()
 browseCmd bang m =
   case words m of
     ['*':s] | looksLikeModuleName s -> do
@@ -2613,7 +2644,7 @@ guessCurrentModule cmd = do
 -- with bang, show class methods and data constructors separately, and
 --            indicate import modules, to aid qualifying unqualified names
 -- with sorted, sort items alphabetically
-browseModule :: GHC.GhcMonad m => Bool -> Module -> Bool -> m ()
+browseModule :: GHC.GhcMonad m => Bool -> Module -> Bool -> ExceptGhciError m ()
 browseModule bang modl exports_only = do
   mb_mod_info <- GHC.getModuleInfo modl
   case mb_mod_info of
@@ -2699,7 +2730,7 @@ browseModule bang modl exports_only = do
 -- Setting the module context.  For details on context handling see
 -- "remembered_ctx" and "transient_ctx" in GhciMonad.
 
-moduleCmd :: GhciMonad m => String -> m ()
+moduleCmd :: GhciMonad m => String -> ExceptGhciError m ()
 moduleCmd str
   | all sensible strs = cmd
   | otherwise = throwGhcException (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
@@ -2728,16 +2759,16 @@ moduleCmd str
 --   (c) :module <stuff>:      setContext
 --   (d) import <module>...:   addImportToContext
 
-addModulesToContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+addModulesToContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> ExceptGhciError m ()
 addModulesToContext starred unstarred = restoreContextOnFailure $ do
    addModulesToContext_ starred unstarred
 
-addModulesToContext_ :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+addModulesToContext_ :: GhciMonad m => [ModuleName] -> [ModuleName] -> ExceptGhciError m ()
 addModulesToContext_ starred unstarred = do
    mapM_ addII (map mkIIModule starred ++ map mkIIDecl unstarred)
    setGHCContextFromGHCiState
 
-remModulesFromContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+remModulesFromContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> ExceptGhciError m ()
 remModulesFromContext  starred unstarred = do
    -- we do *not* call restoreContextOnFailure here.  If the user
    -- is trying to fix up a context that contains errors by removing
@@ -2745,7 +2776,7 @@ remModulesFromContext  starred unstarred = do
    mapM_ rm (starred ++ unstarred)
    setGHCContextFromGHCiState
  where
-   rm :: GhciMonad m => ModuleName -> m ()
+   rm :: GhciMonad m => ModuleName -> ExceptGhciError m ()
    rm str = do
      m <- moduleName <$> lookupModuleName str
      let filt = filter ((/=) m . iiModuleName)
@@ -2753,19 +2784,19 @@ remModulesFromContext  starred unstarred = do
         st { remembered_ctx = filt (remembered_ctx st)
            , transient_ctx  = filt (transient_ctx st) }
 
-setContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+setContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> ExceptGhciError m ()
 setContext starred unstarred = restoreContextOnFailure $ do
   modifyGHCiState $ \st -> st { remembered_ctx = [], transient_ctx = [] }
                                 -- delete the transient context
   addModulesToContext_ starred unstarred
 
-addImportToContext :: GhciMonad m => ImportDecl GhcPs -> m ()
+addImportToContext :: GhciMonad m => ImportDecl GhcPs -> ExceptGhciError m ()
 addImportToContext idecl = restoreContextOnFailure $ do
   addII (IIDecl idecl)   -- #5836
   setGHCContextFromGHCiState
 
 -- Util used by addImportToContext and addModulesToContext
-addII :: GhciMonad m => InteractiveImport -> m ()
+addII :: GhciMonad m => InteractiveImport -> ExceptGhciError m ()
 addII iidecl = do
   checkAdd iidecl
   modifyGHCiState $ \st ->
@@ -2796,7 +2827,7 @@ restoreContextOnFailure do_this = do
 -- -----------------------------------------------------------------------------
 -- Validate a module that we want to add to the context
 
-checkAdd :: GHC.GhcMonad m => InteractiveImport -> m ()
+checkAdd :: GHC.GhcMonad m => InteractiveImport -> ExceptGhciError m ()
 checkAdd ii = do
   dflags <- getDynFlags
   let safe = safeLanguageOn dflags
@@ -2828,7 +2859,7 @@ checkAdd ii = do
 -- override the implicit Prelude import you can say 'import Prelude ()'
 -- at the prompt, just as in Haskell source.
 --
-setGHCContextFromGHCiState :: GhciMonad m => m ()
+setGHCContextFromGHCiState :: GhciMonad m => ExceptGhciError m ()
 setGHCContextFromGHCiState = do
   st <- getGHCiState
       -- re-use checkAdd to check whether the module is valid.  If the
@@ -2944,7 +2975,7 @@ iiSubsumes _ _ = False
 -- This is pretty fragile: most options won't work as expected.  ToDo:
 -- figure out which ones & disallow them.
 
-setCmd :: GhciMonad m => String -> m ()
+setCmd :: GhciMonad m => String -> ExceptGhciError m ()
 setCmd ""   = showOptions False
 setCmd "-a" = showOptions True
 setCmd str
@@ -2970,12 +3001,12 @@ setCmd str
         setLocalConfigBehaviour $ dropWhile isSpace rest
     _ -> toArgsNoLocWithErrorHandler str (void . keepGoing' setOptions)
 
-setiCmd :: GhciMonad m => String -> m ()
+setiCmd :: GhciMonad m => String -> ExceptGhciError m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
 setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
 setiCmd str  = toArgsNoLocWithErrorHandler str (newDynFlags True)
 
-showOptions :: GhciMonad m => Bool -> m ()
+showOptions :: GhciMonad m => Bool -> ExceptGhciError m ()
 showOptions show_all
   = do st <- getGHCiState
        dflags <- getDynFlags
@@ -3025,9 +3056,9 @@ showDynFlags show_all dflags = do
                , Opt_PrintEvldWithShow
                ]
 
-setArgs, setOptions :: GhciMonad m => [String] -> m ()
-setProg, setEditor, setStop :: GhciMonad m => String -> m ()
-setLocalConfigBehaviour :: GhciMonad m => String -> m ()
+setArgs, setOptions :: GhciMonad m => [String] -> ExceptGhciError m ()
+setProg, setEditor, setStop :: GhciMonad m => String -> ExceptGhciError m ()
+setLocalConfigBehaviour :: GhciMonad m => String -> ExceptGhciError m ()
 
 setArgs args = do
   st <- getGHCiState
@@ -3064,13 +3095,13 @@ setStop str@(c:_) | isDigit c
             setGHCiState st{ breaks = new_breaks }
 setStop cmd = modifyGHCiState (\st -> st { stop = cmd })
 
-setPrompt :: GhciMonad m => PromptFunction -> m ()
+setPrompt :: GhciMonad m => PromptFunction -> ExceptGhciError m ()
 setPrompt v = modifyGHCiState (\st -> st {prompt = v})
 
-setPromptCont :: GhciMonad m => PromptFunction -> m ()
+setPromptCont :: GhciMonad m => PromptFunction -> ExceptGhciError m ()
 setPromptCont v = modifyGHCiState (\st -> st {prompt_cont = v})
 
-setPromptFunc :: GHC.GhcMonad m => (PromptFunction -> m ()) -> String -> m ()
+setPromptFunc :: GHC.GhcMonad m => (PromptFunction -> ExceptGhciError m ()) -> String -> ExceptGhciError m ()
 setPromptFunc fSetPrompt s = do
     -- We explicitly annotate the type of the expression to ensure
     -- that unsafeCoerce# is passed the exact type necessary rather
@@ -3085,7 +3116,7 @@ setPromptFunc fSetPrompt s = do
                                        liftM text (func mods line))
 
 setPromptString :: MonadIO m
-                => (PromptFunction -> m ()) -> String -> String -> m ()
+                => (PromptFunction -> ExceptGhciError m ()) -> String -> String -> ExceptGhciError m ()
 setPromptString fSetPrompt value err = do
   if null value
     then liftIO $ hPutStrLn stderr $ err
@@ -3100,7 +3131,7 @@ setPromptString fSetPrompt value err = do
              setParsedPromptString fSetPrompt value
 
 setParsedPromptString :: MonadIO m
-                      => (PromptFunction -> m ()) ->  String -> m ()
+                      => (PromptFunction -> ExceptGhciError m ()) ->  String -> ExceptGhciError m ()
 setParsedPromptString fSetPrompt s = do
   case (checkPromptStringForErrors s) of
     Just err ->
@@ -3119,7 +3150,7 @@ setOptions wds =
 -- use 'parseDynamicFlagsCmdLine' rather than 'parseDynamicFlags'. This
 -- function is called very often and results in repeatedly loading
 -- environment files (see #19650)
-newDynFlags :: GhciMonad m => Bool -> [String] -> m ()
+newDynFlags :: GhciMonad m => Bool -> [String] -> ExceptGhciError m ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
@@ -3188,7 +3219,7 @@ unknownFlagsErr fs = throwGhcException $ CmdLineError $ concatMap oneError fs
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
     ghciFlags = nubSort $ flagsForCompletion True
 
-unsetOptions :: GhciMonad m => String -> m ()
+unsetOptions :: GhciMonad m => String -> ExceptGhciError m ()
 unsetOptions str
   =   -- first, deal with the GHCi opts (+s, +t, etc.)
      let opts = words str
@@ -3227,7 +3258,7 @@ isPlus :: String -> Either String String
 isPlus ('+':opt) = Left opt
 isPlus other     = Right other
 
-setOpt, unsetOpt :: GhciMonad m => String -> m ()
+setOpt, unsetOpt :: GhciMonad m => String -> ExceptGhciError m ()
 
 setOpt str
   = case strToGHCiOpt str of
@@ -3258,7 +3289,7 @@ optToStr CollectInfo = "c"
 -- ---------------------------------------------------------------------------
 -- :show
 
-showCmd :: forall m. GhciMonad m => String -> m ()
+showCmd :: forall m. GhciMonad m => String -> ExceptGhciError m ()
 showCmd ""   = showOptions False
 showCmd "-a" = showOptions True
 showCmd str = do
@@ -3266,14 +3297,14 @@ showCmd str = do
     dflags <- getDynFlags
     hsc_env <- GHC.getSession
 
-    let lookupCmd :: String -> Maybe (m ())
+    let lookupCmd :: String -> Maybe (ExceptGhciError m ())
         lookupCmd name = lookup name $ map (\(_,b,c) -> (b,c)) cmds
 
         -- (show in help?, command name, action)
-        action :: String -> m () -> (Bool, String, m ())
+        action :: String -> ExceptGhciError m () -> (Bool, String, ExceptGhciError m ())
         action name m = (True, name, m)
 
-        hidden :: String -> m () -> (Bool, String, m ())
+        hidden :: String -> ExceptGhciError m () -> (Bool, String, ExceptGhciError m ())
         hidden name m = (False, name, m)
 
         cmds =
@@ -3307,7 +3338,7 @@ showCmd str = do
               $ hang (text ":show") 6
               $ brackets (fsep $ punctuate (text " |") helpCmds)
 
-showiCmd :: GHC.GhcMonad m => String -> m ()
+showiCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 showiCmd str = do
   case words str of
         ["languages"]  -> showiLanguages -- backwards compat
@@ -3315,7 +3346,7 @@ showiCmd str = do
         ["lang"]       -> showiLanguages -- useful abbreviation
         _ -> throwGhcException (CmdLineError ("syntax:  :showi language"))
 
-showImports :: GhciMonad m => m ()
+showImports :: GhciMonad m => ExceptGhciError m ()
 showImports = do
   st <- getGHCiState
   dflags <- getDynFlags
@@ -3338,7 +3369,7 @@ showImports = do
                            map show_prel prel_iidecls ++
                            map show_extra (extra_imports st))
 
-showModules :: GHC.GhcMonad m => m ()
+showModules :: GHC.GhcMonad m => ExceptGhciError m ()
 showModules = do
   loaded_mods <- getLoadedModules
         -- we want *loaded* modules only, see #1734
@@ -3350,7 +3381,7 @@ getLoadedModules = do
   graph <- GHC.getModuleGraph
   filterM isLoadedModSummary (GHC.mgModSummaries graph)
 
-showBindings :: GHC.GhcMonad m => m ()
+showBindings :: GHC.GhcMonad m => ExceptGhciError m ()
 showBindings = do
     bindings <- GHC.getBindings
     (insts, finsts) <- GHC.getInsts
@@ -3373,7 +3404,7 @@ showBindings = do
         $$ showFixity thing fixity
 
 
-printTyThing :: GHC.GhcMonad m => TyThing -> m ()
+printTyThing :: GHC.GhcMonad m => TyThing -> ExceptGhciError m ()
 printTyThing tyth = printForUser (pprTyThing showToHeader tyth)
 
 isLoadedModSummary :: GHC.GhcMonad m => ModSummary -> m Bool
@@ -3401,12 +3432,12 @@ Note [What to show to users] in GHC.Runtime.Eval
 -}
 
 
-showBkptTable :: GhciMonad m => m ()
+showBkptTable :: GhciMonad m => ExceptGhciError m ()
 showBkptTable = do
   st <- getGHCiState
   printForUser $ prettyLocations (breaks st)
 
-showContext :: GHC.GhcMonad m => m ()
+showContext :: GHC.GhcMonad m => ExceptGhciError m ()
 showContext = do
    resumes <- GHC.getResumeContext
    printForUser $ vcat (map pp_resume (reverse resumes))
@@ -3426,7 +3457,7 @@ pprStopped res =
  where
   mb_mod_name = moduleName <$> ibi_tick_mod <$> GHC.resumeBreakpointId res
 
-showUnits :: GHC.GhcMonad m => m ()
+showUnits :: GHC.GhcMonad m => ExceptGhciError m ()
 showUnits = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
@@ -3434,7 +3465,7 @@ showUnits = do
     text ("active package flags:"++if null pkg_flags then " none" else "") $$
       nest 2 (vcat (map pprFlag pkg_flags))
 
-showPaths :: GHC.GhcMonad m => m ()
+showPaths :: GHC.GhcMonad m => ExceptGhciError m ()
 showPaths = do
   dflags <- getDynFlags
   liftIO $ do
@@ -3447,10 +3478,10 @@ showPaths = do
       text ("module import search paths:"++if null ipaths then " none" else "") $$
         nest 2 (vcat (map text ipaths))
 
-showLanguages :: GHC.GhcMonad m => m ()
+showLanguages :: GHC.GhcMonad m => ExceptGhciError m ()
 showLanguages = getDynFlags >>= liftIO . showLanguages' False
 
-showiLanguages :: GHC.GhcMonad m => m ()
+showiLanguages :: GHC.GhcMonad m => ExceptGhciError m ()
 showiLanguages = GHC.getInteractiveDynFlags >>= liftIO . showLanguages' False
 
 showLanguages' :: Bool -> DynFlags -> IO ()
@@ -3481,10 +3512,10 @@ showLanguages' show_all dflags =
    lang = fromMaybe defaultLanguage (language dflags)
 
 
-showTargets :: GHC.GhcMonad m => m ()
+showTargets :: GHC.GhcMonad m => ExceptGhciError m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets
   where
-    showTarget :: GHC.GhcMonad m => Target -> m ()
+    showTarget :: GHC.GhcMonad m => Target -> ExceptGhciError m ()
     showTarget Target { targetId = TargetFile f _ } = liftIO (putStrLn f)
     showTarget Target { targetId = TargetModule m } =
       liftIO (putStrLn $ moduleNameString m)
@@ -3782,18 +3813,18 @@ arrays the available identifiers of the nested functions.
 -- -----------------------------------------------------------------------------
 -- commands for debugger
 
-sprintCmd, printCmd, forceCmd :: GHC.GhcMonad m => String -> m ()
+sprintCmd, printCmd, forceCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 sprintCmd = pprintClosureCommand False False
 printCmd  = pprintClosureCommand True False
 forceCmd  = pprintClosureCommand False True
 
-stepCmd :: GhciMonad m => String -> m ()
+stepCmd :: GhciMonad m => String -> ExceptGhciError m ()
 stepCmd arg = withSandboxOnly ":step" $ step arg
   where
   step []         = doContinue (const True) GHC.SingleStep
   step expression = runStmt expression GHC.SingleStep >> return ()
 
-stepLocalCmd :: GhciMonad m => String -> m ()
+stepLocalCmd :: GhciMonad m => String -> ExceptGhciError m ()
 stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
   where
   step expr
@@ -3811,7 +3842,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
            current_toplevel_decl <- enclosingTickSpan md loc
            doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
 
-stepModuleCmd :: GhciMonad m => String -> m ()
+stepModuleCmd :: GhciMonad m => String -> ExceptGhciError m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
   where
   step expr
@@ -3839,14 +3870,14 @@ enclosingTickSpan md (RealSrcSpan src _) = do
 leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
 leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) realSrcSpanEnd
 
-traceCmd :: GhciMonad m => String -> m ()
+traceCmd :: GhciMonad m => String -> ExceptGhciError m ()
 traceCmd arg
   = withSandboxOnly ":trace" $ tr arg
   where
   tr []         = doContinue (const True) GHC.RunAndLogSteps
   tr expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
-continueCmd :: GhciMonad m => String -> m ()                  -- #19157
+continueCmd :: GhciMonad m => String -> ExceptGhciError m ()                  -- #19157
 continueCmd argLine = withSandboxOnly ":continue" $
   case contSwitch (words argLine) of
     Left sdoc   -> printForUser sdoc
@@ -3858,25 +3889,25 @@ continueCmd argLine = withSandboxOnly ":continue" $
       contSwitch  _  = Left $
           text "After ':continue' only one ignore count is allowed"
 
-doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
+doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> ExceptGhciError m ()
 doContinue pre step = doContinue' pre step Nothing
 
-doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
+doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> ExceptGhciError m ()
 doContinue' pre step mbCnt= do
   runResult <- resume pre step mbCnt
   _ <- afterRunStmt pre runResult
   return ()
 
-abandonCmd :: GhciMonad m => String -> m ()
+abandonCmd :: GhciMonad m => String -> ExceptGhciError m ()
 abandonCmd = noArgs $ withSandboxOnly ":abandon" $ do
   b <- GHC.abandon -- the prompt will change to indicate the new context
   when (not b) $ liftIO $ putStrLn "There is no computation running."
 
-deleteCmd :: GhciMonad m => String -> m ()
+deleteCmd :: GhciMonad m => String -> ExceptGhciError m ()
 deleteCmd argLine = withSandboxOnly ":delete" $ do
    deleteSwitch $ words argLine
    where
-   deleteSwitch :: GhciMonad m => [String] -> m ()
+   deleteSwitch :: GhciMonad m => [String] -> ExceptGhciError m ()
    deleteSwitch [] =
       liftIO $ putStrLn "The delete command requires at least one argument."
    -- delete all break points
@@ -3884,20 +3915,20 @@ deleteCmd argLine = withSandboxOnly ":delete" $ do
    deleteSwitch idents = do
       mapM_ deleteOneBreak idents
       where
-      deleteOneBreak :: GhciMonad m => String -> m ()
+      deleteOneBreak :: GhciMonad m => String -> ExceptGhciError m ()
       deleteOneBreak str
          | all isDigit str = deleteBreak (read str)
          | otherwise = return ()
 
-enableCmd :: GhciMonad m => String -> m ()
+enableCmd :: GhciMonad m => String -> ExceptGhciError m ()
 enableCmd argLine = withSandboxOnly ":enable" $ do
     enaDisaSwitch True $ words argLine
 
-disableCmd :: GhciMonad m => String -> m ()
+disableCmd :: GhciMonad m => String -> ExceptGhciError m ()
 disableCmd argLine = withSandboxOnly ":disable" $ do
     enaDisaSwitch False $ words argLine
 
-enaDisaSwitch :: GhciMonad m => Bool -> [String] -> m ()
+enaDisaSwitch :: GhciMonad m => Bool -> [String] -> ExceptGhciError m ()
 enaDisaSwitch enaDisa [] =
     printForUser (text "The" <+> text strCmd <+>
                   text "command requires at least one argument.")
@@ -3907,19 +3938,19 @@ enaDisaSwitch enaDisa ("*" : _) = enaDisaAllBreaks enaDisa
 enaDisaSwitch enaDisa idents = do
     mapM_ (enaDisaOneBreak enaDisa) idents
   where
-    enaDisaOneBreak :: GhciMonad m => Bool -> String -> m ()
+    enaDisaOneBreak :: GhciMonad m => Bool -> String -> ExceptGhciError m ()
     enaDisaOneBreak enaDisa strId = do
       sdoc_loc <- checkEnaDisa enaDisa strId
       case sdoc_loc of
         Left sdoc -> printForUser sdoc
         Right loc -> enaDisaAssoc enaDisa (read strId, loc)
 
-checkEnaDisa :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
+checkEnaDisa :: GhciMonad m => Bool -> String -> ExceptGhciError m (Either SDoc BreakLocation)
 checkEnaDisa enaDisa strId = do
     sdoc_loc <- getBreakLoc strId
     pure $ sdoc_loc >>= checkEnaDisaState enaDisa strId
 
-getBreakLoc :: GhciMonad m => String -> m (Either SDoc BreakLocation)
+getBreakLoc :: GhciMonad m => String -> ExceptGhciError m (Either SDoc BreakLocation)
 getBreakLoc strId = do
     st <- getGHCiState
     case readMaybe strId >>= flip IntMap.lookup (breaks st) of
@@ -3934,19 +3965,19 @@ checkEnaDisaState enaDisa strId loc = do
         text "Breakpoint" <+> text strId <+> text "already in desired state"
     else Right loc
 
-enaDisaAssoc :: GhciMonad m => Bool -> (Int, BreakLocation) -> m ()
+enaDisaAssoc :: GhciMonad m => Bool -> (Int, BreakLocation) -> ExceptGhciError m ()
 enaDisaAssoc enaDisa (intId, loc) = do
     st <- getGHCiState
     newLoc <- turnBreakOnOff enaDisa loc
     let new_breaks = IntMap.insert intId newLoc (breaks st)
     setGHCiState $ st { breaks = new_breaks }
 
-enaDisaAllBreaks :: GhciMonad m => Bool -> m()
+enaDisaAllBreaks :: GhciMonad m => Bool -> ExceptGhciError m ()
 enaDisaAllBreaks enaDisa = do
     st <- getGHCiState
     mapM_ (enaDisaAssoc enaDisa) $ IntMap.assocs $ breaks st
 
-historyCmd :: GHC.GhcMonad m => String -> m ()
+historyCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 historyCmd arg
   | null arg        = history 20
   | all isDigit arg = history (read arg)
@@ -3977,7 +4008,7 @@ bold :: SDoc -> SDoc
 bold c | do_bold   = text start_bold <> c <> text end_bold
        | otherwise = c
 
-ignoreCmd  :: GhciMonad m => String -> m ()                     -- #19157
+ignoreCmd  :: GhciMonad m => String -> ExceptGhciError m ()                     -- #19157
 ignoreCmd argLine = withSandboxOnly ":ignore" $ do
     result <- ignoreSwitch (words argLine)
     case result of
@@ -3989,7 +4020,7 @@ ignoreCmd argLine = withSandboxOnly ":ignore" $ do
                   }
         setupBreakpoint bi count
 
-ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int))
+ignoreSwitch :: GhciMonad m => [String] -> ExceptGhciError m (Either SDoc (BreakLocation, Int))
 ignoreSwitch [break, count] = do
     sdoc_loc <- getBreakLoc break
     pure $ (,) <$> sdoc_loc <*> getIgnoreCount count
@@ -4004,12 +4035,12 @@ getIgnoreCount str =
     where
       sdocIgnore = text "Ignore count" <+> quotes (text str)
 
-setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m()
+setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> ExceptGhciError m ()
 setupBreakpoint loc count = do
     hsc_env <- GHC.getSession
     GHC.setupBreakpoint hsc_env loc count
 
-backCmd :: GhciMonad m => String -> m ()
+backCmd :: GhciMonad m => String -> ExceptGhciError m ()
 backCmd arg
   | null arg        = back 1
   | all isDigit arg = back (read arg)
@@ -4023,7 +4054,7 @@ backCmd arg
       st <- getGHCiState
       enqueueCommands [stop st]
 
-forwardCmd :: GhciMonad m => String -> m ()
+forwardCmd :: GhciMonad m => String -> ExceptGhciError m ()
 forwardCmd arg
   | null arg        = forward 1
   | all isDigit arg = forward (read arg)
@@ -4040,10 +4071,10 @@ forwardCmd arg
       enqueueCommands [stop st]
 
 -- handle the "break" command
-breakCmd :: GhciMonad m => String -> m ()
+breakCmd :: GhciMonad m => String -> ExceptGhciError m ()
 breakCmd argLine = withSandboxOnly ":break" $ breakSwitch $ words argLine
 
-breakSwitch :: GhciMonad m => [String] -> m ()
+breakSwitch :: GhciMonad m => [String] -> ExceptGhciError m ()
 breakSwitch [] = do
    liftIO $ putStrLn "The break command requires at least one argument."
 breakSwitch (arg1:rest)
@@ -4061,14 +4092,14 @@ breakSwitch (arg1:rest)
    | otherwise = do -- try parsing it as an identifier
         breakById arg1
 
-breakByModule :: GhciMonad m => Module -> [String] -> m ()
+breakByModule :: GhciMonad m => Module -> [String] -> ExceptGhciError m ()
 breakByModule md (arg1:rest)
    | all isDigit arg1 = do  -- looks like a line number
         breakByModuleLine md (read arg1) rest
 breakByModule _ _
    = breakSyntax
 
-breakByModuleLine :: GhciMonad m => Module -> Int -> [String] -> m ()
+breakByModuleLine :: GhciMonad m => Module -> Int -> [String] -> ExceptGhciError m ()
 breakByModuleLine md line args
    | [] <- args = findBreakAndSet md $ maybeToList . findBreakByLine line
    | [col] <- args, all isDigit col =
@@ -4077,7 +4108,7 @@ breakByModuleLine md line args
 
 -- Set a breakpoint for an identifier
 -- See Note [Setting Breakpoints by Id]
-breakById :: GhciMonad m => String -> m ()                          -- #3000
+breakById :: GhciMonad m => String -> ExceptGhciError m ()                          -- #3000
 breakById inp = do
     let (mod_str, top_level, fun_str) = splitIdent inp
         mod_top_lvl = combineModIdent mod_str top_level
@@ -4141,7 +4172,7 @@ breakSyntax = throwGhcException $ CmdLineError ("Syntax: :break [<mod>.]<func>[.
                                              ++ "        :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: GhciMonad m
-                => Module -> (TickArray -> [(Int, RealSrcSpan)]) -> m ()
+                => Module -> (TickArray -> [(Int, RealSrcSpan)]) -> ExceptGhciError m ()
 findBreakAndSet md lookupTickTree = do
    tickArray <- getTickArray md
    case lookupTickTree tickArray of
@@ -4260,7 +4291,7 @@ The names of nested functions are stored in `ModBreaks.modBreaks_decls`.
 -----------------------------------------------------------------------------
 -- :where
 
-whereCmd :: GHC.GhcMonad m => String -> m ()
+whereCmd :: GHC.GhcMonad m => String -> ExceptGhciError m ()
 whereCmd = noArgs $ do
   mstrs <- getCallStackAtCurrentBreakpoint
   case mstrs of
@@ -4270,7 +4301,7 @@ whereCmd = noArgs $ do
 -----------------------------------------------------------------------------
 -- :list
 
-listCmd :: GhciMonad m => String -> m ()
+listCmd :: GhciMonad m => String -> ExceptGhciError m ()
 listCmd "" = do
    mb_span <- getCurrentBreakSpan
    case mb_span of
@@ -4292,7 +4323,7 @@ listCmd "" = do
                                    $$ text "Try" <+> doWhat)
 listCmd str = list2 (words str)
 
-list2 :: GhciMonad m => [String] -> m ()
+list2 :: GhciMonad m => [String] -> ExceptGhciError m ()
 list2 [arg] | all isDigit arg = do
     imports <- GHC.getContext
     case iiModules imports of
@@ -4325,7 +4356,7 @@ list2 [arg] = do
 list2  _other =
         liftIO $ putStrLn "syntax:  :list [<line> | <module> <line> | <identifier>]"
 
-listModuleLine :: GHC.GhcMonad m => Module -> Int -> m ()
+listModuleLine :: GHC.GhcMonad m => Module -> Int -> ExceptGhciError m ()
 listModuleLine modl line = do
    graph <- GHC.getModuleGraph
    let this = GHC.mgLookupModule graph modl
@@ -4345,7 +4376,7 @@ listModuleLine modl line = do
 -- 2) convert the BS to String using utf-string, and write it out.
 -- It would be better if we could convert directly between UTF-8 and the
 -- console encoding, of course.
-listAround :: MonadIO m => RealSrcSpan -> Bool -> m ()
+listAround :: MonadIO m => RealSrcSpan -> Bool -> ExceptGhciError m ()
 listAround pan do_highlight = do
       contents <- liftIO $ BS.readFile (unpackFS file)
       -- Drop carriage returns to avoid duplicates, see #9367.
@@ -4423,7 +4454,7 @@ getTickArray modl = do
         setGHCiState st{tickarrays = extendModuleEnv arrmap modl arr}
         return arr
 
-discardTickArrays :: GhciMonad m => m ()
+discardTickArrays :: GhciMonad m => ExceptGhciError m ()
 discardTickArrays = modifyGHCiState (\st -> st {tickarrays = emptyModuleEnv})
 
 mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
@@ -4435,17 +4466,17 @@ mkTickArray ticks
         srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
 
 -- don't reset the counter back to zero?
-discardActiveBreakPoints :: GhciMonad m => m ()
+discardActiveBreakPoints :: GhciMonad m => ExceptGhciError m ()
 discardActiveBreakPoints = do
    st <- getGHCiState
    mapM_ (turnBreakOnOff False) $ breaks st
    setGHCiState $ st { breaks = IntMap.empty }
 
-discardInterfaceCache :: GhciMonad m => m ()
+discardInterfaceCache :: GhciMonad m => ExceptGhciError m ()
 discardInterfaceCache =
    void (liftIO . iface_clearCache . ifaceCache =<< getGHCiState)
 
-clearHPTs :: GhciMonad m => m ()
+clearHPTs :: GhciMonad m => ExceptGhciError m ()
 clearHPTs = do
   let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
       discardMG hsc = hsc { hsc_mod_graph = GHC.emptyMG }
@@ -4458,10 +4489,10 @@ clearHPTs = do
 -- changes (via :load or :cd), at which stage the package flags are not going to change
 -- but the loaded modules will probably not use all the specified packages so the
 -- warning becomes spurious. At that point the warning is silently disabled.
-disableUnusedPackages :: GhciMonad m => m ()
+disableUnusedPackages :: GhciMonad m => ExceptGhciError m ()
 disableUnusedPackages = newDynFlags False ["-Wno-unused-packages"]
 
-deleteBreak :: GhciMonad m => Int -> m ()
+deleteBreak :: GhciMonad m => Int -> ExceptGhciError m ()
 deleteBreak identity = do
    st <- getGHCiState
    let oldLocations = breaks st
@@ -4473,7 +4504,7 @@ deleteBreak identity = do
            let rest = IntMap.delete identity oldLocations
            setGHCiState $ st { breaks = rest }
 
-turnBreakOnOff :: GhciMonad m => Bool -> BreakLocation -> m BreakLocation
+turnBreakOnOff :: GhciMonad m => Bool -> BreakLocation -> ExceptGhciError m BreakLocation
 turnBreakOnOff onOff loc
   | onOff == breakEnabled loc = return loc
   | otherwise = do
@@ -4489,7 +4520,7 @@ getModBreak m = do
    let decls      = GHC.modBreaks_decls modBreaks
    return (ticks, decls)
 
-setBreakFlag :: GhciMonad m => Module -> Int -> Bool ->m ()
+setBreakFlag :: GhciMonad m => Module -> Int -> Bool -> ExceptGhciError m ()
 setBreakFlag  md ix enaDisa = do
   let enaDisaToCount True = breakOn
       enaDisaToCount False = breakOff
@@ -4518,7 +4549,7 @@ showException :: MonadIO m => SomeException -> m ()
 showException se =
   liftIO $ case fromException se of
            -- omit the location for CmdLineError:
-           Just (CmdLineError s)    -> putException s
+           Just (CmdLineError s)    -> putException (s ++ "aaa")
            -- ditto:
            Just other_ghc_ex        -> putException (show other_ghc_ex)
            Nothing                  ->
@@ -4528,7 +4559,7 @@ showException se =
   where
     putException = hPutStrLn stderr
 
-failIfExprEvalMode :: GhciMonad m => m ()
+failIfExprEvalMode :: GhciMonad m => ExceptGhciError m ()
 failIfExprEvalMode = do
   s <- getGHCiState
   when (ghc_e s) $
@@ -4536,7 +4567,7 @@ failIfExprEvalMode = do
 
 -- | When in expression evaluation mode (ghc -e), we want to exit immediately.
 -- Otherwis, just print out the message.
-printErrAndMaybeExit :: (GhciMonad m, MonadIO m, HasLogger m) => SourceError -> m ()
+printErrAndMaybeExit :: (GhciMonad m, MonadIO m, HasLogger m) => SourceError -> ExceptGhciError m ()
 printErrAndMaybeExit = (>> failIfExprEvalMode) . printGhciException
 
 -----------------------------------------------------------------------------
@@ -4630,10 +4661,10 @@ wantInterpretedModuleName modname = do
    return modl
 
 wantNameFromInterpretedModule :: GHC.GhcMonad m
-                              => (Name -> SDoc -> m ())
+                              => (Name -> SDoc -> ExceptGhciError m ())
                               -> String
-                              -> (Name -> m ())
-                              -> m ()
+                              -> (Name -> ExceptGhciError m ())
+                              -> ExceptGhciError m ()
 wantNameFromInterpretedModule noCanDo str and_then =
   handleSourceError printGhciException $ do
     n NE.:| _ <- GHC.parseName str
@@ -4648,7 +4679,7 @@ wantNameFromInterpretedModule noCanDo str and_then =
                         text " is not interpreted"
        else and_then n
 
-clearCaches :: GhciMonad m => m ()
+clearCaches :: GhciMonad m => ExceptGhciError m ()
 clearCaches = discardActiveBreakPoints
               >> discardInterfaceCache
               >> disableUnusedPackages

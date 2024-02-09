@@ -58,7 +58,7 @@ import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
-import GHCi.UI.Exception (printGhciException, GhciCommandError)
+import GHCi.UI.Exception (printGhciException, GhciCommandError, ExceptGhciError)
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
@@ -86,10 +86,13 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Error ( DiagnosticCode(..) )
-import Debug.Trace
+import Control.Monad.Trans.Except
 
 -----------------------------------------------------------------------------
 -- GHCi monad
+
+reportError :: GhciMonad m => GhciCommandError -> ExceptGhciError m ()
+reportError = throwE
 
 data GHCiState = GHCiState
      {
@@ -397,17 +400,7 @@ printForUserPartWay doc = do
   dflags <- GHC.getInteractiveDynFlags
   liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx DefaultDepth doc
 
--- TODO
-reportError :: GhciMonad m => GhciCommandError -> m ()
-reportError err = printForUser . coloured colBold $
-                   (coloured colRedFg (text "error")) <> colon <+> prefix $$
-                       nest 2 (ppr err) $$ text ""
-  where
-    code = constructorCode err
-    prefix = maybe empty (brackets . ppr . set_ghci_ns) code
-    set_ghci_ns c = c { diagnosticCodeNameSpace = "GHCi" }
 
--- | Run a single Haskell expression
 runStmt
   :: GhciMonad m
   => GhciLStmt GhcPs -> String -> GHC.SingleStep -> m (Maybe GHC.ExecResult)

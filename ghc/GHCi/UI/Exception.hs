@@ -4,7 +4,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module GHCi.UI.Exception(printGhciException, GHCiMessage(..), GhciCommandError(..)) where
+module GHCi.UI.Exception
+    ( printGhciException
+    , GHCiMessage(..)
+    , GhciCommandError(..)
+    , GhciModuleError(..)
+    , GhciMacroError(..)
+    , GhciArgumentParseError(..)
+    , ExceptGhciError) where
 
 import GHC.Prelude
 
@@ -24,6 +31,7 @@ import GHC.Tc.Errors.Types
 import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Types
+import GHC
 
 import GHC.Unit.State
 
@@ -33,6 +41,7 @@ import GHC.Utils.Outputable
 import Control.Monad.IO.Class
 import GHC.Generics
 
+import Control.Monad.Trans.Except (ExceptT (..))
 
 -- | Print the all diagnostics in a 'SourceError'.  Specialised for GHCi error reporting
 -- for some error messages.
@@ -145,52 +154,121 @@ ghciDiagnosticMessage ghc_opts msg =
               text "(Note: this unloads all the modules in the current scope.)"
 
 
+data GhciMacroError
+  = MacroAlreadyDefined String
+  | MacroInvalidStart String
+  | MacroNotDefined
+  | MacroOverwritesBuiltin String
+
+instance Outputable GhciMacroError where
+  ppr = \case
+    MacroAlreadyDefined name
+      -> "Macro" <+> quotes (text name) <+> "is already defined" <.> macro_name_hint
+    MacroOverwritesBuiltin name
+      -> "Macro" <+> quotes (text name) <+> "overwrites builtin command" <.> macro_name_hint
+    MacroInvalidStart str
+      -> "Macro name cannot start with" <+> text str
+
+    where
+      macro_name_hint = "Use" <+> quotes (colon <> "def!") <+> "to overwrite" <> dot
+
+data GhciModuleError
+  = ModuleNotFound String --ModuleName
+  | NoModuleNameGuess
+  | NoModuleInfoForCurrentFile
+  | NoLocationInfoForModule ModuleName
+  | NoResolvedModules
+  | NoModuleForName Name
+  | NoMatchingModuleExport
+
+instance Outputable GhciModuleError where
+  ppr = \case
+    ModuleNotFound modN
+      -> "Module" <+> text modN <+> "not found"
+    NoModuleNameGuess
+      -> "Couldn't guess that module name. Does it exist?"
+    NoModuleInfoForCurrentFile
+      -> "No module info for current file! Try loading it?"
+    NoLocationInfoForModule name
+      -> "Found a name, but no location information" <.> "The module is" <:> ppr name
+    NoResolvedModules
+      -> "Couldn't resolve to any modules."
+    NoModuleForName name
+      -> "No module for" <+> ppr name
+    NoMatchingModuleExport
+      -> "No matching export in any local modules."
+
+data GhciArgumentParseError
+  = SpanPrematureEnd
+  | SpanNoReadAs String String
+  | SpanExpectedWS String
+
+instance Outputable GhciArgumentParseError where
+  ppr = \case
+    SpanPrematureEnd
+      -> "Premature end of string while expecting Int"
+    SpanNoReadAs actual expected
+      -> "Couldn't read" <+> text actual <+> "as" <+> text expected
+    SpanExpectedWS str
+      -> "Expected whitespace in" <+> text str
 
 data GhciCommandError
-  = GhciCommandNotSupportedInMultiMode
+  -- composite errors
+  = GhciMacroError GhciMacroError
+  | GhciModuleError GhciModuleError
+  | GhciArgumentParseError GhciArgumentParseError
+  -- Basic errors
+  | GhciCommandNotSupportedInMultiMode
   | GhciInvalidArgumentString String
-  | GhciInvalidMacroStart String
-  | GhciMacroAlreadyDefined
-  | GhciMacroIsNotDefined
-  | GhciMacroOverwritesBuiltin
   | GhciFileNotFound String
-  | GhciModuleNotFound String --ModuleName
   | GhciCommandSyntaxError String [String]
   | GhciInvalidPromptString
   | GhciPromptCallError String
   | GhciUnknownCommand String String
   | GhciNoLastCommandAvailable String
   | GhciUnknownFlag String [String]
+  | GhciNoSetEditor
+
   deriving Generic
+
+
+
+type ExceptGhciError = ExceptT GhciCommandError
 
 instance Outputable GhciCommandError where
   ppr = \case
+    GhciMacroError me -> ppr me
+    GhciModuleError me -> ppr me
+    GhciArgumentParseError ape -> ppr ape
+
     GhciCommandNotSupportedInMultiMode
-      -> text "Command is not supported (yet) in multi-mode"
+      -> "Command is not supported (yet) in multi-mode"
     GhciInvalidArgumentString str
       -> text str
     GhciCommandSyntaxError cmd args
-      -> text "Syntax" <> colon $+$
+      -> "Syntax" <> colon $+$
            nest 2 (colon <> text cmd <+> hsep (map (angleBrackets . text) args))
     GhciUnknownCommand cmd help
-      -> text "Unknown command" <+> quotes (colon <> text cmd) $+$
+      -> "Unknown command" <+> quotes (colon <> text cmd) $+$
            text help -- TODO
     GhciNoLastCommandAvailable help
-      -> text "There is no last command to perform" $+$
+      -> "There is no last command to perform" $+$
            text help -- TODO
-    GhciInvalidMacroStart str
-      -> text "Macro name cannot start with" <+> text str
-    GhciModuleNotFound modN
-      -> text "Module" <+> text modN <+> text "not found"
     GhciFileNotFound f
-      -> text "File" <+> text f <+> text "not found"
+      -> "File" <+> text f <+> "not found"
     GhciUnknownFlag flag suggestions
-      -> text "Unrecognised flag" <:> text flag $$
+      -> "Unrecognised flag" <:> text flag $$
            case suggestions of
              [] -> empty
-             suggs -> text "did you mean one of" <> colon $$ nest 2 (vcat (map text suggs))
+             suggs -> "did you mean one of" <> colon $$ nest 2 (vcat (map text suggs))
     GhciPromptCallError err
       -> text err
-    where
-      l <:> r = l <> colon <+> r
+    GhciNoSetEditor
+      -> "editor not set, use :set editor"
 
+
+(<:>) :: SDoc -> SDoc -> SDoc
+l <:> r = l <> colon <+> r
+
+(<.>) :: SDoc -> SDoc -> SDoc
+l <.> r = l <> dot   <+> r
