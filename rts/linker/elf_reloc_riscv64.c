@@ -294,9 +294,10 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     // should return the number of blank bytes to insert via NOPs.
     break;
   default:
-    debugBelch("Unimplemented relocation: %x", ELF64_R_TYPE(rel->r_info));
+    debugBelch("Unimplemented relocation: 0x%lx", ELF64_R_TYPE(rel->r_info));
     abort(/* unhandled rel */);
   }
+  abort(/* unhandled rel */);
 }
 
 // TODO: This is duplicated from elf_reloc_aarch64.c
