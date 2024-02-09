@@ -2993,7 +2993,7 @@ bindLetUp x rhs body env sd = do
   let id_dmd'            = finaliseLetBoxity env (idType x) id_dmd
   annotate da_demands x id_dmd'
   rhs_ty <- squeezeDmdShared env rhs id_dmd' --perhaps inline squeezeDmdShared
-  pprTraceM "dmdAnal:LetUp" (ppr x <+> ppr id_dmd <+> ppr id_dmd' $$ ppr rhs_ty)
+--  pprTraceM "dmdAnal:LetUp" (ppr x <+> ppr id_dmd <+> ppr id_dmd' $$ ppr rhs_ty)
   pure $! dmdType2SPair (body_ty' `plusDmdType` rhs_ty)
 
 
