@@ -150,6 +150,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
   int exp_shift = -1;
   switch (ELF64_R_TYPE(rel->r_info)) {
+  case R_RISCV_32_PCREL:
   case R_RISCV_32:
     write32le((inst_t*) P, addend);
     break;
@@ -293,6 +294,8 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     // I guess we don't need to implement this relaxation. Otherwise, this
     // should return the number of blank bytes to insert via NOPs.
     break;
+  case R_RISCV_32_PCREL:
+    return S + A - P;
   default:
     debugBelch("Unimplemented relocation: 0x%lx", ELF64_R_TYPE(rel->r_info));
     abort(/* unhandled rel */);
