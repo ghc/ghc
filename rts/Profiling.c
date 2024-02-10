@@ -204,6 +204,7 @@ void initProfiling (void)
 //
 void refreshProfilingCCSs (void)
 {
+    ACQUIRE_LOCK(&ccs_mutex);
     // make CCS_MAIN the parent of all the pre-defined CCSs.
     CostCentreStack *next;
     for (CostCentreStack *ccs = CCS_LIST; ccs != NULL; ) {
@@ -214,6 +215,7 @@ void refreshProfilingCCSs (void)
         ccs = next;
     }
     CCS_LIST = NULL;
+    RELEASE_LOCK(&ccs_mutex);
 }
 
 void
