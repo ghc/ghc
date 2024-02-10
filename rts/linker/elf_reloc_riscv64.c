@@ -293,7 +293,7 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_ALIGN:
     // I guess we don't need to implement this relaxation. Otherwise, this
     // should return the number of blank bytes to insert via NOPs.
-    break;
+    return 0;
   case R_RISCV_32_PCREL:
     return S + A - P;
   default:
