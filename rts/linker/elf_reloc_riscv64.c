@@ -29,6 +29,7 @@ typedef uint16_t cinst_t;
 // TODO: Decide which functions should be static and/or inlined.
 int64_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
+  debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not supported.");
   abort(/* we don't support Rel locations yet. */);
 }
 
@@ -296,10 +297,14 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     return 0;
   case R_RISCV_32_PCREL:
     return S + A - P;
+  case R_RISCV_GOT_HI20:
+    // reduced G + GOT to GOT_S - This might be wrong!
+    return GOT_S + A - P;
   default:
-    debugBelch("Unimplemented relocation: 0x%lx", ELF64_R_TYPE(rel->r_info));
+    debugBelch("Unimplemented relocation: 0x%lx\n (%lu)", ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
     abort(/* unhandled rel */);
   }
+  debugBelch("This should never happen!");
   abort(/* unhandled rel */);
 }
 
