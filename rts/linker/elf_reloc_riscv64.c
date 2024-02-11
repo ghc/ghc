@@ -88,7 +88,7 @@ uint32_t setLO12_S(uint32_t insn, uint32_t imm) {
 }
 
 void setUType(inst_t *loc, uint32_t val) {
-  const unsigned bits = 64;
+  const unsigned bits = 32;
   uint64_t hi = val + 0x800;
   checkInt(loc, SignExtend64(hi, bits) >> 12, 20);
   write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
