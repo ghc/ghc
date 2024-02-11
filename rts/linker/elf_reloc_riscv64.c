@@ -242,7 +242,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
     break;
   }
   case R_RISCV_SET8:
-    write8le((uint8_t *)P, read8le((uint8_t *)P) - addend);
+    write8le((uint8_t *)P, addend);
     break;
   case R_RISCV_SET16:
     write16le((cinst_t *)P, addend);
