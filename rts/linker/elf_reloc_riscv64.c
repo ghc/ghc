@@ -1,7 +1,7 @@
+#include "elf_reloc_riscv64.h"
 #include "Rts.h"
 #include "elf.h"
 #include "elf_plt.h"
-#include "elf_reloc_riscv64.h"
 #include "elf_util.h"
 #include "rts/Messages.h"
 #include "util.h"
@@ -29,7 +29,8 @@ typedef uint16_t cinst_t;
 // TODO: Decide which functions should be static and/or inlined.
 int64_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
-  debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not supported.");
+  debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not "
+             "supported.");
   abort(/* we don't support Rel locations yet. */);
 }
 
@@ -43,8 +44,10 @@ int64_t SignExtend64(uint64_t X, unsigned B) {
 
 // Make sure that V can be represented as an N bit signed integer.
 void checkInt(inst_t *loc, int64_t v, int n) {
-  if (v != SignExtend64(v, n)){
-    debugBelch("Relocation at 0x%x is out of range. value: 0x%lx (%ld), sign-extended value: 0x%lx (%ld), max bits 0x%x (%d)", *loc, v, v, SignExtend64(v, n), SignExtend64(v, n), n, n);
+  if (v != SignExtend64(v, n)) {
+    debugBelch("Relocation at 0x%x is out of range. value: 0x%lx (%ld), "
+               "sign-extended value: 0x%lx (%ld), max bits 0x%x (%d)\n",
+               *loc, v, v, SignExtend64(v, n), SignExtend64(v, n), n, n);
   }
 }
 // RISCV is little-endian by definition.
@@ -79,6 +82,11 @@ uint32_t setLO12_I(uint32_t insn, uint32_t imm) {
   return (insn & 0xfffff) | (imm << 20);
 }
 
+uint32_t setLO12_S(uint32_t insn, uint32_t imm) {
+  return (insn & 0x1fff07f) | (extractBits(imm, 11, 5) << 25) |
+         (extractBits(imm, 4, 0) << 7);
+}
+
 void setUType(inst_t *loc, uint32_t val) {
   const unsigned bits = 64;
   uint64_t hi = val + 0x800;
@@ -90,6 +98,12 @@ void setIType(inst_t *loc, uint32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
   write32le(loc, setLO12_I(read32le(loc), lo & 0xfff));
+}
+
+void setSType(inst_t *loc, uint32_t val) {
+  uint64_t hi = (val + 0x800) >> 12;
+  uint64_t lo = val - (hi << 12);
+  write32le(loc, setLO12_S(read32le(loc), lo));
 }
 
 void setJType(inst_t *loc, uint32_t val) {
@@ -153,22 +167,18 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32_PCREL:
   case R_RISCV_32:
-    write32le((inst_t*) P, addend);
+    write32le((inst_t *)P, addend);
     break;
   case R_RISCV_64:
-    write64le((uint64_t*) P, addend);
+    write64le((uint64_t *)P, addend);
     break;
   case R_RISCV_GOT_HI20:
   case R_RISCV_PCREL_HI20:
-  case R_RISCV_TLS_GD_HI20:
-  case R_RISCV_TLS_GOT_HI20:
-  case R_RISCV_TPREL_HI20:
   case R_RISCV_HI20: {
     setUType((inst_t *)P, addend);
     break;
   }
   case R_RISCV_PCREL_LO12_I:
-  case R_RISCV_TPREL_LO12_I:
   case R_RISCV_LO12_I: {
     setIType((inst_t *)P, addend);
     break;
@@ -224,6 +234,28 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   case R_RISCV_SUB64:
     write64le((uint64_t *)P, read64le((uint64_t *)P) - addend);
     break;
+  case R_RISCV_SET6: {
+    uint8_t keep = *((uint8_t *)P) & 0xc0;
+    uint8_t imm = (addend & 0x3f) & 0x3f;
+
+    write8le((uint8_t *)P, keep | imm);
+    break;
+  }
+  case R_RISCV_SET8:
+    write8le((uint8_t *)P, read8le((uint8_t *)P) - addend);
+    break;
+  case R_RISCV_SET16:
+    write16le((cinst_t *)P, addend);
+    break;
+  case R_RISCV_SET32:
+    write32le((inst_t *)P, addend);
+    break;
+  case R_RISCV_PCREL_LO12_S:
+  case R_RISCV_TPREL_LO12_S:
+  case R_RISCV_LO12_S: {
+    setSType((inst_t *)P, addend);
+    break;
+  }
   case R_RISCV_RELAX:
   case R_RISCV_ALIGN:
     // I guess we don't need to implement these relaxations (optimizations).
@@ -244,7 +276,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
  * @return The new computed addend.
  */
 int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
-                             int64_t addend) {
+                      int64_t addend) {
 
   /* Position where something is relocated */
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
@@ -289,11 +321,17 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_ADD32:
   case R_RISCV_ADD64:
     return S + A; // Add V when the value is set
+  case R_RISCV_SUB6:
   case R_RISCV_SUB8:
   case R_RISCV_SUB16:
   case R_RISCV_SUB32:
   case R_RISCV_SUB64:
     return S + A; // Subtract from V when value is set
+  case R_RISCV_SET6:
+  case R_RISCV_SET8:
+  case R_RISCV_SET16:
+  case R_RISCV_SET32:
+    return S + A;
   case R_RISCV_RELAX:
   case R_RISCV_ALIGN:
     // I guess we don't need to implement this relaxation. Otherwise, this
@@ -304,8 +342,11 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_GOT_HI20:
     // reduced G + GOT to GOT_S - This might be wrong!
     return GOT_S + A - P;
+  case R_RISCV_PCREL_LO12_S:
+    return S - P;
   default:
-    debugBelch("Unimplemented relocation: 0x%lx\n (%lu)", ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
+    debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
+               ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
     abort(/* unhandled rel */);
   }
   debugBelch("This should never happen!");
