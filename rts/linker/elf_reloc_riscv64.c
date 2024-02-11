@@ -163,7 +163,6 @@ void setCJType(cinst_t *loc, uint32_t val) {
 
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
-  int exp_shift = -1;
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32_PCREL:
   case R_RISCV_32:
