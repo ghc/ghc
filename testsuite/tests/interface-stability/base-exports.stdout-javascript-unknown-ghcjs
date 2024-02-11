@@ -14418,6 +14418,7 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Int
 instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Solo -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Control.Monad.Fix.MonadFix ((,) a) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’

@@ -30,13 +30,13 @@ module GHC.Internal.Control.Monad.Fix (
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Function ( fix )
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Monoid ( Dual(..), Sum(..), Product(..)
+import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
+import GHC.Internal.Data.Tuple ( Solo(..), snd )
 import GHC.Internal.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
-import GHC.Tuple (Solo (..))
 import GHC.Internal.Control.Monad.ST.Imp
 import GHC.Internal.System.IO
 
@@ -71,6 +71,11 @@ class (Monad m) => MonadFix m where
 instance MonadFix Solo where
     mfix f = let a = f (unSolo a) in a
              where unSolo (MkSolo x) = x
+
+-- | @since base-4.21
+instance Monoid a => MonadFix ((,) a) where
+    -- See the CLC proposal thread for discussion and proofs of the laws: https://github.com/haskell/core-libraries-committee/issues/238
+    mfix f = let a = f (snd a) in a
 
 -- | @since base-2.01
 instance MonadFix Maybe where
