@@ -189,6 +189,10 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
     setUType((inst_t *)P, addend);
     break;
   }
+  case R_RISCV_JAL: {
+    setJType((inst_t *)P, addend);
+    break;
+  }
   case R_RISCV_ADD8:
     write8le((uint8_t *)P, read8le((uint8_t *)P) + addend);
     break;
