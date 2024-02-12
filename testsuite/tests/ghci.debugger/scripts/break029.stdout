@@ -1,9 +1,9 @@
 Stopped in Main.f, break029.hs:(4,7)-(6,16)
 _result :: IO Int = _
 x :: Int = 3
-Stopped in Main.f, break029.hs:5:8-21
-_result :: IO Int = _
-x :: Int = 3
+Stopped in Main.f, break029.hs:6:3-16
+_result :: Int = _
+y :: Int = _
 Stopped in Main.f, break029.hs:6:11-15
 _result :: Int = _
 y :: Int = _

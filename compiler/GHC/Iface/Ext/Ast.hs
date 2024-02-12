@@ -1388,7 +1388,6 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
         ]
       XStmtLR x -> case hiePass @p of
         HieRn -> extApplicativeStmt x
-        HieTc -> extApplicativeStmt x
     where
       node = case hiePass @p of
         HieTc -> makeNodeA stmt span

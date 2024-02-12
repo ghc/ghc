@@ -717,27 +717,38 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
       setSrcSpanA loc $
       tcExpr e res_ty
 
-tcXExpr xe@(ExpandedThingRn o e') res_ty
-  | OrigStmt ls@(L loc s@LetStmt{}) <- o
+tcXExpr xe@(ExpandedThingRn o e' doTcApp) res_ty
+  | OrigPat (L loc _) flav (Just s) <- o   -- testcase T16628
+  = setSrcSpanA loc $
+    addStmtCtxt (unLoc s) flav $
+    tcApp (XExpr xe) res_ty
+
+  | OrigStmt ls@(L loc s) flav <- o
   , HsLet x binds e <- e'
   =  do { (binds', wrapper, e') <-  setSrcSpanA loc $
-                            addStmtCtxt s $
+                            addStmtCtxt s flav $
                             tcLocalBinds binds $
                             tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
                                                   -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls (HsLet x binds' (mkLHsWrap wrapper e'))
+        ; return $ mkExpandedStmtTc ls flav (HsLet x binds' (mkLHsWrap wrapper e'))
         }
-  | OrigStmt ls@(L loc s@LastStmt{}) <- o
-  =  setSrcSpanA loc $
-          addStmtCtxt s $
-          mkExpandedStmtTc ls <$> tcExpr e' res_ty
-                -- It is important that we call tcExpr (and not tcApp) here as
-                -- `e` is the last statement's body expression
-                -- and not a HsApp of a generated (>>) or (>>=)
-                -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3
-  | OrigStmt ls@(L loc _) <- o
+
+  | OrigStmt ls@(L loc _) flav <- o
+  , doTcApp
   = setSrcSpanA loc $
-       mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
+    mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
+
+    -- There are currently 2 `do`-statements that require calling `tcExpr` and not `tcApp`:
+    -- `LastStmt`, `AppStmt`
+    -- The reason is that the expanded expression `e` is the last statement's body expression
+    -- (or the the argument expression of an applicative statement)
+    -- It is not an HsApp of a generated (>>) or (>>=)
+    -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3, ado002 etc.
+  | OrigStmt ls@(L loc s) flav <- o
+  , not doTcApp
+  = setSrcSpanA loc $
+    addStmtCtxt s flav $
+    mkExpandedStmtTc ls flav <$> tcExpr e' res_ty
 
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 

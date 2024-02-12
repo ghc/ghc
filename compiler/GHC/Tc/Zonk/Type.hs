@@ -97,7 +97,6 @@ import GHC.Tc.Types.BasicTypes
 import GHC.Data.Maybe
 import GHC.Data.Bag
 
-import Control.Monad
 import Control.Monad.Trans.Class ( lift )
 import Data.Semigroup
 import Data.List.NonEmpty ( NonEmpty )
@@ -1411,54 +1410,6 @@ zonkStmt zBody (BindStmt xbs pat body)
               , xbstc_failOp = new_fail
               })
             new_pat new_body }
-
--- Scopes: join > ops (in reverse order) > pats (in forward order)
---              > rest of stmts
-zonkStmt _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
-  = do  { new_mb_join   <- zonk_join mb_join
-        ; new_args      <- zonk_args args
-        ; new_body_ty   <- noBinders $ zonkTcTypeToTypeX body_ty
-        ; return $ XStmtLR $ ApplicativeStmt new_body_ty new_args new_mb_join }
-  where
-    zonk_join Nothing  = return Nothing
-    zonk_join (Just j) = Just <$> zonkSyntaxExpr j
-
-    get_pat :: (SyntaxExpr GhcTc, ApplicativeArg GhcTc) -> LPat GhcTc
-    get_pat (_, ApplicativeArgOne _ pat _ _) = pat
-    get_pat (_, ApplicativeArgMany _ _ _ pat _) = pat
-
-    replace_pat :: LPat GhcTc
-                -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
-                -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
-    replace_pat pat (op, ApplicativeArgOne fail_op _ a isBody)
-      = (op, ApplicativeArgOne fail_op pat a isBody)
-    replace_pat pat (op, ApplicativeArgMany x a b _ c)
-      = (op, ApplicativeArgMany x a b pat c)
-
-    zonk_args args
-      = do { new_args_rev <- zonk_args_rev (reverse args)
-           ; new_pats     <- zonkPats (map get_pat args)
-           ; return $ zipWithEqual "zonkStmt" replace_pat
-                        new_pats (reverse new_args_rev) }
-
-     -- these need to go backward, because if any operators are higher-rank,
-     -- later operators may introduce skolems that are in scope for earlier
-     -- arguments
-    zonk_args_rev ((op, arg) : args)
-      = do { new_op   <- zonkSyntaxExpr op
-           ; new_arg  <- noBinders $ zonk_arg arg
-           ; new_args <- zonk_args_rev args
-           ; return $ (new_op, new_arg) : new_args }
-    zonk_args_rev [] = return []
-
-    zonk_arg (ApplicativeArgOne fail_op pat expr isBody)
-      = do { new_expr <- zonkLExpr expr
-           ; new_fail <- forM fail_op $ don'tBind . zonkSyntaxExpr
-           ; return (ApplicativeArgOne new_fail pat new_expr isBody) }
-    zonk_arg (ApplicativeArgMany x stmts ret pat ctxt)
-      = runZonkBndrT (zonkStmts zonkLExpr stmts) $ \ new_stmts ->
-        do { new_ret <- zonkExpr ret
-           ; return (ApplicativeArgMany x new_stmts new_ret pat ctxt) }
 
 -------------------------------------------------------------------------
 zonkRecFields :: HsRecordBinds GhcTc -> ZonkTcM (HsRecordBinds GhcTc)

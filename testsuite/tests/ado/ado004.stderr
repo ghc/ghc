@@ -8,24 +8,24 @@ TYPE SIGNATURES
   test1c ::
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test2 ::
-    forall {f :: * -> *} {t} {b}.
-    (Applicative f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t}.
+    (Applicative f, Num b, Num t) =>
     (t -> f b) -> f b
   test2a ::
-    forall {f :: * -> *} {t} {b}.
-    (Functor f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t}.
+    (Functor f, Num b, Num t) =>
     (t -> f b) -> f b
   test2b ::
     forall {f :: * -> *} {t} {a}.
     (Applicative f, Num t) =>
     (t -> a) -> f a
   test2c ::
-    forall {f :: * -> *} {t} {b}.
-    (Functor f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t}.
+    (Functor f, Num b, Num t) =>
     (t -> f b) -> f b
   test2d ::
-    forall {f :: * -> *} {t} {b} {a}.
-    (Functor f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t} {a}.
+    (Functor f, Num b, Num t) =>
     (t -> f a) -> f b
   test3 ::
     forall {m :: * -> *} {t1} {t2} {a}.
@@ -44,4 +44,4 @@ TYPE SIGNATURES
     (Monad m, Num (m a)) =>
     (m a -> m (m a)) -> p -> m a
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.20.0.0]

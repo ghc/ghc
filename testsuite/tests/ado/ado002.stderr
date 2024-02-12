@@ -1,4 +1,3 @@
-
 ado002.hs:8:8: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO b0
                   with actual type: IO Char
@@ -24,23 +23,70 @@ ado002.hs:9:3: error: [GHC-83865]
                  y <- getChar 'a'
                  print (x, y)
 
-ado002.hs:15:11: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the expression: y
-      In a stmt of a 'do' block: return (y, x)
+ado002.hs:13:8: error: [GHC-83865]
+    • Couldn't match type ‘Char’ with ‘Int’
+      Expected: IO Int
+        Actual: IO Char
+    • In a stmt of a 'do' block: x <- getChar
       In the expression:
         do x <- getChar
            y <- getChar
            return (y, x)
+      In an equation for ‘g’:
+          g = do x <- getChar
+                 y <- getChar
+                 return (y, x)
 
-ado002.hs:15:13: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the expression: x
-      In a stmt of a 'do' block: return (y, x)
+ado002.hs:14:8: error: [GHC-83865]
+    • Couldn't match type ‘Char’ with ‘Int’
+      Expected: IO Int
+        Actual: IO Char
+    • In a stmt of a 'do' block: y <- getChar
       In the expression:
         do x <- getChar
            y <- getChar
            return (y, x)
+      In an equation for ‘g’:
+          g = do x <- getChar
+                 y <- getChar
+                 return (y, x)
+
+ado002.hs:20:9: error: [GHC-83865]
+    • Couldn't match type ‘Char’ with ‘Int’
+      Expected: IO Int
+        Actual: IO Char
+    • In a stmt of a 'do' block: x2 <- getChar
+      In the expression:
+        do x1 <- getChar
+           x2 <- getChar
+           x3 <- const (return ()) x1
+           x4 <- getChar
+           x5 <- getChar x4
+           return (x2, x4)
+      In an equation for ‘h’:
+          h = do x1 <- getChar
+                 x2 <- getChar
+                 x3 <- const (return ()) x1
+                 x4 <- getChar
+                 x5 <- getChar x4
+                 return (x2, x4)
+
+ado002.hs:23:3: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression:
+        do x1 <- getChar
+           x2 <- getChar
+           x3 <- const (return ()) x1
+           x4 <- getChar
+           x5 <- getChar x4
+           return (x2, x4)
+      In an equation for ‘h’:
+          h = do x1 <- getChar
+                 x2 <- getChar
+                 x3 <- const (return ()) x1
+                 x4 <- getChar
+                 x5 <- getChar x4
+                 return (x2, x4)
 
 ado002.hs:23:9: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO a0
@@ -56,26 +102,3 @@ ado002.hs:23:9: error: [GHC-83865]
            x5 <- getChar x4
            return (x2, x4)
 
-ado002.hs:24:11: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the expression: x2
-      In a stmt of a 'do' block: return (x2, x4)
-      In the expression:
-        do x1 <- getChar
-           x2 <- getChar
-           x3 <- const (return ()) x1
-           x4 <- getChar
-           x5 <- getChar x4
-           return (x2, x4)
-
-ado002.hs:24:14: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the expression: x4
-      In a stmt of a 'do' block: return (x2, x4)
-      In the expression:
-        do x1 <- getChar
-           x2 <- getChar
-           x3 <- const (return ()) x1
-           x4 <- getChar
-           x5 <- getChar x4
-           return (x2, x4)

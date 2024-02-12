@@ -196,8 +196,8 @@ but several have a little bit of special treatment:
                                       (return (f x))))
 
      See Note [Expanding HsDo with XXExprGhcRn] in `Ghc.Tc.Gen.Do` for more details.
-     To understand why is this done in the typechecker and not in the renamer.
-     See Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+     To understand why is this done in the typechecker and not in the renamer
+     see Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
 
 Note [Overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1867,8 +1867,18 @@ ApplicativeDo
 *                                                                      *
 ************************************************************************
 
-Note [ApplicativeDo]
-~~~~~~~~~~~~~~~~~~~~
+Note [Overview of ApplicativeDo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* The parser produces a list of statements `[Stmt]` for a `do` expression.
+* If `ApplicativeDo` flag is set, the renamer calls `Rename.Expr.postProcessStmtsForApplicativeDo`
+  on the list of statements and the statements which can be parallalized
+  are clubbed together in an `ApplicativeStmt`. See example below.
+* The expansion step in `GHC.Tc.Gen.Do.expandDo` transforms this list of statements,
+  into binds, fmaps etc. according to the expansion rules given below in = Expansion for do =
+* The desugarer in `GHC.HsToCore.dsExpr` does not have any special treatement
+  for do statements as they are just normal expressions.
+
 = Example =
 
 For a sequence of statements
@@ -1955,21 +1965,21 @@ split({stmt_1; ..; stmt_n) =
   -- 1 <= i <= n
   -- i is a good place to insert a bind
 
-== Desugaring for do ==
+== Expansion for do ==
 
-dsDo {} expr = expr
+expandStmt {} expr = expr
 
-dsDo {pat <- rhs; stmts} expr =
-   rhs >>= \pat -> dsDo stmts expr
+expandStmt {pat <- rhs; stmts} expr =
+   rhs >>= \pat -> expandStmt stmts expr
 
-dsDo {(arg_1 | ... | arg_n)} (return expr) =
+expandStmt {(arg_1 | ... | arg_n)} (return expr) =
   (\argpat (arg_1) .. argpat(arg_n) -> expr)
      <$> argexpr(arg_1)
      <*> ...
      <*> argexpr(arg_n)
 
-dsDo {(arg_1 | ... | arg_n); stmts} expr =
-  join (\argpat (arg_1) .. argpat(arg_n) -> dsDo stmts expr)
+expandStmt {(arg_1 | ... | arg_n); stmts} expr =
+  join (\argpat (arg_1) .. argpat(arg_n) -> expandStmt stmts expr)
      <$> argexpr(arg_1)
      <*> ...
      <*> argexpr(arg_n)
@@ -1991,17 +2001,12 @@ ApplicativeDo touches a few phases in the compiler:
   recover the original do-block when e.g. printing type errors, where
   we don't want to show any of the applicative combinators since they
   don't exist in the source code.
-  See ApplicativeStmt and ApplicativeArg in HsExpr.
+  See `ApplicativeStmt` and `ApplicativeArg` in HsExpr.
 
-* Typechecker: ApplicativeDo passes through the typechecker much like any
-  other form of expression. The only crux is that the typechecker has to
-  be aware of the special ApplicativeDo statements in the do-notation, and
-  typecheck them appropriately.
-  Relevant module: GHC.Tc.Gen.Match
-
-* Desugarer: Any do-block which contains applicative statements is desugared
-  as outlined above, to use the Applicative combinators.
-  Relevant module: GHC.HsToCore.Expr
+* Typechecker: All the ApplicativeDo statements are expanded on the fly
+  to its actual semantics (as shown above) with appropriate user syntax. The typechecker
+  then checks the syntax as any other form of expression.
+  Relevant module: GHC.Tc.Gen.Do , GHC.Tc.Gen.Match.tcStmts
 
 -}
 
@@ -2020,7 +2025,7 @@ instance Outputable MonadNames where
     ]
 
 -- | rearrange a list of statements using ApplicativeDoStmt.  See
--- Note [ApplicativeDo].
+-- Note [Overview of ApplicativeDo].
 rearrangeForApplicativeDo
   :: HsDoFlavour
   -> [(ExprLStmt GhcRn, FreeVars)]
@@ -2028,7 +2033,7 @@ rearrangeForApplicativeDo
 
 rearrangeForApplicativeDo _ [] = return ([], emptyNameSet)
 -- If the do-block contains a single @return@ statement, change it to
--- @pure@ if ApplicativeDo is turned on. See Note [ApplicativeDo].
+-- @pure@ if ApplicativeDo is turned on. See Note [Overview of ApplicativeDo].
 rearrangeForApplicativeDo ctxt [(one,_)] = do
   (return_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) returnMName
   (pure_name, _)   <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
@@ -2252,12 +2257,12 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
      (stmts',fvs2) <- stmtTreeToStmts monad_names ctxt tree [] pvarset
      (mb_ret, fvs1) <-
         if | L _ (XStmtLR ApplicativeStmt{}) <- last stmts' ->
-             return (unLoc tup, emptyNameSet)
+             return (tup, emptyNameSet)
            | otherwise -> do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
              (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
-             let expr = HsApp noExtField (noLocA ret) tup
+             let expr = noLocA (HsApp noExtField (noLocA ret) tup)
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField

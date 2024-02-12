@@ -613,7 +613,7 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     _        -> Nothing
 
 addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o@(OrigStmt (L pos LastStmt{})) e
+addTickHsExpanded o@(OrigStmt (L pos LastStmt{}) _) e
   -- LastStmt always gets a tick for breakpoint and hpc coverage
   = do d <- getDensity
        case d of
@@ -754,32 +754,9 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
-addTickStmt isGuard (XStmtLR (ApplicativeStmt body_ty args mb_join)) = do
-    args' <- mapM (addTickApplicativeArg isGuard) args
-    return (XStmtLR (ApplicativeStmt body_ty args' mb_join))
-
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprRHS e
-
-addTickApplicativeArg
-  :: Maybe (Bool -> BoxLabel) -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
-  -> TM (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
-addTickApplicativeArg isGuard (op, arg) =
-  liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
- where
-  addTickArg (ApplicativeArgOne m_fail pat expr isBody) =
-    ApplicativeArgOne
-      <$> mapM (addTickSyntaxExpr hpcSrcSpan) m_fail
-      <*> addTickLPat pat
-      <*> addTickLHsExpr expr
-      <*> pure isBody
-  addTickArg (ApplicativeArgMany x stmts ret pat ctxt) =
-    (ApplicativeArgMany x)
-      <$> addTickLStmts isGuard stmts
-      <*> (unLoc <$> addTickLHsExpr (L (noAnnSrcSpan hpcSrcSpan) ret))
-      <*> addTickLPat pat
-      <*> pure ctxt
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
@@ -968,8 +945,6 @@ addTickCmdStmt stmt@(RecStmt {})
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
        ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
-addTickCmdStmt (XStmtLR (ApplicativeStmt{})) =
-  panic "ToDo: addTickCmdStmt ApplicativeLastStmt"
 
 -- Others should never happen in a command context.
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)

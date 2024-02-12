@@ -78,7 +78,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
 
 import Control.Monad
-import Control.Arrow ( second )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
 
@@ -353,22 +352,14 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
-tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
-  = do  { isApplicativeDo <- xoptM LangExt.ApplicativeDo
-        ; if isApplicativeDo
-          then do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
-                  ; res_ty <- readExpType res_ty
-                  ; return (HsDo res_ty doExpr (L l stmts')) }
-          else do { expanded_expr <- expandDoStmts doExpr stmts
-                                               -- Do expansion on the fly
-                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$>
-                    tcExpr (unLoc expanded_expr) res_ty }
+tcDoStmts doExpr@(DoExpr _) ss@(L _ stmts) res_ty
+  = do  { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
+        ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$> tcExpr expanded_expr res_ty
         }
 
 tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
-        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$>
-          tcExpr (unLoc expanded_expr) res_ty  }
+        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$> tcExpr expanded_expr res_ty  }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
@@ -1030,18 +1021,6 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                             , recS_ret_ty = stmts_ty} }, thing)
         }}
 
-tcDoStmt ctxt (XStmtLR (ApplicativeStmt _ pairs mb_join)) res_ty thing_inside
-  = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
-                                thing_inside . mkCheckExpType
-        ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
-            Nothing -> (, Nothing) <$> tc_app_stmts res_ty
-            Just join_op ->
-              second Just <$>
-              (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
-
-        ; return (XStmtLR $ ApplicativeStmt body_ty pairs' mb_join', thing) }
-
 tcDoStmt _ stmt _ _
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
@@ -1118,87 +1097,6 @@ To achieve this we:
     all branches. This step is done with bindLocalNames.
 -}
 
-tcApplicativeStmts
-  :: HsStmtContextRn
-  -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
-  -> ExpRhoType                         -- rhs_ty
-  -> (TcRhoType -> TcM t)               -- thing_inside
-  -> TcM ([(SyntaxExpr GhcTc, ApplicativeArg GhcTc)], Type, t)
-
-tcApplicativeStmts ctxt pairs rhs_ty thing_inside
- = do { body_ty <- newFlexiTyVarTy liftedTypeKind
-      ; let arity = length pairs
-      ; ts <- replicateM (arity-1) $ newInferExpType
-      ; exp_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
-      ; pat_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
-      ; let fun_ty = mkVisFunTysMany pat_tys body_ty
-
-       -- NB. do the <$>,<*> operators first, we don't want type errors here
-       --     i.e. goOps before goArgs
-       -- See Note [Treat rebindable syntax first]
-      ; let (ops, args) = unzip pairs
-      ; ops' <- goOps fun_ty (zip3 ops (ts ++ [rhs_ty]) exp_tys)
-
-      -- Typecheck each ApplicativeArg separately
-      -- See Note [ApplicativeDo and constraints]
-      ; args' <- mapM (goArg body_ty) (zip3 args pat_tys exp_tys)
-
-      -- Bring into scope all the things bound by the args,
-      -- and typecheck the thing_inside
-      -- See Note [ApplicativeDo and constraints]
-      ; res <- tcExtendIdEnv (concatMap get_arg_bndrs args') $
-               thing_inside body_ty
-
-      ; return (zip ops' args', body_ty, res) }
-  where
-    goOps _ [] = return []
-    goOps t_left ((op,t_i,exp_ty) : ops)
-      = do { (_, op')
-               <- tcSyntaxOp DoOrigin op
-                             [synKnownType t_left, synKnownType exp_ty] t_i $
-                   \ _ _ -> return ()
-           ; t_i <- readExpType t_i
-           ; ops' <- goOps t_i ops
-           ; return (op' : ops') }
-
-    goArg :: Type -> (ApplicativeArg GhcRn, Type, Type)
-          -> TcM (ApplicativeArg GhcTc)
-
-    goArg body_ty (ApplicativeArgOne
-                    { xarg_app_arg_one = fail_op
-                    , app_arg_pattern = pat
-                    , arg_expr = rhs
-                    , ..
-                    }, pat_ty, exp_ty)
-      = setSrcSpan (combineSrcSpans (getLocA pat) (getLocA rhs)) $
-        addErrCtxt (pprStmtInCtxt ctxt (mkRnBindStmt pat rhs))   $
-        do { rhs'      <- tcCheckMonoExprNC rhs exp_ty
-           ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
-                          return ()
-           ; fail_op' <- fmap join . forM fail_op $ \fail ->
-               tcMonadFailOp (DoPatOrigin pat) pat' fail body_ty
-
-           ; return (ApplicativeArgOne
-                      { xarg_app_arg_one = fail_op'
-                      , app_arg_pattern = pat'
-                      , arg_expr        = rhs'
-                      , .. }
-                    ) }
-
-    goArg _body_ty (ApplicativeArgMany x stmts ret pat ctxt, pat_ty, exp_ty)
-      = do { (stmts', (ret',pat')) <-
-                tcStmtsAndThen (HsDoStmt ctxt) tcDoStmt stmts (mkCheckExpType exp_ty) $
-                \res_ty  -> do
-                  { ret'      <- tcExpr ret res_ty
-                  ; (pat', _) <- tcCheckPat (StmtCtxt (HsDoStmt ctxt)) pat (unrestricted pat_ty) $
-                                 return ()
-                  ; return (ret', pat')
-                  }
-           ; return (ApplicativeArgMany x stmts' ret' pat' ctxt) }
-
-    get_arg_bndrs :: ApplicativeArg GhcTc -> [Id]
-    get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders CollNoDictBinders pat
-    get_arg_bndrs (ApplicativeArgMany { bv_pattern =  pat })    = collectPatBinders CollNoDictBinders pat
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

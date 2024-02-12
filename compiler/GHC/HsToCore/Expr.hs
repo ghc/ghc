@@ -314,7 +314,7 @@ dsExpr (HsOverLit _ lit)
 dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
+        | OrigStmt (L loc _) _ <- o
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
       WrapExpr {}                    -> dsHsWrapped e
@@ -465,10 +465,10 @@ dsExpr (HsLet _ binds body) = do
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
 dsExpr (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
-dsExpr (HsDo res_ty ctx@DoExpr{}      (L _ stmts)) = dsDo ctx stmts res_ty
-dsExpr (HsDo res_ty ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts res_ty
-dsExpr (HsDo res_ty ctx@MDoExpr{}     (L _ stmts)) = dsDo ctx stmts res_ty
 dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
+dsExpr (HsDo res_ty ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts res_ty
+dsExpr (HsDo _ DoExpr{}      (L _ stmts)) = pprPanic "shouldn't happen dsDo DoExpr" (ppr stmts)
+dsExpr (HsDo _ MDoExpr{}     (L _ stmts)) = pprPanic "shouldn't happen dsDo MDoExpr" (ppr stmts)
 
 dsExpr (HsIf _ guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -824,37 +824,6 @@ dsDo ctx stmts res_ty
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
                      -- so we must apply the return_op explicitly
-
-    go _ (XStmtLR (ApplicativeStmt body_ty args mb_join)) stmts
-      = do {
-             let
-               (pats, rhss) = unzip (map (do_arg . snd) args)
-
-               do_arg (ApplicativeArgOne fail_op pat expr _) =
-                 ((pat, fail_op), dsLExpr expr)
-               do_arg (ApplicativeArgMany _ stmts ret pat _) =
-                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]) res_ty)
-
-           ; rhss' <- sequence rhss
-
-           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
-
-           ; let match_args (pat, fail_op) (vs,body)
-                   = putSrcSpanDs (getLocA pat) $
-                     do { var   <- selectSimpleMatchVarL ManyTy pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
-                                   body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure ctx pat body_ty match fail_op
-                        ; return (var:vs, match_code)
-                        }
-
-           ; (vars, body) <- foldrM match_args ([],body') pats
-           ; let fun' = mkLams vars body
-           ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
-           ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
-           ; case mb_join of
-               Nothing -> return expr
-               Just join_op -> dsSyntaxExpr join_op [expr] }
 
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
