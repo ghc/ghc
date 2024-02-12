@@ -1965,15 +1965,10 @@ ApplicativeDo touches a few phases in the compiler:
   don't exist in the source code.
   See ApplicativeStmt and ApplicativeArg in HsExpr.
 
-* Typechecker: ApplicativeDo passes through the typechecker much like any
-  other form of expression. The only crux is that the typechecker has to
-  be aware of the special ApplicativeDo statements in the do-notation, and
-  typecheck them appropriately.
-  Relevant module: GHC.Tc.Gen.Match
-
-* Desugarer: Any do-block which contains applicative statements is desugared
-  as outlined above, to use the Applicative combinators.
-  Relevant module: GHC.HsToCore.Expr
+* Typechecker: All the ApplicativeDo statements are expanded on the fly
+  to its actual semantics (as shown above) with appropriate user syntax. The typechecker
+  then checks the syntax as any other form of expression.
+  Relevant module: GHC.Tc.Gen.Do , GHC.Tc.Gen.Match.tcStmts
 
 -}
 
@@ -2221,12 +2216,12 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
      (stmts',fvs2) <- stmtTreeToStmts monad_names ctxt tree [] pvarset
      (mb_ret, fvs1) <-
         if | L _ (XStmtLR ApplicativeStmt{}) <- last stmts' ->
-             return (unLoc tup, emptyNameSet)
+             return (tup, emptyNameSet)
            | otherwise -> do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
              (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
-             let expr = HsApp noExtField (noLocA ret) tup
+             let expr = noLocA (HsApp noExtField (noLocA ret) tup)
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField

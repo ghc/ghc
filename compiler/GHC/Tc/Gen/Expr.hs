@@ -715,27 +715,25 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
       setSrcSpanA loc $
       tcExpr e res_ty
 
-tcXExpr xe@(ExpandedThingRn o e') res_ty
-  | OrigStmt ls@(L loc s@LetStmt{}) <- o
+tcXExpr xe@(ExpandedThingRn o e' tc_info) res_ty
+  | OrigStmt ls@(L loc s@LetStmt{}) flav <- o
   , HsLet x binds e <- e'
   =  do { (binds', wrapper, e') <-  setSrcSpanA loc $
-                            addStmtCtxt s $
+                            addStmtCtxt s flav $
                             tcLocalBinds binds $
                             tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
                                                   -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls (HsLet x binds' (mkLHsWrap wrapper e'))
+        ; return $ mkExpandedStmtTc ls flav (HsLet x binds' (mkLHsWrap wrapper e'))
         }
-  | OrigStmt ls@(L loc s@LastStmt{}) <- o
-  =  setSrcSpanA loc $
-          addStmtCtxt s $
-          mkExpandedStmtTc ls <$> tcExpr e' res_ty
-                -- It is important that we call tcExpr (and not tcApp) here as
-                -- `e` is the last statement's body expression
-                -- and not a HsApp of a generated (>>) or (>>=)
-                -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3
-  | OrigStmt ls@(L loc _) <- o
+  | OrigStmt ls@(L loc s) flav <- o
+  , TcExpr <- tc_info
   = setSrcSpanA loc $
-       mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
+    addStmtCtxt s flav $
+    mkExpandedStmtTc ls flav <$> tcExpr e' res_ty
+  | OrigStmt ls@(L loc _) flav <- o
+  , TcApp <- tc_info
+  = setSrcSpanA loc $
+    mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
 
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 
