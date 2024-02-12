@@ -1,7 +1,7 @@
 
-ado003.hs:7:3: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the pattern: 'a'
+ado003.hs:7:18: error: [GHC-83865]
+    • Couldn't match expected type ‘Char’ with actual type ‘Int’
+    • In the first argument of ‘return’, namely ‘(3 :: Int)’
       In a stmt of a 'do' block: 'a' <- return (3 :: Int)
       In the expression:
         do x <- getChar
