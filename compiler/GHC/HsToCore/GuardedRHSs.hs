@@ -146,12 +146,11 @@ matchGuards (BindStmt _ pat bind_rhs : stmts) ctx rhs rhs_ty = do
       pat rhs_ty match_result
     return $ bindNonRec match_var core_rhs <$> match_result'
 
+
 matchGuards (LastStmt  {} : _) _ _ _ = panic "matchGuards LastStmt"
 matchGuards (ParStmt   {} : _) _ _ _ = panic "matchGuards ParStmt"
 matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
 matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
-matchGuards (XStmtLR ApplicativeStmt {} : _) _ _ _ =
-  panic "matchGuards ApplicativeLastStmt"
 
 {-
 Should {\em fail} if @e@ returns @D@
