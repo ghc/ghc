@@ -99,7 +99,7 @@ int
 hashStr(const HashTable *table, StgWord w)
 {
     const char *key = (char*) w;
-#if defined(x86_64_HOST_ARCH)
+#if WORD_SIZE_IN_BITS == 64
     StgWord h = XXH3_64bits_withSeed (key, strlen(key), 1048583);
 #else
     StgWord h = XXH32 (key, strlen(key), 1048583);
