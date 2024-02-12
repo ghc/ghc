@@ -28,22 +28,6 @@ At point (15,8), we found:
 ==========================
 At point (30,8), we found:
 ==========================
-┌
-│ $dMonad at T23540.hs:1:1, of type: Monad Identity
-│     is an evidence variable bound by a let, depending on: [$fMonadIdentity]
-│           with scope: ModuleScope
-│           
-│     Defined at <no location info>
-└
-|
-`- ┌
-   │ $fMonadIdentity at T23540.hs:25:10-23, of type: Monad Identity
-   │     is an evidence variable bound by an instance of class Monad
-   │           with scope: ModuleScope
-   │           
-   │     Defined at T23540.hs:25:10
-   └
-
 ==========================
 At point (43,8), we found:
 ==========================
@@ -123,38 +107,6 @@ At point (49,14), we found:
 ==========================
 At point (61,7), we found:
 ==========================
-┌
-│ $dApplicative at T23540.hs:1:1, of type: Applicative Identity'
-│     is an evidence variable bound by a let, depending on: [$fApplicativeIdentity']
-│           with scope: ModuleScope
-│           
-│     Defined at <no location info>
-└
-|
-`- ┌
-   │ $fApplicativeIdentity' at T23540.hs:56:10-30, of type: Applicative Identity'
-   │     is an evidence variable bound by an instance of class Applicative
-   │           with scope: ModuleScope
-   │           
-   │     Defined at T23540.hs:56:10
-   └
-
-┌
-│ $dFunctor at T23540.hs:1:1, of type: Functor Identity'
-│     is an evidence variable bound by a let, depending on: [$fFunctorIdentity']
-│           with scope: ModuleScope
-│           
-│     Defined at <no location info>
-└
-|
-`- ┌
-   │ $fFunctorIdentity' at T23540.hs:54:10-26, of type: Functor Identity'
-   │     is an evidence variable bound by an instance of class Functor
-   │           with scope: ModuleScope
-   │           
-   │     Defined at T23540.hs:54:10
-   └
-
 ==========================
 At point (69,4), we found:
 ==========================

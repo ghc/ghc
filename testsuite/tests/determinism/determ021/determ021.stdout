@@ -1,16 +1,16 @@
 [1 of 1] Compiling A                ( A.hs, A.o )
 TYPE SIGNATURES
   test2 ::
-    forall {f :: * -> *} {t} {b}.
-    (Applicative f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t}.
+    (Applicative f, Num b, Num t) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.20.0.0]
 [1 of 1] Compiling A                ( A.hs, A.o )
 TYPE SIGNATURES
   test2 ::
-    forall {f :: * -> *} {t} {b}.
-    (Applicative f, Num t, Num b) =>
+    forall {f :: * -> *} {b} {t}.
+    (Applicative f, Num b, Num t) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.20.0.0]

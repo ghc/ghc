@@ -144,8 +144,6 @@ matchGuards (LastStmt  {} : _) _ _ _ _ = panic "matchGuards LastStmt"
 matchGuards (ParStmt   {} : _) _ _ _ _ = panic "matchGuards ParStmt"
 matchGuards (TransStmt {} : _) _ _ _ _ = panic "matchGuards TransStmt"
 matchGuards (RecStmt   {} : _) _ _ _ _ = panic "matchGuards RecStmt"
-matchGuards (XStmtLR ApplicativeStmt {} : _) _ _ _ _ =
-  panic "matchGuards ApplicativeLastStmt"
 
 {-
 Should {\em fail} if @e@ returns @D@
