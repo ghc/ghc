@@ -42,4 +42,3 @@ T13242a.hs:13:13: error: [GHC-39999]
                  _ <- return 'a'
                  _ <- return 'b'
                  return (x == x)
-
