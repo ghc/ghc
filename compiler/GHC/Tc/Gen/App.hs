@@ -541,7 +541,7 @@ tcValArg do_ql (EValArg { ea_ctxt   = ctxt
     do { traceTc "tcValArg" $
          vcat [ ppr ctxt
               , text "arg type:" <+> ppr sc_arg_ty
-              , text "arg:" <+> ppr arg ]
+              , text "arg:" <+> ppr larg ]
 
          -- Crucial step: expose QL results before checking exp_arg_ty
          -- So far as the paper is concerned, this step applies
@@ -576,7 +576,8 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
     do { -- Expose QL results to tcSkolemise, as in EValArg case
          Scaled mult exp_arg_ty <- liftZonkM $ zonkScaledTcType sc_arg_ty
 
-       ; traceTc "tcEValArgQL {" (vcat [ text "app_res_rho:" <+> ppr app_res_rho
+       ; traceTc "tcEValArgQL {" (vcat [ ppr ctxt
+                                       , text "app_res_rho:" <+> ppr app_res_rho
                                        , text "exp_arg_ty:" <+> ppr exp_arg_ty
                                        , text "args:" <+> ppr inst_args ])
 
@@ -649,10 +650,10 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
        ; go 1 [] fun_sigma rn_args }
   where
     fun_orig = case fun_ctxt of
-      VAExpansion (OrigStmt{}) _ _  -> DoOrigin
-      VAExpansion (OrigPat pat) _ _ -> DoPatOrigin pat
-      VAExpansion (OrigExpr e) _ _  -> exprCtOrigin e
-      VACall e _ _                  -> exprCtOrigin e
+      VAExpansion (OrigStmt{}) _ _    -> DoOrigin
+      VAExpansion (OrigPat pat _ _) _ _ -> DoPatOrigin pat
+      VAExpansion (OrigExpr e) _ _    -> exprCtOrigin e
+      VACall e _ _                    -> exprCtOrigin e
 
     -- These are the type variables which must be instantiated to concrete
     -- types. See Note [Representation-polymorphic Ids with no binding]
@@ -902,18 +903,18 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
                      addErrCtxt (funAppCtxt fun arg arg_no) $
                      thing_inside
 
-           VAExpansion (OrigStmt (L _ stmt@(BindStmt {}))) _ loc
+           VAExpansion (OrigStmt (L _ stmt@(BindStmt {})) flav) _ loc
              | isGeneratedSrcSpan (locA arg_loc) -- This arg is the second argument to generated (>>=)
              -> setSrcSpan loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
-             | otherwise                        -- This arg is the first argument to generated (>>=)
+             | otherwise                         -- This arg is the first argument to generated (>>=)
              -> setSrcSpanA arg_loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
-           VAExpansion (OrigStmt (L loc stmt)) _ _
+           VAExpansion (OrigStmt (L loc stmt) flav) _ _
              -> setSrcSpanA loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
 
            _ -> setSrcSpanA arg_loc $
@@ -1061,7 +1062,7 @@ expr_to_type earg =
       | otherwise = not_in_scope
       where occ = occName rdr
             not_in_scope = failWith $ mkTcRnNotInScope rdr NotInScope
-    go (L l (XExpr (ExpandedThingRn (OrigExpr orig) _))) =
+    go (L l (XExpr (ExpandedThingRn (OrigExpr orig) _ _))) =
       -- Use the original, user-written expression (before expansion).
       -- Example. Say we have   vfun :: forall a -> blah
       --          and the call  vfun (Maybe [1,2,3])
@@ -2269,4 +2270,3 @@ rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 ann
-
