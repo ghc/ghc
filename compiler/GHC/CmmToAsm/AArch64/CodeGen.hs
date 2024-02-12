@@ -1730,6 +1730,7 @@ genCCall target dest_regs arg_regs bid = do
         -- Memory Ordering
         MO_AcquireFence     ->  return (unitOL DMBISH, Nothing)
         MO_ReleaseFence     ->  return (unitOL DMBISH, Nothing)
+        MO_SeqCstFence      ->  return (unitOL DMBISH, Nothing)
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.

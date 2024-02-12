@@ -1132,6 +1132,8 @@ genCCall (PrimTarget MO_AcquireFence) _ _
  = return $ unitOL LWSYNC
 genCCall (PrimTarget MO_ReleaseFence) _ _
  = return $ unitOL LWSYNC
+genCCall (PrimTarget MO_SeqCstFence) _ _
+ = return $ unitOL HWSYNC
 
 genCCall (PrimTarget MO_Touch) _ _
  = return $ nilOL
@@ -2098,6 +2100,7 @@ genCCall' config gcp target dest_regs args
                     MO_U_Mul2 {}     -> unsupported
                     MO_AcquireFence  -> unsupported
                     MO_ReleaseFence  -> unsupported
+                    MO_SeqCstFence   -> unsupported
                     MO_Touch         -> unsupported
                     MO_Prefetch_Data _ -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop

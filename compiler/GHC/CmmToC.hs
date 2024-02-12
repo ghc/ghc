@@ -265,6 +265,8 @@ pprStmt platform stmt =
         text "__atomic_thread_fence(__ATOMIC_RELEASE);"
     CmmUnsafeForeignCall (PrimTarget MO_AcquireFence) [] [] ->
         text "__atomic_thread_fence(__ATOMIC_ACQUIRE);"
+    CmmUnsafeForeignCall (PrimTarget MO_SeqCstFence) [] [] ->
+        text "__atomic_thread_fence(__ATOMIC_SEQ_CST);"
 
     CmmUnsafeForeignCall target@(PrimTarget op) results args ->
         fn_call
@@ -959,6 +961,7 @@ pprCallishMachOp_for_C mop
         MO_F32_Fabs     -> text "fabsf"
         MO_AcquireFence -> unsupported
         MO_ReleaseFence -> unsupported
+        MO_SeqCstFence  -> unsupported
         MO_Memcpy _     -> text "__builtin_memcpy"
         MO_Memset _     -> text "__builtin_memset"
         MO_Memmove _    -> text "__builtin_memmove"

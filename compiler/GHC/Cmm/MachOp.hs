@@ -727,6 +727,7 @@ data CallishMachOp
 
   | MO_AcquireFence
   | MO_ReleaseFence
+  | MO_SeqCstFence
 
   -- | Atomic read-modify-write. Arguments are @[dest, n]@.
   | MO_AtomicRMW Width AtomicMachOp

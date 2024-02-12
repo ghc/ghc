@@ -696,6 +696,7 @@
 // See Note [ThreadSanitizer and fences]
 #define RELEASE_FENCE prim %fence_release();
 #define ACQUIRE_FENCE prim %fence_acquire();
+#define SEQ_CST_FENCE prim %fence_seq_cst();
 
 #if TSAN_ENABLED
 // This is may be efficient than a fence but TSAN can reason about it.

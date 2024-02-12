@@ -1133,6 +1133,8 @@ callishMachOps platform = listToUFM $
         -- with an overlapping token ('acquire') in the lexer.
         ( "fence_acquire", (MO_AcquireFence,)),
         ( "fence_release", (MO_ReleaseFence,)),
+        ( "fence_seq_cst", (MO_SeqCstFence,)),
+
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),

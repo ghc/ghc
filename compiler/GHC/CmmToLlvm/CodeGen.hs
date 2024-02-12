@@ -180,6 +180,8 @@ genCall (PrimTarget MO_AcquireFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncAcquire
 genCall (PrimTarget MO_ReleaseFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncRelease
+genCall (PrimTarget MO_SeqCstFence) _ _ = runStmtsDecls $
+    statement $ Fence False SyncSeqCst
 
 genCall (PrimTarget MO_Touch) _ _ =
     return (nilOL, [])
@@ -992,8 +994,11 @@ cmmPrimOpFunctions mop = do
     -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
+
     MO_ReleaseFence  -> unsupported
     MO_AcquireFence  -> unsupported
+    MO_SeqCstFence   -> unsupported
+
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported
 
