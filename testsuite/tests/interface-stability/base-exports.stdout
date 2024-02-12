@@ -7118,9 +7118,13 @@ module GHC.Float where
   atanhDouble :: Double -> Double
   atanhFloat :: Float -> Float
   castDoubleToWord64 :: Double -> GHC.Word.Word64
+  castDoubleToWord64# :: Double# -> GHC.Prim.Word64#
   castFloatToWord32 :: Float -> GHC.Word.Word32
+  castFloatToWord32# :: Float# -> GHC.Prim.Word32#
   castWord32ToFloat :: GHC.Word.Word32 -> Float
+  castWord32ToFloat# :: GHC.Prim.Word32# -> Float#
   castWord64ToDouble :: GHC.Word.Word64 -> Double
+  castWord64ToDouble# :: GHC.Prim.Word64# -> Double#
   ceilingDouble :: forall b. GHC.Real.Integral b => Double -> b
   ceilingFloat :: forall b. GHC.Real.Integral b => Float -> b
   clamp :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Int

@@ -59,6 +59,8 @@ module GHC.Float
     , rationalToFloat
     , castWord32ToFloat
     , castFloatToWord32
+    , castWord32ToFloat#
+    , castFloatToWord32#
     , float2Double
       -- ** Operations
     , floorFloat
@@ -96,6 +98,8 @@ module GHC.Float
     , rationalToDouble
     , castWord64ToDouble
     , castDoubleToWord64
+    , castWord64ToDouble#
+    , castDoubleToWord64#
     , double2Float
       -- ** Operations
     , floorDouble
@@ -1733,6 +1737,12 @@ best solution is to write the value from the source register to memory and then
 read it from memory into the destination register and the best way to do that
 is using CMM.
 -}
+
+-- Deprecated since GHC 9.10.
+{-# DEPRECATED stgDoubleToWord64 "Use castDoubleToWord64# instead" #-}
+{-# DEPRECATED stgWord64ToDouble "Use castWord64ToDouble# instead" #-}
+{-# DEPRECATED stgFloatToWord32  "Use castFloatToWord32# instead" #-}
+{-# DEPRECATED stgWord32ToFloat  "Use castWord32ToFloat# instead" #-}
 
 stgDoubleToWord64 :: Double# -> Word64#
 stgDoubleToWord64 = castDoubleToWord64#
