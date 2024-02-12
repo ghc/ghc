@@ -1683,7 +1683,7 @@ repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel .
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
-repE e@(XExpr (ExpandedThingRn o x))
+repE e@(XExpr (ExpandedThingRn o x _))
   | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]

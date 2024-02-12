@@ -751,9 +751,9 @@ exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
-exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
-                                               | OrigStmt _ <- thing = DoOrigin
-                                               | OrigPat p  <- thing = DoPatOrigin p
+exprCtOrigin (XExpr (ExpandedThingRn thing _ _)) | OrigExpr a <- thing = exprCtOrigin a
+                                                 | OrigStmt _ _ <- thing = DoOrigin
+                                                 | OrigPat p _ _ <- thing = DoPatOrigin p
 exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
 
 -- | Extract a suitable CtOrigin from a MatchGroup

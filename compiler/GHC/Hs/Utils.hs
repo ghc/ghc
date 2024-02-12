@@ -1187,7 +1187,6 @@ collectStmtBinders flag = \case
     RecStmt { recS_stmts = L _ ss } -> collectLStmtsBinders flag ss
     XStmtLR x -> case ghcPass :: GhcPass idR of
         GhcRn -> collectApplicativeStmtBndrs x
-        GhcTc -> collectApplicativeStmtBndrs x
   where
     collectApplicativeStmtBndrs :: ApplicativeStmt (GhcPass idL) a -> [IdP (GhcPass idL)]
     collectApplicativeStmtBndrs (ApplicativeStmt _ args _) = concatMap (collectArgBinders . snd) args
@@ -1780,7 +1779,6 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (BindStmt _ pat _) = lPatImplicits pat
     hs_stmt (XStmtLR x) = case ghcPass :: GhcPass idR of
         GhcRn -> hs_applicative_stmt x
-        GhcTc -> hs_applicative_stmt x
     hs_stmt (LetStmt _ binds)     = hs_local_binds binds
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []
