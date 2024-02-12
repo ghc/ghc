@@ -951,47 +951,47 @@ follows:
 .. rts-flag:: -hc ⟨name⟩
     :noindex:
 
-    Restrict the profile to closures produced by cost-centre stacks with
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures produced by cost-centre stacks with
     one of the specified cost centres at the top.
 
 .. rts-flag:: -hC ⟨name⟩
     :noindex:
 
-    Restrict the profile to closures produced by cost-centre stacks with
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures produced by cost-centre stacks with
     one of the specified cost centres anywhere in the stack.
 
 .. rts-flag:: -hm ⟨module⟩
     :noindex:
 
-    Restrict the profile to closures produced by the specified modules.
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures produced by the specified modules.
 
 .. rts-flag:: -hd ⟨desc⟩
     :noindex:
 
-    Restrict the profile to closures with the specified description
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures with the specified description
     strings.
 
 .. rts-flag:: -hy ⟨type⟩
     :noindex:
 
-    Restrict the profile to closures with the specified types.
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures with the specified types.
 
 .. rts-flag:: -he ⟨era⟩
     :noindex:
 
-    Restrict the profile to the specified era.
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to the specified era.
 
 .. rts-flag:: -hr ⟨cc⟩
     :noindex:
 
-    Restrict the profile to closures with retainer sets containing
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures with retainer sets containing
     cost-centre stacks with one of the specified cost centres at the
     top.
 
 .. rts-flag:: -hb ⟨bio⟩
     :noindex:
 
-    Restrict the profile to closures with one of the specified
+    *Requires* :ghc-flag:`-prof`. Restrict the profile to closures with one of the specified
     biographies, where ⟨bio⟩ is one of ``lag``, ``drag``, ``void``, or
     ``use``.
 
