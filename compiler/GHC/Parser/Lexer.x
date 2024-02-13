@@ -974,8 +974,8 @@ data Token
   | ITcloseQuote IsUnicodeSyntax        --  |]
   | ITopenTExpQuote HasE                --  [|| or [e||
   | ITcloseTExpQuote                    --  ||]
-  | ITdollar                            --  prefix $
-  | ITdollardollar                      --  prefix $$
+  | ITdollar IsUnicodeSyntax            --  prefix $
+  | ITdollardollar IsUnicodeSyntax      --  prefix $$
   | ITtyQuote                           --  ''
   | ITquasiQuote (FastString,FastString,PsSpan)
     -- ITquasiQuote(quoter, quote, loc)
@@ -1174,6 +1174,9 @@ reservedSymsFM = listToUFM $
        ,("←",   ITlarrow UnicodeSyntax,     UnicodeSyntax, 0 )
 
        ,("⊸",   ITlolly, UnicodeSyntax, 0)
+
+       ,("∫",   ITdollar UnicodeSyntax,       UnicodeSyntax, xbit ThQuotesBit)
+       ,("∬",   ITdollardollar UnicodeSyntax, UnicodeSyntax, xbit ThQuotesBit)
 
        ,("⤙",   ITlarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
        ,("⤚",   ITrarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
@@ -1814,11 +1817,11 @@ varsym opws@OpWsPrefix = sym $ \span exts s ->
          else warnExtConflict OperatorWhitespaceSymbol_PrefixPercent
      | s == fsLit "$" ->
          if xtest ThQuotesBit exts
-         then return ITdollar
+         then return (ITdollar NormalSyntax)
          else warnExtConflict OperatorWhitespaceSymbol_PrefixDollar
      | s == fsLit "$$" ->
          if xtest ThQuotesBit exts
-         then return ITdollardollar
+         then return (ITdollardollar NormalSyntax)
          else warnExtConflict OperatorWhitespaceSymbol_PrefixDollarDollar
      | s == fsLit "-" ->
          return ITprefixminus -- Only when LexicalNegation is on, otherwise we get ITminus

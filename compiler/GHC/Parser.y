@@ -723,8 +723,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
 '|]'            { L _ (ITcloseQuote _) }
 '[||'           { L _ (ITopenTExpQuote _) }
 '||]'           { L _ ITcloseTExpQuote  }
-PREFIX_DOLLAR   { L _ ITdollar }
-PREFIX_DOLLAR_DOLLAR { L _ ITdollardollar }
+PREFIX_DOLLAR   { L _ (ITdollar _) }
+PREFIX_DOLLAR_DOLLAR { L _ (ITdollardollar _) }
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }

@@ -358,8 +358,8 @@ classify tok =
     ITcloseQuote{} -> TkSpecial
     ITopenTExpQuote{} -> TkSpecial
     ITcloseTExpQuote -> TkSpecial
-    ITdollar -> TkSpecial
-    ITdollardollar -> TkSpecial
+    ITdollar{} -> TkSpecial
+    ITdollardollar{} -> TkSpecial
     ITtyQuote -> TkSpecial
     ITquasiQuote{} -> TkUnknown
     ITqQuasiQuote{} -> TkUnknown
