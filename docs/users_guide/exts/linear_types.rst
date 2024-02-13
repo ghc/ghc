@@ -119,7 +119,7 @@ multiplicity if:
 - The binding is a pattern binding (including a simple variable)
   ``p=e`` (you can't write ``let %1 f x = u``, instead write ``let %1
   f = \x -> u``)
-- Either ``p`` is of the form ``!p'`` or ``p`` is a variable. In
+- Either ``p`` is strict (see infra) or ``p`` is a variable. In
   particular neither ``x@y`` nor ``(x)`` are covered by “is a
   variable”
 
@@ -136,12 +136,78 @@ as follows:
 - In all other cases, including function bindings ``let f x1...xn = rhs``,
   the multiplicity is inferred from the term.
 
-When ``-XMonoLocalBinds`` is on, the following also holds:
+When ``-XMonoLocalBinds`` is off, the following also holds:
 
 - Multiplicity-annotated non-variable pattern-bindings (such as
   ``let %1 !(x,y) = rhs``) are never generalised.
 - Non-variable pattern bindings which are inferred as polymorphic or
   qualified are inferred as having multiplicity ``Many``.
+
+Strict patterns
+~~~~~~~~~~~~~~~
+
+GHC considers that non-variable lazy patterns consume the scrutinee
+with multiplicity ``Many``. In practice, a pattern is strict (hence
+can be linear) if (otherwise the pattern is lazy):
+
+- The pattern is a case alternative and isn't annotated with a ``~``
+- The pattern is a let-binding, and is annotated with a ``!``
+- The pattern is a let-binding, :extension:`Strict` is on, and isn't
+  annotated with a ``~``
+- The pattern is nested inside a strict pattern
+
+Here are some examples of the impact on linear typing:
+
+Without ``-XStrict``::
+
+   -- good
+   let %1 x = u in …
+
+   -- good
+   let %1 !x = u in …
+
+   -- bad
+   let %1 (x, y) = u in …
+
+   -- good
+   let %Many (x, y) = u in …
+
+   -- good
+   let %1 !(x, y) = u in …
+
+   -- good
+   let %1 (!(x, y)) = u in …
+
+   -- inferred unrestricted
+   let (x, y) = u in …
+
+   -- can be inferred linear
+   case u of (x, y) -> …
+
+   -- inferred unrestricted
+   case u of ~(x, y) -> …
+
+With ``-XStrict``::
+   -- good
+   let %1 x = u in …
+
+   -- good
+   let %1 !x = u in …
+
+   -- good
+   let %1 (x, y) = u in …
+
+   -- bad
+   let %1 ~(x, y) = u in …
+
+   -- good
+   let %Many ~(x, y) = u in …
+
+   -- can be inferred linear
+   let (x, y) = u in …
+
+   -- inferred unrestricted
+   let ~(x, y) = u in …
 
 Data types
 ----------
