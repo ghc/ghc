@@ -82,8 +82,6 @@ import Control.Arrow ( second )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
 
-import qualified GHC.LanguageExtensions as LangExt
-
 
 {-
 ************************************************************************
@@ -353,15 +351,9 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
-tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
-  = do  { isApplicativeDo <- xoptM LangExt.ApplicativeDo
-        ; if isApplicativeDo
-          then do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
-                  ; res_ty <- readExpType res_ty
-                  ; return (HsDo res_ty doExpr (L l stmts')) }
-          else do { expanded_expr <- expandDoStmts doExpr stmts
-                                               -- Do expansion on the fly
-                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty }
+tcDoStmts doExpr@(DoExpr _) ss@(L _ stmts) res_ty
+  = do  { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
+        ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty
         }
 
 tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
