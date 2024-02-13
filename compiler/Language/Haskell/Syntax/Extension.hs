@@ -211,6 +211,7 @@ type family XIdSig            x
 type family XFixSig           x
 type family XInlineSig        x
 type family XSpecSig          x
+type family XSpecSigE         x
 type family XSpecInstSig      x
 type family XMinimalSig       x
 type family XSCCFunSig        x

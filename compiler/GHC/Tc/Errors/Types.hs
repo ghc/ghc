@@ -3153,6 +3153,14 @@ data TcRnMessage where
   -}
   TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
 
+  {-| TcRnSpecSigShape is an error that occurs when the user writes a SPECIALISE
+      pragma that isn't just a function application.
+
+      Example:
+        {-# SPECIALISE let x=True in x #-}
+  -}
+  TcRnSpecSigShape :: LHsExpr GhcPs -> TcRnMessage
+
   {-| 'TcRnIllegalInvisTyVarBndr' is an error that occurs
       when invisible type variable binders in type declarations
       are used without enabling the @TypeAbstractions@ extension.
@@ -5962,6 +5970,7 @@ data HsDocContext
   | ForeignDeclCtx (LocatedN RdrName)
   | DerivDeclCtx
   | RuleCtx FastString
+  | SpecECtx RdrName
   | TyDataCtx (LocatedN RdrName)
   | TySynCtx (LocatedN RdrName)
   | TyFamilyCtx (LocatedN RdrName)
