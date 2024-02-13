@@ -551,6 +551,37 @@ isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
 isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
 isCompleteMatchSig _                            = False
 
+{- *********************************************************************
+*                                                                      *
+                   Rule binders
+*                                                                      *
+********************************************************************* -}
+
+data RuleBndrs pass = RuleBndrs
+       { rb_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
+           -- ^ Forall'd type vars
+       , rb_tmvs :: [LRuleBndr pass]
+           -- ^ Forall'd term vars, before typechecking;
+           --   after typechecking this includes all forall'd vars
+       }
+
+-- | Located Rule Binder
+type LRuleBndr pass = XRec pass (RuleBndr pass)
+
+-- | Rule Binder
+data RuleBndr pass
+  = RuleBndr    (XCRuleBndr pass)   (LIdP pass)
+  | RuleBndrSig (XRuleBndrSig pass) (LIdP pass) (HsPatSigType pass)
+  | XRuleBndr !(XXRuleBndr pass)
+        -- ^
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --     'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnClose'
+
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+
+collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
+collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
+
 {-
 ************************************************************************
 *                                                                      *

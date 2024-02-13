@@ -21,7 +21,7 @@ module GHC.Rename.Bind (
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
 
    -- Other bindings
-   rnMethodBinds, renameSigs,
+   rnMethodBinds, renameSigs, bindRuleBndrs,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv, emptyMiniFixityEnv,
    HsSigCtxt(..),
@@ -42,14 +42,10 @@ import GHC.Rename.Pat
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( mapFvRn
-                        , checkDupRdrNames
-                        , warnUnusedLocalBinds
-                        , checkUnusedRecordWildcard
-                        , checkDupAndShadowedNames, bindLocalNamesFV
-                        , addNoNestedForallsContextsErr, checkInferredVars )
+import GHC.Rename.Utils
 import GHC.Driver.DynFlags
 import GHC.Unit.Module
+
 import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name
@@ -58,16 +54,19 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Data.List.SetOps    ( findDupsEq )
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
-import GHC.Data.Graph.Directed ( SCC(..) )
-import GHC.Data.Bag
+import GHC.Types.Unique.Set
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Unique.Set
+
+import GHC.Data.List.SetOps    ( findDupsEq )
+import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.Bag
 import GHC.Data.Maybe          ( orElse )
 import GHC.Data.OrdList
+
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -1110,11 +1109,12 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
-renameSig ctxt sig@(SpecSigE _ bndrs spec_e inl)
-  = bindrRuleBndrs bndrs $ \_ bndrs' ->
-    do { (spec_e', fvs) <- rnLExpr spec_e
-       ; fn <- checkSpecSig spec_e'
-       ; return (SpecSigE fn bndrs' spec_e' inl, fvs) }
+renameSig _ctxt (SpecSigE _ bndrs spec_e inl)
+  = do { fn_rdr <- checkSpecESigShape spec_e
+       ; fn_name <- lookupOccRn fn_rdr  -- Checks that the head isn't forall-bound
+       ; bindRuleBndrs (SpecECtx fn_rdr) bndrs $ \_ bndrs' ->
+         do { (spec_e', fvs) <- rnLExpr spec_e
+            ; return (SpecSigE fn_name bndrs' spec_e' inl, fvs) } }
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
@@ -1149,25 +1149,26 @@ renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
        this_mod <- fmap tcg_mod getGblEnv
        unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
-         addErrCtxt (text "In" <+> ppr sig) $ failWithTc TcRnOrphanCompletePragma
+         addErrCtxt (text "In" <+> ppr sig) $
+         failWithTc TcRnOrphanCompletePragma
 
        return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
 
 
-checkSpecSig :: LHsExpr GhcRn -> RnM Name
+checkSpecESigShape :: LHsExpr GhcPs -> RnM RdrName
 -- Checks the shape of a SPECIALISE
 -- That it looks like  (f a1 .. an [ :: ty ])
-checkSpecSig spec_e = go_l spec_e
+checkSpecESigShape spec_e = go_l spec_e
   where
     go_l (L _ e) = go e
 
-    go (ExprWithSig _ fn _) = go_l fn
-    go (HsApp _ fn _)       = go_l fn
-    go (HsAppType _ fn _)   = go_l fn
-    go (HsVar fn)           = return fn
-    go (HsPar e)            = go_l e
-    go _ = do { addErr (TcRnSpecSigShape spec_e)
-              ; return (mkUnboundName (mkVarOccFS (fsLit "SPECIALISE-lhs"))) })
+    go :: HsExpr GhcPs -> RnM RdrName
+    go (ExprWithTySig _ fn _) = go_l fn
+    go (HsApp _ fn _)         = go_l fn
+    go (HsAppType _ fn _)     = go_l fn
+    go (HsVar _ (L _ fn))     = return fn
+    go (HsPar _ e)            = go_l e
+    go _ = failWithTc (TcRnSpecSigShape spec_e)
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1279,18 +1280,17 @@ checkDupMinimalSigs sigs
       sig1 : sig2 : otherSigs -> dupMinimalSigErr sig1 sig2 otherSigs
       _ -> return ()
 
-bindRuleBndrs :: RuleName -> RuleBndrs GhcPs
+bindRuleBndrs :: HsDocContext -> RuleBndrs GhcPs
               -> ([Name] -> RuleBndrs GhcRn -> RnM (a,FreeVars))
               -> RnM (a,FreeVars)
-bindRuleBndrs rule_name (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
+bindRuleBndrs doc (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
   = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
-             doc = RuleCtx rule_name
        ; checkDupRdrNames rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
        ; bindRuleTyVars doc tyvs             $ \ tyvs' ->
          bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
-         thing_inside (RuleBndrs { rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
+         thing_inside names (RuleBndrs { rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
   where
     get_var :: RuleBndr GhcPs -> LocatedN RdrName
     get_var (RuleBndrSig _ v _) = v

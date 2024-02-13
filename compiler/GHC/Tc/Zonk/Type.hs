@@ -852,9 +852,13 @@ zonkLTcSpecPrags ps
   = mapM zonk_prag ps
   where
     zonk_prag (L loc (SpecPrag id co_fn inl))
-        = do { co_fn' <- don'tBind $ zonkCoFn co_fn
-             ; id' <- zonkIdOcc id
-             ; return (L loc (SpecPrag id' co_fn' inl)) }
+      = do { co_fn' <- don'tBind $ zonkCoFn co_fn
+           ; id' <- zonkIdOcc id
+           ; return (L loc (SpecPrag id' co_fn' inl)) }
+    zonk_prag (L loc (SpecPragE bndrs spec_e inl))
+      = zonkRuleBndrs bndrs $ \ bndrs' ->
+        do { spec_e' <- zonkLExpr spec_e
+           ; return (L loc (SpecPragE bndrs' spec_e' inl)) }
 
 {-
 ************************************************************************
@@ -1665,16 +1669,22 @@ zonkRules :: [LRuleDecl GhcTc] -> ZonkTcM [LRuleDecl GhcTc]
 zonkRules rs = mapM (wrapLocZonkMA zonkRule) rs
 
 zonkRule :: RuleDecl GhcTc -> ZonkTcM (RuleDecl GhcTc)
-zonkRule rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
+zonkRule rule@(HsRule { rd_bndrs = bndrs
                       , rd_lhs = lhs
                       , rd_rhs = rhs })
-  = runZonkBndrT (traverse zonk_tm_bndr tm_bndrs) $ \ new_tm_bndrs ->
+  = zonkRuleBndrs bndrs $ \ new_bndrs ->
     do { -- See Note [Zonking the LHS of a RULE]
        ; new_lhs <- setZonkType SkolemiseFlexi $ zonkLExpr lhs
        ; new_rhs <-                              zonkLExpr rhs
-       ; return $ rule { rd_tmvs = new_tm_bndrs
+       ; return $ rule { rd_bndrs = new_bndrs
                        , rd_lhs  = new_lhs
                        , rd_rhs  = new_rhs } }
+
+
+zonkRuleBndrs :: RuleBndrs GhcTc -> (RuleBndrs GhcTc -> ZonkTcM a) -> ZonkTcM a
+zonkRuleBndrs (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
+  = runZonkBndrT (traverse zonk_tm_bndr tmvs) $ \ new_tmvs ->
+    thing_inside (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = new_tmvs })
   where
    zonk_tm_bndr :: LRuleBndr GhcTc -> ZonkBndrTcM (LRuleBndr GhcTc)
    zonk_tm_bndr (L l (RuleBndr x (L loc v)))
@@ -1684,11 +1694,9 @@ zonkRule rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
 
    zonk_it v
      | isId v     = zonkIdBndrX v
-     | otherwise  = assert (isImmutableTyVar v)
+     | otherwise  = assert (isImmutableTyVar v) $
                     zonkTyBndrX v
-                    -- DV: used to be "return v", but that is plain
-                    -- wrong because we may need to go inside the kind
-                    -- of v and zonk there!
+                    -- We may need to go inside the kind of v and zonk there!
 
 {-
 ************************************************************************

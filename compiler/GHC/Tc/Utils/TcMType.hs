@@ -84,7 +84,7 @@ module GHC.Tc.Utils.TcMType (
 
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
-  candidateQTyVarsWithBinders,
+  candidateQTyVarsWithBinders, weedOutCandidates,
   CandidatesQTvs(..), delCandidates,
   candidateKindVars, partitionCandidates,
 
@@ -1341,6 +1341,10 @@ instance Outputable CandidatesQTvs where
     = text "DV" <+> braces (pprWithCommas id [ text "dv_kvs =" <+> ppr kvs
                                              , text "dv_tvs =" <+> ppr tvs
                                              , text "dv_cvs =" <+> ppr cvs ])
+
+weedOutCandidates :: (DTyVarSet -> DTyVarSet) -> CandidateQTVs -> CandidateQTVs
+weedOutCandidate weed_out dv@(DV { dv_kvs = kvs; dv_tvs = tvs })
+  = dv { dv_kvs = weed_out kvs, dv_tvs = weed_out tvs }
 
 isEmptyCandidates :: CandidatesQTvs -> Bool
 isEmptyCandidates (DV { dv_kvs = kvs, dv_tvs = tvs })

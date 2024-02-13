@@ -2036,10 +2036,8 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (#13524)
-       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
-                                                         psig_tys ++ candidates ++ tau_tys
-       ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
-             dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
+       ; dvs <- candidateQTyVarsOfTypes (psig_tys ++ candidates ++ tau_tys)
+       ; let dvs_plus = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
 
        ; traceTc "decideQuantifiedTyVars" (vcat
            [ text "tau_tys =" <+> ppr tau_tys

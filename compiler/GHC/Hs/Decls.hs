@@ -1222,10 +1222,6 @@ instance NoAnn HsRuleAnn where
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
-type instance XCRuleBndr    (GhcPass _) = [AddEpAnn]
-type instance XRuleBndrSig  (GhcPass _) = [AddEpAnn]
-type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
-
 instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where
   ppr (HsRules { rds_ext = ext
                , rds_rules = rules })
@@ -1240,27 +1236,17 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
   ppr (HsRule { rd_ext  = ext
               , rd_name = name
               , rd_act  = act
-              , rd_tyvs = tys
-              , rd_tmvs = tms
+              , rd_bndrs = bndrs
               , rd_lhs  = lhs
               , rd_rhs  = rhs })
         = sep [pprFullRuleName st name <+> ppr act,
-               nest 4 (pp_forall_ty tys <+> pp_forall_tm tys
-                                        <+> pprExpr (unLoc lhs)),
+               nest 4 (ppr bndrs <+> pprExpr (unLoc lhs)),
                nest 6 (equals <+> pprExpr (unLoc rhs)) ]
         where
-          pp_forall_ty Nothing     = empty
-          pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
-          pp_forall_tm Nothing | null tms = empty
-          pp_forall_tm _ = forAllLit <+> fsep (map ppr tms) <> dot
           st = case ghcPass @p of
                  GhcPs | (_, st) <- ext -> st
                  GhcRn | (_, st) <- ext -> st
                  GhcTc | (_, st) <- ext -> st
-
-instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
-   ppr (RuleBndr _ name) = ppr name
-   ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
 
 pprFullRuleName :: SourceText -> GenLocated a (RuleName) -> SDoc
 pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
@@ -1393,7 +1379,6 @@ type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RuleDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RuleDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (SourceText, RuleName) = EpAnnCO
-type instance Anno (RuleBndr (GhcPass p)) = EpAnnCO
 type instance Anno (WarnDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA

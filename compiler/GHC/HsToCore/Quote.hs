@@ -803,8 +803,7 @@ repDefD (L loc (DefaultDecl _ tys)) = do { tys1 <- repLTys tys
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
                         , rd_act = act
-                        , rd_tyvs = m_ty_bndrs
-                        , rd_tmvs = tm_bndrs
+                        , rd_bndrs = RuleBndrs { rb_tyvs = m_ty_bndrs, rb_tmvs = tm_bndrs }
                         , rd_lhs = lhs
                         , rd_rhs = rhs }))
   = do { let ty_bndrs = fromMaybe [] m_ty_bndrs
@@ -996,8 +995,10 @@ rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d (locA loc) fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
-rep_sig (L loc (SpecInstSig _ ty))  = rep_specialiseInst ty (locA loc)
-rep_sig (L _   (MinimalSig {}))       = notHandled ThMinimalPragmas
+rep_sig (L _ sig@(SpecSigE {}))
+  = pprPanic "No TH for SPECIALISE yet" (ppr sig)
+rep_sig (L loc (SpecInstSig _ ty))   = rep_specialiseInst ty (locA loc)
+rep_sig (L _   (MinimalSig {}))      = notHandled ThMinimalPragmas
 rep_sig (L loc (SCCFunSig _ nm str)) = rep_sccFun nm str (locA loc)
 rep_sig (L loc (CompleteMatchSig _ cls mty))
   = rep_complete_sig cls mty (locA loc)

@@ -32,8 +32,9 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Expr( LHsExpr )
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
+import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprLExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
 import GHC.Types.Tickish
@@ -794,20 +795,17 @@ data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
-  deriving Data
 
 -- | Located Type checker Specification Pragmas
 type LTcSpecPrag = Located TcSpecPrag
 
 -- | Type checker Specification Pragma
 data TcSpecPrag
-  = SpecPrag
-        Id
-        HsWrapper
-        InlinePragma
-  -- ^ The Id to be specialised, a wrapper that specialises the
-  -- polymorphic function, and inlining spec for the specialised function
-  deriving Data
+  = SpecPrag Id HsWrapper InlinePragma
+      -- ^ The Id to be specialised, a wrapper that specialises the
+      -- polymorphic function, and inlining spec for the specialised function
+
+   | SpecPragE (RuleBndrs GhcTc) (LHsExpr GhcTc) InlinePragma
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -839,9 +837,9 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_src = src, inl_inline = spec }
         NoUserInlinePrag -> "{-# " ++ extractSpecPragName src
         _                -> "{-# " ++ extractSpecPragName src  ++ "_INLINE"
 
-ppr_sig (SpecSigE _ spec_e inl@(InlinePragma { inl_src = src, inl_inline = spec }))
+ppr_sig (SpecSigE _ bndrs spec_e inl@(InlinePragma { inl_src = src, inl_inline = spec }))
   = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc $
-    pp_inl <+> ppr spec_e
+    pp_inl <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
   where
     -- SPECIALISE or SPECIALISE_INLINE
     pragmaSrc = case spec of
@@ -892,7 +890,7 @@ hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
 hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
-hsSigDoc (SpecSigE _ _ inl)     = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
+hsSigDoc (SpecSigE _ _ _ inl)   = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
 hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
 -- Using the 'inlinePragmaName' function ensures that the pragma name for any
 -- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted
@@ -950,10 +948,37 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
+  ppr (SpecPragE bndrs spec_e inl)
+    = text (extractSpecPragName $ inl_src inl)
+       <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc
 pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
+
+
+{- *********************************************************************
+*                                                                      *
+                  RuleBndrs
+*                                                                      *
+********************************************************************* -}
+
+type instance XCRuleBndr    (GhcPass _) = [AddEpAnn]
+type instance XRuleBndrSig  (GhcPass _) = [AddEpAnn]
+type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
+
+instance (OutputableBndrId p) => Outputable (RuleBndrs (GhcPass p)) where
+   ppr (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs })
+     = pp_forall_ty tyvs <+> pp_forall_tm tyvs
+     where
+       pp_forall_ty Nothing     = empty
+       pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
+       pp_forall_tm Nothing | null tmvs = empty
+       pp_forall_tm _ = forAllLit <+> fsep (map ppr tmvs) <> dot
+
+instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
+   ppr (RuleBndr _ name) = ppr name
+   ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
 
 {-
 ************************************************************************
@@ -966,6 +991,7 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
+type instance Anno (RuleBndr (GhcPass p)) = EpAnnCO
 
 -- For CompleteMatchSig
 type instance Anno [LocatedN RdrName] = SrcSpan

@@ -62,7 +62,7 @@ module GHC.Parser.PostProcess (
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
-        mkRuleBndrs, mkRuleTyVarBndrs,
+        mkRuleBndrs,
         checkRuleTyVarBndrNames,
         checkRecordSyntax,
         checkEmptyGADTs,
@@ -993,32 +993,35 @@ type LRuleTyTmVar = LocatedAn NoEpAnns RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar [AddEpAnn] (LocatedN RdrName) (Maybe (LHsType GhcPs))
 -- ^ Essentially a wrapper for a @RuleBndr GhcPs@
 
--- turns RuleTyTmVars into RuleBnrs - this is straightforward
-mkRuleBndrs :: [LRuleTyTmVar] -> [LRuleBndr GhcPs]
-mkRuleBndrs = fmap (fmap cvt_one)
-  where cvt_one (RuleTyTmVar ann v Nothing) = RuleBndr ann v
-        cvt_one (RuleTyTmVar ann v (Just sig)) =
-          RuleBndrSig ann v (mkHsPatSigType noAnn sig)
+mkRuleBndrs :: Maybe [LRuleTyTmVar] -> [LRuleTyTmVar] -> RuleBndrs GhcPs
+mkRuleBndrs tvbs tmbs
+  = RuleBndrs { rb_tyvs = fmap (fmap cvt_tv) tvbs
+              , rb_tmvs = fmap (fmap cvt_tm) tmbs }
+  where
+    -- cvt_tm turns RuleTyTmVars into RuleBnrs - this is straightforward
+    cvt_tm (RuleTyTmVar ann v Nothing)    = RuleBndr ann v
+    cvt_tm (RuleTyTmVar ann v (Just sig)) = RuleBndrSig ann v (mkHsPatSigType noAnn sig)
 
--- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
-mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
-mkRuleTyVarBndrs = fmap cvt_one
-  where cvt_one (L l (RuleTyTmVar ann v Nothing))
+    -- cvt_ty turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
+    cvt_tv (L l (RuleTyTmVar ann v Nothing))
           = L (l2l l) (UserTyVar ann () (fmap tm_to_ty v))
-        cvt_one (L l (RuleTyTmVar ann v (Just sig)))
+    cvt_tv (L l (RuleTyTmVar ann v (Just sig)))
           = L (l2l l) (KindedTyVar ann () (fmap tm_to_ty v) sig)
-    -- takes something in namespace 'varName' to something in namespace 'tvName'
-        tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
-        tm_to_ty _ = panic "mkRuleTyVarBndrs"
 
+    -- takes something in namespace 'varName' to something in namespace 'tvName'
+    tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
+    tm_to_ty _ = panic "mkRuleTyVarBndrs"
+
+checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P ()
 -- See Note [Parsing explicit foralls in Rules] in Parser.y
-checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
-checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
-  where check (L loc (Unqual occ)) =
-          when (occNameFS occ `elem` [fsLit "family",fsLit "role"])
-            (addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
-               (PsErrParseErrorOnInput occ))
-        check _ = panic "checkRuleTyVarBndrNames"
+checkRuleTyVarBndrNames bndrs
+   = sequence_ [ check lname | L _ (RuleTyTmVar _ lname _) <- bndrs ]
+  where
+    check (L loc (Unqual occ)) =
+          when (occNameFS occ `elem` [fsLit "family",fsLit "role"]) $
+          addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+                          PsErrParseErrorOnInput occ
+    check _ = panic "checkRuleTyVarBndrNames"
 
 checkRecordSyntax :: (MonadP m, Outputable a) => LocatedA a -> m (LocatedA a)
 checkRecordSyntax lr@(L loc r)

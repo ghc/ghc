@@ -381,7 +381,6 @@ checkValidType ctxt ty
                = case ctxt of
                  DefaultDeclCtxt-> MustBeMonoType
                  PatSigCtxt     -> rank0
-                 RuleSigCtxt {} -> rank1
                  TySynCtxt _    -> rank0
 
                  ExprSigCtxt {} -> rank1
@@ -405,10 +404,11 @@ checkValidType ctxt ty
                  SpecInstCtxt   -> rank1
                  GhciCtxt {}    -> ArbitraryRank
 
-                 TyVarBndrKindCtxt _ -> rank0
-                 DataKindCtxt _      -> rank1
-                 TySynKindCtxt _     -> rank1
-                 TyFamResKindCtxt _  -> rank1
+                 TyVarBndrKindCtxt {} -> rank0
+                 RuleBndrTypeCtxt{}   -> rank1
+                 DataKindCtxt _       -> rank1
+                 TySynKindCtxt _      -> rank1
+                 TyFamResKindCtxt _   -> rank1
 
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
@@ -542,7 +542,7 @@ typeOrKindCtxt (ExprSigCtxt {})     = OnlyTypeCtxt
 typeOrKindCtxt (TypeAppCtxt {})     = OnlyTypeCtxt
 typeOrKindCtxt (PatSynCtxt {})      = OnlyTypeCtxt
 typeOrKindCtxt (PatSigCtxt {})      = OnlyTypeCtxt
-typeOrKindCtxt (RuleSigCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (RuleBndrTypeCtxt {})= OnlyTypeCtxt
 typeOrKindCtxt (ForSigCtxt {})      = OnlyTypeCtxt
 typeOrKindCtxt (DefaultDeclCtxt {}) = OnlyTypeCtxt
 typeOrKindCtxt (InstDeclCtxt {})    = OnlyTypeCtxt
@@ -1464,7 +1464,7 @@ okIPCtxt (StandaloneKindSigCtxt {}) = False
 okIPCtxt (ClassSCCtxt {})       = False
 okIPCtxt (InstDeclCtxt {})      = False
 okIPCtxt (SpecInstCtxt {})      = False
-okIPCtxt (RuleSigCtxt {})       = False
+okIPCtxt (RuleBndrTypeCtxt {})  = False
 okIPCtxt DefaultDeclCtxt        = False
 okIPCtxt DerivClauseCtxt        = False
 okIPCtxt (TyVarBndrKindCtxt {}) = False

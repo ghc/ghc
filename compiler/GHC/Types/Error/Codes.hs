@@ -520,6 +520,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMisplacedSigDecl"                          = 87866
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
+  GhcDiagnosticCode "TcRnSpecSigShape"                              = 93944
   GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = Outdated 36038
   GhcDiagnosticCode "TcRnUnexpectedStandaloneDerivingDecl"          = 95159
   GhcDiagnosticCode "TcRnUnusedVariableInRuleDecl"                  = 65669
