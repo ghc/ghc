@@ -828,42 +828,50 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
                     do { (spec_e', rho) <- tcInferRho spec_e
                        ; return (id_bndrs, spec_e', rho) } }
 
-        -- Solve unfication constraints
-        ; _ <- setTcLevel tc_lvl $ runTcS $ solveWanteds wanted
+       -- Solve unfication constraints, and zonk
+       ; _ <- setTcLevel tc_lvl $ solveWantedsTcM wanted
 
-        -- Apply the unifications
-        ; wanted   <- liftZonkM (zonkWC wanted)
-        ; seed_tys <- liftZonkM (mapM zonkTcType (rho : map idType id_bndrs)
+       -- Apply the unifications
+       ; seed_tys <- liftZonkM (mapM zonkTcType (rho : map idType id_bndrs))
 
-        ; let (quant_cts, residual_wanted) = getRuleQuantCts wanted
-              quant_preds = map ctPred quant_cts
-              grown_tcvs  = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
+       ; let (quant_cts, residual_wanted) = getRuleQuantCts wanted
+             quant_preds = ctsPreds quant_cts
+             grown_tcvs  = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
 
-        ; dvs <- candidateQTyVarsOfTypes (quant_preds ++ seed_tys)
-        ; let weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
-        ; skol_info <- mkSkolemInfo (SpecESkol nm)
-        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
-
-        ; let (bound_cts, free_cts) = partition is_bound quant_cts
-              is_bound ct = any (`elemVarSet` tyCoVarsOfCt ct) qtkvs)
-
-
-        ; free_evs  <- mapM mk_quant_ev free_cts
-        ; bound_evs <- mapM mk_quant_ev bound_cts
-        ; let quant_evs = free_evs ++ bound_evs
-
-        ; (implic, ev_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
+       ; dvs <- candidateQTyVarsOfTypes (quant_preds ++ seed_tys)
+       ; let weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
+       ; skol_info <- mkSkolemInfo (SpecESkol nm)
+       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
+       ; (implic, ev_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                   quant_evs residual_wanted
-        ; emitImplications implic
-        ; emitSimples (listToBag free_cts)
+       ; emitImplications implic
 
-        ; let bndrs'  = mkTcRuleBndrs bndrs (qtkvs ++ bound_evs ++ id_bnrs)
-              full_e' = mkHsDictLet ev_binds spec_e'
-        ; traceTc "tcSpecPrag:SpecSigE" $
-          vcat [ text "bndrs:" <+> ppr bndrs'
-               , text "full_e:" <+> ppr full_e'
-               , text "inl:" <+> ppr inl ]
-        ; return [SpecPragE bndrs' free_evs full_e' inl] }
+       ; spec_binds_var <- TcM.newTcEvBinds
+       ; spec_cts <- setTcLevel tc_lvl $
+                     runTcSWithEvBinds spec_binds_var $
+                     solveWanteds quant_cts
+
+       ; bound_evs <- mapM mk_quant_ev quant_cts
+       ; spec_evs  <- mapM mk_quant_ev (bagToList spec_cts)
+
+       ; let bndrs'  = mkTcRuleBndrs bndrs (qtkvs ++ bound_evs ++ id_bnrs)
+             full_e' = mkHsDictLet ev_binds spec_e'
+       ; traceTc "tcSpecPrag:SpecSigE" $
+         vcat [ text "bndrs:" <+> ppr bndrs'
+              , text "full_e:" <+> ppr full_e'
+              , text "inl:" <+> ppr inl ]
+       ; return [SpecPragE (qtvs ++ id_bndrs)
+                           bound_evs full_e'
+                           spec_evs (TcEvBinds spec_binds_var)
+                           inl] }
+
+--   forall @a d1 d2 d3 x xs.
+--      f @a @Int (d1::Eq a) (d2::OrdInt) (d3::Eq a) (x:xs)
+--         = $sf @a d1 x xs
+--   $sf @a d1 x xs
+--      = let d2 = $fOrdInt
+--            d3 = d1
+--        in <f-rhs> @a @Int (d1::Eq a) (d2::OrdInt) (d3::Eq a) (x:xs)
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 
@@ -1362,7 +1370,7 @@ mk_quant_ev ct
 mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
 
-getRuleQuantCts :: WantedConstraints -> ([Ct], WantedConstraints)
+getRuleQuantCts :: WantedConstraints -> (Cts, WantedConstraints)
 -- Extract all the constraints we can quantify over,
 --   also returning the depleted WantedConstraints
 --
@@ -1381,10 +1389,8 @@ getRuleQuantCts :: WantedConstraints -> ([Ct], WantedConstraints)
 --   Not hard, but tiresome.
 
 getRuleQuantCts wc
-  = (bagToList quant_cts, residual}
+  = float_wc emptyVarSet wc
   where
-    !(quant_cts, residual) = float_wc emptyVarSet wc
-
     float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints)
     float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics, wc_errors = errs })
       = ( simple_yes `andCts` implic_yes
