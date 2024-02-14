@@ -1,6 +1,5 @@
 #include "HsFFI.h"
 #include <unistd.h>
-#include <pthread.h>
 #include "hs_try_putmvar002_stub.h"
 
 void externalPutMVar(HsStablePtr mvar, HsInt cap)
