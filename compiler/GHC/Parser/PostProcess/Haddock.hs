@@ -1327,7 +1327,7 @@ mkDocIE (L l_comment hdk_comment) =
     HdkCommentSection n doc -> Just $ L l (IEGroup noExtField n $ L span $ lexHsDocString doc)
     HdkCommentNamed s _doc -> Just $ L l (IEDocNamed noExtField s)
     HdkCommentNext doc -> Just $ L l (IEDoc noExtField $ L span $ lexHsDocString doc)
-    _ -> Nothing
+    HdkCommentPrev doc -> Just $ L l (IEDoc noExtField $ L span $ lexHsDocString doc)
   where l = noAnnSrcSpan span
         span = mkSrcSpanPs l_comment
 
