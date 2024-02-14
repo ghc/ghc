@@ -438,13 +438,20 @@ instance Binary a => Binary (TableCell a) where
         return (TableCell i j c)
 
 instance Binary Meta where
-    put_ bh (Meta v p) = do
+    put_ bh (Meta since) = do
+        put_ bh since
+    get bh = do
+        since <- get bh
+        return (Meta since)
+
+instance Binary MetaSince where
+    put_ bh (MetaSince v p) = do
         put_ bh v
         put_ bh p
     get bh = do
         v <- get bh
         p <- get bh
-        return (Meta v p)
+        return (MetaSince v p)
 
 instance (Binary mod, Binary id) => Binary (MetaDoc mod id) where
   put_ bh MetaDoc { _meta = m, _doc = d } = do

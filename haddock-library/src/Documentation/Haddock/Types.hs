@@ -30,12 +30,18 @@ import Data.Bifoldable
 import Data.Bitraversable
 #endif
 
+-- | A @\@since@ declaration.
+data MetaSince =
+  MetaSince { sincePackage :: Maybe Package
+              -- ^ optional package qualification
+            , sinceVersion :: Version
+            } deriving (Eq, Show)
+
 -- | With the advent of 'Version', we may want to start attaching more
 -- meta-data to comments. We make a structure for this ahead of time
 -- so we don't have to gut half the core each time we want to add such
 -- info.
-data Meta = Meta { _version :: Maybe Version
-                 , _package :: Maybe Package
+data Meta = Meta { _metaSince :: Maybe MetaSince
                  } deriving (Eq, Show)
 
 data MetaDoc mod id =

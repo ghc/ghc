@@ -198,14 +198,17 @@ hackMarkup fmt' currPkg h' =
                          in (markupAppend fmt x y, m ++ m')
 
 renderMeta :: DocMarkup id Html -> Maybe Package -> Meta -> Html
-renderMeta fmt currPkg (Meta { _version = Just x, _package = pkg }) =
+renderMeta fmt currPkg m =
+  maybe noHtml (renderMetaSince fmt currPkg) (_metaSince m)
+
+renderMetaSince :: DocMarkup id Html -> Maybe Package -> MetaSince -> Html
+renderMetaSince fmt currPkg (MetaSince { sincePackage = pkg, sinceVersion = ver }) =
   markupParagraph fmt . markupEmphasis fmt . toHtml $
-    "Since: " ++ formatPkgMaybe pkg ++ formatVersion x
+    "Since: " ++ formatPkgMaybe pkg ++ formatVersion ver
   where
     formatVersion v = concat . intersperse "." $ map show v
     formatPkgMaybe (Just p) | Just p /= currPkg = p ++ "-"
     formatPkgMaybe _ = ""
-renderMeta _ _ _ = noHtml
 
 -- | Goes through 'hackMarkup' to generate the 'Html' rather than
 -- skipping straight to 'markup': this allows us to employ XHtml

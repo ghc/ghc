@@ -108,11 +108,11 @@ parseParas :: Maybe Package
            -> String -- ^ String to parse
            -> MetaDoc mod Identifier
 parseParas pkg input = case parseParasState input of
-  (state, a) -> MetaDoc { _meta = Meta { _version = parserStateSince state
-                                       , _package = pkg
-                                       }
-                        , _doc = a
-                        }
+  (state, a) ->
+    let defaultPackage s = s { sincePackage = sincePackage s <|> pkg }
+    in MetaDoc { _meta = Meta { _metaSince = defaultPackage <$> parserStateSince state }
+               , _doc = a
+               }
 
 parseParasState :: String -> (ParserState, DocH mod Identifier)
 parseParasState = parse (emptyLines *> p) . T.pack . (++ "\n") . filter (/= '\r')
@@ -529,7 +529,10 @@ tableStepFour rs hdrIndex cells =  case hdrIndex of
 
 -- | Parse \@since annotations.
 since :: Parser (DocH mod a)
-since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince >> return DocEmpty
+since = do
+  ver <- ("@since " *> version <* skipHorizontalSpace <* endOfLine)
+  setSince (MetaSince Nothing ver)
+  return DocEmpty
   where
     version = decimal `Parsec.sepBy1` "."
 

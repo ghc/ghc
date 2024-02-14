@@ -56,7 +56,7 @@ jsonMap f g = jsonObject . map (f *** g) . Map.toList
 
 jsonMDoc :: MDoc Name -> JsonDoc
 jsonMDoc MetaDoc{..} =
-  jsonObject [ ("meta", jsonObject [("version", jsonMaybe (jsonString . show) (_version _meta))])
+  jsonObject [ ("meta", jsonObject [("version", jsonMaybe (jsonString . show . sinceVersion) (_metaSince _meta))])
              , ("document",  jsonDoc _doc)
              ]
 

@@ -1263,3 +1263,14 @@ subject to change in the future per user feedback. ::
     -- Some comment
     --
     -- @since 1.2.3
+
+Additionally, as of GHC 9.10 ``@since`` in docstrings following export list items: ::
+
+    module Mod
+        ( wombat -- ^ @since 2.0
+        ) where ...
+
+This has the function of superceding the ``@since`` annotation given at the
+definition site of ``wombat`` and can be used to record changes in the
+module exports, particularly when a declaration is re-exported from another
+module.

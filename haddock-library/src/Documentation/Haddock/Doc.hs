@@ -9,7 +9,7 @@ module Documentation.Haddock.Doc
   , metaConcat
   ) where
 
-import Control.Applicative ((<|>), empty)
+import Control.Applicative ((<|>))
 import Documentation.Haddock.Types
 import Data.Char (isSpace)
 
@@ -35,13 +35,13 @@ metaDocAppend (MetaDoc { _meta = m, _doc = d })
 -- | This is not a monoidal append, it uses '<|>' for the '_version' and
 -- '_package'.
 metaAppend :: Meta -> Meta -> Meta
-metaAppend (Meta v1 p1) (Meta v2 p2) = Meta (v1 <|> v2) (p1 <|> p2)
+metaAppend (Meta v1) (Meta v2) = Meta (v1 <|> v2)
 
 emptyMetaDoc :: MetaDoc mod id
 emptyMetaDoc = MetaDoc { _meta = emptyMeta, _doc = DocEmpty }
 
 emptyMeta :: Meta
-emptyMeta = Meta empty empty
+emptyMeta = Meta Nothing
 
 docAppend :: DocH mod id -> DocH mod id -> DocH mod id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1++ds2)

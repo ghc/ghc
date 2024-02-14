@@ -28,8 +28,7 @@ instance IsString a => IsString (Maybe a) where
 emptyMeta :: Meta
 emptyMeta =
   Meta {
-    _version = Nothing
-  , _package = Nothing
+    _metaSince = Nothing
   }
 
 parseParas :: String -> MetaDoc () String
@@ -547,8 +546,11 @@ spec = do
               "@since 0.5.0"
             , "@since 0.6.0"
             , "@since 0.7.0"
-            ] `shouldBe` MetaDoc { _meta = emptyMeta { _version = Just [0,7,0] }
-                                 , _doc = DocEmpty }
+                                 ]
+          `shouldBe`
+          MetaDoc { _meta = emptyMeta { _metaSince = Just $ MetaSince { sincePackage = Nothing
+                                                                      , sinceVersion = [0,7,0] } }
+                  , _doc = DocEmpty }
 
 
     context "when parsing text paragraphs" $ do

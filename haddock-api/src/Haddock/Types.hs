@@ -594,8 +594,11 @@ type MDoc id = MetaDoc (Wrap (ModuleName, OccName)) (Wrap id)
 
 type DocMarkup id a = DocMarkupH (Wrap (ModuleName, OccName)) id a
 
+instance NFData MetaSince where
+  rnf (MetaSince v p) = v `deepseq` p `deepseq` ()
+
 instance NFData Meta where
-  rnf (Meta v p) = v `deepseq` p `deepseq` ()
+  rnf (Meta since) = since `deepseq` ()
 
 instance NFData id => NFData (MDoc id) where
   rnf (MetaDoc m d) = m `deepseq` d `deepseq` ()

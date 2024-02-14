@@ -70,7 +70,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Types.SafeHaskell
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), first)
 import GHC.Iface.Syntax
 
 createInterface1
@@ -157,6 +157,8 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     let docsDecls = Map.fromList $ UniqMap.nonDetUniqMapToList mod_iface_docs.docs_decls
     traverse (processDocStringsParas dflags pkg_name) docsDecls
 
+  exportsSinceMap <- mkExportSinceMap dflags pkg_name mod_iface_docs
+
   (argMap :: Map Name (Map Int (MDoc Name))) <- do
       let docsArgs = Map.fromList $ UniqMap.nonDetUniqMapToList mod_iface_docs.docs_args
       (result :: Map Name (IntMap (MDoc Name))) <-
@@ -188,6 +190,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     pkg_name
     mdl
     transitiveWarnings
+    exportsSinceMap
     docMap
     argMap
     fixities
@@ -247,6 +250,29 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     funAvail  = [ AvailTC fUNTyConName [fUNTyConName] ]
 
 -------------------------------------------------------------------------------
+-- Export @since annotations
+-------------------------------------------------------------------------------
+mkExportSinceMap
+  :: forall m. (MonadIO m)
+  => DynFlags
+  -> Maybe Package
+  -> Docs
+  -> IfM m (Map Name MetaSince)
+mkExportSinceMap dflags pkg_name docs = do
+    Map.unions <$> traverse processExportDoc (UniqMap.nonDetUniqMapToList (docs_exports docs))
+  where
+    processExportDoc :: (Name, HsDoc GhcRn) -> IfM m (Map Name MetaSince)
+    processExportDoc (nm, doc) = do
+      mdoc <- processDocStringsParas dflags pkg_name [doc]
+      case _doc mdoc of
+        DocEmpty -> return ()
+        _ -> warn "Export docstrings may only contain @since annotations"
+      case _metaSince (_meta mdoc) of
+        Nothing -> return mempty
+        Just since -> return $ Map.singleton nm since
+
+
+-------------------------------------------------------------------------------
 -- Warnings
 -------------------------------------------------------------------------------
 
@@ -294,6 +320,7 @@ parseWarning dflags w = case w of
 
     format x bs = DocWarning . DocParagraph . DocAppend (DocString x)
                   <$> foldrM (\doc rest -> docAppend <$> processDocString dflags doc <*> pure rest) DocEmpty bs
+
 -------------------------------------------------------------------------------
 -- Doc options
 --
@@ -352,6 +379,7 @@ mkExportItems
   -> Maybe Package      -- this package
   -> Module             -- this module
   -> WarningMap
+  -> Map Name MetaSince
   -> DocMap Name
   -> ArgMap Name
   -> FixMap
@@ -362,7 +390,8 @@ mkExportItems
   -> OccEnv Name
   -> IfM m [ExportItem GhcRn]
 mkExportItems
-  prr modMap pkgName thisMod warnings docMap argMap fixMap namedChunks dsItems
+  prr modMap pkgName thisMod warnings exportSinceMap
+  docMap argMap fixMap namedChunks dsItems
   instIfaceMap dflags defMeths =
     concat <$> traverse lookupExport dsItems
   where
@@ -395,7 +424,7 @@ mkExportItems
 
     availExport :: MonadIO m => AvailInfo -> IfM m [ExportItem GhcRn]
     availExport avail =
-      availExportItem prr modMap thisMod warnings
+      availExportItem prr modMap thisMod warnings exportSinceMap
         docMap argMap fixMap instIfaceMap dflags avail defMeths
 
 unrestrictedModExports
@@ -451,6 +480,7 @@ availExportItem
   -> IfaceMap
   -> Module             -- this module
   -> WarningMap
+  -> Map Name MetaSince  -- ^ export \@since declarations
   -> Map Name (MDoc Name)        -- docs (keyed by 'Name's)
   -> ArgMap Name        -- docs for arguments (keyed by 'Name's)
   -> FixMap
@@ -460,7 +490,7 @@ availExportItem
   -> OccEnv Name       -- Default methods
   -> IfM m [ExportItem GhcRn]
 availExportItem
-    prr modMap thisMod warnings docMap argMap fixMap instIfaceMap dflags
+    prr modMap thisMod warnings exportSinceMap docMap argMap fixMap instIfaceMap dflags
     availInfo defMeths
   =
     declWith availInfo
@@ -479,7 +509,9 @@ availExportItem
             then pure (lookupDocs avail warnings docMap argMap defMeths)
             else case Map.lookup tmod modMap of
               Just iface ->
-                pure (lookupDocs avail warnings (ifaceDocMap iface) (ifaceArgMap iface) (mkOccEnv (ifaceDefMeths iface)))
+                pure
+                  $ first (applyExportSince exportSinceMap t)
+                  $ lookupDocs avail warnings (ifaceDocMap iface) (ifaceArgMap iface) (mkOccEnv (ifaceDefMeths iface))
               Nothing ->
                 -- We try to get the subs and docs
                 -- from the installed .haddock file for that package.
@@ -493,7 +525,9 @@ availExportItem
                     let subs_ = availNoDocs avail
                     pure (noDocForDecl, subs_)
                   Just instIface ->
-                    pure (lookupDocs avail warnings (instDocMap instIface) (instArgMap instIface) (mkOccEnv (instDefMeths instIface)))
+                    pure
+                      $ first (applyExportSince exportSinceMap t)
+                      $ lookupDocs avail warnings (instDocMap instIface) (instArgMap instIface) (mkOccEnv (instDefMeths instIface))
 
     -- Tries 'extractDecl' first then falls back to 'hiDecl' if that fails
     availDecl :: Name -> LHsDecl GhcRn -> IfM m (LHsDecl GhcRn)
@@ -587,6 +621,22 @@ availNoDocs :: AvailInfo -> [(Name, DocForDecl Name)]
 availNoDocs avail =
   zip (availSubordinates avail) (repeat noDocForDecl)
 
+-- | Override 'MetaSince' of a declaration with that of its export if appropriate.
+applyExportSince
+  :: Map Name MetaSince
+  -> Name
+  -> DocForDecl Name
+  -> DocForDecl Name
+applyExportSince exportSinceMap nm (dd, argDoc)
+  | Just since <- Map.lookup nm exportSinceMap =
+    let dd' = dd { documentationDoc = setMDocSince (documentationDoc dd) }
+        setMDocSince :: Maybe (MDoc name) -> Maybe (MDoc name)
+        setMDocSince (Just (MetaDoc meta doc)) = Just $ MetaDoc (meta {_metaSince = Just since}) doc
+        setMDocSince Nothing                   = Just $ MetaDoc (Meta {_metaSince = Just since}) DocEmpty
+     in (dd', argDoc)
+applyExportSince _ _ dd = dd
+
+
 hiDecl
   :: MonadIO m
   => DynFlags
@@ -616,6 +666,7 @@ lookupDocs
   -> ArgMap Name
   -> OccEnv Name
   -> (DocForDecl Name, [(Name, DocForDecl Name)])
+     -- ^ documentation for declaration and its subordinates
 lookupDocs avail warningMap docMap argMap def_meths_env =
   let
     n = availName avail

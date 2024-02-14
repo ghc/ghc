@@ -34,7 +34,7 @@ import           Data.Char                   ( ord )
 import           Data.List                   ( foldl' )
 import           Control.Applicative as App
 
-import           Documentation.Haddock.Types ( Version )
+import           Documentation.Haddock.Types ( MetaSince(..) )
 
 import           Prelude hiding (takeWhile)
 import           CompatPrelude
@@ -43,13 +43,13 @@ import           CompatPrelude
 -- through parsing is the version attached to a @\@since@ annotation - if
 -- the doc even contained one.
 newtype ParserState = ParserState {
-  parserStateSince :: Maybe Version
+  parserStateSince :: Maybe MetaSince
 } deriving (Eq, Show)
 
 initialParserState :: ParserState
 initialParserState = ParserState Nothing
 
-setSince :: Version -> Parser ()
+setSince :: MetaSince -> Parser ()
 setSince since = Parsec.modifyState (\st -> st{ parserStateSince = Just since })
 
 type Parser = Parsec.Parsec Text ParserState
