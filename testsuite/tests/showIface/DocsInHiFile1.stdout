@@ -16,6 +16,8 @@ docs:
                 GHC.Base.<>
                 {DocsInHiFile.hs:4:15-18}
                 GHC.Types.Bool
+       export docs:
+         []
        declaration docs:
          [elem -> [text:
                      -- | '()', 'elem'.

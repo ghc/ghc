@@ -3,6 +3,8 @@ docs:
          Just text:
                 -- | Module header
               identifiers:
+       export docs:
+         []
        declaration docs:
          [fα -> [text:
                    -- ^ Documentation for 'R'\'s 'fα' field.

@@ -16,6 +16,8 @@ docs:
                 GHC.Base.<>
                 {HaddockSpanIssueT24378.hs:3:15-18}
                 GHC.Types.Bool
+       export docs:
+         []
        declaration docs:
          [elem -> [text:
                      {-| '()', 'elem'.-}
@@ -81,3 +83,4 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
 extensible fields:
+

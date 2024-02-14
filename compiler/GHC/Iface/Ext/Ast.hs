@@ -2191,16 +2191,16 @@ instance ToHie (LocatedA (ImportDecl GhcRn)) where
 
 instance ToHie (IEContext (LocatedA (IE GhcRn))) where
   toHie (IEC c (L span ie)) = concatM $ makeNode ie (locA span) : case ie of
-      IEVar _ n ->
+      IEVar _ n _ ->
         [ toHie $ IEC c n
         ]
-      IEThingAbs _ n ->
+      IEThingAbs _ n _ ->
         [ toHie $ IEC c n
         ]
-      IEThingAll _ n ->
+      IEThingAll _ n _ ->
         [ toHie $ IEC c n
         ]
-      IEThingWith _ n _ ns ->
+      IEThingWith _ n _ ns _ ->
         [ toHie $ IEC c n
         , toHie $ map (IEC c) ns
         ]

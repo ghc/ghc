@@ -94,28 +94,45 @@ type LIE pass = XRec pass (IE pass)
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
+-- | A docstring attached to an export list item.
+type ExportDoc pass = LHsDoc pass
+
 -- | Imported or exported entity.
 data IE pass
-  = IEVar       (XIEVar pass) (LIEWrappedName pass)
-        -- ^ Imported or Exported Variable
-
-  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName pass)
-        -- ^ Imported or exported Thing with Absent list
+  = IEVar       (XIEVar pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+        -- ^ Imported or exported variable
         --
-        -- The thing is a Class/Type (can't tell)
+        -- @
+        -- module Mod ( test )
+        -- import Mod ( test )
+        -- @
+
+  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+        -- ^ Imported or exported Thing with absent subordinate list
+        --
+        -- The thing is a typeclass or type (can't tell)
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
         --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
+        --
+        -- @
+        -- module Mod ( Test )
+        -- import Mod ( Test )
+        -- @
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
-  | IEThingAll  (XIEThingAll pass) (LIEWrappedName pass)
-        -- ^ Imported or exported Thing with All imported or exported
+  | IEThingAll  (XIEThingAll pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+        -- ^ Imported or exported thing with wildcard subordinate list (e..g @(..)@)
         --
         -- The thing is a Class/Type and the All refers to methods/constructors
         --
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
         --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
         --                                 'GHC.Parser.Annotation.AnnType'
+        -- @
+        -- module Mod ( Test(..) )
+        -- import Mod ( Test(..) )
+        -- @
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -124,7 +141,8 @@ data IE pass
                 (LIEWrappedName pass)
                 IEWildcard
                 [LIEWrappedName pass]
-        -- ^ Imported or exported Thing With given imported or exported
+                (Maybe (ExportDoc pass))
+        -- ^ Imported or exported thing with explicit subordinate list.
         --
         -- The thing is a Class/Type and the imported or exported things are
         -- its children.
@@ -132,6 +150,10 @@ data IE pass
         --                                   'GHC.Parser.Annotation.AnnClose',
         --                                   'GHC.Parser.Annotation.AnnComma',
         --                                   'GHC.Parser.Annotation.AnnType'
+        -- @
+        -- module Mod ( Test(..) )
+        -- import Mod ( Test(..) )
+        -- @
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
@@ -140,11 +162,39 @@ data IE pass
         -- (Export Only)
         --
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
+        --
+        -- @
+        -- module Mod ( module Mod2 )
+        -- @
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | IEGroup             (XIEGroup pass) Int (LHsDoc pass) -- ^ Doc section heading
+        -- ^ A Haddock section in an export list.
+        --
+        -- @
+        -- module Mod
+        --   ( -- * Section heading
+        --     ...
+        --   )
+        -- @
   | IEDoc               (XIEDoc pass) (LHsDoc pass)       -- ^ Some documentation
+        -- ^ A bit of unnamed documentation.
+        --
+        -- @
+        -- module Mod
+        --   ( -- | Documentation
+        --     ...
+        --   )
+        -- @
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
+        -- ^ A reference to a named documentation chunk.
+        --
+        -- @
+        -- module Mod
+        --   ( -- $chunkName
+        --     ...
+        --   )
+        -- @
   | XIE !(XXIE pass)
 
 -- | Wildcard in an import or export sublist, like the @..@ in
