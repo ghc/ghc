@@ -16,6 +16,8 @@ that is up to you.
 module Language.Haskell.TH.Quote
   ( QuasiQuoter(..)
   , quoteFile
+  , namedDefaultQuasiQuoter
+  , defaultQuasiQuoter
   -- * For backwards compatibility
   ,dataToQa, dataToExpQ, dataToPatQ
   ) where
@@ -39,3 +41,54 @@ quoteFile (QuasiQuoter { quoteExp = qe, quotePat = qp, quoteType = qt, quoteDec 
    get old_quoter file_name = do { file_cts <- runIO (readFile file_name)
                                  ; addDependentFile file_name
                                  ; old_quoter file_cts }
+
+-- | A 'QuasiQuoter' that fails with a helpful error message in every
+-- context. It is intended to be modified to create a 'QuasiQuoter' that
+-- fails in all inappropriate contexts.
+--
+-- For example, you could write
+--
+-- @
+-- myPatQQ = (namedDefaultQuasiQuoter "myPatQQ")
+--   { quotePat = ... }
+-- @
+--
+-- If 'myPatQQ' is used in an expression context, the compiler will report
+-- that, naming 'myPatQQ'.
+--
+-- See also 'defaultQuasiQuoter', which does not name the 'QuasiQuoter' in
+-- the error message, and might therefore be more appropriate when
+-- the users of a particular 'QuasiQuoter' tend to define local \"synonyms\"
+-- for it.
+namedDefaultQuasiQuoter :: String -> QuasiQuoter
+namedDefaultQuasiQuoter name = QuasiQuoter
+  { quoteExp = f "use in expression contexts."
+  , quotePat = f "use in pattern contexts."
+  , quoteType = f "use in types."
+  , quoteDec = f "creating declarations."
+  }
+  where
+    f m _ = fail $ "The " ++ name ++ " quasiquoter is not for " ++ m
+
+-- | A 'QuasiQuoter' that fails with a helpful error message in every
+-- context. It is intended to be modified to create a 'QuasiQuoter' that
+-- fails in all inappropriate contexts.
+--
+-- For example, you could write
+--
+-- @
+-- myExpressionQQ = defaultQuasiQuoter
+--   { quoteExp = ... }
+-- @
+--
+-- See also 'namedDefaultQuasiQuoter', which names the 'QuasiQuoter' in the
+-- error messages.
+defaultQuasiQuoter :: QuasiQuoter
+defaultQuasiQuoter = QuasiQuoter
+  { quoteExp = f "use in expression contexts."
+  , quotePat = f "use in pattern contexts."
+  , quoteType = f "use in types."
+  , quoteDec = f "creating declarations."
+  }
+  where
+    f m _ = fail $ "This quasiquoter is not for " ++ m
