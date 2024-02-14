@@ -3340,7 +3340,7 @@ dodgy_msg kind tc ie
              , text "but it is not a type constructor or a class" ]
 
 dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
-dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii
+dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii Nothing
   where
     ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
 

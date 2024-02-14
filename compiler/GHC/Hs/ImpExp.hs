@@ -42,6 +42,7 @@ import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
+import GHC.Hs.Doc (LHsDoc)
 
 
 {-
@@ -245,18 +246,17 @@ type instance XXIE               (GhcPass _) = DataConCantHappen
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
-ieName (IEVar _ (L _ n))            = ieWrappedName n
-ieName (IEThingAbs  _ (L _ n))      = ieWrappedName n
-ieName (IEThingWith _ (L _ n) _ _)  = ieWrappedName n
-ieName (IEThingAll  _ (L _ n))      = ieWrappedName n
+ieName (IEVar _ (L _ n) _)           = ieWrappedName n
+ieName (IEThingAbs  _ (L _ n) _)     = ieWrappedName n
+ieName (IEThingWith _ (L _ n) _ _ _) = ieWrappedName n
+ieName (IEThingAll  _ (L _ n) _)     = ieWrappedName n
 ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
-ieNames (IEVar       _ (L _ n)   )   = [ieWrappedName n]
-ieNames (IEThingAbs  _ (L _ n)   )   = [ieWrappedName n]
-ieNames (IEThingAll  _ (L _ n)   )   = [ieWrappedName n]
-ieNames (IEThingWith _ (L _ n) _ ns) = ieWrappedName n
-                                     : map (ieWrappedName . unLoc) ns
+ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
+ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
+ieNames (IEThingAll  _ (L _ n) _)      = [ieWrappedName n]
+ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
 -- NB the above case does not include names of field selectors
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
@@ -267,15 +267,15 @@ ieDeprecation :: forall p. IsPass p => IE (GhcPass p) -> Maybe (WarningTxt (GhcP
 ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
   where
     ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LWarningTxt (GhcPass p))
-    ie_deprecation GhcPs (IEVar xie _) = xie
-    ie_deprecation GhcPs (IEThingAbs (xie, _) _) = xie
-    ie_deprecation GhcPs (IEThingAll (xie, _) _) = xie
-    ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _) = xie
+    ie_deprecation GhcPs (IEVar xie _ _) = xie
+    ie_deprecation GhcPs (IEThingAbs (xie, _) _ _) = xie
+    ie_deprecation GhcPs (IEThingAll (xie, _) _ _) = xie
+    ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
-    ie_deprecation GhcRn (IEVar xie _) = xie
-    ie_deprecation GhcRn (IEThingAbs (xie, _) _) = xie
-    ie_deprecation GhcRn (IEThingAll (xie, _) _) = xie
-    ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _) = xie
+    ie_deprecation GhcRn (IEVar xie _ _) = xie
+    ie_deprecation GhcRn (IEThingAbs (xie, _) _ _) = xie
+    ie_deprecation GhcRn (IEThingAll (xie, _) _ _) = xie
+    ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
 
@@ -302,12 +302,31 @@ replaceWrappedName (IEType    r (L l _)) n = IEType    r (L l n)
 replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
+exportDocstring :: LHsDoc pass -> SDoc
+exportDocstring doc = braces (text "docstring: " <> ppr doc)
+
 instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
-    ppr ie@(IEVar       _     var) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc var)]
-    ppr ie@(IEThingAbs  _   thing) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc thing)]
-    ppr ie@(IEThingAll  _   thing) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ hcat [ppr (unLoc thing), text "(..)"]]
-    ppr ie@(IEThingWith _ thing wc withs)
-        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))]
+    ppr ie@(IEVar       _     var doc) =
+      sep $ catMaybes [ ppr <$> ieDeprecation ie
+                      , Just $ ppr (unLoc var)
+                      , exportDocstring <$> doc
+                      ]
+    ppr ie@(IEThingAbs  _   thing doc) =
+      sep $ catMaybes [ ppr <$> ieDeprecation ie
+                      , Just $ ppr (unLoc thing)
+                      , exportDocstring <$> doc
+                      ]
+    ppr ie@(IEThingAll  _   thing doc) =
+      sep $ catMaybes [ ppr <$> ieDeprecation ie
+                      , Just $ hcat [ppr (unLoc thing)
+                      , text "(..)"]
+                      , exportDocstring <$> doc
+                      ]
+    ppr ie@(IEThingWith _ thing wc withs doc) =
+      sep $ catMaybes [ ppr <$> ieDeprecation ie
+                      , Just $ ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))
+                      , exportDocstring <$> doc
+                      ]
       where
         ppWiths =
           case wc of

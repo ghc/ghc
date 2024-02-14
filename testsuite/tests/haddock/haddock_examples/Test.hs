@@ -98,6 +98,13 @@ module Test (
 -}
 
         f',
+
+        -- * Test that export @since declarations work
+        since1, -- ^ @since 1.0
+        since2  -- ^ @since 2.0
+      , since3  -- ^ @since 3.0
+      , SinceType(..) -- ^ @since 4.0
+      , SinceClass(..) -- ^ @since 5.0
    ) where
 
 import Hidden
@@ -406,3 +413,11 @@ type CInt = Int
 k = undefined
 l = undefined
 m = undefined
+
+since1 = undefined
+since2 = undefined
+since3 = undefined
+
+data SinceType = SinceType
+class SinceClass a where
+

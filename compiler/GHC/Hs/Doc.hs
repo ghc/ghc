@@ -196,6 +196,8 @@ type DocStructure = [DocStructureItem]
 data Docs = Docs
   { docs_mod_hdr      :: Maybe (HsDoc GhcRn)
     -- ^ Module header.
+  , docs_exports      :: UniqMap Name (HsDoc GhcRn)
+     -- ^ Docs attached to module exports.
   , docs_decls        :: UniqMap Name [HsDoc GhcRn]
     -- ^ Docs for declarations: functions, data types, instances, methods etc.
     -- A list because sometimes subsequent haddock comments can be combined into one
@@ -216,14 +218,15 @@ data Docs = Docs
   }
 
 instance NFData Docs where
-  rnf (Docs mod_hdr decls args structure named_chunks haddock_opts language extentions)
-    = rnf mod_hdr `seq` rnf decls `seq` rnf args `seq` rnf structure `seq` rnf named_chunks
+  rnf (Docs mod_hdr exps decls args structure named_chunks haddock_opts language extentions)
+    = rnf mod_hdr `seq` rnf exps `seq` rnf decls `seq` rnf args `seq` rnf structure `seq` rnf named_chunks
     `seq` rnf haddock_opts `seq` rnf language `seq` rnf extentions
     `seq` ()
 
 instance Binary Docs where
   put_ bh docs = do
     put_ bh (docs_mod_hdr docs)
+    put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_exports docs)
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_decls docs)
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_args docs)
     put_ bh (docs_structure docs)
@@ -233,6 +236,7 @@ instance Binary Docs where
     put_ bh (docs_extensions docs)
   get bh = do
     mod_hdr <- get bh
+    exports <- listToUniqMap <$> get bh
     decls <- listToUniqMap <$> get bh
     args <- listToUniqMap <$> get bh
     structure <- get bh
@@ -241,7 +245,8 @@ instance Binary Docs where
     language <- get bh
     exts <- get bh
     pure Docs { docs_mod_hdr = mod_hdr
-              , docs_decls =  decls
+              , docs_exports = exports
+              , docs_decls = decls
               , docs_args = args
               , docs_structure = structure
               , docs_named_chunks = named_chunks
@@ -254,6 +259,7 @@ instance Outputable Docs where
   ppr docs =
       vcat
         [ pprField (pprMaybe pprHsDocDebug) "module header" docs_mod_hdr
+        , pprField (ppr . fmap pprHsDocDebug) "export docs" docs_exports
         , pprField (ppr . fmap (ppr . map pprHsDocDebug)) "declaration docs" docs_decls
         , pprField (ppr . fmap (pprIntMap ppr pprHsDocDebug)) "arg docs" docs_args
         , pprField (vcat . map ppr) "documentation structure" docs_structure
@@ -283,6 +289,7 @@ instance Outputable Docs where
 emptyDocs :: Docs
 emptyDocs = Docs
   { docs_mod_hdr = Nothing
+  , docs_exports = emptyUniqMap
   , docs_decls = emptyUniqMap
   , docs_args = emptyUniqMap
   , docs_structure = []

@@ -206,7 +206,7 @@ rnExports explicit_mod exports
                  | explicit_mod = exports
                  | has_main
                           = Just (noLocA [noLocA (IEVar Nothing
-                                     (noLocA (IEName noExtField $ noLocA default_main)))])
+                                     (noLocA (IEName noExtField $ noLocA default_main)) Nothing)])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -391,7 +391,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEVar warn_txt_ps l))
+          } (L loc ie@(IEVar warn_txt_ps l doc))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
@@ -405,17 +405,18 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     warn_txt_ps
                                     (locA loc)
 
+               doc' <- traverse rnLHsDoc doc
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEVar warn_txt_rn (replaceLWrappedName l name))
+                      , L loc (IEVar warn_txt_rn (replaceLWrappedName l name) doc')
                       , avail )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingAbs (warn_txt_ps, ann) l))
+          } (L loc ie@(IEThingAbs (warn_txt_ps, ann) l doc))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
@@ -429,17 +430,18 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     warn_txt_ps
                                     (locA loc)
 
+               doc' <- traverse rnLHsDoc doc
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingAbs (warn_txt_rn, ann) (replaceLWrappedName l name))
+                      , L loc (IEThingAbs (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
                       , avail )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingAll (warn_txt_ps, ann) l))
+          } (L loc ie@(IEThingAll (warn_txt_ps, ann) l doc))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ par -> do
                all_kids <- lookup_ie_kids_all ie l par
@@ -455,17 +457,18 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     warn_txt_ps
                                     (locA loc)
 
+               doc' <- traverse rnLHsDoc doc
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name))
+                      , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
                       , AvailTC name all_names )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs))
+          } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs doc))
         = do mb_gre <- addExportErrCtxt ie
                      $ lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ par -> do
@@ -491,10 +494,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     warn_txt_ps
                                     (locA loc)
 
+               doc' <- traverse rnLHsDoc doc
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs)
+                      , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs doc')
                       , AvailTC name all_names )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
@@ -903,7 +907,7 @@ dupExport_ok child ie1 ie2
         || (explicit_in ie1 && explicit_in ie2) )
   where
     explicit_in (IEModuleContents {}) = False                   -- module M
-    explicit_in (IEThingAll _ r)
+    explicit_in (IEThingAll _ r _)
       = occName child == rdrNameOcc (ieWrappedName $ unLoc r)  -- T(..)
     explicit_in _              = True
 

@@ -989,7 +989,7 @@ exportlist :: { ([AddEpAnn], OrdList (LIE GhcPs)) }
         | ','             { ([mj AnnComma $1], nilOL) }
 
 exportlist1 :: { OrdList (LIE GhcPs) }
-        : exportlist1 ',' export
+        : exportlist1 ',' export_cs
                           {% let ls = $1
                              in if isNilOL ls
                                   then return (ls `appOL` $3)
@@ -997,21 +997,24 @@ exportlist1 :: { OrdList (LIE GhcPs) }
                                          SnocOL hs t -> do
                                            t' <- addTrailingCommaA t (gl $2)
                                            return (snocOL hs t' `appOL` $3)}
-        | export          { $1 }
+        | export_cs       { $1 }
 
+
+export_cs :: { OrdList (LIE GhcPs) }
+export_cs : export {% return (unitOL $1) }
 
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
-export  :: { OrdList (LIE GhcPs) }
+export  :: { LIE GhcPs }
         : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
-                                                          ; return $ unitOL $ reLoc $ sL span $ impExp } }
+                                                          ; return $ reLoc $ sL span $ impExp } }
         | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
-                                                                   ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
+                                                                     ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
                                                           ; locImpExp <- return (sL span (IEModuleContents ($1, [mj AnnModule $2]) $3))
-                                                          ; return $ unitOL $ reLoc $ locImpExp } }
+                                                          ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
-                                                       in unitOL $ reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) }
+                                                           in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) Nothing }
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1180,7 +1183,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, [mj AnnModule $1]) $2)) }
-        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) }
+        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) Nothing }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations

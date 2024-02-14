@@ -1318,7 +1318,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               -> IELookupM ([(IE GhcRn, [GlobalRdrElt])], [IELookupWarning])
     lookup_ie ie = handle_bad_import $
       case ie of
-        IEVar _ (L l n) -> do
+        IEVar _ (L l n) _ -> do
             -- See Note [Importing DuplicateRecordFields]
             xs <- lookup_names ie (ieWrappedName n)
             let gres = map imp_item $ NE.toList xs
@@ -1326,12 +1326,12 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   | want_hiding == Exactly
                       = mapMaybe mk_depr_export_warning gres
                   | otherwise = []
-            return ( [ (IEVar Nothing (L l (replaceWrappedName n name)), [gre])
+            return ( [ (IEVar Nothing (L l (replaceWrappedName n name)) noDocstring, [gre])
                      | gre <- gres
                      , let name = greName gre ]
                    , export_depr_warns )
 
-        IEThingAll _ (L l tc) -> do
+        IEThingAll _ (L l tc) _ -> do
             ImpOccItem { imp_item      = gre
                        , imp_bundled   = bundled_gres
                        , imp_is_parent = is_par
@@ -1352,7 +1352,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   | otherwise
                   = []
 
-                renamed_ie = IEThingAll (Nothing, noAnn) (L l (replaceWrappedName tc name))
+                renamed_ie = IEThingAll (Nothing, noAnn) (L l (replaceWrappedName tc name)) noDocstring
                 export_depr_warn
                   | want_hiding == Exactly
                       = maybeToList $ mk_depr_export_warning gre
@@ -1365,7 +1365,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                    , imp_list_warn ++ export_depr_warn)
 
 
-        IEThingAbs _ (L l tc')
+        IEThingAbs _ (L l tc') _
             | want_hiding == EverythingBut   -- hiding ( C )
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
@@ -1381,9 +1381,9 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   return ( [mkIEThingAbs tc' l gre]
                          , maybeToList $ mk_depr_export_warning gre)
 
-        IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns -> do
+        IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns _ -> do
            ImpOccItem { imp_item = gre, imp_bundled = subnames }
-               <- lookup_parent (IEThingAbs (Nothing, noAnn) ltc) (ieWrappedName rdr_tc)
+               <- lookup_parent (IEThingAbs (Nothing, noAnn) ltc noDocstring) (ieWrappedName rdr_tc)
            let name = greName gre
 
            -- Look up the children in the sub-names of the parent
@@ -1391,14 +1391,14 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            case lookupChildren subnames rdr_ns of
 
              Failed rdrs -> failLookupWith $
-                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs) IsSubordinate
+                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs noDocstring) IsSubordinate
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
                                 -- c.f. #15412
 
              Succeeded childnames ->
-                return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames'
+                return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames' noDocstring
                           ,gres)]
                        , export_depr_warns)
 
@@ -1415,8 +1415,11 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
       where
         mkIEThingAbs tc l gre
-          = (IEThingAbs (Nothing, noAnn) (L l (replaceWrappedName tc n)), [gre])
+          = (IEThingAbs (Nothing, noAnn) (L l (replaceWrappedName tc n)) noDocstring, [gre])
           where n = greName gre
+
+        -- N.B. imports never have docstrings
+        noDocstring = Nothing
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport ie _
@@ -1574,8 +1577,8 @@ gresFromIE decl_spec (L loc ie, gres)
   = map set_gre_imp gres
   where
     is_explicit = case ie of
-                    IEThingAll _ name -> \n -> n == lieWrappedName name
-                    _                 -> \_ -> True
+                    IEThingAll _ name _ -> \n -> n == lieWrappedName name
+                    _                   -> \_ -> True
     prov_fn name
       = ImpSpec { is_decl = decl_spec, is_item = item_spec }
       where
@@ -1880,10 +1883,10 @@ findImportUsage imports used_gres
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
         add_unused :: IE GhcRn -> NameSet -> NameSet
-        add_unused (IEVar _ n)      acc = add_unused_name (lieWrappedName n) acc
-        add_unused (IEThingAbs _ n) acc = add_unused_name (lieWrappedName n) acc
-        add_unused (IEThingAll _ n) acc = add_unused_all  (lieWrappedName n) acc
-        add_unused (IEThingWith _ p wc ns) acc =
+        add_unused (IEVar _ n _)    acc   = add_unused_name (lieWrappedName n) acc
+        add_unused (IEThingAbs _ n _) acc = add_unused_name (lieWrappedName n) acc
+        add_unused (IEThingAll _ n _) acc = add_unused_all  (lieWrappedName n) acc
+        add_unused (IEThingWith _ p wc ns _) acc =
           add_wc_all (add_unused_with pn xs acc)
           where pn = lieWrappedName p
                 xs = map lieWrappedName ns
@@ -2051,10 +2054,10 @@ getMinimalImports ie_decls
     to_ie rdr_env _ (Avail c)  -- Note [Overloaded field import]
       = do { let
                gre = expectJust "getMinimalImports Avail" $ lookupGRE_Name rdr_env c
-           ; return $ [IEVar Nothing (to_ie_post_rn $ noLocA $ greName gre)] }
+           ; return $ [IEVar Nothing (to_ie_post_rn $ noLocA $ greName gre) Nothing] }
     to_ie _ _ avail@(AvailTC n [_])  -- Exporting the main decl and nothing else
       | availExportsDecl avail
-      = return [IEThingAbs (Nothing, noAnn) (to_ie_post_rn $ noLocA n)]
+      = return [IEThingAbs (Nothing, noAnn) (to_ie_post_rn $ noLocA n) Nothing]
     to_ie rdr_env iface (AvailTC n cs) =
       case [ xs | avail@(AvailTC x xs) <- mi_exports iface
            , x == n
@@ -2062,12 +2065,12 @@ getMinimalImports ie_decls
            ] of
         [xs]
           | all_used xs
-          -> return [IEThingAll (Nothing, noAnn) (to_ie_post_rn $ noLocA n)]
+          -> return [IEThingAll (Nothing, noAnn) (to_ie_post_rn $ noLocA n) Nothing]
           | otherwise
           -> do { let ns_gres = map (expectJust "getMinimalImports AvailTC" . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
                 ; return [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
-                                 (map (to_ie_post_rn . noLocA) (filter (/= n) ns))] }
+                                 (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
                                        -- Note [Overloaded field import]
         _other
           -> do { let infos = map (expectJust "getMinimalImports AvailTC" . lookupGRE_Name rdr_env) cs
@@ -2076,9 +2079,9 @@ getMinimalImports ie_decls
                       fs = map fieldGREInfo fs_gres
                 ; return $
                   if all_non_overloaded fs
-                  then map (IEVar Nothing . to_ie_post_rn_var . noLocA) ns
+                  then map (\nm -> IEVar Nothing (to_ie_post_rn_var $ noLocA nm) Nothing) ns
                   else [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
-                         (map (to_ie_post_rn . noLocA) (filter (/= n) ns))] }
+                         (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
         where
 
           all_used avail_cs = all (`elem` cs) avail_cs
@@ -2263,7 +2266,7 @@ badImportItemErr iface decl_spec ie sub avails = do
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     all_avails = mi_exports iface
     unavailableChildren = case ie of
-      IEThingWith _ _ _ ns -> map (rdrNameOcc . ieWrappedName  . unLoc) ns
+      IEThingWith _ _ _ ns _ -> map (rdrNameOcc . ieWrappedName  . unLoc) ns
       _ -> panic "importedChildren failed pattern match: no children"
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()

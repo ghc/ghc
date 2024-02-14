@@ -900,8 +900,8 @@ addHiding1 _libdir (L l p) = do
           [L li imp1,imp2] = hsmodImports p
           n1 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n1"))
           n2 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n2"))
-          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)))
-          v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)))
+          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)) Nothing)
+          v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)) Nothing)
           impHiding = L (EpAnn d0
                                (AnnList Nothing
                                         (Just (AddEpAnn AnnOpenP  d1))
@@ -936,8 +936,8 @@ addHiding2 _libdir top = do
                          emptyComments)
           n1 = L (noAnnSrcSpanDP0) (mkVarUnqual (mkFastString "n1"))
           n2 = L (noAnnSrcSpanDP0) (mkVarUnqual (mkFastString "n2"))
-          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)))
-          v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)))
+          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1)) Nothing)
+          v2 = L (           noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2)) Nothing)
           L ln n = last ns
           n' = L (addComma ln) n
           imp1' = imp1 { ideclImportList = Just (EverythingBut, L lh' (init ns ++ [n',v1,v2]))}

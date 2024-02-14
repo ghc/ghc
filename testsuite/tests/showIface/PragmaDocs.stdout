@@ -8,6 +8,8 @@ require own pkg trusted: False
 docs:
   Just module header:
          Nothing
+       export docs:
+         []
        declaration docs:
          []
        arg docs:

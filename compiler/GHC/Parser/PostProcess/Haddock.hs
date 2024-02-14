@@ -299,7 +299,7 @@ lexHsDocString = lexHsDoc parseIdentifier
 lexLHsDocString :: Located HsDocString -> LHsDoc GhcPs
 lexLHsDocString = fmap lexHsDocString
 
--- Only for module exports, not module imports.
+-- | Only for module exports, not module imports.
 --
 --    module M (a, b, c) where   -- use on this [LIE GhcPs]
 --    import I (a, b, c)         -- do not use here!
@@ -314,7 +314,19 @@ instance HasHaddock (LocatedL [LocatedA (IE GhcPs)]) where
 
 -- Needed to use 'addHaddockInterleaveItems' in 'instance HasHaddock (Located [LIE GhcPs])'.
 instance HasHaddock (LocatedA (IE GhcPs)) where
-  addHaddock a = a <$ registerHdkA a
+  addHaddock (L l_export ie ) =
+    extendHdkA (locA l_export) $ liftHdkA $ do
+      docs <- inLocRange (locRangeFrom (getBufPos (srcSpanEnd (locA l_export)))) $
+        takeHdkComments mkDocPrev
+      mb_doc <- selectDocString docs
+      let mb_ldoc = lexLHsDocString <$> mb_doc
+      let ie' = case ie of
+            IEVar ext nm _                 -> IEVar ext nm mb_ldoc
+            IEThingAbs ext nm _            -> IEThingAbs ext nm mb_ldoc
+            IEThingAll ext nm _            -> IEThingAll ext nm mb_ldoc
+            IEThingWith ext nm wild subs _ -> IEThingWith ext nm wild subs mb_ldoc
+            x                              -> x
+      pure $ L l_export ie'
 
 {- Add Haddock items to a list of non-Haddock items.
 Used to process export lists (with mkDocIE) and declarations (with mkDocHsDecl).

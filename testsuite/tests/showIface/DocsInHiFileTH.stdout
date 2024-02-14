@@ -3,6 +3,8 @@ docs:
          Just text:
                 -- |This is the new module header
               identifiers:
+       export docs:
+         []
        declaration docs:
          [Tup2 -> [text:
                      -- |Matches a tuple of (a, a)

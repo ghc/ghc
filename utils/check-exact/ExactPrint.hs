@@ -4566,23 +4566,26 @@ instance ExactPrint (IE GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (IEVar depr ln) = do
+  exact (IEVar depr ln doc) = do
     depr' <- markAnnotated depr
     ln' <- markAnnotated ln
-    return (IEVar depr' ln')
-  exact (IEThingAbs (depr, an) thing) = do
+    doc' <- markAnnotated doc
+    return (IEVar depr' ln' doc')
+  exact (IEThingAbs (depr, an) thing doc) = do
     depr' <- markAnnotated depr
     thing' <- markAnnotated thing
-    return (IEThingAbs (depr', an) thing')
-  exact (IEThingAll (depr, an) thing) = do
+    doc' <- markAnnotated doc
+    return (IEThingAbs (depr', an) thing' doc')
+  exact (IEThingAll (depr, an) thing doc) = do
     depr' <- markAnnotated depr
     thing' <- markAnnotated thing
     an0 <- markEpAnnL' an  lidl AnnOpenP
     an1 <- markEpAnnL' an0 lidl AnnDotdot
     an2 <- markEpAnnL' an1 lidl AnnCloseP
-    return (IEThingAll (depr', an2) thing')
+    doc' <- markAnnotated doc
+    return (IEThingAll (depr', an2) thing' doc')
 
-  exact (IEThingWith (depr, an) thing wc withs) = do
+  exact (IEThingWith (depr, an) thing wc withs doc) = do
     depr' <- markAnnotated depr
     thing' <- markAnnotated thing
     an0 <- markEpAnnL' an lidl AnnOpenP
@@ -4599,7 +4602,8 @@ instance ExactPrint (IE GhcPs) where
           as' <- markAnnotated as
           return (an2, wc, bs'++as')
     an2 <- markEpAnnL' an1 lidl AnnCloseP
-    return (IEThingWith (depr', an2) thing' wc' withs')
+    doc' <- markAnnotated doc
+    return (IEThingWith (depr', an2) thing' wc' withs' doc')
 
   exact (IEModuleContents (depr, an) m) = do
     depr' <- markAnnotated depr

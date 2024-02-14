@@ -73,6 +73,7 @@ extractDocs dflags
         mod_docs
          =  Docs
          { docs_mod_hdr = th_hdr <|> doc_hdr
+         , docs_exports = exports_docs
          -- Left biased union (see #21220)
          , docs_decls = plusUniqMap_C (\a _ -> a)
                           ((:[]) <$> th_decl_docs `plusUniqMap` th_inst_docs)
@@ -100,6 +101,7 @@ extractDocs dflags
                              , isDefaultMethodOcc occ
                              ]
 
+    exports_docs = maybe emptyUniqMap mkExportsDocs mb_rn_exports
     (doc_map, arg_map) = mkMaps def_meths_env local_insts decls_with_docs
     decls_with_docs = topDecls rn_decls
     local_insts = filter (nameIsLocalOrFrom semantic_mdl)
@@ -108,6 +110,25 @@ extractDocs dflags
                                    all_exports def_meths_env
     named_chunks = getNamedChunks (isJust mb_rn_exports) rn_decls
 extractDocs _ _ = pure Nothing
+
+mkExportsDocs :: [(LIE GhcRn, Avails)] -> UniqMap Name (HsDoc GhcRn)
+mkExportsDocs = foldMap f
+  where
+    f :: (LIE GhcRn, Avails) -> UniqMap Name (HsDoc GhcRn)
+    f (L _ ie, avails)
+      | Just (L _ doc) <- ieExportDoc ie =
+        listToUniqMap [ (availName nm, doc) | nm <- avails ]
+    f _ = emptyUniqMap
+
+    ieExportDoc :: IE GhcRn -> Maybe (ExportDoc GhcRn)
+    ieExportDoc (IEVar _ _ doc) = doc
+    ieExportDoc (IEThingAbs _ _ doc) = doc
+    ieExportDoc (IEThingAll _ _ doc) = doc
+    ieExportDoc (IEThingWith _ _ _ _ doc) = doc
+    ieExportDoc (IEModuleContents _ _) = Nothing
+    ieExportDoc (IEGroup _ _ _) = Nothing
+    ieExportDoc (IEDoc _ _) = Nothing
+    ieExportDoc (IEDocNamed _ _) = Nothing
 
 -- | If we have an explicit export list, we extract the documentation structure
 -- from that.

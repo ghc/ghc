@@ -2850,12 +2850,12 @@ mkModuleImpExp warning anns (L l specname) subs = do
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name)
                        -> return $ IEVar warning
-                           (L l (ieNameFromSpec specname))
-      | otherwise      -> IEThingAbs (warning, anns) . L l <$> nameT
-    ImpExpAll          -> IEThingAll (warning, anns) . L l <$> nameT
+                           (L l (ieNameFromSpec specname)) Nothing
+      | otherwise      -> IEThingAbs (warning, anns) . L l <$> nameT <*> pure noExportDoc
+    ImpExpAll          -> IEThingAll (warning, anns) . L l <$> nameT <*> pure noExportDoc
     ImpExpList xs      ->
       (\newName -> IEThingWith (warning, anns) (L l newName)
-        NoIEWildcard (wrapped xs)) <$> nameT
+        NoIEWildcard (wrapped xs)) <$> nameT <*> pure noExportDoc
     ImpExpAllWith xs                       ->
       do allowed <- getBit PatternSynonymsBit
          if allowed
@@ -2867,10 +2867,13 @@ mkModuleImpExp warning anns (L l specname) subs = do
                 ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName
                         -> IEThingWith (warning, anns) (L l newName) pos ies)
-               <$> nameT
+               <$> nameT <*> pure noExportDoc
           else addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
                  PsErrIllegalPatSynExport
   where
+    noExportDoc :: Maybe (LHsDoc GhcPs)
+    noExportDoc = Nothing
+
     name = ieNameVal specname
     nameT =
       if isVarNameSpace (rdrNameSpace name)
@@ -2897,7 +2900,7 @@ mkTypeImpExp name =
 
 checkImportSpec :: LocatedL [LIE GhcPs] -> P (LocatedL [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =
-    case [l | (L l (IEThingWith _ _ (IEWildcard _) _)) <- specs] of
+    case [l | (L l (IEThingWith _ _ (IEWildcard _) _ _)) <- specs] of
       [] -> return ie
       (l:_) -> importSpecError (locA l)
   where

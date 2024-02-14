@@ -1,6 +1,8 @@
 docs:
   Just module header:
          Nothing
+       export docs:
+         []
        declaration docs:
          []
        arg docs:

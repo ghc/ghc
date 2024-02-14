@@ -7,6 +7,8 @@ docs:
                 foo#
                 {MagicHashInHaddocks.hs:3:14-18}
                 Bar##
+       export docs:
+         []
        declaration docs:
          []
        arg docs:

@@ -2397,7 +2397,8 @@
                 [])
                (EpaComments
                 []))
-              {Name: GHC.Types.Type})))))])))))]
+              {Name: GHC.Types.Type})))
+           (Nothing)))])))))]
   (Nothing)
   (Nothing)))
 
