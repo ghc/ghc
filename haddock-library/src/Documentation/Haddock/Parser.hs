@@ -530,11 +530,15 @@ tableStepFour rs hdrIndex cells =  case hdrIndex of
 -- | Parse \@since annotations.
 since :: Parser (DocH mod a)
 since = do
-  ver <- ("@since " *> version <* skipHorizontalSpace <* endOfLine)
-  setSince (MetaSince Nothing ver)
+  ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince
   return DocEmpty
   where
-    version = decimal `Parsec.sepBy1` "."
+    version = do
+      pkg <- Parsec.optionMaybe $ Parsec.try $ package <* Parsec.char '-'
+      ver <- decimal `Parsec.sepBy1` "."
+      return (MetaSince pkg ver)
+
+    package = Parsec.many1 $ Parsec.alphaNum <|> Parsec.oneOf "_-"
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.

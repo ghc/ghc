@@ -539,6 +539,12 @@ spec = do
           MetaDoc { _meta = emptyMeta { _version = Nothing }
                   , _doc = DocParagraph "@since 0.5.0 foo" }
 
+      it "parses package name" $ do
+        parseParas "@since foo-bar-0.5.0" `shouldBe`
+          MetaDoc { _meta = emptyMeta { _metaSince = Just $ MetaSince { sincePackage = Just "foo-bar"
+                                                                      , sinceVersion = [0,5,0] } }
+                  , _doc = DocParagraph "@since 0.5.0 foo" }
+
 
       context "when given multiple times" $ do
         it "gives last occurrence precedence" $ do
