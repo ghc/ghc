@@ -1526,15 +1526,15 @@ pprHexVal platform w rep = parens ctype <> rawlit
 pprCtorArray :: Platform -> InitOrFini -> [CLabel] -> SDoc
 pprCtorArray platform initOrFini lbls =
        decls
-    <> text "static __attribute__((" <> attribute <> text "))"
-    <> text "void _hs_" <> attribute <> text "()"
+    <> text "static __attribute__((" <> text attribute <> text "))"
+    <> text "void _hs_" <> text suffix <> text "()"
     <> braces body
   where
     body = vcat [ pprCLabel platform lbl <> text " ();" | lbl <- lbls ]
     decls = vcat [ text "void" <+> pprCLabel platform lbl <> text " (void);" | lbl <- lbls ]
-    attribute = case initOrFini of
+    (attribute, suffix) = case initOrFini of
                   IsInitArray
                     -- See Note [JSFFI initialization] for details
-                    | ArchWasm32 <- platformArch platform -> text "constructor(101)"
-                    | otherwise -> text "constructor"
-                  IsFiniArray -> text "destructor"
+                    | ArchWasm32 <- platformArch platform -> ("constructor(101)", "constructor")
+                    | otherwise -> ("constructor", "constructor")
+                  IsFiniArray -> ("destructor", "destructor")

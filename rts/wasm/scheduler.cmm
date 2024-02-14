@@ -127,17 +127,6 @@ section "data" {
   stg_scheduler_loop_tid: I64 0 :: I64;
 }
 
-// After creating a new thread with only a stop frame on the stack,
-// push a stg_scheduler_loop frame to make it a scheduler thread. We
-// could omit this and use C FFI to export a Haskell function that
-// invokes the scheduler loop via a foreign import prim, but that is
-// of course less efficient.
-INFO_TABLE_RET (stg_scheduler_loop, RET_SMALL, W_ info_ptr)
-  return ()
-{
-  jump stg_scheduler_loopzh ();
-}
-
 // This always returns () in R1 at the end. If only run via a foreign
 // import prim, it's fine to not return anything, but when run via a
 // stg_scheduler_loop stack frame, then the stop frame expects a valid
@@ -192,4 +181,15 @@ work:
 cleanup:
   I64[stg_scheduler_loop_tid] = 0 :: I64;
   return (ghczmprim_GHCziTupleziPrim_Z0T_closure);
+}
+
+// After creating a new thread with only a stop frame on the stack,
+// push a stg_scheduler_loop frame to make it a scheduler thread. We
+// could omit this and use C FFI to export a Haskell function that
+// invokes the scheduler loop via a foreign import prim, but that is
+// of course less efficient.
+INFO_TABLE_RET (stg_scheduler_loop, RET_SMALL, W_ info_ptr)
+  return ()
+{
+  jump stg_scheduler_loopzh ();
 }
