@@ -1,5 +1,8 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.25.0.0
+  * Introduce `namedDefaultQuasiQuoter` and `defaultQuasiQuoter`, which fail with a helpful error when used in an inappropriate context.
+
 ## 2.24.0.0
 
   * Introduce `dataToCodeQ` and `liftDataTyped`, typed variants of `dataToExpQ` and `liftData` respectively.

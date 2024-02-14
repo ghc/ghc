@@ -26,10 +26,10 @@ import GHC.Internal.Base hiding (Type)
 -- | The 'QuasiQuoter' type, a value @q@ of this type can be used
 -- in the syntax @[q| ... string to parse ...|]@.  In fact, for
 -- convenience, a 'QuasiQuoter' actually defines multiple quasiquoters
--- to be used in different splice contexts; if you are only interested
--- in defining a quasiquoter to be used for expressions, you would
--- define a 'QuasiQuoter' with only 'quoteExp', and leave the other
--- fields stubbed out with errors.
+-- to be used in different splice contexts. In the usual case of a
+-- @QuasiQuoter@ that is only intended to be used in certain splice
+-- contexts, the unused fields should just 'fail'. This is most easily
+-- accomplished using 'namedefaultQuasiQuoter' or 'defaultQuasiQuoter'.
 data QuasiQuoter = QuasiQuoter {
     -- | Quasi-quoter for expressions, invoked by quotes like @lhs = $[q|...]@
     quoteExp  :: String -> Q Exp,
