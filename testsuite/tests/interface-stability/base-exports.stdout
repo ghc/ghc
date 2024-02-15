@@ -908,11 +908,6 @@ module Data.Either where
 
 module Data.Enum where
   -- Safety: Safe-Inferred
-  type Bounded :: * -> Constraint
-  class Bounded a where
-    minBound :: a
-    maxBound :: a
-    {-# MINIMAL minBound, maxBound #-}
   type Enum :: * -> Constraint
   class Enum a where
     succ :: a -> a

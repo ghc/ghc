@@ -114,7 +114,6 @@ Library
         Data.Dynamic
         Data.Either
         Data.Eq
-        Data.Enum
         Data.Foldable
         Data.Function
         Data.Functor

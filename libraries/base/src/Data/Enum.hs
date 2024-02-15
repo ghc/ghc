@@ -10,13 +10,12 @@
 -- Stability   :  stable
 -- Portability :  non-portable (GHC extensions)
 --
--- The 'Enum' and 'Bounded' classes.
+-- The 'Enum' class.
 --
 -----------------------------------------------------------------------------
 
 module Data.Enum
-    ( Bounded(..)
-    , Enum(..)
+    ( Enum(..)
     ) where
 
 import GHC.Enum
