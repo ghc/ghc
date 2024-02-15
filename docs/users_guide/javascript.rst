@@ -157,7 +157,7 @@ passed as an ``Int`` to a ``Callback`` that accepts a ``JSVal``:
     releaseCallback add3
 
 Callbacks as Foreign Exports
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 JavaScript callbacks allow for a sort of FFI exports via FFI imports. To do
 this, a global JavaScript variable is set, and that global variable can then
@@ -331,7 +331,7 @@ Next, the JavaScript ``h$getcwd`` function demonstrates several details:
   in the error case.
 
 Writing JavaScript Functions to be NodeJS and Browser Aware
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In the above example of implementing ``getcwd``, the function we use in the JavaScript
 implementation is from NodeJS, and the behaviour doesn't make sense to implement in a
@@ -434,7 +434,7 @@ C functions compiled with Emscripten get a "_" prepended to their name in
 JavaScript. For example, C "malloc" becomes "_malloc" in JavaScript.
 
 EMCC pragmas
-~~~~~~~~~~~~
+^^^^^^^^^^^^
 
 By default the EMCC linker drops code considered dead and it has no way to know
 which code is alive due to some call from Haskell or from a JavaScript wrapper.
@@ -470,16 +470,19 @@ passed once; the latter argument overrides the former ones).
 
 This pragma allows additional options to be passed to Emscripten if need be. We
 already pass:
+
 - `-sSINGLE_FILE=1`: required to create a single `.js` file as artefact
   (otherwise `.wasm` files corresponding to C codes need to be present in the
   current working directory when invoking the resulting `.js` file).
+
 - `-sALLOW_TABLE_GROWTH`: required to support `addFunction`
+
 - `-sEXPORTED_RUNTIME_METHODS` and `-sEXPORTED_FUNCTIONS`: see above.
 
 Be careful because some extra arguments may break the build in unsuspected ways.
 
 Wrappers
-~~~~~~~~
+^^^^^^^^
 
 The JavaScript backend doesn't generate wrappers for foreign imports to call
 directly into the compiled C code. I.e. given the following foreign import:
@@ -513,7 +516,7 @@ GHC's JavaScript rts provides helper functions for this in `rts/js/mem.js`. See
 `h$copyFromHeap`, `h$copyToHeap`, `h$initHeapBuffer`, etc.
 
 Callbacks
-~~~~~~~~~
+^^^^^^^^^
 
 Some C functions take function pointers as arguments (e.g. callbacks). This is
 supported by the JavaScript backend but requires some work from the wrapper
