@@ -1,6 +1,8 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+-----------------------------------------------------------------------------
 -- |
 --
 -- Module      :  GHC.Desugar
@@ -8,7 +10,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/216>)
 -- Portability :  non-portable (GHC extensions)
 --
 -- Support code for desugaring in GHC
@@ -18,11 +20,14 @@
 -- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
 -- change rapidly without much warning.
 --
+-----------------------------------------------------------------------------
+
+#if __GLASGOW_HASKELL >= 914
+#error "GHC.Desugar should be removed in GHC 9.14"
+#endif
 
 module GHC.Desugar
-    ((>>>),
-     AnnotationWrapper(..),
-     toAnnotationWrapper
-     ) where
+  {-# DEPRECATED ["GHC.Desugar is deprecated and will be removed in GHC 9.14.", "(>>>) should be imported from Control.Arrow.", "AnnotationWrapper is internal to GHC and should not be used externally."] #-}
+  ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
 
 import GHC.Internal.Desugar

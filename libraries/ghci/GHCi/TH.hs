@@ -1,6 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
     TupleSections, RecordWildCards, InstanceSigs, CPP #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+-- TODO We want to import GHC.Internal.Desugar instead of GHC.Desugar when we
+-- can require of the bootstrap compiler to have ghc-internal.
 
 -- |
 -- Running TH splices
@@ -109,7 +112,7 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
-import GHC.Desugar
+import GHC.Desugar (AnnotationWrapper(..))
 import qualified GHC.Internal.TH.Syntax as TH
 import Unsafe.Coerce
 
