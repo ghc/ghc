@@ -560,7 +560,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   ppUnless res_hty_is_unit $
          if libffi
                   then char '*' <> parens (ffi_cResType <> char '*') <>
-                       text "resp = cret;"
+                       text "resp = " <> parens ffi_cResType <> text "cret;"
                   else text "return cret;"
      , rbrace
      ]
