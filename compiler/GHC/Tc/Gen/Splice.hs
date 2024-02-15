@@ -12,6 +12,14 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
+#if __GLASGOW_HASKELL__ < 914
+-- In GHC 9.14, GHC.Desugar will be removed from base in favour of
+-- ghc-internal's GHC.Internal.Desugar. However, because of bootstrapping
+-- concerns, we will only depend on ghc-internal when the boot compiler is
+-- certain to have it.
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+#endif
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -136,9 +144,8 @@ import qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Internal.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
--- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
-import GHC.Desugar      ( AnnotationWrapper(..) )
 import Unsafe.Coerce    ( unsafeCoerce )
+import GHC.Desugar ( AnnotationWrapper(..) )
 #endif
 
 import Control.Monad
