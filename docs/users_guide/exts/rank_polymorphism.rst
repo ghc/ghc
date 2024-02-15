@@ -9,7 +9,7 @@ Arbitrary-rank polymorphism
 
     :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow types of arbitrary rank.
 

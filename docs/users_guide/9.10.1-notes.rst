@@ -6,6 +6,24 @@ Version 9.10.1
 Language
 ~~~~~~~~
 
+- The :extension:`GHC2024` language edition is now supported. It builds on top of
+  :extension:`GHC2021`, adding the following extensions:
+
+  * :extension:`DataKinds`
+  * :extension:`DerivingStrategies`
+  * :extension:`DisambiguateRecordFields`
+  * :extension:`ExplicitNamespaces`
+  * :extension:`GADTs`
+  * :extension:`MonoLocalBinds`
+  * :extension:`LambdaCase`
+  * :extension:`RoleAnnotations`
+
+  At the moment, :extension:`GHC2021` remains the default langauge edition that
+  is used when no other language edition is explicitly loaded (e.g. when running
+  ``ghc`` directly). Because language editions are not necessarily backwards
+  compatible, and future releases of GHC may change the default, it is highly
+  recommended to specify the language edition explicitly.
+
 - GHC Proposal `#281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
   "Visible forall in types of terms" has been partially implemented.
   The following code is now accepted by GHC::

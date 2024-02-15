@@ -8,6 +8,8 @@ Deriving strategies
 
     :since: 8.2.1
 
+    :status: Included in :extension:`GHC2024`
+
     Allow multiple ``deriving``, each optionally qualified with a *strategy*.
 
 In most scenarios, every ``deriving`` statement generates a typeclass instance

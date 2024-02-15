@@ -7,6 +7,7 @@ Lambda-case
     :shortdesc: Enable lambda-case expressions.
 
     :since: 7.6.1
+    :status: Included in :extension:`GHC2024`
 
     Allow the use of lambda-case syntax.
 

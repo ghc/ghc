@@ -9,6 +9,7 @@ Let-generalisation
 
     :implied by: :extension:`TypeFamilies`, :extension:`GADTs`
     :since: 6.12.1
+    :status: Included in :extension:`GHC2024`
 
     Infer less polymorphic types for local bindings by default.
 

@@ -1,49 +1,144 @@
 .. _options-language:
 
-Controlling extensions
-----------------------
+Controlling editions and extensions
+-----------------------------------
 
 .. index::
    single: language; option
    single: options; language
    single: extensions; options controlling
+   single: editions; language
 
-Language extensions can be controlled (i.e. allowed or not) in two ways:
+GHC supports multiple language editions: :extension:`Haskell98`,
+:extension:`Haskell2010`, :extension:`GHC2021` and :extension:`GHC2024`.  Each
+language edition consists of a collection of language extensions, and there are
+many other language extensions not currently part of a language edition but that
+can be enabled explicitly.
 
--  Every language extension can be switched on by a command-line flag
+Currently, :extension:`GHC2021` is used by default if no other language edition
+is explicitly requested, for backwards compatibility purposes. Since later
+versions of GHC may use a different language edition by default, users are
+advised to declare a language edition explicitly.  Using :extension:`GHC2024` is
+recommended for new code.
+
+A language edition can be selected:
+
+-  at the package level, e.g. using ``default-language: GHC2024`` in a
+   ``.cabal`` file;
+
+-  with a command-line flag prefixed by "``-X...``" (e.g. ``-XGHC2024``); or
+
+-  for an individual module using the :pragma:`LANGUAGE` pragma, e.g.
+   ``{-# LANGUAGE GHC2024 #-}``.
+
+Selecting a language edition overrides any previous selection. It is not
+possible to disable a language edition.
+
+Similarly, language extensions can be controlled (either enabled or disabled):
+
+-  at the package level, e.g. using ``default-extensions: TemplateHaskell`` in a
+   ``.cabal`` file;
+
+-  with command-line flags, switched on by a command-line flag
    "``-X...``" (e.g. ``-XTemplateHaskell``), and switched off by the
-   flag "``-XNo...``"; (e.g. ``-XNoTemplateHaskell``).
+   flag "``-XNo...``"; (e.g. ``-XNoTemplateHaskell``);
 
--  Language extensions can also be enabled using the ``LANGUAGE`` pragma, thus
-   ``{-# LANGUAGE TemplateHaskell #-}`` (see :ref:`language-pragma`).
+-  for an individual module using the :pragma:`LANGUAGE` pragma, e.g.
+   ``{-# LANGUAGE TemplateHaskell #-}`` or ``{-# LANGUAGE NoTemplateHaskell #-}``.
 
-.. extension:: GHC2021
-    :shortdesc: Use GHC’s set of default language extensions from 2021
+.. extension:: GHC2024
+    :shortdesc: Use GHC’s set of default language extensions from 2024
+
+    :since: 9.10.1
 
     GHC blesses a number of extensions, beyond Haskell 2010, to be suitable to
     turned on by default. These extensions are considered to be stable and
     conservative.
 
-    ``GHC2021`` is used by GHC if neither ``Haskell98`` nor ``Haskell2010`` is
-    turned on explicitly. Since later versions of GHC may use a later
-    ``GHC20xx`` by default, users are advised to declare the language set
-    explicitly with ``-XGHC2021``.
-
-    Note that, because GHC2021 includes a number of non-standardized
+    Note that, because GHC2024 includes a number of non-standardized
     extensions, the stability guarantees it provides are not quite as strong as
     those provided by, e.g., :extension:`Haskell2010`. While GHC does take
     pains to avoid changing the semantics of these extensions, changes may
     still happen (e.g. the simplified subsumption change introduced in GHC 9.0
     which caused GHC to reject some programs using :extension:`RankNTypes`).
 
+    The ``GHC2024`` language edition includes the following extensions:
+
+    .. hlist::
+
+     * :extension:`BangPatterns`
+     * :extension:`BinaryLiterals`
+     * :extension:`ConstrainedClassMethods`
+     * :extension:`ConstraintKinds`
+     * :extension:`DataKinds`
+     * :extension:`DeriveDataTypeable`
+     * :extension:`DeriveFoldable`
+     * :extension:`DeriveFunctor`
+     * :extension:`DeriveGeneric`
+     * :extension:`DeriveLift`
+     * :extension:`DeriveTraversable`
+     * :extension:`DerivingStrategies`
+     * :extension:`DisambiguateRecordFields`
+     * :extension:`DoAndIfThenElse`
+     * :extension:`EmptyCase`
+     * :extension:`EmptyDataDecls`
+     * :extension:`EmptyDataDeriving`
+     * :extension:`ExistentialQuantification`
+     * :extension:`ExplicitForAll`
+     * :extension:`ExplicitNamespaces`
+     * :extension:`FieldSelectors`
+     * :extension:`FlexibleContexts`
+     * :extension:`FlexibleInstances`
+     * :extension:`ForeignFunctionInterface`
+     * :extension:`GADTs`
+     * :extension:`GADTSyntax`
+     * :extension:`GeneralisedNewtypeDeriving`
+     * :extension:`HexFloatLiterals`
+     * :extension:`ImplicitPrelude`
+     * :extension:`ImportQualifiedPost`
+     * :extension:`InstanceSigs`
+     * :extension:`KindSignatures`
+     * :extension:`LambdaCase`
+     * :extension:`MonoLocalBinds`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`MultiParamTypeClasses`
+     * :extension:`NamedFieldPuns`
+     * :extension:`NamedWildCards`
+     * :extension:`NumericUnderscores`
+     * :extension:`PatternGuards`
+     * :extension:`PolyKinds`
+     * :extension:`PostfixOperators`
+     * :extension:`RankNTypes`
+     * :extension:`RelaxedPolyRec`
+     * :extension:`RoleAnnotations`
+     * :extension:`ScopedTypeVariables`
+     * :extension:`StandaloneDeriving`
+     * :extension:`StandaloneKindSignatures`
+     * :extension:`StarIsType`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`TupleSections`
+     * :extension:`TypeApplications`
+     * :extension:`TypeOperators`
+     * :extension:`TypeSynonymInstances`
+
+.. extension:: GHC2021
+    :shortdesc: Use GHC’s set of default language extensions from 2021
+
+    :since: 9.2.1
+
+    See :extension:`GHC2024` for general comments about ``GHC20xx`` language
+    editions.
+
     Also note that due to a `minor oversight
-    <https://github.com/ghc-proposals/ghc-proposals/issues/551>`_, this
-    extension set behaves slightly differently than enabling each of its
+    <https://github.com/ghc-proposals/ghc-proposals/issues/551>`_, enabling
+    this edition behaves slightly differently than enabling each of its
     constituent extensions. Specifically, while :extension:`TypeOperators` implies
     :extension:`ExplicitNamespaces`, :extension:`ExplicitNamespaces` is not included
-    in :extension:`GHC2021`.
+    in :extension:`GHC2021`. Moreover, while :extension:`GADTs` is not part of
+    :extension:`GHC2021`, the combination of :extension:`GADTSyntax` and
+    :extension:`ExistentialQuantification` is enough to define and use GADTs.
 
-    The ``GHC2021`` language set comprises the following extensions:
+    The ``GHC2021`` language edition includes the following extensions:
 
     .. hlist::
 
@@ -97,10 +192,14 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
 
 .. extension:: Haskell2010
-    :shortdesc: Use the Haskell 2010 language variant.
+    :shortdesc: Use the Haskell 2010 language edition.
 
-    Compile Haskell 2010 language variant. Enables the
-    following language extensions:
+    Compile using the Haskell 2010 language edition, as specified by the
+    `Haskell 2010 report <https://www.haskell.org/onlinereport/haskell2010/>`_.
+    GHC aims to behave mostly as a Haskell 2010 compiler, but there are a few
+    known deviations from the standard (see :ref:`vs-Haskell-defn`).
+
+    The ``Haskell2010`` language edition includes the following language extensions:
 
     .. hlist::
 
@@ -120,10 +219,14 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
 
 .. extension:: Haskell98
-    :shortdesc: Use the Haskell 98 language variant.
+    :shortdesc: Use the Haskell 98 language edition.
 
-    Compile using Haskell 98 language variant. Enables the
-    following language extensions:
+    Compile using the Haskell 98 language edition, as specified by the `Haskell
+    98 report <https://www.haskell.org/onlinereport/>`_.  GHC aims to behave
+    mostly as a Haskell 98 compiler, but there are a few known deviations from
+    the standard (see :ref:`vs-Haskell-defn`).
+
+    The ``Haskell98`` language edition includes the following language extensions:
 
     .. hlist::
 

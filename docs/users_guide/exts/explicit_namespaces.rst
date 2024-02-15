@@ -10,6 +10,7 @@ Explicit namespaces in import/export
 
     :implied by: :extension:`TypeOperators`, :extension:`TypeFamilies`
     :since: 7.6.1
+    :status: Included in :extension:`GHC2024`
 
     Enable use of explicit namespaces in module export lists, patterns, and expressions.
 

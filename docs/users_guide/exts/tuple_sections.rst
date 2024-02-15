@@ -8,7 +8,7 @@ Tuple sections
 
     :since: 6.12
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow the use of tuple section syntax
 

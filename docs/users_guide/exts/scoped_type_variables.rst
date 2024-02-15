@@ -12,7 +12,7 @@ Lexically scoped type variables
 
     :since: 6.8.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.

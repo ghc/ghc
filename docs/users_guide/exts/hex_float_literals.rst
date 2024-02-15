@@ -8,7 +8,7 @@ Hexadecimal floating point literals
 
     :since: 8.4.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow writing floating point literals using hexadecimal notation.
 

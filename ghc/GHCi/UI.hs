@@ -45,6 +45,7 @@ import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
+import GHC.Driver.Flags
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
@@ -3488,6 +3489,7 @@ showLanguages' show_all dflags =
            Haskell98   -> text "Haskell98"
            Haskell2010 -> text "Haskell2010"
            GHC2021     -> text "GHC2021"
+           GHC2024     -> text "GHC2024"
      , (if show_all then text "all active language options:"
                     else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
@@ -3504,7 +3506,7 @@ showLanguages' show_all dflags =
 
    default_dflags = defaultDynFlags (settings dflags) `lang_set` Just lang
 
-   lang = fromMaybe GHC2021 (language dflags)
+   lang = fromMaybe defaultLanguage (language dflags)
 
 
 showTargets :: GHC.GhcMonad m => m ()

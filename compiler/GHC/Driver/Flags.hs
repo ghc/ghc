@@ -4,6 +4,7 @@ module GHC.Driver.Flags
    , enabledIfVerbose
    , GeneralFlag(..)
    , Language(..)
+   , defaultLanguage
    , optimisationFlags
    , codeGenFlags
 
@@ -38,8 +39,13 @@ import Control.Monad (guard)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe,mapMaybe)
 
-data Language = Haskell98 | Haskell2010 | GHC2021
+data Language = Haskell98 | Haskell2010 | GHC2021 | GHC2024
    deriving (Eq, Enum, Show, Bounded)
+
+-- | The default Language is used if one is not specified explicitly, by both
+-- GHC and GHCi.
+defaultLanguage :: Language
+defaultLanguage = GHC2021
 
 instance Outputable Language where
     ppr = text . show

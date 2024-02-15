@@ -8,6 +8,8 @@ Datatype promotion
 
     :since: 7.4.1
 
+    :status: Included in :extension:`GHC2024`
+
     Allow promotion of data types to kind level.
 
 This section describes *data type promotion*, an extension to the kind

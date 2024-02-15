@@ -1,4 +1,4 @@
-{-# LANGUAGE RoleAnnotations, PolyKinds #-}
+{-# LANGUAGE GHC2024 #-}
 
 module Roles1 where
 

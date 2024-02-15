@@ -151,6 +151,7 @@ Role annotations
     :shortdesc: Enable role annotations.
 
     :since: 7.8.1
+    :status: Included in :extension:`GHC2024`
 
     Allow role annotation syntax.
 

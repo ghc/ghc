@@ -8,7 +8,7 @@ Data types with no constructors
 
     :since: 6.8.1
 
-    :status: Included in :extension:`GHC2021` and :extension:`Haskell2010`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021` and :extension:`Haskell2010`
 
     Allow definition of empty ``data`` types.
 

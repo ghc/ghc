@@ -22,7 +22,7 @@ Kind polymorphism
     :implies: :extension:`KindSignatures`
     :since: 7.4.1
 
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
     Allow kind polymorphic types.
 
@@ -389,7 +389,7 @@ Standalone kind signatures and polymorphic recursion
 
     :implies: :extension:`NoCUSKs`
     :since: 8.10.1
-    :status: Included in :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`
 
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
@@ -922,7 +922,7 @@ The kind ``Type``
     :shortdesc: Treat ``*`` as ``Data.Kind.Type``.
 
     :since: 8.6.1
-    :status: Included in :extension:`Haskell98`, :extension:`Haskell2010`, :extension:`GHC2021`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`, :extension:`Haskell2010`, :extension:`Haskell98`
 
     Treat the unqualified uses of the ``*`` type operator as nullary and desugar
     to ``Data.Kind.Type``.

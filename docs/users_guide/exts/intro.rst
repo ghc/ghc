@@ -1,10 +1,9 @@
 Introduction
 ============
 
-As with all known Haskell systems, GHC implements some extensions to the
-standard Haskell language. They can all be enabled or disabled by command line
-flags or language pragmas. By default GHC understands the most recent Haskell
-version it supports, plus a handful of extensions.
+GHC implements several variants of the Haskell language, along with many
+extensions. They can all be enabled or disabled by command line flags or
+:pragma:`LANGUAGE` pragmas.
 
 Some of the extensions serve to give you access to the
 underlying facilities with which we implement Haskell. Thus, you can get
