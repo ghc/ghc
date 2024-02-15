@@ -1,3 +1,7 @@
+## 0.13.0
+
+- `IOPort#` and its related operations have been removed ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
+
 ## 0.12.0
 
 - Shipped with GHC 9.10.1

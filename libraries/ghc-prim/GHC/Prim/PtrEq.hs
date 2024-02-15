@@ -34,7 +34,6 @@ module GHC.Prim.PtrEq
     sameMutVar#,
     sameTVar#,
     sameMVar#,
-    sameIOPort#,
     samePromptTag#,
     eqStableName#
   ) where
@@ -128,10 +127,6 @@ sameTVar# = unsafePtrEquality#
 -- | Compare the underlying pointers of two 'MVar#'s.
 sameMVar# :: forall {l} s (a :: TYPE (BoxedRep l)). MVar# s a -> MVar# s a -> Int#
 sameMVar# = unsafePtrEquality#
-
--- | Compare the underlying pointers of two 'IOPort#'s.
-sameIOPort# :: forall {l} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a -> Int#
-sameIOPort# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'PromptTag#'s.
 samePromptTag# :: forall a. PromptTag# a -> PromptTag# a -> Int#

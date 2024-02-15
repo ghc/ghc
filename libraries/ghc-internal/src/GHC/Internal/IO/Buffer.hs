@@ -223,10 +223,10 @@ data BufferState = ReadBuffer | WriteBuffer
   deriving Eq -- ^ @since base-4.2.0.0
 
 withBuffer :: Buffer e -> (Ptr e -> IO a) -> IO a
-withBuffer Buffer{ bufRaw=raw } f = withForeignPtr (castForeignPtr raw) f
+withBuffer Buffer{ bufRaw=raw } f = unsafeWithForeignPtr (castForeignPtr raw) f
 
 withRawBuffer :: RawBuffer e -> (Ptr e -> IO a) -> IO a
-withRawBuffer raw f = withForeignPtr (castForeignPtr raw) f
+withRawBuffer raw f = unsafeWithForeignPtr (castForeignPtr raw) f
 
 isEmptyBuffer :: Buffer e -> Bool
 isEmptyBuffer Buffer{ bufL=l, bufR=r } = l == r

@@ -59,7 +59,6 @@ module GHC.Internal.Exts
         sameMVar#,
         sameMutVar#,
         sameTVar#,
-        sameIOPort#,
         samePromptTag#,
 
         -- ** Compat wrapper

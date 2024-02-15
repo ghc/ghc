@@ -11,7 +11,7 @@ import GHC.Internal.Conc.Sync
 import GHC.Internal.Base
 import GHC.Internal.Event.Windows
 import GHC.Internal.IO
-import GHC.Internal.IOPort
+import GHC.Internal.MVar
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = wakeupIOManager
@@ -23,10 +23,10 @@ interruptIOManager = interruptSystemManager
 -- 2147483647 μs, less than 36 minutes.
 threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
-    m <- newEmptyIOPort
+    m <- newEmptyMVar
     mgr <- getSystemManager
-    reg <- registerTimeout mgr usecs $ writeIOPort m () >> return ()
-    readIOPort m `onException` unregisterTimeout mgr reg
+    reg <- registerTimeout mgr usecs $ putMVar m () >> return ()
+    readMVar m `onException` unregisterTimeout mgr reg
 
 -- | Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
 -- 2147483647 μs, less than 36 minutes.
