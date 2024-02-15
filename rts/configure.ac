@@ -71,7 +71,6 @@ dnl    unregisterised, Sparc, and PPC backends. Also determines whether
 dnl    linking to libatomic is required for atomic operations, e.g. on
 dnl    RISCV64 GCC.
 FP_CC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does C compiler support __atomic primitives?])
 AC_DEFINE_UNQUOTED([NEED_ATOMIC_LIB], [$need_latomic],
     [Define to 1 if we need -latomic for sub-word atomic operations.])
 

@@ -75,9 +75,6 @@
 
 #if !defined(CMINUSMINUS)
 #if defined(TSAN_ENABLED)
-#if !defined(HAVE_C11_ATOMICS)
-#error TSAN cannot be enabled without C11 atomics support.
-#endif
 
 #define TSAN_ANNOTATE_HAPPENS_BEFORE(addr)                              \
     AnnotateHappensBefore(__FILE__, __LINE__, (void*)(addr))

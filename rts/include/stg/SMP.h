@@ -442,25 +442,7 @@ EXTERN_INLINE void busy_wait_nop(void);
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
-#if defined(HAVE_C11_ATOMICS)
     return __atomic_exchange_n(p, w, __ATOMIC_SEQ_CST);
-#else
-    // When porting GHC to a new platform check that
-    // __sync_lock_test_and_set() actually stores w in *p.
-    // Use test rts/atomicxchg to verify that the correct value is stored.
-    // From the gcc manual:
-    // (https://gcc.gnu.org/onlinedocs/gcc-4.4.3/gcc/Atomic-Builtins.html)
-    // This built-in function, as described by Intel, is not
-    // a traditional test-and-set operation, but rather an atomic
-    // exchange operation.
-    // [...]
-    // Many targets have only minimal support for such locks,
-    // and do not support a full exchange operation. In this case,
-    // a target may support reduced functionality here by which the
-    // only valid value to store is the immediate constant 1. The
-    // exact value actually stored in *ptr is implementation defined.
-    return __sync_lock_test_and_set(p, w);
-#endif
 }
 
 /*
@@ -470,34 +452,21 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
-#if defined(HAVE_C11_ATOMICS)
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return o;
-#else
-    return __sync_val_compare_and_swap(p, o, n);
-#endif
 }
 
 EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
-#if defined(HAVE_C11_ATOMICS)
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return o;
-#else
-    return __sync_val_compare_and_swap(p, o, n);
-#endif
 }
 
 EXTERN_INLINE StgWord
 cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
-#if defined(HAVE_C11_ATOMICS)
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);
     return o;
-#else
-    return __sync_val_compare_and_swap(p, o, n);
-#endif
-
 }
 
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
@@ -506,21 +475,13 @@ cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
-#if defined(HAVE_C11_ATOMICS)
     return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
-#else
-    return __sync_add_and_fetch(p, incr);
-#endif
 }
 
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
-#if defined(HAVE_C11_ATOMICS)
     return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST);
-#else
-    return __sync_sub_and_fetch(p, (StgWord) 1);
-#endif
 }
 
 /*
