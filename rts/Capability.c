@@ -495,7 +495,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
     debugTrace(DEBUG_sched, "passing capability %d to %s %#" FMT_HexWord64,
-               cap->no, task->incall->tso ? "bound task" : "worker",
+               cap->no, task->incall && task->incall->tso ? "bound task" : "worker",
                serialisableTaskId(task));
     ACQUIRE_LOCK(&task->lock);
     if (task->wakeup == false) {
