@@ -151,14 +151,6 @@ void initProfiling (void)
     // initialise our arena
     prof_arena = newArena();
 
-    /* for the benefit of allocate()... */
-    {
-        uint32_t n;
-        for (n=0; n < getNumCapabilities(); n++) {
-            getCapability(n)->r.rCCCS = CCS_SYSTEM;
-        }
-    }
-
 #if defined(THREADED_RTS)
     initMutex(&ccs_mutex);
 #endif
