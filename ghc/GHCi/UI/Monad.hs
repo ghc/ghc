@@ -1,4 +1,11 @@
 {-# LANGUAGE FlexibleInstances, DeriveFunctor, DerivingVia #-}
+
+-- JADE
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -13,7 +20,10 @@ module GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
-        Command(..), CommandResult(..), cmdSuccess,
+        GhciCommand(..), Command, CommandResult(..), cmdSuccess,
+        GhciArgParseable(..), CommandArgs(..), ArgsList(..),
+        GhciCommandParseError(..),
+        GhciCommandAction(..), makeParsedCommand,
         CmdExecOutcome(..),
         LocalConfigBehaviour(..),
         PromptFunction,
@@ -82,6 +92,11 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
+
+-- JADE
+import Control.Monad.Trans.Except
+import Data.Kind
+
 -----------------------------------------------------------------------------
 -- GHCi monad
 
@@ -111,7 +126,7 @@ data GHCiState = GHCiState
         last_command   :: Maybe Command,
             -- ^ @:@ at the GHCi prompt repeats the last command, so we
             -- remember it here
-        cmd_wrapper    :: InputT GHCi CommandResult -> InputT GHCi (Maybe Bool),
+        cmd_wrapper    :: forall m. GhciMonad m => m CommandResult -> m (Maybe Bool),
             -- ^ The command wrapper is run for each command or statement.
             -- The 'Bool' value denotes whether the command is successful and
             -- 'Nothing' means to exit GHCi.
@@ -172,12 +187,63 @@ data GHCiState = GHCiState
 
 type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
 
+
+
+
+-- JADE_START
+-- JADE_TODO
+type Error = String
+
+type CommandActionFunction' args m = CommandActionFunction args m ()
+type CommandActionFunction args m a = CommandArgs args (ExceptT Error m a)
+
+type family CommandArgs (t :: [Type]) r = (f :: Type) where
+  CommandArgs '[] r = r
+  CommandArgs (a ': xs) r = a -> CommandArgs xs r
+
+type family ArgsList f = (r :: [Type]) where
+  ArgsList (x -> r) = x ': ArgsList r
+  ArgsList _        = '[]
+
+
+data GhciCommandParseError
+  = UnconsumedInput
+  | InvalidAmountOfArguments -- JADE_TODO
+  | ParseArgumentError String
+  deriving Show
+
+class GhciArgParseable p where
+  parseGhciArg :: String -> Except GhciCommandParseError (p, String)
+
+class GhciCommandAction ts where
+  parseCommand :: CommandArgs ts a -> String -> Except GhciCommandParseError a
+
+makeParsedCommand :: forall ts a. GhciCommandAction ts => CommandArgs ts a -> CommandArgs '[String] a
+makeParsedCommand command str = case runExcept $ parseCommand @ts command str of
+  Left err -> error (show err) -- JADE_TODO
+  Right ok -> ok
+
+instance GhciCommandAction '[] where
+  parseCommand x "" = pure x
+  parseCommand _ _  = throwE UnconsumedInput
+
+instance (GhciArgParseable t, GhciCommandAction ts) => GhciCommandAction (t ': ts) where
+  parseCommand _ ""  = throwE InvalidAmountOfArguments -- JADE_TODO
+  parseCommand f str = do
+    (l, rest) <- parseGhciArg @t str
+    parseCommand @ts (f l) rest
+
+
+
+
 -- | A GHCi command
-data Command
+type Command = GhciCommand
+
+data GhciCommand
    = Command
    { cmdName           :: String
      -- ^ Name of GHCi command (e.g. "exit")
-   , cmdAction         :: String -> InputT GHCi CmdExecOutcome
+   , cmdAction         :: CommandArgs '[String] (GHCi CmdExecOutcome)
      -- ^ The 'CmdExecOutcome' value denotes whether to exit GHCi cleanly or error out
    , cmdHidden         :: Bool
      -- ^ Commands which are excluded from default completion
@@ -305,18 +371,21 @@ class GhcMonad m => GhciMonad m where
   setGHCiState    :: GHCiState -> m ()
   modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
   reifyGHCi       :: ((Session, IORef GHCiState) -> IO a) -> m a
+  embedGHCi       :: GHCi a -> m a
 
 instance GhciMonad GHCi where
   getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
   setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
   modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef' r f
   reifyGHCi f       = GHCi $ \r -> reifyGhc $ \s -> f (s, r)
+  embedGHCi         = id
 
-instance GhciMonad (InputT GHCi) where
+instance GhciMonad m => GhciMonad (InputT m) where
   getGHCiState    = lift getGHCiState
   setGHCiState    = lift . setGHCiState
   modifyGHCiState = lift . modifyGHCiState
   reifyGHCi       = lift . reifyGHCi
+  embedGHCi       = lift . embedGHCi
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
@@ -335,13 +404,13 @@ instance GhcMonad GHCi where
   getSession    = liftGhc $ getSession
 
 
-instance HasDynFlags (InputT GHCi) where
+instance GhcMonad m => HasDynFlags (InputT m) where
   getDynFlags = lift getDynFlags
 
-instance HasLogger (InputT GHCi) where
+instance GhciMonad m => HasLogger (InputT m) where
   getLogger = lift getLogger
 
-instance GhcMonad (InputT GHCi) where
+instance GhciMonad m => GhcMonad (InputT m) where
   setSession = lift . setSession
   getSession = lift getSession
 

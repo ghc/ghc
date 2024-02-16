@@ -10,6 +10,10 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ImpredicativeTypes #-}
+
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS -fno-warn-name-shadowing #-}
 -- This module does a lot of it
@@ -170,6 +174,7 @@ import GHC.TopHandler ( topHandler )
 
 import GHCi.Leak
 import qualified GHC.Unit.Module.Graph as GHC
+import Data.Coerce
 
 -----------------------------------------------------------------------------
 
@@ -195,77 +200,105 @@ ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": https://www.haskell.org/ghc/  :? for help"
 
+
+
+newtype Paths = Paths [String]
+instance GhciArgParseable Paths where
+  parseGhciArg = withExcept ParseArgumentError . except . fmap (\x -> (Paths x, "")) . toArgsNoLoc
+
+
 ghciCommands :: [Command]
-ghciCommands = map mkCmd [
+ghciCommands =
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
-  ("?",         keepGoing help,                 noCompletion),
-  ("add",       keepGoingPaths addModule,       completeFilename),
-  ("abandon",   keepGoing abandonCmd,           noCompletion),
-  ("break",     keepGoing breakCmd,             completeBreakpoint),
-  ("back",      keepGoing backCmd,              noCompletion),
-  ("browse",    keepGoing' (browseCmd False),   completeModule),
-  ("browse!",   keepGoing' (browseCmd True),    completeModule),
-  ("cd",        keepGoingMulti' changeDirectory,     completeFilename),
-  ("check",     keepGoing' checkModule,         completeHomeModule),
-  ("continue",  keepGoing continueCmd,          noCompletion),
-  ("cmd",       keepGoing cmdCmd,               completeExpression),
-  ("def",       keepGoing (defineMacro False),  completeExpression),
-  ("def!",      keepGoing (defineMacro True),   completeExpression),
-  ("delete",    keepGoing deleteCmd,            noCompletion),
-  ("disable",   keepGoing disableCmd,           noCompletion),
-  ("doc",       keepGoing' docCmd,              completeIdentifier),
-  ("edit",      keepGoingMulti' editFile,            completeFilename),
-  ("enable",    keepGoing enableCmd,            noCompletion),
-  ("force",     keepGoing forceCmd,             completeExpression),
-  ("forward",   keepGoing forwardCmd,           noCompletion),
-  ("help",      keepGoingMulti help,                 noCompletion),
-  ("history",   keepGoingMulti historyCmd,           noCompletion),
-  ("info",      keepGoingMulti' (info False),        completeIdentifier),
-  ("info!",     keepGoingMulti' (info True),         completeIdentifier),
-  ("issafe",    keepGoing' isSafeCmd,           completeModule),
-  ("ignore",    keepGoing ignoreCmd,            noCompletion),
-  ("kind",      keepGoingMulti' (kindOfType False),  completeIdentifier),
-  ("kind!",     keepGoingMulti' (kindOfType True),   completeIdentifier),
-  ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
-  ("load!",     keepGoingPaths loadModuleDefer, completeHomeModuleOrFile),
-  ("list",      keepGoing' listCmd,             noCompletion),
-  ("module",    keepGoing moduleCmd,            completeSetModule),
-  ("main",      keepGoing runMain,              completeFilename),
-  ("print",     keepGoing printCmd,             completeExpression),
-  ("quit",      quit,                           noCompletion),
-  ("reload",    keepGoingMulti' reloadModule,   noCompletion),
-  ("reload!",   keepGoingMulti' reloadModuleDefer,   noCompletion),
-  ("run",       keepGoing runRun,               completeFilename),
-  ("script",    keepGoing' scriptCmd,           completeFilename),
-  ("set",       keepGoingMulti setCmd,          completeSetOptions),
-  ("seti",      keepGoingMulti setiCmd,         completeSeti),
-  ("show",      keepGoingMulti' showCmd,        completeShowOptions),
-  ("showi",     keepGoing showiCmd,             completeShowiOptions),
-  ("sprint",    keepGoing sprintCmd,            completeExpression),
-  ("step",      keepGoing stepCmd,              completeIdentifier),
-  ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
-  ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
-  ("type",      keepGoingMulti' typeOfExpr,          completeExpression),
-  ("trace",     keepGoing traceCmd,             completeExpression),
-  ("unadd",     keepGoingPaths unAddModule,     completeFilename),
-  ("undef",     keepGoing undefineMacro,        completeMacro),
-  ("unset",     keepGoing unsetOptions,         completeSetOptions),
-  ("where",     keepGoing whereCmd,             noCompletion),
-  ("instances", keepGoing' instancesCmd,        completeExpression)
-  ] ++ map mkCmdHidden [ -- hidden commands
-  ("all-types", keepGoing' allTypesCmd),
-  ("complete",  keepGoing completeCmd),
-  ("loc-at",    keepGoing' locAtCmd),
-  ("type-at",   keepGoing' typeAtCmd),
-  ("uses",      keepGoing' usesCmd)
+  map ($ noCompletion)
+    [ mkCmd @'[] True "?"        help
+    , mkCmd @'[] True "help"     help
+    , mkCmd @'[] False "abandon"  abandonCmd
+    , mkCmd @'[] False "back"     backCmd
+    , mkCmd @'[] False "continue" continueCmd
+    , mkCmd @'[] False "forward"  forwardCmd
+    , mkCmd @'[] False "delete"   deleteCmd
+    , mkCmd @'[] False "diable"   disableCmd
+    , mkCmd @'[] False "enable"   enableCmd
+    , mkCmd @'[] True "reload"   reloadModule -- JADE_TODO complete module?
+    , mkCmd @'[] True "reload!"  reloadModuleDefer
+    , mkCmd @'[] True "history"  historyCmd
+    , mkCmd @'[] False "ignore"   ignoreCmd
+    , mkCmd @'[] False "where"    whereCmd
+    , mkCmd @'[] False "list"     listCmd
+    ] ++
+  map ($ completeExpression)
+    [ mkCmd @'[] False "cmd"    cmdCmd
+    , mkCmd @'[] False "force"  forceCmd
+    , mkCmd @'[] False "print"  printCmd
+    , mkCmd @'[] False "sprint" sprintCmd
+    , mkCmd @'[] False "def"    (defineMacro False)
+    , mkCmd @'[] False "def!"   (defineMacro True)
+    , mkCmd @'[] True "type"   typeOfExpr
+    , mkCmd @'[] False "trace"  traceCmd
+    , mkCmd @'[] False "instances" instancesCmd -- JADE_TODO (this isn't an expression?)
+    ] ++
+  map ($ completeIdentifier)
+    [ mkCmd @'[String] False "step"       stepCmd
+    , mkCmd @'[String] False "steplocal"  stepLocalCmd
+    , mkCmd @'[String] False "stepmodule" stepModuleCmd
+    , mkCmd @'[String] True "kind"       (kindOfType False)
+    , mkCmd @'[String] True "kind!"      (kindOfType True)
+    , mkCmd @'[String] True "info"       (info False)
+    , mkCmd @'[String] True "info!"      (info True)
+    , mkCmd @'[String] False "doc"        docCmd
+    ] ++
+  map ($ completeFilename)
+    [ mkCmd @'[String] True "add"    addModule -- JADE_TODO HomeModuleOrFile?
+    , mkCmd @'[Paths] True "unadd"  unAddModule
+    , mkCmd @'[String] True "cd"     changeDirectory
+    , mkCmd @'[String] True "edit"   editFile
+    , mkCmd @'[String] False "main"   runMain
+    , mkCmd @'[String] False "run"    runRun
+    , mkCmd @'[String] False "script" scriptCmd
+    ] ++
+  map ($ completeModule)
+    [ mkCmd @'[String] False "issafe" isSafeCmd
+    , mkCmd @'[String] False "browse" (browseCmd False)
+    , mkCmd @'[String] False "browse!" (browseCmd True)
+    ] ++
+  map ($ completeSetOptions)
+    [ mkCmd @'[String] True "unset" unsetOptions
+    , mkCmd @'[String] False "set"   setCmd
+    ] ++
+    -- Rest
+    [ mkCmd @'[String] False "undef"  undefineMacro   completeMacro
+    , mkCmd @'[String] False "break"  breakCmd        completeBreakpoint
+    , mkCmd @'[String] True "seti"   setiCmd         completeSeti
+    , mkCmd @'[String] True "show"   showCmd         completeShowOptions
+    , mkCmd @'[String] False "showi"  showiCmd        completeShowiOptions
+    , mkCmd @'[String] False "module" moduleCmd       completeSetModule
+    , mkCmd @'[String] True "check"  checkModule    completeHomeModule
+    -- , mkCmd @'[Paths] True  "load"   (loadModule_ . coerce)   completeHomeModuleOrFile
+    -- , mkCmd @'[Paths] True  "load!"  (loadModuleDefer . coerce) completeHomeModuleOrFile
+
+    -- quit
+    , Command "quit" quit False noCompletion
+    ] ++
+  map mkCmdHidden [ -- hidden commands
+    ("all-types", keepGoing' allTypesCmd),
+    ("complete",  keepGoing' completeCmd),
+    ("loc-at",    keepGoing' locAtCmd),
+    ("type-at",   keepGoing' typeAtCmd),
+    ("uses",      keepGoing' usesCmd)
   ]
  where
-  mkCmd (n,a,c) = Command { cmdName = n
-                          , cmdAction = a
-                          , cmdHidden = False
-                          , cmdCompletionFunc = c
-                          }
+  mkCmd :: forall args f. (Coercible f (CommandArgs args (GHCi ())))
+        => Bool
+        -> String
+        -> f
+        -> CompletionFunc GHCi
+        -> Command
+  mkCmd multi name action completion = Command name (continue $ makeParsedCommand @args (coerce action)) False completion
+    where continue | multi = keepGoingMulti'
+                   | otherwise = keepGoing'
 
+  mkCmdHidden :: (String, String -> GHCi CmdExecOutcome) -> Command
   mkCmdHidden (n,a) = Command { cmdName = n
                               , cmdAction = a
                               , cmdHidden = True
@@ -310,12 +343,6 @@ showSDocForUserQualify doc = do
     pure $ showSDocForUser dflags unit_state alwaysQualify doc
 
 
-keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
-keepGoing a str = keepGoing' (lift . a) str
-
-keepGoingMulti :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
-keepGoingMulti a str = keepGoingMulti' (lift . a) str
-
 keepGoing' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
 keepGoing' a str = do
   in_multi <- inMultiMode
@@ -333,7 +360,7 @@ keepGoingMulti' a str = a str >> return CmdSuccess
 inMultiMode :: GhciMonad m => m Bool
 inMultiMode = multiMode <$> getGHCiState
 
-keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
+keepGoingPaths :: GhciMonad m => ([FilePath] -> m ()) -> (String -> m CmdExecOutcome)
 keepGoingPaths a str
  = do case toArgsNoLoc str of
           Left err -> liftIO $ hPutStrLn stderr err >> return CmdSuccess
@@ -809,15 +836,15 @@ runGHCiInput f = do
         f
 
 -- | How to get the next input line from the user
-nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
+nextInputLine :: GhciMonad m => Bool -> Bool -> InputT m (Maybe String)
 nextInputLine show_prompt is_tty
   | is_tty = do
-    prmpt <- if show_prompt then lift mkPrompt else return ""
+    prmpt <- if show_prompt then mkPrompt else return ""
     r <- getInputLine prmpt
     incrementLineNo
-    return r
+    pure r
   | otherwise = do
-    when show_prompt $ lift mkPrompt >>= liftIO . putStr
+    when show_prompt $ mkPrompt >>= liftIO . putStr
     fileLoop stdin
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
@@ -967,7 +994,7 @@ generatePromptFunctionFromString :: String -> PromptFunction
 generatePromptFunctionFromString promptS modules_names line =
         processString promptS
   where
-        processString :: String -> GHCi SDoc
+        processString :: GhciMonad m => String -> m SDoc
         processString ('%':'s':xs) =
             liftM2 (<>) (return modules_list) (processString xs)
             where
@@ -1031,16 +1058,16 @@ generatePromptFunctionFromString promptS modules_names line =
         processString "" =
             return empty
 
-mkPrompt :: GHCi String
+mkPrompt :: GhciMonad m => m String
 mkPrompt = do
   st <- getGHCiState
   dflags <- getDynFlags
   (context, modules_names, line) <- getInfoForPrompt
 
-  prompt_string <- (prompt st) modules_names line
+  prompt_string <- embedGHCi $ (prompt st) modules_names line
   let prompt_doc = context <> prompt_string
 
-  return (showSDoc dflags prompt_doc)
+  pure (showSDoc dflags prompt_doc)
 
 queryQueue :: GhciMonad m => m (Maybe String)
 queryQueue = do
@@ -1066,10 +1093,10 @@ installInteractivePrint (Just ipFun) exprmode = do
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands gCmd = runCommands' handler Nothing gCmd >> return ()
 
-runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
-             -> Maybe (GHCi ()) -- ^ Source error handler
-             -> InputT GHCi (Maybe String)
-             -> InputT GHCi ()
+runCommands' :: GhciMonad m => (SomeException -> m Bool) -- ^ Exception handler
+             -> Maybe (m ()) -- ^ Source error handler
+             -> m (Maybe String)
+             -> m ()
 runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
     b <- handle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
@@ -1083,7 +1110,7 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
     case b of
       Nothing -> return ()
       Just success -> do
-        unless success $ maybe (return ()) lift sourceErrorHandler
+        unless success $ maybe (return ()) id sourceErrorHandler -- JADE_TODO
         unmask $ runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
@@ -1092,18 +1119,18 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
 -- this is relevant only to ghc -e, which will exit with status 1
 -- if the command was unsuccessful. GHCi will continue in either case.
 -- TODO: replace Bool with CmdExecOutcome
-runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
-            -> InputT GHCi (Maybe Bool)
+runOneCommand :: forall m. (GhciMonad m) => (SomeException -> m Bool) -> m (Maybe String)
+            -> m (Maybe Bool)
 runOneCommand eh gCmd = do
   -- run a previously queued command if there is one, otherwise get new
   -- input from user
-  mb_cmd0 <- noSpace (lift queryQueue)
+  mb_cmd0 <- noSpace queryQueue
   mb_cmd1 <- maybe (noSpace gCmd) (return . Just) mb_cmd0
   case mb_cmd1 of
     Nothing -> return Nothing
     Just c  -> do
       st <- getGHCiState
-      ghciHandle (\e -> lift $ eh e >>= return . Just) $
+      ghciHandle (\e -> eh e >>= pure . Just) $
         handleSourceError printErrorAndFail $
           cmd_wrapper st $ doCommand c
                -- source error's are handled by runStmt
@@ -1149,18 +1176,18 @@ runOneCommand eh gCmd = do
     cmdOutcome CmdFailure = Just False
 
     -- | Handle a line of input
-    doCommand :: String -> InputT GHCi CommandResult
+    doCommand :: String -> m CommandResult
 
     -- command
     doCommand stmt | stmt'@(':' : cmd) <- removeSpaces stmt = do
       (stats, result) <- runWithStats (const Nothing) $ specialCommand cmd
-      return $ CommandComplete stmt' (cmdOutcome <$> result) stats
+      pure $ CommandComplete stmt' (cmdOutcome <$> result) stats
 
     -- haskell
     doCommand stmt = do
       -- if 'stmt' was entered via ':{' it will contain '\n's
       let stmt_nl_cnt = length [ () | '\n' <- stmt ]
-      ml <- lift $ isOptionSet Multiline
+      ml <- isOptionSet Multiline
       if ml && stmt_nl_cnt == 0 -- don't trigger automatic multi-line mode for ':{'-multiline input
         then do
           fst_line_num <- line_number <$> getGHCiState
@@ -1169,9 +1196,9 @@ runOneCommand eh gCmd = do
             Nothing -> return CommandIncomplete
             Just ml_stmt -> do
               -- temporarily compensate line-number for multi-line input
-              (stats, result) <- runAndPrintStats runAllocs $ lift $
+              (stats, result) <- runAndPrintStats runAllocs $
                 runStmtWithLineNum fst_line_num ml_stmt GHC.RunToCompletion
-              return $
+              pure $
                 CommandComplete ml_stmt (Just . runSuccess <$> result) stats
         else do -- single line input and :{ - multiline input
           last_line_num <- line_number <$> getGHCiState
@@ -1181,13 +1208,13 @@ runOneCommand eh gCmd = do
               stmt_nl_cnt2 = length [ () | '\n' <- stmt' ]
               stmt' = dropLeadingWhiteLines stmt -- runStmt doesn't like leading empty lines
           -- temporarily compensate line-number for multi-line input
-          (stats, result) <- runAndPrintStats runAllocs $ lift $
+          (stats, result) <- runAndPrintStats runAllocs $
             runStmtWithLineNum fst_line_num stmt' GHC.RunToCompletion
-          return $ CommandComplete stmt' (Just . runSuccess <$> result) stats
+          pure $ CommandComplete stmt' (Just . runSuccess <$> result) stats
 
     -- runStmt wrapper for temporarily overridden line-number
-    runStmtWithLineNum :: Int -> String -> SingleStep
-                       -> GHCi (Maybe GHC.ExecResult)
+    runStmtWithLineNum :: GhciMonad m => Int -> String -> SingleStep
+                       -> m (Maybe GHC.ExecResult)
     runStmtWithLineNum lnum stmt step = do
         st0 <- getGHCiState
         setGHCiState st0 { line_number = lnum }
@@ -1443,14 +1470,14 @@ printTypeOfName n
 data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
 -- | Entry point for execution a ':<command>' input from user
-specialCommand :: String -> InputT GHCi CmdExecOutcome
-specialCommand ('!':str) = lift $ shellEscape (dropWhile isSpace str)
+specialCommand :: GhciMonad m => String -> m CmdExecOutcome
+specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   maybe_cmd <- lookupCommand cmd
   htxt <- short_help <$> getGHCiState
   case maybe_cmd of
-    GotCommand cmd -> (cmdAction cmd) (dropWhile isSpace rest)
+    GotCommand cmd -> embedGHCi $ (cmdAction cmd) (dropWhile isSpace rest)
     BadCommand ->
       do liftIO $ hPutStr stderr ("unknown command ':" ++ cmd ++ "'\n"
                            ++ htxt)
@@ -1825,7 +1852,7 @@ defineMacro overwrite s = do
       hv <- GHC.compileParsedExprRemote new_expr
 
       let newCmd = Command { cmdName = macro_name
-                           , cmdAction = lift . runMacro hv
+                           , cmdAction = runMacro hv
                            , cmdHidden = False
                            , cmdCompletionFunc = noCompletion
                            }
@@ -2004,7 +2031,7 @@ handleGetDocsFailure no_docs = do
 -----------------------------------------------------------------------------
 -- :instances
 
-instancesCmd :: String -> InputT GHCi ()
+instancesCmd :: GhciMonad m => String -> m ()
 instancesCmd "" =
   throwGhcException (CmdLineError "syntax: ':instances <type-you-want-instances-for>'")
 instancesCmd s = do
@@ -2494,7 +2521,7 @@ quit _ = return CleanExit
 
 -- running a script file #1363
 
-scriptCmd :: String -> InputT GHCi ()
+scriptCmd :: GhciMonad m => String -> m ()
 scriptCmd ws = do
   case words' ws of
     [s]    -> runScript s
@@ -2516,8 +2543,8 @@ words' s = case dropWhile isSpace s of
   go acc (c : cs) | isSpace c = acc [] : words' cs
                   | otherwise = go (acc . (c :)) cs
 
-runScript :: String    -- ^ filename
-           -> InputT GHCi ()
+runScript :: GhciMonad m => String    -- ^ filename
+           -> m ()
 runScript filename = do
   filename' <- expandPath filename
   either_script <- liftIO $ tryIO (openFile filename' ReadMode)
