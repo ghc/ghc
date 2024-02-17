@@ -171,8 +171,14 @@ checkSphinxWarnings out = do
     when ("undefined label:" `isInfixOf` log)
       $ fail "Undefined labels found in Sphinx log."
 
-    when ("ERROR:" `isInfixOf` log)
+    when (any hasError (lines log))
       $ fail "Errors found in the Sphinx log."
+    where
+        hasError line =
+            case words line of
+                _ : "ERROR:" : _ -> True
+                _ : "CRITICAL:" : _ -> True
+                _ -> False
 
 -- | Check that all GHC flags are documented in the users guide.
 checkUserGuideFlags :: FilePath -> Action ()
