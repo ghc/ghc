@@ -2598,8 +2598,9 @@ def normalise_errmsg(s: str) -> str:
     s = normalise_callstacks(s)
     s = normalise_type_reps(s)
 
-    # normalise slashes, minimise Windows/Unix filename differences
-    s = re.sub(r'\\', '/', s)
+    # normalise slashes to minimise Windows/Unix filename differences,
+    # but don't normalize backslashes in chars
+    s = re.sub(r"(?!')\\", '/', s)
 
     # Normalize the name of the GHC executable. Specifically,
     # this catches the cases that:
