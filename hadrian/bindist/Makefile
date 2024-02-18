@@ -169,7 +169,7 @@ install_bin_direct:
 install_lib: lib/settings
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
-	
+
 	@dest="$(DESTDIR)$(ActualLibsDir)"; \
 	cd lib; \
 	for i in `$(FIND) . -type f`; do \
@@ -185,6 +185,8 @@ install_lib: lib/settings
 		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
 		  *.dylib) \
 		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
+		  *.mjs) \
+		    $(INSTALL_SCRIPT) $$i "$$dest/`dirname $$i`" ;; \
 		  *) \
 		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ;; \
 		esac; \
