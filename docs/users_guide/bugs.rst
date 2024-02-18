@@ -129,14 +129,21 @@ Context-free syntax
    expressions. Specifically, the restriction that "a nested context
    must be indented further to the right than the enclosing context" is
    relaxed to allow the nested context to be at the same level as the
-   enclosing context, if the enclosing context is a ``do`` expression.
+   enclosing context, if the nested context is a ``do`` expression.
 
-   For example, the following code is accepted by GHC: ::
+   For example, the following code, in which a ``do`` context is nested
+   within a case context, and the statement `feed animal` is indented by
+   the same amount as the case alt, is accepted by GHC: ::
 
-       main = do args <- getArgs
-                 if null args then return [] else do
-                 ps <- mapM process args
-                 mapM print ps
+       main = case animal of
+                Wombat -> do
+                feed animal
+
+   But this code, with the inverse nesting, is not: ::
+
+       main = do
+         case animal of
+         Wombat -> feed animal
 
    This behaviour is controlled by the :extension:`NondecreasingIndentation`
    extension.
