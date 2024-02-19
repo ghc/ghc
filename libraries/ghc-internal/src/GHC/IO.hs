@@ -40,7 +40,7 @@ module GHC.IO (
 
         FilePath,
 
-        catch, catchException, catchAny, throwIO,
+        catch, catchNoAnnotation, catchException, catchAny, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
         unsafeUnmask, interruptible,
@@ -51,7 +51,7 @@ module GHC.IO (
 import GHC.Base
 import GHC.ST
 import GHC.Exception
-import GHC.Exception.Type (NoBacktrace(..), addExceptionContext)
+import GHC.Exception.Type (NoBacktrace(..), WhileHandling(..), addExceptionContext)
 import GHC.Show
 import GHC.IO.Unsafe
 import GHC.Stack.Types ( HasCallStack )
@@ -167,6 +167,10 @@ catchException !io handler = catch io handler
 -- to catch exceptions of any type, see the section \"Catching all
 -- exceptions\" (in "Control.Exception") for an explanation of the problems with doing so.
 --
+-- If the exception handler throws an exception during execution, the
+-- thrown exception will be annotated with a 'WhileHandling'
+-- 'ExceptionAnnotation'.
+--
 -- For catching exceptions in pure (non-'IO') expressions, see the
 -- function 'evaluate'.
 --
@@ -194,6 +198,24 @@ catch (IO io) handler = IO $ catch# io handler'
   where
     handler' e =
       case fromException e of
+        Just e' -> unIO (withWhileHandling e (handler e'))
+        Nothing -> raiseIO# e
+
+-- | Catch an exception without adding a 'WhileHandling' 'ExceptionContext'
+-- to any exceptions thrown by the handler. See the documentation of 'catch'
+-- for a detailed description of the semantics of this function.
+--
+-- @since 4.19.0.0
+catchNoAnnotation
+    :: Exception e
+    => IO a         -- ^ The computation to run
+    -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
+    -> IO a
+-- See #exceptions_and_strictness#.
+catchNoAnnotation (IO io) handler = IO $ catch# io handler'
+  where
+    handler' e =
+      case fromException e of
         Just e' -> unIO (handler e')
         Nothing -> raiseIO# e
 
@@ -205,7 +227,11 @@ catch (IO io) handler = IO $ catch# io handler'
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
   where
-    handler' (SomeException e) = unIO (handler e)
+    handler' se@(SomeException e) =
+        unIO (withWhileHandling se (handler e))
+
+withWhileHandling :: SomeException -> IO a -> IO a
+withWhileHandling cause = annotateIO (WhileHandling cause)
 
 -- | Execute an 'IO' action, adding the given 'ExceptionContext'
 -- to any thrown synchronous exceptions.
