@@ -1,5 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.19.1.0 *October 2023*
+  * Shipped with GHC 9.8.2
+  * Improve documentation of various functions
+  * Implement primitives like `lstat` and `rmdir`, for the JS backend.
+
 ## 4.19.0.0 *October 2023*
 
   * Shipped with GHC 9.8.1

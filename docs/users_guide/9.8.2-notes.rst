@@ -1,0 +1,168 @@
+.. _release-9-8-2:
+
+Version 9.8.2
+==============
+
+The significant changes to the various parts of the compiler are listed below.
+See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.8>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+11, 12, 13, 14 or 15.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Fix a recompilation checking bug impacting the relinking step, where we failed to
+  relink if transitive dependencies were changed (:ghc-ticket:`23724`).
+- Fix a renamer bug where certain styles of import lists for associated type
+  families would not be processed correctly (:ghc-ticket:`24084`).
+- Fix a typechecker bug that could lead to non-termination in certain situations
+  (:ghc-ticket:`24134`).
+- Support code points greater than 2^16 in ``toJSString`` when using the JS
+  backend (:ghc-ticket:`23628`).
+- Fix a code generation bug on the JS backend involving tuple constructors
+  (:ghc-ticket:`23659`).
+- Fix a code generator panic when compiling code using FMA primops
+  (:ghc-ticket:`24160`).
+- Fix a bug causing suboptimal error messages for certain invalid cyclic
+  module graphs with hs-boot files (:ghc-ticket:`24196`, :ghc-ticket:`24275`).
+- Fix an incorrect assertion in the simplifier (:ghc-ticket:`23862`).
+- Fix a bug causing compiler panics with certain package databases involving
+  unusable units and module reexports (:ghc-ticket:`21097`, :ghc-ticket:`16996`,
+  :ghc-ticket:`11050`).
+- Fix some memory leaks in GHCi that manifest on reloads (:ghc-ticket:`24107`,
+  :ghc-ticket:`24118`).
+- Fix a GHCi bug where a failure in the ``:add`` command would cause the
+  process to exit (:ghc-ticket:`24115`).
+- Align objects in the data section properly when using the LLVM backend
+  (:ghc-ticket:`24163`).
+- Fix a simplifier panic when simplifying certain unfoldings
+  (:ghc-ticket:`24242`).
+- Fix a typechecker bug where ``TYPE`` and ``CONSTRAINT`` were treated as apart
+  (:ghc-ticket:`24279`).
+- Allow template haskell code to look up record fields (:ghc-ticket:`24293`).
+- Add ``-finfo-table-map-with-fallback`` and ``-finfo-table-map-with-stack`` flags
+  for info table profiling (:ghc-ticket:`23702`).
+- Improve compile time and code generation performance when ``-finfo-table-map``
+  is enabled (:ghc-ticket:`23103`).
+- Fix a bug in the check for unused type variables in type class instances
+  (:ghc-ticket:`23768`).
+- Fix a panic when typechecking GADT data family instances with unused variables
+  (:ghc-ticket:`23784`).
+- Improve error message for unused variables in RHS of data family instance
+  (:ghc-ticket:`23778`).
+- Fix a compiler panic due to mismatches between ``.hs`` and ``.hs-boot`` files
+  (:ghc-ticket:`16127`).
+- Improve error message for unused variables type family instances
+  (:ghc-ticket:`23734`).
+- Fix a type checker crash on certain programs involving implicitly scoped type
+  variables (:ghc-ticket:`24083`).
+- Fix a bug where certain warning flags were not recognised (:ghc-ticket:`24071`).
+- Fix a bug involving the miscompilation of certain loops (:ghc-ticket:`24295`).
+- Produce FMA instructions even if `-mfma` is not set on AArch64
+  (:ghc-ticket:`24311`).
+- Fix a bug leading to some template haskell splices failing on being reloaded
+  into GHCi due to not clearing the interactive context properly
+  (:ghc-ticket:`23405`).
+- Fix a bug where we could silently truncate 64 bit values to 32 bit on
+  32 bit architectures.
+- Don't produce invalid opcode for FMA instruction on LLVM (:ghc-ticket:`24223`).
+- Fix a warning about non-existent ``+fma`` flag on LLVM (:ghc-ticket:`24379`).
+- Ensure we give nested documentation comments accurate source spans
+  (:ghc-ticket:`24378`).
+- Ensure we don't emit shadowing warnings for ``NoFieldSelector`` fields
+  (:ghc-ticket:`24381`).
+- Fix several bugs involving free variables in breakpoints (:ghc-ticket:`23612`,
+  :ghc-ticket:`23607`, :ghc-ticket:`23998`, :ghc-ticket:`23666`).
+- Fix a bug preventing some specialisations from firing (:ghc-ticket:`24370`).
+- On x86, Don't require ``-mavx2`` when using 256-bit floating-point SIMD
+  primitives (:ghc-ticket:`24222`).
+- Fix a bug preventing haddock from computing the correct links
+  (:ghc-ticket:`24294`).
+
+Runtime system
+--------------
+
+- Ensure we respect maximum event length and don't overflow into program
+  memory (:ghc-ticket:`24197`, :ghc-ticket:`24287`).
+- Ensure concurrent thunk update is sound (:ghc-ticket:`23185`).
+
+Build system and packaging
+--------------------------
+
+- Ensure we use the right ``otool`` and ``install_name_tool`` on Darwin
+  (:ghc-ticket:`24211`).
+- Ensure we use the correct bindist name for the test artifact when generating
+  release ghcup metadata (:ghc-ticket:`24268`).
+- Ensure we handle CXX and CC flags involving standard flags correctly with
+  new autotools versions (:ghc-ticket:`24324`). 
+- Ensure we correctly set ``--target`` when configuring the linker
+  (:ghc-ticket:`24414`).
+- Suppress duplicate library warnings on new macOS linker (:ghc-ticket:`24167`,
+  :ghc-ticket:`24168`).
+- Fix a bug where ``-DNOSMP`` wasn't being passed to the C compiler even if the
+  target doesn't support SMP (:ghc-ticket:`24082`).
+- Don't assume the locale is ``*.UTF-8`` in hadrian.
+
+Core libraries
+--------------
+
+- Fix a bug in ghc-bignum where usage of `bigNatIsPowerOf2` might result in
+  out of bounds access (:ghc-ticket:`24066`).
+- Bump ``base`` to 4.19.1.0
+- Bump ``filepath`` to 1.4.200.1
+- Bump ``unix`` to 2.8.4.0
+- Bump ``bytestring`` to 0.12.1.0
+- Bump ``text`` to 2.1.1
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/semaphore-compat/semaphore-compat.cabal: Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
