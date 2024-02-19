@@ -291,12 +291,13 @@ free_adjustor(void *adjustor, void *context) {
 /* Must hold owner->lock */
 static struct AdjustorChunk *
 alloc_adjustor_chunk(struct AdjustorPool *owner) {
-    size_t pg_sz = getPageSize();
-    struct AdjustorExecPage *exec_page = mmapAnonForLinker(pg_sz);
+    ExecPage *exec_page = allocateExecPage();
     if (exec_page == NULL) {
         barf("alloc_adjustor_chunk: failed to allocate");
     }
-    exec_page->magic = ADJUSTOR_EXEC_PAGE_MAGIC;
+
+    struct AdjustorExecPage *adj_page = (struct AdjustorExecPage *) exec_page;
+    adj_page->magic = ADJUSTOR_EXEC_PAGE_MAGIC;
 
     // N.B. pad bitmap to ensure that .contexts is aligned.
     size_t bitmap_sz = ROUND_UP(owner->chunk_slots, 8*sizeof(void*)) / 8;
@@ -307,7 +308,7 @@ alloc_adjustor_chunk(struct AdjustorPool *owner) {
     chunk->first_free = 0;
     chunk->contexts = (struct AdjustorContext *) (chunk->slot_bitmap + bitmap_sz);
     chunk->free_list_next = NULL;
-    chunk->exec_page = exec_page;
+    chunk->exec_page = adj_page;
     chunk->exec_page->owner = chunk;
 
     // initialize the slot bitmap
@@ -317,13 +318,13 @@ alloc_adjustor_chunk(struct AdjustorPool *owner) {
     size_t code_sz = owner->adjustor_code_size;
     for (size_t i = 0; i < owner->chunk_slots; i++) {
         owner->make_code(
-                &exec_page->adjustor_code[i*code_sz],
+                &adj_page->adjustor_code[i*code_sz],
                 get_context(chunk, i),
                 owner->user_data);
     }
 
     // Remap the executable page as executable
-    mprotectForLinker(exec_page, pg_sz, MEM_READ_EXECUTE);
+    freezeExecPage(exec_page);
 
     return chunk;
 }
