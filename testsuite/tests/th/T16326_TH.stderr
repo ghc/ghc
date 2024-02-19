@@ -5,8 +5,9 @@ data Nested_0 :: forall a_1 .
                  forall c_3 .
                  forall d_4 ->
                  forall e_5 .
-                 Data.Proxy.Proxy ('(:) a_1
-                                        ('(:) b_2 ('(:) c_3 ('(:) d_4 ('(:) e_5 '[]))))) ->
+                 GHC.Internal.Data.Proxy.Proxy ('(:) a_1
+                                                     ('(:) b_2
+                                                           ('(:) c_3 ('(:) d_4 ('(:) e_5 '[]))))) ->
                  *
 T16326_TH.hs:(17,2)-(24,14): Splicing declarations
     do info <- reify ''Foo2

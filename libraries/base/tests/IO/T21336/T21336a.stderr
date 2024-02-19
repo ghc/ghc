@@ -1,1 +1,1 @@
-Exception during weak pointer finalization (ignored): GHC.IO.FD.fdWrite: resource exhausted (No space left on device)
+Exception during weak pointer finalization (ignored): GHC.Internal.IO.FD.fdWrite: resource exhausted (No space left on device)

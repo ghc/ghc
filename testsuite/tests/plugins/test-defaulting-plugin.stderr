@@ -10,8 +10,8 @@ test-defaulting-plugin.hs:28:15: warning: [GHC-18042] [-Wtype-defaults (in -Wall
     • Defaulting the type variable ‘a0’ to type ‘2’ in the following constraints
         (KnownNat a0)
           arising from a use of ‘w’ at test-defaulting-plugin.hs:28:15
-        (GHC.TypeError.Assert
-           (Data.Type.Ord.OrdCond (CmpNat 2 a0) True True False)
+        (GHC.Internal.TypeError.Assert
+           (GHC.Internal.Data.Type.Ord.OrdCond (CmpNat 2 a0) True True False)
            (TypeError ...))
           arising from a use of ‘w’ at test-defaulting-plugin.hs:28:15
     • In the second argument of ‘(+)’, namely ‘w’

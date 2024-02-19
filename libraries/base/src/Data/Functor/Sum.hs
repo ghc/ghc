@@ -23,10 +23,11 @@ module Data.Functor.Sum (
   ) where
 
 import Control.Applicative ((<|>))
-import Data.Data (Data)
+import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Text.Read ()
+import GHC.Internal.Text.Read ()
+import Prelude
 
 -- | Lifted sum of functors.
 --

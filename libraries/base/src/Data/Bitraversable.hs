@@ -29,15 +29,16 @@ module Data.Bitraversable
 import Control.Applicative
 import Data.Bifunctor
 import Data.Bifoldable
-import Data.Coerce
-import Data.Functor.Identity (Identity(..))
-import Data.Functor.Utils (StateL(..), StateR(..))
+import GHC.Internal.Data.Coerce
+import GHC.Internal.Data.Functor.Identity (Identity(..))
+import GHC.Internal.Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
+import Prelude
 
 -- $setup
 -- >>> import Prelude
--- >>> import Data.Maybe
--- >>> import Data.List (find)
+-- >>> import GHC.Internal.Data.Maybe
+-- >>> import GHC.Internal.Data.List (find)
 
 -- | 'Bitraversable' identifies bifunctorial data structures whose elements can
 -- be traversed in order, performing 'Applicative' or 'Monad' actions at each

@@ -20,6 +20,7 @@ module Data.Bifunctor
 
 import Control.Applicative  ( Const(..) )
 import GHC.Generics ( K1(..) )
+import Prelude
 
 -- $setup
 -- >>> import Prelude

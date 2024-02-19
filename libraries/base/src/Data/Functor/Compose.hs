@@ -29,13 +29,14 @@ module Data.Functor.Compose (
 import Data.Functor.Classes
 
 import Control.Applicative
-import Data.Coerce (coerce)
-import Data.Data (Data)
-import Data.Foldable (Foldable(..))
-import Data.Monoid (Sum(..), All(..), Any(..), Product(..))
-import Data.Type.Equality (TestEquality(..), (:~:)(..))
+import GHC.Internal.Data.Coerce (coerce)
+import GHC.Internal.Data.Data (Data)
+import GHC.Internal.Data.Foldable (Foldable(..))
+import GHC.Internal.Data.Monoid (Sum(..), All(..), Any(..), Product(..))
+import GHC.Internal.Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
-import Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
+import GHC.Internal.Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
+import Prelude
 
 infixr 9 `Compose`
 

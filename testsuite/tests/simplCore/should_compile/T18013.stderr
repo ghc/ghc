@@ -139,8 +139,8 @@ mapMaybeRule [InlPrag=[2]]
 [GblId,
  Arity=1,
  Str=<1!P(L,LC(S,C(1,C(1,P(L,1L)))))>,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (@b) (f [Occ=Once1!] :: Rule IO a b) ->
                  case f of { Rule @s ww ww1 [Occ=OnceL1!] ->
@@ -155,7 +155,8 @@ mapMaybeRule [InlPrag=[2]]
                        (s1 [Occ=Once2] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
                        case a1 of {
                          Nothing ->
-                           (# s1, T18013a.Result @s @(Maybe b) ww (GHC.Maybe.Nothing @b) #);
+                           (# s1,
+                              T18013a.Result @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) #);
                          Just x [Occ=Once1] ->
                            case ((ww1 s2 x)
                                  `cast` <Co:4> :: IO (Result s b)
@@ -166,7 +167,8 @@ mapMaybeRule [InlPrag=[2]]
                            of
                            { (# ipv [Occ=Once1], ipv1 [Occ=Once1!] #) ->
                            case ipv1 of { Result t2 [Occ=Once1] c1 [Occ=Once1] ->
-                           (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
+                           (# ipv,
+                              T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
                            }
                            }
                        })
@@ -183,7 +185,9 @@ mapMaybeRule
       let {
         lvl :: Result s (Maybe b)
         [LclId, Unf=OtherCon []]
-        lvl = T18013a.Result @s @(Maybe b) ww (GHC.Maybe.Nothing @b) } in
+        lvl
+          = T18013a.Result
+              @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) } in
       T18013a.Rule
         @IO
         @(Maybe a)
@@ -205,7 +209,8 @@ mapMaybeRule
                 of
                 { (# ipv, ipv1 #) ->
                 case ipv1 of { Result t2 c1 ->
-                (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
+                (# ipv,
+                   T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
                 }
                 }
             })
@@ -219,36 +224,41 @@ mapMaybeRule
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T18013.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule3 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule3 = GHC.Types.TrNameS T18013.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T18013.$trModule2 = "T18013"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule :: GHC.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule
   = GHC.Types.Module T18013.$trModule3 T18013.$trModule1
 

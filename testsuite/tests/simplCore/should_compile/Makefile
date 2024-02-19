@@ -65,7 +65,7 @@ T8832:
 
 T12603:
 	$(RM) -f T12603.o T12603.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T12603.hs | grep 'GHC.Real'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T12603.hs | grep 'GHC.Internal.Real'
          # Horribly delicate; looking for a top-level shared call to 2^8
 
 T11155:

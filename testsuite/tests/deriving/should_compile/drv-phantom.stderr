@@ -1,14 +1,17 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Base.Functor DrvPhantom.NotAList where
-    GHC.Base.fmap _ = GHC.Prim.coerce
+  instance GHC.Internal.Base.Functor DrvPhantom.NotAList where
+    GHC.Internal.Base.fmap _ = GHC.Prim.coerce
   
-  instance Data.Foldable.Foldable DrvPhantom.NotAList where
-    Data.Foldable.foldMap _ _ = GHC.Base.mempty
+  instance GHC.Internal.Data.Foldable.Foldable
+             DrvPhantom.NotAList where
+    GHC.Internal.Data.Foldable.foldMap _ _ = GHC.Internal.Base.mempty
   
-  instance Data.Traversable.Traversable DrvPhantom.NotAList where
-    Data.Traversable.traverse _ z = GHC.Base.pure (GHC.Prim.coerce z)
+  instance GHC.Internal.Data.Traversable.Traversable
+             DrvPhantom.NotAList where
+    GHC.Internal.Data.Traversable.traverse _ z
+      = GHC.Internal.Base.pure (GHC.Prim.coerce z)
   
 
 Derived type family instances:
@@ -16,3 +19,141 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
+GHC.Internal.Base.Functor [DrvPhantom.NotAList]
+  GHC.Internal.Base.<$ = GHC.Internal.Base.$dm<$
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.fold = GHC.Internal.Data.Foldable.$dmfold
+                                      @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldMap' = GHC.Internal.Data.Foldable.$dmfoldMap'
+                                          @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldr = GHC.Internal.Data.Foldable.$dmfoldr
+                                       @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldr' = GHC.Internal.Data.Foldable.$dmfoldr'
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldl = GHC.Internal.Data.Foldable.$dmfoldl
+                                       @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldl' = GHC.Internal.Data.Foldable.$dmfoldl'
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldr1 = GHC.Internal.Data.Foldable.$dmfoldr1
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.foldl1 = GHC.Internal.Data.Foldable.$dmfoldl1
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.toList = GHC.Internal.Data.Foldable.$dmtoList
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.null = GHC.Internal.Data.Foldable.$dmnull
+                                      @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.length = GHC.Internal.Data.Foldable.$dmlength
+                                        @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.elem = GHC.Internal.Data.Foldable.$dmelem
+                                      @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.maximum = GHC.Internal.Data.Foldable.$dmmaximum
+                                         @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.minimum = GHC.Internal.Data.Foldable.$dmminimum
+                                         @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.sum = GHC.Internal.Data.Foldable.$dmsum
+                                     @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Foldable.Foldable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Foldable.product = GHC.Internal.Data.Foldable.$dmproduct
+                                         @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Traversable.Traversable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Traversable.sequenceA = GHC.Internal.Data.Traversable.$dmsequenceA
+                                              @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Traversable.Traversable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Traversable.mapM = GHC.Internal.Data.Traversable.$dmmapM
+                                         @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Data.Traversable.Traversable [DrvPhantom.NotAList]
+  GHC.Internal.Data.Traversable.sequence = GHC.Internal.Data.Traversable.$dmsequence
+                                             @(DrvPhantom.NotAList)
+
+

@@ -1,12 +1,12 @@
 type Unit :: *
 data Unit = ()
   	-- Defined in ‘GHC.Tuple.Prim’
-instance Monoid () -- Defined in ‘GHC.Base’
-instance Semigroup () -- Defined in ‘GHC.Base’
-instance Bounded () -- Defined in ‘GHC.Enum’
-instance Read () -- Defined in ‘GHC.Read’
-instance Enum () -- Defined in ‘GHC.Enum’
-instance Show () -- Defined in ‘GHC.Show’
+instance Monoid () -- Defined in ‘GHC.Internal.Base’
+instance Semigroup () -- Defined in ‘GHC.Internal.Base’
+instance Bounded () -- Defined in ‘GHC.Internal.Enum’
+instance Read () -- Defined in ‘GHC.Internal.Read’
+instance Enum () -- Defined in ‘GHC.Internal.Enum’
+instance Show () -- Defined in ‘GHC.Internal.Show’
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
 type (##) :: GHC.Types.ZeroBitType
@@ -19,21 +19,27 @@ data (##) = (##)
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
   	-- Defined in ‘GHC.Tuple.Prim’
-instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
+instance Traversable ((,) a)
+  -- Defined in ‘GHC.Internal.Data.Traversable’
+instance Monoid a => Applicative ((,) a)
+  -- Defined in ‘GHC.Internal.Base’
+instance Foldable ((,) a)
+  -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
+instance Monoid a => Monad ((,) a)
+  -- Defined in ‘GHC.Internal.Base’
 instance (Monoid a, Monoid b) => Monoid (a, b)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘GHC.Internal.Base’
 instance (Semigroup a, Semigroup b) => Semigroup (a, b)
-  -- Defined in ‘GHC.Base’
-instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
+  -- Defined in ‘GHC.Internal.Base’
 instance (Bounded a, Bounded b) => Bounded (a, b)
-  -- Defined in ‘GHC.Enum’
-instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
-instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
-instance Functor ((,) a) -- Defined in ‘GHC.Base’
-instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+  -- Defined in ‘GHC.Internal.Enum’
+instance (Read a, Read b) => Read (a, b)
+  -- Defined in ‘GHC.Internal.Read’
 instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
-instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
+instance (Show a, Show b) => Show (a, b)
+  -- Defined in ‘GHC.Internal.Show’
 type (#,#) :: *
               -> *
               -> TYPE

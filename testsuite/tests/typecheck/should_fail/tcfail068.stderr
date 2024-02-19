@@ -1,11 +1,11 @@
 
 tcfail068.hs:14:9: error: [GHC-25897]
     • Couldn't match type ‘s1’ with ‘s’
-      Expected: GHC.ST.ST s1 (IndTree s a)
-        Actual: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
+      Expected: GHC.Internal.ST.ST s1 (IndTree s a)
+        Actual: GHC.Internal.ST.ST s1 (STArray s1 (Int, Int) a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
-          forall s1. GHC.ST.ST s1 (IndTree s a)
+          forall s1. GHC.Internal.ST.ST s1 (IndTree s a)
         at tcfail068.hs:(13,15)-(14,31)
       ‘s’ is a rigid type variable bound by
         the type signature for:
@@ -28,7 +28,7 @@ tcfail068.hs:19:21: error: [GHC-25897]
         Actual: IndTree s a
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
-          forall s1. GHC.ST.ST s1 (IndTree s a)
+          forall s1. GHC.Internal.ST.ST s1 (IndTree s a)
         at tcfail068.hs:(18,15)-(21,19)
       ‘s’ is a rigid type variable bound by
         the type signature for:
@@ -48,11 +48,11 @@ tcfail068.hs:19:21: error: [GHC-25897]
 
 tcfail068.hs:24:36: error: [GHC-25897]
     • Couldn't match type ‘s1’ with ‘s’
-      Expected: GHC.ST.ST s1 (IndTree s a)
-        Actual: GHC.ST.ST s (IndTree s a)
+      Expected: GHC.Internal.ST.ST s1 (IndTree s a)
+        Actual: GHC.Internal.ST.ST s (IndTree s a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
-          forall s1. GHC.ST.ST s1 (IndTree s a)
+          forall s1. GHC.Internal.ST.ST s1 (IndTree s a)
         at tcfail068.hs:24:35-46
       ‘s’ is a rigid type variable bound by
         the type signature for:
@@ -74,9 +74,9 @@ tcfail068.hs:24:36: error: [GHC-25897]
                     else
                         (readSTArray arr (i, k) >>= \ val -> ...)
     • Relevant bindings include
-        itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+        itrap' :: Int -> Int -> GHC.Internal.ST.ST s (IndTree s a)
           (bound at tcfail068.hs:26:9)
-        itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+        itrapsnd :: Int -> Int -> GHC.Internal.ST.ST s (IndTree s a)
           (bound at tcfail068.hs:29:9)
         arr :: IndTree s a (bound at tcfail068.hs:24:23)
         itrap :: ((Int, Int), (Int, Int))
@@ -85,11 +85,11 @@ tcfail068.hs:24:36: error: [GHC-25897]
 
 tcfail068.hs:36:46: error: [GHC-25897]
     • Couldn't match type ‘s1’ with ‘s’
-      Expected: GHC.ST.ST s1 (c, IndTree s b)
-        Actual: GHC.ST.ST s (c, IndTree s b)
+      Expected: GHC.Internal.ST.ST s1 (c, IndTree s b)
+        Actual: GHC.Internal.ST.ST s (c, IndTree s b)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
-          forall s1. GHC.ST.ST s1 (c, IndTree s b)
+          forall s1. GHC.Internal.ST.ST s1 (c, IndTree s b)
         at tcfail068.hs:36:45-63
       ‘s’ is a rigid type variable bound by
         the type signature for:
@@ -120,9 +120,11 @@ tcfail068.hs:36:46: error: [GHC-25897]
                     else
                         (readSTArray arr (i, k) >>= \ val -> ...)
     • Relevant bindings include
-        itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+        itrapstate' :: Int
+                       -> Int -> c -> GHC.Internal.ST.ST s (c, IndTree s b)
           (bound at tcfail068.hs:38:9)
-        itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+        itrapstatesnd :: Int
+                         -> Int -> c -> GHC.Internal.ST.ST s (c, IndTree s b)
           (bound at tcfail068.hs:41:9)
         arr :: IndTree s b (bound at tcfail068.hs:36:34)
         itrapstate :: ((Int, Int), (Int, Int))

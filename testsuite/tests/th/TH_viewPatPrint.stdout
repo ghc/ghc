@@ -1,2 +1,2 @@
-ViewP (VarE GHC.Base.id) (VarP x_0)
-(GHC.Base.id -> x_0)
+ViewP (VarE GHC.Internal.Base.id) (VarP x_0)
+(GHC.Internal.Base.id -> x_0)

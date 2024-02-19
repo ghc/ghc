@@ -8,8 +8,8 @@
 
 #pragma once
 
-extern StgClosure DLL_IMPORT_DATA_VARNAME(ghczminternal_GHCziStackziCloneStack_StackSnapshot_closure);
-#define StackSnapshot_constructor_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziStackziCloneStack_StackSnapshot_closure)
+extern StgClosure DLL_IMPORT_DATA_VARNAME(ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure);
+#define StackSnapshot_constructor_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure)
 
 StgStack* cloneStack(Capability* capability, const StgStack* stack);
 

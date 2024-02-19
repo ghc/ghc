@@ -15,7 +15,7 @@ c3 :: C a b => a1 -> b
 c4 :: C a b => a1 -> b
 -- imported via Control.Monad
 type MonadPlus :: (* -> *) -> Constraint
-class (GHC.Base.Alternative m, Monad m) => MonadPlus m
+class (GHC.Internal.Base.Alternative m, Monad m) => MonadPlus m
   ...
 mplus :: MonadPlus m => m a -> m a -> m a
 mzero :: MonadPlus m => m a
@@ -25,11 +25,11 @@ mzero :: MonadPlus m => m a
 return :: Monad m => a -> m a
 -- imported via Control.Monad, Prelude, T
 type Monad :: (* -> *) -> Constraint
-class GHC.Base.Applicative m => Monad m
+class GHC.Internal.Base.Applicative m => Monad m
   ...
 -- imported via Data.Maybe
 catMaybes :: [Maybe a] -> [a]
-fromJust :: GHC.Stack.Types.HasCallStack => Maybe a -> a
+fromJust :: GHC.Internal.Stack.Types.HasCallStack => Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
 isJust :: Maybe a -> GHC.Types.Bool
 isNothing :: Maybe a -> GHC.Types.Bool
@@ -43,18 +43,19 @@ type Maybe :: * -> *
 data Maybe a = ...
 Nothing :: Maybe a
 -- imported via Prelude
-(+) :: GHC.Num.Num a => a -> a -> a
+(+) :: GHC.Internal.Num.Num a => a -> a -> a
 (=<<) :: Monad m => (a -> m b) -> m a -> m b
 type Eq :: * -> Constraint
 class Eq a
   ...
 -- imported via Prelude, T
-Prelude.length :: Data.Foldable.Foldable t => t a -> GHC.Types.Int
+Prelude.length ::
+  GHC.Internal.Data.Foldable.Foldable t => t a -> GHC.Types.Int
 -- imported via T
 type T.Integer :: *
 data T.Integer = ...
 T.length ::
-  bytestring-0.11.4.0:Data.ByteString.Internal.Type.ByteString
+  bytestring-0.12.1.0:Data.ByteString.Internal.Type.ByteString
   -> GHC.Types.Int
 :browse! T
 -- defined locally

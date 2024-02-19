@@ -96,15 +96,21 @@ holes3.hs:11:15: error: [GHC-88464]
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
         ioError :: forall a. IOError -> IO a
-        (!!) :: forall a. GHC.Stack.Types.HasCallStack => [a] -> Int -> a
+        (!!) :: forall a.
+                GHC.Internal.Stack.Types.HasCallStack =>
+                [a] -> Int -> a
         break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
-        cycle :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        cycle :: forall a.
+                 GHC.Internal.Stack.Types.HasCallStack =>
+                 [a] -> [a]
         drop :: forall a. Int -> [a] -> [a]
         dropWhile :: forall a. (a -> Bool) -> [a] -> [a]
-        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        init :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
+        init :: forall a.
+                GHC.Internal.Stack.Types.HasCallStack =>
+                [a] -> [a]
         iterate :: forall a. (a -> a) -> a -> [a]
-        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        last :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
         repeat :: forall a. a -> [a]
         replicate :: forall a. Int -> a -> [a]
         reverse :: forall a. [a] -> [a]
@@ -112,7 +118,9 @@ holes3.hs:11:15: error: [GHC-88464]
         scanr1 :: forall a. (a -> a -> a) -> [a] -> [a]
         span :: forall a. (a -> Bool) -> [a] -> ([a], [a])
         splitAt :: forall a. Int -> [a] -> ([a], [a])
-        tail :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
+        tail :: forall a.
+                GHC.Internal.Stack.Types.HasCallStack =>
+                [a] -> [a]
         take :: forall a. Int -> [a] -> [a]
         takeWhile :: forall a. (a -> Bool) -> [a] -> [a]
         subtract :: forall a. Num a => a -> a -> a
@@ -171,10 +179,10 @@ holes3.hs:11:15: error: [GHC-88464]
         realToFrac :: forall a b. (Real a, Fractional b) => a -> b
         Left :: forall a b. a -> Either a b
         Right :: forall a b. b -> Either a b
+        const :: forall a b. a -> b -> a
         maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
         fst :: forall a b. (a, b) -> a
         snd :: forall a b. (a, b) -> b
-        const :: forall a b. a -> b -> a
         scanl :: forall b a. (b -> a -> b) -> b -> [a] -> [b]
         scanr :: forall a b. (a -> b -> b) -> b -> [a] -> [b]
         unzip :: forall a b. [(a, b)] -> ([a], [b])
@@ -187,12 +195,12 @@ holes3.hs:11:15: error: [GHC-88464]
         round :: forall a b. (RealFrac a, Integral b) => a -> b
         truncate :: forall a b. (RealFrac a, Integral b) => a -> b
         seq :: forall a b. a -> b -> b
-        either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
-        curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
-        uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         ($!) :: forall a b. (a -> b) -> a -> b
         (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+        either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
+        curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
+        uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         unzip3 :: forall a b c. [(a, b, c)] -> ([a], [b], [c])
         zip3 :: forall a b c. [a] -> [b] -> [c] -> [(a, b, c)]
         zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]

@@ -9,8 +9,8 @@ T9497d.hs:2:8: error: [GHC-88464]
         readLn :: forall a. Read a => IO a
           with readLn @()
           (imported from ‘Prelude’ at T9497d.hs:1:1
-           (and originally defined in ‘System.IO’))
+           (and originally defined in ‘GHC.Internal.System.IO’))
         mempty :: forall a. Monoid a => a
           with mempty @(IO ())
           (imported from ‘Prelude’ at T9497d.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Internal.Base’))

@@ -17,8 +17,10 @@ description:
 
 Library
     default-language: Haskell2010
+    default-extensions: NoImplicitPrelude
     build-depends:
         ghc-internal >= 0.1 && < 0.2,
+        ghc-prim,
 
     exposed-modules:
           Control.Applicative
@@ -55,7 +57,7 @@ Library
         , System.Mem.Weak
         , System.Timeout
 
-    reexported-modules:
+    exposed-modules:
         , Control.Arrow
         , Control.Category
         , Control.Concurrent.MVar
@@ -264,7 +266,7 @@ Library
         , GHC.Num.BigNat
 
     if os(windows)
-        reexported-modules:
+        exposed-modules:
               GHC.IO.Encoding.CodePage.API
             , GHC.IO.Encoding.CodePage.Table
             , GHC.Conc.Windows
@@ -283,15 +285,15 @@ Library
             , GHC.IO.Windows.Encoding
             , GHC.IO.Windows.Paths
     else
-        reexported-modules:
+        exposed-modules:
             GHC.Event
 
     if arch(javascript)
-        reexported-modules:
-              GHC.JS.Prim
-            , GHC.JS.Prim.Internal
-            , GHC.JS.Prim.Internal.Build
-            , GHC.JS.Foreign.Callback
+        exposed-modules:
+              GHC.Internal.JS.Prim
+            , GHC.Internal.JS.Prim.Internal
+            , GHC.Internal.JS.Prim.Internal.Build
+            , GHC.Internal.JS.Foreign.Callback
 
     other-modules:
         System.CPUTime.Unsupported

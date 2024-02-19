@@ -9,8 +9,8 @@ T11071a.hs:13:12: error: [GHC-88464]
     Variable not in scope: union
     Suggested fix:
       Add ‘union’ to one of these import lists:
-        ‘Data.IntMap’ (at T11071a.hs:4:1-21)
         ‘Data.List’ (at T11071a.hs:3:1-24)
+        ‘Data.IntMap’ (at T11071a.hs:4:1-21)
 
 T11071a.hs:14:12: error: [GHC-88464]
     Data constructor not in scope: Down

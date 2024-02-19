@@ -4,10 +4,10 @@ T15883d.hs:14:1: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         instance Show (Foo LiftedRep) -- Defined at T15883d.hs:14:1
         ...plus 29 others
-        ...plus 9 instances involving out-of-scope types
+        ...plus 10 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘(showsPrec 11 b1)’
       In the second argument of ‘showParen’, namely

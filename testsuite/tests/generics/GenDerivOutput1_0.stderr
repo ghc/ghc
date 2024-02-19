@@ -1,62 +1,60 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Generics.Generic1 GenDerivOutput1_0.List where
-    GHC.Generics.from1 x
-      = GHC.Generics.M1
+  instance GHC.Internal.Generics.Generic1
+             GenDerivOutput1_0.List where
+    GHC.Internal.Generics.from1 x
+      = GHC.Internal.Generics.M1
           (case x of
              GenDerivOutput1_0.Nil
-               -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
+               -> GHC.Internal.Generics.L1
+                    (GHC.Internal.Generics.M1 GHC.Internal.Generics.U1)
              GenDerivOutput1_0.Cons g1 g2
-               -> GHC.Generics.R1
-                    (GHC.Generics.M1
-                       ((GHC.Generics.:*:)
-                          (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
-    GHC.Generics.to1 (GHC.Generics.M1 x)
+               -> GHC.Internal.Generics.R1
+                    (GHC.Internal.Generics.M1
+                       ((GHC.Internal.Generics.:*:)
+                          (GHC.Internal.Generics.M1 (GHC.Internal.Generics.Par1 g1))
+                          (GHC.Internal.Generics.M1 (GHC.Internal.Generics.Rec1 g2)))))
+    GHC.Internal.Generics.to1 (GHC.Internal.Generics.M1 x)
       = case x of
-          (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1))
+          (GHC.Internal.Generics.L1 (GHC.Internal.Generics.M1 GHC.Internal.Generics.U1))
             -> GenDerivOutput1_0.Nil
-          (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
-                                                                (GHC.Generics.M1 g2))))
+          (GHC.Internal.Generics.R1 (GHC.Internal.Generics.M1 ((GHC.Internal.Generics.:*:) (GHC.Internal.Generics.M1 g1)
+                                                                                           (GHC.Internal.Generics.M1 g2))))
             -> GenDerivOutput1_0.Cons
-                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
+                 (GHC.Internal.Generics.unPar1 g1) (GHC.Internal.Generics.unRec1 g2)
   
 
 Derived type family instances:
-  type GHC.Generics.Rep1 GenDerivOutput1_0.List = GHC.Generics.D1
-                                                    ('GHC.Generics.MetaData
-                                                       "List"
-                                                       "GenDerivOutput1_0"
-                                                       "main"
-                                                       'GHC.Types.False)
-                                                    (GHC.Generics.C1
-                                                       ('GHC.Generics.MetaCons
-                                                          "Nil"
-                                                          'GHC.Generics.PrefixI
-                                                          'GHC.Types.False)
-                                                       GHC.Generics.U1
-                                                     GHC.Generics.:+: GHC.Generics.C1
-                                                                        ('GHC.Generics.MetaCons
-                                                                           "Cons"
-                                                                           'GHC.Generics.PrefixI
-                                                                           'GHC.Types.True)
-                                                                        (GHC.Generics.S1
-                                                                           ('GHC.Generics.MetaSel
-                                                                              ('GHC.Maybe.Just
-                                                                                 "element")
-                                                                              'GHC.Generics.NoSourceUnpackedness
-                                                                              'GHC.Generics.NoSourceStrictness
-                                                                              'GHC.Generics.DecidedLazy)
-                                                                           GHC.Generics.Par1
-                                                                         GHC.Generics.:*: GHC.Generics.S1
-                                                                                            ('GHC.Generics.MetaSel
-                                                                                               ('GHC.Maybe.Just
-                                                                                                  "rest")
-                                                                                               'GHC.Generics.NoSourceUnpackedness
-                                                                                               'GHC.Generics.NoSourceStrictness
-                                                                                               'GHC.Generics.DecidedLazy)
-                                                                                            (GHC.Generics.Rec1
-                                                                                               GenDerivOutput1_0.List)))
+  type GHC.Internal.Generics.Rep1
+         GenDerivOutput1_0.List = GHC.Internal.Generics.D1
+                                    ('GHC.Internal.Generics.MetaData
+                                       "List" "GenDerivOutput1_0" "main" 'GHC.Types.False)
+                                    (GHC.Internal.Generics.C1
+                                       ('GHC.Internal.Generics.MetaCons
+                                          "Nil" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                       GHC.Internal.Generics.U1
+                                     GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
+                                                                 ('GHC.Internal.Generics.MetaCons
+                                                                    "Cons"
+                                                                    'GHC.Internal.Generics.PrefixI
+                                                                    'GHC.Types.True)
+                                                                 (GHC.Internal.Generics.S1
+                                                                    ('GHC.Internal.Generics.MetaSel
+                                                                       ('GHC.Internal.Maybe.Just
+                                                                          "element")
+                                                                       'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                       'GHC.Internal.Generics.NoSourceStrictness
+                                                                       'GHC.Internal.Generics.DecidedLazy)
+                                                                    GHC.Internal.Generics.Par1
+                                                                  GHC.Internal.Generics.:*: GHC.Internal.Generics.S1
+                                                                                              ('GHC.Internal.Generics.MetaSel
+                                                                                                 ('GHC.Internal.Maybe.Just
+                                                                                                    "rest")
+                                                                                                 'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                                                 'GHC.Internal.Generics.NoSourceStrictness
+                                                                                                 'GHC.Internal.Generics.DecidedLazy)
+                                                                                              (GHC.Internal.Generics.Rec1
+                                                                                                 GenDerivOutput1_0.List)))
 
 

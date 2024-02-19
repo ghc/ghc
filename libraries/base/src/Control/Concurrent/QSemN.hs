@@ -24,11 +24,12 @@ module Control.Concurrent.QSemN
           signalQSemN   -- :: QSemN -> Int -> IO ()
       ) where
 
-import Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar
+import Prelude
+import GHC.Internal.Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar
                           , tryPutMVar, isEmptyMVar)
-import Control.Exception
-import Control.Monad (when)
-import Data.IORef (IORef, newIORef, atomicModifyIORef)
+import GHC.Internal.Control.Exception
+import GHC.Internal.Control.Monad (when)
+import GHC.Internal.Data.IORef (IORef, newIORef, atomicModifyIORef)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | 'QSemN' is a quantity semaphore in which the resource is acquired

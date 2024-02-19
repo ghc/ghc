@@ -15,7 +15,8 @@ f [Occ=LoopBreaker] :: Int -> T
 f = \ (ds :: Int) ->
       case ds of wild { I# ds1 ->
       case ds1 of {
-        __DEFAULT -> f (- @Int GHC.Num.$fNumInt wild (GHC.Types.I# 1#));
+        __DEFAULT ->
+          f (- @Int GHC.Internal.Num.$fNumInt wild (GHC.Types.I# 1#));
         0# -> T22719.T
       }
       }

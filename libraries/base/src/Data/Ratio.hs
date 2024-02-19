@@ -24,7 +24,8 @@ module Data.Ratio
 
   ) where
 
-import GHC.Real         -- The basic defns for Ratio
+import GHC.Internal.Real         -- The basic defns for Ratio
+import Prelude
 
 -- -----------------------------------------------------------------------------
 -- approxRational

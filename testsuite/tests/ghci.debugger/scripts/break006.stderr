@@ -5,8 +5,8 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: a (bound at <interactive>:4:1)
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
@@ -18,8 +18,8 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: a (bound at <interactive>:6:1)
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

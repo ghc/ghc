@@ -23,8 +23,9 @@ module Data.STRef.Lazy (
         modifySTRef
  ) where
 
-import Control.Monad.ST.Lazy
-import qualified Data.STRef as ST
+import Prelude
+import GHC.Internal.Control.Monad.ST.Lazy
+import qualified GHC.Internal.Data.STRef as ST
 
 newSTRef    :: a -> ST s (ST.STRef s a)
 readSTRef   :: ST.STRef s a -> ST s a

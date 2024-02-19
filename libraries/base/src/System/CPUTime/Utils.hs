@@ -7,7 +7,9 @@ module System.CPUTime.Utils
     , csuSecondsToInteger
     ) where
 
-import Foreign.C.Types
+import GHC.Internal.Foreign.C.Types
+import GHC.Num.Integer (Integer)
+import GHC.Internal.Real (fromIntegral)
 
 cClockToInteger :: CClock -> Integer
 cClockToInteger (CClock n) = fromIntegral n

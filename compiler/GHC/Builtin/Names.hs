@@ -276,7 +276,7 @@ basicKnownKeyNames
         -- Dynamic
         toDynName,
 
-        -- Numeric stuff
+        -- GHC.Internal.Numeric stuff
         negateName, minusName, geName, eqName,
         mkRationalBase2Name, mkRationalBase10Name,
 
@@ -548,117 +548,119 @@ genericTyConNames = [
 --MetaHaskell Extension Add a new module here
 -}
 
-pRELUDE :: Module
-pRELUDE         = mkBaseModule_ pRELUDE_NAME
-
 gHC_PRIM, gHC_PRIM_PANIC,
-    gHC_TYPES, gHC_GENERICS, gHC_MAGIC, gHC_MAGIC_DICT,
-    gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
-    gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
-    gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
-    gHC_NUM_INTEGER, gHC_NUM_NATURAL, gHC_NUM_BIGNAT,
-    gHC_LIST, gHC_TUPLE, gHC_TUPLE_PRIM, dATA_EITHER, dATA_LIST, dATA_STRING,
-    dATA_FOLDABLE, dATA_TRAVERSABLE,
-    gHC_CONC, gHC_IO, gHC_IO_Exception,
-    gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
-    gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
-    tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
-    rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
-    aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS, gHC_IS_LIST,
-    cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
-    gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
-    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, fOREIGN_C_CONSTPTR :: Module
-
-gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
-gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
-gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
-gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
-gHC_MAGIC_DICT  = mkPrimModule (fsLit "GHC.Magic.Dict")
-gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
-gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
+    gHC_TYPES, gHC_INTERNAL_DATA_DATA, gHC_MAGIC, gHC_MAGIC_DICT,
+    gHC_CLASSES, gHC_PRIMOPWRAPPERS :: Module
+gHC_PRIM           = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
+gHC_PRIM_PANIC     = mkPrimModule (fsLit "GHC.Prim.Panic")
+gHC_TYPES          = mkPrimModule (fsLit "GHC.Types")
+gHC_MAGIC          = mkPrimModule (fsLit "GHC.Magic")
+gHC_MAGIC_DICT     = mkPrimModule (fsLit "GHC.Magic.Dict")
+gHC_CSTRING        = mkPrimModule (fsLit "GHC.CString")
+gHC_CLASSES        = mkPrimModule (fsLit "GHC.Classes")
 gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
-gHC_BASE        = mkGhcInternalModule (fsLit "GHC.Base")
-gHC_ENUM        = mkGhcInternalModule (fsLit "GHC.Enum")
-gHC_GHCI        = mkGhcInternalModule (fsLit "GHC.GHCi")
-gHC_GHCI_HELPERS= mkGhcInternalModule (fsLit "GHC.GHCi.Helpers")
-gHC_SHOW        = mkGhcInternalModule (fsLit "GHC.Show")
-gHC_READ        = mkGhcInternalModule (fsLit "GHC.Read")
-gHC_NUM         = mkGhcInternalModule (fsLit "GHC.Num")
-gHC_MAYBE       = mkGhcInternalModule (fsLit "GHC.Maybe")
-gHC_NUM_INTEGER = mkBignumModule (fsLit "GHC.Num.Integer")
-gHC_NUM_NATURAL = mkBignumModule (fsLit "GHC.Num.Natural")
-gHC_NUM_BIGNAT  = mkBignumModule (fsLit "GHC.Num.BigNat")
-gHC_LIST        = mkGhcInternalModule (fsLit "GHC.List")
-gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
-gHC_TUPLE_PRIM  = mkPrimModule (fsLit "GHC.Tuple.Prim")
-dATA_EITHER     = mkGhcInternalModule (fsLit "Data.Either")
-dATA_LIST       = mkGhcInternalModule (fsLit "Data.List")
-dATA_STRING     = mkGhcInternalModule (fsLit "Data.String")
-dATA_FOLDABLE   = mkGhcInternalModule (fsLit "Data.Foldable")
-dATA_TRAVERSABLE= mkGhcInternalModule (fsLit "Data.Traversable")
-gHC_CONC        = mkGhcInternalModule (fsLit "GHC.Conc")
-gHC_IO          = mkGhcInternalModule (fsLit "GHC.IO")
-gHC_IO_Exception = mkGhcInternalModule (fsLit "GHC.IO.Exception")
-gHC_ST          = mkGhcInternalModule (fsLit "GHC.ST")
-gHC_IX          = mkGhcInternalModule (fsLit "GHC.Ix")
-gHC_STABLE      = mkGhcInternalModule (fsLit "GHC.Stable")
-gHC_PTR         = mkGhcInternalModule (fsLit "GHC.Ptr")
-gHC_ERR         = mkGhcInternalModule (fsLit "GHC.Err")
-gHC_REAL        = mkGhcInternalModule (fsLit "GHC.Real")
-gHC_FLOAT       = mkGhcInternalModule (fsLit "GHC.Float")
-gHC_TOP_HANDLER = mkGhcInternalModule (fsLit "GHC.TopHandler")
-sYSTEM_IO       = mkGhcInternalModule (fsLit "System.IO")
-dYNAMIC         = mkGhcInternalModule (fsLit "Data.Dynamic")
-tYPEABLE        = mkGhcInternalModule (fsLit "Data.Typeable")
-tYPEABLE_INTERNAL = mkGhcInternalModule (fsLit "Data.Typeable.Internal")
-gENERICS        = mkGhcInternalModule (fsLit "Data.Data")
-rEAD_PREC       = mkGhcInternalModule (fsLit "Text.ParserCombinators.ReadPrec")
-lEX             = mkGhcInternalModule (fsLit "Text.Read.Lex")
-gHC_INT         = mkGhcInternalModule (fsLit "GHC.Int")
-gHC_WORD        = mkGhcInternalModule (fsLit "GHC.Word")
-mONAD           = mkGhcInternalModule (fsLit "Control.Monad")
-mONAD_FIX       = mkGhcInternalModule (fsLit "Control.Monad.Fix")
-mONAD_ZIP       = mkBaseModule        (fsLit "Control.Monad.Zip")
-mONAD_FAIL      = mkGhcInternalModule (fsLit "Control.Monad.Fail")
-aRROW           = mkGhcInternalModule (fsLit "Control.Arrow")
-gHC_DESUGAR     = mkGhcInternalModule (fsLit "GHC.Desugar")
-rANDOM          = mkGhcInternalModule (fsLit "System.Random")
-gHC_EXTS        = mkGhcInternalModule (fsLit "GHC.Exts")
-gHC_IS_LIST     = mkGhcInternalModule (fsLit "GHC.IsList")
-cONTROL_EXCEPTION_BASE = mkGhcInternalModule (fsLit "Control.Exception.Base")
-gHC_GENERICS    = mkGhcInternalModule (fsLit "GHC.Generics")
-gHC_TYPEERROR   = mkGhcInternalModule (fsLit "GHC.TypeError")
-gHC_TYPELITS    = mkGhcInternalModule (fsLit "GHC.TypeLits")
-gHC_TYPELITS_INTERNAL = mkGhcInternalModule (fsLit "GHC.TypeLits.Internal")
-gHC_TYPENATS    = mkGhcInternalModule (fsLit "GHC.TypeNats")
-gHC_TYPENATS_INTERNAL = mkGhcInternalModule (fsLit "GHC.TypeNats.Internal")
-dATA_COERCE     = mkGhcInternalModule (fsLit "Data.Coerce")
-dEBUG_TRACE     = mkGhcInternalModule (fsLit "Debug.Trace")
-uNSAFE_COERCE   = mkGhcInternalModule (fsLit "Unsafe.Coerce")
-fOREIGN_C_CONSTPTR = mkGhcInternalModule (fsLit "Foreign.C.ConstPtr")
+gHC_INTERNAL_TUPLE                  = mkPrimModule (fsLit "GHC.Tuple")
+gHC_INTERNAL_TUPLE_PRIM             = mkPrimModule (fsLit "GHC.Tuple.Prim")
 
-gHC_SRCLOC :: Module
-gHC_SRCLOC = mkGhcInternalModule (fsLit "GHC.SrcLoc")
+pRELUDE, dATA_LIST, cONTROL_MONAD_ZIP :: Module
+pRELUDE            = mkBaseModule_ pRELUDE_NAME
+dATA_LIST          = mkBaseModule (fsLit "Data.List")
+cONTROL_MONAD_ZIP  = mkBaseModule (fsLit "Control.Monad.Zip")
 
-gHC_STACK, gHC_STACK_TYPES :: Module
-gHC_STACK = mkGhcInternalModule (fsLit "GHC.Stack")
-gHC_STACK_TYPES = mkGhcInternalModule (fsLit "GHC.Stack.Types")
+gHC_INTERNAL_NUM_INTEGER, gHC_INTERNAL_NUM_NATURAL, gHC_INTERNAL_NUM_BIGNAT :: Module
+gHC_INTERNAL_NUM_INTEGER            = mkBignumModule (fsLit "GHC.Num.Integer")
+gHC_INTERNAL_NUM_NATURAL            = mkBignumModule (fsLit "GHC.Num.Natural")
+gHC_INTERNAL_NUM_BIGNAT             = mkBignumModule (fsLit "GHC.Num.BigNat")
 
-gHC_STATICPTR :: Module
-gHC_STATICPTR = mkGhcInternalModule (fsLit "GHC.StaticPtr")
+gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
+    gHC_INTERNAL_GHCI, gHC_INTERNAL_GHCI_HELPERS, gHC_CSTRING, gHC_INTERNAL_DATA_STRING,
+    gHC_INTERNAL_SHOW, gHC_INTERNAL_READ, gHC_INTERNAL_NUM, gHC_INTERNAL_MAYBE,
+    gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_TUPLE_PRIM, gHC_INTERNAL_DATA_EITHER,
+    gHC_INTERNAL_DATA_FOLDABLE, gHC_INTERNAL_DATA_TRAVERSABLE,
+    gHC_INTERNAL_CONC, gHC_INTERNAL_IO, gHC_INTERNAL_IO_Exception,
+    gHC_INTERNAL_ST, gHC_INTERNAL_IX, gHC_INTERNAL_STABLE, gHC_INTERNAL_PTR, gHC_INTERNAL_ERR, gHC_INTERNAL_REAL,
+    gHC_INTERNAL_FLOAT, gHC_INTERNAL_TOP_HANDLER, gHC_INTERNAL_SYSTEM_IO, gHC_INTERNAL_DYNAMIC,
+    gHC_INTERNAL_TYPEABLE, gHC_INTERNAL_TYPEABLE_INTERNAL, gHC_INTERNAL_GENERICS,
+    gHC_INTERNAL_READ_PREC, gHC_INTERNAL_LEX, gHC_INTERNAL_INT, gHC_INTERNAL_WORD, gHC_INTERNAL_MONAD, gHC_INTERNAL_MONAD_FIX,  gHC_INTERNAL_MONAD_FAIL,
+    gHC_INTERNAL_ARROW, gHC_INTERNAL_DESUGAR, gHC_INTERNAL_RANDOM, gHC_INTERNAL_EXTS, gHC_INTERNAL_IS_LIST,
+    gHC_INTERNAL_CONTROL_EXCEPTION_BASE, gHC_INTERNAL_TYPEERROR, gHC_INTERNAL_TYPELITS, gHC_INTERNAL_TYPELITS_INTERNAL,
+    gHC_INTERNAL_TYPENATS, gHC_INTERNAL_TYPENATS_INTERNAL,
+    gHC_INTERNAL_DATA_COERCE, gHC_INTERNAL_DEBUG_TRACE, gHC_INTERNAL_UNSAFE_COERCE, gHC_INTERNAL_FOREIGN_C_CONSTPTR :: Module
+gHC_INTERNAL_BASE                   = mkGhcInternalModule (fsLit "GHC.Internal.Base")
+gHC_INTERNAL_ENUM                   = mkGhcInternalModule (fsLit "GHC.Internal.Enum")
+gHC_INTERNAL_GHCI                   = mkGhcInternalModule (fsLit "GHC.Internal.GHCi")
+gHC_INTERNAL_GHCI_HELPERS           = mkGhcInternalModule (fsLit "GHC.Internal.GHCi.Helpers")
+gHC_INTERNAL_SHOW                   = mkGhcInternalModule (fsLit "GHC.Internal.Show")
+gHC_INTERNAL_READ                   = mkGhcInternalModule (fsLit "GHC.Internal.Read")
+gHC_INTERNAL_NUM                    = mkGhcInternalModule (fsLit "GHC.Internal.Num")
+gHC_INTERNAL_MAYBE                  = mkGhcInternalModule (fsLit "GHC.Internal.Maybe")
+gHC_INTERNAL_LIST                   = mkGhcInternalModule (fsLit "GHC.Internal.List")
+gHC_INTERNAL_DATA_EITHER            = mkGhcInternalModule (fsLit "GHC.Internal.Data.Either")
+gHC_INTERNAL_DATA_STRING            = mkGhcInternalModule (fsLit "GHC.Internal.Data.String")
+gHC_INTERNAL_DATA_FOLDABLE          = mkGhcInternalModule (fsLit "GHC.Internal.Data.Foldable")
+gHC_INTERNAL_DATA_TRAVERSABLE       = mkGhcInternalModule (fsLit "GHC.Internal.Data.Traversable")
+gHC_INTERNAL_CONC                   = mkGhcInternalModule (fsLit "GHC.Internal.GHC.Conc")
+gHC_INTERNAL_IO                     = mkGhcInternalModule (fsLit "GHC.Internal.IO")
+gHC_INTERNAL_IO_Exception           = mkGhcInternalModule (fsLit "GHC.Internal.IO.Exception")
+gHC_INTERNAL_ST                     = mkGhcInternalModule (fsLit "GHC.Internal.ST")
+gHC_INTERNAL_IX                     = mkGhcInternalModule (fsLit "GHC.Internal.Ix")
+gHC_INTERNAL_STABLE                 = mkGhcInternalModule (fsLit "GHC.Internal.Stable")
+gHC_INTERNAL_PTR                    = mkGhcInternalModule (fsLit "GHC.Internal.Ptr")
+gHC_INTERNAL_ERR                    = mkGhcInternalModule (fsLit "GHC.Internal.Err")
+gHC_INTERNAL_REAL                   = mkGhcInternalModule (fsLit "GHC.Internal.Real")
+gHC_INTERNAL_FLOAT                  = mkGhcInternalModule (fsLit "GHC.Internal.Float")
+gHC_INTERNAL_TOP_HANDLER            = mkGhcInternalModule (fsLit "GHC.Internal.TopHandler")
+gHC_INTERNAL_SYSTEM_IO              = mkGhcInternalModule (fsLit "GHC.Internal.System.IO")
+gHC_INTERNAL_DYNAMIC                = mkGhcInternalModule (fsLit "GHC.Internal.Data.Dynamic")
+gHC_INTERNAL_TYPEABLE               = mkGhcInternalModule (fsLit "GHC.Internal.Data.Typeable")
+gHC_INTERNAL_TYPEABLE_INTERNAL      = mkGhcInternalModule (fsLit "GHC.Internal.Data.Typeable.Internal")
+gHC_INTERNAL_DATA_DATA              = mkGhcInternalModule (fsLit "GHC.Internal.Data.Data")
+gHC_INTERNAL_READ_PREC              = mkGhcInternalModule (fsLit "GHC.Internal.Text.ParserCombinators.ReadPrec")
+gHC_INTERNAL_LEX                    = mkGhcInternalModule (fsLit "GHC.Internal.Text.Read.Lex")
+gHC_INTERNAL_INT                    = mkGhcInternalModule (fsLit "GHC.Internal.Int")
+gHC_INTERNAL_WORD                   = mkGhcInternalModule (fsLit "GHC.Internal.Word")
+gHC_INTERNAL_MONAD                  = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad")
+gHC_INTERNAL_MONAD_FIX              = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad.Fix")
+gHC_INTERNAL_MONAD_FAIL             = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad.Fail")
+gHC_INTERNAL_ARROW                  = mkGhcInternalModule (fsLit "GHC.Internal.Control.Arrow")
+gHC_INTERNAL_DESUGAR                = mkGhcInternalModule (fsLit "GHC.Internal.Desugar")
+gHC_INTERNAL_RANDOM                 = mkGhcInternalModule (fsLit "GHC.Internal.System.Random")
+gHC_INTERNAL_EXTS                   = mkGhcInternalModule (fsLit "GHC.Internal.Exts")
+gHC_INTERNAL_IS_LIST                = mkGhcInternalModule (fsLit "GHC.Internal.IsList")
+gHC_INTERNAL_CONTROL_EXCEPTION_BASE = mkGhcInternalModule (fsLit "GHC.Internal.Control.Exception.Base")
+gHC_INTERNAL_GENERICS               = mkGhcInternalModule (fsLit "GHC.Internal.Generics")
+gHC_INTERNAL_TYPEERROR              = mkGhcInternalModule (fsLit "GHC.Internal.TypeError")
+gHC_INTERNAL_TYPELITS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits")
+gHC_INTERNAL_TYPELITS_INTERNAL      = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits.Internal")
+gHC_INTERNAL_TYPENATS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeNats")
+gHC_INTERNAL_TYPENATS_INTERNAL      = mkGhcInternalModule (fsLit "GHC.Internal.TypeNats.Internal")
+gHC_INTERNAL_DATA_COERCE            = mkGhcInternalModule (fsLit "GHC.Internal.Data.Coerce")
+gHC_INTERNAL_DEBUG_TRACE            = mkGhcInternalModule (fsLit "GHC.Internal.Debug.Trace")
+gHC_INTERNAL_UNSAFE_COERCE          = mkGhcInternalModule (fsLit "GHC.Internal.Unsafe.Coerce")
+gHC_INTERNAL_FOREIGN_C_CONSTPTR     = mkGhcInternalModule (fsLit "GHC.Internal.Foreign.C.ConstPtr")
 
-gHC_STATICPTR_INTERNAL :: Module
-gHC_STATICPTR_INTERNAL = mkGhcInternalModule (fsLit "GHC.StaticPtr.Internal")
+gHC_INTERNAL_SRCLOC :: Module
+gHC_INTERNAL_SRCLOC = mkGhcInternalModule (fsLit "GHC.Internal.SrcLoc")
 
-gHC_FINGERPRINT_TYPE :: Module
-gHC_FINGERPRINT_TYPE = mkGhcInternalModule (fsLit "GHC.Fingerprint.Type")
+gHC_INTERNAL_STACK, gHC_INTERNAL_STACK_TYPES :: Module
+gHC_INTERNAL_STACK = mkGhcInternalModule (fsLit "GHC.Internal.Stack")
+gHC_INTERNAL_STACK_TYPES = mkGhcInternalModule (fsLit "GHC.Internal.Stack.Types")
 
-gHC_OVER_LABELS :: Module
-gHC_OVER_LABELS = mkGhcInternalModule (fsLit "GHC.OverloadedLabels")
+gHC_INTERNAL_STATICPTR :: Module
+gHC_INTERNAL_STATICPTR = mkGhcInternalModule (fsLit "GHC.Internal.StaticPtr")
 
-gHC_RECORDS :: Module
-gHC_RECORDS = mkGhcInternalModule (fsLit "GHC.Records")
+gHC_INTERNAL_STATICPTR_INTERNAL :: Module
+gHC_INTERNAL_STATICPTR_INTERNAL = mkGhcInternalModule (fsLit "GHC.Internal.StaticPtr.Internal")
+
+gHC_INTERNAL_FINGERPRINT_TYPE :: Module
+gHC_INTERNAL_FINGERPRINT_TYPE = mkGhcInternalModule (fsLit "GHC.Internal.Fingerprint.Type")
+
+gHC_INTERNAL_OVER_LABELS :: Module
+gHC_INTERNAL_OVER_LABELS = mkGhcInternalModule (fsLit "GHC.Internal.OverloadedLabels")
+
+gHC_INTERNAL_RECORDS :: Module
+gHC_INTERNAL_RECORDS = mkGhcInternalModule (fsLit "GHC.Internal.Records")
 
 rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
@@ -743,8 +745,8 @@ left_RDR                = nameRdrName leftDataConName
 right_RDR               = nameRdrName rightDataConName
 
 fromEnum_RDR, toEnum_RDR :: RdrName
-fromEnum_RDR            = varQual_RDR gHC_ENUM (fsLit "fromEnum")
-toEnum_RDR              = varQual_RDR gHC_ENUM (fsLit "toEnum")
+fromEnum_RDR            = varQual_RDR gHC_INTERNAL_ENUM (fsLit "fromEnum")
+toEnum_RDR              = varQual_RDR gHC_INTERNAL_ENUM (fsLit "toEnum")
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR            = nameRdrName enumFromName
@@ -753,11 +755,11 @@ enumFromThen_RDR        = nameRdrName enumFromThenName
 enumFromThenTo_RDR      = nameRdrName enumFromThenToName
 
 times_RDR, plus_RDR :: RdrName
-times_RDR               = varQual_RDR  gHC_NUM (fsLit "*")
-plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
+times_RDR               = varQual_RDR  gHC_INTERNAL_NUM (fsLit "*")
+plus_RDR                = varQual_RDR gHC_INTERNAL_NUM (fsLit "+")
 
 compose_RDR :: RdrName
-compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
+compose_RDR             = varQual_RDR gHC_INTERNAL_BASE (fsLit ".")
 
 not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     and_RDR, range_RDR, inRange_RDR, index_RDR,
@@ -765,56 +767,56 @@ not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
 and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
 not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
 dataToTag_RDR           = varQual_RDR gHC_MAGIC (fsLit "dataToTag#")
-succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
-pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
-minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
-maxBound_RDR            = varQual_RDR gHC_ENUM (fsLit "maxBound")
-range_RDR               = varQual_RDR gHC_IX (fsLit "range")
-inRange_RDR             = varQual_RDR gHC_IX (fsLit "inRange")
-index_RDR               = varQual_RDR gHC_IX (fsLit "index")
-unsafeIndex_RDR         = varQual_RDR gHC_IX (fsLit "unsafeIndex")
-unsafeRangeSize_RDR     = varQual_RDR gHC_IX (fsLit "unsafeRangeSize")
+succ_RDR                = varQual_RDR gHC_INTERNAL_ENUM (fsLit "succ")
+pred_RDR                = varQual_RDR gHC_INTERNAL_ENUM (fsLit "pred")
+minBound_RDR            = varQual_RDR gHC_INTERNAL_ENUM (fsLit "minBound")
+maxBound_RDR            = varQual_RDR gHC_INTERNAL_ENUM (fsLit "maxBound")
+range_RDR               = varQual_RDR gHC_INTERNAL_IX (fsLit "range")
+inRange_RDR             = varQual_RDR gHC_INTERNAL_IX (fsLit "inRange")
+index_RDR               = varQual_RDR gHC_INTERNAL_IX (fsLit "index")
+unsafeIndex_RDR         = varQual_RDR gHC_INTERNAL_IX (fsLit "unsafeIndex")
+unsafeRangeSize_RDR     = varQual_RDR gHC_INTERNAL_IX (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
     readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
-readList_RDR            = varQual_RDR gHC_READ (fsLit "readList")
-readListDefault_RDR     = varQual_RDR gHC_READ (fsLit "readListDefault")
-readListPrec_RDR        = varQual_RDR gHC_READ (fsLit "readListPrec")
-readListPrecDefault_RDR = varQual_RDR gHC_READ (fsLit "readListPrecDefault")
-readPrec_RDR            = varQual_RDR gHC_READ (fsLit "readPrec")
-parens_RDR              = varQual_RDR gHC_READ (fsLit "parens")
-choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
-lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
-expectP_RDR             = varQual_RDR gHC_READ (fsLit "expectP")
+readList_RDR            = varQual_RDR gHC_INTERNAL_READ (fsLit "readList")
+readListDefault_RDR     = varQual_RDR gHC_INTERNAL_READ (fsLit "readListDefault")
+readListPrec_RDR        = varQual_RDR gHC_INTERNAL_READ (fsLit "readListPrec")
+readListPrecDefault_RDR = varQual_RDR gHC_INTERNAL_READ (fsLit "readListPrecDefault")
+readPrec_RDR            = varQual_RDR gHC_INTERNAL_READ (fsLit "readPrec")
+parens_RDR              = varQual_RDR gHC_INTERNAL_READ (fsLit "parens")
+choose_RDR              = varQual_RDR gHC_INTERNAL_READ (fsLit "choose")
+lexP_RDR                = varQual_RDR gHC_INTERNAL_READ (fsLit "lexP")
+expectP_RDR             = varQual_RDR gHC_INTERNAL_READ (fsLit "expectP")
 
 readField_RDR, readFieldHash_RDR, readSymField_RDR :: RdrName
-readField_RDR           = varQual_RDR gHC_READ (fsLit "readField")
-readFieldHash_RDR       = varQual_RDR gHC_READ (fsLit "readFieldHash")
-readSymField_RDR        = varQual_RDR gHC_READ (fsLit "readSymField")
+readField_RDR           = varQual_RDR gHC_INTERNAL_READ (fsLit "readField")
+readFieldHash_RDR       = varQual_RDR gHC_INTERNAL_READ (fsLit "readFieldHash")
+readSymField_RDR        = varQual_RDR gHC_INTERNAL_READ (fsLit "readSymField")
 
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
-punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
-ident_RDR               = dataQual_RDR lEX (fsLit "Ident")
-symbol_RDR              = dataQual_RDR lEX (fsLit "Symbol")
+punc_RDR                = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Punc")
+ident_RDR               = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Ident")
+symbol_RDR              = dataQual_RDR gHC_INTERNAL_LEX (fsLit "Symbol")
 
 step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: RdrName
-step_RDR                = varQual_RDR  rEAD_PREC (fsLit "step")
-alt_RDR                 = varQual_RDR  rEAD_PREC (fsLit "+++")
-reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
-prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
-pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
+step_RDR                = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "step")
+alt_RDR                 = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "+++")
+reset_RDR               = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "reset")
+prec_RDR                = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "prec")
+pfail_RDR               = varQual_RDR  gHC_INTERNAL_READ_PREC (fsLit "pfail")
 
 showsPrec_RDR, shows_RDR, showString_RDR,
     showSpace_RDR, showCommaSpace_RDR, showParen_RDR :: RdrName
-showsPrec_RDR           = varQual_RDR gHC_SHOW (fsLit "showsPrec")
-shows_RDR               = varQual_RDR gHC_SHOW (fsLit "shows")
-showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
-showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
-showCommaSpace_RDR      = varQual_RDR gHC_SHOW (fsLit "showCommaSpace")
-showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
+showsPrec_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showsPrec")
+shows_RDR               = varQual_RDR gHC_INTERNAL_SHOW (fsLit "shows")
+showString_RDR          = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showString")
+showSpace_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showSpace")
+showCommaSpace_RDR      = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showCommaSpace")
+showParen_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showParen")
 
 error_RDR :: RdrName
-error_RDR = varQual_RDR gHC_ERR (fsLit "error")
+error_RDR = varQual_RDR gHC_INTERNAL_ERR (fsLit "error")
 
 -- Generics (constructors and functions)
 u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
@@ -831,70 +833,70 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   uAddrHash_RDR, uCharHash_RDR, uDoubleHash_RDR,
   uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: RdrName
 
-u1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "U1")
-par1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Par1")
-rec1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Rec1")
-k1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "K1")
-m1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "M1")
+u1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "U1")
+par1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Par1")
+rec1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Rec1")
+k1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "K1")
+m1DataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "M1")
 
-l1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "L1")
-r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
+l1DataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "L1")
+r1DataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "R1")
 
-prodDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
-comp1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Comp1")
+prodDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit ":*:")
+comp1DataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Comp1")
 
-unPar1_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "Par1")  (fsLit "unPar1")
-unRec1_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "Rec1")  (fsLit "unRec1")
-unK1_RDR    = fieldQual_RDR gHC_GENERICS (fsLit "K1")    (fsLit "unK1")
-unComp1_RDR = fieldQual_RDR gHC_GENERICS (fsLit "Comp1") (fsLit "unComp1")
+unPar1_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Par1")  (fsLit "unPar1")
+unRec1_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Rec1")  (fsLit "unRec1")
+unK1_RDR    = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "K1")    (fsLit "unK1")
+unComp1_RDR = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "Comp1") (fsLit "unComp1")
 
-from_RDR  = varQual_RDR gHC_GENERICS (fsLit "from")
-from1_RDR = varQual_RDR gHC_GENERICS (fsLit "from1")
-to_RDR    = varQual_RDR gHC_GENERICS (fsLit "to")
-to1_RDR   = varQual_RDR gHC_GENERICS (fsLit "to1")
+from_RDR  = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "from")
+from1_RDR = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "from1")
+to_RDR    = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "to")
+to1_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "to1")
 
-datatypeName_RDR  = varQual_RDR gHC_GENERICS (fsLit "datatypeName")
-moduleName_RDR    = varQual_RDR gHC_GENERICS (fsLit "moduleName")
-packageName_RDR   = varQual_RDR gHC_GENERICS (fsLit "packageName")
-isNewtypeName_RDR = varQual_RDR gHC_GENERICS (fsLit "isNewtype")
-selName_RDR       = varQual_RDR gHC_GENERICS (fsLit "selName")
-conName_RDR       = varQual_RDR gHC_GENERICS (fsLit "conName")
-conFixity_RDR     = varQual_RDR gHC_GENERICS (fsLit "conFixity")
-conIsRecord_RDR   = varQual_RDR gHC_GENERICS (fsLit "conIsRecord")
+datatypeName_RDR  = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "datatypeName")
+moduleName_RDR    = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "moduleName")
+packageName_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "packageName")
+isNewtypeName_RDR = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "isNewtype")
+selName_RDR       = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "selName")
+conName_RDR       = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conName")
+conFixity_RDR     = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conFixity")
+conIsRecord_RDR   = varQual_RDR gHC_INTERNAL_GENERICS (fsLit "conIsRecord")
 
-prefixDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Prefix")
-infixDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Infix")
+prefixDataCon_RDR     = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Prefix")
+infixDataCon_RDR      = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "Infix")
 leftAssocDataCon_RDR  = nameRdrName leftAssociativeDataConName
 rightAssocDataCon_RDR = nameRdrName rightAssociativeDataConName
 notAssocDataCon_RDR   = nameRdrName notAssociativeDataConName
 
-uAddrDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UAddr")
-uCharDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UChar")
-uDoubleDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "UDouble")
-uFloatDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "UFloat")
-uIntDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "UInt")
-uWordDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UWord")
+uAddrDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UAddr")
+uCharDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UChar")
+uDoubleDataCon_RDR = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UDouble")
+uFloatDataCon_RDR  = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UFloat")
+uIntDataCon_RDR    = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UInt")
+uWordDataCon_RDR   = dataQual_RDR gHC_INTERNAL_GENERICS (fsLit "UWord")
 
-uAddrHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UAddr")   (fsLit "uAddr#")
-uCharHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UChar")   (fsLit "uChar#")
-uDoubleHash_RDR = fieldQual_RDR gHC_GENERICS (fsLit "UDouble") (fsLit "uDouble#")
-uFloatHash_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "UFloat")  (fsLit "uFloat#")
-uIntHash_RDR    = fieldQual_RDR gHC_GENERICS (fsLit "UInt")    (fsLit "uInt#")
-uWordHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UWord")   (fsLit "uWord#")
+uAddrHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UAddr")   (fsLit "uAddr#")
+uCharHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UChar")   (fsLit "uChar#")
+uDoubleHash_RDR = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UDouble") (fsLit "uDouble#")
+uFloatHash_RDR  = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UFloat")  (fsLit "uFloat#")
+uIntHash_RDR    = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UInt")    (fsLit "uInt#")
+uWordHash_RDR   = fieldQual_RDR gHC_INTERNAL_GENERICS (fsLit "UWord")   (fsLit "uWord#")
 
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
 fmap_RDR                = nameRdrName fmapName
-replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
+replace_RDR             = varQual_RDR gHC_INTERNAL_BASE (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
-liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")
-foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
-foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
-null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
-all_RDR                 = varQual_RDR dATA_FOLDABLE       (fsLit "all")
-traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
+liftA2_RDR              = varQual_RDR gHC_INTERNAL_BASE (fsLit "liftA2")
+foldable_foldr_RDR      = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "foldr")
+foldMap_RDR             = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "foldMap")
+null_RDR                = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "null")
+all_RDR                 = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "all")
+traverse_RDR            = varQual_RDR gHC_INTERNAL_DATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = nameRdrName memptyName
 mappend_RDR             = nameRdrName mappendName
 
@@ -925,7 +927,7 @@ wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
 runMainIOName, runRWName :: Name
-runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
+runMainIOName = varQual gHC_INTERNAL_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
@@ -938,12 +940,12 @@ specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
-eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
-leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
-rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
+eitherTyConName   = tcQual  gHC_INTERNAL_DATA_EITHER (fsLit "Either") eitherTyConKey
+leftDataConName   = dcQual gHC_INTERNAL_DATA_EITHER (fsLit "Left")   leftDataConKey
+rightDataConName  = dcQual gHC_INTERNAL_DATA_EITHER (fsLit "Right")  rightDataConKey
 
 voidTyConName :: Name
-voidTyConName = tcQual gHC_BASE (fsLit "Void") voidTyConKey
+voidTyConName = tcQual gHC_INTERNAL_BASE (fsLit "Void") voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -962,57 +964,57 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
   metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
 
-v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
-u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
-par1TyConName  = tcQual gHC_GENERICS (fsLit "Par1") par1TyConKey
-rec1TyConName  = tcQual gHC_GENERICS (fsLit "Rec1") rec1TyConKey
-k1TyConName  = tcQual gHC_GENERICS (fsLit "K1") k1TyConKey
-m1TyConName  = tcQual gHC_GENERICS (fsLit "M1") m1TyConKey
+v1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "V1") v1TyConKey
+u1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "U1") u1TyConKey
+par1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Par1") par1TyConKey
+rec1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rec1") rec1TyConKey
+k1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "K1") k1TyConKey
+m1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "M1") m1TyConKey
 
-sumTyConName    = tcQual gHC_GENERICS (fsLit ":+:") sumTyConKey
-prodTyConName   = tcQual gHC_GENERICS (fsLit ":*:") prodTyConKey
-compTyConName   = tcQual gHC_GENERICS (fsLit ":.:") compTyConKey
+sumTyConName    = tcQual gHC_INTERNAL_GENERICS (fsLit ":+:") sumTyConKey
+prodTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit ":*:") prodTyConKey
+compTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit ":.:") compTyConKey
 
-rTyConName  = tcQual gHC_GENERICS (fsLit "R") rTyConKey
-dTyConName  = tcQual gHC_GENERICS (fsLit "D") dTyConKey
-cTyConName  = tcQual gHC_GENERICS (fsLit "C") cTyConKey
-sTyConName  = tcQual gHC_GENERICS (fsLit "S") sTyConKey
+rTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "R") rTyConKey
+dTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "D") dTyConKey
+cTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "C") cTyConKey
+sTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "S") sTyConKey
 
-rec0TyConName  = tcQual gHC_GENERICS (fsLit "Rec0") rec0TyConKey
-d1TyConName  = tcQual gHC_GENERICS (fsLit "D1") d1TyConKey
-c1TyConName  = tcQual gHC_GENERICS (fsLit "C1") c1TyConKey
-s1TyConName  = tcQual gHC_GENERICS (fsLit "S1") s1TyConKey
+rec0TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rec0") rec0TyConKey
+d1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "D1") d1TyConKey
+c1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "C1") c1TyConKey
+s1TyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "S1") s1TyConKey
 
-repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
-rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
+repTyConName  = tcQual gHC_INTERNAL_GENERICS (fsLit "Rep")  repTyConKey
+rep1TyConName = tcQual gHC_INTERNAL_GENERICS (fsLit "Rep1") rep1TyConKey
 
-uRecTyConName      = tcQual gHC_GENERICS (fsLit "URec") uRecTyConKey
-uAddrTyConName     = tcQual gHC_GENERICS (fsLit "UAddr") uAddrTyConKey
-uCharTyConName     = tcQual gHC_GENERICS (fsLit "UChar") uCharTyConKey
-uDoubleTyConName   = tcQual gHC_GENERICS (fsLit "UDouble") uDoubleTyConKey
-uFloatTyConName    = tcQual gHC_GENERICS (fsLit "UFloat") uFloatTyConKey
-uIntTyConName      = tcQual gHC_GENERICS (fsLit "UInt") uIntTyConKey
-uWordTyConName     = tcQual gHC_GENERICS (fsLit "UWord") uWordTyConKey
+uRecTyConName      = tcQual gHC_INTERNAL_GENERICS (fsLit "URec") uRecTyConKey
+uAddrTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UAddr") uAddrTyConKey
+uCharTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UChar") uCharTyConKey
+uDoubleTyConName   = tcQual gHC_INTERNAL_GENERICS (fsLit "UDouble") uDoubleTyConKey
+uFloatTyConName    = tcQual gHC_INTERNAL_GENERICS (fsLit "UFloat") uFloatTyConKey
+uIntTyConName      = tcQual gHC_INTERNAL_GENERICS (fsLit "UInt") uIntTyConKey
+uWordTyConName     = tcQual gHC_INTERNAL_GENERICS (fsLit "UWord") uWordTyConKey
 
-prefixIDataConName = dcQual gHC_GENERICS (fsLit "PrefixI")  prefixIDataConKey
-infixIDataConName  = dcQual gHC_GENERICS (fsLit "InfixI")   infixIDataConKey
-leftAssociativeDataConName  = dcQual gHC_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
-rightAssociativeDataConName = dcQual gHC_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
-notAssociativeDataConName   = dcQual gHC_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
+prefixIDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "PrefixI")  prefixIDataConKey
+infixIDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "InfixI")   infixIDataConKey
+leftAssociativeDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
+rightAssociativeDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
+notAssociativeDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
 
-sourceUnpackDataConName         = dcQual gHC_GENERICS (fsLit "SourceUnpack")         sourceUnpackDataConKey
-sourceNoUnpackDataConName       = dcQual gHC_GENERICS (fsLit "SourceNoUnpack")       sourceNoUnpackDataConKey
-noSourceUnpackednessDataConName = dcQual gHC_GENERICS (fsLit "NoSourceUnpackedness") noSourceUnpackednessDataConKey
-sourceLazyDataConName           = dcQual gHC_GENERICS (fsLit "SourceLazy")           sourceLazyDataConKey
-sourceStrictDataConName         = dcQual gHC_GENERICS (fsLit "SourceStrict")         sourceStrictDataConKey
-noSourceStrictnessDataConName   = dcQual gHC_GENERICS (fsLit "NoSourceStrictness")   noSourceStrictnessDataConKey
-decidedLazyDataConName          = dcQual gHC_GENERICS (fsLit "DecidedLazy")          decidedLazyDataConKey
-decidedStrictDataConName        = dcQual gHC_GENERICS (fsLit "DecidedStrict")        decidedStrictDataConKey
-decidedUnpackDataConName        = dcQual gHC_GENERICS (fsLit "DecidedUnpack")        decidedUnpackDataConKey
+sourceUnpackDataConName         = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceUnpack")         sourceUnpackDataConKey
+sourceNoUnpackDataConName       = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceNoUnpack")       sourceNoUnpackDataConKey
+noSourceUnpackednessDataConName = dcQual gHC_INTERNAL_GENERICS (fsLit "NoSourceUnpackedness") noSourceUnpackednessDataConKey
+sourceLazyDataConName           = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceLazy")           sourceLazyDataConKey
+sourceStrictDataConName         = dcQual gHC_INTERNAL_GENERICS (fsLit "SourceStrict")         sourceStrictDataConKey
+noSourceStrictnessDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "NoSourceStrictness")   noSourceStrictnessDataConKey
+decidedLazyDataConName          = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedLazy")          decidedLazyDataConKey
+decidedStrictDataConName        = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedStrict")        decidedStrictDataConKey
+decidedUnpackDataConName        = dcQual gHC_INTERNAL_GENERICS (fsLit "DecidedUnpack")        decidedUnpackDataConKey
 
-metaDataDataConName  = dcQual gHC_GENERICS (fsLit "MetaData")  metaDataDataConKey
-metaConsDataConName  = dcQual gHC_GENERICS (fsLit "MetaCons")  metaConsDataConKey
-metaSelDataConName   = dcQual gHC_GENERICS (fsLit "MetaSel")   metaSelDataConKey
+metaDataDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaData")  metaDataDataConKey
+metaConsDataConName  = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaCons")  metaConsDataConKey
+metaSelDataConName   = dcQual gHC_INTERNAL_GENERICS (fsLit "MetaSel")   metaSelDataConKey
 
 -- Primitive Int
 divIntName, modIntName :: Name
@@ -1025,7 +1027,7 @@ unpackCStringName, unpackCStringFoldrName,
     unpackCStringAppendName, unpackCStringAppendUtf8Name,
     eqStringName, cstringLengthName :: Name
 cstringLengthName       = varQual gHC_CSTRING (fsLit "cstringLength#") cstringLengthIdKey
-eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+eqStringName            = varQual gHC_INTERNAL_BASE (fsLit "eqString")  eqStringIdKey
 
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
@@ -1046,50 +1048,50 @@ eqClassName       = clsQual gHC_CLASSES (fsLit "Eq")      eqClassKey
 eqName            = varQual gHC_CLASSES (fsLit "==")      eqClassOpKey
 ordClassName      = clsQual gHC_CLASSES (fsLit "Ord")     ordClassKey
 geName            = varQual gHC_CLASSES (fsLit ">=")      geClassOpKey
-functorClassName  = clsQual gHC_BASE    (fsLit "Functor") functorClassKey
-fmapName          = varQual gHC_BASE    (fsLit "fmap")    fmapClassOpKey
+functorClassName  = clsQual gHC_INTERNAL_BASE    (fsLit "Functor") functorClassKey
+fmapName          = varQual gHC_INTERNAL_BASE    (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName :: Name
-monadClassName     = clsQual gHC_BASE (fsLit "Monad")  monadClassKey
-thenMName          = varQual gHC_BASE (fsLit ">>")     thenMClassOpKey
-bindMName          = varQual gHC_BASE (fsLit ">>=")    bindMClassOpKey
-returnMName        = varQual gHC_BASE (fsLit "return") returnMClassOpKey
+monadClassName     = clsQual gHC_INTERNAL_BASE (fsLit "Monad")  monadClassKey
+thenMName          = varQual gHC_INTERNAL_BASE (fsLit ">>")     thenMClassOpKey
+bindMName          = varQual gHC_INTERNAL_BASE (fsLit ">>=")    bindMClassOpKey
+returnMName        = varQual gHC_INTERNAL_BASE (fsLit "return") returnMClassOpKey
 
 -- Class MonadFail
 monadFailClassName, failMName :: Name
-monadFailClassName = clsQual mONAD_FAIL (fsLit "MonadFail") monadFailClassKey
-failMName          = varQual mONAD_FAIL (fsLit "fail")      failMClassOpKey
+monadFailClassName = clsQual gHC_INTERNAL_MONAD_FAIL (fsLit "MonadFail") monadFailClassKey
+failMName          = varQual gHC_INTERNAL_MONAD_FAIL (fsLit "fail")      failMClassOpKey
 
 -- Class Applicative
 applicativeClassName, pureAName, apAName, thenAName :: Name
-applicativeClassName = clsQual gHC_BASE (fsLit "Applicative") applicativeClassKey
-apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
-thenAName            = varQual gHC_BASE (fsLit "*>")          thenAClassOpKey
+applicativeClassName = clsQual gHC_INTERNAL_BASE (fsLit "Applicative") applicativeClassKey
+apAName              = varQual gHC_INTERNAL_BASE (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual gHC_INTERNAL_BASE (fsLit "pure")        pureAClassOpKey
+thenAName            = varQual gHC_INTERNAL_BASE (fsLit "*>")          thenAClassOpKey
 
 -- Classes (Foldable, Traversable)
 foldableClassName, traversableClassName :: Name
-foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
-traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
+foldableClassName     = clsQual  gHC_INTERNAL_DATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
+traversableClassName  = clsQual  gHC_INTERNAL_DATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
 
 -- Classes (Semigroup, Monoid)
 semigroupClassName, sappendName :: Name
-semigroupClassName = clsQual gHC_BASE       (fsLit "Semigroup") semigroupClassKey
-sappendName        = varQual gHC_BASE       (fsLit "<>")        sappendClassOpKey
+semigroupClassName = clsQual gHC_INTERNAL_BASE       (fsLit "Semigroup") semigroupClassKey
+sappendName        = varQual gHC_INTERNAL_BASE       (fsLit "<>")        sappendClassOpKey
 monoidClassName, memptyName, mappendName, mconcatName :: Name
-monoidClassName    = clsQual gHC_BASE       (fsLit "Monoid")    monoidClassKey
-memptyName         = varQual gHC_BASE       (fsLit "mempty")    memptyClassOpKey
-mappendName        = varQual gHC_BASE       (fsLit "mappend")   mappendClassOpKey
-mconcatName        = varQual gHC_BASE       (fsLit "mconcat")   mconcatClassOpKey
+monoidClassName    = clsQual gHC_INTERNAL_BASE       (fsLit "Monoid")    monoidClassKey
+memptyName         = varQual gHC_INTERNAL_BASE       (fsLit "mempty")    memptyClassOpKey
+mappendName        = varQual gHC_INTERNAL_BASE       (fsLit "mappend")   mappendClassOpKey
+mconcatName        = varQual gHC_INTERNAL_BASE       (fsLit "mconcat")   mconcatClassOpKey
 
 
 
 -- AMP additions
 
 joinMName, alternativeClassName :: Name
-joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
-alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
+joinMName            = varQual gHC_INTERNAL_BASE (fsLit "join")        joinMIdKey
+alternativeClassName = clsQual gHC_INTERNAL_MONAD (fsLit "Alternative") alternativeClassKey
 
 --
 joinMIdKey, apAClassOpKey, pureAClassOpKey, thenAClassOpKey,
@@ -1103,28 +1105,28 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 -- Functions for GHC extensions
 considerAccessibleName :: Name
-considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
+considerAccessibleName = varQual gHC_INTERNAL_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
 
--- Random GHC.Base functions
+-- Random GHC.Internal.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
     dollarName :: Name
-dollarName        = varQual gHC_BASE (fsLit "$")          dollarIdKey
-otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
-foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
-buildName         = varQual gHC_BASE (fsLit "build")      buildIdKey
-augmentName       = varQual gHC_BASE (fsLit "augment")    augmentIdKey
-mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
-appendName        = varQual gHC_BASE (fsLit "++")         appendIdKey
-assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
-fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
+dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
+otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
+foldrName         = varQual gHC_INTERNAL_BASE (fsLit "foldr")      foldrIdKey
+buildName         = varQual gHC_INTERNAL_BASE (fsLit "build")      buildIdKey
+augmentName       = varQual gHC_INTERNAL_BASE (fsLit "augment")    augmentIdKey
+mapName           = varQual gHC_INTERNAL_BASE (fsLit "map")        mapIdKey
+appendName        = varQual gHC_INTERNAL_BASE (fsLit "++")         appendIdKey
+assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
+fromStringName    = varQual gHC_INTERNAL_DATA_STRING (fsLit "fromString") fromStringClassOpKey
 
--- Module GHC.Num
+-- Module GHC.Internal.Num
 numClassName, fromIntegerName, minusName, negateName :: Name
-numClassName      = clsQual gHC_NUM (fsLit "Num")         numClassKey
-fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
-minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
-negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
+numClassName      = clsQual gHC_INTERNAL_NUM (fsLit "Num")         numClassKey
+fromIntegerName   = varQual gHC_INTERNAL_NUM (fsLit "fromInteger") fromIntegerClassOpKey
+minusName         = varQual gHC_INTERNAL_NUM (fsLit "-")           minusClassOpKey
+negateName        = varQual gHC_INTERNAL_NUM (fsLit "negate")      negateClassOpKey
 
 ---------------------------------
 -- ghc-bignum
@@ -1196,9 +1198,9 @@ integerFromNaturalName
    :: Name
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
-bnbVarQual str key = varQual gHC_NUM_BIGNAT  (fsLit str) key
-bnnVarQual str key = varQual gHC_NUM_NATURAL (fsLit str) key
-bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
+bnbVarQual str key = varQual gHC_INTERNAL_NUM_BIGNAT  (fsLit str) key
+bnnVarQual str key = varQual gHC_INTERNAL_NUM_NATURAL (fsLit str) key
+bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 
 -- Types and DataCons
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
@@ -1274,44 +1276,44 @@ integerShiftRName         = bniVarQual "integerShiftR#"            integerShiftR
 -- End of ghc-bignum
 ---------------------------------
 
--- GHC.Real types and classes
+-- GHC.Internal.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
     realToFracName, mkRationalBase2Name, mkRationalBase10Name :: Name
-rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
-ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
-realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
-integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
-realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
-fractionalClassName = clsQual gHC_REAL (fsLit "Fractional")   fractionalClassKey
-fromRationalName    = varQual gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKey
-toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
-fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
-realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
-mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
-mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
--- GHC.Float classes
+rationalTyConName   = tcQual  gHC_INTERNAL_REAL (fsLit "Rational")     rationalTyConKey
+ratioTyConName      = tcQual  gHC_INTERNAL_REAL (fsLit "Ratio")        ratioTyConKey
+ratioDataConName    = dcQual  gHC_INTERNAL_REAL (fsLit ":%")           ratioDataConKey
+realClassName       = clsQual gHC_INTERNAL_REAL (fsLit "Real")         realClassKey
+integralClassName   = clsQual gHC_INTERNAL_REAL (fsLit "Integral")     integralClassKey
+realFracClassName   = clsQual gHC_INTERNAL_REAL (fsLit "RealFrac")     realFracClassKey
+fractionalClassName = clsQual gHC_INTERNAL_REAL (fsLit "Fractional")   fractionalClassKey
+fromRationalName    = varQual gHC_INTERNAL_REAL (fsLit "fromRational") fromRationalClassOpKey
+toIntegerName       = varQual gHC_INTERNAL_REAL (fsLit "toInteger")    toIntegerClassOpKey
+toRationalName      = varQual gHC_INTERNAL_REAL (fsLit "toRational")   toRationalClassOpKey
+fromIntegralName    = varQual  gHC_INTERNAL_REAL (fsLit "fromIntegral")fromIntegralIdKey
+realToFracName      = varQual  gHC_INTERNAL_REAL (fsLit "realToFrac")  realToFracIdKey
+mkRationalBase2Name  = varQual  gHC_INTERNAL_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
+mkRationalBase10Name = varQual  gHC_INTERNAL_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
+-- GHC.Internal.Float classes
 floatingClassName, realFloatClassName :: Name
-floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
-realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
+floatingClassName  = clsQual gHC_INTERNAL_FLOAT (fsLit "Floating")  floatingClassKey
+realFloatClassName = clsQual gHC_INTERNAL_FLOAT (fsLit "RealFloat") realFloatClassKey
 
--- other GHC.Float functions
+-- other GHC.Internal.Float functions
 integerToFloatName, integerToDoubleName,
   naturalToFloatName, naturalToDoubleName,
   rationalToFloatName, rationalToDoubleName :: Name
-integerToFloatName   = varQual gHC_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
-integerToDoubleName  = varQual gHC_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
-naturalToFloatName   = varQual gHC_FLOAT (fsLit "naturalToFloat#") naturalToFloatIdKey
-naturalToDoubleName  = varQual gHC_FLOAT (fsLit "naturalToDouble#") naturalToDoubleIdKey
-rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
-rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
+integerToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
+integerToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
+naturalToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "naturalToFloat#") naturalToFloatIdKey
+naturalToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "naturalToDouble#") naturalToDoubleIdKey
+rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
+rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
 -- Class Ix
 ixClassName :: Name
-ixClassName = clsQual gHC_IX (fsLit "Ix") ixClassKey
+ixClassName = clsQual gHC_INTERNAL_IX (fsLit "Ix") ixClassKey
 
 -- Typeable representation types
 trModuleTyConName
@@ -1373,18 +1375,18 @@ typeableClassName
   , typeCharTypeRepName
   , trGhcPrimModuleName
   :: Name
-typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
-typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
-someTypeRepTyConName   = tcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepTyConKey
-someTypeRepDataConName = dcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepDataConKey
-typeRepIdName         = varQual tYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
-mkTrTypeName          = varQual tYPEABLE_INTERNAL (fsLit "mkTrType")       mkTrTypeKey
-mkTrConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
-mkTrAppName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrAppKey
-mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
-typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
-typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
-typeCharTypeRepName   = varQual tYPEABLE_INTERNAL (fsLit "typeCharTypeRep") typeCharTypeRepKey
+typeableClassName     = clsQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
+typeRepTyConName      = tcQual  gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
+someTypeRepTyConName   = tcQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepTyConKey
+someTypeRepDataConName = dcQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepDataConKey
+typeRepIdName         = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
+mkTrTypeName          = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrType")       mkTrTypeKey
+mkTrConName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
+mkTrAppName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrAppKey
+mkTrFunName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
+typeNatTypeRepName    = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
+typeSymbolTypeRepName = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
+typeCharTypeRepName   = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeCharTypeRep") typeCharTypeRepKey
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
@@ -1402,7 +1404,7 @@ withDictClassName :: Name
 withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
 
 nonEmptyTyConName :: Name
-nonEmptyTyConName = tcQual gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey
+nonEmptyTyConName = tcQual gHC_INTERNAL_BASE (fsLit "NonEmpty") nonEmptyTyConKey
 
 -- DataToTag
 dataToTagClassName :: Name
@@ -1417,185 +1419,185 @@ errorMessageTypeErrorFamName
   :: Name
 
 errorMessageTypeErrorFamName =
-  tcQual gHC_TYPEERROR (fsLit "TypeError") errorMessageTypeErrorFamKey
+  tcQual gHC_INTERNAL_TYPEERROR (fsLit "TypeError") errorMessageTypeErrorFamKey
 
 typeErrorTextDataConName =
-  dcQual gHC_TYPEERROR (fsLit "Text") typeErrorTextDataConKey
+  dcQual gHC_INTERNAL_TYPEERROR (fsLit "Text") typeErrorTextDataConKey
 
 typeErrorAppendDataConName =
-  dcQual gHC_TYPEERROR (fsLit ":<>:") typeErrorAppendDataConKey
+  dcQual gHC_INTERNAL_TYPEERROR (fsLit ":<>:") typeErrorAppendDataConKey
 
 typeErrorVAppendDataConName =
-  dcQual gHC_TYPEERROR (fsLit ":$$:") typeErrorVAppendDataConKey
+  dcQual gHC_INTERNAL_TYPEERROR (fsLit ":$$:") typeErrorVAppendDataConKey
 
 typeErrorShowTypeDataConName =
-  dcQual gHC_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
+  dcQual gHC_INTERNAL_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- "Unsatisfiable" constraint
 unsatisfiableClassName, unsatisfiableIdName :: Name
 unsatisfiableClassName =
-  clsQual gHC_TYPEERROR (fsLit "Unsatisfiable") unsatisfiableClassNameKey
+  clsQual gHC_INTERNAL_TYPEERROR (fsLit "Unsatisfiable") unsatisfiableClassNameKey
 unsatisfiableIdName =
-  varQual gHC_TYPEERROR (fsLit "unsatisfiable") unsatisfiableIdNameKey
+  varQual gHC_INTERNAL_TYPEERROR (fsLit "unsatisfiable") unsatisfiableIdNameKey
 
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
   unsafeReflDataConName :: Name
-unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
-unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
-unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
-unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
+unsafeEqualityProofName = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
+unsafeEqualityTyConName = tcQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
+unsafeReflDataConName   = dcQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
+unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
 
 -- Dynamic
 toDynName :: Name
-toDynName = varQual dYNAMIC (fsLit "toDyn") toDynIdKey
+toDynName = varQual gHC_INTERNAL_DYNAMIC (fsLit "toDyn") toDynIdKey
 
 -- Class Data
 dataClassName :: Name
-dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
+dataClassName = clsQual gHC_INTERNAL_DATA_DATA (fsLit "Data") dataClassKey
 
 -- Error module
 assertErrorName    :: Name
-assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
+assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") assertErrorIdKey
 
--- Debug.Trace
+-- GHC.Internal.Debug.Trace
 traceName          :: Name
-traceName         = varQual dEBUG_TRACE (fsLit "trace") traceKey
+traceName         = varQual gHC_INTERNAL_DEBUG_TRACE (fsLit "trace") traceKey
 
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
     enumFromThenToName, boundedClassName :: Name
-enumClassName      = clsQual gHC_ENUM (fsLit "Enum")           enumClassKey
-enumFromName       = varQual gHC_ENUM (fsLit "enumFrom")       enumFromClassOpKey
-enumFromToName     = varQual gHC_ENUM (fsLit "enumFromTo")     enumFromToClassOpKey
-enumFromThenName   = varQual gHC_ENUM (fsLit "enumFromThen")   enumFromThenClassOpKey
-enumFromThenToName = varQual gHC_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
-boundedClassName   = clsQual gHC_ENUM (fsLit "Bounded")        boundedClassKey
+enumClassName      = clsQual gHC_INTERNAL_ENUM (fsLit "Enum")           enumClassKey
+enumFromName       = varQual gHC_INTERNAL_ENUM (fsLit "enumFrom")       enumFromClassOpKey
+enumFromToName     = varQual gHC_INTERNAL_ENUM (fsLit "enumFromTo")     enumFromToClassOpKey
+enumFromThenName   = varQual gHC_INTERNAL_ENUM (fsLit "enumFromThen")   enumFromThenClassOpKey
+enumFromThenToName = varQual gHC_INTERNAL_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
+boundedClassName   = clsQual gHC_INTERNAL_ENUM (fsLit "Bounded")        boundedClassKey
 
 -- List functions
 concatName, filterName, zipName :: Name
-concatName        = varQual gHC_LIST (fsLit "concat") concatIdKey
-filterName        = varQual gHC_LIST (fsLit "filter") filterIdKey
-zipName           = varQual gHC_LIST (fsLit "zip")    zipIdKey
+concatName        = varQual gHC_INTERNAL_LIST (fsLit "concat") concatIdKey
+filterName        = varQual gHC_INTERNAL_LIST (fsLit "filter") filterIdKey
+zipName           = varQual gHC_INTERNAL_LIST (fsLit "zip")    zipIdKey
 
 -- Overloaded lists
 isListClassName, fromListName, fromListNName, toListName :: Name
-isListClassName = clsQual gHC_IS_LIST (fsLit "IsList")    isListClassKey
-fromListName    = varQual gHC_IS_LIST (fsLit "fromList")  fromListClassOpKey
-fromListNName   = varQual gHC_IS_LIST (fsLit "fromListN") fromListNClassOpKey
-toListName      = varQual gHC_IS_LIST (fsLit "toList")    toListClassOpKey
+isListClassName = clsQual gHC_INTERNAL_IS_LIST (fsLit "IsList")    isListClassKey
+fromListName    = varQual gHC_INTERNAL_IS_LIST (fsLit "fromList")  fromListClassOpKey
+fromListNName   = varQual gHC_INTERNAL_IS_LIST (fsLit "fromListN") fromListNClassOpKey
+toListName      = varQual gHC_INTERNAL_IS_LIST (fsLit "toList")    toListClassOpKey
 
 -- HasField class ops
 getFieldName, setFieldName :: Name
-getFieldName   = varQual gHC_RECORDS (fsLit "getField") getFieldClassOpKey
-setFieldName   = varQual gHC_RECORDS (fsLit "setField") setFieldClassOpKey
+getFieldName   = varQual gHC_INTERNAL_RECORDS (fsLit "getField") getFieldClassOpKey
+setFieldName   = varQual gHC_INTERNAL_RECORDS (fsLit "setField") setFieldClassOpKey
 
 -- Class Show
 showClassName :: Name
-showClassName   = clsQual gHC_SHOW (fsLit "Show")      showClassKey
+showClassName   = clsQual gHC_INTERNAL_SHOW (fsLit "Show")      showClassKey
 
 -- Class Read
 readClassName :: Name
-readClassName   = clsQual gHC_READ (fsLit "Read")      readClassKey
+readClassName   = clsQual gHC_INTERNAL_READ (fsLit "Read")      readClassKey
 
 -- Classes Generic and Generic1, Datatype, Constructor and Selector
 genClassName, gen1ClassName, datatypeClassName, constructorClassName,
   selectorClassName :: Name
-genClassName  = clsQual gHC_GENERICS (fsLit "Generic")  genClassKey
-gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
+genClassName  = clsQual gHC_INTERNAL_GENERICS (fsLit "Generic")  genClassKey
+gen1ClassName = clsQual gHC_INTERNAL_GENERICS (fsLit "Generic1") gen1ClassKey
 
-datatypeClassName    = clsQual gHC_GENERICS (fsLit "Datatype")    datatypeClassKey
-constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
-selectorClassName    = clsQual gHC_GENERICS (fsLit "Selector")    selectorClassKey
+datatypeClassName    = clsQual gHC_INTERNAL_GENERICS (fsLit "Datatype")    datatypeClassKey
+constructorClassName = clsQual gHC_INTERNAL_GENERICS (fsLit "Constructor") constructorClassKey
+selectorClassName    = clsQual gHC_INTERNAL_GENERICS (fsLit "Selector")    selectorClassKey
 
 genericClassNames :: [Name]
 genericClassNames = [genClassName, gen1ClassName]
 
 -- GHCi things
 ghciIoClassName, ghciStepIoMName :: Name
-ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
-ghciStepIoMName = varQual gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
+ghciIoClassName = clsQual gHC_INTERNAL_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
+ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
 
 -- IO things
 ioTyConName, ioDataConName,
   thenIOName, bindIOName, returnIOName, failIOName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
 ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
-thenIOName        = varQual gHC_BASE  (fsLit "thenIO")   thenIOIdKey
-bindIOName        = varQual gHC_BASE  (fsLit "bindIO")   bindIOIdKey
-returnIOName      = varQual gHC_BASE  (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_IO    (fsLit "failIO")   failIOIdKey
+thenIOName        = varQual gHC_INTERNAL_BASE  (fsLit "thenIO")   thenIOIdKey
+bindIOName        = varQual gHC_INTERNAL_BASE  (fsLit "bindIO")   bindIOIdKey
+returnIOName      = varQual gHC_INTERNAL_BASE  (fsLit "returnIO") returnIOIdKey
+failIOName        = varQual gHC_INTERNAL_IO    (fsLit "failIO")   failIOIdKey
 
 -- IO things
 printName :: Name
-printName         = varQual sYSTEM_IO (fsLit "print") printIdKey
+printName         = varQual gHC_INTERNAL_SYSTEM_IO (fsLit "print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
-int8TyConName     = tcQual gHC_INT  (fsLit "Int8")  int8TyConKey
-int16TyConName    = tcQual gHC_INT  (fsLit "Int16") int16TyConKey
-int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
-int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
+int8TyConName     = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
+int16TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int16") int16TyConKey
+int32TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int32") int32TyConKey
+int64TyConName    = tcQual gHC_INTERNAL_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
 word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
-word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
-word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
-word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
-word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
+word8TyConName    = tcQual  gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey
+word16TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word16") word16TyConKey
+word32TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word32") word32TyConKey
+word64TyConName   = tcQual  gHC_INTERNAL_WORD (fsLit "Word64") word64TyConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
-ptrTyConName      = tcQual   gHC_PTR (fsLit "Ptr")    ptrTyConKey
-funPtrTyConName   = tcQual   gHC_PTR (fsLit "FunPtr") funPtrTyConKey
+ptrTyConName      = tcQual   gHC_INTERNAL_PTR (fsLit "Ptr")    ptrTyConKey
+funPtrTyConName   = tcQual   gHC_INTERNAL_PTR (fsLit "FunPtr") funPtrTyConKey
 
 -- Foreign objects and weak pointers
 stablePtrTyConName, newStablePtrName :: Name
-stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr")    stablePtrTyConKey
-newStablePtrName      = varQual  gHC_STABLE (fsLit "newStablePtr") newStablePtrIdKey
+stablePtrTyConName    = tcQual   gHC_INTERNAL_STABLE (fsLit "StablePtr")    stablePtrTyConKey
+newStablePtrName      = varQual  gHC_INTERNAL_STABLE (fsLit "newStablePtr") newStablePtrIdKey
 
 -- Recursive-do notation
 monadFixClassName, mfixName :: Name
-monadFixClassName  = clsQual mONAD_FIX (fsLit "MonadFix") monadFixClassKey
-mfixName           = varQual mONAD_FIX (fsLit "mfix")     mfixIdKey
+monadFixClassName  = clsQual gHC_INTERNAL_MONAD_FIX (fsLit "MonadFix") monadFixClassKey
+mfixName           = varQual gHC_INTERNAL_MONAD_FIX (fsLit "mfix")     mfixIdKey
 
 -- Arrow notation
 arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: Name
-arrAName           = varQual aRROW (fsLit "arr")       arrAIdKey
-composeAName       = varQual gHC_DESUGAR (fsLit ">>>") composeAIdKey
-firstAName         = varQual aRROW (fsLit "first")     firstAIdKey
-appAName           = varQual aRROW (fsLit "app")       appAIdKey
-choiceAName        = varQual aRROW (fsLit "|||")       choiceAIdKey
-loopAName          = varQual aRROW (fsLit "loop")      loopAIdKey
+arrAName           = varQual gHC_INTERNAL_ARROW (fsLit "arr")       arrAIdKey
+composeAName       = varQual gHC_INTERNAL_DESUGAR (fsLit ">>>") composeAIdKey
+firstAName         = varQual gHC_INTERNAL_ARROW (fsLit "first")     firstAIdKey
+appAName           = varQual gHC_INTERNAL_ARROW (fsLit "app")       appAIdKey
+choiceAName        = varQual gHC_INTERNAL_ARROW (fsLit "|||")       choiceAIdKey
+loopAName          = varQual gHC_INTERNAL_ARROW (fsLit "loop")      loopAIdKey
 
 -- Monad comprehensions
 guardMName, liftMName, mzipName :: Name
-guardMName         = varQual mONAD (fsLit "guard")    guardMIdKey
-liftMName          = varQual mONAD (fsLit "liftM")    liftMIdKey
-mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
+guardMName         = varQual gHC_INTERNAL_MONAD (fsLit "guard")    guardMIdKey
+liftMName          = varQual gHC_INTERNAL_MONAD (fsLit "liftM")    liftMIdKey
+mzipName           = varQual cONTROL_MONAD_ZIP (fsLit "mzip") mzipIdKey
 
 
 -- Annotation type checking
 toAnnotationWrapperName :: Name
-toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
+toAnnotationWrapperName = varQual gHC_INTERNAL_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
 
 -- Other classes, needed for type defaulting
 monadPlusClassName, isStringClassName :: Name
-monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")      monadPlusClassKey
-isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
+monadPlusClassName  = clsQual gHC_INTERNAL_MONAD (fsLit "MonadPlus")      monadPlusClassKey
+isStringClassName   = clsQual gHC_INTERNAL_DATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals
 knownNatClassName :: Name
-knownNatClassName     = clsQual gHC_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
+knownNatClassName     = clsQual gHC_INTERNAL_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
 knownSymbolClassName :: Name
-knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
+knownSymbolClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
 knownCharClassName :: Name
-knownCharClassName  = clsQual gHC_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
+knownCharClassName  = clsQual gHC_INTERNAL_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
 
 -- Overloaded labels
 fromLabelClassOpName :: Name
 fromLabelClassOpName
- = varQual gHC_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
+ = varQual gHC_INTERNAL_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
 
 -- Implicit Parameters
 ipClassName :: Name
@@ -1605,19 +1607,19 @@ ipClassName
 -- Overloaded record fields
 hasFieldClassName :: Name
 hasFieldClassName
- = clsQual gHC_RECORDS (fsLit "HasField") hasFieldClassNameKey
+ = clsQual gHC_INTERNAL_RECORDS (fsLit "HasField") hasFieldClassNameKey
 
 -- Source Locations
 callStackTyConName, emptyCallStackName, pushCallStackName,
   srcLocDataConName :: Name
 callStackTyConName
-  = tcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
+  = tcQual gHC_INTERNAL_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 emptyCallStackName
-  = varQual gHC_STACK_TYPES (fsLit "emptyCallStack") emptyCallStackKey
+  = varQual gHC_INTERNAL_STACK_TYPES (fsLit "emptyCallStack") emptyCallStackKey
 pushCallStackName
-  = varQual gHC_STACK_TYPES (fsLit "pushCallStack") pushCallStackKey
+  = varQual gHC_INTERNAL_STACK_TYPES (fsLit "pushCallStack") pushCallStackKey
 srcLocDataConName
-  = dcQual gHC_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
+  = dcQual gHC_INTERNAL_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
 
 -- plugins
 pLUGINS :: Module
@@ -1630,35 +1632,35 @@ frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPlugin
 -- Static pointers
 makeStaticName :: Name
 makeStaticName =
-    varQual gHC_STATICPTR_INTERNAL (fsLit "makeStatic") makeStaticKey
+    varQual gHC_INTERNAL_STATICPTR_INTERNAL (fsLit "makeStatic") makeStaticKey
 
 staticPtrInfoTyConName :: Name
 staticPtrInfoTyConName =
-    tcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
+    tcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
 
 staticPtrInfoDataConName :: Name
 staticPtrInfoDataConName =
-    dcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
+    dcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
 
 staticPtrTyConName :: Name
 staticPtrTyConName =
-    tcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrTyConKey
+    tcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtr") staticPtrTyConKey
 
 staticPtrDataConName :: Name
 staticPtrDataConName =
-    dcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
+    dcQual gHC_INTERNAL_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
 
 fromStaticPtrName :: Name
 fromStaticPtrName =
-    varQual gHC_STATICPTR (fsLit "fromStaticPtr") fromStaticPtrClassOpKey
+    varQual gHC_INTERNAL_STATICPTR (fsLit "fromStaticPtr") fromStaticPtrClassOpKey
 
 fingerprintDataConName :: Name
 fingerprintDataConName =
-    dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
+    dcQual gHC_INTERNAL_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
 constPtrConName :: Name
 constPtrConName =
-    tcQual fOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
+    tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
 
 jsvalTyConName :: Name
 jsvalTyConName = tcQual (mkGhcInternalModule (fsLit "GHC.Wasm.Prim.Types")) (fsLit "JSVal") jsvalTyConKey

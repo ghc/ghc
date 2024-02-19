@@ -5,4 +5,4 @@ Main.funcToReify :: GHC.Classes.IP "z" GHC.Types.Int =>
 2
 f_0 :: (?x :: GHC.Types.Int) => GHC.Types.Int
 f_0 = let ?y = 2
-       in ?x GHC.Num.+ ?y
+       in ?x GHC.Internal.Num.+ ?y

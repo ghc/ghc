@@ -189,18 +189,18 @@ Note [Fast comparison for built-in Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this wired-in Name in GHC.Builtin.Names:
 
-   int8TyConName = tcQual gHC_INT  (fsLit "Int8")  int8TyConKey
+   int8TyConName = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
 
 Ultimately this turns into something like:
 
-   int8TyConName = Name gHC_INT (mkOccName ..."Int8") int8TyConKey
+   int8TyConName = Name gHC_INTERNAL_INT (mkOccName ..."Int8") int8TyConKey
 
 So a comparison like `x == int8TyConName` will turn into `getUnique x ==
 int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
 definition will look like:
 
    int8TyConName = case (mkOccName..."Int8") of occ ->
-                   Name gHC_INT occ int8TyConKey
+                   Name gHC_INTERNAL_INT occ int8TyConKey
 
 and now the comparison will not optimise.  This matters even more when there are
 numerous comparisons (see #19386):

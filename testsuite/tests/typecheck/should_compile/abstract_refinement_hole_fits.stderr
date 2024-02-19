@@ -8,8 +8,8 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
       Valid hole fits include
         f :: [Integer] -> Integer
         g :: [Integer] -> Integer
-        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
+        last :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
         maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
         minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
         product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
@@ -37,12 +37,12 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
                          (a -> b -> b) -> b -> t a -> b
         const (_ :: Integer)
           where const :: forall a b. a -> b -> a
-        curry (_ :: (t0, [Integer]) -> Integer) (_ :: t0)
-          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
-        (.) (_ :: b3 -> Integer) (_ :: [Integer] -> b3)
+        (.) (_ :: b1 -> Integer) (_ :: [Integer] -> b1)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         flip (_ :: [Integer] -> t0 -> Integer) (_ :: t0)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+        curry (_ :: (t0, [Integer]) -> Integer) (_ :: t0)
+          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: [Integer] -> Integer)
@@ -50,12 +50,16 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         id (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> [Integer] -> Integer]) (_ :: t0)
-          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where head :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         last (_ :: [t0 -> [Integer] -> Integer]) (_ :: t0)
-          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        fst (_ :: (t0 -> [Integer] -> Integer, b1)) (_ :: t0)
+          where last :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
+        fst (_ :: (t0 -> [Integer] -> Integer, b2)) (_ :: t0)
           where fst :: forall a b. (a, b) -> a
-        snd (_ :: (a2, t0 -> [Integer] -> Integer)) (_ :: t0)
+        snd (_ :: (a3, t0 -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
         return (_ :: Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
@@ -81,14 +85,14 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where (*>) :: forall (f :: * -> *) a b.
                         Applicative f =>
                         f a -> f b -> f b
-        (<$>) (_ :: a1 -> Integer) (_ :: [Integer] -> a1)
-          where (<$>) :: forall (f :: * -> *) a b.
-                         Functor f =>
-                         (a -> b) -> f a -> f b
-        (=<<) (_ :: a4 -> [Integer] -> Integer) (_ :: [Integer] -> a4)
+        (=<<) (_ :: a1 -> [Integer] -> Integer) (_ :: [Integer] -> a1)
           where (=<<) :: forall (m :: * -> *) a b.
                          Monad m =>
                          (a -> m b) -> m a -> m b
+        (<$>) (_ :: a2 -> Integer) (_ :: [Integer] -> a2)
+          where (<$>) :: forall (f :: * -> *) a b.
+                         Functor f =>
+                         (a -> b) -> f a -> f b
         (<*) (_ :: [Integer] -> Integer) (_ :: [Integer] -> b4)
           where (<*) :: forall (f :: * -> *) a b.
                         Applicative f =>
@@ -100,14 +104,18 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         id (_ :: [Integer] -> Integer)
           where id :: forall a. a -> a
         head (_ :: [[Integer] -> Integer])
-          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where head :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         last (_ :: [[Integer] -> Integer])
-          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where last :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         asTypeOf (_ :: [Integer] -> Integer) (_ :: [Integer] -> Integer)
           where asTypeOf :: forall a. a -> a -> a
         (!!) (_ :: [[Integer] -> Integer]) (_ :: Int)
           where (!!) :: forall a.
-                        GHC.Stack.Types.HasCallStack =>
+                        GHC.Internal.Stack.Types.HasCallStack =>
                         [a] -> Int -> a
         fst (_ :: ([Integer] -> Integer, b0))
           where fst :: forall a b. (a, b) -> a
@@ -115,7 +123,7 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where snd :: forall a b. (a, b) -> b
         const (_ :: [Integer] -> Integer) (_ :: t0)
           where const :: forall a b. a -> b -> a
-        uncurry (_ :: a3 -> b2 -> [Integer] -> Integer) (_ :: (a3, b2))
+        uncurry (_ :: a4 -> b3 -> [Integer] -> Integer) (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b
@@ -152,18 +160,18 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
                          (a -> b -> b) -> b -> t a -> b
-        curry (_ :: (Integer, [Integer]) -> Integer)
-          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         flip (_ :: [Integer] -> Integer -> Integer)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+        curry (_ :: (Integer, [Integer]) -> Integer)
+          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         const (_ :: [Integer] -> Integer)
           where const :: forall a b. a -> b -> a
-        curry (_ :: (t0, Integer) -> [Integer] -> Integer) (_ :: t0)
-          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
-        (.) (_ :: b3 -> [Integer] -> Integer) (_ :: Integer -> b3)
+        (.) (_ :: b1 -> [Integer] -> Integer) (_ :: Integer -> b1)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         flip (_ :: Integer -> t0 -> [Integer] -> Integer) (_ :: t0)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+        curry (_ :: (t0, Integer) -> [Integer] -> Integer) (_ :: t0)
+          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: Integer -> [Integer] -> Integer)
@@ -171,12 +179,16 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         id (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> Integer -> [Integer] -> Integer]) (_ :: t0)
-          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where head :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         last (_ :: [t0 -> Integer -> [Integer] -> Integer]) (_ :: t0)
-          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        fst (_ :: (t0 -> Integer -> [Integer] -> Integer, b1)) (_ :: t0)
+          where last :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
+        fst (_ :: (t0 -> Integer -> [Integer] -> Integer, b2)) (_ :: t0)
           where fst :: forall a b. (a, b) -> a
-        snd (_ :: (a2, t0 -> Integer -> [Integer] -> Integer)) (_ :: t0)
+        snd (_ :: (a3, t0 -> Integer -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
         return (_ :: [Integer] -> Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
@@ -204,15 +216,15 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where (*>) :: forall (f :: * -> *) a b.
                         Applicative f =>
                         f a -> f b -> f b
-        (<$>) (_ :: a1 -> [Integer] -> Integer) (_ :: Integer -> a1)
-          where (<$>) :: forall (f :: * -> *) a b.
-                         Functor f =>
-                         (a -> b) -> f a -> f b
-        (=<<) (_ :: a4 -> Integer -> [Integer] -> Integer)
-              (_ :: Integer -> a4)
+        (=<<) (_ :: a1 -> Integer -> [Integer] -> Integer)
+              (_ :: Integer -> a1)
           where (=<<) :: forall (m :: * -> *) a b.
                          Monad m =>
                          (a -> m b) -> m a -> m b
+        (<$>) (_ :: a2 -> [Integer] -> Integer) (_ :: Integer -> a2)
+          where (<$>) :: forall (f :: * -> *) a b.
+                         Functor f =>
+                         (a -> b) -> f a -> f b
         (<*) (_ :: Integer -> [Integer] -> Integer) (_ :: Integer -> b4)
           where (<*) :: forall (f :: * -> *) a b.
                         Applicative f =>
@@ -224,15 +236,19 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         id (_ :: Integer -> [Integer] -> Integer)
           where id :: forall a. a -> a
         head (_ :: [Integer -> [Integer] -> Integer])
-          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where head :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         last (_ :: [Integer -> [Integer] -> Integer])
-          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+          where last :: forall a.
+                        GHC.Internal.Stack.Types.HasCallStack =>
+                        [a] -> a
         asTypeOf (_ :: Integer -> [Integer] -> Integer)
                  (_ :: Integer -> [Integer] -> Integer)
           where asTypeOf :: forall a. a -> a -> a
         (!!) (_ :: [Integer -> [Integer] -> Integer]) (_ :: Int)
           where (!!) :: forall a.
-                        GHC.Stack.Types.HasCallStack =>
+                        GHC.Internal.Stack.Types.HasCallStack =>
                         [a] -> Int -> a
         fst (_ :: (Integer -> [Integer] -> Integer, b0))
           where fst :: forall a b. (a, b) -> a
@@ -240,8 +256,8 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where snd :: forall a b. (a, b) -> b
         const (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
           where const :: forall a b. a -> b -> a
-        uncurry (_ :: a3 -> b2 -> Integer -> [Integer] -> Integer)
-                (_ :: (a3, b2))
+        uncurry (_ :: a4 -> b3 -> Integer -> [Integer] -> Integer)
+                (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: Integer -> [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b

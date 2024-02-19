@@ -42,39 +42,39 @@ main :: IO ()
 main
   = >>
       @IO
-      GHC.Base.$fMonadIO
+      GHC.Internal.Base.$fMonadIO
       @()
       @()
       (putStrLn (unpackCString# "c"#))
       (>>
          @IO
-         GHC.Base.$fMonadIO
+         GHC.Internal.Base.$fMonadIO
          @()
          @()
          (putStrLn (unpackCString# "x"#))
          (>>
             @IO
-            GHC.Base.$fMonadIO
+            GHC.Internal.Base.$fMonadIO
             @()
             @()
             (putStrLn (unpackCString# "z"#))
             (>>
                @IO
-               GHC.Base.$fMonadIO
+               GHC.Internal.Base.$fMonadIO
                @()
                @()
                (putStrLn (unpackCString# "efg"#))
                (>>
                   @IO
-                  GHC.Base.$fMonadIO
+                  GHC.Internal.Base.$fMonadIO
                   @()
                   @()
-                  (case Control.Exception.Base.patError
+                  (case GHC.Internal.Control.Exception.Base.patError
                           @LiftedRep @() "T9400.hs:(17,5)-(18,29)|case"#
                    of {})
                   (>>
                      @IO
-                     GHC.Base.$fMonadIO
+                     GHC.Internal.Base.$fMonadIO
                      @()
                      @()
                      (putStrLn (unpackCStringUtf8# "abc"#))

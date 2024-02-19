@@ -11,25 +11,25 @@ T14884.hs:4:5: error: [GHC-88464]
                  (a -> m b) -> t a -> m ()
           with mapM_ @[] @IO @Char @()
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘Data.Foldable’))
+           (and originally defined in ‘GHC.Internal.Data.Foldable’))
         foldMap :: forall (t :: * -> *) m a.
                    (Foldable t, Monoid m) =>
                    (a -> m) -> t a -> m
           with foldMap @[] @(IO ()) @Char
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘Data.Foldable’))
+           (and originally defined in ‘GHC.Internal.Data.Foldable’))
         id :: forall a. a -> a
           with id @(String -> IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Internal.Base’))
         ($) :: forall a b. (a -> b) -> a -> b
           with ($) @GHC.Types.LiftedRep @GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Internal.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b
           with ($!) @GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Internal.Base’))
 
 T14884.hs:4:7: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’
@@ -37,8 +37,8 @@ T14884.hs:4:7: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
         instance (Show a, Show b) => Show (Either a b)
-          -- Defined in ‘Data.Either’
-        instance Show Ordering -- Defined in ‘GHC.Show’
+          -- Defined in ‘GHC.Internal.Data.Either’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
         ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

@@ -28,6 +28,7 @@ module System.CPUTime
     , cpuTimePrecision
     ) where
 
+import Prelude
 import System.IO.Unsafe (unsafePerformIO)
 
 -- Here is where we decide which backend to use

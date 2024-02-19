@@ -5,8 +5,8 @@ tcfail008.hs:3:5: error: [GHC-39999]
       Relevant bindings include o :: [a0] (bound at tcfail008.hs:3:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Num Integer -- Defined in ‘GHC.Num’
-        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
         ...plus three others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)

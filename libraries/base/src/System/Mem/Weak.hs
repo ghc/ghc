@@ -89,7 +89,8 @@ module System.Mem.Weak (
         -- $notes
    ) where
 
-import GHC.Weak
+import Prelude
+import GHC.Internal.Weak
 
 -- | A specialised version of 'mkWeak', where the key and the value are
 -- the same object:
@@ -107,7 +108,7 @@ mkWeakPtr key finalizer = mkWeak key key finalizer
 
   Note: adding a finalizer to a 'Foreign.ForeignPtr.ForeignPtr' using
   'addFinalizer' won't work; use the specialised version
-  'Foreign.ForeignPtr.addForeignPtrFinalizer' instead.  For discussion
+  'GHC.Internal.Foreign.ForeignPtr.addForeignPtrFinalizer' instead.  For discussion
   see the 'Weak' type.
 .
 -}

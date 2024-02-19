@@ -10,6 +10,8 @@ module System.CPUTime.Posix.ClockGetTime
     , getCpuTimePrecision
     ) where
 
+import Prelude
+
 #if _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 
 import Foreign

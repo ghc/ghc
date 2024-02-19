@@ -4,19 +4,20 @@ let {
   x :: [GHC.Types.Int]
   [LclId]
   x = let {
-        $dEnum :: GHC.Enum.Enum GHC.Types.Int
+        $dEnum :: GHC.Internal.Enum.Enum GHC.Types.Int
         [LclId]
-        $dEnum = GHC.Enum.$fEnumInt } in
+        $dEnum = GHC.Internal.Enum.$fEnumInt } in
       letrec {
         x :: [GHC.Types.Int]
         [LclId]
-        x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
+        x = GHC.Internal.Enum.enumFrom
+              @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x } in
-GHC.Base.returnIO
+GHC.Internal.Base.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
      @GHC.Types.Any
-     (Unsafe.Coerce.unsafeCoerce#
+     (GHC.Internal.Unsafe.Coerce.unsafeCoerce#
         @GHC.Types.LiftedRep
         @GHC.Types.LiftedRep
         @[GHC.Types.Int]
@@ -31,19 +32,20 @@ let {
   x :: [GHC.Types.Int]
   [LclId]
   x = let {
-        $dEnum :: GHC.Enum.Enum GHC.Types.Int
+        $dEnum :: GHC.Internal.Enum.Enum GHC.Types.Int
         [LclId]
-        $dEnum = GHC.Enum.$fEnumInt } in
+        $dEnum = GHC.Internal.Enum.$fEnumInt } in
       letrec {
         x :: [GHC.Types.Int]
         [LclId]
-        x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
+        x = GHC.Internal.Enum.enumFrom
+              @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x } in
-GHC.Base.returnIO
+GHC.Internal.Base.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
      @GHC.Types.Any
-     (Unsafe.Coerce.unsafeCoerce#
+     (GHC.Internal.Unsafe.Coerce.unsafeCoerce#
         @GHC.Types.LiftedRep
         @GHC.Types.LiftedRep
         @[GHC.Types.Int]

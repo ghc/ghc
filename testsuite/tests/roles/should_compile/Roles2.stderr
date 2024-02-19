@@ -6,7 +6,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.19.0.0, ghc-internal-0.1.0.0]
+Dependent packages: [base-4.19.0.0]
 
 ==================== Typechecker ====================
 Roles2.$tcT2
@@ -29,7 +29,8 @@ $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp GHC.Ptr.$tcFunPtr ((:) $krep [])
+  = GHC.Types.KindRepTyConApp
+      GHC.Internal.Ptr.$tcFunPtr ((:) $krep [])
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles2.$tcT2 ((:) $krep [])
 $krep [InlPrag=[~]]

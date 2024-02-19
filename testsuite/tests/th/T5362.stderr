@@ -1,4 +1,4 @@
 f_0 :: ()
-f_0 = GHC.Err.undefined g_1
+f_0 = GHC.Internal.Err.undefined g_1
 g_1 :: ()
-g_1 = GHC.Err.undefined
+g_1 = GHC.Internal.Err.undefined

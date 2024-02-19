@@ -377,7 +377,7 @@ coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "coercible_sel") coercib
 charTyConName, charDataConName, intTyConName, intDataConName, stringTyConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char")   charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#")     charDataConKey charDataCon
-stringTyConName   = mkWiredInTyConName   UserSyntax gHC_BASE  (fsLit "String") stringTyConKey stringTyCon
+stringTyConName   = mkWiredInTyConName   UserSyntax gHC_INTERNAL_BASE  (fsLit "String") stringTyConKey stringTyCon
 intTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int")    intTyConKey   intTyCon
 intDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#")     intDataConKey  intDataCon
 
@@ -392,17 +392,17 @@ nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") ni
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 maybeTyConName, nothingDataConName, justDataConName :: Name
-maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_MAYBE (fsLit "Maybe")
+maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_INTERNAL_MAYBE (fsLit "Maybe")
                                           maybeTyConKey maybeTyCon
-nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
+nothingDataConName = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "Nothing")
                                           nothingDataConKey nothingDataCon
-justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
+justDataConName    = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
 wordTyConName, wordDataConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
 wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
-word8DataConName   = mkWiredInDataConName UserSyntax gHC_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
+word8DataConName   = mkWiredInDataConName UserSyntax gHC_INTERNAL_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
 floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
@@ -883,7 +883,7 @@ isBuiltInOcc_maybe occ =
 
 isTupleTyOcc_maybe :: Module -> OccName -> Maybe Name
 isTupleTyOcc_maybe mod occ
-  | mod == gHC_TUPLE_PRIM
+  | mod == gHC_INTERNAL_TUPLE_PRIM
   = match_occ
   where
     match_occ
@@ -935,9 +935,9 @@ isPunOcc_maybe :: Module -> OccName -> Maybe Name
 isPunOcc_maybe mod occ
   | mod == gHC_TYPES, occ == occName listTyConName
   = Just listTyConName
-  | mod == gHC_TUPLE_PRIM, occ == occName unitTyConName
+  | mod == gHC_INTERNAL_TUPLE_PRIM, occ == occName unitTyConName
   = Just unitTyConName
-  | mod == gHC_TUPLE_PRIM
+  | mod == gHC_INTERNAL_TUPLE_PRIM
   = isTupleNTyOcc_maybe occ
 isPunOcc_maybe _ _ = Nothing
 
@@ -1122,7 +1122,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Boxed
-    modu    = gHC_TUPLE_PRIM
+    modu    = gHC_INTERNAL_TUPLE_PRIM
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
                          (ATyCon tycon) UserSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
@@ -2422,28 +2422,28 @@ integerTyConName
 integerTyConName
    = mkWiredInTyConName
       UserSyntax
-      gHC_NUM_INTEGER
+      gHC_INTERNAL_NUM_INTEGER
       (fsLit "Integer")
       integerTyConKey
       integerTyCon
 integerISDataConName
    = mkWiredInDataConName
       UserSyntax
-      gHC_NUM_INTEGER
+      gHC_INTERNAL_NUM_INTEGER
       (fsLit "IS")
       integerISDataConKey
       integerISDataCon
 integerIPDataConName
    = mkWiredInDataConName
       UserSyntax
-      gHC_NUM_INTEGER
+      gHC_INTERNAL_NUM_INTEGER
       (fsLit "IP")
       integerIPDataConKey
       integerIPDataCon
 integerINDataConName
    = mkWiredInDataConName
       UserSyntax
-      gHC_NUM_INTEGER
+      gHC_INTERNAL_NUM_INTEGER
       (fsLit "IN")
       integerINDataConKey
       integerINDataCon
@@ -2471,21 +2471,21 @@ naturalTyConName
 naturalTyConName
    = mkWiredInTyConName
       UserSyntax
-      gHC_NUM_NATURAL
+      gHC_INTERNAL_NUM_NATURAL
       (fsLit "Natural")
       naturalTyConKey
       naturalTyCon
 naturalNSDataConName
    = mkWiredInDataConName
       UserSyntax
-      gHC_NUM_NATURAL
+      gHC_INTERNAL_NUM_NATURAL
       (fsLit "NS")
       naturalNSDataConKey
       naturalNSDataCon
 naturalNBDataConName
    = mkWiredInDataConName
       UserSyntax
-      gHC_NUM_NATURAL
+      gHC_INTERNAL_NUM_NATURAL
       (fsLit "NB")
       naturalNBDataConKey
       naturalNBDataCon

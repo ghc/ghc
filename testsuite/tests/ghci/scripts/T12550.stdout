@@ -15,58 +15,63 @@ type Functor :: (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   ...
-  	-- Defined in ‘GHC.Base’
+  	-- Defined in ‘GHC.Internal.Base’
 Functor ∷ (★ → ★) → Constraint
 type Functor :: (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   (<$) ∷ ∀ a b. a → f b → f a
   {-# MINIMAL fmap #-}
-  	-- Defined in ‘GHC.Base’
-instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
-instance Functor IO -- Defined in ‘GHC.Base’
-instance Functor [] -- Defined in ‘GHC.Base’
-instance Functor Maybe -- Defined in ‘GHC.Base’
-instance Functor Solo -- Defined in ‘GHC.Base’
-instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Base’
-instance ∀ a b. Functor ((,,) a b) -- Defined in ‘GHC.Base’
-instance ∀ a b c. Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+  	-- Defined in ‘GHC.Internal.Base’
+instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Internal.Base’
+instance Functor IO -- Defined in ‘GHC.Internal.Base’
+instance Functor [] -- Defined in ‘GHC.Internal.Base’
+instance Functor Maybe -- Defined in ‘GHC.Internal.Base’
+instance Functor Solo -- Defined in ‘GHC.Internal.Base’
+instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
+instance ∀ a b. Functor ((,,) a b)
+  -- Defined in ‘GHC.Internal.Base’
+instance ∀ a b c. Functor ((,,,) a b c)
+  -- Defined in ‘GHC.Internal.Base’
 instance ∀ a b c d. Functor ((,,,,) a b c d)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘GHC.Internal.Base’
 instance ∀ a b c d e. Functor ((,,,,,) a b c d e)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘GHC.Internal.Base’
 instance ∀ a b c d e f. Functor ((,,,,,,) a b c d e f)
-  -- Defined in ‘GHC.Base’
-instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’
+  -- Defined in ‘GHC.Internal.Base’
+instance ∀ a. Functor (Either a)
+  -- Defined in ‘GHC.Internal.Data.Either’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒
          Functor (f :*: g)
-  -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒
          Functor (f :+: g)
-  -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒
          Functor (f :.: g)
-  -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
 instance ∀ (f ∷ ★ → ★).
          (Generic1 f, Functor (Rep1 f)) ⇒
          Functor (Generically1 f)
-  -- Defined in ‘GHC.Generics’
-instance ∀ i c. Functor (K1 i c) -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
+instance ∀ i c. Functor (K1 i c)
+  -- Defined in ‘GHC.Internal.Generics’
 instance ∀ i (c ∷ Meta) (f ∷ ★ → ★). Functor f ⇒ Functor (M1 i c f)
-  -- Defined in ‘GHC.Generics’
-instance Functor Par1 -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
+instance Functor Par1 -- Defined in ‘GHC.Internal.Generics’
 instance ∀ (f ∷ ★ → ★). Functor f ⇒ Functor (Rec1 f)
-  -- Defined in ‘GHC.Generics’
-instance Functor U1 -- Defined in ‘GHC.Generics’
-instance Functor (URec Char) -- Defined in ‘GHC.Generics’
-instance Functor (URec Double) -- Defined in ‘GHC.Generics’
-instance Functor (URec Float) -- Defined in ‘GHC.Generics’
-instance Functor (URec Int) -- Defined in ‘GHC.Generics’
-instance Functor (URec Word) -- Defined in ‘GHC.Generics’
-instance Functor V1 -- Defined in ‘GHC.Generics’
+  -- Defined in ‘GHC.Internal.Generics’
+instance Functor U1 -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Char) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Double)
+  -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Float) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Int) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Word) -- Defined in ‘GHC.Internal.Generics’
+instance Functor V1 -- Defined in ‘GHC.Internal.Generics’
 datatypeName
   ∷ ∀ {k} (d ∷ k) k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
       (a ∷ k1).
@@ -78,7 +83,7 @@ class Datatype d where
                    (a ∷ k1).
                  t d f a → [Char]
   ...
-  	-- Defined in ‘GHC.Generics’
+  	-- Defined in ‘GHC.Internal.Generics’
 (:*:)
   ∷ ∀ k (f ∷ k → ★) (g ∷ k → ★) (p ∷ k). f p → g p → (:*:) f g p
 Rep ∷ ★ → ★ → ★

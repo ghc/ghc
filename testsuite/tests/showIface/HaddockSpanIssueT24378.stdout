@@ -7,13 +7,13 @@ docs:
 -}
               identifiers:
                 {HaddockSpanIssueT24378.hs:1:6-9}
-                Data.Foldable.elem
+                GHC.Internal.Data.Foldable.elem
                 {HaddockSpanIssueT24378.hs:1:6-9}
                 elem
                 {HaddockSpanIssueT24378.hs:1:14-18}
-                System.IO.print
+                GHC.Internal.System.IO.print
                 {HaddockSpanIssueT24378.hs:3:2-3}
-                GHC.Base.<>
+                GHC.Internal.Base.<>
                 {HaddockSpanIssueT24378.hs:3:15-18}
                 GHC.Types.Bool
        declaration docs:
@@ -21,7 +21,7 @@ docs:
                      {-| '()', 'elem'.-}
                    identifiers:
                      {HaddockSpanIssueT24378.hs:7:12-15}
-                     Data.Foldable.elem
+                     GHC.Internal.Data.Foldable.elem
                      {HaddockSpanIssueT24378.hs:7:12-15}
                      elem]]
        arg docs:
@@ -81,3 +81,4 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
 extensible fields:
+

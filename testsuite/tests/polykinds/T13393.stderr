@@ -4,10 +4,12 @@ T13393.hs:61:3: error: [GHC-39999]
       prevents the constraint ‘(Traversable t0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘t0’ should be.
       Potentially matching instances:
-        instance Traversable (Either a) -- Defined in ‘Data.Traversable’
-        instance Traversable Identity -- Defined in ‘Data.Traversable’
+        instance Traversable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        instance Traversable Identity
+          -- Defined in ‘GHC.Internal.Data.Traversable’
         ...plus four others
-        ...plus 28 instances involving out-of-scope types
+        ...plus 27 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block:
         mapM putBackLeftOverInputAndReturnOutput undefined

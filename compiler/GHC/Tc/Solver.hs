@@ -628,7 +628,7 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
          -- it's only used for the ambiguity check, which throws the evidence away anyway.
          -- This avoids problems with circularity; where we are trying to look
          -- up the "unsatisfiable" Id while we are in the middle of typechecking it.
-       ; if mod == gHC_TYPEERROR then return (Var unsat_ev) else
+       ; if mod == gHC_INTERNAL_TYPEERROR then return (Var unsat_ev) else
     do { unsatisfiable_id <- tcLookupId unsatisfiableIdName
 
          -- See Note [Evidence terms from Unsatisfiable Givens]

@@ -19,8 +19,8 @@ instance Ord Data.ByteString.Lazy.ByteString
 
 type Data.ByteString.ByteString :: *
 data Data.ByteString.ByteString
-  = bytestring-0.12.1.0:Data.ByteString.Internal.Type.BS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
-                                                                          GHC.Word.Word8)
+  = bytestring-0.12.1.0:Data.ByteString.Internal.Type.BS {-# UNPACK #-}(GHC.Internal.ForeignPtr.ForeignPtr
+                                                                          GHC.Internal.Word.Word8)
                                                          {-# UNPACK #-}Int
   	-- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
 instance Monoid Data.ByteString.ByteString

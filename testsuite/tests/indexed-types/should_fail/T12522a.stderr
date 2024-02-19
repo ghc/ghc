@@ -7,8 +7,8 @@ T12522a.hs:23:26: error: [GHC-39999]
         test :: Uncurried [a0, [Char]] [Char] (bound at T12522a.hs:23:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

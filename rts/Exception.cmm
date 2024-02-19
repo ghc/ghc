@@ -14,9 +14,9 @@
 #include "RaiseAsync.h"
 
 import CLOSURE ghczmprim_GHCziTypes_True_closure;
-import CLOSURE ghczminternal_GHCziExceptionziType_divZZeroException_closure;
-import CLOSURE ghczminternal_GHCziExceptionziType_underflowException_closure;
-import CLOSURE ghczminternal_GHCziExceptionziType_overflowException_closure;
+import CLOSURE ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure;
+import CLOSURE ghczminternal_GHCziInternalziExceptionziType_underflowException_closure;
+import CLOSURE ghczminternal_GHCziInternalziExceptionziType_overflowException_closure;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE CATCHF_PUSHED_ctr;
 import CLOSURE RtsFlags;
@@ -648,17 +648,17 @@ stg_raiseIOzh (P_ exception)
 
 stg_raiseDivZZerozh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziExceptionziType_divZZeroException_closure);
+    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure);
 }
 
 stg_raiseUnderflowzh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziExceptionziType_underflowException_closure);
+    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_underflowException_closure);
 }
 
 stg_raiseOverflowzh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziExceptionziType_overflowException_closure);
+    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_overflowException_closure);
 }
 
 /* The FFI doesn't support variadic C functions so we can't directly expose

@@ -48,15 +48,15 @@ module Data.Functor.Contravariant (
   ) where
 
 import Control.Applicative
-import Control.Category
-import Data.Function (on)
+import GHC.Internal.Control.Category
+import GHC.Internal.Data.Function (on)
 
 import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Functor.Compose
 
-import Data.Monoid (Alt(..), All(..))
-import Data.Proxy
+import GHC.Internal.Data.Monoid (Alt(..), All(..))
+import GHC.Internal.Data.Proxy
 import GHC.Generics
 
 import Prelude hiding ((.), id)

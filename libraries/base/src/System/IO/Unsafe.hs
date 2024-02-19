@@ -23,13 +23,13 @@ module System.IO.Unsafe (
    unsafeFixIO,
   ) where
 
-import GHC.Base
-import GHC.IO
-import GHC.IORef
-import GHC.Exception
-import Control.Exception
+import GHC.Internal.Base
+import GHC.Internal.IO
+import GHC.Internal.IORef
+import GHC.Internal.Exception
+import GHC.Internal.Control.Exception
 
--- | A slightly faster version of `System.IO.fixIO` that may not be
+-- | A slightly faster version of `GHC.Internal.System.IO.fixIO` that may not be
 -- safe to use with multiple threads.  The unsafety arises when used
 -- like this:
 --

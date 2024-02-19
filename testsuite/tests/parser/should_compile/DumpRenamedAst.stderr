@@ -105,7 +105,7 @@
                            [])
                           (EpaComments
                            []))
-                         {Name: System.IO.putStrLn})))
+                         {Name: GHC.Internal.System.IO.putStrLn})))
                       (L
                        (EpAnn
                         (EpaSpan { DumpRenamedAst.hs:35:17-23 })
@@ -2200,7 +2200,7 @@
                       [])
                      (EpaComments
                       []))
-                    {Name: Data.Either.Either})))
+                    {Name: GHC.Internal.Data.Either.Either})))
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:32:25 })

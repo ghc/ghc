@@ -8,4 +8,4 @@ T15321.hs:9:9: error: [GHC-88464]
           with fail @Language.Haskell.TH.Syntax.Q
                     @Language.Haskell.TH.Syntax.Exp
           (imported from ‘Prelude’ at T15321.hs:3:8-13
-           (and originally defined in ‘Control.Monad.Fail’))
+           (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))

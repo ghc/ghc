@@ -12,11 +12,11 @@ hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:15:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -31,11 +31,11 @@ hard_hole_fits.hs:15:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:16:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -52,11 +52,11 @@ hard_hole_fits.hs:16:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:17:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -71,11 +71,11 @@ hard_hole_fits.hs:17:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:18:31: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -90,11 +90,11 @@ hard_hole_fits.hs:18:31: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:19:25: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -109,11 +109,11 @@ hard_hole_fits.hs:19:25: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:20:36: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -129,11 +129,11 @@ hard_hole_fits.hs:20:36: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:21:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -148,11 +148,11 @@ hard_hole_fits.hs:21:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:22:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -169,11 +169,11 @@ hard_hole_fits.hs:22:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:23:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -189,11 +189,11 @@ hard_hole_fits.hs:23:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:24:29: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -208,11 +208,11 @@ hard_hole_fits.hs:24:29: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:25:24: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -226,11 +226,11 @@ hard_hole_fits.hs:25:24: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:26:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -245,11 +245,11 @@ hard_hole_fits.hs:26:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -264,11 +264,11 @@ hard_hole_fits.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:28:38: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -285,11 +285,11 @@ hard_hole_fits.hs:28:38: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:29:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -311,11 +311,11 @@ hard_hole_fits.hs:29:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:30:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -331,11 +331,11 @@ hard_hole_fits.hs:30:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:31:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -351,11 +351,11 @@ hard_hole_fits.hs:31:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:32:30: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -370,11 +370,11 @@ hard_hole_fits.hs:32:30: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:33:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -390,11 +390,11 @@ hard_hole_fits.hs:33:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:34:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -411,11 +411,11 @@ hard_hole_fits.hs:34:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:35:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -429,11 +429,11 @@ hard_hole_fits.hs:35:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:36:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -450,11 +450,11 @@ hard_hole_fits.hs:36:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:37:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -469,11 +469,11 @@ hard_hole_fits.hs:37:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:38:40: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -491,11 +491,11 @@ hard_hole_fits.hs:38:40: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:39:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -510,11 +510,11 @@ hard_hole_fits.hs:39:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:40:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -528,11 +528,11 @@ hard_hole_fits.hs:40:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:41:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -546,11 +546,11 @@ hard_hole_fits.hs:41:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:42:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -564,11 +564,11 @@ hard_hole_fits.hs:42:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:43:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -582,11 +582,11 @@ hard_hole_fits.hs:43:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:44:29: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -602,11 +602,11 @@ hard_hole_fits.hs:44:29: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:45:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
@@ -620,11 +620,11 @@ hard_hole_fits.hs:45:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:46:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
@@ -641,8 +641,8 @@ hard_hole_fits.hs:46:21: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
+           (and originally defined in ‘GHC.Internal.Enum’))

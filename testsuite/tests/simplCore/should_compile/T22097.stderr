@@ -8,10 +8,13 @@ Result size of Tidy Core
 -- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
 T22097.main2 :: String
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=False, ConLike=False, WorkFree=False, Expandable=False,
+         Guidance=IF_ARGS [] 30 0}]
 T22097.main2
-  = case T22097a.$wgoEven 10# of { (# #) -> GHC.Show.$fShowBool4 }
+  = case T22097a.$wgoEven 10# of { (# #) ->
+    GHC.Internal.Show.$fShowBool4
+    }
 
 -- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
 T22097.main1
@@ -20,20 +23,21 @@ T22097.main1
 [GblId,
  Arity=1,
  Str=<L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0] 40 0}]
 T22097.main1
   = \ (eta [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
-      GHC.IO.Handle.Text.hPutStr2
-        GHC.IO.Handle.FD.stdout T22097.main2 GHC.Types.True eta
+      GHC.Internal.IO.Handle.Text.hPutStr2
+        GHC.Internal.IO.Handle.FD.stdout T22097.main2 GHC.Types.True eta
 
 -- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
 main :: IO ()
 [GblId,
  Arity=1,
  Str=<L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 main
   = T22097.main1

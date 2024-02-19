@@ -13,8 +13,8 @@ T11071.hs:21:12: error: [GHC-76037]
 
 T11071.hs:22:12: error: [GHC-76037]
     Not in scope: ‘M'.foobar’
-    NB: neither ‘Data.IntMap’,
-                ‘Data.Map’ nor ‘System.IO’ export ‘foobar’.
+    NB: neither ‘System.IO’,
+                ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
 
 T11071.hs:23:12: error: [GHC-76037]
     Not in scope: ‘Data.List.sort’

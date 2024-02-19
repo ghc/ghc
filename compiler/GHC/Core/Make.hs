@@ -907,7 +907,7 @@ nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
                                   nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
 
 err_nm :: String -> Unique -> Id -> Name
-err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
+err_nm str uniq id = mkWiredInIdName gHC_INTERNAL_CONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id

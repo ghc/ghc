@@ -1,4 +1,5 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.IO.Class
@@ -16,6 +17,8 @@
 module Control.Monad.IO.Class (
     MonadIO(..)
   ) where
+
+import GHC.Internal.Base
 
 -- | Monads in which 'IO' computations may be embedded.
 -- Any monad built by applying a sequence of monad transformers to the
