@@ -55,7 +55,7 @@ DoExpansion2.hs:31:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
 DoExpansion2.hs:34:22: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type: t0 -> IO (Maybe Int)
                   with actual type: IO String
-    • The function ‘getVal’ is applied to two value arguments,
+    • The function ‘getVal’ is applied to two visible arguments,
         but its type ‘Int -> IO String’ has only one
       In a stmt of a 'do' block: Just x <- getVal 3 4
       In the expression:

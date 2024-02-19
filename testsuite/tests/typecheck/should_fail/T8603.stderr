@@ -6,7 +6,7 @@ T8603.hs:33:17: error: [GHC-18872]
         [a2] :: *
       Expected: [a2] -> StateT s RV a0
         Actual: t0 ((->) [a1]) (StateT s RV a0)
-    • The function ‘lift’ is applied to two value arguments,
+    • The function ‘lift’ is applied to two visible arguments,
         but its type ‘(Control.Monad.Trans.Class.MonadTrans t, Monad m) =>
                       m a -> t m a’
         has only one

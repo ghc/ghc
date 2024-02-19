@@ -26,7 +26,7 @@ Defer01.hs:24:4: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
 
 Defer01.hs:30:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    • The function ‘e’ is applied to one value argument,
+    • The function ‘e’ is applied to one visible argument,
         but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
@@ -95,7 +95,7 @@ Defer01.hs:49:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
 (deferred type error)
 *** Exception: Defer01.hs:30:5: error: [GHC-83865]
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    • The function ‘e’ is applied to one value argument,
+    • The function ‘e’ is applied to one visible argument,
         but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'

@@ -10,7 +10,7 @@ DoExpansion3.hs:15:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
 DoExpansion3.hs:18:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type: t0 -> t
                   with actual type: IO Char
-    • The function ‘getChar’ is applied to one value argument,
+    • The function ‘getChar’ is applied to one visible argument,
         but its type ‘IO Char’ has none
       In the expression: getChar 2
       In an equation for ‘y’: y = getChar 2

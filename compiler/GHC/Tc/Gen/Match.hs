@@ -75,7 +75,7 @@ import GHC.Driver.DynFlags ( getDynFlags )
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( Arity, isDoExpansionGenerated )
+import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -1207,7 +1207,7 @@ the variables they bind into scope, and typecheck the thing_inside.
 --       The MatchGroup for `f` has arity 2, not 3
 checkArgCounts :: AnnoBody body
                => MatchGroup GhcRn (LocatedA (body GhcRn))
-               -> TcM Arity
+               -> TcM VisArity
 checkArgCounts (MG { mg_alts = L _ [] })
     = return 1 -- See Note [Empty MatchGroups] in GHC.Rename.Bind
                --   case e of {} or \case {}
@@ -1227,6 +1227,6 @@ checkArgCounts (MG { mg_alts = L _ (match1:matches) })
     n_args1 = reqd_args_in_match match1
     mb_bad_matches = NE.nonEmpty [m | m <- matches, reqd_args_in_match m /= n_args1]
 
-    reqd_args_in_match :: LocatedA (Match GhcRn body1) -> Arity
+    reqd_args_in_match :: LocatedA (Match GhcRn body1) -> VisArity
     -- Counts the number of /required/ args in the match
     reqd_args_in_match (L _ (Match { m_pats = pats })) = count (isVisArgPat . unLoc) pats

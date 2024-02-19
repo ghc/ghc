@@ -6,5 +6,5 @@ T23903.hs:21:1: error: [GHC-55287]
         t0 :: TYPE cx0
       Cannot unify ‘Rep a’ with the type variable ‘cx0’
       because the former is not a concrete ‘RuntimeRep’.
-    • The equation for ‘f’ has one value argument,
+    • The equation for ‘f’ has one visible argument,
         but its type ‘a #-> ()’ has none

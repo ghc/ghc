@@ -2,7 +2,7 @@
 ado002.hs:8:8: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO b0
                   with actual type: IO Char
-    • The function ‘getChar’ is applied to one value argument,
+    • The function ‘getChar’ is applied to one visible argument,
         but its type ‘IO Char’ has none
       In a stmt of a 'do' block: y <- getChar 'a'
       In the expression:
@@ -45,7 +45,7 @@ ado002.hs:15:13: error: [GHC-83865]
 ado002.hs:23:9: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO a0
                   with actual type: IO Char
-    • The function ‘getChar’ is applied to one value argument,
+    • The function ‘getChar’ is applied to one visible argument,
         but its type ‘IO Char’ has none
       In a stmt of a 'do' block: x5 <- getChar x4
       In the expression:
