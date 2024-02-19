@@ -61,7 +61,7 @@
         ltInteger# :: Integer -> Integer -> Int#
         neqInteger# :: Integer -> Integer -> Int#
 
-  * New `GHC.Integer.testBitInteger` primitive for use with `Data.Bits`
+  * New `GHC.Internal.Integer.testBitInteger` primitive for use with `Data.Bits`
 
   * Reduce short-lived heap allocation and try to demote `J#` back
     to `S#` more aggressively.  See also

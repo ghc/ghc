@@ -8,8 +8,13 @@ module System.CPUTime.Windows
     , getCpuTimePrecision
     ) where
 
-import Foreign
-import Foreign.C
+import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Foreign.Marshal.Alloc
+import GHC.Internal.Foreign.Marshal.Utils
+import GHC.Internal.Foreign.Storable
+import GHC.Internal.Foreign.C.Types
+import GHC.Internal.Word
+import Prelude
 
 -- For FILETIME etc. on Windows
 #if HAVE_WINDOWS_H

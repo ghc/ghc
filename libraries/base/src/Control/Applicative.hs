@@ -51,18 +51,18 @@ module Control.Applicative (
     asum,
     ) where
 
-import Control.Category hiding ((.), id)
-import Control.Arrow
-import Data.Maybe
-import Data.Tuple
-import Data.Foldable (asum)
-import Data.Functor ((<$>))
-import Data.Functor.Const (Const(..))
-import Data.Typeable (Typeable)
-import Data.Data (Data)
+import GHC.Internal.Control.Category hiding ((.), id)
+import GHC.Internal.Control.Arrow
+import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Tuple
+import GHC.Internal.Data.Foldable (asum)
+import GHC.Internal.Data.Functor ((<$>))
+import GHC.Internal.Data.Functor.Const (Const(..))
+import GHC.Internal.Data.Typeable (Typeable)
+import GHC.Internal.Data.Data (Data)
 
-import GHC.Base
-import GHC.Functor.ZipList (ZipList(..))
+import GHC.Internal.Base
+import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Generics
 
 -- $setup

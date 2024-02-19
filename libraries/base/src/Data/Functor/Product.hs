@@ -23,13 +23,14 @@ module Data.Functor.Product (
   ) where
 
 import Control.Applicative
-import Control.Monad (MonadPlus(..))
-import Control.Monad.Fix (MonadFix(..))
+import GHC.Internal.Control.Monad (MonadPlus(..))
+import GHC.Internal.Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(mzipWith))
-import Data.Data (Data)
+import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Text.Read ()
+import GHC.Internal.Text.Read ()
+import Prelude
 
 -- | Lifted product of functors.
 --

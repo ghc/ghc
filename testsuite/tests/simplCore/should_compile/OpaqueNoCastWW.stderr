@@ -29,7 +29,7 @@ times
        (ds :: Signed m)
        (ds1 :: Signed n) ->
        * @Integer
-         GHC.Num.$fNumInteger
+         GHC.Internal.Num.$fNumInteger
          (ds
           `cast` (OpaqueNoCastWW.N:Signed[0] <m>_P :: Signed m ~R# Integer))
          (ds1

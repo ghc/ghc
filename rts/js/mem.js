@@ -72,9 +72,9 @@ function h$stl(o, xs, t) {
 // #endif
 
 // #ifdef GHCJS_PROF
-// var h$nothing = h$c(h$ghczminternalZCGHCziBaseziNothing_con_e, h$CCS_SYSTEM);
+// var h$nothing = h$c(h$ghczminternalZCGHCziInternalziBaseziNothing_con_e, h$CCS_SYSTEM);
 // #else
-//var h$nothing = h$c(h$ghczminternalZCGHCziBaseziNothing_con_e);
+//var h$nothing = h$c(h$ghczminternalZCGHCziInternalziBaseziNothing_con_e);
 // #endif
 
 // delayed init for top-level closures

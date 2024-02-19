@@ -12,7 +12,7 @@
 
 #include "Cmm.h"
 
-import CLOSURE ghczminternal_ControlziExceptionziBase_noMatchingContinuationPrompt_closure;
+import CLOSURE ghczminternal_GHCziInternalziControlziExceptionziBase_noMatchingContinuationPrompt_closure;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE ALLOC_RTS_ctr;
 import CLOSURE ALLOC_RTS_tot;
@@ -104,7 +104,7 @@ stg_control0zh_ll // explicit stack
 
   // see Note [When capturing the continuation fails] in Continuation.c
   if (cont == NULL) (likely: False) {
-    jump stg_raisezh(ghczminternal_ControlziExceptionziBase_noMatchingContinuationPrompt_closure);
+    jump stg_raisezh(ghczminternal_GHCziInternalziControlziExceptionziBase_noMatchingContinuationPrompt_closure);
   }
 
   W_ apply_mask_frame;

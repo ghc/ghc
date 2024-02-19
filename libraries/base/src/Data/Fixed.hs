@@ -85,11 +85,13 @@ module Data.Fixed
     divMod'
 ) where
 
-import Data.Data
-import GHC.TypeLits (KnownNat, natVal)
-import GHC.Read
-import Text.ParserCombinators.ReadPrec
-import Text.Read.Lex
+import GHC.Internal.Data.Data
+import GHC.Internal.TypeLits (KnownNat, natVal)
+import GHC.Internal.Read
+import GHC.Internal.Text.ParserCombinators.ReadPrec
+import GHC.Internal.Text.Read.Lex
+import Data.Typeable
+import Prelude
 
 default () -- avoid any defaulting shenanigans
 

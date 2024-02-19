@@ -65,7 +65,7 @@ module Control.Concurrent (
 
         -- * Communication abstractions
 
-        module Control.Concurrent.MVar,
+        module GHC.Internal.Control.Concurrent.MVar,
         module Control.Concurrent.Chan,
         module Control.Concurrent.QSem,
         module Control.Concurrent.QSemN,
@@ -105,24 +105,26 @@ module Control.Concurrent (
 
     ) where
 
-import Control.Exception.Base as Exception
+import Prelude
+import GHC.Internal.Control.Exception.Base as Exception
 
-import GHC.Conc.Bound
+import GHC.Internal.Conc.Bound
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
 
-import System.Posix.Types ( Fd )
+import GHC.Internal.System.Posix.Types ( Fd )
 
 #if defined(mingw32_HOST_OS)
-import Foreign.C
-import System.IO
-import Data.Functor ( void )
-import Data.Int ( Int64 )
+import GHC.Internal.Foreign.C.Error
+import GHC.Internal.Foreign.C.Types
+import GHC.Internal.System.IO
+import GHC.Internal.Data.Functor ( void )
+import GHC.Internal.Data.Int ( Int64 )
 #else
-import qualified GHC.Conc
+import qualified GHC.Internal.Conc.IO as Conc
 #endif
 
-import Control.Concurrent.MVar
+import GHC.Internal.Control.Concurrent.MVar
 import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
@@ -269,9 +271,9 @@ threadWaitRead fd
                           return ()
                         -- hWaitForInput does work properly, but we can only
                         -- do this for stdin since we know its FD.
-                  _ -> errorWithoutStackTrace "threadWaitRead requires -threaded on Windows, or use System.IO.hWaitForInput"
+                  _ -> errorWithoutStackTrace "threadWaitRead requires -threaded on Windows, or use GHC.System.IO.hWaitForInput"
 #else
-  = GHC.Conc.threadWaitRead fd
+  = Conc.threadWaitRead fd
 #endif
 
 -- | Block the current thread until data can be written to the
@@ -287,7 +289,7 @@ threadWaitWrite fd
   | threaded  = withThread (waitFd fd True)
   | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
-  = GHC.Conc.threadWaitWrite fd
+  = Conc.threadWaitWrite fd
 #endif
 
 -- | Returns an STM action that can be used to wait for data
@@ -311,7 +313,7 @@ threadWaitReadSTM fd
                   return (waitAction, killAction)
   | otherwise = errorWithoutStackTrace "threadWaitReadSTM requires -threaded on Windows"
 #else
-  = GHC.Conc.threadWaitReadSTM fd
+  = Conc.threadWaitReadSTM fd
 #endif
 
 -- | Returns an STM action that can be used to wait until data
@@ -335,7 +337,7 @@ threadWaitWriteSTM fd
                   return (waitAction, killAction)
   | otherwise = errorWithoutStackTrace "threadWaitWriteSTM requires -threaded on Windows"
 #else
-  = GHC.Conc.threadWaitWriteSTM fd
+  = Conc.threadWaitWriteSTM fd
 #endif
 
 #if defined(mingw32_HOST_OS)
@@ -512,7 +514,7 @@ a timely enough manner.  Basically, the same caveats as for finalizers
 apply to deadlock detection.
 
 There is a subtle interaction between deadlock detection and
-finalizers (as created by 'Foreign.Concurrent.newForeignPtr' or the
+finalizers (as created by 'GHC.Foreign.Concurrent.newForeignPtr' or the
 functions in "System.Mem.Weak"): if a thread is blocked waiting for a
 finalizer to run, then the thread will be considered deadlocked and
 sent an exception.  So preferably don't do this, but if you have no

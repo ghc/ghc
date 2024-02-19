@@ -5,30 +5,32 @@ T15883e.hs:16:1: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘d0’ should be.
       Potentially matching instances:
         instance (Data a, Data b) => Data (Either a b)
-          -- Defined in ‘Data.Data’
-        instance Data a => Data (Down a) -- Defined in ‘Data.Data’
-        ...plus 21 others
-        ...plus 48 instances involving out-of-scope types
+          -- Defined in ‘GHC.Internal.Data.Data’
+        instance Data a => Data (Down a)
+          -- Defined in ‘GHC.Internal.Data.Data’
+        ...plus 20 others
+        ...plus 47 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: z (\ a1 -> MkFoo a1) `k` a1
-      In an equation for ‘Data.Data.gfoldl’:
-          Data.Data.gfoldl k z (MkFoo a1) = (z (\ a1 -> MkFoo a1) `k` a1)
-      When typechecking the code for ‘Data.Data.gfoldl’
+      In an equation for ‘GHC.Internal.Data.Data.gfoldl’:
+          GHC.Internal.Data.Data.gfoldl k z (MkFoo a1)
+            = (z (\ a1 -> MkFoo a1) `k` a1)
+      When typechecking the code for ‘GHC.Internal.Data.Data.gfoldl’
         in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘Data (Foo LiftedRep)’
 
 T15883e.hs:16:1: error: [GHC-46956]
     • Couldn't match expected type ‘a’ with actual type ‘d0’
-    • because type variable ‘a’ would escape its scope
-    This (rigid, skolem) type variable is bound by
-      a type expected by the context:
-        forall a. a
-      at T15883e.hs:16:1-52
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a type expected by the context:
+          forall a. a
+        at T15883e.hs:16:1-52
     • In the first argument of ‘MkFoo’, namely ‘a1’
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’
-      When typechecking the code for ‘Data.Data.gfoldl’
+      When typechecking the code for ‘GHC.Internal.Data.Data.gfoldl’
         in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
     • Relevant bindings include a1 :: d0 (bound at T15883e.hs:16:1)
@@ -39,30 +41,31 @@ T15883e.hs:16:1: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘b0’ should be.
       Potentially matching instances:
         instance (Data a, Data b) => Data (Either a b)
-          -- Defined in ‘Data.Data’
-        instance Data a => Data (Down a) -- Defined in ‘Data.Data’
-        ...plus 21 others
-        ...plus 48 instances involving out-of-scope types
+          -- Defined in ‘GHC.Internal.Data.Data’
+        instance Data a => Data (Down a)
+          -- Defined in ‘GHC.Internal.Data.Data’
+        ...plus 20 others
+        ...plus 47 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: k (z (\ a1 -> MkFoo a1))
-      In an equation for ‘Data.Data.gunfold’:
-          Data.Data.gunfold k z _ = k (z (\ a1 -> MkFoo a1))
-      When typechecking the code for ‘Data.Data.gunfold’
+      In an equation for ‘GHC.Internal.Data.Data.gunfold’:
+          GHC.Internal.Data.Data.gunfold k z _ = k (z (\ a1 -> MkFoo a1))
+      When typechecking the code for ‘GHC.Internal.Data.Data.gunfold’
         in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘Data (Foo LiftedRep)’
 
 T15883e.hs:16:1: error: [GHC-46956]
     • Couldn't match expected type ‘a’ with actual type ‘b0’
-    • because type variable ‘a’ would escape its scope
-    This (rigid, skolem) type variable is bound by
-      a type expected by the context:
-        forall a. a
-      at T15883e.hs:16:1-52
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a type expected by the context:
+          forall a. a
+        at T15883e.hs:16:1-52
     • In the first argument of ‘MkFoo’, namely ‘a1’
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’
-      When typechecking the code for ‘Data.Data.gunfold’
+      When typechecking the code for ‘GHC.Internal.Data.Data.gunfold’
         in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
     • Relevant bindings include a1 :: b0 (bound at T15883e.hs:16:1)

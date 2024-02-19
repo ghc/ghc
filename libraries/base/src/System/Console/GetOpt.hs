@@ -62,7 +62,8 @@ module System.Console.GetOpt (
    -- $example2
 ) where
 
-import Data.List ( isPrefixOf, find )
+import Prelude
+import GHC.Internal.Data.List ( isPrefixOf, find )
 
 -- |What to do with options following non-options
 data ArgOrder a
@@ -162,7 +163,7 @@ Process the command-line, and return the list of values that matched
 * The option descriptions (see 'OptDescr')
 
 * The actual command line arguments (presumably got from
-  'System.Environment.getArgs').
+  'GHC.Internal.System.Environment.getArgs').
 
 'getOpt' returns a triple consisting of the option arguments, a list
 of non-options, and a list of error messages.
@@ -314,7 +315,7 @@ arguments:
 >    module Opts1 where
 >
 >    import System.Console.GetOpt
->    import Data.Maybe ( fromMaybe )
+>    import GHC.Internal.Data.Maybe ( fromMaybe )
 >
 >    data Flag
 >     = Verbose  | Version
@@ -355,7 +356,7 @@ A different approach is to group the option values in a record of type
 >    module Opts2 where
 >
 >    import System.Console.GetOpt
->    import Data.Maybe ( fromMaybe )
+>    import GHC.Internal.Data.Maybe ( fromMaybe )
 >
 >    data Options = Options
 >     { optVerbose     :: Bool

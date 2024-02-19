@@ -1,15 +1,18 @@
 
 annfail10.hs:9:1: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from an annotation
-      prevents the constraint ‘(Data.Data.Data a0)’ from being solved.
+      prevents the constraint ‘(GHC.Internal.Data.Data.Data
+                                  a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance (Data.Data.Data a, Data.Data.Data b) =>
-                 Data.Data.Data (Either a b)
-          -- Defined in ‘Data.Data’
-        instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
+        instance (GHC.Internal.Data.Data.Data a,
+                  GHC.Internal.Data.Data.Data b) =>
+                 GHC.Internal.Data.Data.Data (Either a b)
+          -- Defined in ‘GHC.Internal.Data.Data’
+        instance GHC.Internal.Data.Data.Data Ordering
+          -- Defined in ‘GHC.Internal.Data.Data’
         ...plus 17 others
-        ...plus 50 instances involving out-of-scope types
+        ...plus 49 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation: {-# ANN f 1 #-}
 
@@ -18,8 +21,8 @@ annfail10.hs:9:11: error: [GHC-39999]
       prevents the constraint ‘(Num a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Num Integer -- Defined in ‘GHC.Num’
-        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
         ...plus three others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)

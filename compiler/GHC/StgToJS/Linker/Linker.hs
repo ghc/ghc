@@ -930,29 +930,29 @@ rtsDeps :: ([UnitId], Set ExportedFun)
 rtsDeps =
   ( [ghcInternalUnitId, primUnitId]
   , S.fromList $ concat
-      [ mkInternalFuns "GHC.Conc.Sync"
+      [ mkInternalFuns "GHC.Internal.Conc.Sync"
           ["reportError"]
-      , mkInternalFuns "Control.Exception.Base"
+      , mkInternalFuns "GHC.Internal.Control.Exception.Base"
           ["nonTermination"]
-      , mkInternalFuns "GHC.Exception.Type"
+      , mkInternalFuns "GHC.Internal.Exception.Type"
           [ "SomeException"
           , "underflowException"
           , "overflowException"
           , "divZeroException"
           ]
-      , mkInternalFuns "GHC.TopHandler"
+      , mkInternalFuns "GHC.Internal.TopHandler"
           [ "runMainIO"
           , "topHandler"
           ]
-      , mkInternalFuns "GHC.Base"
+      , mkInternalFuns "GHC.Internal.Base"
           ["$fMonadIO"]
-      , mkInternalFuns "GHC.Maybe"
+      , mkInternalFuns "GHC.Internal.Maybe"
           [ "Nothing"
           , "Just"
           ]
-      , mkInternalFuns "GHC.Ptr"
+      , mkInternalFuns "GHC.Internal.Ptr"
           ["Ptr"]
-      , mkInternalFuns "GHC.JS.Prim"
+      , mkInternalFuns "GHC.Internal.JS.Prim"
           [ "JSVal"
           , "JSException"
           , "$fShowJSException"
@@ -961,7 +961,7 @@ rtsDeps =
           , "resolveIO"
           , "toIO"
           ]
-      , mkInternalFuns "GHC.JS.Prim.Internal"
+      , mkInternalFuns "GHC.Internal.JS.Prim.Internal"
           [ "wouldBlock"
           , "blockedIndefinitelyOnMVar"
           , "blockedIndefinitelyOnSTM"
@@ -987,7 +987,7 @@ rtsDeps =
       ]
   )
 
--- | Export the functions in base
+-- | Export the functions in @ghc-internal@
 mkInternalFuns :: FastString -> [FastString] -> [ExportedFun]
 mkInternalFuns = mkExportedFuns ghcInternalUnitId
 

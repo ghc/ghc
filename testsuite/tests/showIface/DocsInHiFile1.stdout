@@ -7,13 +7,13 @@ docs:
 -}
               identifiers:
                 {DocsInHiFile.hs:2:6-9}
-                Data.Foldable.elem
+                GHC.Internal.Data.Foldable.elem
                 {DocsInHiFile.hs:2:6-9}
                 elem
                 {DocsInHiFile.hs:2:14-18}
-                System.IO.print
+                GHC.Internal.System.IO.print
                 {DocsInHiFile.hs:4:2-3}
-                GHC.Base.<>
+                GHC.Internal.Base.<>
                 {DocsInHiFile.hs:4:15-18}
                 GHC.Types.Bool
        export docs:
@@ -23,7 +23,7 @@ docs:
                      -- | '()', 'elem'.
                    identifiers:
                      {DocsInHiFile.hs:14:13-16}
-                     Data.Foldable.elem
+                     GHC.Internal.Data.Foldable.elem
                      {DocsInHiFile.hs:14:13-16}
                      elem],
           D -> [text:
@@ -47,7 +47,7 @@ docs:
                         -- ^ 'Show' instance
                       identifiers:
                         {DocsInHiFile.hs:22:25-28}
-                        GHC.Show.Show],
+                        GHC.Internal.Show.Show],
           D' -> [text:
                    -- | Another datatype...
                  identifiers:,
@@ -89,8 +89,9 @@ docs:
          avails:
            [P{P, p}]
          avails:
-           [GHC.Show.Show{GHC.Show.Show, GHC.Show.show, GHC.Show.showList,
-                          GHC.Show.showsPrec}]
+           [GHC.Internal.Show.Show{GHC.Internal.Show.Show,
+                                   GHC.Internal.Show.show, GHC.Internal.Show.showList,
+                                   GHC.Internal.Show.showsPrec}]
        named chunks:
        haddock options:
        language:

@@ -25,7 +25,7 @@ module GHC.Integer.GMP.Internals
 
       -- ** Basic 'Integer' operations
 
-    , module GHC.Integer
+    , module GHC.Internal.Integer
 
       -- ** Additional 'Integer' operations
     , gcdInteger
@@ -126,8 +126,8 @@ module GHC.Integer.GMP.Internals
     , importIntegerFromByteArray
     ) where
 
-import GHC.Integer
-import GHC.Natural
+import GHC.Internal.Integer
+import GHC.Internal.Natural
 import GHC.Num.Integer (Integer(..))
 import qualified GHC.Num.Integer as I
 import qualified GHC.Num.BigNat as B

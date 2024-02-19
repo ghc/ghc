@@ -50,15 +50,16 @@ module Data.Bifoldable
   ) where
 
 import Control.Applicative
-import Data.Functor.Utils (Max(..), Min(..), (#.))
-import Data.Maybe (fromMaybe)
-import Data.Monoid
+import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
+import GHC.Internal.Data.Maybe (fromMaybe)
+import GHC.Internal.Data.Monoid
 import GHC.Generics (K1(..))
+import Prelude
 
 -- $setup
 -- >>> import Prelude
 -- >>> import Data.Char
--- >>> import Data.Monoid (Product (..), Sum (..))
+-- >>> import GHC.Internal.Data.Monoid (Product (..), Sum (..))
 -- >>> data BiList a b = BiList [a] [b]
 -- >>> instance Bifoldable BiList where bifoldr f g z (BiList as bs) = foldr f (foldr g z bs) as
 

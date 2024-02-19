@@ -21,8 +21,8 @@ TyAppPat_PatternBindingExistential.hs:13:3: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

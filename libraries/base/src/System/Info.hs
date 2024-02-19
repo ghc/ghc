@@ -26,7 +26,8 @@ module System.Info
   , fullCompilerVersion
   ) where
 
-import           Data.Version (Version (..))
+import GHC.Internal.Data.Version (Version (..))
+import Prelude
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.

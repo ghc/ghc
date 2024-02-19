@@ -7,8 +7,8 @@ T7279.hs:6:10: error: [GHC-39999]
         at T7279.hs:6:10-35
       The type variable ‘b0’ is ambiguous
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

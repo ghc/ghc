@@ -1,5 +1,7 @@
+type Maybe :: * -> *
+data Maybe a = Nothing | Just a
 catMaybes :: [Maybe a] -> [a]
-fromJust :: GHC.Stack.Types.HasCallStack => Maybe a -> a
+fromJust :: GHC.Internal.Stack.Types.HasCallStack => Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
 isJust :: Maybe a -> Bool
 isNothing :: Maybe a -> Bool
@@ -7,8 +9,6 @@ listToMaybe :: [a] -> Maybe a
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybeToList :: Maybe a -> [a]
-type Maybe :: * -> *
-data Maybe a = Nothing | Just a
 type T :: *
 data T = A Int | B Float
 f :: Double -> Double

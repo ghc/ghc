@@ -19,16 +19,18 @@ module Data.Array.Byte (
   MutableByteArray(..),
 ) where
 
-import Data.Bits ((.&.), unsafeShiftR)
-import Data.Data (mkNoRepType, Data(..), Typeable)
-import qualified Data.Foldable as F
-import Data.Maybe (fromMaybe)
+import GHC.Internal.Data.Bits ((.&.), unsafeShiftR)
+import GHC.Internal.Data.Data (mkNoRepType, Data(..))
+import GHC.Internal.Data.Typeable (Typeable)
+import qualified GHC.Internal.Data.Foldable as F
+import GHC.Internal.Data.Maybe (fromMaybe)
 import Data.Semigroup
-import GHC.Exts
+import GHC.Internal.Exts
 import GHC.Num.Integer (Integer(..))
-import GHC.Show (intToDigit)
-import GHC.ST (ST(..), runST)
-import GHC.Word (Word8(..))
+import GHC.Internal.Show (intToDigit)
+import GHC.Internal.ST (ST(..), runST)
+import GHC.Internal.Word (Word8(..))
+import Prelude
 
 -- | Lifted wrapper for 'ByteArray#'.
 --

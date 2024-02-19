@@ -36,13 +36,13 @@ module Data.Complex
         )  where
 
 import Prelude hiding (Applicative(..))
-import GHC.Base (Applicative (..))
+import GHC.Internal.Base (Applicative (..))
 import GHC.Generics (Generic, Generic1)
-import GHC.Float (Floating(..))
-import Data.Data (Data)
+import GHC.Internal.Float (Floating(..))
+import GHC.Internal.Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
-import Control.Monad.Fix (MonadFix(..))
+import GHC.Internal.Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(..))
 
 infix  6  :+

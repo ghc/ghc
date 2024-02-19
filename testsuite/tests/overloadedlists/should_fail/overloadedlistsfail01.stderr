@@ -4,8 +4,8 @@ overloadedlistsfail01.hs:5:8: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 25 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
@@ -14,10 +14,12 @@ overloadedlistsfail01.hs:5:8: error: [GHC-39999]
 
 overloadedlistsfail01.hs:5:14: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from an overloaded list
-      prevents the constraint ‘(GHC.IsList.IsList a0)’ from being solved.
+      prevents the constraint ‘(GHC.Internal.IsList.IsList
+                                  a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instance:
-        instance GHC.IsList.IsList [a] -- Defined in ‘GHC.IsList’
+        instance GHC.Internal.IsList.IsList [a]
+          -- Defined in ‘GHC.Internal.IsList’
         ...plus four instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘print’, namely ‘[1]’
@@ -27,11 +29,11 @@ overloadedlistsfail01.hs:5:14: error: [GHC-39999]
 overloadedlistsfail01.hs:5:15: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from the literal ‘1’
       prevents the constraint ‘(Num
-                                  (GHC.IsList.Item a0))’ from being solved.
+                                  (GHC.Internal.IsList.Item a0))’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Num Integer -- Defined in ‘GHC.Num’
-        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
         ...plus three others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)

@@ -21,10 +21,10 @@ module Control.Concurrent (
         forkOS
     ) where
 
-import Data.Bool
+import GHC.Internal.Data.Bool
 
-import GHC.IO
-import GHC.Conc.Sync
+import GHC.Internal.IO
+import GHC.Internal.Conc.Sync
 
 rtsSupportsBoundThreads :: Bool
 forkOS :: IO () -> IO ThreadId

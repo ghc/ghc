@@ -4,10 +4,10 @@ RecordDotSyntaxFail8.hs:37:3: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         instance Show Bar -- Defined at RecordDotSyntaxFail8.hs:22:41
         ...plus 29 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘print’
       In a stmt of a 'do' block: print $ ....baz.quux
@@ -18,7 +18,8 @@ RecordDotSyntaxFail8.hs:37:3: error: [GHC-39999]
 RecordDotSyntaxFail8.hs:37:11: error: [GHC-39999]
     • No instance for ‘HasField "quux" Quux a0’
         arising from selecting the field ‘quux’
-      NB: There is no field selector ‘quux :: Quux -> a0’ in scope for record type ‘Quux’
+      NB: There is no field selector ‘quux :: Quux
+                                              -> a0’ in scope for record type ‘Quux’
     • In the second argument of ‘($)’, namely ‘....baz.quux’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:

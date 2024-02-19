@@ -3,5 +3,5 @@
 rn039.hs:6:20: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
     This binding for ‘-’ shadows the existing binding
       imported from ‘Prelude’ at rn039.hs:2:8-11
-      (and originally defined in ‘GHC.Num’)
+      (and originally defined in ‘GHC.Internal.Num’)
 [2 of 2] Linking rn039

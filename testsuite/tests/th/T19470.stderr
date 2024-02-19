@@ -7,6 +7,6 @@ CallStack (from HasCallStack):
       Code: undefined
     • In the Template Haskell splice $$undefined
       In the first argument of ‘print’, namely ‘($$undefined :: String)’
-      In the first argument of ‘GHC.GHCi.ghciStepIO ::
+      In the first argument of ‘GHC.Internal.GHCi.ghciStepIO ::
                                   IO a -> IO a’, namely
         ‘(print ($$undefined :: String))’

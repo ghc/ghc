@@ -52,7 +52,7 @@ import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import qualified GHC.Types.Name.Ppr as Ppr (mkNamePprCtx)
-import GHC.Builtin.Names (gHC_GHCI_HELPERS)
+import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
@@ -515,7 +515,7 @@ initInterpBuffering = do
   let mkHelperExpr :: OccName -> Ghc ForeignHValue
       mkHelperExpr occ =
         GHC.compileParsedExprRemote
-        $ GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS occ
+        $ GHC.nlHsVar $ RdrName.mkOrig gHC_INTERNAL_GHCI_HELPERS occ
   nobuf <- mkHelperExpr $ mkVarOccFS (fsLit "disableBuffering")
   flush <- mkHelperExpr $ mkVarOccFS (fsLit "flushAll")
   return (nobuf, flush)
@@ -546,7 +546,7 @@ mkEvalWrapper progname' args' =
   where
     nlHsString = nlHsLit . mkHsString
     evalWrapper' =
-      GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOccFS (fsLit "evalWrapper"))
+      GHC.nlHsVar $ RdrName.mkOrig gHC_INTERNAL_GHCI_HELPERS (mkVarOccFS (fsLit "evalWrapper"))
 
 -- | Run a 'GhcMonad' action to compile an expression for internal usage.
 runInternal :: GhcMonad m => m a -> m a

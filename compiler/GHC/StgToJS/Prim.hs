@@ -903,9 +903,9 @@ genPrim prof bound ty op = case op of
                              -- slots, depending on the return type.
   RaiseOp                 -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
   RaiseIOOp               -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
-  RaiseUnderflowOp        -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypeziunderflowException", false_])
-  RaiseOverflowOp         -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypezioverflowException", false_])
-  RaiseDivZeroOp          -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziExceptionziTypezidivZZeroException", false_])
+  RaiseUnderflowOp        -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypeziunderflowException", false_])
+  RaiseOverflowOp         -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypezioverflowException", false_])
+  RaiseDivZeroOp          -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypezidivZZeroException", false_])
   MaskAsyncExceptionsOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$maskAsync" [a])
   MaskUninterruptibleOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
   UnmaskAsyncExceptionsOp -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$unmaskAsync" [a])

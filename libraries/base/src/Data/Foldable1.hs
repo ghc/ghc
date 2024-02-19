@@ -28,8 +28,8 @@ module Data.Foldable1 (
     minimumBy,
     ) where
 
-import Data.Foldable      (Foldable, foldlM, foldr)
-import Data.List          (foldl, foldl')
+import GHC.Internal.Data.Foldable      (Foldable, foldlM, foldr)
+import GHC.Internal.Data.List          (foldl, foldl')
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup
        (Dual (..), First (..), Last (..), Max (..), Min (..), Product (..),
@@ -45,19 +45,19 @@ import Data.Complex (Complex (..))
 import GHC.Generics
        (M1 (..), Par1 (..), Rec1 (..), V1, (:*:) (..), (:+:) (..), (:.:) (..))
 
-import Data.Ord (Down (..))
+import GHC.Internal.Data.Ord (Down (..))
 
-import qualified Data.Monoid as Mon
+import qualified GHC.Internal.Data.Monoid as Mon
 
 -- Instances
 import Data.Functor.Compose          (Compose (..))
-import Data.Functor.Identity         (Identity (..))
+import GHC.Internal.Data.Functor.Identity         (Identity (..))
 
 import qualified Data.Functor.Product as Functor
 import qualified Data.Functor.Sum     as Functor
 
 -- coerce
-import Data.Coerce (Coercible, coerce)
+import GHC.Internal.Data.Coerce (Coercible, coerce)
 
 -- $setup
 -- >>> import Prelude hiding (foldr1, foldl1, head, last, minimum, maximum)

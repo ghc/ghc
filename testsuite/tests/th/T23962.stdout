@@ -1,1 +1,1 @@
-typeOf (Data.Proxy.Proxy :: Data.Proxy.Proxy *)
+typeOf (GHC.Internal.Data.Proxy.Proxy :: GHC.Internal.Data.Proxy.Proxy *)

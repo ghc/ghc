@@ -1,1 +1,1 @@
-cont_missing_prompt_err: GHC.Exts.control0#: no matching prompt in the current continuation
+cont_missing_prompt_err: GHC.Internal.Exts.control0#: no matching prompt in the current continuation

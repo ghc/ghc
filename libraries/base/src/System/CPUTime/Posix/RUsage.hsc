@@ -8,6 +8,7 @@ module System.CPUTime.Posix.RUsage
     , getCpuTimePrecision
     ) where
 
+import Prelude
 import Data.Ratio
 import Foreign
 import Foreign.C

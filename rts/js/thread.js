@@ -70,7 +70,7 @@ var h$blocked = new h$Set();
 function h$Thread() {
     this.tid = ++h$threadIdN;
     this.status = THREAD_RUNNING;
-    this.stack = [h$done, 0, h$ghczminternalZCGHCziConcziSynczireportError, h$catch_e];
+    this.stack = [h$done, 0, h$ghczminternalZCGHCziInternalziConcziSynczireportError, h$catch_e];
 #ifdef GHCJS_DEBUG_STACK
     this.stack = new Proxy(this.stack, {
      set(obj,prop,value) {
@@ -878,7 +878,7 @@ function h$handleBlockedSyncThread(c) {
       TRACE_SCHEDULER("blocking synchronous thread: exception")
       h$sp += 2;
       h$currentThread.sp = h$sp;
-      h$stack[h$sp-1] = h$ghczminternalZCGHCziJSziPrimziInternalziwouldBlock;
+      h$stack[h$sp-1] = h$ghczminternalZCGHCziInternalziJSziPrimziInternalziwouldBlock;
       h$stack[h$sp]   = h$raiseAsync_frame;
       h$forceWakeupThread(h$currentThread);
       c = h$raiseAsync_frame;
@@ -950,7 +950,7 @@ function h$setCurrentThreadResultValue(v) {
 function h$runSyncReturn(a, cont) {
   var t = new h$Thread();
   TRACE_SCHEDULER("h$runSyncReturn created thread: " + h$threadString(t))
-  var aa = MK_AP1(h$ghczminternalZCGHCziJSziPrimziInternalzisetCurrentThreadResultValue, a);
+  var aa = MK_AP1(h$ghczminternalZCGHCziInternalziJSziPrimziInternalzisetCurrentThreadResultValue, a);
   h$runSyncAction(t, aa, cont);
   if(t.status === THREAD_FINISHED) {
     if(t.resultIsException) {
@@ -993,7 +993,7 @@ function h$runSync(a, cont) {
 function h$runSyncAction(t, a, cont) {
   h$runInitStatic();
   var c = h$return;
-  t.stack[2] = h$ghczminternalZCGHCziJSziPrimziInternalzisetCurrentThreadResultException;
+  t.stack[2] = h$ghczminternalZCGHCziInternalziJSziPrimziInternalzisetCurrentThreadResultException;
   t.stack[4] = h$ap_1_0;
   t.stack[5] = a;
   t.stack[6] = h$return;
@@ -1147,7 +1147,7 @@ function h$main(a) {
     t.stack[0] = h$doneMain_e;
 #ifndef GHCJS_BROWSER
   if(!h$isBrowser() && !h$isGHCJSi()) {
-    t.stack[2] = h$ghczminternalZCGHCziTopHandlerzitopHandler;
+    t.stack[2] = h$ghczminternalZCGHCziInternalziTopHandlerzitopHandler;
   }
 #endif
   t.stack[4] = h$ap_1_0;
@@ -1392,7 +1392,7 @@ function h$blockOnBlackhole(c) {
   TRACE_SCHEDULER("blackhole, blocking: " + h$collectProps(c))
   if(BLACKHOLE_TID(c) === h$currentThread) {
     TRACE_SCHEDULER("NonTermination")
-    return h$throw(h$ghczminternalZCControlziExceptionziBasezinonTermination, true);
+    return h$throw(h$ghczminternalZCGHCziInternalziControlziExceptionziBasezinonTermination, true);
   }
   TRACE_SCHEDULER("blackhole, blocking thread: " + h$threadString(h$currentThread))
   if(BLACKHOLE_QUEUE(c) === null) {

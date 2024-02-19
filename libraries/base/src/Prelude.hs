@@ -47,11 +47,11 @@ module Prelude (
 
     -- ** Numbers
 
-    -- *** Numeric types
+    -- *** GHC.Internal.Numeric types
     Int, Integer, Float, Double,
     Rational, Word,
 
-    -- *** Numeric type classes
+    -- *** GHC.Internal.Numeric type classes
     Num((+), (-), (*), negate, abs, signum, fromInteger),
     Real(toRational),
     Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
@@ -63,7 +63,7 @@ module Prelude (
               encodeFloat, exponent, significand, scaleFloat, isNaN,
               isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
 
-    -- *** Numeric functions
+    -- *** GHC.Internal.Numeric functions
     subtract, even, odd, gcd, lcm, (^), (^^),
     fromIntegral, realToFrac,
 
@@ -164,22 +164,22 @@ module Prelude (
     type (~)
   ) where
 
-import Control.Monad
-import System.IO
-import System.IO.Error
-import qualified Data.List as List
-import Data.Either
-import Data.Foldable    ( Foldable(..) )
-import qualified Data.Foldable as Foldable
-import Data.Functor     ( (<$>) )
-import Data.Maybe
-import Data.Traversable ( Traversable(..) )
-import Data.Tuple
+import GHC.Internal.Control.Monad
+import GHC.Internal.System.IO
+import GHC.Internal.System.IO.Error
+import qualified GHC.Internal.Data.List as List
+import GHC.Internal.Data.Either
+import GHC.Internal.Data.Foldable    ( Foldable(..) )
+import qualified GHC.Internal.Data.Foldable as Foldable
+import GHC.Internal.Data.Functor     ( (<$>) )
+import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Traversable ( Traversable(..) )
+import GHC.Internal.Data.Tuple
 
-import GHC.Base hiding ( foldr, mapM, sequence )
-import Text.Read
-import GHC.Enum
-import GHC.Num
-import GHC.Real
-import GHC.Float
-import GHC.Show
+import GHC.Internal.Base hiding ( foldr, mapM, sequence )
+import GHC.Internal.Text.Read
+import GHC.Internal.Enum
+import GHC.Internal.Num
+import GHC.Internal.Real
+import GHC.Internal.Float
+import GHC.Internal.Show

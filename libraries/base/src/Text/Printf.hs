@@ -92,13 +92,14 @@ module Text.Printf(
   IsChar(..)
 ) where
 
+import Prelude
 import Data.Char
-import Data.Int
-import Data.List (stripPrefix)
-import Data.Word
-import Numeric
-import Numeric.Natural
-import System.IO
+import GHC.Internal.Data.Int
+import GHC.Internal.Data.List (stripPrefix)
+import GHC.Internal.Word
+import GHC.Internal.Numeric
+import GHC.Internal.Numeric.Natural
+import GHC.Internal.System.IO
 
 -- $setup
 -- >>> import Prelude
@@ -233,10 +234,10 @@ import System.IO
 --
 -- Note that the formatting for 'RealFloat' types is
 -- currently a bit different from that of C @printf(3)@,
--- conforming instead to 'Numeric.showEFloat',
--- 'Numeric.showFFloat' and 'Numeric.showGFloat' (and their
--- alternate versions 'Numeric.showFFloatAlt' and
--- 'Numeric.showGFloatAlt'). This is hard to fix: the fixed
+-- conforming instead to 'GHC.Internal.Numeric.showEFloat',
+-- 'GHC.Internal.Numeric.showFFloat' and 'GHC.Internal.Numeric.showGFloat' (and their
+-- alternate versions 'GHC.Internal.Numeric.showFFloatAlt' and
+-- 'GHC.Internal.Numeric.showGFloatAlt'). This is hard to fix: the fixed
 -- versions would format in a backward-incompatible way.
 -- In any case the Haskell behavior is generally more
 -- sensible than the C behavior.  A brief summary of some

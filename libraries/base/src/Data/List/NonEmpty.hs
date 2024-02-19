@@ -109,13 +109,13 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
 import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
-import           Data.Foldable       hiding (length, toList)
-import qualified Data.Foldable       as Foldable
-import           Data.Function       (on)
-import qualified Data.List           as List
-import           Data.Ord            (comparing)
-import           GHC.Base            (NonEmpty(..))
-import           GHC.Stack.Types     (HasCallStack)
+import           GHC.Internal.Data.Foldable       hiding (length, toList)
+import qualified GHC.Internal.Data.Foldable       as Foldable
+import           GHC.Internal.Data.Function       (on)
+import qualified GHC.Internal.Data.List           as List
+import           GHC.Internal.Data.Ord            (comparing)
+import           GHC.Internal.Base            (NonEmpty(..))
+import           GHC.Internal.Stack.Types     (HasCallStack)
 
 infixr 5 <|
 
@@ -155,7 +155,7 @@ uncons :: NonEmpty a -> (a, Maybe (NonEmpty a))
 uncons ~(a :| as) = (a, nonEmpty as)
 
 -- | The 'unfoldr' function is analogous to "Data.List"'s
--- 'Data.List.unfoldr' operation.
+-- 'GHC.Internal.Data.List.unfoldr' operation.
 unfoldr :: (a -> (b, Maybe a)) -> a -> NonEmpty b
 unfoldr f a = case f a of
   (b, mc) -> b :| maybe [] go mc
@@ -491,7 +491,7 @@ permutations xs0        =  xs0 :| perms xs0 []
             interleave' _ []     r = (ts, r)
             interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
                                      in  (y:us, f (t:y:us) : zs)
--- The implementation of 'permutations' is adopted from 'Data.List.permutations',
+-- The implementation of 'permutations' is adopted from 'GHC.Internal.Data.List.permutations',
 -- see there for discussion and explanations.
 
 -- | 'permutations1' operates like 'permutations', but uses the knowledge that its input is
@@ -534,7 +534,7 @@ zipWith f ~(x :| xs) ~(y :| ys) = f x y :| List.zipWith f xs ys
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: Functor f => f (a,b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
-{-# DEPRECATED unzip "This function will be made monomorphic in base-4.22, consider switching to Data.Functor.unzip" #-}
+{-# DEPRECATED unzip "This function will be made monomorphic in base-4.22, consider switching to GHC.Internal.Data.Functor.unzip" #-}
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurrence of each element.
@@ -550,7 +550,7 @@ nub = nubBy (==)
 nubBy :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty a
 nubBy eq (a :| as) = a :| List.nubBy eq (List.filter (\b -> not (eq a b)) as)
 
--- | 'transpose' for 'NonEmpty', behaves the same as 'Data.List.transpose'
+-- | 'transpose' for 'NonEmpty', behaves the same as 'GHC.Internal.Data.List.transpose'
 -- The rows/columns need not be the same length, in which case
 -- > transpose . transpose /= id
 transpose :: NonEmpty (NonEmpty a) -> NonEmpty (NonEmpty a)
@@ -558,7 +558,7 @@ transpose = fmap fromList
           . fromList . List.transpose . toList
           . fmap toList
 
--- | 'sortBy' for 'NonEmpty', behaves the same as 'Data.List.sortBy'
+-- | 'sortBy' for 'NonEmpty', behaves the same as 'GHC.Internal.Data.List.sortBy'
 sortBy :: (a -> a -> Ordering) -> NonEmpty a -> NonEmpty a
 sortBy f = lift (List.sortBy f)
 

@@ -4,5 +4,5 @@ mod152.hs:2:26: error: [GHC-87543]
     It could refer to
        either ‘Prelude.id’,
               imported from ‘Prelude’ at mod152.hs:2:8
-              (and originally defined in ‘GHC.Base’),
+              (and originally defined in ‘GHC.Internal.Base’),
            or ‘M.id’, defined at mod152.hs:2:36.

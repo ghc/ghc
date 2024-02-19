@@ -8,9 +8,10 @@ module System.CPUTime.Posix.Times
     , getCpuTimePrecision
     ) where
 
+import Prelude
 import Foreign
 import Data.Ratio
-import Foreign.C.Types
+import GHC.Internal.Foreign.C.Types
 import System.CPUTime.Utils
 
 -- for struct tms

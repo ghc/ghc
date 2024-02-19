@@ -1,1 +1,1 @@
-fptrfail01: GHC.ForeignPtr: attempt to mix Haskell and C finalizers in the same ForeignPtr
+fptrfail01: GHC.Internal.ForeignPtr: attempt to mix Haskell and C finalizers in the same ForeignPtr

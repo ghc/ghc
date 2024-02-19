@@ -42,7 +42,7 @@ module Data.Char
     , digitToInt
     , intToDigit
 
-    -- * Numeric representations
+    -- * GHC.Internal.Numeric representations
     , ord
     , chr
 
@@ -52,13 +52,13 @@ module Data.Char
     , readLitChar
     ) where
 
-import GHC.Base
-import GHC.Char
-import GHC.Real (fromIntegral)
-import GHC.Show
-import GHC.Read (readLitChar, lexLitChar)
-import GHC.Unicode
-import GHC.Num
+import GHC.Internal.Base
+import GHC.Internal.Char
+import GHC.Internal.Real (fromIntegral)
+import GHC.Internal.Show
+import GHC.Internal.Read (readLitChar, lexLitChar)
+import GHC.Internal.Unicode
+import GHC.Internal.Num
 
 -- $setup
 -- Allow the use of Prelude in doctests.

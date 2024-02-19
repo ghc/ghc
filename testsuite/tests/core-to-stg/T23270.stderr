@@ -4,15 +4,17 @@ Result size of CorePrep
   = {terms: 29, types: 19, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 14, types: 10, coercions: 0, joins: 0/0}
-T23270.f :: forall a. GHC.Maybe.Maybe a -> GHC.Types.Int
+T23270.f :: forall a. GHC.Internal.Maybe.Maybe a -> GHC.Types.Int
 [GblId, Arity=1, Unf=OtherCon []]
 T23270.f
-  = \ (@a) (x [Occ=Once1!] :: GHC.Maybe.Maybe a) ->
+  = \ (@a) (x [Occ=Once1!] :: GHC.Internal.Maybe.Maybe a) ->
       case x of {
-        GHC.Maybe.Nothing -> GHC.Types.I# 0#;
-        GHC.Maybe.Just _ [Occ=Dead] ->
-          case "T23270.hs:4:7-28|case"# of sat [Occ=Once1] { __DEFAULT ->
-          case Control.Exception.Base.patError @GHC.Types.LiftedRep @() sat
+        GHC.Internal.Maybe.Nothing -> GHC.Types.I# 0#;
+        GHC.Internal.Maybe.Just _ [Occ=Dead] ->
+          case "T23270.hs:4:7-28|case"# of sat [Occ=Once1, Dmd=SL]
+          { __DEFAULT ->
+          case GHC.Internal.Control.Exception.Base.patError
+                 @GHC.Types.LiftedRep @() sat
           of {}
           }
       }

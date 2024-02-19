@@ -11,12 +11,13 @@ docs:
          re-exported module(s): [Data.Functor.Identity]
            []
          re-exported module(s): [Data.Maybe]
-           [GHC.Maybe.Maybe{GHC.Maybe.Maybe, GHC.Maybe.Nothing,
-                            GHC.Maybe.Just},
-            Data.Maybe.maybe]
+           [GHC.Internal.Maybe.Maybe{GHC.Internal.Maybe.Maybe,
+                                     GHC.Internal.Maybe.Nothing, GHC.Internal.Maybe.Just},
+            GHC.Internal.Data.Maybe.maybe]
          re-exported module(s): [Data.Tuple]
-           [Data.Tuple.swap, Data.Tuple.curry, Data.Tuple.fst, Data.Tuple.snd,
-            Data.Tuple.uncurry]
+           [GHC.Internal.Data.Tuple.swap, GHC.Internal.Data.Tuple.curry,
+            GHC.Internal.Data.Tuple.fst, GHC.Internal.Data.Tuple.snd,
+            GHC.Internal.Data.Tuple.uncurry]
        named chunks:
        haddock options:
        language:

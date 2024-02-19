@@ -7,6 +7,7 @@ module System.CPUTime.Javascript
 where
 
 import qualified System.CPUTime.Unsupported as I
+import Prelude
 
 getCpuTimePrecision :: IO Integer
 getCpuTimePrecision = toInteger <$> js_cpuTimePrecision

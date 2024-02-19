@@ -592,11 +592,11 @@ function h$resolveDeadlocks() {
                 // blocked on MVar
                 if(bo.m === mark) throw "assertion failed: thread should have been marked";
                 // MVar unreachable
-                kill = h$ghczminternalZCGHCziJSziPrimziInternalziblockedIndefinitelyOnMVar;
+                kill = h$ghczminternalZCGHCziInternalziJSziPrimziInternalziblockedIndefinitelyOnMVar;
                 break;
             } else if(t.blockedOn instanceof h$TVarsWaiting) {
                 // blocked in STM transaction
-                kill = h$ghczminternalZCGHCziJSziPrimziInternalziblockedIndefinitelyOnSTM;
+                kill = h$ghczminternalZCGHCziInternalziJSziPrimziInternalziblockedIndefinitelyOnSTM;
                 break;
             } else {
                 // blocked on something else, we can't do anything

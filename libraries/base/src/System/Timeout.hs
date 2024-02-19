@@ -18,17 +18,18 @@
 module System.Timeout ( Timeout, timeout ) where
 
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-import Control.Monad
-import GHC.Event           (getSystemTimerManager,
+import GHC.Internal.Control.Monad
+import GHC.Internal.Event           (getSystemTimerManager,
                             registerTimeout, unregisterTimeout)
 #endif
 
 import Control.Concurrent
-import Control.Exception   (Exception(..), handleJust, bracket,
+import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             uninterruptibleMask_,
                             asyncExceptionToException,
                             asyncExceptionFromException)
-import Data.Unique         (Unique, newUnique)
+import GHC.Internal.Data.Unique         (Unique, newUnique)
+import Prelude
 
 -- $setup
 -- >>> import Prelude
@@ -85,8 +86,8 @@ instance Exception Timeout where
 -- @timeout@ is used to wrap an FFI call that blocks, no timeout event can be
 -- delivered until the FFI call returns, which pretty much negates the purpose
 -- of the combinator. In practice, however, this limitation is less severe than
--- it may sound. Standard I\/O functions like 'System.IO.hGetBuf',
--- 'System.IO.hPutBuf', Network.Socket.accept, or 'System.IO.hWaitForInput'
+-- it may sound. Standard I\/O functions like 'GHC.Internal.System.IO.hGetBuf',
+-- 'GHC.Internal.System.IO.hPutBuf', Network.Socket.accept, or 'GHC.Internal.System.IO.hWaitForInput'
 -- appear to be blocking, but they really don't because the runtime system uses
 -- scheduling mechanisms like @select(2)@ to perform asynchronous I\/O, so it
 -- is possible to interrupt standard socket I\/O or file I\/O using this

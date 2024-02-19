@@ -3,7 +3,8 @@ module System.CPUTime.Unsupported
     , getCpuTimePrecision
     ) where
 
-import GHC.IO.Exception
+import GHC.Internal.IO.Exception
+import Prelude
 
 getCPUTime :: IO Integer
 getCPUTime =

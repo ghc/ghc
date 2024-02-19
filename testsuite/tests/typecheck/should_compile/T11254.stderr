@@ -5,7 +5,7 @@ T11254.hs:16:10: warning: [GHC-18872] [-Wdeferred-type-errors (in -Wdefault)]
     • In the instance declaration for ‘ID Rational’
 
 T11254.hs:18:12: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘GHC.Real.Ratio Integer’ with ‘Int’
+    • Couldn't match type ‘GHC.Internal.Real.Ratio Integer’ with ‘Int’
       Expected: Rational -> Frac Rational
         Actual: Rational -> Rational
     • When checking that instance signature for ‘embed’

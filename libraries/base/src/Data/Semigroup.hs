@@ -85,7 +85,7 @@ module Data.Semigroup (
   , First(..)
   , Last(..)
   , WrappedMonoid(..)
-  -- * Re-exported monoids from Data.Monoid
+  -- * Re-exported monoids from GHC.Internal.Data.Monoid
   , Dual(..)
   , Endo(..)
   , All(..)
@@ -101,29 +101,29 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           GHC.Base hiding (Any)
-import           GHC.Enum
-import           GHC.Show
-import           GHC.Read
-import           GHC.Num
-import           GHC.Real
-import           Data.Functor ((<$>))
+import           GHC.Internal.Base hiding (Any)
+import           GHC.Internal.Enum
+import           GHC.Internal.Show
+import           GHC.Internal.Read
+import           GHC.Internal.Num
+import           GHC.Internal.Real
+import           GHC.Internal.Data.Functor ((<$>))
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
-import           Data.Foldable
-import           Data.Traversable
-import           Data.Semigroup.Internal
-import           Control.Monad.Fix
-import           Data.Data
+import           GHC.Internal.Data.Foldable
+import           GHC.Internal.Data.Traversable
+import           GHC.Internal.Data.Semigroup.Internal
+import           GHC.Internal.Control.Monad.Fix
+import           GHC.Internal.Data.Data
 import           GHC.Generics
-import qualified GHC.List as List
+import qualified GHC.Internal.List as List
 
 -- $setup
 -- >>> import Prelude
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
 
--- | A generalization of 'Data.List.cycle' to an arbitrary 'Semigroup'.
+-- | A generalization of 'GHC.Internal.Data.List.cycle' to an arbitrary 'Semigroup'.
 -- May fail to terminate for some values in some semigroups.
 --
 -- ==== __Examples__

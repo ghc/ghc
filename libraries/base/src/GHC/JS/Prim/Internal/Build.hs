@@ -1,0 +1,147 @@
+{-# LANGUAGE CPP #-}
+
+#if !defined(javascript_HOST_ARCH)
+
+module GHC.JS.Prim.Internal.Build () where
+
+#else
+
+module GHC.JS.Prim.Internal.Build
+  ( buildArrayI
+  , buildArrayM
+  , buildObjectI
+  , buildObjectM
+  , buildArrayI1
+  , buildArrayI2
+  , buildArrayI3
+  , buildArrayI4
+  , buildArrayI5
+  , buildArrayI6
+  , buildArrayI7
+  , buildArrayI8
+  , buildArrayI9
+  , buildArrayI10
+  , buildArrayI11
+  , buildArrayI12
+  , buildArrayI13
+  , buildArrayI14
+  , buildArrayI15
+  , buildArrayI16
+  , buildArrayI17
+  , buildArrayI18
+  , buildArrayI19
+  , buildArrayI20
+  , buildArrayI21
+  , buildArrayI22
+  , buildArrayI23
+  , buildArrayI24
+  , buildArrayI25
+  , buildArrayI26
+  , buildArrayI27
+  , buildArrayI28
+  , buildArrayI29
+  , buildArrayI30
+  , buildArrayI31
+  , buildArrayI32
+  , buildArrayM1
+  , buildArrayM2
+  , buildArrayM3
+  , buildArrayM4
+  , buildArrayM5
+  , buildArrayM6
+  , buildArrayM7
+  , buildArrayM8
+  , buildArrayM9
+  , buildArrayM10
+  , buildArrayM11
+  , buildArrayM12
+  , buildArrayM13
+  , buildArrayM14
+  , buildArrayM15
+  , buildArrayM16
+  , buildArrayM17
+  , buildArrayM18
+  , buildArrayM19
+  , buildArrayM20
+  , buildArrayM21
+  , buildArrayM22
+  , buildArrayM23
+  , buildArrayM24
+  , buildArrayM25
+  , buildArrayM26
+  , buildArrayM27
+  , buildArrayM28
+  , buildArrayM29
+  , buildArrayM30
+  , buildArrayM31
+  , buildArrayM32
+  , buildObjectI1
+  , buildObjectI2
+  , buildObjectI3
+  , buildObjectI4
+  , buildObjectI5
+  , buildObjectI6
+  , buildObjectI7
+  , buildObjectI8
+  , buildObjectI9
+  , buildObjectI10
+  , buildObjectI11
+  , buildObjectI12
+  , buildObjectI13
+  , buildObjectI14
+  , buildObjectI15
+  , buildObjectI16
+  , buildObjectI17
+  , buildObjectI18
+  , buildObjectI19
+  , buildObjectI20
+  , buildObjectI21
+  , buildObjectI22
+  , buildObjectI23
+  , buildObjectI24
+  , buildObjectI25
+  , buildObjectI26
+  , buildObjectI27
+  , buildObjectI28
+  , buildObjectI29
+  , buildObjectI30
+  , buildObjectI31
+  , buildObjectI32
+  , buildObjectM1
+  , buildObjectM2
+  , buildObjectM3
+  , buildObjectM4
+  , buildObjectM5
+  , buildObjectM6
+  , buildObjectM7
+  , buildObjectM8
+  , buildObjectM9
+  , buildObjectM10
+  , buildObjectM11
+  , buildObjectM12
+  , buildObjectM13
+  , buildObjectM14
+  , buildObjectM15
+  , buildObjectM16
+  , buildObjectM17
+  , buildObjectM18
+  , buildObjectM19
+  , buildObjectM20
+  , buildObjectM21
+  , buildObjectM22
+  , buildObjectM23
+  , buildObjectM24
+  , buildObjectM25
+  , buildObjectM26
+  , buildObjectM27
+  , buildObjectM28
+  , buildObjectM29
+  , buildObjectM30
+  , buildObjectM31
+  , buildObjectM32
+  ) where
+
+import GHC.Internal.JS.Prim.Internal.Build
+
+#endif
+

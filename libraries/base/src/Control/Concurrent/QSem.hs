@@ -23,10 +23,11 @@ module Control.Concurrent.QSem
           signalQSem    -- :: QSem -> IO ()
         ) where
 
-import Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar, tryTakeMVar
+import Prelude
+import GHC.Internal.Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar, tryTakeMVar
                           , putMVar, newMVar, tryPutMVar)
-import Control.Exception
-import Data.Maybe
+import GHC.Internal.Control.Exception
+import GHC.Internal.Data.Maybe
 
 -- | 'QSem' is a quantity semaphore in which the resource is acquired
 -- and released in units of one. It provides guaranteed FIFO ordering

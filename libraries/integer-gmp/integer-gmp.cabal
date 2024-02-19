@@ -36,6 +36,7 @@ library
       base >= 4.11 && < 5
     , ghc-prim
     , ghc-bignum
+    , ghc-internal
 
   exposed-modules:
     GHC.Integer.GMP.Internals

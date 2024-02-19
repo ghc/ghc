@@ -72,25 +72,26 @@ module Data.Functor.Classes (
 
 import Control.Applicative (Alternative((<|>)), Const(Const))
 
-import Data.Functor.Identity (Identity(Identity))
-import Data.Proxy (Proxy(Proxy))
+import GHC.Internal.Data.Functor.Identity (Identity(Identity))
+import GHC.Internal.Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Ord (Down(Down))
+import GHC.Internal.Data.Ord (Down(Down))
 import Data.Complex (Complex((:+)))
 
 import GHC.Generics (Generic1(..), Generically1(..))
 import GHC.Tuple (Solo (..))
-import GHC.Read (expectP, list, paren)
+import GHC.Internal.Read (expectP, list, paren)
 
-import Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
-import Text.Read (Read(..), parens, prec, step)
-import Text.Read.Lex (Lexeme(..))
-import Text.Show (showListWith)
+import GHC.Internal.Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
+import GHC.Internal.Text.Read (Read(..), parens, prec, step)
+import GHC.Internal.Text.Read.Lex (Lexeme(..))
+import GHC.Internal.Text.Show (showListWith)
+import Prelude
 
 -- $setup
 -- >>> import Prelude
 -- >>> import Data.Complex (Complex (..))
--- >>> import Text.ParserCombinators.ReadPrec
+-- >>> import GHC.Internal.Text.ParserCombinators.ReadPrec
 
 -- | Lifting of the 'Eq' class to unary type constructors.
 --

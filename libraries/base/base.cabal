@@ -22,8 +22,10 @@ description:    Haskell's base library provides, among other things, core types 
 
 Library
     default-language: Haskell2010
+    default-extensions: NoImplicitPrelude
     build-depends:
         ghc-internal >= 0.1 && < 0.2,
+        ghc-prim,
 
     exposed-modules:
           Control.Applicative
@@ -60,7 +62,7 @@ Library
         , System.Mem.Weak
         , System.Timeout
 
-    reexported-modules:
+    exposed-modules:
         , Control.Arrow
         , Control.Category
         , Control.Concurrent.MVar
@@ -269,7 +271,7 @@ Library
         , GHC.Num.BigNat
 
     if os(windows)
-        reexported-modules:
+        exposed-modules:
               GHC.IO.Encoding.CodePage.API
             , GHC.IO.Encoding.CodePage.Table
             , GHC.Conc.Windows
@@ -288,11 +290,11 @@ Library
             , GHC.IO.Windows.Encoding
             , GHC.IO.Windows.Paths
     else
-        reexported-modules:
+        exposed-modules:
             GHC.Event
 
     if arch(javascript)
-        reexported-modules:
+        exposed-modules:
               GHC.JS.Prim
             , GHC.JS.Prim.Internal
             , GHC.JS.Prim.Internal.Build

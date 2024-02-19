@@ -36,9 +36,10 @@ module Control.Concurrent.Chan
         writeList2Chan,
    ) where
 
+import Prelude
 import System.IO.Unsafe         ( unsafeInterleaveIO )
-import Control.Concurrent.MVar
-import Control.Exception (mask_)
+import GHC.Internal.Control.Concurrent.MVar
+import GHC.Internal.Control.Exception (mask_)
 
 #define _UPK_(x) {-# UNPACK #-} !(x)
 
@@ -128,7 +129,7 @@ dupChan (Chan _ writeVar) = do
 -- Operators for interfacing with functional streams.
 
 -- |Return a lazy list representing the contents of the supplied
--- 'Chan', much like 'System.IO.hGetContents'.
+-- 'Chan', much like 'GHC.Internal.System.IO.hGetContents'.
 getChanContents :: Chan a -> IO [a]
 getChanContents ch
   = unsafeInterleaveIO (do

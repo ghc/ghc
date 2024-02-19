@@ -61,7 +61,8 @@ fun2 :: forall {a}. [a] -> ((), Int)
          Tmpl= \ (@a) (x [Occ=Once1] :: [a]) ->
                  (T7360.fun4,
                   case x of wild [Occ=Once1] { __DEFAULT ->
-                  case GHC.List.$wlenAcc @a wild 0# of ww1 [Occ=Once1] { __DEFAULT ->
+                  case GHC.Internal.List.$wlenAcc @a wild 0# of ww1 [Occ=Once1]
+                  { __DEFAULT ->
                   GHC.Types.I# ww1
                   }
                   })}]
@@ -69,7 +70,7 @@ fun2
   = \ (@a) (x :: [a]) ->
       (T7360.fun4,
        case x of wild { __DEFAULT ->
-       case GHC.List.$wlenAcc @a wild 0# of ww1 { __DEFAULT ->
+       case GHC.Internal.List.$wlenAcc @a wild 0# of ww1 { __DEFAULT ->
        GHC.Types.I# ww1
        }
        })

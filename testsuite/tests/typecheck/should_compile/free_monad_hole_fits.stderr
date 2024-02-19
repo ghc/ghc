@@ -63,14 +63,14 @@ free_monad_hole_fits.hs:25:31: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault
           where (<*>) :: forall (f :: * -> *) a b.
                          Applicative f =>
                          f (a -> b) -> f a -> f b
-        (<$>) (_ :: a -> b)
-          where (<$>) :: forall (f :: * -> *) a b.
-                         Functor f =>
-                         (a -> b) -> f a -> f b
         (=<<) (_ :: a -> Free f b)
           where (=<<) :: forall (m :: * -> *) a b.
                          Monad m =>
                          (a -> m b) -> m a -> m b
+        (<$>) (_ :: a -> b)
+          where (<$>) :: forall (f :: * -> *) a b.
+                         Functor f =>
+                         (a -> b) -> f a -> f b
         ($) (_ :: Free f a -> Free f b)
           where ($) :: forall a b. (a -> b) -> a -> b
         pure (_ :: Free f b)

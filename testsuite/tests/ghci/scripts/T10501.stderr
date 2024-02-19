@@ -1,8 +1,8 @@
 *** Exception: Prelude.head: empty list
 CallStack (from HasCallStack):
-  error, called at libraries/ghc-internal/src/GHC/List.hs:2018:3 in ghc-internal:GHC.List
-  errorEmptyList, called at libraries/ghc-internal/src/GHC/List.hs:90:11 in ghc-internal:GHC.List
-  badHead, called at libraries/ghc-internal/src/GHC/List.hs:84:28 in ghc-internal:GHC.List
+  error, called at libraries/ghc-internal/src/GHC/Internal/List.hs:2030:3 in ghc-internal:GHC.Internal.List
+  errorEmptyList, called at libraries/ghc-internal/src/GHC/Internal/List.hs:96:11 in ghc-internal:GHC.Internal.List
+  badHead, called at libraries/ghc-internal/src/GHC/Internal/List.hs:90:28 in ghc-internal:GHC.Internal.List
   head, called at <interactive>:1:10 in interactive:Ghci1
 *** Exception: Prelude.undefined
 CallStack (from HasCallStack):

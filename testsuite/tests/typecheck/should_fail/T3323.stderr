@@ -1,27 +1,37 @@
 
 T3323.hs:18:7: error: [GHC-39999]
-    • Could not deduce ‘GHC.IO.Device.RawIO dev0’
-      from the context: (GHC.IO.Device.RawIO dev,
-                         GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev,
-                         ghc-internal-0.1.0.0:Data.Typeable.Internal.Typeable dev)
+    • Could not deduce ‘GHC.Internal.IO.Device.RawIO dev0’
+      from the context: (GHC.Internal.IO.Device.RawIO dev,
+                         GHC.Internal.IO.Device.IODevice dev,
+                         GHC.Internal.IO.BufferedIO.BufferedIO dev,
+                         ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                           dev)
         bound by a pattern with constructor:
                    Handle__ :: forall dev enc_state dec_state.
-                               (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev,
-                                GHC.IO.BufferedIO.BufferedIO dev,
-                                ghc-internal-0.1.0.0:Data.Typeable.Internal.Typeable dev) =>
+                               (GHC.Internal.IO.Device.RawIO dev,
+                                GHC.Internal.IO.Device.IODevice dev,
+                                GHC.Internal.IO.BufferedIO.BufferedIO dev,
+                                ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                                  dev) =>
                                dev
                                -> HandleType
-                               -> GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.Word.Word8)
+                               -> GHC.Internal.IORef.IORef
+                                    (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)
                                -> BufferMode
-                               -> GHC.IORef.IORef (dec_state, GHC.IO.Buffer.Buffer GHC.Word.Word8)
-                               -> GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.IO.Buffer.CharBufElem)
-                               -> GHC.IORef.IORef (BufferList GHC.IO.Buffer.CharBufElem)
-                               -> Maybe (GHC.IO.Encoding.Types.TextEncoder enc_state)
-                               -> Maybe (GHC.IO.Encoding.Types.TextDecoder dec_state)
-                               -> Maybe GHC.IO.Encoding.Types.TextEncoding
+                               -> GHC.Internal.IORef.IORef
+                                    (dec_state,
+                                     GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)
+                               -> GHC.Internal.IORef.IORef
+                                    (GHC.Internal.IO.Buffer.Buffer
+                                       GHC.Internal.IO.Buffer.CharBufElem)
+                               -> GHC.Internal.IORef.IORef
+                                    (BufferList GHC.Internal.IO.Buffer.CharBufElem)
+                               -> Maybe (GHC.Internal.IO.Encoding.Types.TextEncoder enc_state)
+                               -> Maybe (GHC.Internal.IO.Encoding.Types.TextDecoder dec_state)
+                               -> Maybe GHC.Internal.IO.Encoding.Types.TextEncoding
                                -> Newline
                                -> Newline
-                               -> Maybe (GHC.MVar.MVar Handle__)
+                               -> Maybe (GHC.Internal.MVar.MVar Handle__)
                                -> Handle__,
                  in a record update
         at T3323.hs:18:7-28

@@ -36,7 +36,7 @@ test('safePkg01',
      run_command, ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
 # Fail since we enable package trust
-test('ImpSafe01', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust base'])
+test('ImpSafe01', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust ghc-internal'])
 
 # Succeed since we don't enable package trust
 test('ImpSafe02', normal, compile, ['-distrust base'])
@@ -50,7 +50,7 @@ test('ImpSafe03',
   ], '-fpackage-trust' ])
 
 # Fail same as ImpSafe01 but testing with -XTrustworthy now
-test('ImpSafe04', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust base'])
+test('ImpSafe04', normalise_version('ghc-internal', 'base'), compile_fail, ['-fpackage-trust -distrust ghc-internal'])
 
 test('ImpSafeOnly01',
      [js_broken(22349),
