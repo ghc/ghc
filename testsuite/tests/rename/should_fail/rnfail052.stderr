@@ -2,17 +2,17 @@
 rnfail052.hs:7:6: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use ExplicitForAll
+      to enable syntax: forall <tvs>. <type>
 
 rnfail052.hs:10:14: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use ExplicitForAll
+      to enable syntax: forall <tvs>. <type>
 
 rnfail052.hs:13:15: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use ExplicitForAll
+      to enable syntax: forall <tvs>. <type>

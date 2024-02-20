@@ -2,5 +2,5 @@
 T3155.hs:14:9: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use ExplicitForAll
+      to enable syntax: forall <tvs>. <type>

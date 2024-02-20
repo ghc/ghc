@@ -674,10 +674,9 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordDotInvalid{}             -> noHints
     PsErrIllegalPatSynExport                      -> [suggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
-    PsErrExplicitForall is_unicode                ->
-      let info = text "or a similar language extension to enable explicit-forall syntax:" <+>
-                 forallSym is_unicode <+> text "<tvs>. <type>"
-      in [ suggestExtensionWithInfo info LangExt.RankNTypes ]
+    PsErrExplicitForall is_unicode                -> [useExtensionInOrderTo info LangExt.ExplicitForAll]
+      where info = text "to enable syntax:" <+> forallSym is_unicode <+> user_code "tvs" <> dot <+> user_code "type"
+            user_code = angleBrackets . text
     PsErrIllegalQualifiedDo{}                     -> [suggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
@@ -732,9 +731,8 @@ instance Diagnostic PsMessage where
     PsErrIfInFunAppExpr{}                         -> suggestParensAndBlockArgs
     PsErrProcInFunAppExpr{}                       -> suggestParensAndBlockArgs
     PsErrMalformedTyOrClDecl{}                    -> noHints
-    PsErrIllegalWhereInDataDecl                   ->
-      [ suggestExtensionWithInfo (text "or a similar language extension to enable syntax: data T where")
-                                 LangExt.GADTs ]
+    PsErrIllegalWhereInDataDecl                   -> [useExtensionInOrderTo info LangExt.GADTSyntax]
+      where info = text "to enable syntax: data T where"
     PsErrIllegalDataTypeContext{}                 -> [suggestExtension LangExt.DatatypeContexts]
     PsErrPrimStringInvalidChar                    -> noHints
     PsErrSuffixAT                                 -> noHints
