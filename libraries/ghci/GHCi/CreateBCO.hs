@@ -80,11 +80,10 @@ linkBCO' arr ResolvedBCO{..} = do
       !(I# arity#)  = resolvedBCOArity
 
       !(EmptyArr empty#) = emptyArr -- See Note [BCO empty array]
-
-      barr a = case a of UArray _lo _hi n b -> if n == 0 then empty# else b
-      insns_barr = barr resolvedBCOInstrs
-      bitmap_barr = barr (toWordArray resolvedBCOBitmap)
-      literals_barr = barr (toWordArray resolvedBCOLits)
+      barr arr# = if I# (sizeofByteArray# arr#) == 0 then empty# else arr#
+      insns_barr = barr (getBCOByteArray resolvedBCOInstrs)
+      bitmap_barr = barr (getBCOByteArray resolvedBCOBitmap)
+      literals_barr = barr (getBCOByteArray resolvedBCOLits)
 
   PtrsArr marr <- mkPtrsArray arr n_ptrs ptrs
   IO $ \s ->

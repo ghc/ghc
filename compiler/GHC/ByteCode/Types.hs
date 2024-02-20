@@ -1,6 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE UnliftedNewtypes           #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -8,6 +10,8 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
+  , BCOInstrs, getBCOInstrs, BCOBitmap, getBCOBitmap
+  , instrsFromUArray, bitmapFromUArray
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
@@ -36,7 +40,6 @@ import Control.DeepSeq
 
 import Foreign
 import Data.Array
-import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -45,6 +48,9 @@ import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
 import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Base (ByteArray#)
+import Data.Array.Unboxed (UArray)
+import Data.Array.Base (UArray(..))
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -148,12 +154,26 @@ newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
 newtype AddrPtr = AddrPtr (RemotePtr ())
   deriving (NFData)
 
+-- | 'BCOInstrs' is backed by an 'ByteArray#' and stores
+-- 'Word16' elements.
+newtype BCOInstrs = BCOInstrs { getBCOInstrs :: ByteArray# }
+
+-- | 'BCOBitmap' is backed by an 'ByteArray#' and stores
+-- 'Word64' elements.
+newtype BCOBitmap = BCOBitmap { getBCOBitmap :: ByteArray# }
+
+instrsFromUArray :: UArray Int Word16 -> BCOInstrs
+instrsFromUArray !(UArray _ _ _ barr) = BCOInstrs barr
+
+bitmapFromUArray :: UArray Int Word64 -> BCOBitmap
+bitmapFromUArray !(UArray _ _ _ barr) = BCOBitmap barr
+
 data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
-        unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
-        unlinkedBCOBitmap :: !(UArray Int Word64),      -- bitmap
+        unlinkedBCOInstrs :: !BCOInstrs,      -- insns
+        unlinkedBCOBitmap :: !BCOBitmap,      -- bitmap
         unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
         unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
    }

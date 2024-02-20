@@ -1,17 +1,23 @@
 {-# LANGUAGE RecordWildCards, DeriveGeneric, GeneralizedNewtypeDeriving,
-    BangPatterns, CPP #-}
+    BangPatterns, CPP, MagicHash, FlexibleInstances, FlexibleContexts,
+    TypeApplications, ScopedTypeVariables #-}
 module GHCi.ResolvedBCO
   ( ResolvedBCO(..)
   , ResolvedBCOPtr(..)
   , isLittleEndian
+  , BCOByteArray(..)
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
+import GHC.Base (ByteArray#, sizeofByteArray#, Int (I#))
 import GHC.Data.SizedSeq
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 
-import Data.Array.Unboxed
+import qualified Data.Array.IO.Internals as A
+import qualified Data.Array.Base as A
+
+import Data.Array.Base(UArray(UArray))
 import Data.Binary
 import GHC.Generics
 import GHCi.BinaryArray
@@ -32,18 +38,24 @@ isLittleEndian = True
 -- | A 'ResolvedBCO' is one in which all the 'Name' references have been
 -- resolved to actual addresses or 'RemoteHValues'.
 --
--- Note, all arrays are zero-indexed (we assume this when
--- serializing/deserializing)
 data ResolvedBCO
    = ResolvedBCO {
         resolvedBCOIsLE   :: Bool,
         resolvedBCOArity  :: {-# UNPACK #-} !Int,
-        resolvedBCOInstrs :: UArray Int Word16,         -- insns
-        resolvedBCOBitmap :: UArray Int Word64,         -- bitmap
-        resolvedBCOLits   :: UArray Int Word64,         -- non-ptrs
+        resolvedBCOInstrs :: BCOByteArray Word16,       -- insns
+        resolvedBCOBitmap :: BCOByteArray Word64,       -- bitmap
+        resolvedBCOLits   :: BCOByteArray Word64,       -- non-ptrs
         resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ptrs
    }
    deriving (Generic, Show)
+
+data BCOByteArray a = BCOByteArray { getBCOByteArray :: ByteArray# }
+
+instance Show (BCOByteArray Word16) where
+  showsPrec n = showsPrec n . bcoByteArrayToUArray
+
+instance Show (BCOByteArray Word64) where
+  showsPrec n = showsPrec n . bcoByteArrayToUArray
 
 -- | The Binary instance for ResolvedBCOs.
 --
@@ -54,12 +66,36 @@ instance Binary ResolvedBCO where
   put ResolvedBCO{..} = do
     put resolvedBCOIsLE
     put resolvedBCOArity
-    putArray resolvedBCOInstrs
-    putArray resolvedBCOBitmap
-    putArray resolvedBCOLits
+    put resolvedBCOInstrs
+    put resolvedBCOBitmap
+    put resolvedBCOLits
     put resolvedBCOPtrs
   get = ResolvedBCO
-        <$> get <*> get <*> getArray <*> getArray <*> getArray <*> get
+        <$> get <*> get <*> get <*> get <*> get <*> get
+
+instance Binary (BCOByteArray Word16) where
+  put = putBCOByteArray
+  get = decodeBCOByteArray
+
+instance Binary (BCOByteArray Word64) where
+  put = putBCOByteArray
+  get = decodeBCOByteArray
+
+bcoByteArrayToUArray :: BCOByteArray a -> UArray Int a
+bcoByteArrayToUArray (BCOByteArray arr#) =
+  let n# = sizeofByteArray# arr#
+      n = I# n#
+  in UArray 0 (n - 1) n arr#
+
+putBCOByteArray :: BCOByteArray a -> Put
+putBCOByteArray =
+  putArray . bcoByteArrayToUArray
+
+decodeBCOByteArray :: forall a. A.MArray A.IOUArray a IO => Get (BCOByteArray a)
+decodeBCOByteArray = do
+  !(UArray _ _ _ arr#) <- getArray :: Get (UArray Int a)
+  pure $ BCOByteArray arr#
+
 
 data ResolvedBCOPtr
   = ResolvedBCORef {-# UNPACK #-} !Int
