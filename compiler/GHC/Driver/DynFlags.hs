@@ -140,6 +140,8 @@ import qualified Data.Set as Set
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Time.Clock
+
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -459,7 +461,9 @@ data DynFlags = DynFlags {
     -- 'Int' because it can be used to test uniques in decreasing order.
 
   -- | Temporary: CFG Edge weights for fast iterations
-  cfgWeights            :: Weights
+  cfgWeights            :: Weights,
+
+  compilationStartTime  :: Maybe UTCTime
 }
 
 class HasDynFlags m where
@@ -513,6 +517,7 @@ initDynFlags dflags = do
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
  tmp_dir <- normalise <$> getTemporaryDirectory
+ time <- getCurrentTime
  return dflags{
         useUnicode    = useUnicode',
         useColor      = useColor',
@@ -520,7 +525,8 @@ initDynFlags dflags = do
         -- if the terminal supports color, we assume it supports links as well
         canUseErrorLinks = stderrSupportsAnsiColors,
         colScheme     = colScheme',
-        tmpDir        = TempDir tmp_dir
+        tmpDir        = TempDir tmp_dir,
+        compilationStartTime = Just time
         }
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
@@ -711,7 +717,9 @@ defaultDynFlags mySettings =
 
         reverseErrors = False,
         maxErrors     = Nothing,
-        cfgWeights    = defaultWeights
+        cfgWeights    = defaultWeights,
+
+        compilationStartTime = Nothing
       }
 
 type FatalMessager = String -> IO ()

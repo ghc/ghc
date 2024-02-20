@@ -28,5 +28,6 @@ initLogFlags dflags = LogFlags
   , log_enable_debug         = not (hasNoDebugOutput dflags)
   , log_verbosity            = verbosity dflags
   , log_ways                 = Just $ ways dflags
+  , log_compile_start_time   = compilationStartTime dflags
   }
 

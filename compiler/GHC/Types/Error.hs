@@ -114,6 +114,9 @@ import Text.Printf ( printf )
 import GHC.Version (cProjectVersion)
 import GHC.Types.Hint.Ppr () -- Outputtable instance
 
+import Data.Time.Clock
+import System.Directory
+
 {- Note [Messages]
 ~~~~~~~~~~~~~~~~~~
 We represent the 'Messages' as a single bag of warnings and errors.
@@ -712,9 +715,9 @@ getMessageClassColour (MCDiagnostic SevWarning _reason _code) = Col.sWarning
 getMessageClassColour MCFatal                                 = Col.sFatal
 getMessageClassColour _                                       = const mempty
 
-getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
-getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
+getCaretDiagnostic :: Maybe UTCTime -> MessageClass -> SrcSpan -> IO SDoc
+getCaretDiagnostic _ _ (UnhelpfulSpan _) = pure empty
+getCaretDiagnostic mtime msg_class (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -727,13 +730,19 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
       -- (a) no lazy IO, otherwise IO exceptions may occur in pure code
       -- (b) always UTF-8, rather than some system-dependent encoding
       --     (Haskell source code must be UTF-8 anyway)
-      content <- hGetStringBuffer fn
+      content <- hGetStringBuffer fn -- JADE_TODO
+
+      foo fn
+
       case atLine i content of
         Just at_line -> pure $
           case lines (fix <$> lexemeToString at_line (len at_line)) of
             srcLine : _ -> Just srcLine
             _           -> Nothing
         _ -> pure Nothing
+
+    foo fn | Just time <- mtime = pure () -- JADE_TODO -- getModificationTime fn > time
+           | otherwise = pure ()
 
     -- allow user to visibly see that their code is incorrectly encoded
     -- (StringBuffer.nextChar uses \0 to represent undecodable characters)

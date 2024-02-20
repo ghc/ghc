@@ -127,6 +127,7 @@ data LogFlags = LogFlags
   , log_enable_debug         :: !Bool               -- ^ Enable debug output
   , log_verbosity            :: !Int                -- ^ Verbosity level
   , log_ways                 :: !(Maybe Ways)         -- ^ Current ways (to name dump files)
+  , log_compile_start_time   :: !(Maybe UTCTime)
   }
 
 -- | Default LogFlags
@@ -147,6 +148,7 @@ defaultLogFlags = LogFlags
   , log_enable_debug         = False
   , log_verbosity            = 0
   , log_ways                 = Nothing
+  , log_compile_start_time   = Nothing
   }
 
 -- | Test if a DumpFlag is enabled
@@ -420,7 +422,7 @@ defaultLogAction logflags msg_class srcSpan msg
         hPutChar stderr '\n'
         caretDiagnostic <-
             if log_show_caret logflags
-            then getCaretDiagnostic msg_class srcSpan
+            then getCaretDiagnostic (log_compile_start_time logflags) msg_class srcSpan
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
