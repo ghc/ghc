@@ -215,8 +215,8 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
              (text "bytecode instruction count mismatch")
 
   let asm_insns = ssElts final_insns
-      insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
-      bitmap_arr = mkBitmapArray bsize bitmap
+      !insns_arr =  instrsFromUArray $ Array.listArray (0 :: Int, fromIntegral n_insns - 1) asm_insns
+      !bitmap_arr = bitmapFromUArray $ mkBitmapArray bsize bitmap
       ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr final_lits final_ptrs
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
