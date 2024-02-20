@@ -1,6 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE UnliftedNewtypes           #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -8,6 +10,7 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
+  , BCOByteArray(..), mkBCOByteArray
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
@@ -34,10 +37,10 @@ import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI
 import Control.DeepSeq
+import GHCi.ResolvedBCO ( BCOByteArray(..), mkBCOByteArray )
 
 import Foreign
 import Data.Array
-import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -153,8 +156,8 @@ data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
-        unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
-        unlinkedBCOBitmap :: !(UArray Int Word64),      -- bitmap
+        unlinkedBCOInstrs :: !(BCOByteArray Word16),      -- insns
+        unlinkedBCOBitmap :: !(BCOByteArray Word),      -- bitmap
         unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
         unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
    }

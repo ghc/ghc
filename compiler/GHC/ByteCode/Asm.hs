@@ -213,8 +213,8 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
              (text "bytecode instruction count mismatch")
 
   let asm_insns = ssElts final_insns
-      insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
-      bitmap_arr = mkBitmapArray bsize bitmap
+      !insns_arr =  mkBCOByteArray $ Array.listArray (0 :: Int, fromIntegral n_insns - 1) asm_insns
+      !bitmap_arr = mkBCOByteArray $ mkBitmapArray bsize bitmap
       ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSizedSeq final_lits) (fromSizedSeq final_ptrs)
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
@@ -224,7 +224,7 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
 
   return ul_bco
 
-mkBitmapArray :: Word -> [StgWord] -> UArray Int Word64
+mkBitmapArray :: Word -> [StgWord] -> UArray Int Word
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.
