@@ -44,15 +44,18 @@ bool needStubForRelaRISCV64(Elf_Rela *rela) {
 // riscv64 assembly. (See
 // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/5ffe5b5aeedb37b1c1c0c3d94641267d9ad4795a/riscv-elf.adoc#procedure-linkage-table)
 bool makeStubRISCV64(Stub *s) {
-  uint32_t * P = (uint32_t *)s->addr;
-  int32_t addr = (uint64_t) s->got_addr - (uint64_t) P;
+  uint32_t *P = (uint32_t *)s->addr;
+  int32_t addr = (uint64_t)s->got_addr - (uint64_t)P;
 
   uint64_t hi = (addr + 0x800) >> 12;
   uint64_t lo = addr - (hi << 12);
 
-  debugBelch("makeStubRISCV64: P = %p, got_addr = %p, target = %p, addr = 0x%x "
-             ", hi = 0x%lx, lo = 0x%lx\n",
-             P, s->got_addr, s->target, addr, hi, lo);
+  IF_DEBUG(
+      linker,
+      debugBelch(
+          "makeStubRISCV64: P = %p, got_addr = %p, target = %p, addr = 0x%x "
+          ", hi = 0x%lx, lo = 0x%lx\n",
+          P, s->got_addr, s->target, addr, hi, lo));
 
   // AUIPC ip, %pcrel_hi(addr)
   uint32_t auipcInst = 0b0010111; // opcode

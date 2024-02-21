@@ -134,9 +134,9 @@ uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end) {
 }
 
 uint32_t setLO12_I(uint32_t insn, uint32_t imm) {
-  debugBelch(
-      "setLO12_I: insn 0x%x imm 0x%x (insn & 0xfffff) 0x%x (imm << 20) 0x%x \n",
-      insn, imm, (insn & 0xfffff), (imm << 20));
+  IF_DEBUG(linker, debugBelch("setLO12_I: insn 0x%x imm 0x%x (insn & 0xfffff) "
+                              "0x%x (imm << 20) 0x%x \n",
+                              insn, imm, (insn & 0xfffff), (imm << 20)));
   return (insn & 0xfffff) | (imm << 20);
 }
 
@@ -155,12 +155,14 @@ void setUType(inst_t *loc, uint32_t val) {
 void setIType(inst_t *loc, uint32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
-  debugBelch("setIType: hi 0x%lx lo 0x%lx\n", hi, lo);
-  debugBelch("setIType: loc %p  *loc 0x%x  val 0x%x\n", loc, *loc, val);
+  IF_DEBUG(linker, debugBelch("setIType: hi 0x%lx lo 0x%lx\n", hi, lo));
+  IF_DEBUG(linker, debugBelch("setIType: loc %p  *loc 0x%x  val 0x%x\n", loc,
+                              *loc, val));
   uint32_t insn = setLO12_I(read32le(loc), lo & 0xfff);
-  debugBelch("setIType: insn 0x%x\n", insn);
+  IF_DEBUG(linker, debugBelch("setIType: insn 0x%x\n", insn));
   write32le(loc, insn);
-  debugBelch("setIType: loc %p  *loc' 0x%x  val 0x%x\n", loc, *loc, val);
+  IF_DEBUG(linker, debugBelch("setIType: loc %p  *loc' 0x%x  val 0x%x\n", loc,
+                              *loc, val));
 }
 
 void setSType(inst_t *loc, uint32_t val) {
@@ -226,11 +228,14 @@ void setCJType(cinst_t *loc, uint32_t val) {
 
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
-  debugBelch("Relocation type %s 0x%lx (%lu) symbol 0x%lx addend 0x%lx (%lu / "
-             "%ld) P 0x%lx\n",
-             relocationTypeToString(rel->r_info), ELF64_R_TYPE(rel->r_info),
-             ELF64_R_TYPE(rel->r_info), ELF64_R_SYM(rel->r_info), addend,
-             addend, addend, P);
+  IF_DEBUG(
+      linker,
+      debugBelch(
+          "Relocation type %s 0x%lx (%lu) symbol 0x%lx addend 0x%lx (%lu / "
+          "%ld) P 0x%lx\n",
+          relocationTypeToString(rel->r_info), ELF64_R_TYPE(rel->r_info),
+          ELF64_R_TYPE(rel->r_info), ELF64_R_SYM(rel->r_info), addend, addend,
+          addend, P));
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32_PCREL:
   case R_RISCV_32:
@@ -362,8 +367,9 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
 
   int64_t A = addend;
 
-  debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx\n",
-             relocationTypeToString(rel->r_info), P, S, symbol->name, GOT_S, A);
+  IF_DEBUG(linker, debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx\n",
+                              relocationTypeToString(rel->r_info), P, S,
+                              symbol->name, GOT_S, A));
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32:
     return S + A;
@@ -391,12 +397,14 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_CALL_PLT: {
     if (findStub(section, (void **)&S, 0)) {
       /* did not find it. Crete a new stub. */
-      if (makeStub(section, (void **)&S, (void*) GOT_S, 0)) {
+      if (makeStub(section, (void **)&S, (void *)GOT_S, 0)) {
         abort(/* could not find or make stub */);
       }
     }
-    debugBelch("S = 0x%lx  A = 0x%lx  P = 0x%lx  (S + A) - P = 0x%lx \n", S, A,
-               P, (S + A) - P);
+    IF_DEBUG(
+        linker,
+        debugBelch("S = 0x%lx  A = 0x%lx  P = 0x%lx  (S + A) - P = 0x%lx \n", S,
+                   A, P, (S + A) - P));
     return (S + A) - P;
   }
   case R_RISCV_ADD8:
