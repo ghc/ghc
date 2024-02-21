@@ -1,6 +1,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 module GHC.Data.FlatBag
-  ( FlatBag
+  ( FlatBag(EmptyFlatBag, UnitFlatBag, TupleFlatBag)
   , emptyFlatBag
   , unitFlatBag
   , sizeFlatBag

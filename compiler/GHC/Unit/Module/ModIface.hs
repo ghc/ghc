@@ -289,6 +289,19 @@ That's why in GHC.Driver.Main.hscMaybeWriteIface there is the call to
 forceModIface.
 -}
 
+
+{- Note [Storing flat structures in 'ModIface']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To reduce memory usage of GHCi, we have started to migrate to flat
+representations of lists of data over the standard linked list.
+
+For example, we prefer 'Array Int e' over '[e]' (even though we would prefer
+'Vector e').
+
+As '[e]' requires more space than 'Array Int e' in all cases but the empty list,
+this allows us to save a noticeable amount of memory.
+-}
+
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
 mi_boot :: ModIface -> IsBootInterface

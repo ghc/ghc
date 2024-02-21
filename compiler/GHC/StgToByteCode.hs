@@ -91,6 +91,7 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+import Data.Array as Array
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -119,14 +120,14 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
-             mapM schemeTopBind flattened_binds
+             FlatBag.fromList (length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
              (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
-           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           (vcat (intersperse (char ' ') (map ppr $ Array.elems proto_bcos)))
 
         cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs
           (case modBreaks of
