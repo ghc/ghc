@@ -13,6 +13,61 @@
 
 #if defined(OBJFORMAT_ELF)
 
+char *relocationTypeToString(Elf64_Xword type) {
+  switch (ELF64_R_TYPE(type)) {
+  case R_RISCV_NONE:
+    return "R_RISCV_NONE";
+  case R_RISCV_32:
+    return "R_RISCV_32";
+  case R_RISCV_64:
+    return "R_RISCV_64";
+  case R_RISCV_RELATIVE:
+    return "R_RISCV_RELATIVE";
+  case R_RISCV_COPY:
+    return "R_RISCV_COPY";
+  case R_RISCV_JUMP_SLOT:
+    return "R_RISCV_JUMP_SLOT";
+  case R_RISCV_TLS_DTPMOD32:
+    return "R_RISCV_TLS_DTPMOD32";
+  case R_RISCV_TLS_DTPMOD64:
+    return "R_RISCV_TLS_DTPMOD64";
+  case R_RISCV_TLS_DTPREL32:
+    return "R_RISCV_TLS_DTPREL32";
+  case R_RISCV_TLS_DTPREL64:
+    return "R_RISCV_TLS_DTPREL64";
+  case R_RISCV_TLS_TPREL32:
+    return "R_RISCV_TLS_TPREL32";
+  case R_RISCV_TLS_TPREL64:
+    return "R_RISCV_TLS_TPREL64";
+  case R_RISCV_BRANCH:
+    return "R_RISCV_BRANCH";
+  case R_RISCV_JAL:
+    return "R_RISCV_JAL";
+  case R_RISCV_CALL:
+    return "R_RISCV_CALL";
+  case R_RISCV_CALL_PLT:
+    return "R_RISCV_CALL_PLT";
+  case R_RISCV_GOT_HI20:
+    return "R_RISCV_GOT_HI20";
+  case R_RISCV_PCREL_HI20:
+    return "R_RISCV_PCREL_HI20";
+  case R_RISCV_LO12_I:
+    return "R_RISCV_LO12_I";
+  case R_RISCV_PCREL_LO12_I:
+    return "R_RISCV_PCREL_LO12_I";
+  case R_RISCV_HI20:
+    return "R_RISCV_HI20";
+  case R_RISCV_LO12_S:
+    return "R_RISCV_LO12_S";
+  case R_RISCV_PCREL_LO12_S:
+    return "R_RISCV_PCREL_LO12_S";
+  case R_RISCV_RELAX:
+    return "R_RISCV_RELAX";
+  default:
+    return "Unknown relocation type";
+  }
+}
+
 #define Page(x) ((x) & ~0xFFF)
 
 typedef uint64_t addr_t;
@@ -79,6 +134,9 @@ uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end) {
 }
 
 uint32_t setLO12_I(uint32_t insn, uint32_t imm) {
+  debugBelch(
+      "setLO12_I: insn 0x%x imm 0x%x (insn & 0xfffff) 0x%x (imm << 20) 0x%x \n",
+      insn, imm, (insn & 0xfffff), (imm << 20));
   return (insn & 0xfffff) | (imm << 20);
 }
 
@@ -97,7 +155,12 @@ void setUType(inst_t *loc, uint32_t val) {
 void setIType(inst_t *loc, uint32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
-  write32le(loc, setLO12_I(read32le(loc), lo & 0xfff));
+  debugBelch("setIType: hi 0x%lx lo 0x%lx\n", hi, lo);
+  debugBelch("setIType: loc %p  *loc 0x%x  val 0x%x\n", loc, *loc, val);
+  uint32_t insn = setLO12_I(read32le(loc), lo & 0xfff);
+  debugBelch("setIType: insn 0x%x\n", insn);
+  write32le(loc, insn);
+  debugBelch("setIType: loc %p  *loc' 0x%x  val 0x%x\n", loc, *loc, val);
 }
 
 void setSType(inst_t *loc, uint32_t val) {
@@ -163,6 +226,11 @@ void setCJType(cinst_t *loc, uint32_t val) {
 
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
+  debugBelch("Relocation type %s 0x%lx (%lu) symbol 0x%lx addend 0x%lx (%lu / "
+             "%ld) P 0x%lx\n",
+             relocationTypeToString(rel->r_info), ELF64_R_TYPE(rel->r_info),
+             ELF64_R_TYPE(rel->r_info), ELF64_R_SYM(rel->r_info), addend,
+             addend, addend, P);
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32_PCREL:
   case R_RISCV_32:
@@ -194,8 +262,12 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
     setBType((inst_t *)P, addend);
     break;
   }
+  case R_RISCV_CALL:
   case R_RISCV_CALL_PLT: {
+    // We could relax more (in some cases) but right now most important is to
+    // make it work.
     setUType((inst_t *)P, addend);
+    setIType(((inst_t *)P) + 1, addend);
     break;
   }
   case R_RISCV_JAL: {
@@ -289,6 +361,9 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   addr_t GOT_S = (addr_t)symbol->got_addr;
 
   int64_t A = addend;
+
+  debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx\n",
+             relocationTypeToString(rel->r_info), P, S, symbol->name, GOT_S, A);
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32:
     return S + A;
@@ -313,8 +388,17 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_BRANCH:
     return S + A - P;
   case R_RISCV_CALL:
-  case R_RISCV_CALL_PLT:
-    return S + A - P;
+  case R_RISCV_CALL_PLT: {
+    if (findStub(section, (void **)&S, 0)) {
+      /* did not find it. Crete a new stub. */
+      if (makeStub(section, (void **)&S, (void*) GOT_S, 0)) {
+        abort(/* could not find or make stub */);
+      }
+    }
+    debugBelch("S = 0x%lx  A = 0x%lx  P = 0x%lx  (S + A) - P = 0x%lx \n", S, A,
+               P, (S + A) - P);
+    return (S + A) - P;
+  }
   case R_RISCV_ADD8:
   case R_RISCV_ADD16:
   case R_RISCV_ADD32:
@@ -370,8 +454,8 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
 
       CHECK(0x0 != symbol);
 
-      // TODO: This always fails, because we don't support Rel locations: Do we
-      // need this case?
+      // TODO: This always fails, because we don't support Rel locations: Do
+      // we need this case?
       /* decode implicit addend */
       int64_t addend = decodeAddendRISCV64(targetSection, rel);
 
