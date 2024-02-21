@@ -48,7 +48,7 @@ import GHC.Internal.Data.Bits
 utf8 :: TextEncoding
 utf8 = mkUTF8 ErrorOnCodingFailure
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 mkUTF8 :: CodingFailureMode -> TextEncoding
 mkUTF8 cfm = TextEncoding { textEncodingName = "UTF-8",
                             mkTextDecoder = utf8_DF cfm,

@@ -78,8 +78,8 @@ data State = Created
            | Running
            | Dying
            | Finished
-             deriving ( Eq   -- ^ @since 4.7.0.0
-                      , Show -- ^ @since 4.7.0.0
+             deriving ( Eq   -- ^ @since base-4.7.0.0
+                      , Show -- ^ @since base-4.7.0.0
                       )
 
 -- | The event manager state.

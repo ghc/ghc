@@ -164,7 +164,7 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- >>> sqrt $ [1 / n^2 | n <- [1..1000]] & sum & (*6)
 -- 3.1406380562059946
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 (&) :: forall r a (b :: TYPE r). a -> (a -> b) -> b
 x & f = f x
 
@@ -187,7 +187,7 @@ x & f = f x
 --
 -- * @applyWhen 'False' f = 'id'@
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 applyWhen :: Bool -> (a -> a) -> a -> a
 applyWhen True  f x = f x
 applyWhen False _ x = x

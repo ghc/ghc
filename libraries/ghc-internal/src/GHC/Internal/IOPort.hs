@@ -82,7 +82,7 @@ notice in future releases.
 
 -}
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Eq (IOPort a) where
         (IOPort ioport1#) == (IOPort ioport2#) =
             isTrue# (sameIOPort# ioport1# ioport2#)

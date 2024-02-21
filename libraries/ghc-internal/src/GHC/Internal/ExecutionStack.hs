@@ -26,7 +26,7 @@
 --  ,("RTS expects libdw","YES")
 -- @
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.ExecutionStack (

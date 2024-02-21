@@ -115,7 +115,7 @@ module GHC.Internal.Exts
         --
         -- | These are available from the /Trustworthy/ module "Data.Coerce" as well.
         --
-        -- @since 4.7.0.0
+        -- @since base-4.7.0.0
         GHC.Internal.Data.Coerce.coerce,
 
         -- ** Very unsafe coercion
@@ -123,7 +123,7 @@ module GHC.Internal.Exts
 
         -- ** Casting class dictionaries with single methods
         --
-        --   @since 4.17.0.0
+        --   @since base-4.17.0.0
         WithDict(..),
 
         -- * Converting ADTs to constructor tags
@@ -221,8 +221,8 @@ traceEvent = GHC.Internal.Debug.Trace.traceEventIO
 -- entire ghc package at runtime
 
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving ( Data -- ^ @since 4.3.0.0
-                         , Eq   -- ^ @since 4.3.0.0
+                deriving ( Data -- ^ @since base-4.3.0.0
+                         , Eq   -- ^ @since base-4.3.0.0
                          )
 
 
@@ -262,7 +262,7 @@ atomicModifyMutVar# mv f s =
 -- to allow garbage collection of the original 'SmallMutableArray#'  in
 -- case a new 'SmallMutableArray#' had to be allocated.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 resizeSmallMutableArray#
   :: SmallMutableArray# s a -- ^ Array to resize
   -> Int# -- ^ New size of array

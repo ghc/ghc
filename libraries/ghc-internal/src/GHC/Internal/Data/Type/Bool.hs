@@ -16,7 +16,7 @@
 --
 -- Basic operations on type-level Booleans.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Type.Bool (
@@ -54,7 +54,7 @@ infixr 2 ||
 
 -- | Type-level "not". An injective type family since @4.10.0.0@.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family Not a = res | res -> a where
   Not 'False = 'True
   Not 'True  = 'False

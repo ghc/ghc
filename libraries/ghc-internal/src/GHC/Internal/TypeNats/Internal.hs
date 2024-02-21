@@ -25,7 +25,7 @@
 -- to prevent module cycles while still allowing these identifiers to be
 -- imported in "Data.Type.Ord".
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 
 module GHC.Internal.TypeNats.Internal
   ( Natural
@@ -37,5 +37,5 @@ import GHC.Num.Natural(Natural)
 
 -- | Comparison of type-level naturals, as a function.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family CmpNat (m :: Natural) (n :: Natural) :: Ordering

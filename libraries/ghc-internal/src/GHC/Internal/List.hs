@@ -110,7 +110,7 @@ badHead = errorEmptyList "head"
 -- * If the list is non-empty, returns @'Just' (x, xs)@,
 -- where @x@ is the 'head' of the list and @xs@ its 'tail'.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 --
 -- ==== __Examples__
 --
@@ -159,7 +159,7 @@ uncons (x:xs)           = Just (x, xs)
 -- >>> head . fst <$> unsnoc (1 : 2 : undefined)
 -- Just 1
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 unsnoc :: [a] -> Maybe ([a], a)
 -- The lazy pattern ~(a, b) is important to be productive on infinite lists
 -- and not to be prone to stack overflows.

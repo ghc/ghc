@@ -484,7 +484,7 @@ getSomeCharacters handle_@Handle__{..} buf@Buffer{..} =
 -- | The 'hGetContents'' operation reads all input on the given handle
 -- before returning it as a 'String' and closing the handle.
 --
--- @since 4.15.0.0
+-- @since base-4.15.0.0
 
 hGetContents' :: Handle -> IO String
 hGetContents' handle = do

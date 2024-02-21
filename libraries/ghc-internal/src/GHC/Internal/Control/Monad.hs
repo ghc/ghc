@@ -376,7 +376,7 @@ infixl 4 <$!>
 
 -- | Strict version of 'Data.Functor.<$>'.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 (<$!>) :: Monad m => (a -> b) -> m a -> m b
 {-# INLINE (<$!>) #-}
 f <$!> m = do

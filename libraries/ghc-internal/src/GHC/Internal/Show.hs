@@ -165,40 +165,40 @@ appPrec1 = I# 11#       -- appPrec + 1
 -- Simple Instances
 --------------------------------------------------------------
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Show Void
 
--- | @since 2.01
+-- | @since base-2.01
 deriving instance Show ()
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Show a => Show (Solo a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show a => Show [a]  where
   {-# SPECIALISE instance Show [String] #-}
   {-# SPECIALISE instance Show [Char] #-}
   {-# SPECIALISE instance Show [Int] #-}
   showsPrec _         = showList
 
--- | @since 2.01
+-- | @since base-2.01
 deriving instance Show Bool
 
--- | @since 2.01
+-- | @since base-2.01
 deriving instance Show Ordering
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Show Char  where
     showsPrec _ '\'' = showString "'\\''"
     showsPrec _ c    = showChar '\'' . showLitChar c . showChar '\''
 
     showList cs = showChar '"' . showLitString cs . showChar '"'
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Int where
     showsPrec = showSignedInt
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Word where
     showsPrec _ (W# w) = showWord w
 
@@ -211,30 +211,30 @@ showWord w# cs
       !c#         = chr# (ord# '0'# +# word2Int# r)
     in showWord q (C# c# : cs)
 
--- | @since 2.01
+-- | @since base-2.01
 deriving instance Show a => Show (Maybe a)
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Show a => Show (NonEmpty a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show TyCon where
   showsPrec p (TyCon _ _ _ tc_name _ _) = showsPrec p tc_name
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Show TrName where
   showsPrec _ (TrNameS s) = showString (unpackCStringUtf8# s)
   showsPrec _ (TrNameD s) = showString s
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Show Module where
   showsPrec _ (Module p m) = shows p . (':' :) . shows m
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Show CallStack where
   showsPrec _ = shows . getCallStack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Show SrcLoc
 
 --------------------------------------------------------------
@@ -247,60 +247,60 @@ deriving instance Show SrcLoc
 --      showsPrec _ (x,y) = let sx = shows x; sy = shows y in
 --                          \s -> showChar '(' (sx (showChar ',' (sy (showChar ')' s))))
 
--- | @since 2.01
+-- | @since base-2.01
 instance  (Show a, Show b) => Show (a,b)  where
   showsPrec _ (a,b) s = show_tuple [shows a, shows b] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c) => Show (a, b, c) where
   showsPrec _ (a,b,c) s = show_tuple [shows a, shows b, shows c] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
   showsPrec _ (a,b,c,d) s = show_tuple [shows a, shows b, shows c, shows d] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
   showsPrec _ (a,b,c,d,e) s = show_tuple [shows a, shows b, shows c, shows d, shows e] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f) => Show (a,b,c,d,e,f) where
   showsPrec _ (a,b,c,d,e,f) s = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g)
         => Show (a,b,c,d,e,f,g) where
   showsPrec _ (a,b,c,d,e,f,g) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h)
          => Show (a,b,c,d,e,f,g,h) where
   showsPrec _ (a,b,c,d,e,f,g,h) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i)
          => Show (a,b,c,d,e,f,g,h,i) where
   showsPrec _ (a,b,c,d,e,f,g,h,i) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j)
          => Show (a,b,c,d,e,f,g,h,i,j) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k)
          => Show (a,b,c,d,e,f,g,h,i,j,k) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l) where
@@ -308,7 +308,7 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m) where
@@ -316,7 +316,7 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l, shows m] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m, Show n)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
@@ -324,7 +324,7 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l, shows m, shows n] s
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m, Show n, Show o)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
@@ -477,7 +477,7 @@ itos n# cs
 -- The Integer instances for Show
 --------------------------------------------------------------
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Integer where
     showsPrec p (IS i) r = showsPrec p (I# i) r
     showsPrec p n r
@@ -488,7 +488,7 @@ instance Show Integer where
         | otherwise = integerToString n r
     showList = showList__ (showsPrec 0)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Show Natural where
     showsPrec p (NS w) = showsPrec p (W# w)
     showsPrec p n      = showsPrec p (integerFromNatural n)
@@ -603,17 +603,17 @@ instance Show KindRep where
       . showString " "
       . showsPrec 11 q
 
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 deriving instance Show Levity
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Show RuntimeRep
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Show VecCount
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Show VecElem
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Show TypeLitSort

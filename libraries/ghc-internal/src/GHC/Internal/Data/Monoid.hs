@@ -140,18 +140,18 @@ import GHC.Internal.Data.Semigroup.Internal
 -- >>> First Nothing <> mempty
 -- First {getFirst = Nothing}
 newtype First a = First { getFirst :: Maybe a }
-        deriving ( Eq          -- ^ @since 2.01
-                 , Ord         -- ^ @since 2.01
-                 , Read        -- ^ @since 2.01
-                 , Show        -- ^ @since 2.01
-                 , Generic     -- ^ @since 4.7.0.0
-                 , Generic1    -- ^ @since 4.7.0.0
-                 , Functor     -- ^ @since 4.8.0.0
-                 , Applicative -- ^ @since 4.8.0.0
-                 , Monad       -- ^ @since 4.8.0.0
+        deriving ( Eq          -- ^ @since base-2.01
+                 , Ord         -- ^ @since base-2.01
+                 , Read        -- ^ @since base-2.01
+                 , Show        -- ^ @since base-2.01
+                 , Generic     -- ^ @since base-4.7.0.0
+                 , Generic1    -- ^ @since base-4.7.0.0
+                 , Functor     -- ^ @since base-4.8.0.0
+                 , Applicative -- ^ @since base-4.8.0.0
+                 , Monad       -- ^ @since base-4.8.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (First a) where
         First Nothing <> b = b
         a             <> _ = a
@@ -161,7 +161,7 @@ instance Semigroup (First a) where
           | otherwise    = first
 
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid (First a) where
         mempty = First Nothing
 
@@ -182,24 +182,24 @@ instance Monoid (First a) where
 -- >>> Last Nothing <> mempty
 -- Last {getLast = Nothing}
 newtype Last a = Last { getLast :: Maybe a }
-        deriving ( Eq          -- ^ @since 2.01
-                 , Ord         -- ^ @since 2.01
-                 , Read        -- ^ @since 2.01
-                 , Show        -- ^ @since 2.01
-                 , Generic     -- ^ @since 4.7.0.0
-                 , Generic1    -- ^ @since 4.7.0.0
-                 , Functor     -- ^ @since 4.8.0.0
-                 , Applicative -- ^ @since 4.8.0.0
-                 , Monad       -- ^ @since 4.8.0.0
+        deriving ( Eq          -- ^ @since base-2.01
+                 , Ord         -- ^ @since base-2.01
+                 , Read        -- ^ @since base-2.01
+                 , Show        -- ^ @since base-2.01
+                 , Generic     -- ^ @since base-4.7.0.0
+                 , Generic1    -- ^ @since base-4.7.0.0
+                 , Functor     -- ^ @since base-4.8.0.0
+                 , Applicative -- ^ @since base-4.8.0.0
+                 , Monad       -- ^ @since base-4.8.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (Last a) where
         a <> Last Nothing = a
         _ <> b                   = b
         stimes = stimesIdempotentMonoid
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid (Last a) where
         mempty = Last Nothing
 
@@ -214,32 +214,32 @@ instance Monoid (Last a) where
 -- >>> Ap [Sum 10, Sum 20] <> Ap [Sum 1, Sum 2]
 -- Ap {getAp = [Sum {getSum = 11},Sum {getSum = 12},Sum {getSum = 21},Sum {getSum = 22}]}
 --
--- @since 4.12.0.0
+-- @since base-4.12.0.0
 newtype Ap f a = Ap { getAp :: f a }
-        deriving ( Alternative -- ^ @since 4.12.0.0
-                 , Applicative -- ^ @since 4.12.0.0
-                 , Enum        -- ^ @since 4.12.0.0
-                 , Eq          -- ^ @since 4.12.0.0
-                 , Functor     -- ^ @since 4.12.0.0
-                 , Generic     -- ^ @since 4.12.0.0
-                 , Generic1    -- ^ @since 4.12.0.0
-                 , Monad       -- ^ @since 4.12.0.0
-                 , MonadFail   -- ^ @since 4.12.0.0
-                 , MonadPlus   -- ^ @since 4.12.0.0
-                 , Ord         -- ^ @since 4.12.0.0
-                 , Read        -- ^ @since 4.12.0.0
-                 , Show        -- ^ @since 4.12.0.0
+        deriving ( Alternative -- ^ @since base-4.12.0.0
+                 , Applicative -- ^ @since base-4.12.0.0
+                 , Enum        -- ^ @since base-4.12.0.0
+                 , Eq          -- ^ @since base-4.12.0.0
+                 , Functor     -- ^ @since base-4.12.0.0
+                 , Generic     -- ^ @since base-4.12.0.0
+                 , Generic1    -- ^ @since base-4.12.0.0
+                 , Monad       -- ^ @since base-4.12.0.0
+                 , MonadFail   -- ^ @since base-4.12.0.0
+                 , MonadPlus   -- ^ @since base-4.12.0.0
+                 , Ord         -- ^ @since base-4.12.0.0
+                 , Read        -- ^ @since base-4.12.0.0
+                 , Show        -- ^ @since base-4.12.0.0
                  )
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Applicative f, Semigroup a) => Semigroup (Ap f a) where
         (Ap x) <> (Ap y) = Ap $ liftA2 (<>) x y
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Applicative f, Monoid a) => Monoid (Ap f a) where
         mempty = Ap $ pure mempty
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Applicative f, Bounded a) => Bounded (Ap f a) where
   minBound = pure minBound
   maxBound = pure maxBound
@@ -270,7 +270,7 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
 -- >>> (Ap [1,2] * 3) + (Ap [1,2] * 4)
 -- Ap {getAp = [7,11,10,14]}
 --
--- @since 4.12.0.0
+-- @since base-4.12.0.0
 instance (Applicative f, Num a) => Num (Ap f a) where
   (+)         = liftA2 (+)
   (*)         = liftA2 (*)

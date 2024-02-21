@@ -76,8 +76,8 @@ throw e = raise# (toException e)
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
 data ErrorCall = ErrorCallWithLocation String String
-    deriving ( Eq  -- ^ @since 4.7.0.0
-             , Ord -- ^ @since 4.7.0.0
+    deriving ( Eq  -- ^ @since base-4.7.0.0
+             , Ord -- ^ @since base-4.7.0.0
              )
 
 pattern ErrorCall :: String -> ErrorCall
@@ -86,10 +86,10 @@ pattern ErrorCall err <- ErrorCallWithLocation err _ where
 
 {-# COMPLETE ErrorCall #-}
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Exception ErrorCall
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err "") = showString err
   showsPrec _ (ErrorCallWithLocation err loc) =
@@ -116,7 +116,7 @@ showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 
 -- | Pretty print a 'SrcLoc'.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 prettySrcLoc :: SrcLoc -> String
 prettySrcLoc SrcLoc {..}
   = foldr (++) ""
@@ -128,7 +128,7 @@ prettySrcLoc SrcLoc {..}
 
 -- | Pretty print a 'CallStack'.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 prettyCallStack :: CallStack -> String
 prettyCallStack = intercalate "\n" . prettyCallStackLines
 

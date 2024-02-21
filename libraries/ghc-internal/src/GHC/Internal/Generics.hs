@@ -32,7 +32,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 --
 -- If you're using @GHC.Generics@, you should consider using the
 -- <http://hackage.haskell.org/package/generic-deriving> package, which
@@ -762,231 +762,231 @@ import GHC.Internal.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
 
 -- | Void: used for datatypes without constructors
 data V1 (p :: k)
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Read     -- ^ @since 4.9.0.0
-           , Show     -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Read     -- ^ @since base-4.9.0.0
+           , Show     -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance Semigroup (V1 p) where
   v <> _ = v
 
 -- | Unit: used for constructors without arguments
 data U1 (p :: k) = U1
-  deriving ( Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Eq (U1 p) where
   _ == _ = True
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Ord (U1 p) where
   compare _ _ = EQ
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Read (U1 p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Show (U1 p) where
   showsPrec _ _ = showString "U1"
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Functor U1 where
   fmap _ _ = U1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Applicative U1 where
   pure _ = U1
   _ <*> _ = U1
   liftA2 _ _ _ = U1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Alternative U1 where
   empty = U1
   _ <|> _ = U1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monad U1 where
   _ >>= _ = U1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadPlus U1
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance Semigroup (U1 p) where
   _ <> _ = U1
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance Monoid (U1 p) where
   mempty = U1
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Applicative Par1 where
   pure = Par1
   (<*>) = coerce
   liftA2 = coerce
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monad Par1 where
   Par1 x >>= f = f x
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Semigroup p => Semigroup (Par1 p)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Monoid p => Monoid (Par1 p)
 
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
 newtype Rec1 (f :: k -> Type) (p :: k) = Rec1 { unRec1 :: f p }
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Applicative f => Applicative (Rec1 f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Alternative f => Alternative (Rec1 f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monad f => Monad (Rec1 f) where
   Rec1 x >>= f = Rec1 (x >>= \a -> unRec1 (f a))
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance MonadPlus f => MonadPlus (Rec1 f)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Semigroup (f p) => Semigroup (Rec1 f p)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Monoid (f p) => Monoid (Rec1 f p)
 
 -- | Constants, additional parameters and recursion of kind @*@
 newtype K1 (i :: Type) c (p :: k) = K1 { unK1 :: c }
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance Monoid c => Applicative (K1 i c) where
   pure _ = K1 mempty
   liftA2 = \_ -> coerce (mappend :: c -> c -> c)
   (<*>) = coerce (mappend :: c -> c -> c)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Semigroup c => Semigroup (K1 i c p)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Monoid c => Monoid (K1 i c p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Applicative f => Applicative (M1 i c f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Alternative f => Alternative (M1 i c f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Monad f => Monad (M1 i c f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance MonadPlus f => MonadPlus (M1 i c f)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Semigroup (f p) => Semigroup (M1 i c f p)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Monoid (f p) => Monoid (M1 i c f p)
 
 -- | Meta-information (constructor names, etc.)
 newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
     M1 { unM1 :: f p }
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
 data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
 data (:*:) (f :: k -> Type) (g :: k -> Type) (p :: k) = f p :*: g p
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :*: g) where
   pure a = pure a :*: pure a
   (f :*: g) <*> (x :*: y) = (f <*> x) :*: (g <*> y)
   liftA2 f (a :*: b) (x :*: y) = liftA2 f a x :*: liftA2 f b y
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Alternative f, Alternative g) => Alternative (f :*: g) where
   empty = empty :*: empty
   (x1 :*: y1) <|> (x2 :*: y2) = (x1 <|> x2) :*: (y1 <|> y2)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Monad f, Monad g) => Monad (f :*: g) where
   (m :*: n) >>= f = (m >>= \a -> fstP (f a)) :*: (n >>= \a -> sndP (f a))
     where
       fstP (a :*: _) = a
       sndP (_ :*: b) = b
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (MonadPlus f, MonadPlus g) => MonadPlus (f :*: g)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Semigroup (f p), Semigroup (g p)) => Semigroup ((f :*: g) p) where
   (x1 :*: y1) <> (x2 :*: y2) = (x1 <> x2) :*: (y1 <> y2)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
   mempty = mempty :*: mempty
 
@@ -994,134 +994,134 @@ instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
 infixr 7 :.:
 newtype (:.:) (f :: k2 -> Type) (g :: k1 -> k2) (p :: k1) =
     Comp1 { unComp1 :: f (g p) }
-  deriving ( Eq       -- ^ @since 4.7.0.0
-           , Ord      -- ^ @since 4.7.0.0
-           , Read     -- ^ @since 4.7.0.0
-           , Show     -- ^ @since 4.7.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.7.0.0
+           , Ord      -- ^ @since base-4.7.0.0
+           , Read     -- ^ @since base-4.7.0.0
+           , Show     -- ^ @since base-4.7.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :.: g) where
   pure x = Comp1 (pure (pure x))
   Comp1 f <*> Comp1 x = Comp1 (liftA2 (<*>) f x)
   liftA2 f (Comp1 x) (Comp1 y) = Comp1 (liftA2 (liftA2 f) x y)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Alternative f, Applicative g) => Alternative (f :.: g) where
   empty = Comp1 empty
   (<|>) = coerce ((<|>) :: f (g a) -> f (g a) -> f (g a)) ::
     forall a . (f :.: g) a -> (f :.: g) a -> (f :.: g) a
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Semigroup (f (g p)) => Semigroup ((f :.: g) p)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
 
 -- | Constants of unlifted kinds
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data family URec (a :: Type) (p :: k)
 
 -- | Used for marking occurrences of 'Addr#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec (Ptr ()) (p :: k) = UAddr { uAddr# :: Addr# }
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Used for marking occurrences of 'Char#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec Char (p :: k) = UChar { uChar# :: Char# }
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Show     -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Show     -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Used for marking occurrences of 'Double#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec Double (p :: k) = UDouble { uDouble# :: Double# }
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Show     -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Show     -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Used for marking occurrences of 'Float#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec Float (p :: k) = UFloat { uFloat# :: Float# }
   deriving ( Eq, Ord, Show
-           , Functor  -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
            , Generic
-           , Generic1 -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Used for marking occurrences of 'Int#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec Int (p :: k) = UInt { uInt# :: Int# }
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Show     -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Show     -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Used for marking occurrences of 'Word#'
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data instance URec Word (p :: k) = UWord { uWord# :: Word# }
-  deriving ( Eq       -- ^ @since 4.9.0.0
-           , Ord      -- ^ @since 4.9.0.0
-           , Show     -- ^ @since 4.9.0.0
-           , Functor  -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.9.0.0
-           , Generic1 -- ^ @since 4.9.0.0
+  deriving ( Eq       -- ^ @since base-4.9.0.0
+           , Ord      -- ^ @since base-4.9.0.0
+           , Show     -- ^ @since base-4.9.0.0
+           , Functor  -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.9.0.0
+           , Generic1 -- ^ @since base-4.9.0.0
            )
 
 -- | Type synonym for @'URec' 'Addr#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UAddr   = URec (Ptr ())
 -- | Type synonym for @'URec' 'Char#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UChar   = URec Char
 
 -- | Type synonym for @'URec' 'Double#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UDouble = URec Double
 
 -- | Type synonym for @'URec' 'Float#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UFloat  = URec Float
 
 -- | Type synonym for @'URec' 'Int#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UInt    = URec Int
 
 -- | Type synonym for @'URec' 'Word#'@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type UWord   = URec Word
 
 -- | Tag for K1: recursion (of kind @Type@)
@@ -1154,15 +1154,15 @@ class Datatype d where
   moduleName   :: t d (f :: k -> Type) (a :: k) -> [Char]
   -- | The package name of the module where the type is declared
   --
-  -- @since 4.9.0.0
+  -- @since base-4.9.0.0
   packageName :: t d (f :: k -> Type) (a :: k) -> [Char]
   -- | Marks if the datatype is actually a newtype
   --
-  -- @since 4.7.0.0
+  -- @since base-4.7.0.0
   isNewtype    :: t d (f :: k -> Type) (a :: k) -> Bool
   isNewtype _ = False
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (KnownSymbol n, KnownSymbol m, KnownSymbol p, SingI nt)
     => Datatype ('MetaData n m p nt) where
   datatypeName _ = symbolVal (Proxy :: Proxy n)
@@ -1183,7 +1183,7 @@ class Constructor c where
   conIsRecord :: t c (f :: k -> Type) (a :: k) -> Bool
   conIsRecord _ = False
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (KnownSymbol n, SingI f, SingI r)
     => Constructor ('MetaCons n f r) where
   conName     _ = symbolVal (Proxy :: Proxy n)
@@ -1193,16 +1193,16 @@ instance (KnownSymbol n, SingI f, SingI r)
 -- | Datatype to represent the fixity of a constructor. An infix
 -- | declaration directly corresponds to an application of 'Infix'.
 data Fixity = Prefix | Infix Associativity Int
-  deriving ( Eq       -- ^ @since 4.6.0.0
-           , Show     -- ^ @since 4.6.0.0
-           , Ord      -- ^ @since 4.6.0.0
-           , Read     -- ^ @since 4.6.0.0
-           , Generic  -- ^ @since 4.7.0.0
+  deriving ( Eq       -- ^ @since base-4.6.0.0
+           , Show     -- ^ @since base-4.6.0.0
+           , Ord      -- ^ @since base-4.6.0.0
+           , Read     -- ^ @since base-4.6.0.0
+           , Generic  -- ^ @since base-4.7.0.0
            )
 
 -- | This variant of 'Fixity' appears at the type level.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data FixityI = PrefixI | InfixI Associativity Nat
 
 -- | Get the precedence of a fixity value.
@@ -1214,14 +1214,14 @@ prec (Infix _ n) = n
 data Associativity = LeftAssociative
                    | RightAssociative
                    | NotAssociative
-  deriving ( Eq       -- ^ @since 4.6.0.0
-           , Show     -- ^ @since 4.6.0.0
-           , Ord      -- ^ @since 4.6.0.0
-           , Read     -- ^ @since 4.6.0.0
-           , Enum     -- ^ @since 4.9.0.0
-           , Bounded  -- ^ @since 4.9.0.0
-           , Ix       -- ^ @since 4.9.0.0
-           , Generic  -- ^ @since 4.7.0.0
+  deriving ( Eq       -- ^ @since base-4.6.0.0
+           , Show     -- ^ @since base-4.6.0.0
+           , Ord      -- ^ @since base-4.6.0.0
+           , Read     -- ^ @since base-4.6.0.0
+           , Enum     -- ^ @since base-4.9.0.0
+           , Bounded  -- ^ @since base-4.9.0.0
+           , Ix       -- ^ @since base-4.9.0.0
+           , Generic  -- ^ @since base-4.7.0.0
            )
 
 -- | The unpackedness of a field as the user wrote it in the source code. For
@@ -1236,18 +1236,18 @@ data Associativity = LeftAssociative
 -- The fields of @ExampleConstructor@ have 'NoSourceUnpackedness',
 -- 'SourceNoUnpack', and 'SourceUnpack', respectively.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data SourceUnpackedness = NoSourceUnpackedness
                         | SourceNoUnpack
                         | SourceUnpack
-  deriving ( Eq      -- ^ @since 4.9.0.0
-           , Show    -- ^ @since 4.9.0.0
-           , Ord     -- ^ @since 4.9.0.0
-           , Read    -- ^ @since 4.9.0.0
-           , Enum    -- ^ @since 4.9.0.0
-           , Bounded -- ^ @since 4.9.0.0
-           , Ix      -- ^ @since 4.9.0.0
-           , Generic -- ^ @since 4.9.0.0
+  deriving ( Eq      -- ^ @since base-4.9.0.0
+           , Show    -- ^ @since base-4.9.0.0
+           , Ord     -- ^ @since base-4.9.0.0
+           , Read    -- ^ @since base-4.9.0.0
+           , Enum    -- ^ @since base-4.9.0.0
+           , Bounded -- ^ @since base-4.9.0.0
+           , Ix      -- ^ @since base-4.9.0.0
+           , Generic -- ^ @since base-4.9.0.0
            )
 
 -- | The strictness of a field as the user wrote it in the source code. For
@@ -1260,18 +1260,18 @@ data SourceUnpackedness = NoSourceUnpackedness
 -- The fields of @ExampleConstructor@ have 'NoSourceStrictness',
 -- 'SourceLazy', and 'SourceStrict', respectively.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data SourceStrictness = NoSourceStrictness
                       | SourceLazy
                       | SourceStrict
-  deriving ( Eq      -- ^ @since 4.9.0.0
-           , Show    -- ^ @since 4.9.0.0
-           , Ord     -- ^ @since 4.9.0.0
-           , Read    -- ^ @since 4.9.0.0
-           , Enum    -- ^ @since 4.9.0.0
-           , Bounded -- ^ @since 4.9.0.0
-           , Ix      -- ^ @since 4.9.0.0
-           , Generic -- ^ @since 4.9.0.0
+  deriving ( Eq      -- ^ @since base-4.9.0.0
+           , Show    -- ^ @since base-4.9.0.0
+           , Ord     -- ^ @since base-4.9.0.0
+           , Read    -- ^ @since base-4.9.0.0
+           , Enum    -- ^ @since base-4.9.0.0
+           , Bounded -- ^ @since base-4.9.0.0
+           , Ix      -- ^ @since base-4.9.0.0
+           , Generic -- ^ @since base-4.9.0.0
            )
 
 -- | The strictness that GHC infers for a field during compilation. Whereas
@@ -1295,18 +1295,18 @@ data SourceStrictness = NoSourceStrictness
 -- * If compiled with @-O2@ enabled, then the fields will have 'DecidedUnpack',
 --   'DecidedStrict', and 'DecidedLazy', respectively.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data DecidedStrictness = DecidedLazy
                        | DecidedStrict
                        | DecidedUnpack
-  deriving ( Eq      -- ^ @since 4.9.0.0
-           , Show    -- ^ @since 4.9.0.0
-           , Ord     -- ^ @since 4.9.0.0
-           , Read    -- ^ @since 4.9.0.0
-           , Enum    -- ^ @since 4.9.0.0
-           , Bounded -- ^ @since 4.9.0.0
-           , Ix      -- ^ @since 4.9.0.0
-           , Generic -- ^ @since 4.9.0.0
+  deriving ( Eq      -- ^ @since base-4.9.0.0
+           , Show    -- ^ @since base-4.9.0.0
+           , Ord     -- ^ @since base-4.9.0.0
+           , Read    -- ^ @since base-4.9.0.0
+           , Enum    -- ^ @since base-4.9.0.0
+           , Bounded -- ^ @since base-4.9.0.0
+           , Ix      -- ^ @since base-4.9.0.0
+           , Generic -- ^ @since base-4.9.0.0
            )
 
 -- | Class for datatypes that represent records
@@ -1315,18 +1315,18 @@ class Selector s where
   selName :: t s (f :: k -> Type) (a :: k) -> [Char]
   -- | The selector's unpackedness annotation (if any)
   --
-  -- @since 4.9.0.0
+  -- @since base-4.9.0.0
   selSourceUnpackedness :: t s (f :: k -> Type) (a :: k) -> SourceUnpackedness
   -- | The selector's strictness annotation (if any)
   --
-  -- @since 4.9.0.0
+  -- @since base-4.9.0.0
   selSourceStrictness :: t s (f :: k -> Type) (a :: k) -> SourceStrictness
   -- | The strictness that the compiler inferred for the selector
   --
-  -- @since 4.9.0.0
+  -- @since base-4.9.0.0
   selDecidedStrictness :: t s (f :: k -> Type) (a :: k) -> DecidedStrictness
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (SingI mn, SingI su, SingI ss, SingI ds)
     => Selector ('MetaSel mn su ss ds) where
   selName _ = fromMaybe "" (fromSing (sing :: Sing mn))
@@ -1415,15 +1415,15 @@ class Generic1 (f :: k -> Type) where
 -- type/ like 'Generically' decouples the instance from the type
 -- class.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 newtype Generically a = Generically a
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance (Generic a, Semigroup (Rep a ())) => Semigroup (Generically a) where
   (<>) :: Generically a -> Generically a -> Generically a
   Generically a <> Generically b = Generically (to (from a <> from b :: Rep a ()))
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance (Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
   mempty :: Generically a
   mempty = Generically (to (mempty :: Rep a ()))
@@ -1471,21 +1471,21 @@ instance (Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
 -- type/ like 'Generically1' decouples the instance from the type
 -- class.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 type    Generically1 :: forall k. (k -> Type) -> (k -> Type)
 newtype Generically1 f a where
   Generically1 :: forall {k} f a. f a -> Generically1 @k f a
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance (Generic1 f, Eq (Rep1 f a)) => Eq (Generically1 f a) where
    Generically1 x == Generically1 y = from1 x == from1 y
    Generically1 x /= Generically1 y = from1 x /= from1 y
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance (Generic1 f, Ord (Rep1 f a)) => Ord (Generically1 f a) where
    Generically1 x `compare` Generically1 y = from1 x `compare` from1 y
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance (Generic1 f, Functor (Rep1 f)) => Functor (Generically1 f) where
   fmap :: (a -> a') -> (Generically1 f a -> Generically1 f a')
   fmap f (Generically1 as) = Generically1
@@ -1495,7 +1495,7 @@ instance (Generic1 f, Functor (Rep1 f)) => Functor (Generically1 f) where
   a <$ Generically1 as = Generically1
     (to1 (a <$ from1 as))
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance (Generic1 f, Applicative (Rep1 f)) => Applicative (Generically1 f) where
   pure :: a -> Generically1 f a
   pure a = Generically1
@@ -1510,7 +1510,7 @@ instance (Generic1 f, Applicative (Rep1 f)) => Applicative (Generically1 f) wher
   liftA2 (·) (Generically1 as) (Generically1 bs) = Generically1
     (to1 (liftA2 (·) (from1 as) (from1 bs)))
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance (Generic1 f, Alternative (Rep1 f)) => Alternative (Generically1 f) where
   empty :: Generically1 f a
   empty = Generically1
@@ -1539,7 +1539,7 @@ instance (Generic1 f, Alternative (Rep1 f)) => Alternative (Generically1 f) wher
 --   the field's unpackedness and strictness annotations, and @ds@ is the
 --   strictness that GHC infers for the field.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data Meta = MetaData Symbol Symbol Symbol Bool
           | MetaCons Symbol FixityI Bool
           | MetaSel  (Maybe Symbol)
@@ -1549,151 +1549,151 @@ data Meta = MetaData Symbol Symbol Symbol Bool
 -- Derived instances
 --------------------------------------------------------------------------------
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Generic Void
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic [a]
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic (NonEmpty a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic (Maybe a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic (Either a b)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic Bool
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic Ordering
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic (Proxy t)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ()
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Generic (Solo a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,) a b)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,,) a b c)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,,,) a b c d)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,,,,) a b c d e)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,,,,,) a b c d e f)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic ((,,,,,,) a b c d e f g)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,) a b c d e f g h)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,) a b c d e f g h i)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,) a b c d e f g h i j)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,) a b c d e f g h i j k)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,,) a b c d e f g h i j k l)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,,,) a b c d e f g h i j k l m)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Generic (Down a)
 
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 deriving instance Generic SrcLoc
 
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 deriving instance Generic GeneralCategory
 
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 deriving instance Generic Fingerprint
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 []
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 NonEmpty
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 Maybe
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 (Either a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 Proxy
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Generic1 Solo
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,) a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,,) a b)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,,,) a b c)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,,,,) a b c d)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,,,,,) a b c d e)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 deriving instance Generic1 ((,,,,,,) a b c d e f)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,) a b c d e f g)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,) a b c d e f g h)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,) a b c d e f g h i)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,) a b c d e f g h i j)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,,) a b c d e f g h i j k)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,,,) a b c d e f g h i j k l)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,,,,) a b c d e f g h i j k l m)
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Generic1 Down
 
 --------------------------------------------------------------------------------
@@ -1724,10 +1724,10 @@ class SingKind k where
 data instance Sing (s :: Symbol) where
   SSym :: KnownSymbol s => Sing s
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance KnownSymbol a => SingI a where sing = SSym
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind Symbol where
   type DemoteRep Symbol = String
   fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
@@ -1737,13 +1737,13 @@ data instance Sing (a :: Bool) where
   STrue  :: Sing 'True
   SFalse :: Sing 'False
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'True  where sing = STrue
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'False where sing = SFalse
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind Bool where
   type DemoteRep Bool = Bool
   fromSing STrue  = True
@@ -1754,13 +1754,13 @@ data instance Sing (b :: Maybe a) where
   SNothing :: Sing 'Nothing
   SJust    :: Sing a -> Sing ('Just a)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance            SingI 'Nothing  where sing = SNothing
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI a => SingI ('Just a) where sing = SJust sing
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind a => SingKind (Maybe a) where
   type DemoteRep (Maybe a) = Maybe (DemoteRep a)
   fromSing SNothing  = Nothing
@@ -1771,14 +1771,14 @@ data instance Sing (a :: FixityI) where
   SPrefix :: Sing 'PrefixI
   SInfix  :: Sing a -> Integer -> Sing ('InfixI a n)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'PrefixI where sing = SPrefix
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (SingI a, KnownNat n) => SingI ('InfixI a n) where
   sing = SInfix (sing :: Sing a) (natVal (Proxy :: Proxy n))
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind FixityI where
   type DemoteRep FixityI = Fixity
   fromSing SPrefix      = Prefix
@@ -1790,16 +1790,16 @@ data instance Sing (a :: Associativity) where
   SRightAssociative :: Sing 'RightAssociative
   SNotAssociative   :: Sing 'NotAssociative
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'LeftAssociative  where sing = SLeftAssociative
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'RightAssociative where sing = SRightAssociative
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'NotAssociative   where sing = SNotAssociative
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance SingKind Associativity where
   type DemoteRep Associativity = Associativity
   fromSing SLeftAssociative  = LeftAssociative
@@ -1812,16 +1812,16 @@ data instance Sing (a :: SourceUnpackedness) where
   SSourceNoUnpack       :: Sing 'SourceNoUnpack
   SSourceUnpack         :: Sing 'SourceUnpack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'NoSourceUnpackedness where sing = SNoSourceUnpackedness
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'SourceNoUnpack       where sing = SSourceNoUnpack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'SourceUnpack         where sing = SSourceUnpack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind SourceUnpackedness where
   type DemoteRep SourceUnpackedness = SourceUnpackedness
   fromSing SNoSourceUnpackedness = NoSourceUnpackedness
@@ -1834,16 +1834,16 @@ data instance Sing (a :: SourceStrictness) where
   SSourceLazy         :: Sing 'SourceLazy
   SSourceStrict       :: Sing 'SourceStrict
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'NoSourceStrictness where sing = SNoSourceStrictness
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'SourceLazy         where sing = SSourceLazy
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'SourceStrict       where sing = SSourceStrict
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind SourceStrictness where
   type DemoteRep SourceStrictness = SourceStrictness
   fromSing SNoSourceStrictness = NoSourceStrictness
@@ -1856,16 +1856,16 @@ data instance Sing (a :: DecidedStrictness) where
   SDecidedStrict :: Sing 'DecidedStrict
   SDecidedUnpack :: Sing 'DecidedUnpack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'DecidedLazy   where sing = SDecidedLazy
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'DecidedStrict where sing = SDecidedStrict
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingI 'DecidedUnpack where sing = SDecidedUnpack
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance SingKind DecidedStrictness where
   type DemoteRep DecidedStrictness = DecidedStrictness
   fromSing SDecidedLazy   = DecidedLazy

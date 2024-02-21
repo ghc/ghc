@@ -57,7 +57,7 @@ newtype IORef a = IORef (STRef RealWorld a)
   deriving Eq
   -- ^ Pointer equality.
   --
-  -- @since 4.0.0.0
+  -- @since base-4.0.0.0
 
 -- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)
@@ -171,7 +171,7 @@ atomicSwapIORef (IORef (STRef ref)) new = IO (atomicSwapMutVar# ref new)
 -- This function imposes a memory barrier, preventing reordering around
 -- the \"atomic block\"; see "Data.IORef#memmodel" for details.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
 -- See Note [atomicModifyIORef' definition]
 atomicModifyIORef' ref f = do

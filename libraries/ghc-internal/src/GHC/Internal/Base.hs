@@ -235,10 +235,10 @@ foldr = errorWithoutStackTrace "urk"
 
 -- | Uninhabited data type
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data Void deriving
-  ( Eq      -- ^ @since 4.8.0.0
-  , Ord     -- ^ @since 4.8.0.0
+  ( Eq      -- ^ @since base-4.8.0.0
+  , Ord     -- ^ @since base-4.8.0.0
   )
 
 -- | Since 'Void' values logically don't exist, this witnesses the
@@ -252,7 +252,7 @@ data Void deriving
 -- :}
 -- 5
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 absurd :: Void -> a
 absurd a = case a of {}
 
@@ -260,7 +260,7 @@ absurd a = case a of {}
 -- values of type 'Void' is holding no values.
 -- It is implemented in terms of @fmap absurd@.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 vacuous :: Functor f => f Void -> f a
 vacuous = fmap absurd
 
@@ -278,7 +278,7 @@ infixr 6 <>
 -- [Unit]: @'sconcat' ('pure' x) = x@
 -- [Multiplication]: @'sconcat' ('join' xss) = 'sconcat' ('fmap' 'sconcat' xss)@
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 class Semigroup a where
         -- | An associative operation.
         --
@@ -425,7 +425,7 @@ class Semigroup a => Monoid a where
 
         {-# MINIMAL mempty | mconcat #-}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup [a] where
         (<>) = (++)
         {-# INLINE (<>) #-}
@@ -437,7 +437,7 @@ instance Semigroup [a] where
             rep 0 = []
             rep i = x ++ rep (i - 1)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid [a] where
         {-# INLINE mempty #-}
         mempty  = []
@@ -445,7 +445,7 @@ instance Monoid [a] where
         mconcat xss = [x | xs <- xss, x <- xs]
 -- See Note: [List comprehensions and inlining]
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup Void where
     a <> _ = a
     stimes _ a = a
@@ -469,16 +469,16 @@ needed to make foldr/build forms efficient are turned off, we'll get reasonably
 efficient translations anyway.
 -}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (NonEmpty a) where
         (a :| as) <> ~(b :| bs) = a :| (as ++ b : bs)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup b => Semigroup (a -> b) where
         f <> g = \x -> f x <> g x
         stimes n f e = stimes n (f e)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
         -- If `b` has a specialised mconcat, use that, rather than the default
@@ -487,69 +487,69 @@ instance Monoid b => Monoid (a -> b) where
         mconcat = \fs x -> mconcat $ map (\f -> f x) fs
         {-# INLINE mconcat #-}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup () where
         _ <> _      = ()
         sconcat _   = ()
         stimes  _ _ = ()
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid () where
         -- Should it be strict?
         mempty        = ()
         mconcat _     = ()
 
--- | @since 4.15
+-- | @since base-4.15
 instance Semigroup a => Semigroup (Solo a) where
   MkSolo a <> MkSolo b = MkSolo (a <> b)
   stimes n (MkSolo a) = MkSolo (stimes n a)
 
--- | @since 4.15
+-- | @since base-4.15
 instance Monoid a => Monoid (Solo a) where
   mempty = MkSolo mempty
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
         (a,b) <> (a',b') = (a<>a',b<>b')
         stimes n (a,b) = (stimes n a, stimes n b)
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Monoid a, Monoid b) => Monoid (a,b) where
         mempty = (mempty, mempty)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c) => Semigroup (a, b, c) where
         (a,b,c) <> (a',b',c') = (a<>a',b<>b',c<>c')
         stimes n (a,b,c) = (stimes n a, stimes n b, stimes n c)
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Monoid a, Monoid b, Monoid c) => Monoid (a,b,c) where
         mempty = (mempty, mempty, mempty)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d)
          => Semigroup (a, b, c, d) where
         (a,b,c,d) <> (a',b',c',d') = (a<>a',b<>b',c<>c',d<>d')
         stimes n (a,b,c,d) = (stimes n a, stimes n b, stimes n c, stimes n d)
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Monoid a, Monoid b, Monoid c, Monoid d) => Monoid (a,b,c,d) where
         mempty = (mempty, mempty, mempty, mempty)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d, Semigroup e)
          => Semigroup (a, b, c, d, e) where
         (a,b,c,d,e) <> (a',b',c',d',e') = (a<>a',b<>b',c<>c',d<>d',e<>e')
         stimes n (a,b,c,d,e) =
             (stimes n a, stimes n b, stimes n c, stimes n d, stimes n e)
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Monoid a, Monoid b, Monoid c, Monoid d, Monoid e) =>
                 Monoid (a,b,c,d,e) where
         mempty = (mempty, mempty, mempty, mempty, mempty)
 
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup Ordering where
     LT <> _ = LT
     EQ <> y = y
@@ -561,11 +561,11 @@ instance Semigroup Ordering where
       GT -> x
 
 -- lexicographical ordering
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid Ordering where
     mempty             = EQ
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup a => Semigroup (Maybe a) where
     Nothing <> b       = b
     a       <> Nothing = a
@@ -585,11 +585,11 @@ instance Semigroup a => Semigroup (Maybe a) where
 -- /Since 4.11.0/: constraint on inner @a@ value generalised from
 -- 'Monoid' to 'Semigroup'.
 --
--- @since 2.01
+-- @since base-2.01
 instance Semigroup a => Monoid (Maybe a) where
     mempty = Nothing
 
--- | @since 4.15
+-- | @since base-4.15
 instance Applicative Solo where
   pure = MkSolo
 
@@ -610,63 +610,63 @@ instance Applicative Solo where
 -- > ("hello ", (+15)) <*> ("world!", 2002)
 -- > ("hello world!",2017)
 --
--- @since 2.01
+-- @since base-2.01
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u <> v, f x)
     liftA2 f (u, x) (v, y) = (u <> v, f x y)
 
--- | @since 4.15
+-- | @since base-4.15
 instance Monad Solo where
   MkSolo x >>= f = f x
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monoid a => Monad ((,) a) where
     (u, a) >>= k = case k a of (v, b) -> (u <> v, b)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance Functor ((,,) a b) where
     fmap f (a, b, c) = (a, b, f c)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance (Monoid a, Monoid b) => Applicative ((,,) a b) where
     pure x = (mempty, mempty, x)
     (a, b, f) <*> (a', b', x) = (a <> a', b <> b', f x)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance (Monoid a, Monoid b) => Monad ((,,) a b) where
     (u, v, a) >>= k = case k a of (u', v', b) -> (u <> u', v <> v', b)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance Functor ((,,,) a b c) where
     fmap f (a, b, c, d) = (a, b, c, f d)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance (Monoid a, Monoid b, Monoid c) => Applicative ((,,,) a b c) where
     pure x = (mempty, mempty, mempty, x)
     (a, b, c, f) <*> (a', b', c', x) = (a <> a', b <> b', c <> c', f x)
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 instance (Monoid a, Monoid b, Monoid c) => Monad ((,,,) a b c) where
     (u, v, w, a) >>= k = case k a of (u', v', w', b) -> (u <> u', v <> v', w <> w', b)
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Functor ((,,,,) a b c d) where
     fmap f (a, b, c, d, e) = (a, b, c, d, f e)
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Functor ((,,,,,) a b c d e) where
     fmap fun (a, b, c, d, e, f) = (a, b, c, d, e, fun f)
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Functor ((,,,,,,) a b c d e f) where
     fmap fun (a, b, c, d, e, f, g) = (a, b, c, d, e, f, fun g)
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance Semigroup a => Semigroup (IO a) where
     (<>) = liftA2 (<>)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monoid a => Monoid (IO a) where
     mempty = pure mempty
 
@@ -1241,21 +1241,21 @@ ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
 
 -- instances for Prelude types
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor ((->) r) where
     fmap = (.)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Applicative ((->) r) where
     pure = const
     (<*>) f g x = f x (g x)
     liftA2 q f g x = q (f x) (g x)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monad ((->) r) where
     f >>= k = \ r -> k (f r) r
 
--- | @since 4.15
+-- | @since base-4.15
 instance Functor Solo where
   fmap f (MkSolo a) = MkSolo (f a)
 
@@ -1264,16 +1264,16 @@ instance Functor Solo where
   -- in the contents.
   x <$ MkSolo _ = MkSolo x
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor ((,) a) where
     fmap f (x,y) = (x, f y)
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Functor Maybe  where
     fmap _ Nothing       = Nothing
     fmap f (Just a)      = Just (f a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Applicative Maybe where
     pure = Just
 
@@ -1286,7 +1286,7 @@ instance Applicative Maybe where
     Just _m1 *> m2      = m2
     Nothing  *> _m2     = Nothing
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Monad Maybe  where
     (Just x) >>= k      = k x
     Nothing  >>= _      = Nothing
@@ -1373,7 +1373,7 @@ class Applicative f => Alternative f where
 
 -- | Picks the leftmost 'Just' value, or, alternatively, 'Nothing'.
 --
--- @since 2.01
+-- @since base-2.01
 instance Alternative Maybe where
     empty = Nothing
     Nothing <|> r = r
@@ -1407,7 +1407,7 @@ class (Alternative m, Monad m) => MonadPlus m where
 
 -- | Picks the leftmost 'Just' value, or, alternatively, 'Nothing'.
 --
--- @since 2.01
+-- @since base-2.01
 instance MonadPlus Maybe
 
 ---------------------------------------------
@@ -1417,24 +1417,24 @@ infixr 5 :|
 
 -- | Non-empty (and non-strict) list type.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data NonEmpty a = a :| [a]
-  deriving ( Eq  -- ^ @since 4.9.0.0
-           , Ord -- ^ @since 4.9.0.0
+  deriving ( Eq  -- ^ @since base-4.9.0.0
+           , Ord -- ^ @since base-4.9.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Functor NonEmpty where
   fmap f ~(a :| as) = f a :| fmap f as
   b <$ ~(_ :| as)   = b   :| (b <$ as)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Applicative NonEmpty where
   pure a = a :| []
   (<*>) = ap
   liftA2 = liftM2
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Monad NonEmpty where
   ~(a :| as) >>= f = b :| (bs ++ bs')
     where b :| bs = f a
@@ -1444,13 +1444,13 @@ instance Monad NonEmpty where
 ----------------------------------------------
 -- The list type
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor [] where
     {-# INLINE fmap #-}
     fmap = map
 
 -- See Note: [List comprehensions and inlining]
--- | @since 2.01
+-- | @since base-2.01
 instance Applicative [] where
     {-# INLINE pure #-}
     pure x    = [x]
@@ -1462,7 +1462,7 @@ instance Applicative [] where
     xs *> ys  = [y | _ <- xs, y <- ys]
 
 -- See Note: [List comprehensions and inlining]
--- | @since 2.01
+-- | @since base-2.01
 instance Monad []  where
     {-# INLINE (>>=) #-}
     xs >>= f             = [y | x <- xs, y <- f x]
@@ -1471,14 +1471,14 @@ instance Monad []  where
 
 -- | Combines lists by concatenation, starting from the empty list.
 --
--- @since 2.01
+-- @since base-2.01
 instance Alternative [] where
     empty = []
     (<|>) = (++)
 
 -- | Combines lists by concatenation, starting from the empty list.
 --
--- @since 2.01
+-- @since base-2.01
 instance MonadPlus []
 
 {-
@@ -2006,11 +2006,11 @@ asTypeOf                =  const
 -- Functor/Applicative/Monad instances for IO
 ----------------------------------------------
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Functor IO where
    fmap f x = x >>= (pure . f)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Applicative IO where
     {-# INLINE pure #-}
     {-# INLINE (*>) #-}
@@ -2020,7 +2020,7 @@ instance Applicative IO where
     (<*>) = ap
     liftA2 = liftM2
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Monad IO  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
@@ -2030,7 +2030,7 @@ instance  Monad IO  where
 -- | Takes the first non-throwing 'IO' action\'s result.
 -- 'empty' throws an exception.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 instance Alternative IO where
     empty = failIO "mzero"
     (<|>) = mplusIO
@@ -2038,7 +2038,7 @@ instance Alternative IO where
 -- | Takes the first non-throwing 'IO' action\'s result.
 -- 'mzero' throws an exception.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 instance MonadPlus IO
 
 returnIO :: a -> IO a

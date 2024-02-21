@@ -134,7 +134,7 @@ data Event = Event {
     , eventFd    :: Fd
     } deriving (Show)
 
--- | @since 4.3.1.0
+-- | @since base-4.3.1.0
 instance Storable Event where
     sizeOf    _ = #size struct epoll_event
     alignment _ = alignment (undefined :: CInt)
@@ -159,11 +159,11 @@ newtype ControlOp = ControlOp CInt
 
 newtype EventType = EventType {
       unEventType :: Word32
-    } deriving ( Show       -- ^ @since 4.4.0.0
-               , Eq         -- ^ @since 4.4.0.0
-               , Num        -- ^ @since 4.4.0.0
-               , Bits       -- ^ @since 4.4.0.0
-               , FiniteBits -- ^ @since 4.7.0.0
+    } deriving ( Show       -- ^ @since base-4.4.0.0
+               , Eq         -- ^ @since base-4.4.0.0
+               , Num        -- ^ @since base-4.4.0.0
+               , Bits       -- ^ @since base-4.4.0.0
+               , FiniteBits -- ^ @since base-4.7.0.0
                )
 
 #{enum EventType, EventType

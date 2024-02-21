@@ -31,7 +31,7 @@ Once the design of the @DataKinds@ feature is more stable, this will be
 considered only an internal GHC module, and the programmer interface for
 working with type-level data will be defined in a separate library.
 
-@since 4.6.0.0
+@since base-4.6.0.0
 -}
 
 module GHC.Internal.TypeLits
@@ -95,24 +95,24 @@ import qualified GHC.Internal.TypeNats as N
 -- | This class gives the string associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 natVal :: forall n proxy. N.KnownNat n => proxy n -> Integer
 natVal p = toInteger (N.natVal p)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
                 UnsafeSSymbol x -> x
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 natVal' :: forall n. N.KnownNat n => Proxy# n -> Integer
 natVal' p = toInteger (N.natVal' p)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
 symbolVal' _ = case symbolSing :: SSymbol n of
                 UnsafeSSymbol x -> x
@@ -120,9 +120,9 @@ symbolVal' _ = case symbolSing :: SSymbol n of
 
 -- | This type represents unknown type-level symbols.
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
-                  -- ^ @since 4.7.0.0
+                  -- ^ @since base-4.7.0.0
 
--- | @since 4.16.0.0
+-- | @since base-4.16.0.0
 class KnownChar (n :: Char) where
   charSing :: SChar n
 
@@ -138,7 +138,7 @@ data SomeChar = forall n. KnownChar n => SomeChar (Proxy n)
 
 -- | Convert an integer into an unknown type-level natural.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 someNatVal :: Integer -> Maybe N.SomeNat
 someNatVal n
   | n >= 0        = Just (N.someNatVal (fromInteger n))
@@ -146,31 +146,31 @@ someNatVal n
 
 -- | Convert a string into an unknown type-level symbol.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal s = withSomeSSymbol s (\(ss :: SSymbol s) ->
                   withKnownSymbol ss (SomeSymbol @s Proxy))
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Eq SomeSymbol where
   SomeSymbol x == SomeSymbol y = symbolVal x == symbolVal y
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Ord SomeSymbol where
   compare (SomeSymbol x) (SomeSymbol y) = compare (symbolVal x) (symbolVal y)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Show SomeSymbol where
   showsPrec p (SomeSymbol x) = showsPrec p (symbolVal x)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
 
 
 -- | Convert a character into an unknown type-level char.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 someCharVal :: Char -> SomeChar
 someCharVal c = withSomeSChar c (\(sc :: SChar c) ->
                 withKnownChar sc (SomeChar @c Proxy))
@@ -191,30 +191,30 @@ instance Read SomeChar where
 
 -- | Concatenation of type-level symbols.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 type family AppendSymbol (m ::Symbol) (n :: Symbol) :: Symbol
 
 -- Char-related type families
 
 -- | Extending a type-level symbol with a type-level character
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
 
 -- | This type family yields type-level `Just` storing the first character
 -- of a symbol and its tail if it is defined and `Nothing` otherwise.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
 
 -- | Convert a character to its Unicode code point (cf. `Data.Char.ord`)
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 type family CharToNat (c :: Char) :: N.Nat
 
 -- | Convert a Unicode code point to a character (cf. `Data.Char.chr`)
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 type family NatToChar (n :: N.Nat) :: Char
 
 --------------------------------------------------------------------------------
@@ -222,7 +222,7 @@ type family NatToChar (n :: N.Nat) :: Char
 -- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or 'Nothing'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 sameSymbol :: forall a b proxy1 proxy2.
               (KnownSymbol a, KnownSymbol b) =>
               proxy1 a -> proxy2 b -> Maybe (a :~: b)
@@ -231,7 +231,7 @@ sameSymbol _ _ = testEquality (symbolSing @a) (symbolSing @b)
 -- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or that the type-level symbols are distinct.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 decideSymbol :: forall a b proxy1 proxy2.
               (KnownSymbol a, KnownSymbol b) =>
               proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
@@ -246,7 +246,7 @@ decSymbol (UnsafeSSymbol x) (UnsafeSSymbol y)
 -- | We either get evidence that this function was instantiated with the
 -- same type-level characters, or 'Nothing'.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 sameChar :: forall a b proxy1 proxy2.
             (KnownChar a, KnownChar b) =>
             proxy1 a -> proxy2 b -> Maybe (a :~: b)
@@ -255,7 +255,7 @@ sameChar _ _ = testEquality (charSing @a) (charSing @b)
 -- | We either get evidence that this function was instantiated with the
 -- same type-level characters, or that the type-level characters are distinct.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 decideChar :: forall a b proxy1 proxy2.
             (KnownChar a, KnownChar b) =>
             proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
@@ -270,7 +270,7 @@ decChar (UnsafeSChar x) (UnsafeSChar y)
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
           => proxy1 a -> proxy2 b -> OrderingI a b
 cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
@@ -284,7 +284,7 @@ cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
 -- | Like 'sameChar', but if the Chars aren't equal, this additionally
 -- provides proof of LT or GT.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 cmpChar :: forall a b proxy1 proxy2. (KnownChar a, KnownChar b)
         => proxy1 a -> proxy2 b -> OrderingI a b
 cmpChar x y = case compare (charVal x) (charVal y) of
@@ -305,7 +305,7 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 -- For a version of this function that returns a 'Natural' instead of an
 -- 'Integer', see 'N.fromSNat' in "GHC.TypeNats".
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 fromSNat :: N.SNat n -> Integer
 fromSNat sn = toInteger (N.fromSNat sn)
 
@@ -318,7 +318,7 @@ fromSNat sn = toInteger (N.fromSNat sn)
 -- For a version of this function where the continuation uses @'SNat@ n@
 -- instead of @'Maybe' ('SNat' n)@, see 'N.withSomeSNat' in "GHC.TypeNats".
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withSomeSNat :: forall rep (r :: TYPE rep).
                 Integer -> (forall n. Maybe (N.SNat n) -> r) -> r
 withSomeSNat n k
@@ -339,7 +339,7 @@ withSomeSNat n k
 -- 3. The 'withSomeSSymbol' function, which creates an 'SSymbol' from a
 --    'String'.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 newtype SSymbol (s :: Symbol) = UnsafeSSymbol String
 type role SSymbol nominal
 
@@ -361,7 +361,7 @@ type role SSymbol nominal
 -- f SSymbol = {- KnownSymbol s in scope -}
 -- @
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 pattern SSymbol :: forall s. () => KnownSymbol s => SSymbol s
 pattern SSymbol <- (knownSymbolInstance -> KnownSymbolInstance)
   where SSymbol = symbolSing
@@ -377,15 +377,15 @@ data KnownSymbolInstance (s :: Symbol) where
 knownSymbolInstance :: SSymbol s -> KnownSymbolInstance s
 knownSymbolInstance ss = withKnownSymbol ss KnownSymbolInstance
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Eq (SSymbol s) where
   _ == _ = True
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Ord (SSymbol s) where
   compare _ _ = EQ
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Show (SSymbol s) where
   showsPrec p (UnsafeSSymbol s)
     = showParen (p > appPrec)
@@ -393,26 +393,26 @@ instance Show (SSymbol s) where
         . showsPrec appPrec1 s
       )
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestEquality SSymbol where
   testEquality a b = case decSymbol a b of
     Right p -> Just p
     Left _  -> Nothing
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestCoercion SSymbol where
   testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
 
 -- | Return the String corresponding to @s@ in an @'SSymbol' s@ value.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 fromSSymbol :: SSymbol s -> String
 fromSSymbol (UnsafeSSymbol s) = s
 
 -- | Convert an explicit @'SSymbol' s@ value into an implicit @'KnownSymbol' s@
 -- constraint.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withKnownSymbol :: forall s rep (r :: TYPE rep).
                    SSymbol s -> (KnownSymbol s => r) -> r
 withKnownSymbol = withDict @(KnownSymbol s)
@@ -421,7 +421,7 @@ withKnownSymbol = withDict @(KnownSymbol s)
 -- | Convert a 'String' into an @'SSymbol' s@ value, where @s@ is a fresh
 -- type-level symbol.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withSomeSSymbol :: forall rep (r :: TYPE rep).
                    String -> (forall s. SSymbol s -> r) -> r
 withSomeSSymbol s k = k (UnsafeSSymbol s)
@@ -442,7 +442,7 @@ withSomeSSymbol s k = k (UnsafeSSymbol s)
 --
 -- 3. The 'withSomeSChar' function, which creates an 'SChar' from a 'Char'.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 newtype SChar (s :: Char) = UnsafeSChar Char
 type role SChar nominal
 
@@ -464,7 +464,7 @@ type role SChar nominal
 -- f SChar = {- KnownChar c in scope -}
 -- @
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 pattern SChar :: forall c. () => KnownChar c => SChar c
 pattern SChar <- (knownCharInstance -> KnownCharInstance)
   where SChar = charSing
@@ -480,15 +480,15 @@ data KnownCharInstance (n :: Char) where
 knownCharInstance :: SChar c -> KnownCharInstance c
 knownCharInstance sc = withKnownChar sc KnownCharInstance
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Eq (SChar c) where
   _ == _ = True
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Ord (SChar c) where
   compare _ _ = EQ
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Show (SChar c) where
   showsPrec p (UnsafeSChar c)
     = showParen (p > appPrec)
@@ -496,26 +496,26 @@ instance Show (SChar c) where
         . showsPrec appPrec1 c
       )
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestEquality SChar where
   testEquality a b = case decChar a b of
     Right p -> Just p
     Left _  -> Nothing
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestCoercion SChar where
   testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
 
 -- | Return the 'Char' corresponding to @c@ in an @'SChar' c@ value.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 fromSChar :: SChar c -> Char
 fromSChar (UnsafeSChar c) = c
 
 -- | Convert an explicit @'SChar' c@ value into an implicit @'KnownChar' c@
 -- constraint.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withKnownChar :: forall c rep (r :: TYPE rep).
                  SChar c -> (KnownChar c => r) -> r
 withKnownChar = withDict @(KnownChar c)
@@ -524,7 +524,7 @@ withKnownChar = withDict @(KnownChar c)
 -- | Convert a 'Char' into an @'SChar' c@ value, where @c@ is a fresh type-level
 -- character.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withSomeSChar :: forall rep (r :: TYPE rep).
                  Char -> (forall c. SChar c -> r) -> r
 withSomeSChar c k = k (UnsafeSChar c)

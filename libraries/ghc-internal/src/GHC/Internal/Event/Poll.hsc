@@ -150,15 +150,15 @@ data PollFd = PollFd {
       pfdFd      :: {-# UNPACK #-} !Fd
     , pfdEvents  :: {-# UNPACK #-} !Event
     , pfdRevents :: {-# UNPACK #-} !Event
-    } deriving Show -- ^ @since 4.4.0.0
+    } deriving Show -- ^ @since base-4.4.0.0
 
 newtype Event = Event CShort
-    deriving ( Eq         -- ^ @since 4.4.0.0
-             , Show       -- ^ @since 4.4.0.0
-             , Num        -- ^ @since 4.4.0.0
-             , Storable   -- ^ @since 4.4.0.0
-             , Bits       -- ^ @since 4.4.0.0
-             , FiniteBits -- ^ @since 4.7.0.0
+    deriving ( Eq         -- ^ @since base-4.4.0.0
+             , Show       -- ^ @since base-4.4.0.0
+             , Num        -- ^ @since base-4.4.0.0
+             , Storable   -- ^ @since base-4.4.0.0
+             , Bits       -- ^ @since base-4.4.0.0
+             , FiniteBits -- ^ @since base-4.7.0.0
              )
 
 #{enum Event, Event
@@ -182,7 +182,7 @@ toEvent e = remap (pollIn .|. pollErr .|. pollHup)  E.evtRead `mappend`
             | e .&. evt /= 0 = to
             | otherwise      = mempty
 
--- | @since 4.3.1.0
+-- | @since base-4.3.1.0
 instance Storable PollFd where
     sizeOf _    = #size struct pollfd
     alignment _ = alignment (undefined :: CInt)

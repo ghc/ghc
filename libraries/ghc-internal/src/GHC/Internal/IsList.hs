@@ -12,7 +12,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.IsList
@@ -27,7 +27,7 @@ import GHC.Internal.Data.Version ( Version(..), makeVersion )
 -- | The 'IsList' class and its methods are intended to be used in
 --   conjunction with the OverloadedLists extension.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 class IsList l where
   -- | The 'Item' type function returns the type of items of the structure
   --   @l@.
@@ -50,19 +50,19 @@ class IsList l where
   --   It should satisfy fromList . toList = id.
   toList :: l -> [Item l]
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance IsList [a] where
   type (Item [a]) = a
   fromList = id
   toList = id
 
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance IsList (ZipList a) where
   type Item (ZipList a) = a
   fromList = ZipList
   toList = getZipList
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance IsList (NonEmpty a) where
   type Item (NonEmpty a) = a
 
@@ -71,7 +71,7 @@ instance IsList (NonEmpty a) where
 
   toList ~(a :| as) = a : as
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance IsList Version where
   type (Item Version) = Int
   fromList = makeVersion
@@ -80,7 +80,7 @@ instance IsList Version where
 -- | Be aware that 'fromList . toList = id' only for unfrozen 'CallStack's,
 -- since 'toList' removes frozenness information.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 instance IsList CallStack where
   type (Item CallStack) = (String, SrcLoc)
   fromList = fromCallSiteList

@@ -18,7 +18,7 @@
 -- <https://www.haskell.org/ghc/docs/latest/html/users_guide/runtime_control.html GHC User's Guide>,
 -- or by running RTS help message using @+RTS --help@.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 --
 module GHC.Internal.RTS.Flags
   ( RtsTime
@@ -71,24 +71,24 @@ import GHC.Internal.Show
 
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --
--- @since 4.8.2.0
+-- @since base-4.8.2.0
 type RtsTime = Word64
 
 -- | Should we produce a summary of the garbage collector statistics after the
 -- program has exited?
 --
--- @since 4.8.2.0
+-- @since base-4.8.2.0
 data GiveGCStats
     = NoGCStats
     | CollectGCStats
     | OneLineGCStats
     | SummaryGCStats
     | VerboseGCStats
-    deriving ( Show -- ^ @since 4.8.0.0
-             , Generic -- ^ @since 4.15.0.0
+    deriving ( Show -- ^ @since base-4.8.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Enum GiveGCStats where
     fromEnum NoGCStats      = #{const NO_GC_STATS}
     fromEnum CollectGCStats = #{const COLLECT_GC_STATS}
@@ -105,7 +105,7 @@ instance Enum GiveGCStats where
 
 -- | The I/O SubSystem to use in the program.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 data IoSubSystem
   = IoPOSIX   -- ^ Use a POSIX I/O Sub-System
   | IoNative  -- ^ Use platform native Sub-System. For unix OSes this is the
@@ -113,7 +113,7 @@ data IoSubSystem
               --   native APIs for I/O, including IOCP and RIO.
   deriving (Eq, Show)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Enum IoSubSystem where
     fromEnum IoPOSIX  = #{const IO_MNGR_POSIX}
     fromEnum IoNative = #{const IO_MNGR_NATIVE}
@@ -122,7 +122,7 @@ instance Enum IoSubSystem where
     toEnum #{const IO_MNGR_NATIVE} = IoNative
     toEnum e = errorWithoutStackTrace ("invalid enum for IoSubSystem: " ++ show e)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Storable IoSubSystem where
     sizeOf = sizeOf . fromEnum
     alignment = sizeOf . fromEnum
@@ -131,7 +131,7 @@ instance Storable IoSubSystem where
 
 -- | Parameters of the garbage collector.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data GCFlags = GCFlags
     { statsFile             :: Maybe FilePath
     , giveStats             :: GiveGCStats
@@ -162,23 +162,23 @@ data GCFlags = GCFlags
     , allocLimitGrace       :: Word
     , numa                  :: Bool
     , numaMask              :: Word
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters concerning context switching
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Miscellaneous parameters
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data MiscFlags = MiscFlags
     { tickInterval          :: RtsTime
     , installSignalHandlers :: Bool
@@ -193,14 +193,14 @@ data MiscFlags = MiscFlags
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
     , ioManager             :: IoSubSystem
     , numIoWorkerThreads    :: Word32
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Flags to control debugging output & extra checking in various
 -- subsystems.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data DebugFlags = DebugFlags
     { scheduler      :: Bool -- ^ @s@
     , interpreter    :: Bool -- ^ @i@
@@ -218,24 +218,24 @@ data DebugFlags = DebugFlags
     , squeeze        :: Bool -- ^ @z@ stack squeezing & lazy blackholing
     , hpc            :: Bool -- ^ @c@ coverage
     , sparks         :: Bool -- ^ @r@
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Should the RTS produce a cost-center summary?
 --
--- @since 4.8.2.0
+-- @since base-4.8.2.0
 data DoCostCentres
     = CostCentresNone
     | CostCentresSummary
     | CostCentresVerbose
     | CostCentresAll
     | CostCentresJSON
-    deriving ( Show -- ^ @since 4.8.0.0
-             , Generic -- ^ @since 4.15.0.0
+    deriving ( Show -- ^ @since base-4.8.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Enum DoCostCentres where
     fromEnum CostCentresNone    = #{const COST_CENTRES_NONE}
     fromEnum CostCentresSummary = #{const COST_CENTRES_SUMMARY}
@@ -252,18 +252,18 @@ instance Enum DoCostCentres where
 
 -- | Parameters pertaining to the cost-center profiler.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data CCFlags = CCFlags
     { doCostCentres :: DoCostCentres
     , profilerTicks :: Int
     , msecsPerTick  :: Int
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | What sort of heap profile are we collecting?
 --
--- @since 4.8.2.0
+-- @since base-4.8.2.0
 data DoHeapProfile
     = NoHeapProfiling
     | HeapByCCS
@@ -274,11 +274,11 @@ data DoHeapProfile
     | HeapByLDV
     | HeapByClosureType
     | HeapByInfoTable
-    deriving ( Show -- ^ @since 4.8.0.0
-             , Generic -- ^ @since 4.15.0.0
+    deriving ( Show -- ^ @since base-4.8.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Enum DoHeapProfile where
     fromEnum NoHeapProfiling   = #{const NO_HEAP_PROFILING}
     fromEnum HeapByCCS         = #{const HEAP_BY_CCS}
@@ -303,13 +303,13 @@ instance Enum DoHeapProfile where
 
 -- | Parameters of the cost-center profiler
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data ProfFlags = ProfFlags
     { doHeapProfile            :: DoHeapProfile
     , heapProfileInterval      :: RtsTime -- ^ time between samples
     , heapProfileIntervalTicks :: Word    -- ^ ticks between samples (derived)
     , startHeapProfileAtStartup :: Bool
-    , startTimeProfileAtStartup :: Bool   -- ^ @since 4.20.0.0
+    , startTimeProfileAtStartup :: Bool   -- ^ @since base-4.20.0.0
     , showCCSOnException       :: Bool
     , maxRetainerSetSize       :: Word
     , ccsLength                :: Word
@@ -320,22 +320,22 @@ data ProfFlags = ProfFlags
     , ccsSelector              :: Maybe String
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Is event tracing enabled?
 --
--- @since 4.8.2.0
+-- @since base-4.8.2.0
 data DoTrace
     = TraceNone      -- ^ no tracing
     | TraceEventLog  -- ^ send tracing events to the event log
     | TraceStderr    -- ^ send tracing events to @stderr@
-    deriving ( Show -- ^ @since 4.8.0.0
-             , Generic -- ^ @since 4.15.0.0
+    deriving ( Show -- ^ @since base-4.8.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Enum DoTrace where
     fromEnum TraceNone     = #{const TRACE_NONE}
     fromEnum TraceEventLog = #{const TRACE_EVENTLOG}
@@ -348,7 +348,7 @@ instance Enum DoTrace where
 
 -- | Parameters pertaining to event tracing
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data TraceFlags = TraceFlags
     { tracing        :: DoTrace
     , timestamp      :: Bool -- ^ show timestamp in stderr output
@@ -359,23 +359,23 @@ data TraceFlags = TraceFlags
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters pertaining to ticky-ticky profiler
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters pertaining to parallelism
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data ParFlags = ParFlags
     { nCapabilities :: Word32
     , migrate :: Bool
@@ -388,24 +388,24 @@ data ParFlags = ParFlags
     , parGcThreads :: Word32
     , setAffinity :: Bool
     }
-    deriving ( Show -- ^ @since 4.8.0.0
-             , Generic -- ^ @since 4.15.0.0
+    deriving ( Show -- ^ @since base-4.8.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | Parameters pertaining to Haskell program coverage (HPC)
 --
--- @since 4.22.0.0
+-- @since base-4.22.0.0
 data HpcFlags = HpcFlags
     { writeTixFile :: Bool
       -- ^ Controls whether the @<program>.tix@ file should be
       -- written after the execution of the program.
     }
-    deriving (Show -- ^ @since 4.22.0.0
-             , Generic -- ^ @since 4.22.0.0
+    deriving (Show -- ^ @since base-4.22.0.0
+             , Generic -- ^ @since base-4.22.0.0
              )
 -- | Parameters of the runtime system
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data RTSFlags = RTSFlags
     { gcFlags         :: GCFlags
     , concurrentFlags :: ConcFlags
@@ -417,8 +417,8 @@ data RTSFlags = RTSFlags
     , tickyFlags      :: TickyFlags
     , parFlags        :: ParFlags
     , hpcFlags        :: HpcFlags
-    } deriving ( Show -- ^ @since 4.8.0.0
-               , Generic -- ^ @since 4.15.0.0
+    } deriving ( Show -- ^ @since base-4.8.0.0
+               , Generic -- ^ @since base-4.15.0.0
                )
 
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags

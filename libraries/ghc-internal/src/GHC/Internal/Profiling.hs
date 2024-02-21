@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 module GHC.Internal.Profiling ( -- * Cost Centre Profiling
                        startProfTimer
                      , stopProfTimer
@@ -16,13 +16,13 @@ import GHC.Internal.Base
 -- | Stop attributing ticks to cost centres. Allocations will still be
 -- attributed.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 foreign import ccall stopProfTimer :: IO ()
 
 -- | Start attributing ticks to cost centres. This is called by the RTS on
 -- startup but can be disabled using the rts flag @--no-automatic-time-samples@.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 foreign import ccall startProfTimer :: IO ()
 
 -- | Request a heap census on the next context switch. The census can be
@@ -31,7 +31,7 @@ foreign import ccall startProfTimer :: IO ()
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 foreign import ccall requestHeapCensus :: IO ()
 
 -- | Start heap profiling. This is called normally by the RTS on start-up,
@@ -40,7 +40,7 @@ foreign import ccall requestHeapCensus :: IO ()
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 foreign import ccall startHeapProfTimer :: IO ()
 
 -- | Stop heap profiling.
@@ -48,6 +48,6 @@ foreign import ccall startHeapProfTimer :: IO ()
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 foreign import ccall stopHeapProfTimer :: IO ()
 

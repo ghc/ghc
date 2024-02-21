@@ -152,7 +152,7 @@ class Eq a => Bits a where
     -- implementation (which ought to be equivalent to 'zeroBits' for
     -- types which possess a 0th bit).
     --
-    -- @since 4.7.0.0
+    -- @since base-4.7.0.0
     zeroBits :: a
     zeroBits = clearBit (bit 0) 0
 
@@ -187,7 +187,7 @@ class Eq a => Bits a where
         value of the argument is ignored.  Returns Nothing
         for types that do not have a fixed bitsize, like 'Integer'.
 
-        @since 4.7.0.0
+        @since base-4.7.0.0
         -}
     bitSizeMaybe      :: a -> Maybe Int
 
@@ -229,7 +229,7 @@ class Eq a => Bits a where
 
         Defaults to 'shiftL' unless defined explicitly by an instance.
 
-        @since 4.5.0.0 -}
+        @since base-4.5.0.0 -}
     unsafeShiftL            :: a -> Int -> a
     {-# INLINE unsafeShiftL #-}
     x `unsafeShiftL` i = x `shiftL` i
@@ -259,7 +259,7 @@ class Eq a => Bits a where
 
         Defaults to 'shiftR' unless defined explicitly by an instance.
 
-        @since 4.5.0.0 -}
+        @since base-4.5.0.0 -}
     unsafeShiftR            :: a -> Int -> a
     {-# INLINE unsafeShiftR #-}
     x `unsafeShiftR` i = x `shiftR` i
@@ -290,12 +290,12 @@ class Eq a => Bits a where
         Can be implemented using `popCountDefault' if @a@ is also an
         instance of 'Num'.
 
-        @since 4.5.0.0 -}
+        @since base-4.5.0.0 -}
     popCount          :: a -> Int
 
 -- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 class Bits b => FiniteBits b where
     -- | Return the number of bits in the type of the argument.
     -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
@@ -306,7 +306,7 @@ class Bits b => FiniteBits b where
     -- 'bitSizeMaybe' = 'Just' . 'finiteBitSize'
     -- @
     --
-    -- @since 4.7.0.0
+    -- @since base-4.7.0.0
     finiteBitSize :: b -> Int
 
     -- | Count number of zero bits preceding the most significant set bit.
@@ -326,7 +326,7 @@ class Bits b => FiniteBits b where
     -- integral types are implemented using CPU specific machine
     -- instructions.
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     countLeadingZeros :: b -> Int
     countLeadingZeros x = (w-1) - go (w-1)
       where
@@ -356,7 +356,7 @@ class Bits b => FiniteBits b where
     -- integral types are implemented using CPU specific machine
     -- instructions.
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     countTrailingZeros :: b -> Int
     countTrailingZeros x = go 0
       where
@@ -375,7 +375,7 @@ class Bits b => FiniteBits b where
 --
 -- Note that: @bitDefault i = 1 `shiftL` i@
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 bitDefault :: (Bits a, Num a) => Int -> a
 bitDefault = \i -> 1 `shiftL` i
 {-# INLINE bitDefault #-}
@@ -384,7 +384,7 @@ bitDefault = \i -> 1 `shiftL` i
 --
 -- Note that: @testBitDefault x i = (x .&. bit i) /= 0@
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
 testBitDefault = \x i -> (x .&. bit i) /= 0
 {-# INLINE testBitDefault #-}
@@ -394,7 +394,7 @@ testBitDefault = \x i -> (x .&. bit i) /= 0
 -- This implementation is intentionally naive. Instances are expected to provide
 -- an optimized implementation for their size.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 popCountDefault :: (Bits a, Num a) => a -> Int
 popCountDefault = go 0
  where
@@ -404,7 +404,7 @@ popCountDefault = go 0
 
 -- | Interpret 'Bool' as 1-bit bit-field
 --
---  @since 4.7.0.0
+--  @since base-4.7.0.0
 instance Bits Bool where
     (.&.) = (&&)
 
@@ -434,13 +434,13 @@ instance Bits Bool where
     popCount False = 0
     popCount True  = 1
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance FiniteBits Bool where
     finiteBitSize _ = 1
     countTrailingZeros x = if x then 0 else 1
     countLeadingZeros  x = if x then 0 else 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Int where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -484,7 +484,7 @@ instance Bits Int where
 
     isSigned _             = True
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (I# x#) = I# (word2Int# (clz# (int2Word# x#)))
@@ -492,7 +492,7 @@ instance FiniteBits Int where
     countTrailingZeros (I# x#) = I# (word2Int# (ctz# (int2Word# x#)))
     {-# INLINE countTrailingZeros #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -527,7 +527,7 @@ instance Bits Word where
     bit                      = bitDefault
     testBit                  = testBitDefault
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (W# x#) = I# (word2Int# (clz# x#))
@@ -535,7 +535,7 @@ instance FiniteBits Word where
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
     {-# INLINE countTrailingZeros #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Integer where
    (.&.)      = integerAnd
    (.|.)      = integerOr
@@ -563,7 +563,7 @@ instance Bits Integer where
    bitSize _  = errorWithoutStackTrace "GHC.Internal.Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
--- | @since 4.8.0
+-- | @since base-4.8.0
 instance Bits Natural where
    (.&.)         = naturalAnd
    (.|.)         = naturalOr
@@ -617,7 +617,7 @@ instance Bits Natural where
 -- 'fromIntegral', which is itself optimized with rules for @base@ types but may
 -- go through 'Integer' for some type pairs.)
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 
 toIntegralSized :: (Integral a, Integral b, Bits a, Bits b) => a -> Maybe b
 toIntegralSized x                 -- See Note [toIntegralSized optimization]

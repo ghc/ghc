@@ -72,21 +72,21 @@ finalizerExceptionHandler = unsafePerformIO $ newIORef (const $ return ())
 -- | Get the global action called to report exceptions thrown by weak pointer
 -- finalizers to the user.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 getFinalizerExceptionHandler :: IO (SomeException -> IO ())
 getFinalizerExceptionHandler = readIORef finalizerExceptionHandler
 
 -- | Set the global action called to report exceptions thrown by weak pointer
 -- finalizers to the user.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 setFinalizerExceptionHandler :: (SomeException -> IO ()) -> IO ()
 setFinalizerExceptionHandler = writeIORef finalizerExceptionHandler
 
 -- | An exception handler for 'Handle' finalization that prints the error to
 -- the given 'Handle', but doesn't rethrow it.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 printToHandleFinalizerExceptionHandler :: Handle -> SomeException -> IO ()
 printToHandleFinalizerExceptionHandler hdl se =
     hPutStrLn hdl msg `catchException` (\(SomeException _) -> return ())

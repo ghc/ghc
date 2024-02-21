@@ -109,7 +109,7 @@ infixl 1 <&>
 -- ('<&>') = 'flip' 'fmap'
 -- @
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 --
 -- ==== __Examples__
 -- Apply @(+1)@ to a list, a 'Data.Maybe.Just' and a 'Data.Either.Right':
@@ -130,7 +130,7 @@ infixl 4 $>
 
 -- | Flipped version of '<$'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 --
 -- ==== __Examples__
 --
@@ -176,7 +176,7 @@ infixl 4 $>
 -- >>> unzip [("I", "love"), ("really", "haskell")]
 -- (["I","really"],["love","haskell"])
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 unzip :: Functor f => f (a, b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
 

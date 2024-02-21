@@ -319,7 +319,7 @@ getContents     =  hGetContents stdin
 -- which is fully read before being returned
 -- (same as 'hGetContents'' 'stdin').
 --
--- @since 4.15.0.0
+-- @since base-4.15.0.0
 
 getContents'    :: IO String
 getContents'    =  hGetContents' stdin
@@ -344,7 +344,7 @@ readFile name   =  openFile name ReadMode >>= hGetContents
 -- returns the contents of the file as a string.
 -- The file is fully read before being returned, as with 'getContents''.
 --
--- @since 4.15.0.0
+-- @since base-4.15.0.0
 
 readFile'       :: FilePath -> IO String
 -- There's a bit of overkill here—both withFile and

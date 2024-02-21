@@ -118,7 +118,7 @@ data Handle
 --    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
 --      seekable.
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Eq Handle where
  (FileHandle _ h1)     == (FileHandle _ h2)     = h1 == h2
  (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
@@ -259,10 +259,10 @@ data BufferMode
                 -- ^ block-buffering should be enabled if possible.
                 -- The size of the buffer is @n@ items if the argument
                 -- is 'Just' @n@ and is otherwise implementation-dependent.
-   deriving ( Eq   -- ^ @since 4.2.0.0
-            , Ord  -- ^ @since 4.2.0.0
-            , Read -- ^ @since 4.2.0.0
-            , Show -- ^ @since 4.2.0.0
+   deriving ( Eq   -- ^ @since base-4.2.0.0
+            , Ord  -- ^ @since base-4.2.0.0
+            , Read -- ^ @since base-4.2.0.0
+            , Show -- ^ @since base-4.2.0.0
             )
 
 {-
@@ -365,10 +365,10 @@ and hence it is only possible on a seekable Handle.
 -- | The representation of a newline in the external file or stream.
 data Newline = LF    -- ^ @\'\\n\'@
              | CRLF  -- ^ @\'\\r\\n\'@
-             deriving ( Eq   -- ^ @since 4.2.0.0
-                      , Ord  -- ^ @since 4.3.0.0
-                      , Read -- ^ @since 4.3.0.0
-                      , Show -- ^ @since 4.3.0.0
+             deriving ( Eq   -- ^ @since base-4.2.0.0
+                      , Ord  -- ^ @since base-4.3.0.0
+                      , Read -- ^ @since base-4.3.0.0
+                      , Show -- ^ @since base-4.3.0.0
                       )
 
 -- | Specifies the translation, if any, of newline characters between
@@ -382,10 +382,10 @@ data NewlineMode
                   outputNL :: Newline
                     -- ^ the representation of newlines on output
                  }
-             deriving ( Eq   -- ^ @since 4.2.0.0
-                      , Ord  -- ^ @since 4.3.0.0
-                      , Read -- ^ @since 4.3.0.0
-                      , Show -- ^ @since 4.3.0.0
+             deriving ( Eq   -- ^ @since base-4.2.0.0
+                      , Ord  -- ^ @since base-4.3.0.0
+                      , Read -- ^ @since base-4.3.0.0
+                      , Show -- ^ @since base-4.3.0.0
                       )
 
 -- | The native newline representation for the current platform: 'LF'
@@ -432,7 +432,7 @@ noNewlineTranslation  = NewlineMode { inputNL  = LF, outputNL = LF }
 -- we provide a more user-friendly Show instance for it
 -- than the derived one.
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show HandleType where
   showsPrec _ t =
     case t of
@@ -443,7 +443,7 @@ instance Show HandleType where
       AppendHandle      -> showString "writable (append)"
       ReadWriteHandle   -> showString "read-writable"
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show Handle where
   showsPrec _ (FileHandle   file _)   = showHandle file
   showsPrec _ (DuplexHandle file _ _) = showHandle file

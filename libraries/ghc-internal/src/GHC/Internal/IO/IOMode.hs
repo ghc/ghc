@@ -26,11 +26,11 @@ import GHC.Internal.Enum
 
 -- | See 'GHC.Internal.System.IO.openFile'
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
-                    deriving ( Eq   -- ^ @since 4.2.0.0
-                             , Ord  -- ^ @since 4.2.0.0
-                             , Ix   -- ^ @since 4.2.0.0
-                             , Enum -- ^ @since 4.2.0.0
-                             , Read -- ^ @since 4.2.0.0
-                             , Show -- ^ @since 4.2.0.0
+                    deriving ( Eq   -- ^ @since base-4.2.0.0
+                             , Ord  -- ^ @since base-4.2.0.0
+                             , Ix   -- ^ @since base-4.2.0.0
+                             , Enum -- ^ @since base-4.2.0.0
+                             , Read -- ^ @since base-4.2.0.0
+                             , Show -- ^ @since base-4.2.0.0
                              )
 

@@ -150,7 +150,7 @@ withCStringLen enc = withEncodedCString enc False
 --   explicitly freed using 'GHC.Internal.Foreign.Marshal.Alloc.free' or
 --   'GHC.Internal.Foreign.Marshal.Alloc.finalizerFree'.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 newCStringLen0     :: TextEncoding -> String -> IO CStringLen
 newCStringLen0 enc = newEncodedCString enc True
 
@@ -161,7 +161,7 @@ newCStringLen0 enc = newEncodedCString enc True
 --   normally or via an exception), so the pointer to the temporary
 --   storage must /not/ be used after this.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 withCStringLen0         :: TextEncoding -> String -> (CStringLen -> IO a) -> IO a
 withCStringLen0 enc = withEncodedCString enc True
 

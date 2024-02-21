@@ -27,6 +27,6 @@ default ()
 -- error monad can be built using the 'Data.Either.Either' type.
 --
 data  Maybe a  =  Nothing | Just a
-  deriving ( Eq  -- ^ @since 2.01
-           , Ord -- ^ @since 2.01
+  deriving ( Eq  -- ^ @since base-2.01
+           , Ord -- ^ @since base-2.01
            )

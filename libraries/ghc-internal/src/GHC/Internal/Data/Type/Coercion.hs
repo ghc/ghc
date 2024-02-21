@@ -19,7 +19,7 @@
 --
 -- Definition of representational equality ('Coercion').
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Type.Coercion
@@ -45,7 +45,7 @@ import GHC.Internal.Base
 -- To use this equality in practice, pattern-match on the @Coercion a b@ to get out
 -- the @Coercible a b@ instance, and then use 'coerce' to apply it.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 data Coercion a b where
   Coercion :: Coercible a b => Coercion a b
 
@@ -59,7 +59,7 @@ coerceWith Coercion x = coerce x
 
 -- | Generalized form of type-safe cast using representational equality
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 gcoerceWith :: Coercion a b -> (Coercible a b => r) -> r
 gcoerceWith Coercion x = x
 
@@ -75,26 +75,26 @@ trans Coercion Coercion = Coercion
 repr :: (a Eq.:~: b) -> Coercion a b
 repr Eq.Refl = Coercion
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Eq   (Coercion a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Show (Coercion a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Ord  (Coercion a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Coercible a b => Read (Coercion a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Coercible a b => Enum (Coercion a b) where
   toEnum 0 = Coercion
   toEnum _ = errorWithoutStackTrace "GHC.Internal.Data.Type.Coercion.toEnum: bad argument"
 
   fromEnum Coercion = 0
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Coercible a b => Bounded (Coercion a b)
 
 -- | This class contains types where you can learn the equality of two types
@@ -104,14 +104,14 @@ class TestCoercion f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
   testCoercion :: f a -> f b -> Maybe (Coercion a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance TestCoercion ((Eq.:~:) a) where
   testCoercion Eq.Refl Eq.Refl = Just Coercion
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance TestCoercion ((Eq.:~~:) a) where
   testCoercion Eq.HRefl Eq.HRefl = Just Coercion
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance TestCoercion (Coercion a) where
   testCoercion Coercion Coercion = Just Coercion

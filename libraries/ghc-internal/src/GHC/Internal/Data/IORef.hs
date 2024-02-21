@@ -68,7 +68,7 @@ modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 -- This is not an atomic update, consider using 'atomicModifyIORef'' when
 -- operating in a multithreaded environment.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
     x <- readIORef ref
@@ -131,7 +131,7 @@ atomicModifyIORef ref f = do
 -- Such a write will not be reordered with other reads
 -- or writes even on CPUs with weak memory model.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 atomicWriteIORef :: IORef a -> a -> IO ()
 atomicWriteIORef ref a = do
   _ <- atomicSwapIORef ref a

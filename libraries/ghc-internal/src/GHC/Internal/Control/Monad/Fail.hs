@@ -34,7 +34,7 @@
 -- See <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>
 -- for more details.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 --
 module GHC.Internal.Control.Monad.Fail ( MonadFail(fail) ) where
 
@@ -65,20 +65,20 @@ import GHC.Internal.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
 -- exception (except in instances of @MonadIO@).  In particular,
 -- @fail@ should not be implemented in terms of @error@.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 class Monad m => MonadFail m where
     fail :: String -> m a
 
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadFail Maybe where
     fail _ = Nothing
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadFail [] where
     {-# INLINE fail #-}
     fail _ = []
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadFail IO where
     fail = failIO

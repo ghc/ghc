@@ -187,44 +187,44 @@ INTEGRAL_TYPE(CRLim,"rlim_t",HTYPE_RLIM_T)
 #endif
 
 #if defined(HTYPE_BLKSIZE_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CBlkSize,"blksize_t",HTYPE_BLKSIZE_T)
 #endif
 #if defined(HTYPE_BLKCNT_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CBlkCnt,"blkcnt_t",HTYPE_BLKCNT_T)
 #endif
 #if defined(HTYPE_CLOCKID_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CClockId,"clockid_t",HTYPE_CLOCKID_T)
 #endif
 #if defined(HTYPE_FSBLKCNT_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CFsBlkCnt,"fsblkcnt_t",HTYPE_FSBLKCNT_T)
 #endif
 #if defined(HTYPE_FSFILCNT_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CFsFilCnt,"fsfilcnt_t",HTYPE_FSFILCNT_T)
 #endif
 #if defined(HTYPE_ID_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CId,"id_t",HTYPE_ID_T)
 #endif
 #if defined(HTYPE_KEY_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 INTEGRAL_TYPE(CKey,"key_t",HTYPE_KEY_T)
 #endif
 #if defined(HTYPE_TIMER_T)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 OPAQUE_TYPE(CTimer,"timer_t",HTYPE_TIMER_T)
 #endif
 
 #if defined(HTYPE_SOCKLEN_T)
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 INTEGRAL_TYPE(CSocklen,"socklen_t",HTYPE_SOCKLEN_T)
 #endif
 #if defined(HTYPE_NFDS_T)
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 INTEGRAL_TYPE(CNfds,"nfds_t",HTYPE_NFDS_T)
 #endif
 

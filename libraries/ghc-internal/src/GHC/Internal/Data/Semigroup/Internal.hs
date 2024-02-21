@@ -17,7 +17,7 @@
 -- This module exists mostly to simplify or workaround import-graph
 -- issues.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 module GHC.Internal.Data.Semigroup.Internal where
 
 import GHC.Internal.Base hiding (Any)
@@ -85,34 +85,34 @@ stimesMonoid n x0 = case compare n 0 of
 -- >>> Dual (Dual "Hello") <> Dual (Dual "World")
 -- Dual {getDual = Dual {getDual = "HelloWorld"}}
 newtype Dual a = Dual { getDual :: a }
-        deriving ( Eq       -- ^ @since 2.01
-                 , Ord      -- ^ @since 2.01
-                 , Read     -- ^ @since 2.01
-                 , Show     -- ^ @since 2.01
-                 , Bounded  -- ^ @since 2.01
-                 , Generic  -- ^ @since 4.7.0.0
-                 , Generic1 -- ^ @since 4.7.0.0
+        deriving ( Eq       -- ^ @since base-2.01
+                 , Ord      -- ^ @since base-2.01
+                 , Read     -- ^ @since base-2.01
+                 , Show     -- ^ @since base-2.01
+                 , Bounded  -- ^ @since base-2.01
+                 , Generic  -- ^ @since base-4.7.0.0
+                 , Generic1 -- ^ @since base-4.7.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup a => Semigroup (Dual a) where
         Dual a <> Dual b = Dual (b <> a)
         stimes n (Dual a) = Dual (stimes n a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid a => Monoid (Dual a) where
         mempty = Dual mempty
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Functor Dual where
     fmap     = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative Dual where
     pure     = Dual
     (<*>)    = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Monad Dual where
     m >>= k  = k (getDual m)
 
@@ -130,10 +130,10 @@ instance Monad Dual where
 -- >>> appEndo computation 1
 -- 6
 newtype Endo a = Endo { appEndo :: a -> a }
-               deriving ( Generic -- ^ @since 4.7.0.0
+               deriving ( Generic -- ^ @since base-4.7.0.0
                         )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (Endo a) where
     (<>) = coerce ((.) :: (a -> a) -> (a -> a) -> (a -> a))
 
@@ -176,7 +176,7 @@ stimesEndoError = errorWithoutStackTrace "stimes (for Endo): negative multiplier
 -- really careless, we could theoretically get GHC to build a *list* of
 -- compositions, which would be awful.
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid (Endo a) where
         mempty = Endo id
 
@@ -195,20 +195,20 @@ instance Monoid (Endo a) where
 -- >>> All True <> mempty
 -- All {getAll = True}
 newtype All = All { getAll :: Bool }
-        deriving ( Eq      -- ^ @since 2.01
-                 , Ord     -- ^ @since 2.01
-                 , Read    -- ^ @since 2.01
-                 , Show    -- ^ @since 2.01
-                 , Bounded -- ^ @since 2.01
-                 , Generic -- ^ @since 4.7.0.0
+        deriving ( Eq      -- ^ @since base-2.01
+                 , Ord     -- ^ @since base-2.01
+                 , Read    -- ^ @since base-2.01
+                 , Show    -- ^ @since base-2.01
+                 , Bounded -- ^ @since base-2.01
+                 , Generic -- ^ @since base-4.7.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup All where
         (<>) = coerce (&&)
         stimes = stimesIdempotentMonoid
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid All where
         mempty = All True
 
@@ -227,20 +227,20 @@ instance Monoid All where
 -- >>> Any False <> mempty
 -- Any {getAny = False}
 newtype Any = Any { getAny :: Bool }
-        deriving ( Eq      -- ^ @since 2.01
-                 , Ord     -- ^ @since 2.01
-                 , Read    -- ^ @since 2.01
-                 , Show    -- ^ @since 2.01
-                 , Bounded -- ^ @since 2.01
-                 , Generic -- ^ @since 4.7.0.0
+        deriving ( Eq      -- ^ @since base-2.01
+                 , Ord     -- ^ @since base-2.01
+                 , Read    -- ^ @since base-2.01
+                 , Show    -- ^ @since base-2.01
+                 , Bounded -- ^ @since base-2.01
+                 , Generic -- ^ @since base-4.7.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup Any where
         (<>) = coerce (||)
         stimes = stimesIdempotentMonoid
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monoid Any where
         mempty = Any False
 
@@ -256,22 +256,22 @@ instance Monoid Any where
 -- >>> mconcat [ Sum n | n <- [3 .. 9]]
 -- Sum {getSum = 42}
 newtype Sum a = Sum { getSum :: a }
-        deriving ( Eq       -- ^ @since 2.01
-                 , Ord      -- ^ @since 2.01
-                 , Read     -- ^ @since 2.01
-                 , Show     -- ^ @since 2.01
-                 , Bounded  -- ^ @since 2.01
-                 , Generic  -- ^ @since 4.7.0.0
-                 , Generic1 -- ^ @since 4.7.0.0
-                 , Num      -- ^ @since 4.7.0.0
+        deriving ( Eq       -- ^ @since base-2.01
+                 , Ord      -- ^ @since base-2.01
+                 , Read     -- ^ @since base-2.01
+                 , Show     -- ^ @since base-2.01
+                 , Bounded  -- ^ @since base-2.01
+                 , Generic  -- ^ @since base-4.7.0.0
+                 , Generic1 -- ^ @since base-4.7.0.0
+                 , Num      -- ^ @since base-4.7.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Num a => Semigroup (Sum a) where
         (<>) = coerce ((+) :: a -> a -> a)
         stimes n (Sum a) = Sum (fromIntegral n * a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num a => Monoid (Sum a) where
         mempty = Sum 0
         -- By default, we would get a lazy right fold. This forces the use of a strict
@@ -279,16 +279,16 @@ instance Num a => Monoid (Sum a) where
         mconcat = List.foldl' (<>) mempty
         {-# INLINE mconcat #-}
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Functor Sum where
     fmap     = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative Sum where
     pure     = Sum
     (<*>)    = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Monad Sum where
     m >>= k  = k (getSum m)
 
@@ -304,23 +304,23 @@ instance Monad Sum where
 -- >>> mconcat [ Product n | n <- [2 .. 10]]
 -- Product {getProduct = 3628800}
 newtype Product a = Product { getProduct :: a }
-        deriving ( Eq       -- ^ @since 2.01
-                 , Ord      -- ^ @since 2.01
-                 , Read     -- ^ @since 2.01
-                 , Show     -- ^ @since 2.01
-                 , Bounded  -- ^ @since 2.01
-                 , Generic  -- ^ @since 4.7.0.0
-                 , Generic1 -- ^ @since 4.7.0.0
-                 , Num      -- ^ @since 4.7.0.0
+        deriving ( Eq       -- ^ @since base-2.01
+                 , Ord      -- ^ @since base-2.01
+                 , Read     -- ^ @since base-2.01
+                 , Show     -- ^ @since base-2.01
+                 , Bounded  -- ^ @since base-2.01
+                 , Generic  -- ^ @since base-4.7.0.0
+                 , Generic1 -- ^ @since base-4.7.0.0
+                 , Num      -- ^ @since base-4.7.0.0
                  )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Num a => Semigroup (Product a) where
         (<>) = coerce ((*) :: a -> a -> a)
         stimes n (Product a) = Product (a ^ n)
 
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num a => Monoid (Product a) where
         mempty = Product 1
         -- By default, we would get a lazy right fold. This forces the use of a strict
@@ -328,16 +328,16 @@ instance Num a => Monoid (Product a) where
         mconcat = List.foldl' (<>) mempty
         {-# INLINE mconcat #-}
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Functor Product where
     fmap     = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative Product where
     pure     = Product
     (<*>)    = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Monad Product where
     m >>= k  = k (getProduct m)
 
@@ -353,28 +353,28 @@ instance Monad Product where
 -- >>> Alt Nothing <> Alt (Just 24)
 -- Alt {getAlt = Just 24}
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}
-  deriving ( Generic     -- ^ @since 4.8.0.0
-           , Generic1    -- ^ @since 4.8.0.0
-           , Read        -- ^ @since 4.8.0.0
-           , Show        -- ^ @since 4.8.0.0
-           , Eq          -- ^ @since 4.8.0.0
-           , Ord         -- ^ @since 4.8.0.0
-           , Num         -- ^ @since 4.8.0.0
-           , Enum        -- ^ @since 4.8.0.0
-           , Monad       -- ^ @since 4.8.0.0
-           , MonadPlus   -- ^ @since 4.8.0.0
-           , Applicative -- ^ @since 4.8.0.0
-           , Alternative -- ^ @since 4.8.0.0
-           , Functor     -- ^ @since 4.8.0.0
+  deriving ( Generic     -- ^ @since base-4.8.0.0
+           , Generic1    -- ^ @since base-4.8.0.0
+           , Read        -- ^ @since base-4.8.0.0
+           , Show        -- ^ @since base-4.8.0.0
+           , Eq          -- ^ @since base-4.8.0.0
+           , Ord         -- ^ @since base-4.8.0.0
+           , Num         -- ^ @since base-4.8.0.0
+           , Enum        -- ^ @since base-4.8.0.0
+           , Monad       -- ^ @since base-4.8.0.0
+           , MonadPlus   -- ^ @since base-4.8.0.0
+           , Applicative -- ^ @since base-4.8.0.0
+           , Alternative -- ^ @since base-4.8.0.0
+           , Functor     -- ^ @since base-4.8.0.0
            )
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Alternative f => Semigroup (Alt f a) where
     (<>) = coerce ((<|>) :: f a -> f a -> f a)
     stimes = stimesMonoid
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Alternative f => Monoid (Alt f a) where
     mempty = Alt empty

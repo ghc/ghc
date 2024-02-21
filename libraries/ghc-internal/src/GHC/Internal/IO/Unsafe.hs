@@ -138,7 +138,7 @@ in the middle without an exception being raised. Therefore, functions
 like 'GHC.Internal.Control.Exception.bracket' cannot be used safely within
 'unsafeDupablePerformIO'.
 
-@since 4.4.0.0
+@since base-4.4.0.0
 -}
 unsafeDupablePerformIO  :: IO a -> a
 -- See Note [unsafePerformIO and strictness]

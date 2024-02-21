@@ -288,38 +288,38 @@ Solution: add an INLINE pragma on the default method:
 
 -- instances for Prelude types
 
--- | @since 2.01
+-- | @since base-2.01
 instance Traversable Maybe where
     traverse _ Nothing = pure Nothing
     traverse f (Just x) = Just <$> f x
 
--- | @since 2.01
+-- | @since base-2.01
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = liftA2 (:) (f x) ys
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Traversable NonEmpty where
   traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)
     traverse f (Right y) = Right <$> f y
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Traversable Solo
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Traversable ((,) a) where
     traverse f (x, y) = (,) x <$> f y
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Traversable Proxy where
     traverse _ _ = pure Proxy
     {-# INLINE traverse #-}
@@ -330,44 +330,44 @@ instance Traversable Proxy where
     sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Traversable (Const m) where
     traverse _ (Const m) = pure $ Const m
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Traversable Dual where
     traverse f (Dual x) = Dual <$> f x
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Traversable Sum where
     traverse f (Sum x) = Sum <$> f x
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Traversable Product where
     traverse f (Product x) = Product <$> f x
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Traversable First where
     traverse f (First x) = First <$> traverse f x
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Traversable Last where
     traverse f (Last x) = Last <$> traverse f x
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Traversable f) => Traversable (Alt f) where
     traverse f (Alt x) = Alt <$> traverse f x
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Traversable f) => Traversable (Ap f) where
     traverse f (Ap x) = Ap <$> traverse f x
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable Identity
 
 
 -- Instances for GHC.Generics
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Traversable U1 where
     traverse _ _ = pure U1
     {-# INLINE traverse #-}
@@ -378,50 +378,50 @@ instance Traversable U1 where
     sequence _ = pure U1
     {-# INLINE sequence #-}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable V1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable Par1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable f => Traversable (Rec1 f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable (K1 i c)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable f => Traversable (M1 i c f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :+: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :*: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :.: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UAddr
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UChar
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UDouble
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UFloat
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UInt
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Traversable UWord
 
 -- Instance for GHC.Internal.Data.Ord
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Traversable Down
 
 -- general functions
@@ -484,7 +484,7 @@ mapAccumR f s t = coerce (traverse @t @(StateR s) @a @b) (flip f) t s
 -- It returns a final value of this accumulator together with the new structure.
 -- The accumulator is often used for caching the intermediate results of a computation.
 --
---  @since 4.18.0.0
+--  @since base-4.18.0.0
 --
 -- ==== __Examples__
 --
@@ -510,7 +510,7 @@ mapAccumM f s t = coerce (mapM @t @(StateT s m) @a @b) (StateT #. flip f) t s
 
 -- | 'forAccumM' is 'mapAccumM' with the arguments rearranged.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 forAccumM
   :: (Monad m, Traversable t)
   => s -> t a -> (s -> a -> m (s, b)) -> m (s, t b)

@@ -71,7 +71,7 @@ reads = readsPrec minPrec
 -- >>> readEither "hello" :: Either String Int
 -- Left "Prelude.read: no parse"
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 readEither :: Read a => String -> Either String a
 readEither s =
   case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
@@ -93,7 +93,7 @@ readEither s =
 -- >>> readMaybe "hello" :: Maybe Int
 -- Nothing
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 readMaybe :: Read a => String -> Maybe a
 readMaybe s = case readEither s of
                 Left _  -> Nothing

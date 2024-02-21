@@ -12,7 +12,7 @@
 -- A logically uninhabited data type, used to indicate that a given
 -- term should not exist.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 ----------------------------------------------------------------------------
 module GHC.Internal.Data.Void
     ( Void

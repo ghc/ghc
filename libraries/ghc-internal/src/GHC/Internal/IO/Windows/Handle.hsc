@@ -125,22 +125,22 @@ convertHandle io async
   = let !hwnd = getConsoleHandle io
     in NativeHandle hwnd async
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Show (Io NativeHandle) where
   show = show . toHANDLE
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Show (Io ConsoleHandle) where
   show = show . getConsoleHandle
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance GHC.IO.Device.RawIO (Io NativeHandle) where
   read             = hwndRead
   readNonBlocking  = hwndReadNonBlocking
   write            = hwndWrite
   writeNonBlocking = hwndWriteNonBlocking
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance GHC.IO.Device.RawIO (Io ConsoleHandle) where
   read             = consoleRead True
   readNonBlocking  = consoleReadNonBlocking
@@ -177,7 +177,7 @@ instance RawHandle (Io ConsoleHandle) where
 -- -----------------------------------------------------------------------------
 -- The Windows IO device implementation
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance GHC.IO.Device.IODevice (Io NativeHandle) where
   ready      = handle_ready
   close      = handle_close
@@ -193,7 +193,7 @@ instance GHC.IO.Device.IODevice (Io NativeHandle) where
   devType    = handle_dev_type
   dup        = handle_duplicate
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance GHC.IO.Device.IODevice (Io ConsoleHandle) where
   ready      = handle_ready
   close      = handle_close . flip convertHandle False
@@ -215,7 +215,7 @@ instance GHC.IO.Device.IODevice (Io ConsoleHandle) where
 dEFAULT_BUFFER_SIZE :: Int
 dEFAULT_BUFFER_SIZE = 8192
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 -- See libraries/base/GHC/IO/BufferedIO.hs
 instance BufferedIO (Io NativeHandle) where
   newBuffer _dev state = newByteBuffer dEFAULT_BUFFER_SIZE state
@@ -224,7 +224,7 @@ instance BufferedIO (Io NativeHandle) where
   flushWriteBuffer     = writeBuf'
   flushWriteBuffer0    = writeBufNonBlocking
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 -- See libraries/base/GHC/IO/BufferedIO.hs
 instance BufferedIO (Io ConsoleHandle) where
   newBuffer _dev state = newByteBuffer dEFAULT_BUFFER_SIZE state

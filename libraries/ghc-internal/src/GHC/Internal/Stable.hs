@@ -105,7 +105,7 @@ castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerceAddr s)
 castPtrToStablePtr :: Ptr () -> StablePtr a
 castPtrToStablePtr (Ptr a) = StablePtr (unsafeCoerceAddr a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq (StablePtr a) where
     (StablePtr sp1) == (StablePtr sp2) =
         case eqStablePtr# sp1 sp2 of

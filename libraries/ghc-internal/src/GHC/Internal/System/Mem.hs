@@ -39,16 +39,16 @@ performGC = performMajorGC
 
 -- | Triggers an immediate major garbage collection.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 foreign import ccall "performMajorGC" performMajorGC :: IO ()
 
 -- | Triggers an immediate major garbage collection, ensuring that collection
 -- finishes before returning.
 --
--- @since 4.20.0.0
+-- @since base-4.20.0.0
 foreign import ccall "performBlockingMajorGC" performBlockingMajorGC :: IO ()
 
 -- | Triggers an immediate minor garbage collection.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 foreign import ccall "performGC" performMinorGC :: IO ()

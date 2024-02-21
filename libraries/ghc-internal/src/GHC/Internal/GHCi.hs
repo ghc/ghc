@@ -33,27 +33,27 @@ import GHC.Internal.Base (IO(), Monad, Functor(fmap), Applicative(..), (>>=), id
 class (Monad m) => GHCiSandboxIO m where
     ghciStepIO :: m a -> IO a
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance GHCiSandboxIO IO where
     ghciStepIO = id
 
 -- | A monad that doesn't allow any IO.
 newtype NoIO a = NoIO { noio :: IO a }
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Functor NoIO where
   fmap f (NoIO a) = NoIO (fmap f a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative NoIO where
   pure a = NoIO (pure a)
   (<*>) = ap
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance Monad NoIO where
     (>>=) k f = NoIO (noio k >>= noio . f)
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance GHCiSandboxIO NoIO where
     ghciStepIO = noio
 

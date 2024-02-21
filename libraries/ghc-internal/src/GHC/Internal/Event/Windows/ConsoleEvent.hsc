@@ -42,11 +42,11 @@ data ConsoleEvent
   -- these are sent to Services only.
   | Logoff
   | Shutdown
-    deriving ( Eq   -- ^ @since 4.3.0.0
-             , Ord  -- ^ @since 4.3.0.0
-             , Enum -- ^ @since 4.3.0.0
-             , Show -- ^ @since 4.3.0.0
-             , Read -- ^ @since 4.3.0.0
+    deriving ( Eq   -- ^ @since base-4.3.0.0
+             , Ord  -- ^ @since base-4.3.0.0
+             , Enum -- ^ @since base-4.3.0.0
+             , Show -- ^ @since base-4.3.0.0
+             , Read -- ^ @since base-4.3.0.0
              )
 
 start_console_handler :: Word32 -> IO ()

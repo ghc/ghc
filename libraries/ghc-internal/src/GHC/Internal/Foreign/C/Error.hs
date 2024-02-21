@@ -111,7 +111,7 @@ import GHC.Internal.Base
 
 newtype Errno = Errno CInt
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Errno where
   errno1@(Errno no1) == errno2@(Errno no2)
     | isValidErrno errno1 && isValidErrno errno2 = no1 == no2
@@ -205,7 +205,7 @@ eNOTDIR         = Errno (CONST_ENOTDIR)
 eNOTEMPTY       = Errno (CONST_ENOTEMPTY)
 eNOTSOCK        = Errno (CONST_ENOTSOCK)
 eNOTSUP         = Errno (CONST_ENOTSUP)
--- ^ @since 4.7.0.0
+-- ^ @since base-4.7.0.0
 eNOTTY          = Errno (CONST_ENOTTY)
 eNXIO           = Errno (CONST_ENXIO)
 eOPNOTSUPP      = Errno (CONST_EOPNOTSUPP)

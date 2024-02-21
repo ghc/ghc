@@ -125,8 +125,8 @@ poll kq mtimeout f = do
 
 newtype KQueueFd = KQueueFd {
       fromKQueueFd :: CInt
-    } deriving ( Eq   -- ^ @since 4.4.0.0
-               , Show -- ^ @since 4.4.0.0
+    } deriving ( Eq   -- ^ @since base-4.4.0.0
+               , Show -- ^ @since base-4.4.0.0
                )
 
 data Event = KEvent {
@@ -140,12 +140,12 @@ data Event = KEvent {
     , data_  :: {-# UNPACK #-} !CIntPtr
 #endif
     , udata  :: {-# UNPACK #-} !(Ptr ())
-    } deriving Show -- ^ @since 4.4.0.0
+    } deriving Show -- ^ @since base-4.4.0.0
 
 toEvents :: Fd -> [Filter] -> Flag -> FFlag -> [Event]
 toEvents fd flts flag fflag = map (\filt -> KEvent (fromIntegral fd) filt flag fflag 0 nullPtr) flts
 
--- | @since 4.3.1.0
+-- | @since base-4.3.1.0
 instance Storable Event where
     sizeOf _ = #size struct kevent
     alignment _ = alignment (undefined :: CInt)
@@ -170,9 +170,9 @@ instance Storable Event where
         #{poke struct kevent, udata} ptr (udata ev)
 
 newtype FFlag = FFlag Word32
-    deriving ( Eq       -- ^ @since 4.4.0.0
-             , Show     -- ^ @since 4.4.0.0
-             , Storable -- ^ @since 4.4.0.0
+    deriving ( Eq       -- ^ @since base-4.4.0.0
+             , Show     -- ^ @since base-4.4.0.0
+             , Storable -- ^ @since base-4.4.0.0
              )
 
 #{enum FFlag, FFlag
@@ -184,12 +184,12 @@ newtype Flag = Flag Word32
 #else
 newtype Flag = Flag Word16
 #endif
-    deriving ( Bits       -- ^ @since 4.7.0.0
-             , FiniteBits -- ^ @since 4.7.0.0
-             , Eq         -- ^ @since 4.4.0.0
-             , Num        -- ^ @since 4.7.0.0
-             , Show       -- ^ @since 4.4.0.0
-             , Storable   -- ^ @since 4.4.0.0
+    deriving ( Bits       -- ^ @since base-4.7.0.0
+             , FiniteBits -- ^ @since base-4.7.0.0
+             , Eq         -- ^ @since base-4.4.0.0
+             , Num        -- ^ @since base-4.7.0.0
+             , Show       -- ^ @since base-4.4.0.0
+             , Storable   -- ^ @since base-4.4.0.0
              )
 
 #{enum Flag, Flag
@@ -203,10 +203,10 @@ newtype Filter = Filter Int32
 #else
 newtype Filter = Filter Int16
 #endif
-    deriving ( Eq       -- ^ @since 4.4.0.0
-             , Num      -- ^ @since 4.4.0.0
-             , Show     -- ^ @since 4.4.0.0
-             , Storable -- ^ @since 4.4.0.0
+    deriving ( Eq       -- ^ @since base-4.4.0.0
+             , Num      -- ^ @since base-4.4.0.0
+             , Show     -- ^ @since base-4.4.0.0
+             , Storable -- ^ @since base-4.4.0.0
              )
 
 filterRead :: Filter
@@ -219,7 +219,7 @@ data TimeSpec = TimeSpec {
     , tv_nsec :: {-# UNPACK #-} !CLong
     }
 
--- | @since 4.3.1.0
+-- | @since base-4.3.1.0
 instance Storable TimeSpec where
     sizeOf _ = #size struct timespec
     alignment _ = alignment (undefined :: CInt)

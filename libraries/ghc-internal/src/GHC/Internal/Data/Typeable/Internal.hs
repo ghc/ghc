@@ -148,7 +148,7 @@ tyConKindRep (TyCon _ _ _ _ _ k) = k
 
 -- | Helper to fully evaluate 'TyCon' for use as @NFData(rnf)@ implementation
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 rnfModule :: Module -> ()
 rnfModule (Module p m) = rnfTrName p `seq` rnfTrName m
 
@@ -268,7 +268,7 @@ typeableInstance rep = withTypeable rep TypeableInstance
 -- f TypeRep = {- Typeable a in scope -}
 -- @
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 pattern TypeRep :: forall {k :: Type} (a :: k). () => Typeable @k a => TypeRep @k a
 pattern TypeRep <- (typeableInstance -> TypeableInstance)
   where TypeRep = typeRep
@@ -339,7 +339,7 @@ represents an application.
 
 -- Compare keys for equality
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq (TypeRep a) where
   _ == _  = True
   {-# INLINABLE (==) #-}
@@ -352,7 +352,7 @@ instance TestEquality TypeRep where
     = Nothing
   {-# INLINEABLE testEquality #-}
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance Ord (TypeRep a) where
   compare _ _ = EQ
   {-# INLINABLE compare #-}
@@ -391,7 +391,7 @@ pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (eqType
 
 -- | Observe the 'Fingerprint' of a type representation
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 typeRepFingerprint :: TypeRep a -> Fingerprint
 typeRepFingerprint TrType = fpTYPELiftedRep
 typeRepFingerprint (TrTyCon {trTyConFingerprint = fpr}) = fpr
@@ -613,7 +613,7 @@ typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
 
 -- | Type equality
 --
--- @since 4.10
+-- @since base-4.10
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
 eqTypeRep a b = case inline decTypeRep a b of
@@ -623,7 +623,7 @@ eqTypeRep a b = case inline decTypeRep a b of
 
 -- | Type equality decision
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 decTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Either (a :~~: b -> Void) (a :~~: b)
 decTypeRep a b
@@ -856,7 +856,7 @@ typeOf _ = typeRep
 -- | Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 someTypeRep :: forall proxy a. Typeable a => proxy a -> SomeTypeRep
 someTypeRep _ = SomeTypeRep (typeRep :: TypeRep a)
 {-# INLINE typeRep #-}
@@ -905,7 +905,7 @@ showTypeable p (TrApp {trAppFun = f, trAppArg = x})
     showChar ' ' .
     showsPrec 10 x
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance Show SomeTypeRep where
   showsPrec p (SomeTypeRep ty) = showsPrec p ty
 
@@ -1026,7 +1026,7 @@ showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as
 
 -- | Helper to fully evaluate 'TypeRep' for use as @NFData(rnf)@ implementation
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 rnfTypeRep :: TypeRep a -> ()
 -- The TypeRep structure is almost entirely strict by definition. The
 -- fingerprinting and strict kind caching ensure that everything
@@ -1037,7 +1037,7 @@ rnfTypeRep !_ = ()
 -- | Helper to fully evaluate 'SomeTypeRep' for use as @NFData(rnf)@
 -- implementation
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 rnfSomeTypeRep :: SomeTypeRep -> ()
 rnfSomeTypeRep (SomeTypeRep r) = rnfTypeRep r
 

@@ -101,7 +101,7 @@ foreign import ccall unsafe hs_spt_lookup :: Ptr Word64 -> IO (Ptr a)
 class IsStatic p where
     fromStaticPtr :: Typeable a => StaticPtr a -> p a
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance IsStatic StaticPtr where
     fromStaticPtr = id
 
@@ -115,7 +115,7 @@ data StaticPtrInfo = StaticPtrInfo
       -- @(Line, Column)@ pair.
     , spInfoSrcLoc     :: (Int, Int)
     }
-  deriving Show -- ^ @since 4.8.0.0
+  deriving Show -- ^ @since base-4.8.0.0
 
 -- | 'StaticPtrInfo' of the given 'StaticPtr'.
 staticPtrInfo :: StaticPtr a -> StaticPtrInfo

@@ -141,7 +141,7 @@ import GHC.Internal.IO (interruptible)
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance Functor Handler where
      fmap f (Handler h) = Handler (fmap f . h)
 
@@ -223,7 +223,7 @@ A typical use of 'tryJust' for recovery looks like this:
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 allowInterrupt :: IO ()
 allowInterrupt = interruptible $ return ()
 

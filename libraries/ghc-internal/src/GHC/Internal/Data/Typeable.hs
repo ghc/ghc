@@ -118,7 +118,7 @@ typeOf _ = I.someTypeRep (Proxy :: Proxy a)
 -- | Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
 typeRep = I.someTypeRep
 
@@ -137,7 +137,7 @@ cast x
 
 -- | Extract a witness of equality of two types
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
 eqT
   | Just HRefl <- heqT @a @b = Just Refl
@@ -145,7 +145,7 @@ eqT
 
 -- | Decide an equality of two types
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 decT :: forall a b. (Typeable a, Typeable b) => Either (a :~: b -> Void) (a :~: b)
 decT = case hdecT @a @b of
   Right HRefl -> Right Refl
@@ -153,7 +153,7 @@ decT = case hdecT @a @b of
 
 -- | Extract a witness of heterogeneous equality of two types
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 heqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~~: b)
 heqT = ta `I.eqTypeRep` tb
   where
@@ -162,7 +162,7 @@ heqT = ta `I.eqTypeRep` tb
 
 -- | Decide heterogeneous equality of two types.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 hdecT :: forall a b. (Typeable a, Typeable b) => Either (a :~~: b -> Void) (a :~~: b)
 hdecT = ta `I.decTypeRep` tb
   where
@@ -221,7 +221,7 @@ typeRepTyCon = I.someTypeRepTyCon
 -- | Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 typeRepFingerprint :: TypeRep -> Fingerprint
 typeRepFingerprint = I.someTypeRepFingerprint
 

@@ -15,7 +15,7 @@
 -- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
 -- change rapidly without much warning.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 -----------------------------------------------------------------------------
 
 #include "HsFFI.h"

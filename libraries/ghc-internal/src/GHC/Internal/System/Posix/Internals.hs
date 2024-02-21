@@ -437,7 +437,7 @@ type CFilePath = CWString
 -- need to be able to interrupt a blocking open call.
 -- See #17912.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 c_interruptible_open :: CFilePath -> CInt -> CMode -> IO CInt
 c_interruptible_open filepath oflags mode =
   getMaskingState >>= \case
@@ -485,7 +485,7 @@ c_safe_open filepath oflags mode =
 
 -- | Consult the RTS to find whether it is threaded.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 hostIsThreaded :: Bool
 hostIsThreaded = rtsIsThreaded_ /= 0
 
@@ -495,13 +495,13 @@ foreign import ccall unsafe "HsBase.h __hscore_open"
 
 -- |
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 foreign import ccall interruptible "HsBase.h __hscore_open"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 
 -- |
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
 
 foreign import ccall safe "HsBase.h __hscore_open"

@@ -84,7 +84,7 @@ makeStableName a = IO $ \ s ->
 hashStableName :: StableName a -> Int
 hashStableName (StableName sn) = I# (stableNameToInt# sn)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq (StableName a) where
     (StableName sn1) == (StableName sn2) =
        case eqStableName# sn1 sn2 of
@@ -94,7 +94,7 @@ instance Eq (StableName a) where
 -- | Equality on 'StableName' that does not require that the types of
 -- the arguments match.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 eqStableName :: StableName a -> StableName b -> Bool
 eqStableName (StableName sn1) (StableName sn2) =
        case eqStableName# sn1 sn2 of

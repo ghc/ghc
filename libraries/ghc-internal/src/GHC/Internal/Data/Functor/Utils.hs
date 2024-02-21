@@ -23,7 +23,7 @@ import qualified GHC.Internal.List as List
 newtype Max a = Max {getMax :: Maybe a}
 newtype Min a = Min {getMin :: Maybe a}
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Ord a => Semigroup (Max a) where
     {-# INLINE (<>) #-}
     m <> Max Nothing = m
@@ -32,7 +32,7 @@ instance Ord a => Semigroup (Max a) where
       | x >= y    = Max m
       | otherwise = Max n
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Ord a => Monoid (Max a) where
     mempty = Max Nothing
     -- By default, we would get a lazy right fold. This forces the use of a strict
@@ -40,7 +40,7 @@ instance Ord a => Monoid (Max a) where
     mconcat = List.foldl' (<>) mempty
     {-# INLINE mconcat #-}
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Ord a => Semigroup (Min a) where
     {-# INLINE (<>) #-}
     m <> Min Nothing = m
@@ -49,7 +49,7 @@ instance Ord a => Semigroup (Min a) where
       | x <= y    = Min m
       | otherwise = Min n
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Ord a => Monoid (Min a) where
     mempty = Min Nothing
     -- By default, we would get a lazy right fold. This forces the use of a strict
@@ -60,11 +60,11 @@ instance Ord a => Monoid (Min a) where
 -- left-to-right state-transforming monad
 newtype StateL s a = StateL { runStateL :: s -> (s, a) }
 
--- | @since 4.0
+-- | @since base-4.0
 instance Functor (StateL s) where
     fmap f (StateL k) = StateL $ \ s -> let (s', v) = k s in (s', f v)
 
--- | @since 4.0
+-- | @since base-4.0
 instance Applicative (StateL s) where
     pure x = StateL (\ s -> (s, x))
     StateL kf <*> StateL kv = StateL $ \ s ->
@@ -79,11 +79,11 @@ instance Applicative (StateL s) where
 -- right-to-left state-transforming monad
 newtype StateR s a = StateR { runStateR :: s -> (s, a) }
 
--- | @since 4.0
+-- | @since base-4.0
 instance Functor (StateR s) where
     fmap f (StateR k) = StateR $ \ s -> let (s', v) = k s in (s', f v)
 
--- | @since 4.0
+-- | @since base-4.0
 instance Applicative (StateR s) where
     pure x = StateR (\ s -> (s, x))
     StateR kf <*> StateR kv = StateR $ \ s ->
@@ -99,15 +99,15 @@ instance Applicative (StateR s) where
 -- The implementation is copied from the transformers package with the
 -- return tuple swapped.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 newtype StateT s m a = StateT { runStateT :: s -> m (s, a) }
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Monad m => Functor (StateT s m) where
     fmap = liftM
     {-# INLINE fmap #-}
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Monad m => Applicative (StateT s m) where
     pure a = StateT $ \ s -> return (s, a)
     {-# INLINE pure #-}
@@ -119,7 +119,7 @@ instance Monad m => Applicative (StateT s m) where
     m *> k = m >>= \_ -> k
     {-# INLINE (*>) #-}
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance (Monad m) => Monad (StateT s m) where
     m >>= k  = StateT $ \ s -> do
         (s', a) <- runStateT m s

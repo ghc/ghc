@@ -20,7 +20,7 @@
 -- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
 -- change rapidly without much warning.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.InfoProv
@@ -103,7 +103,7 @@ peekInfoProv infop = do
 -- then consulting a specially generated map (by `-finfo-table-map`) to find out where we think
 -- the best source position to describe that info table arose from.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 whereFrom :: a -> IO (Maybe InfoProv)
 whereFrom obj = do
   ipe <- getIPE obj

@@ -13,7 +13,7 @@
 --
 -- Handle operations implemented by file descriptors (FDs)
 --
--- @since 4.2.0.0
+-- @since base-4.2.0.0
 --
 -----------------------------------------------------------------------------
 
@@ -162,7 +162,7 @@ openFile fp im =
 -- this exception will be raised by 'withFile' rather than any exception
 -- raised by @act@.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile fp im act = do
   -- Only annotate when setup or teardown of withFile' raised the exception
@@ -184,7 +184,7 @@ withFile fp im act = do
 -- On POSIX systems, 'openFileBlocking' is an /interruptible operation/ as
 -- described in "Control.Exception".
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
   catchException
@@ -198,7 +198,7 @@ openFileBlocking fp im =
 -- this exception will be raised by 'withFile' rather than any exception raised
 -- by @act@.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFileBlocking fp im act = do
   -- Only annotate when setup or teardown of withFile' raised the exception
@@ -230,7 +230,7 @@ openBinaryFile fp m =
 -- close the file when finished with it so the file does not remain
 -- open until the garbage collector collects the handle.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withBinaryFile fp im act =
   -- Only annotate when setup or teardown of withFile' raised the exception
@@ -383,7 +383,7 @@ fdToHandle fdint = do
 -- | Turn an existing Handle into a file descriptor. This function throws an
 -- IOError if the Handle does not reference a file descriptor.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 handleToFd :: Handle -> IO FD.FD
 handleToFd h = case h of
   FileHandle _ mv -> do

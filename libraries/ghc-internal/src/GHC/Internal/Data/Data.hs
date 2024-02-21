@@ -504,7 +504,7 @@ data DataType = DataType
                         , datarep :: DataRep
                         }
 
-              deriving Show -- ^ @since 4.0.0.0
+              deriving Show -- ^ @since base-4.0.0.0
 
 -- | Representation of constructors. Note that equality on constructors
 -- with different types may not work -- i.e. the constructors for 'False' and
@@ -517,14 +517,14 @@ data Constr = Constr
                         , datatype  :: DataType
                         }
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Show Constr where
  show = constring
 
 
 -- | Equality of constructors
 --
--- @since 4.0.0.0
+-- @since base-4.0.0.0
 instance Eq Constr where
   c == c' = constrRep c == constrRep c'
 
@@ -536,8 +536,8 @@ data DataRep = AlgRep [Constr]
              | CharRep
              | NoRep
 
-            deriving ( Eq   -- ^ @since 4.0.0.0
-                     , Show -- ^ @since 4.0.0.0
+            deriving ( Eq   -- ^ @since base-4.0.0.0
+                     , Show -- ^ @since base-4.0.0.0
                      )
 -- The list of constructors could be an array, a balanced tree, or others.
 
@@ -548,8 +548,8 @@ data ConstrRep = AlgConstr    ConIndex
                | FloatConstr  Rational
                | CharConstr   Char
 
-               deriving ( Eq   -- ^ @since 4.0.0.0
-                        , Show -- ^ @since 4.0.0.0
+               deriving ( Eq   -- ^ @since base-4.0.0.0
+                        , Show -- ^ @since base-4.0.0.0
                         )
 
 
@@ -562,8 +562,8 @@ type ConIndex = Int
 data Fixity = Prefix
             | Infix     -- Later: add associativity and precedence
 
-            deriving ( Eq   -- ^ @since 4.0.0.0
-                     , Show -- ^ @since 4.0.0.0
+            deriving ( Eq   -- ^ @since base-4.0.0.0
+                     , Show -- ^ @since base-4.0.0.0
                      )
 
 
@@ -623,7 +623,7 @@ mkDataType str cs = DataType
 
 -- | Constructs a constructor
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 mkConstrTag :: DataType -> String -> Int -> [String] -> Fixity -> Constr
 mkConstrTag dt str idx fields fix =
         Constr
@@ -868,7 +868,7 @@ tyconModule x = case break ((==) '.') x of
 --
 ------------------------------------------------------------------------------
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance Data Bool
 
 ------------------------------------------------------------------------------
@@ -876,7 +876,7 @@ deriving instance Data Bool
 charType :: DataType
 charType = mkCharType "Prelude.Char"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Char where
   toConstr x = mkCharConstr charType x
   gunfold _ z c = case constrRep c of
@@ -891,7 +891,7 @@ instance Data Char where
 floatType :: DataType
 floatType = mkFloatType "Prelude.Float"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Float where
   toConstr = mkRealConstr floatType
   gunfold _ z c = case constrRep c of
@@ -906,7 +906,7 @@ instance Data Float where
 doubleType :: DataType
 doubleType = mkFloatType "Prelude.Double"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Double where
   toConstr = mkRealConstr doubleType
   gunfold _ z c = case constrRep c of
@@ -921,7 +921,7 @@ instance Data Double where
 intType :: DataType
 intType = mkIntType "Prelude.Int"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Int where
   toConstr x = mkIntegralConstr intType x
   gunfold _ z c = case constrRep c of
@@ -936,7 +936,7 @@ instance Data Int where
 integerType :: DataType
 integerType = mkIntType "Prelude.Integer"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Integer where
   toConstr = mkIntegralConstr integerType
   gunfold _ z c = case constrRep c of
@@ -953,7 +953,7 @@ instance Data Integer where
 naturalType :: DataType
 naturalType = mkIntType "Numeric.Natural.Natural"
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Data Natural where
   toConstr x = mkIntegralConstr naturalType x
   gunfold _ z c = case constrRep c of
@@ -968,7 +968,7 @@ instance Data Natural where
 int8Type :: DataType
 int8Type = mkIntType "Data.Int.Int8"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Int8 where
   toConstr x = mkIntegralConstr int8Type x
   gunfold _ z c = case constrRep c of
@@ -983,7 +983,7 @@ instance Data Int8 where
 int16Type :: DataType
 int16Type = mkIntType "Data.Int.Int16"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Int16 where
   toConstr x = mkIntegralConstr int16Type x
   gunfold _ z c = case constrRep c of
@@ -998,7 +998,7 @@ instance Data Int16 where
 int32Type :: DataType
 int32Type = mkIntType "Data.Int.Int32"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Int32 where
   toConstr x = mkIntegralConstr int32Type x
   gunfold _ z c = case constrRep c of
@@ -1013,7 +1013,7 @@ instance Data Int32 where
 int64Type :: DataType
 int64Type = mkIntType "Data.Int.Int64"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Int64 where
   toConstr x = mkIntegralConstr int64Type x
   gunfold _ z c = case constrRep c of
@@ -1028,7 +1028,7 @@ instance Data Int64 where
 wordType :: DataType
 wordType = mkIntType "Data.Word.Word"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Word where
   toConstr x = mkIntegralConstr wordType x
   gunfold _ z c = case constrRep c of
@@ -1043,7 +1043,7 @@ instance Data Word where
 word8Type :: DataType
 word8Type = mkIntType "Data.Word.Word8"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Word8 where
   toConstr x = mkIntegralConstr word8Type x
   gunfold _ z c = case constrRep c of
@@ -1058,7 +1058,7 @@ instance Data Word8 where
 word16Type :: DataType
 word16Type = mkIntType "Data.Word.Word16"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Word16 where
   toConstr x = mkIntegralConstr word16Type x
   gunfold _ z c = case constrRep c of
@@ -1073,7 +1073,7 @@ instance Data Word16 where
 word32Type :: DataType
 word32Type = mkIntType "Data.Word.Word32"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Word32 where
   toConstr x = mkIntegralConstr word32Type x
   gunfold _ z c = case constrRep c of
@@ -1088,7 +1088,7 @@ instance Data Word32 where
 word64Type :: DataType
 word64Type = mkIntType "Data.Word.Word64"
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Data Word64 where
   toConstr x = mkIntegralConstr word64Type x
   gunfold _ z c = case constrRep c of
@@ -1110,7 +1110,7 @@ ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
 -- of the internal (:%) constructor to preserve the invariant that a Ratio
 -- value is reduced to normal form. See #10011.
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance (Data a, Integral a) => Data (Ratio a) where
   gfoldl k z (a :% b) = z (%) `k` a `k` b
   toConstr _ = ratioConstr
@@ -1132,7 +1132,7 @@ listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 -- | For historical reasons, the constructor name used for @(:)@ is
 -- @"(:)"@. In a derived instance, it would be @":"@.
 --
--- @since 4.0.0.0
+-- @since base-4.0.0.0
 instance Data a => Data [a] where
   gfoldl _ z []     = z []
   gfoldl f z (x:xs) = z (:) `f` x `f` xs
@@ -1159,80 +1159,80 @@ instance Data a => Data [a] where
 
 ------------------------------------------------------------------------------
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data a => Data (NonEmpty a)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance Data a => Data (Maybe a)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance Data Ordering
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b) => Data (Either a b)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data Void
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance Data ()
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Data a => Data (Solo a)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b) => Data (a,b)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b, Data c) => Data (a,b,c)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b, Data c, Data d)
          => Data (a,b,c,d)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b, Data c, Data d, Data e)
          => Data (a,b,c,d,e)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b, Data c, Data d, Data e, Data f)
          => Data (a,b,c,d,e,f)
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 deriving instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
          => Data (a,b,c,d,e,f,g)
 
 ------------------------------------------------------------------------------
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Data a => Data (Ptr a) where
   toConstr _   = errorWithoutStackTrace "GHC.Internal.Data.Data.toConstr(Ptr)"
   gunfold _ _  = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(Ptr)"
   dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
   dataCast1 x  = gcast1 x
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 deriving instance Data a => Data (ConstPtr a)
 
 ------------------------------------------------------------------------------
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Data a => Data (ForeignPtr a) where
   toConstr _   = errorWithoutStackTrace "GHC.Internal.Data.Data.toConstr(ForeignPtr)"
   gunfold _ _  = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(ForeignPtr)"
   dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
   dataCast1 x  = gcast1 x
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Data IntPtr
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 deriving instance Data WordPtr
 
 ------------------------------------------------------------------------------
 -- The Data instance for Array preserves data abstraction at the cost of
 -- inefficiency. We omit reflection services for the sake of data abstraction.
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance (Data a, Data b, Ix a) => Data (Array a b)
  where
   gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
@@ -1244,111 +1244,111 @@ instance (Data a, Data b, Ix a) => Data (Array a b)
 ----------------------------------------------------------------------------
 -- Data instance for Proxy
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance (Data t) => Data (Proxy t)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance (a ~ b, Data a) => Data (a :~: b)
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance (Typeable i, Typeable j, Typeable a, Typeable b,
                     (a :: i) ~~ (b :: j))
     => Data (a :~~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance (Coercible a b, Data a, Data b) => Data (Coercion a b)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data a => Data (Identity a)
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance (Typeable k, Data a, Typeable (b :: k)) => Data (Const a b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Data Version
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Internal.Data.Monoid wrappers
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data a => Data (Dual a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data All
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data Any
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data a => Data (Sum a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data a => Data (Product a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data a => Data (First a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance Data a => Data (Last a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 deriving instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance (Data (f a), Data a, Typeable f) => Data (Ap f a)
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Generics representations
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data p => Data (U1 p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data p => Data (Par1 p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Data (f p), Typeable f, Data p) => Data (Rec1 f p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Typeable i, Data p, Data c) => Data (K1 i c p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Data p, Data (f p), Typeable c, Typeable i, Typeable f)
     => Data (M1 i c f p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
     => Data ((f :+: g) p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Typeable (f :: Type -> Type), Typeable (g :: Type -> Type),
           Data p, Data (f (g p)))
     => Data ((f :.: g) p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data p => Data (V1 p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
     => Data ((f :*: g) p)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data Generics.Fixity
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data Associativity
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data SourceUnpackedness
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data SourceStrictness
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Data DecidedStrictness
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Internal.Data.Ord
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Data a => Data (Down a)

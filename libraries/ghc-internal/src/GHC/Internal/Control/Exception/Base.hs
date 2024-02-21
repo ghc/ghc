@@ -280,11 +280,11 @@ bracketOnError before after thing =
 -- source location of the pattern.
 newtype PatternMatchFail = PatternMatchFail String
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception PatternMatchFail
 
 -----
@@ -296,11 +296,11 @@ instance Exception PatternMatchFail
 -- location of the record selector.
 newtype RecSelError = RecSelError String
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception RecSelError
 
 -----
@@ -310,11 +310,11 @@ instance Exception RecSelError
 -- constructed.
 newtype RecConError = RecConError String
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception RecConError
 
 -----
@@ -326,11 +326,11 @@ instance Exception RecConError
 -- location of the record update.
 newtype RecUpdError = RecUpdError String
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception RecUpdError
 
 -----
@@ -340,11 +340,11 @@ instance Exception RecUpdError
 -- @String@ gives information about which method it was.
 newtype NoMethodError = NoMethodError String
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception NoMethodError
 
 -----
@@ -353,14 +353,14 @@ instance Exception NoMethodError
 -- This is only possible with -fdefer-type-errors. The @String@ gives
 -- details about the failed type check.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 newtype TypeError = TypeError String
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Show TypeError where
     showsPrec _ (TypeError err) = showString err
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Exception TypeError
 
 -----
@@ -371,11 +371,11 @@ instance Exception TypeError
 -- guaranteed to terminate or not.
 data NonTermination = NonTermination
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show NonTermination where
     showsPrec _ NonTermination = showString "<<loop>>"
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception NonTermination
 
 -----
@@ -384,11 +384,11 @@ instance Exception NonTermination
 -- package, inside another call to @atomically@.
 data NestedAtomically = NestedAtomically
 
--- | @since 4.0
+-- | @since base-4.0
 instance Show NestedAtomically where
     showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"
 
--- | @since 4.0
+-- | @since base-4.0
 instance Exception NestedAtomically
 
 -----
@@ -396,15 +396,15 @@ instance Exception NestedAtomically
 -- | Thrown when the program attempts a continuation capture, but no prompt with
 -- the given prompt tag exists in the current continuation.
 --
--- @since 4.18
+-- @since base-4.18
 data NoMatchingContinuationPrompt = NoMatchingContinuationPrompt
 
--- | @since 4.18
+-- | @since base-4.18
 instance Show NoMatchingContinuationPrompt where
   showsPrec _ NoMatchingContinuationPrompt =
     showString "GHC.Internal.Exts.control0#: no matching prompt in the current continuation"
 
--- | @since 4.18
+-- | @since base-4.18
 instance Exception NoMatchingContinuationPrompt
 
 -----

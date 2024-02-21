@@ -41,7 +41,7 @@ error s = raise# (errorCallWithCallStackException s ?callStack)
 
 -- | A variant of 'error' that does not produce a stack trace.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
                           [Char] -> a
 errorWithoutStackTrace s = raise# (errorCallException s)

@@ -130,7 +130,7 @@ data ForeignPtrContents
     -- 'PlainPtr'Most commonly, this is used with @Addr#@ literals.
     -- See Note [Why FinalPtr].
     --
-    -- @since 4.15
+    -- @since base-4.15
   | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
     -- ^ The pointer refers to a byte array.
     -- The 'MutableByteArray#' field means that the 'MutableByteArray#' is
@@ -211,15 +211,15 @@ data ForeignPtrContents
 --
 -- For more discussion of FinalPtr, see GHC MR #2165 and bytestring PR #191.
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq (ForeignPtr a) where
     p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord (ForeignPtr a) where
     compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 
@@ -621,7 +621,7 @@ plusForeignPtr :: ForeignPtr a -> Int -> ForeignPtr b
 -- be called with the same address that it would have had this call
 -- not happened, *not* the new address.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 
 -- | Causes the finalizers associated with a foreign pointer to be run

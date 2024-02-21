@@ -101,7 +101,7 @@ import GHC.Internal.Text.Show
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'GHC.Internal.Control.Exception.try' from "Control.Exception".
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 tryIOError     :: IO a -> IO (Either IOError a)
 tryIOError f   =  catch (do r <- f
                             return (Right r))
@@ -176,7 +176,7 @@ isUserError          = isUserErrorType             . ioeGetErrorType
 -- | An error indicating that the operation failed because the
 -- resource vanished. See 'resourceVanishedErrorType'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 isResourceVanishedError :: IOError -> Bool
 isResourceVanishedError = isResourceVanishedErrorType . ioeGetErrorType
 
@@ -224,7 +224,7 @@ userErrorType             = UserError
 -- This happens when, for example, attempting to write to a closed
 -- socket or attempting to write to a named pipe that was deleted.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 resourceVanishedErrorType :: IOErrorType
 resourceVanishedErrorType = ResourceVanished
 
@@ -279,7 +279,7 @@ isUserErrorType _ = False
 -- | I\/O error where the operation failed because the resource vanished.
 -- See 'resourceVanishedErrorType'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 isResourceVanishedErrorType :: IOErrorType -> Bool
 isResourceVanishedErrorType ResourceVanished = True
 isResourceVanishedErrorType _ = False
@@ -358,6 +358,6 @@ annotateIOError ioe loc hdl path =
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'GHC.Internal.Control.Exception.catch' from "Control.Exception".
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 catchIOError :: IO a -> (IOError -> IO a) -> IO a
 catchIOError = catch

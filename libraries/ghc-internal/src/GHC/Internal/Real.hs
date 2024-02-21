@@ -149,7 +149,7 @@ underflowError = raise# underflowException
 -- Note that `Ratio`'s instances inherit the deficiencies from the type
 -- parameter's. For example, @Ratio Natural@'s 'Num' instance has similar
 -- problems to `Numeric.Natural.Natural`'s.
-data  Ratio a = !a :% !a  deriving Eq -- ^ @since 2.01
+data  Ratio a = !a :% !a  deriving Eq -- ^ @since base-2.01
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
 -- two 'Integer' values.  A rational number may be constructed using
@@ -433,11 +433,11 @@ See #15081 and Phab:D4650 for the related discussion about this problem.
 -- Instances for Int
 --------------------------------------------------------------
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  Real Int  where
     toRational x        =  toInteger x :% 1
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance Integral Int where
     toInteger (I# i) = IS i
 
@@ -494,11 +494,11 @@ Hence the bang on a, see #18187.
 -- Instances for @Word@
 --------------------------------------------------------------
 
--- | @since 2.01
+-- | @since base-2.01
 instance Real Word where
     toRational x = toInteger x % 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Integral Word where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -532,11 +532,11 @@ instance Integral Word where
 -- Instances for Integer
 --------------------------------------------------------------
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  Real Integer  where
     toRational x        =  x :% 1
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Real Natural where
     toRational n = integerFromNatural n :% 1
 
@@ -552,7 +552,7 @@ instance Real Natural where
 -- but this does not happen because they are all marked with NOINLINE pragma.
 
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance Integral Integer where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -582,7 +582,7 @@ instance Integral Integer where
     !_ `quotRem` 0 = divZeroError
     n  `quotRem` d = n `integerQuotRem` d
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Integral Natural where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -611,13 +611,13 @@ instance Integral Natural where
 -- Instances for @Ratio@
 --------------------------------------------------------------
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Integral a)  => Ord (Ratio a)  where
     {-# SPECIALIZE instance Ord Rational #-}
     (x:%y) <= (x':%y')  =  x * y' <= x' * y
     (x:%y) <  (x':%y')  =  x * y' <  x' * y
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Integral a)  => Num (Ratio a)  where
     {-# SPECIALIZE instance Num Rational #-}
     (x:%y) + (x':%y')   =  reduce (x*y' + x'*y) (y*y')
@@ -628,7 +628,7 @@ instance  (Integral a)  => Num (Ratio a)  where
     signum (x:%_)       =  signum x :% 1
     fromInteger x       =  fromInteger x :% 1
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 {-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
 instance  (Integral a)  => Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
@@ -639,12 +639,12 @@ instance  (Integral a)  => Fractional (Ratio a)  where
         | otherwise     = y :% x
     fromRational (x:%y) =  fromInteger x % fromInteger y
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Integral a)  => Real (Ratio a)  where
     {-# SPECIALIZE instance Real Rational #-}
     toRational (x:%y)   =  toInteger x :% toInteger y
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Integral a)  => RealFrac (Ratio a)  where
     {-# SPECIALIZE instance RealFrac Rational #-}
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
@@ -660,7 +660,7 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
           (EQ, True) -> n + x
           (GT, _) -> n + x
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Show a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)  =  showParen (p > ratioPrec) $
@@ -672,7 +672,7 @@ instance  (Show a)  => Show (Ratio a)  where
                            -- Haskell 98 [Sep 08, #1920]
                            showsPrec ratioPrec1 y
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance  (Integral a)  => Enum (Ratio a)  where
     {-# SPECIALIZE instance Enum Rational #-}
     succ x              =  x + 1

@@ -21,7 +21,7 @@
 -- The interface provides 'I.TypeRep', a type representation which can
 -- be safely decomposed and composed. See "Data.Dynamic" for an example of this.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 --
 -----------------------------------------------------------------------------
 module GHC.Internal.Type.Reflection

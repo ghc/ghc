@@ -21,7 +21,7 @@ This module exports:
   - The 'Unsatisfiable' constraint, a more principled variant of 'TypeError'
     which gives a more predictable way of reporting custom type errors.
 
-@since 4.17.0.0
+@since base-4.17.0.0
 -}
 
 module GHC.Internal.TypeError
@@ -91,7 +91,7 @@ infixl 6 :<>:
 --                                   Text " is not exportable.")
 -- @
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type family TypeError (a :: ErrorMessage) :: b where
 
 {- Note [Getting good error messages from boolean comparisons]
@@ -140,7 +140,7 @@ equation of Assert kicks in, and
 -- where @NotPError@ reduces to a @TypeError@ which is reported if the
 -- assertion fails.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 --
 type Assert :: Bool -> Constraint -> Constraint
 type family Assert check errMsg where
@@ -176,7 +176,7 @@ Very cunning!
 --
 -- See also the 'unsatisfiable' function.
 --
--- @since 4.19.0.0@.
+-- @since base-4.19.0.0@.
 type Unsatisfiable :: ErrorMessage -> Constraint
 class Unsatisfiable msg where
   unsatisfiableLifted :: a
@@ -189,7 +189,7 @@ class Unsatisfiable msg where
 -- > instance Unsatisfiable (Text "No Eq instance for functions") => Eq (a -> b) where
 --     (==) = unsatisfiable
 --
--- @since 4.19.0.0@.
+-- @since base-4.19.0.0@.
 unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
 unsatisfiable = unsatisfiableLifted @msg @((##) -> a) (##)
   -- See Note [The Unsatisfiable representation-polymorphism trick]
