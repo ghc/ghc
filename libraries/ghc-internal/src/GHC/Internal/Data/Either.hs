@@ -125,18 +125,18 @@ Left "parse error"
 
 -}
 data  Either a b  =  Left a | Right b
-  deriving ( Eq   -- ^ @since 2.01
-           , Ord  -- ^ @since 2.01
-           , Read -- ^ @since 3.0
-           , Show -- ^ @since 3.0
+  deriving ( Eq   -- ^ @since base-2.01
+           , Ord  -- ^ @since base-2.01
+           , Read -- ^ @since base-3.0
+           , Show -- ^ @since base-3.0
            )
 
--- | @since 3.0
+-- | @since base-3.0
 instance Functor (Either a) where
     fmap _ (Left x) = Left x
     fmap f (Right y) = Right (f y)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (Either a b) where
     Left _ <> b = b
     a      <> _ = a
@@ -147,13 +147,13 @@ instance Semigroup (Either a b) where
       | otherwise = x
 #endif
 
--- | @since 3.0
+-- | @since base-3.0
 instance Applicative (Either e) where
     pure          = Right
     Left  e <*> _ = Left e
     Right f <*> r = fmap f r
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance Monad (Either e) where
     Left  l >>= _ = Left l
     Right r >>= k = k r
@@ -239,7 +239,7 @@ partitionEithers = foldr (either left right) ([],[])
 
 -- | Return `True` if the given value is a `Left`-value, `False` otherwise.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 --
 -- ==== __Examples__
 --
@@ -271,7 +271,7 @@ isLeft (Right _) = False
 
 -- | Return `True` if the given value is a `Right`-value, `False` otherwise.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 --
 -- ==== __Examples__
 --
@@ -302,7 +302,7 @@ isRight (Right _) = True
 
 -- | Return the contents of a 'Left'-value or a default value otherwise.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 --
 -- ==== __Examples__
 --
@@ -319,7 +319,7 @@ fromLeft a _        = a
 
 -- | Return the contents of a 'Right'-value or a default value otherwise.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 --
 -- ==== __Examples__
 --

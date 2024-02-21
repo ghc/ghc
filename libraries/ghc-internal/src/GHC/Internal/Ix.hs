@@ -175,7 +175,7 @@ hopelessIndexError :: Int -- Try to use 'indexError' instead!
 hopelessIndexError = errorWithoutStackTrace "Error in array index"
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  Ix Char  where
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -191,7 +191,7 @@ instance  Ix Char  where
     inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  Ix Int  where
     {-# INLINE range #-}
         -- The INLINE stops the build in the RHS from getting inlined,
@@ -209,14 +209,14 @@ instance  Ix Int  where
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  isTrue# (m <=# i) && isTrue# (i <=# n)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance Ix Word where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  Ix Integer  where
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -232,7 +232,7 @@ instance  Ix Integer  where
     inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Ix Natural where
     range (m,n) = [m..n]
     inRange (m,n) i = m <= i && i <= n
@@ -241,7 +241,7 @@ instance Ix Natural where
               | otherwise   = indexError b i "Natural"
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Bool where -- as derived
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -257,7 +257,7 @@ instance Ix Bool where -- as derived
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Ordering where -- as derived
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -273,7 +273,7 @@ instance Ix Ordering where -- as derived
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Ix Void where
     range _     = []
     index _     = absurd
@@ -281,7 +281,7 @@ instance Ix Void where
     rangeSize _ = 0
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance Ix () where
     {-# INLINE range #-}
     range   ((), ())    = [()]
@@ -311,7 +311,7 @@ instance Ix a => Ix (Solo a) where -- as derived
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     {-# SPECIALISE instance Ix (Int,Int) #-}
 
@@ -330,7 +330,7 @@ instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
     {-# SPECIALISE instance Ix (Int,Int,Int) #-}
 
@@ -351,7 +351,7 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     range ((l1,l2,l3,l4),(u1,u2,u3,u4)) =
       [(i1,i2,i3,i4) | i1 <- range (l1,u1),
@@ -372,7 +372,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 2.01
+-- | @since base-2.01
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     range ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) =
       [(i1,i2,i3,i4,i5) | i1 <- range (l1,u1),
@@ -396,7 +396,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
       Ix (a1,a2,a3,a4,a5,a6)  where
     range ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) =
@@ -423,7 +423,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
       Ix (a1,a2,a3,a4,a5,a6,a7)  where
     range ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7)) =
@@ -455,7 +455,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8)  where
     range ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8)) =
@@ -489,7 +489,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9)  where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9)) =
@@ -526,7 +526,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA)  where
@@ -567,7 +567,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA, Ix aB) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB)  where
@@ -613,7 +613,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA, Ix aB, Ix aC) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC)  where
@@ -661,7 +661,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA, Ix aB, Ix aC, Ix aD) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD)  where
@@ -712,7 +712,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA, Ix aB, Ix aC, Ix aD, Ix aE) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE)  where
@@ -765,7 +765,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
     -- Default method for index
 
 ----------------------------------------------------------------------
--- | @since 4.15.0.0
+-- | @since base-4.15.0.0
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
            Ix aA, Ix aB, Ix aC, Ix aD, Ix aE, Ix aF) =>
       Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE,aF)  where

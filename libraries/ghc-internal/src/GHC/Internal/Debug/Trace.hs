@@ -79,7 +79,7 @@ import GHC.Internal.Data.List (null, partition)
 -- | The 'traceIO' function outputs the trace message from the IO monad.
 -- This sequences the output with respect to other IO actions.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 traceIO :: String -> IO ()
 traceIO msg =
     withCString "%s\n" $ \cfmt -> do
@@ -133,7 +133,7 @@ Like 'trace' but returns the message instead of a third value.
 hello
 "hello"
 
-@since 4.7.0.0
+@since base-4.7.0.0
 -}
 traceId :: String -> String
 traceId a = trace a a
@@ -162,7 +162,7 @@ Like 'traceShow' but returns the shown value instead of a third value.
 (6,"helloworld")
 (6,"helloworld")
 
-@since 4.7.0.0
+@since base-4.7.0.0
 -}
 traceShowId :: Show a => a -> a
 traceShowId a = trace (show a) a
@@ -174,7 +174,7 @@ Like 'trace', but outputs the result of calling a function on the argument.
 hello
 ("hello","world")
 
-@since 4.18.0.0
+@since base-4.18.0.0
 -}
 traceWith :: (a -> String) -> a -> a
 traceWith f a = trace (f a) a
@@ -187,7 +187,7 @@ a 'String'.
 3
 [1,2,3]
 
-@since 4.18.0.0
+@since base-4.18.0.0
 -}
 traceShowWith :: Show b => (a -> b) -> a -> a
 traceShowWith f = traceWith (show . f)
@@ -216,7 +216,7 @@ x: 3
 y: 12
 Just 18
 
-@since 4.7.0.0
+@since base-4.7.0.0
 -}
 traceM :: Applicative f => String -> f ()
 traceM string = trace string $ pure ()
@@ -236,7 +236,7 @@ do
 12
 Just 18
 
-@since 4.7.0.0
+@since base-4.7.0.0
 -}
 traceShowM :: (Show a, Applicative f) => a -> f ()
 traceShowM = traceM . show
@@ -250,7 +250,7 @@ traceShowM = traceM . show
 -- stack correspond to @SCC@ annotations, so it is a good idea to use
 -- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 traceStack :: String -> a -> a
 traceStack str expr = unsafePerformIO $ do
    traceIO str
@@ -283,7 +283,7 @@ traceStack str expr = unsafePerformIO $ do
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceEvent'.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 traceEvent :: String -> a -> a
 traceEvent msg expr = unsafeDupablePerformIO $ do
     traceEventIO msg
@@ -295,7 +295,7 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceEvent', 'traceEventIO' sequences the event with respect to
 -- other IO actions.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 traceEventIO :: String -> IO ()
 traceEventIO msg =
   Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
@@ -304,7 +304,7 @@ traceEventIO msg =
 -- | Like 'traceEvent', but emits the result of calling a function on its
 -- argument.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 traceEventWith :: (a -> String) -> a -> a
 traceEventWith f a = traceEvent (f a) a
 
@@ -340,7 +340,7 @@ traceEventWith f a = traceEvent (f a) a
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceMarker'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 traceMarker :: String -> a -> a
 traceMarker msg expr = unsafeDupablePerformIO $ do
     traceMarkerIO msg
@@ -352,7 +352,7 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceMarker', 'traceMarkerIO' sequences the event with respect to
 -- other IO actions.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 traceMarkerIO :: String -> IO ()
 traceMarkerIO msg =
   Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
@@ -360,7 +360,7 @@ traceMarkerIO msg =
 
 -- | Immediately flush the event log, if enabled.
 --
--- @since 4.15.0.0
+-- @since base-4.15.0.0
 flushEventLog :: IO ()
 flushEventLog = c_flushEventLog nullPtr
 

@@ -22,7 +22,7 @@
 in the implementation of type-level natural numbers.  The programmer interface
 for working with type-level naturals should be defined in a separate library.
 
-@since 4.10.0.0
+@since base-4.10.0.0
 -}
 
 module GHC.Internal.TypeNats
@@ -72,7 +72,7 @@ import GHC.Internal.TypeNats.Internal(CmpNat)
 -- Previously, this was an opaque data type, but it was changed to a type
 -- synonym.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 
 type Nat = Natural
 --------------------------------------------------------------------------------
@@ -80,28 +80,28 @@ type Nat = Natural
 -- | This class gives the integer associated with a type-level natural.
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 class KnownNat (n :: Nat) where
   natSing :: SNat n
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 natVal :: forall n proxy. KnownNat n => proxy n -> Natural
 natVal _ = case natSing :: SNat n of
              UnsafeSNat x -> x
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 natVal' :: forall n. KnownNat n => Proxy# n -> Natural
 natVal' _ = case natSing :: SNat n of
              UnsafeSNat x -> x
 
 -- | This type represents unknown type-level natural numbers.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 
 -- | Convert an integer into an unknown type-level natural.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 someNatVal :: Natural -> SomeNat
 someNatVal n = withSomeSNat n (\(sn :: SNat n) ->
                withKnownNat sn (SomeNat @n Proxy))
@@ -171,19 +171,19 @@ stop using this hack.
 -}
 
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Eq SomeNat where
   SomeNat x == SomeNat y = natVal x == natVal y
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Ord SomeNat where
   compare (SomeNat x) (SomeNat y) = compare (natVal x) (natVal y)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Show SomeNat where
   showsPrec p (SomeNat x) = showsPrec p (natVal x)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Read SomeNat where
   readsPrec p xs = do (a,ys) <- readsPrec p xs
                       [(someNatVal a, ys)]
@@ -196,40 +196,40 @@ infixr 8 ^
 
 -- | Addition of type-level naturals.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family (m :: Nat) + (n :: Nat) :: Nat
 
 -- | Multiplication of type-level naturals.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family (m :: Nat) * (n :: Nat) :: Nat
 
 -- | Exponentiation of type-level naturals.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 -- | Subtraction of type-level naturals.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
 
 -- | Division (round down) of natural numbers.
 -- @Div x 0@ is undefined (i.e., it cannot be reduced).
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 type family Div (m :: Nat) (n :: Nat) :: Nat
 
 -- | Modulus of natural numbers.
 -- @Mod x 0@ is undefined (i.e., it cannot be reduced).
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 type family Mod (m :: Nat) (n :: Nat) :: Nat
 
 -- | Log base 2 (round down) of natural numbers.
 -- @Log 0@ is undefined (i.e., it cannot be reduced).
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 type family Log2 (m :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
@@ -237,7 +237,7 @@ type family Log2 (m :: Nat) :: Nat
 -- | We either get evidence that this function was instantiated with the
 -- same type-level numbers, or 'Nothing'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 sameNat :: forall a b proxy1 proxy2.
            (KnownNat a, KnownNat b) =>
            proxy1 a -> proxy2 b -> Maybe (a :~: b)
@@ -246,7 +246,7 @@ sameNat _ _ = testEquality (natSing @a) (natSing @b)
 -- | We either get evidence that this function was instantiated with the
 -- same type-level numbers, or that the type-level numbers are distinct.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 decideNat :: forall a b proxy1 proxy2.
            (KnownNat a, KnownNat b) =>
            proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
@@ -313,7 +313,7 @@ if needed, so there is no hurry to commit to either development paths.
 -- | Like 'sameNat', but if the numbers aren't equal, this additionally
 -- provides proof of LT or GT.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
        => proxy1 a -> proxy2 b -> OrderingI a b
 cmpNat x y = case compare (natVal x) (natVal y) of
@@ -343,7 +343,7 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 -- 3. The 'withSomeSNat' function, which creates an 'SNat' from a 'Natural'
 --    number.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 newtype SNat (n :: Nat) = UnsafeSNat Natural
 type role SNat nominal
 
@@ -365,7 +365,7 @@ type role SNat nominal
 -- f SNat = {- KnownNat n in scope -}
 -- @
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 pattern SNat :: forall n. () => KnownNat n => SNat n
 pattern SNat <- (knownNatInstance -> KnownNatInstance)
   where SNat = natSing
@@ -381,15 +381,15 @@ data KnownNatInstance (n :: Nat) where
 knownNatInstance :: SNat n -> KnownNatInstance n
 knownNatInstance sn = withKnownNat sn KnownNatInstance
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Eq (SNat n) where
   _ == _ = True
 
--- | @since 4.19.0.0
+-- | @since base-4.19.0.0
 instance Ord (SNat n) where
   compare _ _ = EQ
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance Show (SNat n) where
   showsPrec p (UnsafeSNat n)
     = showParen (p > appPrec)
@@ -397,26 +397,26 @@ instance Show (SNat n) where
         . showsPrec appPrec1 n
       )
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestEquality SNat where
   testEquality a b = case decNat a b of
     Right x -> Just x
     Left _  -> Nothing
 
--- | @since 4.18.0.0
+-- | @since base-4.18.0.0
 instance TestCoercion SNat where
   testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
 
 -- | Return the 'Natural' number corresponding to @n@ in an @'SNat' n@ value.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 fromSNat :: SNat n -> Natural
 fromSNat (UnsafeSNat n) = n
 
 -- | Convert an explicit @'SNat' n@ value into an implicit @'KnownNat' n@
 -- constraint.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withKnownNat :: forall n rep (r :: TYPE rep).
                 SNat n -> (KnownNat n => r) -> r
 withKnownNat = withDict @(KnownNat n)
@@ -425,7 +425,7 @@ withKnownNat = withDict @(KnownNat n)
 -- | Convert a 'Natural' number into an @'SNat' n@ value, where @n@ is a fresh
 -- type-level natural number.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 withSomeSNat :: forall rep (r :: TYPE rep).
                 Natural -> (forall n. SNat n -> r) -> r
 withSomeSNat n k = k (UnsafeSNat n)

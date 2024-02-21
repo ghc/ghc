@@ -156,11 +156,11 @@ be difficult to correct while continuing to support 'threadStatus'.
 -- | Map a thread to an integer identifier which is unique within the
 -- current process.
 --
--- @since 4.19.0.0
+-- @since base-4.19.0.0
 fromThreadId :: ThreadId -> Word64
 fromThreadId tid = fromIntegral $ getThreadId (id2TSO tid)
 
--- | @since 4.2.0.0
+-- | @since base-4.2.0.0
 instance Show ThreadId where
    showsPrec d t = showParen (d >= 11) $
         showString "ThreadId " .
@@ -179,11 +179,11 @@ foreign import ccall unsafe "eq_thread" eq_thread :: ThreadId# -> ThreadId# -> C
 foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> CInt
 -- Returns -1, 0, 1
 
--- | @since 4.2.0.0
+-- | @since base-4.2.0.0
 instance Eq ThreadId where
   ThreadId t1 == ThreadId t2 = eq_thread t1 t2 /= 0
 
--- | @since 4.2.0.0
+-- | @since base-4.2.0.0
 instance Ord ThreadId where
   compare (ThreadId t1) (ThreadId t2) = case cmp_thread t1 t2 of
     -1 -> LT
@@ -206,7 +206,7 @@ instance Ord ThreadId where
 --
 -- Allocation accounting is accurate only to about 4Kbytes.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
 setAllocationCounter (I64# i) = IO $ \s ->
   case setThreadAllocationCounter# i s of s' -> (# s', () #)
@@ -214,7 +214,7 @@ setAllocationCounter (I64# i) = IO $ \s ->
 -- | Return the current value of the allocation counter for the
 -- current thread.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 getAllocationCounter :: IO Int64
 getAllocationCounter = IO $ \s ->
   case getThreadAllocationCounter# s of (# s', ctr #) -> (# s', I64# ctr #)
@@ -240,7 +240,7 @@ getAllocationCounter = IO $ \s ->
 -- Compared to using timeouts, allocation limits don't count time
 -- spent blocked or in foreign calls.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 enableAllocationLimit :: IO ()
 enableAllocationLimit = do
   ThreadId t <- myThreadId
@@ -248,7 +248,7 @@ enableAllocationLimit = do
 
 -- | Disable allocation limit processing for the current thread.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 disableAllocationLimit :: IO ()
 disableAllocationLimit = do
   ThreadId t <- myThreadId
@@ -306,7 +306,7 @@ forkIO action = IO $ \ s ->
 -- only be used in that thread; the behaviour is undefined if it is
 -- invoked in a different thread.
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
@@ -331,7 +331,7 @@ system supports that, although in practice this is usually unnecessary
 (and may actually degrade performance in some cases - experimentation
 is recommended).
 
-@since 4.4.0.0
+@since base-4.4.0.0
 -}
 forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
@@ -344,7 +344,7 @@ forkOn (I# cpu) action = IO $ \ s ->
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
 -- given CPU, as with 'forkOn'.
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 forkOnWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkOnWithUnmask cpu io = forkOn cpu (io unsafeUnmask)
 
@@ -364,7 +364,7 @@ Returns the number of Haskell threads that can run truly
 simultaneously (on separate physical processors) at any given time.  To change
 this value, use 'setNumCapabilities'.
 
-@since 4.4.0.0
+@since base-4.4.0.0
 -}
 getNumCapabilities :: IO Int
 getNumCapabilities = do
@@ -383,7 +383,7 @@ capabilities is not set larger than the number of physical processor
 cores, and it may often be beneficial to leave one or more cores free
 to avoid contention with other processes in the machine.
 
-@since 4.5.0.0
+@since base-4.5.0.0
 -}
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i
@@ -395,7 +395,7 @@ foreign import ccall safe "setNumCapabilities"
 
 -- | Returns the number of CPUs that the machine has
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 getNumProcessors :: IO Int
 getNumProcessors = fmap fromIntegral c_getNumberOfProcessors
 
@@ -514,7 +514,7 @@ labelThread t str =
 -- | 'labelThreadByteArray#' sets the label of a thread to the given UTF-8
 --  encoded string contained in a `ByteArray#`.
 --
---  @since 4.18
+--  @since base-4.18
 labelThreadByteArray# :: ThreadId -> ByteArray# -> IO ()
 labelThreadByteArray# (ThreadId t) str =
     IO $ \s -> case labelThread# t str s of s1 -> (# s1, () #)
@@ -549,7 +549,7 @@ runSparks = IO loop
 
 -- | List the Haskell threads of the current process.
 --
--- @since 4.18
+-- @since base-4.18
 listThreads :: IO [ThreadId]
 listThreads = IO $ \s ->
     case listThreads# s of
@@ -585,9 +585,9 @@ data BlockReason
         -- ^blocked on some other resource.  Without @-threaded@,
         -- I\/O and 'Control.Concurrent.threadDelay' show up as
         -- 'BlockedOnOther', with @-threaded@ they show up as 'BlockedOnMVar'.
-  deriving ( Eq   -- ^ @since 4.3.0.0
-           , Ord  -- ^ @since 4.3.0.0
-           , Show -- ^ @since 4.3.0.0
+  deriving ( Eq   -- ^ @since base-4.3.0.0
+           , Ord  -- ^ @since base-4.3.0.0
+           , Show -- ^ @since base-4.3.0.0
            )
 
 -- | The current status of a thread
@@ -600,9 +600,9 @@ data ThreadStatus
         -- ^the thread is blocked on some resource
   | ThreadDied
         -- ^the thread received an uncaught exception
-  deriving ( Eq   -- ^ @since 4.3.0.0
-           , Ord  -- ^ @since 4.3.0.0
-           , Show -- ^ @since 4.3.0.0
+  deriving ( Eq   -- ^ @since base-4.3.0.0
+           , Ord  -- ^ @since base-4.3.0.0
+           , Show -- ^ @since base-4.3.0.0
            )
 
 -- | Query the current execution status of a thread.
@@ -630,7 +630,7 @@ threadStatus (ThreadId t) = IO $ \s ->
 -- that capability or not.  A thread is locked to a capability if it
 -- was created with @forkOn@.
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
@@ -639,7 +639,7 @@ threadCapability (ThreadId t) = IO $ \s ->
 -- | Query the label of thread, returning 'Nothing' if the
 -- thread's label has not been set.
 --
--- @since 4.18
+-- @since base-4.18
 threadLabel :: ThreadId -> IO (Maybe String)
 threadLabel (ThreadId t) = IO $ \s ->
     case threadLabel# t s of
@@ -664,7 +664,7 @@ threadLabel (ThreadId t) = IO $ \s ->
 -- caller must use @deRefWeak@ first to determine whether the thread
 -- still exists.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
 mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
    case mkWeakNoFinalizer# t# t s of
@@ -698,11 +698,11 @@ newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
 unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unSTM (STM a) = a
 
--- | @since 4.3.0.0
+-- | @since base-4.3.0.0
 instance  Functor STM where
    fmap f x = x >>= (pure . f)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative STM where
   {-# INLINE pure #-}
   {-# INLINE (*>) #-}
@@ -712,17 +712,17 @@ instance Applicative STM where
   liftA2 = liftM2
   m *> k = thenSTM m k
 
--- | @since 4.3.0.0
+-- | @since base-4.3.0.0
 instance  Monad STM  where
     {-# INLINE (>>=)  #-}
     m >>= k     = bindSTM m k
     (>>) = (*>)
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance Semigroup a => Semigroup (STM a) where
     (<>) = liftA2 (<>)
 
--- | @since 4.17.0.0
+-- | @since base-4.17.0.0
 instance Monoid a => Monoid (STM a) where
     mempty = pure mempty
 
@@ -743,14 +743,14 @@ returnSTM x = STM (\s -> (# s, x #))
 
 -- | Takes the first non-'retry'ing 'STM' action.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 instance Alternative STM where
   empty = retry
   (<|>) = orElse
 
 -- | Takes the first non-'retry'ing 'STM' action.
 --
--- @since 4.3.0.0
+-- @since base-4.3.0.0
 instance MonadPlus STM
 
 -- | Unsafely performs IO in the STM monad.  Beware: this is a highly
@@ -860,7 +860,7 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Eq (TVar a) where
         (TVar tvar1#) == (TVar tvar2#) = isTrue# (sameTVar# tvar1# tvar2#)
 

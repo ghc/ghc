@@ -1241,8 +1241,8 @@ data HandleData = HandleData {
 data HandleKey = HandleKey {
       handleValue  :: {-# UNPACK #-} !HANDLE
     , handleUnique :: {-# UNPACK #-} !Unique
-    } deriving ( Eq   -- ^ @since 4.4.0.0
-               , Show -- ^ @since 4.4.0.0
+    } deriving ( Eq   -- ^ @since base-4.4.0.0
+               , Show -- ^ @since base-4.4.0.0
                )
 
 -- | Callback invoked on I/O events.

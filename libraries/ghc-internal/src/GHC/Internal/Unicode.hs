@@ -140,12 +140,12 @@ data GeneralCategory
         | Surrogate             -- ^ Cs: Other, Surrogate
         | PrivateUse            -- ^ Co: Other, Private Use
         | NotAssigned           -- ^ Cn: Other, Not Assigned
-        deriving ( Show     -- ^ @since 2.01
-                 , Eq       -- ^ @since 2.01
-                 , Ord      -- ^ @since 2.01
-                 , Enum     -- ^ @since 2.01
-                 , Bounded  -- ^ @since 2.01
-                 , Ix       -- ^ @since 2.01
+        deriving ( Show     -- ^ @since base-2.01
+                 , Eq       -- ^ @since base-2.01
+                 , Ord      -- ^ @since base-2.01
+                 , Enum     -- ^ @since base-2.01
+                 , Bounded  -- ^ @since base-2.01
+                 , Ix       -- ^ @since base-2.01
                  )
 
 -- | The Unicode general category of the character. This relies on the
@@ -278,7 +278,7 @@ isUpper c = case generalCategory c of
 -- @\'ᾯ\'@ (@U+1FAF@ Greek capital letter omega with dasia and perispomeni and
 -- prosgegrammeni).
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 {-# INLINE isUpperCase #-}
 isUpperCase             :: Char -> Bool
 isUpperCase = DCP.isUppercase
@@ -305,7 +305,7 @@ isLower c = case generalCategory c of
 --
 -- See 'isLower' for the legacy predicate.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 {-# INLINE isLowerCase #-}
 isLowerCase             :: Char -> Bool
 isLowerCase = DCP.isLowercase

@@ -13,7 +13,7 @@
 --
 -- Function to retrieve the absolute filepath of the current executable.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.System.Environment.ExecutablePath
@@ -124,7 +124,7 @@ import GHC.Internal.System.Posix.Internals
 -- varies by operating system.  See 'executablePath' for a more
 -- reliable way to query the current executable.
 --
--- @since 4.6.0.0
+-- @since base-4.6.0.0
 getExecutablePath :: IO FilePath
 
 -- | Get an action to query the absolute pathname of the current executable.
@@ -145,7 +145,7 @@ getExecutablePath :: IO FilePath
 -- executable file was deleted/unlinked, some (including NetBSD) return the
 -- original path.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 executablePath :: Maybe (IO (Maybe FilePath))
 
 

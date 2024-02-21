@@ -24,7 +24,7 @@
 -- Definition of propositional equality @(':~:')@. Pattern-matching on a variable
 -- of type @(a ':~:' b)@ produces a proof that @a '~' b@.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 -----------------------------------------------------------------------------
 
 
@@ -60,7 +60,7 @@ infix 4 :~:, :~~:
 -- in practice, pattern-match on the @a :~: b@ to get out the @Refl@ constructor;
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 data a :~: b where  -- See Note [The equality types story] in GHC.Builtin.Types.Prim
   Refl :: a :~: a
 
@@ -96,54 +96,54 @@ inner Refl = Refl
 outer :: (f a :~: g b) -> (f :~: g)
 outer Refl = Refl
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Eq   (a :~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Show (a :~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance Ord  (a :~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance a ~ b => Read (a :~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance a ~ b => Enum (a :~: b) where
   toEnum 0 = Refl
   toEnum _ = errorWithoutStackTrace "GHC.Internal.Data.Type.Equality.toEnum: bad argument"
 
   fromEnum Refl = 0
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 deriving instance a ~ b => Bounded (a :~: b)
 
 -- | Kind heterogeneous propositional equality. Like ':~:', @a :~~: b@ is
 -- inhabited by a terminating value if and only if @a@ is the same type as @b@.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 type (:~~:) :: k1 -> k2 -> Type
 data a :~~: b where
    HRefl :: a :~~: a
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance Eq   (a :~~: b)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance Show (a :~~: b)
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance Ord  (a :~~: b)
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance a ~~ b => Read (a :~~: b)
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance a ~~ b => Enum (a :~~: b) where
   toEnum 0 = HRefl
   toEnum _ = errorWithoutStackTrace "GHC.Internal.Data.Type.Equality.toEnum: bad argument"
 
   fromEnum HRefl = 0
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 deriving instance a ~~ b => Bounded (a :~~: b)
 
 -- | This class contains types where you can learn the equality of two types
@@ -167,11 +167,11 @@ class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
   testEquality :: f a -> f b -> Maybe (a :~: b)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance TestEquality ((:~:) a) where
   testEquality Refl Refl = Just Refl
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance TestEquality ((:~~:) a) where
   testEquality HRefl HRefl = Just Refl
 

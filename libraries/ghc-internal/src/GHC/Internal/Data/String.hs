@@ -101,13 +101,13 @@ ensure the good behavior of the above example remains in the future.
 
 -- | @(a ~ Char)@ context was introduced in @4.9.0.0@
 --
--- @since 2.01
+-- @since base-2.01
 instance (a ~ Char) => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance IsString a => IsString (Const a (b :: k))
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance IsString a => IsString (Identity a)

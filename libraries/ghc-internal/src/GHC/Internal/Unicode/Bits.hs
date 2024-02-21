@@ -62,7 +62,7 @@ The caller must make sure that:
 
 * @ceiling (addr + (n * 8))@ is legally accessible @Word8@.
 
-@since 0.3.0
+@since base-0.3.0
 -}
 lookupIntN
   :: Addr# -- ^ Bitmap address

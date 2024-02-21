@@ -72,7 +72,7 @@ data {-# CTYPE "HsWord8" #-} Word8
 -- ^ 8-bit unsigned integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Word8 where
     (==) = eqWord8
     (/=) = neWord8
@@ -83,7 +83,7 @@ neWord8 (W8# x) (W8# y) = isTrue# ((word8ToWord# x) `neWord#` (word8ToWord# y))
 {-# INLINE [1] eqWord8 #-}
 {-# INLINE [1] neWord8 #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord Word8 where
     (<)  = ltWord8
     (<=) = leWord8
@@ -100,11 +100,11 @@ gtWord8, geWord8, ltWord8, leWord8 :: Word8 -> Word8 -> Bool
 (W8# x) `ltWord8` (W8# y) = isTrue# (x `ltWord8#` y)
 (W8# x) `leWord8` (W8# y) = isTrue# (x `leWord8#` y)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Word8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num Word8 where
     (W8# x#) + (W8# y#)    = W8# (x# `plusWord8#` y#)
     (W8# x#) - (W8# y#)    = W8# (x# `subWord8#` y#)
@@ -115,11 +115,11 @@ instance Num Word8 where
     signum _               = 1
     fromInteger i          = W8# (wordToWord8# (integerToWord# i))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Real Word8 where
     toRational x = toInteger x % 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Enum Word8 where
     succ x
         | x /= maxBound = x + 1
@@ -139,7 +139,7 @@ instance Enum Word8 where
     {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
--- | @since 2.01
+-- | @since base-2.01
 instance Integral Word8 where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -166,18 +166,18 @@ instance Integral Word8 where
 
     toInteger (W8# x#)            = IS (word2Int# (word8ToWord# x#))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bounded Word8 where
     minBound = 0
     maxBound = 0xFF
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Word8 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Word8 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -213,7 +213,7 @@ instance Bits Word8 where
     bit i                     = bitDefault i
     testBit a i               = testBitDefault a i
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Word8 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
@@ -262,7 +262,7 @@ data {-# CTYPE "HsWord16" #-} Word16 = W16# Word16#
 -- ^ 16-bit unsigned integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Word16 where
     (==) = eqWord16
     (/=) = neWord16
@@ -273,7 +273,7 @@ neWord16 (W16# x) (W16# y) = isTrue# ((word16ToWord# x) `neWord#` (word16ToWord#
 {-# INLINE [1] eqWord16 #-}
 {-# INLINE [1] neWord16 #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord Word16 where
     (<)  = ltWord16
     (<=) = leWord16
@@ -290,11 +290,11 @@ gtWord16, geWord16, ltWord16, leWord16 :: Word16 -> Word16 -> Bool
 (W16# x) `ltWord16` (W16# y) = isTrue# (x `ltWord16#` y)
 (W16# x) `leWord16` (W16# y) = isTrue# (x `leWord16#` y)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Word16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num Word16 where
     (W16# x#) + (W16# y#)  = W16# (x# `plusWord16#` y#)
     (W16# x#) - (W16# y#)  = W16# (x# `subWord16#` y#)
@@ -305,11 +305,11 @@ instance Num Word16 where
     signum _               = 1
     fromInteger i          = W16# (wordToWord16# (integerToWord# i))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Real Word16 where
     toRational x = toInteger x % 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Enum Word16 where
     succ x
         | x /= maxBound = x + 1
@@ -329,7 +329,7 @@ instance Enum Word16 where
     {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
--- | @since 2.01
+-- | @since base-2.01
 instance Integral Word16 where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -356,18 +356,18 @@ instance Integral Word16 where
 
     toInteger (W16# x#)             = IS (word2Int# (word16ToWord# x#))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bounded Word16 where
     minBound = 0
     maxBound = 0xFFFF
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Word16 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Word16 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -403,7 +403,7 @@ instance Bits Word16 where
     bit i                     = bitDefault i
     testBit a i               = testBitDefault a i
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Word16 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
@@ -413,7 +413,7 @@ instance FiniteBits Word16 where
 
 -- | Reverse order of bytes in 'Word16'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 byteSwap16 :: Word16 -> Word16
 byteSwap16 (W16# w#) = W16# (wordToWord16# (byteSwap16# (word16ToWord# w#)))
 
@@ -494,7 +494,7 @@ data {-# CTYPE "HsWord32" #-} Word32 = W32# Word32#
 -- ^ 32-bit unsigned integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Word32 where
     (==) = eqWord32
     (/=) = neWord32
@@ -505,7 +505,7 @@ neWord32 (W32# x) (W32# y) = isTrue# ((word32ToWord# x) `neWord#` (word32ToWord#
 {-# INLINE [1] eqWord32 #-}
 {-# INLINE [1] neWord32 #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord Word32 where
     (<)  = ltWord32
     (<=) = leWord32
@@ -522,7 +522,7 @@ gtWord32, geWord32, ltWord32, leWord32 :: Word32 -> Word32 -> Bool
 (W32# x) `ltWord32` (W32# y) = isTrue# (x `ltWord32#` y)
 (W32# x) `leWord32` (W32# y) = isTrue# (x `leWord32#` y)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num Word32 where
     (W32# x#) + (W32# y#)  = W32# (x# `plusWord32#` y#)
     (W32# x#) - (W32# y#)  = W32# (x# `subWord32#` y#)
@@ -533,7 +533,7 @@ instance Num Word32 where
     signum _               = 1
     fromInteger i          = W32# (wordToWord32# (integerToWord# i))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Enum Word32 where
     succ x
         | x /= maxBound = x + 1
@@ -567,7 +567,7 @@ instance Enum Word32 where
     enumFromThen        = boundedEnumFromThen
 #endif
 
--- | @since 2.01
+-- | @since base-2.01
 instance Integral Word32 where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -594,7 +594,7 @@ instance Integral Word32 where
 
     toInteger (W32# x#)             = integerFromWord# (word32ToWord# x#)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Word32 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -630,7 +630,7 @@ instance Bits Word32 where
     bit i                     = bitDefault i
     testBit a i               = testBitDefault a i
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Word32 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
@@ -638,7 +638,7 @@ instance FiniteBits Word32 where
     countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# (word32ToWord# x#)))
     countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# (word32ToWord# x#)))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Word32 where
 #if WORD_SIZE_IN_BITS < 33
     showsPrec p x = showsPrec p (toInteger x)
@@ -647,16 +647,16 @@ instance Show Word32 where
 #endif
 
 
--- | @since 2.01
+-- | @since base-2.01
 instance Real Word32 where
     toRational x = toInteger x % 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bounded Word32 where
     minBound = 0
     maxBound = 0xFFFFFFFF
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Word32 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
@@ -664,7 +664,7 @@ instance Ix Word32 where
 
 -- | Reverse order of bytes in 'Word32'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 byteSwap32 :: Word32 -> Word32
 byteSwap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 
@@ -676,7 +676,7 @@ data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Word64 where
     (==) = eqWord64
     (/=) = neWord64
@@ -687,7 +687,7 @@ neWord64 (W64# x) (W64# y) = isTrue# (x `neWord64#` y)
 {-# INLINE [1] eqWord64 #-}
 {-# INLINE [1] neWord64 #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord Word64 where
     (<)  = ltWord64
     (<=) = leWord64
@@ -704,7 +704,7 @@ gtWord64, geWord64, ltWord64, leWord64 :: Word64 -> Word64 -> Bool
 (W64# x) `ltWord64` (W64# y) = isTrue# (x `ltWord64#` y)
 (W64# x) `leWord64` (W64# y) = isTrue# (x `leWord64#` y)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Num Word64 where
     (W64# x#) + (W64# y#)  = W64# (x# `plusWord64#` y#)
     (W64# x#) - (W64# y#)  = W64# (x# `subWord64#` y#)
@@ -715,7 +715,7 @@ instance Num Word64 where
     signum _               = 1
     fromInteger i          = W64# (integerToWord64# i)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Enum Word64 where
     succ x
         | x /= maxBound = x + 1
@@ -880,7 +880,7 @@ efdtWord64DnFB c n x1 x2 y    -- Be careful about underflow!
                in W64# x1 `c` go_dn x2
 
 
--- | @since 2.01
+-- | @since base-2.01
 instance Integral Word64 where
     -- see Note [INLINE division wrappers] in GHC.Internal.Base
     {-# INLINE quot    #-}
@@ -912,7 +912,7 @@ instance Integral Word64 where
 
     toInteger (W64# x#)             = integerFromWord64# x#
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bits Word64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -947,7 +947,7 @@ instance Bits Word64 where
     bit i                     = bitDefault i
     testBit a i               = testBitDefault a i
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance FiniteBits Word64 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
@@ -955,20 +955,20 @@ instance FiniteBits Word64 where
     countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
     countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Word64 where
     showsPrec p x = showsPrec p (toInteger x)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Real Word64 where
     toRational x = toInteger x % 1
 
--- | @since 2.01
+-- | @since base-2.01
 instance Bounded Word64 where
     minBound = 0
     maxBound = 0xFFFFFFFFFFFFFFFF
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ix Word64 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
@@ -976,31 +976,31 @@ instance Ix Word64 where
 
 -- | Reverse order of bytes in 'Word64'.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 byteSwap64 :: Word64 -> Word64
 byteSwap64 (W64# w#) = W64# (byteSwap64# w#)
 
 -- | Reverse the order of the bits in a 'Word8'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 bitReverse8 :: Word8 -> Word8
 bitReverse8 (W8# w#) = W8# (wordToWord8# (bitReverse8# (word8ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word16'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 bitReverse16 :: Word16 -> Word16
 bitReverse16 (W16# w#) = W16# (wordToWord16# (bitReverse16# (word16ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word32'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 bitReverse32 :: Word32 -> Word32
 bitReverse32 (W32# w#) = W32# (wordToWord32# (bitReverse32# (word32ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word64'.
 --
--- @since 4.14.0.0
+-- @since base-4.14.0.0
 bitReverse64 :: Word64 -> Word64
 bitReverse64 (W64# w#) = W64# (bitReverse64# w#)
 

@@ -14,7 +14,7 @@
 --
 -- The arbitrary-precision 'Natural' number type.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Numeric.Natural

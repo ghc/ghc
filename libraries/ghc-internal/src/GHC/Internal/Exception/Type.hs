@@ -43,7 +43,7 @@ encapsulated in a @SomeException@.
 -}
 data SomeException = forall e . Exception e => SomeException e
 
--- | @since 3.0
+-- | @since base-3.0
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
 
@@ -144,14 +144,14 @@ class (Typeable e, Show e) => Exception e where
     --
     -- Default implementation: @'show'@.
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     displayException :: e -> String
     displayException = show
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Exception Void
 
--- | @since 3.0
+-- | @since base-3.0
 instance Exception SomeException where
     toException se = se
     fromException = Just
@@ -164,9 +164,9 @@ data ArithException
   | LossOfPrecision
   | DivideByZero
   | Denormal
-  | RatioZeroDenominator -- ^ @since 4.6.0.0
-  deriving ( Eq  -- ^ @since 3.0
-           , Ord -- ^ @since 3.0
+  | RatioZeroDenominator -- ^ @since base-4.6.0.0
+  deriving ( Eq  -- ^ @since base-3.0
+           , Ord -- ^ @since base-3.0
            )
 
 divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
@@ -175,10 +175,10 @@ overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
 underflowException      = toException Underflow
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Exception ArithException
 
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Show ArithException where
   showsPrec _ Overflow        = showString "arithmetic overflow"
   showsPrec _ Underflow       = showString "arithmetic underflow"

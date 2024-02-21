@@ -26,7 +26,7 @@
 --   applying the transformer to 'Identity'.  For example, @State s@
 --   is an abbreviation for @StateT s 'Identity'@.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Functor.Identity (
@@ -69,33 +69,33 @@ import GHC.Types (Bool(..))
 -- Identity 25
 -- @
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving ( Bits       -- ^ @since 4.9.0.0
-             , Bounded    -- ^ @since 4.9.0.0
-             , Enum       -- ^ @since 4.9.0.0
-             , Eq         -- ^ @since 4.8.0.0
-             , FiniteBits -- ^ @since 4.9.0.0
-             , Floating   -- ^ @since 4.9.0.0
-             , Fractional -- ^ @since 4.9.0.0
-             , Generic    -- ^ @since 4.8.0.0
-             , Generic1   -- ^ @since 4.8.0.0
-             , Integral   -- ^ @since 4.9.0.0
-             , Ix         -- ^ @since 4.9.0.0
-             , Semigroup  -- ^ @since 4.9.0.0
-             , Monoid     -- ^ @since 4.9.0.0
-             , Num        -- ^ @since 4.9.0.0
-             , Ord        -- ^ @since 4.8.0.0
-             , Real       -- ^ @since 4.9.0.0
-             , RealFrac   -- ^ @since 4.9.0.0
-             , RealFloat  -- ^ @since 4.9.0.0
-             , Storable   -- ^ @since 4.9.0.0
+    deriving ( Bits       -- ^ @since base-4.9.0.0
+             , Bounded    -- ^ @since base-4.9.0.0
+             , Enum       -- ^ @since base-4.9.0.0
+             , Eq         -- ^ @since base-4.8.0.0
+             , FiniteBits -- ^ @since base-4.9.0.0
+             , Floating   -- ^ @since base-4.9.0.0
+             , Fractional -- ^ @since base-4.9.0.0
+             , Generic    -- ^ @since base-4.8.0.0
+             , Generic1   -- ^ @since base-4.8.0.0
+             , Integral   -- ^ @since base-4.9.0.0
+             , Ix         -- ^ @since base-4.9.0.0
+             , Semigroup  -- ^ @since base-4.9.0.0
+             , Monoid     -- ^ @since base-4.9.0.0
+             , Num        -- ^ @since base-4.9.0.0
+             , Ord        -- ^ @since base-4.8.0.0
+             , Real       -- ^ @since base-4.9.0.0
+             , RealFrac   -- ^ @since base-4.9.0.0
+             , RealFloat  -- ^ @since base-4.9.0.0
+             , Storable   -- ^ @since base-4.9.0.0
              )
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 instance (Read a) => Read (Identity a) where
     readsPrec d = readParen (d > 10) $ \ r ->
         [(Identity x,t) | ("Identity",s) <- lex r, (x,t) <- readsPrec 11 s]
@@ -103,7 +103,7 @@ instance (Read a) => Read (Identity a) where
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 instance (Show a) => Show (Identity a) where
     showsPrec d (Identity x) = showParen (d > 10) $
         showString "Identity " . showsPrec 11 x
@@ -111,7 +111,7 @@ instance (Show a) => Show (Identity a) where
 -- ---------------------------------------------------------------------------
 -- Identity instances for Functor and Monad
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable Identity where
     foldMap                = coerce
 
@@ -130,20 +130,20 @@ instance Foldable Identity where
     sum                    = runIdentity
     toList (Identity x)    = [x]
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Functor Identity where
     fmap     = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Applicative Identity where
     pure     = Identity
     (<*>)    = coerce
     liftA2   = coerce
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Monad Identity where
     m >>= k  = k (runIdentity m)
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance MonadFix Identity where
     mfix f   = Identity (fix (runIdentity . f))

@@ -26,7 +26,7 @@
 -- to prevent module cycles while still allowing these identifiers to be
 -- imported in "Data.Type.Ord".
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 
 module GHC.Internal.TypeLits.Internal
   ( Symbol
@@ -38,12 +38,12 @@ import GHC.Types(Symbol, Char)
 
 -- | Comparison of type-level symbols, as a function.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
 
 -- Char-related type families
 
 -- | Comparison of type-level characters.
 --
--- @since 4.16.0.0
+-- @since base-4.16.0.0
 type family CmpChar (a :: Char) (b :: Char) :: Ordering

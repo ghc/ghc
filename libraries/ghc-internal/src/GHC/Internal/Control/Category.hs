@@ -50,22 +50,22 @@ class Category cat where
                 (p . q) . r = p . (q . r)
  #-}
 
--- | @since 3.0
+-- | @since base-3.0
 instance Category (->) where
     id = GHC.Internal.Base.id
     (.) = (GHC.Internal.Base..)
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Category (:~:) where
   id          = Refl
   Refl . Refl = Refl
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance Category (:~~:) where
   id            = HRefl
   HRefl . HRefl = HRefl
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Category Coercion where
   id = Coercion
   (.) Coercion = coerce

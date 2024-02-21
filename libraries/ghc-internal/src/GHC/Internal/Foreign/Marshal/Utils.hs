@@ -178,7 +178,7 @@ moveBytes = coerce $ \(Ptr dest#) (Ptr src#) (I# size#) s
 
 -- |Fill a given number of bytes in memory area with a byte value.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 fillBytes :: Ptr a -> Word8 -> Int -> IO ()
 fillBytes = coerce $ \(Ptr dest#) (W8# byte#) (I# size#) s
   -> (# setAddrRange# dest# size# (word2Int# (word8ToWord# byte#)) s, () #)

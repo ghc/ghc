@@ -162,7 +162,7 @@ data IODeviceType
               -- read and write operations and may be seekable only
               -- to positions of certain granularity (block-
               -- aligned).
-  deriving ( Eq -- ^ @since 4.2.0.0
+  deriving ( Eq -- ^ @since base-4.2.0.0
            )
 
 -- -----------------------------------------------------------------------------
@@ -175,11 +175,11 @@ data SeekMode
                         -- from the current position.
   | SeekFromEnd         -- ^ the position of @hdl@ is set to offset @i@
                         -- from the end of the file.
-    deriving ( Eq   -- ^ @since 4.2.0.0
-             , Ord  -- ^ @since 4.2.0.0
-             , Ix   -- ^ @since 4.2.0.0
-             , Enum -- ^ @since 4.2.0.0
-             , Read -- ^ @since 4.2.0.0
-             , Show -- ^ @since 4.2.0.0
+    deriving ( Eq   -- ^ @since base-4.2.0.0
+             , Ord  -- ^ @since base-4.2.0.0
+             , Ix   -- ^ @since base-4.2.0.0
+             , Enum -- ^ @since base-4.2.0.0
+             , Read -- ^ @since base-4.2.0.0
+             , Show -- ^ @since base-4.2.0.0
              )
 

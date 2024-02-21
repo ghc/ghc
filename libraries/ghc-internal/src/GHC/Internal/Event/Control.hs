@@ -57,8 +57,8 @@ data ControlMessage = CMsgWakeup
                     | CMsgDie
                     | CMsgSignal {-# UNPACK #-} !(ForeignPtr Word8)
                                  {-# UNPACK #-} !Signal
-    deriving ( Eq   -- ^ @since 4.4.0.0
-             , Show -- ^ @since 4.4.0.0
+    deriving ( Eq   -- ^ @since base-4.4.0.0
+             , Show -- ^ @since base-4.4.0.0
              )
 
 -- | The structure used to tell the IO manager thread what to do.

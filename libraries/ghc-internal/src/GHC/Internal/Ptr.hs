@@ -45,8 +45,8 @@ import GHC.Internal.Numeric          ( showHex )
 -- redundant role annotation checks that this doesn't change
 type role Ptr phantom
 data Ptr a = Ptr Addr#
-  deriving ( Eq  -- ^ @since 2.01
-           , Ord -- ^ @since 2.01
+  deriving ( Eq  -- ^ @since base-2.01
+           , Ord -- ^ @since base-2.01
            )
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
@@ -165,7 +165,7 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 ------------------------------------------------------------------------
 -- Show instances for Ptr and FunPtr
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show (Ptr a) where
    showsPrec _ (Ptr a) rs = pad_out (showHex (integerFromWord#(int2Word#(addr2Int# a))) "")
      where
@@ -173,6 +173,6 @@ instance Show (Ptr a) where
        pad_out ls =
           '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr

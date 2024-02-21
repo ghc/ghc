@@ -12,7 +12,7 @@
 --
 -- Access to GHC's call-stack simulation
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude #-}
@@ -121,7 +121,7 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 -- Otherwise, the list returned is likely to be empty or
 -- uninformative.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
 
@@ -143,7 +143,7 @@ ccsToStrings ccs0 = go ccs0 []
 
 -- | Get the stack trace attached to an object.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 whoCreated :: a -> IO [String]
 whoCreated obj = do
   ccs <- getCCSOf obj

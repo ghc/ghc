@@ -56,7 +56,7 @@ import GHC.Internal.IORef
 utf32  :: TextEncoding
 utf32 = mkUTF32 ErrorOnCodingFailure
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 mkUTF32 :: CodingFailureMode -> TextEncoding
 mkUTF32 cfm = TextEncoding { textEncodingName = "UTF-32",
                              mkTextDecoder = utf32_DF cfm,
@@ -147,7 +147,7 @@ utf32_native_encode = utf32be_encode
 utf32be :: TextEncoding
 utf32be = mkUTF32be ErrorOnCodingFailure
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 mkUTF32be :: CodingFailureMode -> TextEncoding
 mkUTF32be cfm = TextEncoding { textEncodingName = "UTF-32BE",
                                mkTextDecoder = utf32be_DF cfm,
@@ -177,7 +177,7 @@ utf32be_EF cfm =
 utf32le :: TextEncoding
 utf32le = mkUTF32le ErrorOnCodingFailure
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 mkUTF32le :: CodingFailureMode -> TextEncoding
 mkUTF32le cfm = TextEncoding { textEncodingName = "UTF-32LE",
                                mkTextDecoder = utf32le_DF cfm,

@@ -72,10 +72,10 @@ import GHC.Internal.Data.Typeable ( cast )
 -- to the @MVar@ so it can't ever continue.
 data BlockedIndefinitelyOnMVar = BlockedIndefinitelyOnMVar
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception BlockedIndefinitelyOnMVar
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show BlockedIndefinitelyOnMVar where
     showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely in an MVar operation"
 
@@ -88,10 +88,10 @@ blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 -- other references to any @TVar@s involved, so it can't ever continue.
 data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception BlockedIndefinitelyOnSTM
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show BlockedIndefinitelyOnSTM where
     showsPrec _ BlockedIndefinitelyOnSTM = showString "thread blocked indefinitely in an STM transaction"
 
@@ -104,10 +104,10 @@ blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
 -- The @Deadlock@ exception is raised in the main thread only.
 data Deadlock = Deadlock
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception Deadlock
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show Deadlock where
     showsPrec _ Deadlock = showString "<<deadlock>>"
 
@@ -117,15 +117,15 @@ instance Show Deadlock where
 -- 'GHC.Internal.System.Mem.setAllocationCounter' and
 -- 'GHC.Internal.System.Mem.enableAllocationLimit'.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 data AllocationLimitExceeded = AllocationLimitExceeded
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Exception AllocationLimitExceeded where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
--- | @since 4.7.1.0
+-- | @since base-4.7.1.0
 instance Show AllocationLimitExceeded where
     showsPrec _ AllocationLimitExceeded =
       showString "allocation limit exceeded"
@@ -139,13 +139,13 @@ allocationLimitExceeded = toException AllocationLimitExceeded
 -- cannot be compacted, nor can mutable objects or pinned objects.
 -- See 'GHC.Compact.compact'.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 newtype CompactionFailed = CompactionFailed String
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance Exception CompactionFailed where
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 instance Show CompactionFailed where
     showsPrec _ (CompactionFailed why) =
       showString ("compaction failed: " ++ why)
@@ -167,10 +167,10 @@ cannotCompactMutable =
 -- |'assert' was applied to 'False'.
 newtype AssertionFailed = AssertionFailed String
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception AssertionFailed
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show AssertionFailed where
     showsPrec _ (AssertionFailed err) = showString err
 
@@ -178,21 +178,21 @@ instance Show AssertionFailed where
 
 -- |Superclass for asynchronous exceptions.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 data SomeAsyncException = forall e . Exception e => SomeAsyncException e
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Show SomeAsyncException where
     showsPrec p (SomeAsyncException e) = showsPrec p e
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Exception SomeAsyncException
 
--- |@since 4.7.0.0
+-- |@since base-4.7.0.0
 asyncExceptionToException :: Exception e => e -> SomeException
 asyncExceptionToException = toException . SomeAsyncException
 
--- |@since 4.7.0.0
+-- |@since base-4.7.0.0
 asyncExceptionFromException :: Exception e => SomeException -> Maybe e
 asyncExceptionFromException x = do
     SomeAsyncException a <- fromException x
@@ -231,11 +231,11 @@ data AsyncException
         -- ^This exception is raised by default in the main thread of
         -- the program when the user requests to terminate the program
         -- via the usual mechanism(s) (e.g. Control-C in the console).
-  deriving ( Eq  -- ^ @since 4.2.0.0
-           , Ord -- ^ @since 4.2.0.0
+  deriving ( Eq  -- ^ @since base-4.2.0.0
+           , Ord -- ^ @since base-4.2.0.0
            )
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Exception AsyncException where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
@@ -248,11 +248,11 @@ data ArrayException
   | UndefinedElement    String
         -- ^An attempt was made to evaluate an element of an
         -- array that had not been initialized.
-  deriving ( Eq  -- ^ @since 4.2.0.0
-           , Ord -- ^ @since 4.2.0.0
+  deriving ( Eq  -- ^ @since base-4.2.0.0
+           , Ord -- ^ @since base-4.2.0.0
            )
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception ArrayException
 
 -- for the RTS
@@ -260,14 +260,14 @@ stackOverflow, heapOverflow :: SomeException
 stackOverflow = toException StackOverflow
 heapOverflow  = toException HeapOverflow
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show AsyncException where
   showsPrec _ StackOverflow   = showString "stack overflow"
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"
   showsPrec _ UserInterrupt   = showString "user interrupt"
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show ArrayException where
   showsPrec _ (IndexOutOfBounds s)
         = showString "array index out of range"
@@ -281,13 +281,13 @@ instance Show ArrayException where
 -- | The exception thrown when an infinite cycle is detected in
 -- 'GHC.Internal.System.IO.fixIO'.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 data FixIOException = FixIOException
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Exception FixIOException
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Show FixIOException where
   showsPrec _ FixIOException = showString "cyclic evaluation in fixIO"
 
@@ -307,7 +307,7 @@ data ExitCode
                 -- may be prohibited (e.g. 0 on a POSIX-compliant system).
   deriving (Eq, Ord, Read, Show, Generic)
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception ExitCode
 
 ioException     :: IOException -> IO a
@@ -346,10 +346,10 @@ data IOException
                                      --   or other types)
    }
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Exception IOException
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Eq IOException where
   (IOError h1 e1 loc1 str1 en1 fn1) == (IOError h2 e2 loc2 str2 en2 fn2) =
     e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && en1==en2 && fn1==fn2
@@ -378,11 +378,11 @@ data IOErrorType
   | ResourceVanished
   | Interrupted
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Eq IOErrorType where
    x == y = isTrue# (getTag x ==# getTag y)
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show IOErrorType where
   showsPrec _ e =
     showString $
@@ -421,7 +421,7 @@ userError str   =  IOError Nothing UserError "" str Nothing Nothing
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show IOException where
     showsPrec p (IOError hdl iot loc s _ fn) =
       (case fn of

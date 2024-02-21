@@ -44,7 +44,7 @@ as a box, which may be empty or full.
 -- pull in Eq (Mvar a) too, to avoid GHC.Internal.Conc being an orphan-instance module
 -- | Compares the underlying pointers.
 --
--- @since 4.1.0.0
+-- @since base-4.1.0.0
 instance Eq (MVar a) where
     (MVar mvar1#) == (MVar mvar2#) = isTrue# (sameMVar# mvar1# mvar2#)
 
@@ -159,7 +159,7 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
 -- returns immediately, with 'Nothing' if the 'MVar' was empty, or
 -- @'Just' a@ if the 'MVar' was full with contents @a@.
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 tryReadMVar :: MVar a -> IO (Maybe a)
 tryReadMVar (MVar m) = IO $ \ s ->
     case tryReadMVar# m s of

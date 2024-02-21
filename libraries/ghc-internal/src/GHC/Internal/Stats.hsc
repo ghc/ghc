@@ -22,7 +22,7 @@
 -- If depend on it, make sure to use a tight upper bound, e.g., @base < 4.X@ rather
 -- than @base < 5@, because the interface can change rapidly without much warning.
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 -----------------------------------------------------------------------------
 module GHC.Internal.Stats
     (
@@ -50,14 +50,14 @@ foreign import ccall "getRTSStats" getRTSStats_ :: Ptr () -> IO ()
 
 -- | Returns whether GC stats have been enabled (with @+RTS -T@, for example).
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 foreign import ccall "getRTSStatsEnabled" getRTSStatsEnabled :: IO Bool
 
 --
 -- | Statistics about runtime activity since the start of the
 -- program.  This is a mirror of the C @struct RTSStats@ in @RtsAPI.h@
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 --
 data RTSStats = RTSStats {
   -- -----------------------------------
@@ -98,10 +98,10 @@ data RTSStats = RTSStats {
   -- the values can occasionally go slightly negative)
 
     -- | Total CPU time used by the init phase
-    -- @since 4.12.0.0
+    -- @since base-4.12.0.0
   , init_cpu_ns :: RtsTime
     -- | Total elapsed time used by the init phase
-    -- @since 4.12.0.0
+    -- @since base-4.12.0.0
   , init_elapsed_ns :: RtsTime
     -- | Total CPU time used by the mutator
   , mutator_cpu_ns :: RtsTime
@@ -134,9 +134,9 @@ data RTSStats = RTSStats {
 
     -- | Details about the most recent GC
   , gc :: GCDetails
-  } deriving ( Read -- ^ @since 4.10.0.0
-             , Show -- ^ @since 4.10.0.0
-             , Generic -- ^ @since 4.15.0.0
+  } deriving ( Read -- ^ @since base-4.10.0.0
+             , Show -- ^ @since base-4.10.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
 --
@@ -174,7 +174,7 @@ data GCDetails = GCDetails {
     -- Block fragmentation is the difference between the amount of blocks retained by the RTS and the blocks that are in use.
     -- This occurs when megablocks are only sparsely used, eg, when data that cannot be moved retains a megablock.
     --
-    -- @since 4.18.0.0
+    -- @since base-4.18.0.0
   , gcdetails_block_fragmentation_bytes :: Word64
     -- | The time elapsed during synchronisation before GC
   , gcdetails_sync_elapsed_ns :: RtsTime
@@ -189,9 +189,9 @@ data GCDetails = GCDetails {
     -- | The time elapsed during the post-mark pause phase of the concurrent
     -- nonmoving GC.
   , gcdetails_nonmoving_gc_sync_elapsed_ns :: RtsTime
-  } deriving ( Read -- ^ @since 4.10.0.0
-             , Show -- ^ @since 4.10.0.0
-             , Generic -- ^ @since 4.15.0.0
+  } deriving ( Read -- ^ @since base-4.10.0.0
+             , Show -- ^ @since base-4.10.0.0
+             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
@@ -199,7 +199,7 @@ type RtsTime = Int64
 
 -- | Get current runtime system statistics.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 --
 getRTSStats :: IO RTSStats
 getRTSStats = do

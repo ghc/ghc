@@ -208,13 +208,13 @@ class  (Fractional a) => Floating a  where
     -- | @'log1p' x@ computes @'log' (1 + x)@, but provides more precise
     -- results for small (absolute) values of @x@ if possible.
     --
-    -- @since 4.9.0.0
+    -- @since base-4.9.0.0
     log1p               :: a -> a
 
     -- | @'expm1' x@ computes @'exp' x - 1@, but provides more precise
     -- results for small (absolute) values of @x@ if possible.
     --
-    -- @since 4.9.0.0
+    -- @since base-4.9.0.0
     expm1               :: a -> a
 
     -- | @'log1pexp' x@ computes @'log' (1 + 'exp' x)@, but provides more
@@ -228,7 +228,7 @@ class  (Fractional a) => Floating a  where
     -- * if @'exp' x@ is close to @-1@, @'log' (1 + 'exp' x)@ will be
     --   imprecise for the reasons given in 'expm1'.
     --
-    -- @since 4.9.0.0
+    -- @since base-4.9.0.0
     log1pexp            :: a -> a
 
     -- | @'log1mexp' x@ computes @'log' (1 - 'exp' x)@, but provides more
@@ -242,7 +242,7 @@ class  (Fractional a) => Floating a  where
     -- * if @'exp' x@ is close to @1@, @'log' (1 - 'exp' x)@ will be
     --   imprecise for the reasons given in 'expm1'.
     --
-    -- @since 4.9.0.0
+    -- @since base-4.9.0.0
     log1mexp            :: a -> a
 
     {-# INLINE (**) #-}
@@ -384,7 +384,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 -- Float
 ------------------------------------------------------------------------
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
@@ -426,7 +426,7 @@ naturalToFloat# (NS w) = word2Float# w
 naturalToFloat# (NB b) = case integerToBinaryFloat' (IP b) of
                            F# x -> x
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- Beware that 'toRational' generates garbage for non-finite arguments:
 --
@@ -447,7 +447,7 @@ instance  Real Float  where
             | otherwise                                         ->
                     IS m# :% integerShiftL# 1 (int2Word# (negateInt# e#))
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
@@ -482,7 +482,7 @@ rationalToFloat n d
         minEx       = FLT_MIN_EXP
         mantDigs    = FLT_MANT_DIG
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- Beware that results for non-finite arguments are garbage:
 --
@@ -565,7 +565,7 @@ properFractionFloat (F# x#)
 
 
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Floating Float  where
     pi                  =  3.141592653589793238
     exp x               =  expFloat x
@@ -598,7 +598,7 @@ instance  Floating Float  where
       | otherwise = a
     {-# INLINE log1pexp #-}
 
--- | @since 2.01
+-- | @since base-2.01
 instance  RealFloat Float  where
     floatRadix _        =  FLT_RADIX        -- from float.h
     floatDigits _       =  FLT_MANT_DIG     -- ditto
@@ -629,7 +629,7 @@ instance  RealFloat Float  where
     isNegativeZero x = 0 /= isFloatNegativeZero x
     isIEEE _         = True
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Show Float  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
@@ -638,7 +638,7 @@ instance  Show Float  where
 -- Double
 ------------------------------------------------------------------------
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
@@ -682,7 +682,7 @@ naturalToDouble# (NB b) = case integerToBinaryFloat' (IP b) of
                             D# x -> x
 
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- Beware that 'toRational' generates garbage for non-finite arguments:
 --
@@ -703,7 +703,7 @@ instance  Real Double  where
             | otherwise                                            ->
                 m :% integerShiftL# 1 (int2Word# (negateInt# e#))
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
@@ -738,7 +738,7 @@ rationalToDouble n d
         minEx       = DBL_MIN_EXP
         mantDigs    = DBL_MANT_DIG
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Floating Double  where
     pi                  =  3.141592653589793238
     exp x               =  expDouble x
@@ -771,7 +771,7 @@ instance  Floating Double  where
       | otherwise = a
     {-# INLINE log1pexp #-}
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- Beware that results for non-finite arguments are garbage:
 --
@@ -893,7 +893,7 @@ All of this is really stated, in more general form, in the GHC
 user manual section "How rules interact with class methods".
 -}
 
--- | @since 2.01
+-- | @since base-2.01
 instance  RealFloat Double  where
     floatRadix _        =  FLT_RADIX        -- from float.h
     floatDigits _       =  DBL_MANT_DIG     -- ditto
@@ -925,7 +925,7 @@ instance  RealFloat Double  where
     isNegativeZero x    = 0 /= isDoubleNegativeZero x
     isIEEE _            = True
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Show Double  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
@@ -950,7 +950,7 @@ a `non-lossy' conversion to and from Ints. Instead we make use of the
 for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
 -}
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- 'fromEnum' just truncates its argument, beware of all sorts of overflows.
 --
@@ -969,7 +969,7 @@ instance  Enum Float  where
     enumFromThen   = numericEnumFromThen
     enumFromThenTo = numericEnumFromThenTo
 
--- | @since 2.01
+-- | @since base-2.01
 --
 -- 'fromEnum' just truncates its argument, beware of all sorts of overflows.
 --
@@ -1710,7 +1710,7 @@ exponents returned by decodeFloat.
 -- >>> clamp (-10) 5
 -- 10
 --
--- @since 4.13.0.0
+-- @since base-4.13.0.0
 clamp :: Int -> Int -> Int
 clamp bd k = max (-bd) (min bd k)
 
@@ -1760,7 +1760,7 @@ stgWord32ToFloat = castWord32ToFloat#
 -- | @'castWord32ToFloat' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 
 {-# INLINE castWord32ToFloat #-}
 castWord32ToFloat :: Word32 -> Float
@@ -1769,7 +1769,7 @@ castWord32ToFloat (W32# w#) = F# (castWord32ToFloat# w#)
 -- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 
 {-# INLINE castFloatToWord32 #-}
 castFloatToWord32 :: Float -> Word32
@@ -1778,7 +1778,7 @@ castFloatToWord32 (F# f#) = W32# (castFloatToWord32# f#)
 -- | @'castWord64ToDouble' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 
 {-# INLINE castWord64ToDouble #-}
 castWord64ToDouble :: Word64 -> Double
@@ -1787,7 +1787,7 @@ castWord64ToDouble (W64# w) = D# (castWord64ToDouble# w)
 -- | @'castDoubleToWord64' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 
 {-# INLINE castDoubleToWord64 #-}
 castDoubleToWord64 :: Double -> Word64

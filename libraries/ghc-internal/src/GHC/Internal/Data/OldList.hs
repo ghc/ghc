@@ -262,7 +262,7 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 -- >>> dropWhileEnd (> 10) [1..20]
 -- [1,2,3,4,5,6,7,8,9,10]
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
@@ -1814,7 +1814,7 @@ rqpart cmp x (y:ys) rle rgt r =
 -- >>> (sortBy . comparing) fst [(3, 1), (2, 2), (1, 3)]
 -- [(1,3),(2,2),(3,1)]
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
   map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
@@ -1832,7 +1832,7 @@ sortOn f =
 -- >>> singleton 'c'
 -- "c"
 --
--- @since 4.15.0.0
+-- @since base-4.15.0.0
 --
 singleton :: a -> [a]
 singleton x = [x]

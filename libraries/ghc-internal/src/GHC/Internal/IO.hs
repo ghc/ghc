@@ -281,7 +281,7 @@ unsafeUnmask (IO io) = IO $ unmaskAsyncExceptions# io
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 interruptible :: IO a -> IO a
 interruptible act = do
   st <- getMaskingState
@@ -301,8 +301,8 @@ data MaskingState
       -- ^ the state during 'mask': asynchronous exceptions are masked, but blocking operations may still be interrupted
   | MaskedUninterruptible
       -- ^ the state during 'uninterruptibleMask': asynchronous exceptions are masked, and blocking operations may not be interrupted
- deriving ( Eq   -- ^ @since 4.3.0.0
-          , Show -- ^ @since 4.3.0.0
+ deriving ( Eq   -- ^ @since base-4.3.0.0
+          , Show -- ^ @since base-4.3.0.0
           )
 
 -- | Returns the 'MaskingState' for the current thread.

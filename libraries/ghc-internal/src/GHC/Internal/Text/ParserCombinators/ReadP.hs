@@ -100,19 +100,19 @@ data P a
   | Fail
   | Result a (P a)
   | Final (NonEmpty (a,String))
-  deriving Functor -- ^ @since 4.8.0.0
+  deriving Functor -- ^ @since base-4.8.0.0
 
 -- Monad, MonadPlus
 
--- | @since 4.5.0.0
+-- | @since base-4.5.0.0
 instance Applicative P where
   pure x = Result x Fail
   (<*>) = ap
 
--- | @since 2.01
+-- | @since base-2.01
 instance MonadPlus P
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monad P where
   (Get f)         >>= k = Get (\c -> f c >>= k)
   (Look f)        >>= k = Look (\s -> f s >>= k)
@@ -120,11 +120,11 @@ instance Monad P where
   (Result x p)    >>= k = k x <|> (p >>= k)
   (Final (r:|rs)) >>= k = final [ys' | (x,s) <- (r:rs), ys' <- run (k x) s]
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadFail P where
   fail _ = Fail
 
--- | @since 4.5.0.0
+-- | @since base-4.5.0.0
 instance Alternative P where
   empty = Fail
 
@@ -163,30 +163,30 @@ instance Alternative P where
 
 newtype ReadP a = R (forall b . (a -> P b) -> P b)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor ReadP where
   fmap h (R f) = R (\k -> f (k . h))
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance Applicative ReadP where
     pure x = R (\k -> k x)
     (<*>) = ap
     -- liftA2 = liftM2
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monad ReadP where
   R m >>= f = R (\k -> m (\a -> let R m' = f a in m' k))
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadFail ReadP where
   fail _    = R (\_ -> Fail)
 
--- | @since 4.6.0.0
+-- | @since base-4.6.0.0
 instance Alternative ReadP where
   empty = pfail
   (<|>) = (+++)
 
--- | @since 2.01
+-- | @since base-2.01
 instance MonadPlus ReadP
 
 -- ---------------------------------------------------------------------------

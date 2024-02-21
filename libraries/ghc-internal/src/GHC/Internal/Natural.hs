@@ -80,7 +80,7 @@ mkNatural = N.naturalFromWordList
 -- This operation is mostly useful for test-suites and/or code which
 -- constructs 'Integer' values directly.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 isValidNatural :: Natural -> Bool
 isValidNatural = N.naturalCheck
 
@@ -95,7 +95,7 @@ minusNatural = N.naturalSubThrow
 
 -- | 'Natural' subtraction. Returns 'Nothing's for non-positive results.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
 minusNaturalMaybe x y = case N.naturalSub x y of
    (# (# #) |   #) -> Nothing
@@ -152,27 +152,27 @@ shiftLNatural n i = N.naturalShiftL n (int2Word  i)
 shiftRNatural :: Natural -> Int -> Natural
 shiftRNatural n i = N.naturalShiftR n (int2Word i)
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 naturalToInteger :: Natural -> Integer
 naturalToInteger = I.integerFromNatural
 
 naturalToWord :: Natural -> Word
 naturalToWord = N.naturalToWord
 
--- | @since 4.10.0.0
+-- | @since base-4.10.0.0
 naturalFromInteger :: Integer -> Natural
 naturalFromInteger = I.integerToNatural
 
 -- | Construct 'Natural' from 'Word' value.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 wordToNatural :: Word -> Natural
 wordToNatural = N.naturalFromWord
 
 -- | Try downcasting 'Natural' to 'Word' value.
 -- Returns 'Nothing' if value doesn't fit in 'Word'.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 naturalToWordMaybe :: Natural -> Maybe Word
 naturalToWordMaybe n = case N.naturalToWordMaybe# n of
    (#       | w #) -> Just (W# w)
@@ -184,6 +184,6 @@ wordToNatural# = N.naturalFromWord
 -- | \"@'powModNatural' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
 powModNatural = N.naturalPowMod

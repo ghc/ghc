@@ -94,20 +94,20 @@ data Version =
                 -- The interpretation of the list of tags is entirely dependent
                 -- on the entity that this version applies to.
         }
-  deriving ( Read    -- ^ @since 2.01
-           , Show    -- ^ @since 2.01
-           , Generic -- ^ @since 4.9.0.0
+  deriving ( Read    -- ^ @since base-2.01
+           , Show    -- ^ @since base-2.01
+           , Generic -- ^ @since base-4.9.0.0
            )
 {-# DEPRECATED versionTags "See GHC ticket #2496" #-}
 -- TODO. Remove all references to versionTags in GHC 8.0 release.
 
--- | @since 2.01
+-- | @since base-2.01
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2
                 && sort (versionTags v1) == sort (versionTags v2)
                 -- tags may be in any order
 
--- | @since 2.01
+-- | @since base-2.01
 instance Ord Version where
   v1 `compare` v2 = versionBranch v1 `compare` versionBranch v2
 
@@ -132,6 +132,6 @@ parseVersion = do branch <- sepBy1 (fmap read (munch1 isDigit)) (char '.')
 
 -- | Construct tag-less 'Version'
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 makeVersion :: [Int] -> Version
 makeVersion b = Version b []

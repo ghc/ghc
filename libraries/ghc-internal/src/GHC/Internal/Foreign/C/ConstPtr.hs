@@ -33,7 +33,7 @@ import GHC.Internal.Show
 -- @const@ and non-@const@ pointers typically have equivalent calling
 -- conventions), it does matter for @capi@ imports. See GHC #22043.
 --
--- @since 4.18.0.0
+-- @since base-4.18.0.0
 --
 type ConstPtr :: Type -> Type
 type role ConstPtr phantom

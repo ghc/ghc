@@ -17,7 +17,7 @@
 
 -- The 'Const' functor.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 
 module GHC.Internal.Data.Functor.Const (Const(..)) where
 
@@ -50,31 +50,31 @@ import GHC.Internal.Show (Show(showsPrec), showParen, showString)
 -- >>> Const [1, 2, 3] <*> Const [4, 5, 6]
 -- Const [1,2,3,4,5,6]
 newtype Const a b = Const { getConst :: a }
-    deriving ( Bits       -- ^ @since 4.9.0.0
-             , Bounded    -- ^ @since 4.9.0.0
-             , Enum       -- ^ @since 4.9.0.0
-             , Eq         -- ^ @since 4.9.0.0
-             , FiniteBits -- ^ @since 4.9.0.0
-             , Floating   -- ^ @since 4.9.0.0
-             , Fractional -- ^ @since 4.9.0.0
-             , Generic    -- ^ @since 4.9.0.0
-             , Generic1   -- ^ @since 4.9.0.0
-             , Integral   -- ^ @since 4.9.0.0
-             , Ix         -- ^ @since 4.9.0.0
-             , Semigroup  -- ^ @since 4.9.0.0
-             , Monoid     -- ^ @since 4.9.0.0
-             , Num        -- ^ @since 4.9.0.0
-             , Ord        -- ^ @since 4.9.0.0
-             , Real       -- ^ @since 4.9.0.0
-             , RealFrac   -- ^ @since 4.9.0.0
-             , RealFloat  -- ^ @since 4.9.0.0
-             , Storable   -- ^ @since 4.9.0.0
+    deriving ( Bits       -- ^ @since base-4.9.0.0
+             , Bounded    -- ^ @since base-4.9.0.0
+             , Enum       -- ^ @since base-4.9.0.0
+             , Eq         -- ^ @since base-4.9.0.0
+             , FiniteBits -- ^ @since base-4.9.0.0
+             , Floating   -- ^ @since base-4.9.0.0
+             , Fractional -- ^ @since base-4.9.0.0
+             , Generic    -- ^ @since base-4.9.0.0
+             , Generic1   -- ^ @since base-4.9.0.0
+             , Integral   -- ^ @since base-4.9.0.0
+             , Ix         -- ^ @since base-4.9.0.0
+             , Semigroup  -- ^ @since base-4.9.0.0
+             , Monoid     -- ^ @since base-4.9.0.0
+             , Num        -- ^ @since base-4.9.0.0
+             , Ord        -- ^ @since base-4.9.0.0
+             , Real       -- ^ @since base-4.9.0.0
+             , RealFrac   -- ^ @since base-4.9.0.0
+             , RealFloat  -- ^ @since base-4.9.0.0
+             , Storable   -- ^ @since base-4.9.0.0
              )
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Const' newtype if the 'getConst' field were removed
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 instance Read a => Read (Const a b) where
     readsPrec d = readParen (d > 10)
         $ \r -> [(Const x,t) | ("Const", s) <- lex r, (x, t) <- readsPrec 11 s]
@@ -82,20 +82,20 @@ instance Read a => Read (Const a b) where
 -- | This instance would be equivalent to the derived instances of the
 -- 'Const' newtype if the 'getConst' field were removed
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 instance Show a => Show (Const a b) where
     showsPrec d (Const x) = showParen (d > 10) $
                             showString "Const " . showsPrec 11 x
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Foldable (Const m) where
     foldMap _ _ = mempty
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor (Const m) where
     fmap _ (Const v) = Const v
 
--- | @since 2.0.1
+-- | @since base-2.0.1
 instance Monoid m => Applicative (Const m) where
     pure _ = Const mempty
     liftA2 _ (Const x) (Const y) = Const (x `mappend` y)

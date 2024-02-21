@@ -220,7 +220,7 @@ type CharBuffer = Buffer Char
 #endif
 
 data BufferState = ReadBuffer | WriteBuffer
-  deriving Eq -- ^ @since 4.2.0.0
+  deriving Eq -- ^ @since base-4.2.0.0
 
 withBuffer :: Buffer e -> (Ptr e -> IO a) -> IO a
 withBuffer Buffer{ bufRaw=raw } f = withForeignPtr (castForeignPtr raw) f

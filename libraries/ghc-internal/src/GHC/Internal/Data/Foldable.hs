@@ -249,7 +249,7 @@ class Foldable t where
     -- >>> (\ (X a) -> showString "0x" . showHex a $ "") $ foldMap' X bits
     -- "0x42"
     --
-    -- @since 4.13.0.0
+    -- @since base-4.13.0.0
     foldMap' :: Monoid m => (a -> m) -> t a -> m
     foldMap' f = foldl' (\ acc a -> acc <> f a) mempty
 
@@ -333,7 +333,7 @@ class Foldable t where
     -- fit for the task at hand.  If the order in which the elements are
     -- combined is not important, use 'foldl'' instead.
     --
-    -- @since 4.6.0.0
+    -- @since base-4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 = \ xs ->
         foldl (\ (k::b->b) (x::a) -> oneShot (\ (z::b) -> z `seq` k (f x z)))
@@ -408,7 +408,7 @@ class Foldable t where
     --
     -- @foldl' f z = 'List.foldl'' f z . 'toList'@
     --
-    -- @since 4.6.0.0
+    -- @since base-4.6.0.0
     foldl' :: (b -> a -> b) -> b -> t a -> b
     {-# INLINE foldl' #-}
     foldl' f z0 = \ xs ->
@@ -524,7 +524,7 @@ class Foldable t where
     -- >>> toList [1, 2, 3]
     -- [1,2,3]
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     toList :: t a -> [a]
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
@@ -552,7 +552,7 @@ class Foldable t where
     -- >>> null [1..]
     -- False
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     null :: t a -> Bool
     null = foldr (\_ _ -> False) True
 
@@ -574,7 +574,7 @@ class Foldable t where
     -- >>> length [1..]
     -- * Hangs forever *
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     length :: t a -> Int
     length = foldl' (\c _ -> c+1) 0
 
@@ -605,7 +605,7 @@ class Foldable t where
     -- >>> 3 `elem` ([4..] ++ [3])
     -- * Hangs forever *
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     elem :: Eq a => a -> t a -> Bool
     elem = any . (==)
 
@@ -631,7 +631,7 @@ class Foldable t where
     --
     -- WARNING: This function is partial for possibly-empty structures like lists.
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
        getMax . foldMap' (Max #. (Just :: a -> Maybe a))
@@ -659,7 +659,7 @@ class Foldable t where
     --
     -- WARNING: This function is partial for possibly-empty structures like lists.
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     minimum :: forall a . Ord a => t a -> a
     minimum = fromMaybe (errorWithoutStackTrace "minimum: empty structure") .
        getMin . foldMap' (Min #. (Just :: a -> Maybe a))
@@ -686,7 +686,7 @@ class Foldable t where
     -- >>> sum [1..]
     -- * Hangs forever *
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     sum :: Num a => t a -> a
     sum = getSum #. foldMap' Sum
     {-# INLINEABLE sum #-}
@@ -713,14 +713,14 @@ class Foldable t where
     -- >>> product [1..]
     -- * Hangs forever *
     --
-    -- @since 4.8.0.0
+    -- @since base-4.8.0.0
     product :: Num a => t a -> a
     product = getProduct #. foldMap' Product
     {-# INLINEABLE product #-}
 
 -- instances for Prelude types
 
--- | @since 2.01
+-- | @since base-2.01
 instance Foldable Maybe where
     foldMap = maybe mempty
 
@@ -730,7 +730,7 @@ instance Foldable Maybe where
     foldl _ z Nothing = z
     foldl f z (Just x) = f z x
 
--- | @since 2.01
+-- | @since base-2.01
 instance Foldable [] where
     elem    = List.elem
     foldl   = List.foldl
@@ -749,7 +749,7 @@ instance Foldable [] where
     sum     = List.sum
     toList  = id
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Foldable NonEmpty where
   foldr f z ~(a :| as) = f a (List.foldr f z as)
   foldl f z (a :| as) = List.foldl f (f z a) as
@@ -775,7 +775,7 @@ instance Foldable NonEmpty where
   fold ~(m :| ms) = m `mappend` fold ms
   toList ~(a :| as) = a : as
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Foldable (Either a) where
     foldMap _ (Left _) = mempty
     foldMap f (Right y) = f y
@@ -788,10 +788,10 @@ instance Foldable (Either a) where
 
     null             = isLeft
 
--- | @since 4.15
+-- | @since base-4.15
 deriving instance Foldable Solo
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Foldable ((,) a) where
     foldMap f (_, y) = f y
 
@@ -799,7 +799,7 @@ instance Foldable ((,) a) where
     length _  = 1
     null _ = False
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable (Array i) where
     foldr = foldrElems
     foldl = foldlElems
@@ -811,7 +811,7 @@ instance Foldable (Array i) where
     length = numElements
     null a = numElements a == 0
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Foldable Proxy where
     foldMap _ _ = mempty
     {-# INLINE foldMap #-}
@@ -829,7 +829,7 @@ instance Foldable Proxy where
     sum _      = 0
     product _  = 1
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable Dual where
     foldMap            = coerce
 
@@ -848,7 +848,7 @@ instance Foldable Dual where
     sum                = getDual
     toList (Dual x)    = [x]
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable Sum where
     foldMap            = coerce
 
@@ -867,7 +867,7 @@ instance Foldable Sum where
     sum                = getSum
     toList (Sum x)     = [x]
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable Product where
     foldMap               = coerce
 
@@ -886,24 +886,24 @@ instance Foldable Product where
     sum                   = getProduct
     toList (Product x)    = [x]
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable First where
     foldMap f = foldMap f . getFirst
 
--- | @since 4.8.0.0
+-- | @since base-4.8.0.0
 instance Foldable Last where
     foldMap f = foldMap f . getLast
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Foldable f) => Foldable (Alt f) where
     foldMap f = foldMap f . getAlt
 
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 instance (Foldable f) => Foldable (Ap f) where
     foldMap f = foldMap f . getAp
 
 -- Instances for GHC.Generics
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Foldable U1 where
     foldMap _ _ = mempty
     {-# INLINE foldMap #-}
@@ -921,50 +921,50 @@ instance Foldable U1 where
     sum _      = 0
     product _  = 1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable V1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable Par1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable f => Foldable (Rec1 f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable (K1 i c)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable f => Foldable (M1 i c f)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :+: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :*: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :.: g)
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UAddr
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UChar
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UDouble
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UFloat
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UInt
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 deriving instance Foldable UWord
 
 -- Instances for GHC.Internal.Data.Ord
--- | @since 4.12.0.0
+-- | @since base-4.12.0.0
 deriving instance Foldable Down
 
 -- | Right-to-left monadic fold over the elements of a structure.

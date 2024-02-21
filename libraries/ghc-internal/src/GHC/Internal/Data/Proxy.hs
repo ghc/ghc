@@ -13,7 +13,7 @@
 --
 -- Definition of a Proxy type (poly-kinded in GHC)
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Proxy
@@ -53,8 +53,8 @@ import GHC.Internal.Arr
 --
 -- >>> Proxy :: Proxy complicatedStructure
 -- Proxy
-data Proxy t = Proxy deriving ( Bounded -- ^ @since 4.7.0.0
-                              , Read    -- ^ @since 4.7.0.0
+data Proxy t = Proxy deriving ( Bounded -- ^ @since base-4.7.0.0
+                              , Read    -- ^ @since base-4.7.0.0
                               )
 
 -- | A concrete, promotable proxy type, for use at the kind level.
@@ -65,19 +65,19 @@ data KProxy (t :: Type) = KProxy
 -- interchangeably, so all of these instances are hand-written to be
 -- lazy in Proxy arguments.
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Eq (Proxy s) where
   _ == _ = True
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Ord (Proxy s) where
   compare _ _ = EQ
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Show (Proxy s) where
   showsPrec _ _ = showString "Proxy"
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Enum (Proxy s) where
     succ _               = errorWithoutStackTrace "Proxy.succ"
     pred _               = errorWithoutStackTrace "Proxy.pred"
@@ -89,7 +89,7 @@ instance Enum (Proxy s) where
     enumFromThenTo _ _ _ = [Proxy]
     enumFromTo _ _       = [Proxy]
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Ix (Proxy s) where
     range _           = [Proxy]
     index _ _         = 0
@@ -98,42 +98,42 @@ instance Ix (Proxy s) where
     unsafeIndex _ _   = 0
     unsafeRangeSize _ = 1
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Semigroup (Proxy s) where
     _ <> _ = Proxy
     sconcat _ = Proxy
     stimes _ _ = Proxy
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Monoid (Proxy s) where
     mempty = Proxy
     mconcat _ = Proxy
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Functor Proxy where
     fmap _ _ = Proxy
     {-# INLINE fmap #-}
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Applicative Proxy where
     pure _ = Proxy
     {-# INLINE pure #-}
     _ <*> _ = Proxy
     {-# INLINE (<*>) #-}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Alternative Proxy where
     empty = Proxy
     {-# INLINE empty #-}
     _ <|> _ = Proxy
     {-# INLINE (<|>) #-}
 
--- | @since 4.7.0.0
+-- | @since base-4.7.0.0
 instance Monad Proxy where
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance MonadPlus Proxy
 
 -- | 'asProxyTypeOf' is a type-restricted version of 'const'.

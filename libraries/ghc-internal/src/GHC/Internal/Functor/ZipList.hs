@@ -37,19 +37,19 @@ import GHC.Internal.Data.Data (Data)
 -- >>> ZipList [(+1), (^2), (/ 2)] <*> ZipList [5, 5, 5]
 -- ZipList {getZipList = [6.0,25.0,2.5]}
 newtype ZipList a = ZipList { getZipList :: [a] }
-                  deriving ( Show     -- ^ @since 4.7.0.0
-                           , Eq       -- ^ @since 4.7.0.0
-                           , Ord      -- ^ @since 4.7.0.0
-                           , Read     -- ^ @since 4.7.0.0
-                           , Functor  -- ^ @since 2.01
-                           , Foldable -- ^ @since 4.9.0.0
-                           , Generic  -- ^ @since 4.7.0.0
-                           , Generic1 -- ^ @since 4.7.0.0
+                  deriving ( Show     -- ^ @since base-4.7.0.0
+                           , Eq       -- ^ @since base-4.7.0.0
+                           , Ord      -- ^ @since base-4.7.0.0
+                           , Read     -- ^ @since base-4.7.0.0
+                           , Functor  -- ^ @since base-2.01
+                           , Foldable -- ^ @since base-4.9.0.0
+                           , Generic  -- ^ @since base-4.7.0.0
+                           , Generic1 -- ^ @since base-4.7.0.0
                            )
 -- See GHC.Internal.Data.Traversable for Traversable instance due to import loops
 
 
--- | @since 4.9.0.0
+-- | @since base-4.9.0.0
 instance Traversable ZipList where
     traverse f (ZipList x) = ZipList `fmap` traverse f x
 
@@ -64,12 +64,12 @@ instance Traversable ZipList where
 -- >     = ZipList (zipWith3 (\a b c -> stimes c [a, b]) "abcd" "567" [1..])
 -- >     = ZipList {getZipList = ["a5","b6b6","c7c7c7"]}
 --
--- @since 2.01
+-- @since base-2.01
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
     liftA2 f (ZipList xs) (ZipList ys) = ZipList (zipWith f xs ys)
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Alternative ZipList where
    empty = ZipList []
    ZipList xs0 <|> ZipList ys0 = ZipList $ go xs0 ys0
@@ -78,6 +78,6 @@ instance Alternative ZipList where
        go    []     ys  = ys
        go    xs      _  = xs
 
--- | @since 4.14.0.0
+-- | @since base-4.14.0.0
 deriving instance Data a => Data (ZipList a)
 

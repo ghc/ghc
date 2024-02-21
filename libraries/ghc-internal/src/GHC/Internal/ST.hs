@@ -52,13 +52,13 @@ default ()
 newtype ST s a = ST (STRep s a)
 type STRep s a = State# s -> (# State# s, a #)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor (ST s) where
     fmap f (ST m) = ST $ \ s ->
       case (m s) of { (# new_s, r #) ->
       (# new_s, f r #) }
 
--- | @since 4.4.0.0
+-- | @since base-4.4.0.0
 instance Applicative (ST s) where
     {-# INLINE pure #-}
     {-# INLINE (*>)   #-}
@@ -67,7 +67,7 @@ instance Applicative (ST s) where
     (<*>) = ap
     liftA2 = liftM2
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monad (ST s) where
     {-# INLINE (>>=)  #-}
     (>>) = (*>)
@@ -77,11 +77,11 @@ instance Monad (ST s) where
         case (k r) of { ST k2 ->
         (k2 new_s) }})
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Semigroup a => Semigroup (ST s a) where
     (<>) = liftA2 (<>)
 
--- | @since 4.11.0.0
+-- | @since base-4.11.0.0
 instance Monoid a => Monoid (ST s a) where
     mempty = pure mempty
 
@@ -108,7 +108,7 @@ unsafeInterleaveST m = unsafeDupableInterleaveST (noDuplicateST >> m)
 -- The computation may be performed multiple times by different threads,
 -- possibly at the same time. To prevent this, use 'unsafeInterleaveST' instead.
 --
--- @since 4.11
+-- @since base-4.11
 {-# NOINLINE unsafeDupableInterleaveST #-}
 -- See Note [unsafeDupableInterleaveIO should not be inlined]
 -- in GHC.Internal.IO.Unsafe
@@ -120,7 +120,7 @@ unsafeDupableInterleaveST (ST m) = ST ( \ s ->
     (# s, r #)
   )
 
--- | @since 2.01
+-- | @since base-2.01
 instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
     showList       = showList__ (showsPrec 0)

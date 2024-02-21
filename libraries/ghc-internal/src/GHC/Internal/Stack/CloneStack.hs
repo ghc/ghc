@@ -13,7 +13,7 @@
 -- Such a "cloned" stack can be decoded with 'decode' to a stack trace, given
 -- that the @-finfo-table-map@ is enabled.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 module GHC.Internal.Stack.CloneStack (
   StackSnapshot(..),
   StackEntry(..),
@@ -36,7 +36,7 @@ import GHC.Internal.Ptr
 
 -- | A frozen snapshot of the state of an execution stack.
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
 
 foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr InfoProvEnt) #)
@@ -185,14 +185,14 @@ The relevant notes are:
 
 -- | Clone the stack of the executing thread
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 cloneMyStack :: IO StackSnapshot
 cloneMyStack = IO $ \s ->
    case (cloneMyStack# s) of (# s1, stack #) -> (# s1, StackSnapshot stack #)
 
 -- | Clone the stack of a thread identified by its 'ThreadId'
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 cloneThreadStack :: ThreadId -> IO StackSnapshot
 cloneThreadStack (ThreadId tid#) = do
   resultVar <- newEmptyMVar @StackSnapshot
@@ -229,7 +229,7 @@ data StackEntry = StackEntry
 --     the stack. (These are pushed every time when a @case ... of@ scrutinee
 --     is evaluated.)
 --
--- @since 4.17.0.0
+-- @since base-4.17.0.0
 decode :: StackSnapshot -> IO [StackEntry]
 decode stackSnapshot = do
     stackEntries <- getDecodedStackArray stackSnapshot

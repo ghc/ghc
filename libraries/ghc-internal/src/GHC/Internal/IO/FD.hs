@@ -110,7 +110,7 @@ fdIsSocket :: FD -> Bool
 fdIsSocket fd = fdIsSocket_ fd /= 0
 #endif
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance Show FD where
   show fd = show (fdFD fd)
 
@@ -122,14 +122,14 @@ ifSupported s a = a <!> (error $ "FD:" ++ s ++ " not supported")
 ifSupported _ = id
 #endif
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance GHC.Internal.IO.Device.RawIO FD where
   read             = ifSupported "fdRead" fdRead
   readNonBlocking  = ifSupported "fdReadNonBlocking" fdReadNonBlocking
   write            = ifSupported "fdWrite" fdWrite
   writeNonBlocking = ifSupported "fdWriteNonBlocking" fdWriteNonBlocking
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance GHC.Internal.IO.Device.IODevice FD where
   ready         = ifSupported "ready" ready
   close         = ifSupported "close" close
@@ -153,7 +153,7 @@ instance GHC.Internal.IO.Device.IODevice FD where
 dEFAULT_FD_BUFFER_SIZE :: Int
 dEFAULT_FD_BUFFER_SIZE = 8192
 
--- | @since 4.1.0.0
+-- | @since base-4.1.0.0
 instance BufferedIO FD where
   newBuffer _dev state = ifSupported "newBuf" $ newByteBuffer dEFAULT_FD_BUFFER_SIZE state
   fillReadBuffer    fd buf = ifSupported "readBuf" $ readBuf' fd buf

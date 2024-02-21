@@ -104,7 +104,7 @@ noDup a = runRW# (\s ->
   case noDuplicate# s of
     _ -> a)
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor (ST s) where
     fmap f m = ST $ \ s ->
       let
@@ -122,7 +122,7 @@ instance Functor (ST s) where
         s' = noDup (snd (unST m s))
       in (x, s')
 
--- | @since 2.01
+-- | @since base-2.01
 instance Applicative (ST s) where
     pure a = ST $ \ s -> (a,s)
 
@@ -177,7 +177,7 @@ instance Applicative (ST s) where
     -- in <*>. If someone demands the (mr, s'') pair, then they will
     -- force mr or s''. To get s'', they need s'.
 
--- | @since 2.01
+-- | @since base-2.01
 instance Monad (ST s) where
     (>>) = (*>)
 
@@ -210,7 +210,7 @@ fixST m = ST (\ s ->
 -- itself is demanded directly in the `let` body. See also
 -- Note [Lazy ST: not producing lazy pairs].
 
--- | @since 2.01
+-- | @since base-2.01
 instance MonadFix (ST s) where
         mfix = fixST
 

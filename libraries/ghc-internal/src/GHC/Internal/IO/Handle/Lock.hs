@@ -46,7 +46,7 @@ import GHC.Internal.IO.Handle.Lock.NoOp
 -- function throws 'FileLockingNotImplemented'. We deliberately choose to not
 -- provide fcntl based locking instead because of its broken semantics.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 hLock :: Handle -> LockMode -> IO ()
 hLock h mode = void $ lockImpl h "hLock" mode True
 
@@ -54,13 +54,13 @@ hLock h mode = void $ lockImpl h "hLock" mode True
 --
 -- Returns 'True' if taking the lock was successful and 'False' otherwise.
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 hTryLock :: Handle -> LockMode -> IO Bool
 hTryLock h mode = lockImpl h "hTryLock" mode False
 
 -- | Release a lock taken with 'hLock' or 'hTryLock'.
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 hUnlock :: Handle -> IO ()
 hUnlock = unlockImpl
 

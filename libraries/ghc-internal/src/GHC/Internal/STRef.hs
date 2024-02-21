@@ -59,6 +59,6 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
 
 -- | Pointer equality.
 --
--- @since 2.01
+-- @since base-2.01
 instance Eq (STRef s a) where
     STRef v1# == STRef v2# = isTrue# (sameMutVar# v1# v2#)

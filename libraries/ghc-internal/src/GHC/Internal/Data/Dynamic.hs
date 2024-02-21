@@ -72,7 +72,7 @@ import GHC.Internal.Exception
 data Dynamic where
     Dynamic :: forall a. TypeRep a -> a -> Dynamic
 
--- | @since 2.01
+-- | @since base-2.01
 instance Show Dynamic where
    -- the instance just prints the type representation.
    showsPrec _ (Dynamic t _) =
@@ -81,7 +81,7 @@ instance Show Dynamic where
           showString ">>"
 
 -- here so that it isn't an orphan:
--- | @since 4.0.0.0
+-- | @since base-4.0.0.0
 instance Exception Dynamic
 
 -- | Converts an arbitrary value into an object of type 'Dynamic'.

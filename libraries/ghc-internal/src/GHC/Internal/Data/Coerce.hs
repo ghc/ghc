@@ -16,12 +16,12 @@
 -- More in-depth information can be found on the
 -- <https://gitlab.haskell.org/ghc/ghc/wikis/roles Roles wiki page>
 --
--- @since 4.7.0.0
+-- @since base-4.7.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Coerce
         ( -- * Safe coercions
-          -- @since 4.7.0.0
+          -- @since base-4.7.0.0
           coerce, Coercible
         ) where
 import GHC.Prim (coerce)

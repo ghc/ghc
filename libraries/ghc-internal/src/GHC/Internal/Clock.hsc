@@ -17,7 +17,7 @@ import GHC.Internal.Num
 
 -- | Return monotonic time in seconds, since some unspecified starting point
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 getMonotonicTime :: IO Double
 getMonotonicTime = do
 #if defined(javascript_HOST_ARCH)
@@ -30,7 +30,7 @@ getMonotonicTime = do
 
 -- | Return monotonic time in nanoseconds, since some unspecified starting point
 --
--- @since 4.11.0.0
+-- @since base-4.11.0.0
 #if defined(javascript_HOST_ARCH)
 getMonotonicTimeNSec :: IO Word64
 getMonotonicTimeNSec = do

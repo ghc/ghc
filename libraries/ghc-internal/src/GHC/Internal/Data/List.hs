@@ -234,7 +234,7 @@ import GHC.Internal.List (List)
 --
 -- Note: 'isSubsequenceOf' is often used in infix form.
 --
--- @since 4.8.0.0
+-- @since base-4.8.0.0
 --
 -- ==== __Examples__
 --

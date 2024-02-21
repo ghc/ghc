@@ -91,7 +91,7 @@ type role Array nominal representational
 type role STArray nominal nominal representational
 
 -- Just pointer equality on mutable arrays:
--- | @since 2.01
+-- | @since base-2.01
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
         isTrue# (sameMutableArray# arr1# arr2#)
@@ -535,7 +535,7 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
 ----------------------------------------------------------------------
 -- Array instances
 
--- | @since 2.01
+-- | @since base-2.01
 instance Functor (Array i) where
     fmap = amap
 
@@ -548,15 +548,15 @@ instance Functor (Array i) where
             case newArray# n# x s1# of
                 (# s2#, marr# #) -> done l u n marr# s2#
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Ix i, Eq e) => Eq (Array i e) where
     (==) = eqArray
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Ix i, Ord e) => Ord (Array i e) where
     compare = cmpArray
 
--- | @since 2.01
+-- | @since base-2.01
 instance (Ix a, Show a, Show b) => Show (Array a b) where
     showsPrec p a =
         showParen (p > appPrec) $

@@ -73,7 +73,7 @@ import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Interna
 -- 'CallStack' API, we may decide to change the implementation in the
 -- future.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 type HasCallStack = (?callStack :: CallStack)
 
 -- | 'CallStack's are a lightweight method of obtaining a
@@ -138,7 +138,7 @@ type HasCallStack = (?callStack :: CallStack)
 -- 'CallStack' API, we may decide to change the implementation in the
 -- future.
 --
--- @since 4.8.1.0
+-- @since base-4.8.1.0
 data CallStack
   = EmptyCallStack
   | PushCallStack [Char] SrcLoc CallStack
@@ -152,7 +152,7 @@ data CallStack
 --
 -- The list is ordered by most recent call.
 --
--- @since 4.8.1.0
+-- @since base-4.8.1.0
 getCallStack :: CallStack -> [([Char], SrcLoc)]
 getCallStack stk = case stk of
   EmptyCallStack            -> []
@@ -161,7 +161,7 @@ getCallStack stk = case stk of
 
 -- | Convert a list of call-sites to a 'CallStack'.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 fromCallSiteList :: [([Char], SrcLoc)] -> CallStack
 fromCallSiteList ((fn,loc):cs) = PushCallStack fn loc (fromCallSiteList cs)
 fromCallSiteList []            = EmptyCallStack
@@ -186,7 +186,7 @@ fromCallSiteList []            = EmptyCallStack
 --
 -- This function has no effect on a frozen 'CallStack'.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 pushCallStack :: ([Char], SrcLoc) -> CallStack -> CallStack
 pushCallStack (fn, loc) stk = case stk of
   FreezeCallStack _ -> stk
@@ -196,7 +196,7 @@ pushCallStack (fn, loc) stk = case stk of
 
 -- | The empty 'CallStack'.
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 emptyCallStack :: CallStack
 emptyCallStack = EmptyCallStack
 {-# INLINE emptyCallStack #-}
@@ -206,7 +206,7 @@ emptyCallStack = EmptyCallStack
 --
 -- prop> pushCallStack callSite (freezeCallStack callStack) = freezeCallStack callStack
 --
--- @since 4.9.0.0
+-- @since base-4.9.0.0
 freezeCallStack :: CallStack -> CallStack
 freezeCallStack stk = FreezeCallStack stk
 {-# INLINE freezeCallStack #-}
@@ -214,7 +214,7 @@ freezeCallStack stk = FreezeCallStack stk
 
 -- | A single location in the source code.
 --
--- @since 4.8.1.0
+-- @since base-4.8.1.0
 data SrcLoc = SrcLoc
   { srcLocPackage   :: [Char]
   , srcLocModule    :: [Char]
@@ -223,4 +223,4 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq -- ^ @since 4.9.0.0
+  } deriving Eq -- ^ @since base-4.9.0.0

@@ -111,7 +111,7 @@ utf32be = UTF32.utf32be
 
 -- | The Unicode encoding of the current locale
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 getLocaleEncoding :: IO TextEncoding
 {-# NOINLINE getLocaleEncoding #-}
 
@@ -127,7 +127,7 @@ getLocaleEncoding :: IO TextEncoding
 -- the use of code pages is deprecated: Strings should be retrieved
 -- via the "wide" W-family of UTF-16 APIs instead
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 getFileSystemEncoding :: IO TextEncoding
 {-# NOINLINE getFileSystemEncoding #-}
 
@@ -135,7 +135,7 @@ getFileSystemEncoding :: IO TextEncoding
 -- bytes are replaced with their closest visual match. Used for
 -- the 'Foreign.C.String.CString' marshalling functions in "Foreign.C.String"
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 getForeignEncoding :: IO TextEncoding
 {-# NOINLINE getForeignEncoding #-}
 
@@ -158,15 +158,15 @@ getForeignEncoding :: IO TextEncoding
 -- "invalid argument (cannot decode byte sequence starting from ...)"
 -- or "invalid argument (cannot encode character ...)".
 --
--- @since 4.5.0.0
+-- @since base-4.5.0.0
 setLocaleEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setLocaleEncoding #-}
 
--- | @since 4.5.0.0
+-- | @since base-4.5.0.0
 setFileSystemEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setFileSystemEncoding #-}
 
--- | @since 4.5.0.0
+-- | @since base-4.5.0.0
 setForeignEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setForeignEncoding #-}
 
@@ -180,7 +180,7 @@ mkGlobal x = unsafePerformIO $ do
     return (readIORef x_ref, writeIORef x_ref)
 {-# NOINLINE mkGlobal #-}
 
--- | @since 4.5.0.0
+-- | @since base-4.5.0.0
 initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 {-# NOINLINE initLocaleEncoding #-}
 -- N.B. initLocaleEncoding is exported for use in GHC.Internal.System.IO.localeEncoding.
@@ -229,7 +229,7 @@ argvEncoding = getFileSystemEncoding
 -- discards information, so encode followed by decode is not the
 -- identity.
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 char8 :: TextEncoding
 char8 = Latin1.latin1
 

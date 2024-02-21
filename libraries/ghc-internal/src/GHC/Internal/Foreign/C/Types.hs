@@ -146,7 +146,7 @@ INTEGRAL_TYPE(CULLong,"unsigned long long",HTYPE_UNSIGNED_LONG_LONG)
 -- | Haskell type representing the C @bool@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
--- @since 4.10.0.0
+-- @since base-4.10.0.0
 INTEGRAL_TYPE(CBool,"bool",HTYPE_BOOL)
 
 -- | Haskell type representing the C @float@ type.
@@ -198,13 +198,13 @@ ARITHMETIC_TYPE(CTime,"time_t",HTYPE_TIME_T)
 -- | Haskell type representing the C @useconds_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 
 ARITHMETIC_TYPE(CUSeconds,"useconds_t",HTYPE_USECONDS_T)
 -- | Haskell type representing the C @suseconds_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
--- @since 4.4.0.0
+-- @since base-4.4.0.0
 ARITHMETIC_TYPE(CSUSeconds,"suseconds_t",HTYPE_SUSECONDS_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
