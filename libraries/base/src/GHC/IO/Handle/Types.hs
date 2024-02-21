@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- |
 -- Module      :  GHC.IO.Handle.Types

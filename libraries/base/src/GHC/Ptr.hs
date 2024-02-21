@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
 -- |
 -- Module      :  GHC.Ptr
 -- Copyright   :  (c) The FFI Task Force, 2000-2002

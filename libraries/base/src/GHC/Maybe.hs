@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
 -- |
 -- Module      :  GHC.Maybe
 -- Copyright   :  (c) The University of Glasgow 1997-2002

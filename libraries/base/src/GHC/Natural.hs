@@ -1,5 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- |
 -- Compatibility module for pre ghc-bignum code.

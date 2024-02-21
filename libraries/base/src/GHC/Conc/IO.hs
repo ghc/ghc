@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
 -- |
 --
 -- Module      :  GHC.Conc.IO
