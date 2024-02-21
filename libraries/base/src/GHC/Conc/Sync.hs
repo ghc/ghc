@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- |
 -- Module      :  GHC.Conc.Sync

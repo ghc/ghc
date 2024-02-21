@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
 -- |
 -- Module      :  GHC.Conc.POSIX
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
