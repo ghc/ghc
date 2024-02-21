@@ -8,6 +8,7 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
+  , BCOArr(..)
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
@@ -35,7 +36,7 @@ import GHCi.FFI
 import Control.DeepSeq
 
 import Foreign
-import Data.Array
+import Data.Array as A
 import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
@@ -49,8 +50,14 @@ import Language.Haskell.Syntax.Module.Name (ModuleName)
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
 
+-- | Flat representation of things stored in 'CompiledByteCode'.
+--
+-- See Note [Flat structures in 'ModIface']
+newtype BCOArr a = BCOArr { getBCOArr :: Array Int a }
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, NFData)
+
 data CompiledByteCode = CompiledByteCode
-  { bc_bcos   :: [UnlinkedBCO]  -- Bunch of interpretable bindings
+  { bc_bcos   :: BCOArr UnlinkedBCO -- Bunch of interpretable bindings
   , bc_itbls  :: ItblEnv        -- A mapping from DataCons to their itbls
   , bc_ffis   :: [FFIInfo]      -- ffi blocks we allocated
   , bc_strs   :: AddrEnv        -- malloc'd top-level strings
@@ -63,6 +70,9 @@ newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
 
 instance Outputable CompiledByteCode where
   ppr CompiledByteCode{..} = ppr bc_bcos
+
+instance Outputable a => Outputable (BCOArr a) where
+  ppr = ppr . A.elems . getBCOArr
 
 -- Not a real NFData instance, because ModBreaks contains some things
 -- we can't rnf

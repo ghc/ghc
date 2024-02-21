@@ -50,6 +50,7 @@ import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
 
 import Foreign hiding (shiftL, shiftR)
+import qualified Data.Foldable as Foldable
 import Data.Char        ( ord )
 import Data.List        ( genericLength )
 import Data.Map.Strict (Map)
@@ -90,7 +91,7 @@ bcoFreeNames bco
 assembleBCOs
   :: Interp
   -> Profile
-  -> [ProtoBCO Name]
+  -> BCOArr (ProtoBCO Name)
   -> [TyCon]
   -> AddrEnv
   -> Maybe ModBreaks
@@ -129,7 +130,7 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
 -- top-level string literal bindings] in GHC.StgToByteCode for some discussion
 -- about why.
 --
-mallocStrings :: Interp -> [UnlinkedBCO] -> IO [UnlinkedBCO]
+mallocStrings :: Interp -> BCOArr UnlinkedBCO -> IO (BCOArr UnlinkedBCO)
 mallocStrings interp ulbcos = do
   let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
   ptrs <- interpCmd interp (MallocStrings bytestrings)
@@ -170,7 +171,8 @@ assembleOneBCO interp profile pbco = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   ubco <- assembleBCO (profilePlatform profile) pbco
-  [ubco'] <- mallocStrings interp [ubco]
+  let bcoArrSingleton = BCOArr (Array.listArray (1,1) [ubco])
+  [ubco'] <- Foldable.toList <$> mallocStrings interp bcoArrSingleton
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
