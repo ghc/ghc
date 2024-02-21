@@ -25,7 +25,7 @@ unsigned numberOfStubsForSection( ObjectCode *oc, unsigned sectionIndex);
 #define STUB_SIZE          ADD_SUFFIX(stubSize)
 
 bool findStub(Section * section, void* * addr, uint8_t flags);
-bool makeStub(Section * section, void* * addr, uint8_t flags);
+bool makeStub(Section * section, void* * addr, void* got_addr, uint8_t flags);
 
 void freeStubs(Section * section);
 

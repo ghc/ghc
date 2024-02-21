@@ -101,7 +101,7 @@
 #  include <elf_abi.h>
 #endif
 
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH) || defined (riscv64_HOST_ARCH)
 #  define NEED_GOT
 #  define NEED_PLT
 #  include "elf_got.h"
