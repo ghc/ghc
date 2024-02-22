@@ -58,7 +58,7 @@ CostCentre      *CC_LIST  = NULL;
 static CostCentreStack *CCS_LIST = NULL;
 
 #if defined(THREADED_RTS)
-static Mutex ccs_mutex;
+Mutex ccs_mutex;
 #endif
 
 /*
