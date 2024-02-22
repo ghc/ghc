@@ -83,7 +83,7 @@ import GHC.Internal.Unicode (isSpace)
 import GHC.Internal.Data.OldList
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Word
-import GHC.Internal.Data.Int
+import GHC.Internal.Int
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.C.Types

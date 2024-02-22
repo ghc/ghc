@@ -119,7 +119,7 @@ import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.System.IO
 import GHC.Internal.Data.Functor ( void )
-import GHC.Internal.Data.Int ( Int64 )
+import GHC.Internal.Int ( Int64 )
 #else
 import qualified GHC.Internal.Conc.IO as Conc
 #endif

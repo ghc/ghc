@@ -24,7 +24,7 @@ module Data.Int
      -- $notes
      ) where
 
-import GHC.Internal.Data.Int
+import GHC.Internal.Int
 
 {- $notes
 

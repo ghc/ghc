@@ -94,7 +94,7 @@ module Text.Printf(
 
 import Prelude
 import Data.Char
-import GHC.Internal.Data.Int
+import GHC.Internal.Int
 import GHC.Internal.Data.List (stripPrefix)
 import GHC.Internal.Word
 import GHC.Internal.Numeric

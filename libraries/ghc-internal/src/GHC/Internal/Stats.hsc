@@ -33,7 +33,7 @@ module GHC.Internal.Stats
 ) where
 
 import GHC.Internal.Control.Monad
-import GHC.Internal.Data.Int
+import GHC.Internal.Int
 import GHC.Internal.Word
 import GHC.Internal.Base
 import GHC.Internal.Generics (Generic)

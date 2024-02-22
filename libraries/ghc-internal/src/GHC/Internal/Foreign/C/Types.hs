@@ -90,7 +90,7 @@ module GHC.Internal.Foreign.C.Types
 
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Data.Bits        ( Bits(..), FiniteBits(..) )
-import GHC.Internal.Data.Int         ( Int8,  Int16,  Int32,  Int64  )
+import GHC.Internal.Int              ( Int8,  Int16,  Int32,  Int64  )
 import GHC.Internal.Word             ( Word8, Word16, Word32, Word64 )
 
 import GHC.Internal.Base

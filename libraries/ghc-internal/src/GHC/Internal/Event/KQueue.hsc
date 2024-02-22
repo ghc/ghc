@@ -28,7 +28,7 @@ available = False
 #else
 
 import GHC.Internal.Data.Bits (Bits(..), FiniteBits(..))
-import GHC.Internal.Data.Int
+import GHC.Internal.Int
 import GHC.Internal.Data.Maybe ( catMaybes )
 import GHC.Internal.Word (Word16, Word32)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
@@ -49,7 +49,7 @@ import GHC.Internal.System.Posix.Types (Fd(..))
 import qualified GHC.Internal.Event.Array as A
 
 #if defined(netbsd_HOST_OS)
-import GHC.Internal.Data.Int (Int64)
+import GHC.Internal.Int (Int64)
 #endif
 
 #include <sys/types.h>

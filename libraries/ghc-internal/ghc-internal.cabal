@@ -118,7 +118,6 @@ Library
         GHC.Internal.Data.Functor.Identity
         GHC.Internal.Data.Functor.Utils
         GHC.Internal.Data.IORef
-        GHC.Internal.Data.Int
         GHC.Internal.Data.Ix
         GHC.Internal.Data.Kind
         GHC.Internal.Data.List
