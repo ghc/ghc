@@ -7,13 +7,17 @@ license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     Core Libraries Committee <core-libraries-committee@haskell.org>
 bug-reports:    https://github.com/haskell/core-libraries-committee/issues
-synopsis:       Basic libraries
+synopsis:       Core data structures and operations
 category:       Prelude
 build-type:     Configure
-description:
-    This package contains the Standard Haskell "Prelude" and its support libraries,
-    and a large collection of useful libraries ranging from data
-    structures to parsing combinators and debugging utilities.
+description:    Haskell's base library provides, among other things, core types (e.g. [Bool]("Data.Bool") and [Int]("Data.Int")),
+                data structures (e.g. [List]("Data.List"), [Tuple]("Data.Tuple") and [Maybe]("Data.Maybe")),
+                the [Exception]("Control.Exception") mechanism, and the [IO]("System.IO") & [Concurrency]("Control.Concurrent") operations.
+                The "Prelude" module, which is imported by default, exposes a curated set of types and functions from other modules.
+
+                Other data structures like [Map](https://hackage.haskell.org/package/containers/docs/Data-Map.html),
+                [Set](https://hackage.haskell.org/package/containers/docs/Data-Set.html) are available in the [containers](https://hackage.haskell.org/package/containers) library.
+                To work with textual data, use the [text](https://hackage.haskell.org/package/text/docs/Data-Text.html) library.
 
 extra-tmp-files:
     autom4te.cache
