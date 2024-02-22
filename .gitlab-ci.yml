@@ -402,7 +402,8 @@ hadrian-ghc-in-ghci:
     - "echo 'package hadrian'  > hadrian/cabal.project.local"
     - "echo '  ghc-options: -Werror'  >> hadrian/cabal.project.local"
     # Load ghc-in-ghci then immediately exit and check the modules loaded
-    - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+    - export CORES="$(mk/detect-cpu-count.sh)"
+    - echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n2 | grep "Ok,"
   after_script:
     - .gitlab/ci.sh save_cache
     - cat ci-timings
@@ -453,8 +454,9 @@ hadrian-multi:
     - .gitlab/ci.sh configure
     # Now GHC means, use this GHC for hadrian
     - export GHC=$BOOT_HC
+    - export CORES="$(mk/detect-cpu-count.sh)"
     # Load hadrian-multi then immediately exit and check the modules loaded
-    - echo ":q" | hadrian/ghci-multi -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+    - echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci-multi -j$CORES | tail -n2 | grep "Ok,"
   after_script:
     - .gitlab/ci.sh save_cache
   cache:
