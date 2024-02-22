@@ -41,7 +41,7 @@ def job_triple(job_name):
         'release-armv7-linux-deb10-release': 'armv7-deb10-linux',
         'release-aarch64-linux-deb10-release': 'aarch64-deb10-linux',
         'release-aarch64-linux-deb11-release': 'aarch64-deb11-linux',
-        'release-aarch64-linux-alpine_3_18-release': 'aarch64-alpine3_18-linux',
+        'release-aarch64-linux-alpine3_18-release+no_split_sections': 'aarch64-alpine3_18-linux',
         'release-aarch64-darwin-release': 'aarch64-apple-darwin',
 
         'source-tarball': 'src',
