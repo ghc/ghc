@@ -41,8 +41,6 @@ module GHC.Internal.System.Environment.Blank
 
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (elem, null, takeWhile)
-import GHC.Internal.Foreign.C.Error
-import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Base
 #if defined(mingw32_HOST_OS)
@@ -51,6 +49,8 @@ import GHC.Internal.Windows
 import GHC.Internal.Control.Monad
 import GHC.Internal.Data.List (lookup)
 #else
+import GHC.Internal.Foreign.C.Error
+import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Enum
 import GHC.Internal.System.Posix.Internals

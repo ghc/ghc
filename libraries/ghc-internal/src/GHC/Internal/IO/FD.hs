@@ -51,6 +51,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Windows
 import GHC.Internal.Data.Bool
 import GHC.Internal.IO.SubSystem ((<!>))
+import GHC.Internal.Foreign.Storable
 #endif
 
 import GHC.Internal.Foreign.C.Types

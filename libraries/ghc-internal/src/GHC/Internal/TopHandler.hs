@@ -43,9 +43,8 @@ import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Base
-import GHC.Internal.Conc hiding (throwTo)
+import GHC.Internal.Conc.Sync hiding (throwTo)
 import GHC.Internal.Real
-import GHC.Internal.Ptr
 import GHC.Internal.IO
 import GHC.Internal.IO.Handle
 import GHC.Internal.IO.StdHandles
@@ -53,7 +52,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Weak
 
 #if defined(mingw32_HOST_OS)
-import GHC.Internal.ConsoleHandler
+import GHC.Internal.ConsoleHandler as GHC.ConsoleHandler
 #elif defined(javascript_HOST_ARCH)
 #else
 import GHC.Internal.Data.Dynamic (toDyn)

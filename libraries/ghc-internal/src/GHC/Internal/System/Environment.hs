@@ -33,7 +33,9 @@ module GHC.Internal.System.Environment
 import GHC.Internal.Data.Maybe (maybe)
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types
+#if !defined(mingw32_HOST_OS)
 import GHC.Internal.Foreign.C.Error
+#endif
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Storable
@@ -54,6 +56,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Control.Monad (unless)
 import GHC.Internal.IO.Encoding (argvEncoding)
 import GHC.Internal.Windows
+import GHC.Internal.Word
 #else
 import GHC.Internal.IO.Encoding (getFileSystemEncoding, argvEncoding)
 import GHC.Internal.System.Posix.Internals (withFilePath)

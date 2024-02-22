@@ -109,18 +109,19 @@ import Prelude
 import GHC.Internal.Control.Exception.Base as Exception
 
 import GHC.Internal.Conc.Bound
-import GHC.Internal.Conc hiding (threadWaitRead, threadWaitWrite,
+import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
 
 import GHC.Internal.System.Posix.Types ( Fd )
 
 #if defined(mingw32_HOST_OS)
+import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.System.IO
 import GHC.Internal.Data.Functor ( void )
 import GHC.Internal.Data.Int ( Int64 )
 #else
-import qualified GHC.Internal.Conc
+import qualified GHC.Conc
 #endif
 
 import GHC.Internal.Control.Concurrent.MVar

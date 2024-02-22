@@ -88,7 +88,6 @@ import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (isPrefixOf, drop)
 import GHC.Internal.Word
-import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Ptr
