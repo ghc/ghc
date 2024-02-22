@@ -29,7 +29,6 @@ import qualified Data.Map as Map
 import System.FilePath
 
 import qualified GHC.Cmm.Dataflow.Label as H
-import qualified GHC.Cmm.Dataflow.Collections as H
 
 -- | Generate DWARF/debug information
 dwarfGen :: IsDoc doc => String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock]

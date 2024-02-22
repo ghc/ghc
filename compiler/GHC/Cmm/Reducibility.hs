@@ -40,7 +40,6 @@ import qualified Data.Sequence as Seq
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph hiding (addBlock)

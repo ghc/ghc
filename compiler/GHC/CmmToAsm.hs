@@ -95,7 +95,6 @@ import GHC.Cmm.DebugBlock
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel

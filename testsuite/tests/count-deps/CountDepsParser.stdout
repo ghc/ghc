@@ -7,7 +7,6 @@ GHC.Builtin.Uniques
 GHC.ByteCode.Types
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
-GHC.Cmm.Dataflow.Collections
 GHC.Cmm.Dataflow.Label
 GHC.Cmm.Expr
 GHC.Cmm.MachOp

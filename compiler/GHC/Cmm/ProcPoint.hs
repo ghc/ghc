@@ -26,7 +26,6 @@ import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Supply
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label

@@ -38,8 +38,8 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm hiding (pprBBlock, pprStatic)
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.InitFini

@@ -50,7 +50,6 @@ import GHC.Cmm.Node
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Utils.Outputable

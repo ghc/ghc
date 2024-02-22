@@ -23,7 +23,6 @@ import GHC.Cmm.Config
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Unit.Module
 import GHC.Data.Graph.Directed

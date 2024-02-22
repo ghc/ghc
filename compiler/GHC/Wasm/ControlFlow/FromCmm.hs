@@ -15,7 +15,6 @@ import qualified Data.Tree as Tree
 
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
@@ -334,7 +333,7 @@ smartPlus platform e k =
     CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger k) width)]
   where width = cmmExprWidth platform e
 
-addToList :: (IsMap map) => ([a] -> [a]) -> KeyOf map -> map [a] -> map [a]
+addToList :: ([a] -> [a]) -> Label -> LabelMap [a] -> LabelMap [a]
 addToList consx = mapAlter add
     where add Nothing = Just (consx [])
           add (Just xs) = Just (consx xs)

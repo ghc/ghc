@@ -14,7 +14,6 @@ import GHC.Cmm.LRegSet
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Label
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
 

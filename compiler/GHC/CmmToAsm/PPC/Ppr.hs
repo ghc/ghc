@@ -29,7 +29,6 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
 import GHC.Cmm.BlockId

@@ -55,7 +55,6 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock

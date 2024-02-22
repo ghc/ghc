@@ -18,7 +18,6 @@ import GHC.Platform.Reg
 
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.CLabel

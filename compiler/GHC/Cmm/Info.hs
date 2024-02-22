@@ -40,7 +40,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Data.Bitmap
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
-import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
 import GHC.Platform.Profile

@@ -62,8 +62,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad (mapAccumLM)
 
-import GHC.Cmm.Dataflow.Collections
-
 -- Note [General layout of an NCG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- @cmmTopCodeGen@ will be our main entry point to code gen.  Here we'll get

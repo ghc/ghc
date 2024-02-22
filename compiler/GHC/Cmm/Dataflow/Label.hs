@@ -1,8 +1,10 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module GHC.Cmm.Dataflow.Label
     ( Label
@@ -11,18 +13,76 @@ module GHC.Cmm.Dataflow.Label
     , FactBase
     , lookupFact
     , mkHooplLabel
+    -- * Set
+    , setEmpty
+    , setNull
+    , setSize
+    , setMember
+    , setSingleton
+    , setInsert
+    , setDelete
+    , setUnion
+    , setUnions
+    , setDifference
+    , setIntersection
+    , setIsSubsetOf
+    , setFilter
+    , setFoldl
+    , setFoldr
+    , setFromList
+    , setElems
+    -- * Map
+    , mapNull
+    , mapSize
+    , mapMember
+    , mapLookup
+    , mapFindWithDefault
+    , mapEmpty
+    , mapSingleton
+    , mapInsert
+    , mapInsertWith
+    , mapDelete
+    , mapAlter
+    , mapAdjust
+    , mapUnion
+    , mapUnions
+    , mapUnionWithKey
+    , mapDifference
+    , mapIntersection
+    , mapIsSubmapOf
+    , mapMap
+    , mapMapWithKey
+    , mapFoldl
+    , mapFoldr
+    , mapFoldlWithKey
+    , mapFoldMapWithKey
+    , mapFilter
+    , mapFilterWithKey
+    , mapElems
+    , mapKeys
+    , mapToList
+    , mapFromList
+    , mapFromListWith
     ) where
 
 import GHC.Prelude
 
 import GHC.Utils.Outputable
 
--- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
-import GHC.Cmm.Dataflow.Collections
-
 import GHC.Types.Unique (Uniquable(..), mkUniqueGrimily)
+
+-- The code generator will eventually be using all the labels stored in a
+-- LabelSet and LabelMap. For these reasons we use the strict variants of these
+-- data structures. We inline selectively to enable the RULES in Word64Map/Set
+-- to fire.
+import GHC.Data.Word64Set (Word64Set)
+import qualified GHC.Data.Word64Set as S
+import GHC.Data.Word64Map.Strict (Word64Map)
+import qualified GHC.Data.Word64Map.Strict as M
 import GHC.Data.TrieMap
+
 import Data.Word (Word64)
+import Data.List (foldl1')
 
 
 -----------------------------------------------------------------------------
@@ -30,7 +90,7 @@ import Data.Word (Word64)
 -----------------------------------------------------------------------------
 
 newtype Label = Label { lblToUnique :: Word64 }
-  deriving (Eq, Ord)
+  deriving newtype (Eq, Ord)
 
 mkHooplLabel :: Word64 -> Label
 mkHooplLabel = Label
@@ -50,78 +110,177 @@ instance OutputableP env Label where
 -----------------------------------------------------------------------------
 -- LabelSet
 
-newtype LabelSet = LS UniqueSet deriving (Eq, Ord, Show, Monoid, Semigroup)
+newtype LabelSet = LS Word64Set
+  deriving newtype (Eq, Ord, Show, Monoid, Semigroup)
 
-instance IsSet LabelSet where
-  type ElemOf LabelSet = Label
+setNull :: LabelSet -> Bool
+setNull (LS s) = S.null s
 
-  setNull (LS s) = setNull s
-  setSize (LS s) = setSize s
-  setMember (Label k) (LS s) = setMember k s
+setSize :: LabelSet -> Int
+setSize (LS s) = S.size s
 
-  setEmpty = LS setEmpty
-  setSingleton (Label k) = LS (setSingleton k)
-  setInsert (Label k) (LS s) = LS (setInsert k s)
-  setDelete (Label k) (LS s) = LS (setDelete k s)
+setMember :: Label -> LabelSet -> Bool
+setMember (Label k) (LS s) = S.member k s
 
-  setUnion (LS x) (LS y) = LS (setUnion x y)
-  setDifference (LS x) (LS y) = LS (setDifference x y)
-  setIntersection (LS x) (LS y) = LS (setIntersection x y)
-  setIsSubsetOf (LS x) (LS y) = setIsSubsetOf x y
-  setFilter f (LS s) = LS (setFilter (f . mkHooplLabel) s)
-  setFoldl k z (LS s) = setFoldl (\a v -> k a (mkHooplLabel v)) z s
-  setFoldr k z (LS s) = setFoldr (\v a -> k (mkHooplLabel v) a) z s
+setEmpty :: LabelSet
+setEmpty = LS S.empty
 
-  setElems (LS s) = map mkHooplLabel (setElems s)
-  setFromList ks = LS (setFromList (map lblToUnique ks))
+setSingleton :: Label -> LabelSet
+setSingleton (Label k) = LS (S.singleton k)
+
+setInsert :: Label -> LabelSet -> LabelSet
+setInsert (Label k) (LS s) = LS (S.insert k s)
+
+setDelete :: Label -> LabelSet -> LabelSet
+setDelete (Label k) (LS s) = LS (S.delete k s)
+
+setUnion :: LabelSet -> LabelSet -> LabelSet
+setUnion (LS x) (LS y) = LS (S.union x y)
+
+{-# INLINE setUnions #-}
+setUnions :: [LabelSet] -> LabelSet
+setUnions [] = setEmpty
+setUnions sets = foldl1' setUnion sets
+
+setDifference :: LabelSet -> LabelSet -> LabelSet
+setDifference (LS x) (LS y) = LS (S.difference x y)
+
+setIntersection :: LabelSet -> LabelSet -> LabelSet
+setIntersection (LS x) (LS y) = LS (S.intersection x y)
+
+setIsSubsetOf :: LabelSet -> LabelSet -> Bool
+setIsSubsetOf (LS x) (LS y) = S.isSubsetOf x y
+
+setFilter :: (Label -> Bool) -> LabelSet -> LabelSet
+setFilter f (LS s) = LS (S.filter (f . mkHooplLabel) s)
+
+{-# INLINE setFoldl #-}
+setFoldl :: (t -> Label -> t) -> t -> LabelSet -> t
+setFoldl k z (LS s) = S.foldl (\a v -> k a (mkHooplLabel v)) z s
+
+{-# INLINE setFoldr #-}
+setFoldr :: (Label -> t -> t) -> t -> LabelSet -> t
+setFoldr k z (LS s) = S.foldr (\v a -> k (mkHooplLabel v) a) z s
+
+{-# INLINE setElems #-}
+setElems :: LabelSet -> [Label]
+setElems (LS s) = map mkHooplLabel (S.elems s)
+
+{-# INLINE setFromList #-}
+setFromList :: [Label] -> LabelSet
+setFromList ks  = LS (S.fromList (map lblToUnique ks))
 
 -----------------------------------------------------------------------------
 -- LabelMap
 
-newtype LabelMap v = LM (UniqueMap v)
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+newtype LabelMap v = LM (Word64Map v)
+  deriving newtype (Eq, Ord, Show, Functor, Foldable)
+  deriving stock   Traversable
 
-instance IsMap LabelMap where
-  type KeyOf LabelMap = Label
+mapNull :: LabelMap a -> Bool
+mapNull (LM m) = M.null m
 
-  mapNull (LM m) = mapNull m
-  mapSize (LM m) = mapSize m
-  mapMember (Label k) (LM m) = mapMember k m
-  mapLookup (Label k) (LM m) = mapLookup k m
-  mapFindWithDefault def (Label k) (LM m) = mapFindWithDefault def k m
+{-# INLINE mapSize #-}
+mapSize :: LabelMap a -> Int
+mapSize (LM m) = M.size m
 
-  mapEmpty = LM mapEmpty
-  mapSingleton (Label k) v = LM (mapSingleton k v)
-  mapInsert (Label k) v (LM m) = LM (mapInsert k v m)
-  mapInsertWith f (Label k) v (LM m) = LM (mapInsertWith f k v m)
-  mapDelete (Label k) (LM m) = LM (mapDelete k m)
-  mapAlter f (Label k) (LM m) = LM (mapAlter f k m)
-  mapAdjust f (Label k) (LM m) = LM (mapAdjust f k m)
+mapMember :: Label -> LabelMap a -> Bool
+mapMember (Label k) (LM m) = M.member k m
 
-  mapUnion (LM x) (LM y) = LM (mapUnion x y)
-  mapUnionWithKey f (LM x) (LM y) = LM (mapUnionWithKey (f . mkHooplLabel) x y)
-  mapDifference (LM x) (LM y) = LM (mapDifference x y)
-  mapIntersection (LM x) (LM y) = LM (mapIntersection x y)
-  mapIsSubmapOf (LM x) (LM y) = mapIsSubmapOf x y
+mapLookup :: Label -> LabelMap a -> Maybe a
+mapLookup (Label k) (LM m) = M.lookup k m
 
-  mapMap f (LM m) = LM (mapMap f m)
-  mapMapWithKey f (LM m) = LM (mapMapWithKey (f . mkHooplLabel) m)
-  mapFoldl k z (LM m) = mapFoldl k z m
-  mapFoldr k z (LM m) = mapFoldr k z m
-  mapFoldlWithKey k z (LM m) =
-      mapFoldlWithKey (\a v -> k a (mkHooplLabel v)) z m
-  mapFoldMapWithKey f (LM m) = mapFoldMapWithKey (\k v -> f (mkHooplLabel k) v) m
-  {-# INLINEABLE mapFilter #-}
-  mapFilter f (LM m) = LM (mapFilter f m)
-  {-# INLINEABLE mapFilterWithKey #-}
-  mapFilterWithKey f (LM m) = LM (mapFilterWithKey (f . mkHooplLabel) m)
+mapFindWithDefault :: a -> Label -> LabelMap a -> a
+mapFindWithDefault def (Label k) (LM m) = M.findWithDefault def k m
 
-  mapElems (LM m) = mapElems m
-  mapKeys (LM m) = map mkHooplLabel (mapKeys m)
-  {-# INLINEABLE mapToList #-}
-  mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- mapToList m]
-  mapFromList assocs = LM (mapFromList [(lblToUnique k, v) | (k, v) <- assocs])
-  mapFromListWith f assocs = LM (mapFromListWith f [(lblToUnique k, v) | (k, v) <- assocs])
+mapEmpty :: LabelMap v
+mapEmpty = LM M.empty
+
+mapSingleton :: Label -> v -> LabelMap v
+mapSingleton (Label k) v = LM (M.singleton k v)
+
+mapInsert :: Label -> v -> LabelMap v -> LabelMap v
+mapInsert (Label k) v (LM m) = LM (M.insert k v m)
+
+mapInsertWith :: (v -> v -> v) -> Label -> v -> LabelMap v -> LabelMap v
+mapInsertWith f (Label k) v (LM m) = LM (M.insertWith f k v m)
+
+mapDelete :: Label -> LabelMap v -> LabelMap v
+mapDelete (Label k) (LM m) = LM (M.delete k m)
+
+mapAlter :: (Maybe v -> Maybe v) -> Label -> LabelMap v -> LabelMap v
+mapAlter f (Label k) (LM m) = LM (M.alter f k m)
+
+mapAdjust :: (v -> v) -> Label -> LabelMap v -> LabelMap v
+mapAdjust f (Label k) (LM m) = LM (M.adjust f k m)
+
+mapUnion :: LabelMap v -> LabelMap v -> LabelMap v
+mapUnion (LM x) (LM y) = LM (M.union x y)
+
+{-# INLINE mapUnions #-}
+mapUnions :: [LabelMap a] -> LabelMap a
+mapUnions [] = mapEmpty
+mapUnions maps = foldl1' mapUnion maps
+
+mapUnionWithKey :: (Label -> v -> v -> v) -> LabelMap v -> LabelMap v -> LabelMap v
+mapUnionWithKey f (LM x) (LM y) = LM (M.unionWithKey (f . mkHooplLabel) x y)
+
+mapDifference :: LabelMap v -> LabelMap b -> LabelMap v
+mapDifference (LM x) (LM y) = LM (M.difference x y)
+
+mapIntersection :: LabelMap v -> LabelMap b -> LabelMap v
+mapIntersection (LM x) (LM y) = LM (M.intersection x y)
+
+mapIsSubmapOf :: Eq a => LabelMap a -> LabelMap a -> Bool
+mapIsSubmapOf (LM x) (LM y) = M.isSubmapOf x y
+
+mapMap :: (a -> v) -> LabelMap a -> LabelMap v
+mapMap f (LM m) = LM (M.map f m)
+
+mapMapWithKey :: (Label -> a -> v) -> LabelMap a -> LabelMap v
+mapMapWithKey f (LM m) = LM (M.mapWithKey (f . mkHooplLabel) m)
+
+{-# INLINE mapFoldl #-}
+mapFoldl :: (a -> b -> a) -> a -> LabelMap b -> a
+mapFoldl k z (LM m) = M.foldl k z m
+
+{-# INLINE mapFoldr #-}
+mapFoldr :: (a -> b -> b) -> b -> LabelMap a -> b
+mapFoldr k z (LM m) = M.foldr k z m
+
+{-# INLINE mapFoldlWithKey #-}
+mapFoldlWithKey :: (t -> Label -> b -> t) -> t -> LabelMap b -> t
+mapFoldlWithKey k z (LM m) = M.foldlWithKey (\a v -> k a (mkHooplLabel v)) z m
+
+mapFoldMapWithKey :: Monoid m => (Label -> t -> m) -> LabelMap t -> m
+mapFoldMapWithKey f (LM m) = M.foldMapWithKey (\k v -> f (mkHooplLabel k) v) m
+
+{-# INLINEABLE mapFilter #-}
+mapFilter :: (v -> Bool) -> LabelMap v -> LabelMap v
+mapFilter f (LM m) = LM (M.filter f m)
+
+{-# INLINEABLE mapFilterWithKey #-}
+mapFilterWithKey :: (Label -> v -> Bool) -> LabelMap v -> LabelMap v
+mapFilterWithKey f (LM m)  = LM (M.filterWithKey (f . mkHooplLabel) m)
+
+{-# INLINE mapElems #-}
+mapElems :: LabelMap a -> [a]
+mapElems (LM m) = M.elems m
+
+{-# INLINE mapKeys #-}
+mapKeys :: LabelMap a -> [Label]
+mapKeys (LM m) = map (mkHooplLabel . fst) (M.toList m)
+
+{-# INLINE mapToList #-}
+mapToList :: LabelMap b -> [(Label, b)]
+mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- M.toList m]
+
+{-# INLINE mapFromList #-}
+mapFromList :: [(Label, v)] -> LabelMap v
+mapFromList assocs = LM (M.fromList [(lblToUnique k, v) | (k, v) <- assocs])
+
+mapFromListWith :: (v -> v -> v) -> [(Label, v)] -> LabelMap v
+mapFromListWith f assocs = LM (M.fromListWith f [(lblToUnique k, v) | (k, v) <- assocs])
 
 -----------------------------------------------------------------------------
 -- Instances
@@ -137,11 +296,11 @@ instance OutputableP env a => OutputableP env (LabelMap a) where
 
 instance TrieMap LabelMap where
   type Key LabelMap = Label
-  emptyTM = mapEmpty
-  lookupTM k m = mapLookup k m
+  emptyTM       = mapEmpty
+  lookupTM k m  = mapLookup k m
   alterTM k f m = mapAlter f k m
-  foldTM k m z = mapFoldr k z m
-  filterTM f m = mapFilter f m
+  foldTM k m z  = mapFoldr k z m
+  filterTM f m  = mapFilter f m
 
 -----------------------------------------------------------------------------
 -- FactBase

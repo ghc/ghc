@@ -22,7 +22,6 @@ import GHC.Utils.Misc
 
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
 
 import Data.Kind
 
@@ -116,7 +115,7 @@ labelsDefined :: forall block n e x . NonLocal (block n) => Graph' block n e x
 labelsDefined GNil      = setEmpty
 labelsDefined (GUnit{}) = setEmpty
 labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
-  where addEntry :: forall a. LabelSet -> ElemOf LabelSet -> a -> LabelSet
+  where addEntry :: forall a. LabelSet -> Label -> a -> LabelSet
         addEntry labels label _ = setInsert label labels
         exitLabel :: MaybeO x (block n C O) -> LabelSet
         exitLabel NothingO  = setEmpty
