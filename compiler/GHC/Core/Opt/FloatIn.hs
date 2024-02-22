@@ -22,14 +22,17 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Unfold( ExprSize(..), sizeExpr,
+                        UnfoldingOpts(..), defaultUnfoldingOpts )
 import GHC.Core.Opt.Arity( isOneShotBndr )
+import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood )
+import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood, idUnfolding )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -552,9 +555,14 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
              all_alt_bndrs [scrut_fvs, all_alt_fvs]
              -- all_alt_bndrs: see Note [Shadowing and name capture]
 
-        -- Float into the alts with the is_case flag set
+    -- Float into the alts with the is_case flag set
+    -- Efficiency short-cut for the common case of a single alternative,
+    --   e.g.  case e of I# x -> blah
+    -- In that case just float in unconditionally.
     (drop_here2, alts_drops_s)
-       = sepBindsByDropPoint platform True alts_drops emptyDVarSet alts_fvs
+       = case alts of
+            [_] -> ([], [alts_drops])
+            _   -> sepBindsByDropPoint platform True alts_drops emptyDVarSet alts_fvs
 
     scrut_fvs = freeVarsOf scrut
 
@@ -797,6 +805,7 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
         | drop_here = go binds (insert here_box) fork_boxes
         | otherwise = go binds here_box          new_fork_boxes
         where
+          drop_here = used_here || cant_push
           -- "here" means the group of bindings dropped at the top of the fork
 
           used_here     = bndrs `usedInDropBox` here_box
@@ -808,18 +817,24 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
                -- Short-cut for the singleton case;
                -- used for lambdas and singleton cases
 
-          drop_here = used_here || cant_push
-
           n_used_alts = count id used_in_flags -- returns number of Trues in list.
 
           cant_push
-            | is_case   = (n_alts > 1 && n_used_alts == n_alts)
-                             -- Used in all, muliple branches, don't push
-                          || (n_used_alts > 1 && not (floatIsDupable platform bind))
-                             -- floatIsDupable: see Note [Duplicating floats]
+            | is_case
+            = -- The alternatives of a case expresison
+              dont_float_into_alts
 
-            | otherwise = floatIsCase bind || n_used_alts > 1
-                             -- floatIsCase: see Note [Floating primops]
+            | otherwise
+            = -- Not the alternatives of a case expression
+              -- floatIsCase: see Note [Floating primops]
+              floatIsCase bind || n_used_alts > 1
+
+          -- See Note [Duplicating floats into case alternatives]
+          dont_float_into_alts
+            = (n_used_alts == n_alts)
+                 -- Don't float in if used in all alternatives
+              || (n_used_alts > 1 && not (floatIsDupable platform bind))
+                 -- Nor if used in multiple alts and not small
 
           new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe
                                         fork_boxes used_in_flags
@@ -831,19 +846,19 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
           insert_maybe box False = box
 
 
-{- Note [Duplicating floats]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For case expressions we duplicate the binding if it is reasonably
-small, and if it is not used in all the RHSs This is good for
-situations like
+{- Note [Duplicating floats into case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For case expressions (is_case = True) it is safe to float the bining into all
+RHSs, without duplicating work.  But it might duplicate code.  So we refrain if
+* It is used in all alternatives
+* It is used in multiple alternatives, and is not small (floatIsDupable)
+
+This is good for situations like
      let x = I# y in
      case e of
        C -> error x
        D -> error x
        E -> ...not mentioning x...
-
-If the thing is used in all RHSs there is nothing gained,
-so we don't duplicate then.
 -}
 
 floatedBindsFVs :: RevFloatInBinds -> FreeVarSet
@@ -858,9 +873,26 @@ wrapFloats []               e = e
 wrapFloats (FB _ _ fl : bs) e = wrapFloats bs (wrapFloat fl e)
 
 floatIsDupable :: Platform -> FloatBind -> Bool
+floatIsDupable _ (FloatCase scrut _ _ _) = small_enough_e scrut
+floatIsDupable _ (FloatLet (Rec prs))    = all small_enough_b prs
+floatIsDupable _ (FloatLet (NonRec b r)) = small_enough_b (b,r)
+
+small_enough_b :: (Id,CoreExpr) -> Bool
+small_enough_b (b,_) = smallEnoughToInline defaultUnfoldingOpts (idUnfolding b)
+
+small_enough_e :: CoreExpr -> Bool
+small_enough_e e
+  = case sizeExpr opts (unfoldingCreationThreshold opts) [] e of
+      TooBig -> False
+      SizeIs n _ _ -> n < unfoldingUseThreshold opts
+  where
+    opts = defaultUnfoldingOpts
+
+{-
 floatIsDupable platform (FloatCase scrut _ _ _) = exprIsDupable platform scrut
 floatIsDupable platform (FloatLet (Rec prs))    = all (exprIsDupable platform . snd) prs
 floatIsDupable platform (FloatLet (NonRec _ r)) = exprIsDupable platform r
+-}
 
 floatIsCase :: FloatBind -> Bool
 floatIsCase (FloatCase {}) = True
