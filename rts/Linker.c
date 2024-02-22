@@ -598,7 +598,26 @@ internal_dlopen(const char *dll_name)
    // (see POSIX also)
 
    ACQUIRE_LOCK(&dl_mutex);
+
+   // When dlopen() loads a profiled dynamic library, it calls the
+   // ctors which will call registerCcsList() to append the defined
+   // CostCentreStacks to CCS_LIST. This execution path starting from
+   // addDLL() was only protected by dl_mutex previously. However,
+   // another thread may be doing other things with the RTS linker
+   // that transitively calls refreshProfilingCCSs() which also
+   // accesses CCS_LIST, and those execution paths are protected by
+   // linker_mutex. So there's a risk of data race that may lead to
+   // segfaults (#24423), and we need to ensure the ctors are also
+   // protected by ccs_mutex.
+#if defined(PROFILING)
+   ACQUIRE_LOCK(&ccs_mutex);
+#endif
+
    hdl = dlopen(dll_name, RTLD_LAZY|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
+
+#if defined(PROFILING)
+   RELEASE_LOCK(&ccs_mutex);
+#endif
 
    errmsg = NULL;
    if (hdl == NULL) {

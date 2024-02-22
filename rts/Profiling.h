@@ -55,6 +55,10 @@ extern Arena *prof_arena;
 void debugCCS( CostCentreStack *ccs );
 #endif
 
+#if defined(THREADED_RTS)
+extern Mutex ccs_mutex;
+#endif
+
 #endif
 
 #include "EndPrivate.h"
