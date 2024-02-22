@@ -136,7 +136,7 @@ guard           :: (Alternative f) => Bool -> f ()
 guard True      =  pure ()
 guard False     =  empty
 
--- | This generalizes the list-based 'GHC.Internal.Data.List.filter' function.
+-- | This generalizes the list-based 'Data.List.filter' function.
 --
 -- > runIdentity (filterM (Identity . p) xs) == filter p xs
 --
@@ -255,7 +255,7 @@ zipWithM_         :: (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m ()
 -- See Note [Fusion for zipN/zipWithN] in List.hs.
 zipWithM_ f xs ys =  sequenceA_ (zipWith f xs ys)
 
-{- | The 'foldM' function is analogous to 'GHC.Internal.Data.Foldable.foldl', except that its result is
+{- | The 'foldM' function is analogous to 'Data.Foldable.foldl', except that its result is
 encapsulated in a monad. Note that 'foldM' works from left-to-right over
 the list arguments. This could be an issue where @('>>')@ and the `folded
 function' are not commutative.
@@ -388,15 +388,15 @@ f <$!> m = do
 -- -----------------------------------------------------------------------------
 -- Other MonadPlus functions
 
--- | Direct 'MonadPlus' equivalent of 'GHC.Internal.Data.List.filter'.
+-- | Direct 'MonadPlus' equivalent of 'Data.List.filter'.
 --
 -- ==== __Examples__
 --
--- The 'GHC.Internal.Data.List.filter' function is just 'mfilter' specialized to
+-- The 'Data.List.filter' function is just 'mfilter' specialized to
 -- the list monad:
 --
 -- @
--- 'GHC.Internal.Data.List.filter' = ( 'mfilter' :: (a -> Bool) -> [a] -> [a] )
+-- 'Data.List.filter' = ( 'mfilter' :: (a -> Bool) -> [a] -> [a] )
 -- @
 --
 -- An example using 'mfilter' with the 'Maybe' monad:
@@ -412,27 +412,3 @@ mfilter p ma = do
   a <- ma
   if p a then return a else mzero
 
-{- $naming
-
-The functions in this library use the following naming conventions:
-
-* A postfix \'@M@\' always stands for a function in the Kleisli category:
-  The monad type constructor @m@ is added to function results
-  (modulo currying) and nowhere else.  So, for example,
-
-> filter  ::              (a ->   Bool) -> [a] ->   [a]
-> filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-
-* A postfix \'@_@\' changes the result type from @(m a)@ to @(m ())@.
-  Thus, for example:
-
-> sequence  :: Monad m => [m a] -> m [a]
-> sequence_ :: Monad m => [m a] -> m ()
-
-* A prefix \'@m@\' generalizes an existing function to a monadic form.
-  Thus, for example:
-
-> filter  ::                (a -> Bool) -> [a] -> [a]
-> mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a
-
--}

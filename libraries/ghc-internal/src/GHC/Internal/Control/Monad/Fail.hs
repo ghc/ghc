@@ -11,31 +11,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Transitional module providing the 'MonadFail' class and primitive
--- instances.
---
--- This module can be imported for defining forward compatible
--- 'MonadFail' instances:
---
--- @
--- import qualified GHC.Internal.Control.Monad.Fail as Fail
---
--- instance Monad Foo where
---   (>>=) = {- ...bind impl... -}
---
---   -- Provide legacy 'fail' implementation for when
---   -- new-style MonadFail desugaring is not enabled.
---   fail = Fail.fail
---
--- instance Fail.MonadFail Foo where
---   fail = {- ...fail implementation... -}
--- @
---
--- See <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>
--- for more details.
---
--- @since base-4.9.0.0
---
 module GHC.Internal.Control.Monad.Fail ( MonadFail(fail) ) where
 
 import GHC.Internal.Base (String, Monad(), Maybe(Nothing), IO(), failIO)

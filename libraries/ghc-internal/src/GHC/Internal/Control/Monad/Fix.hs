@@ -44,13 +44,13 @@ import GHC.Internal.System.IO
 -- Instances of 'MonadFix' should satisfy the following laws:
 --
 -- [Purity]
---      @'mfix' ('GHC.Internal.Control.Monad.return' . h)  =  'GHC.Internal.Control.Monad.return' ('fix' h)@
+--      @'mfix' ('Control.Monad.return' . h)  =  'Control.Monad.return' ('fix' h)@
 --
 -- [Left shrinking (or Tightening)]
 --      @'mfix' (\\x -> a >>= \\y -> f x y)  =  a >>= \\y -> 'mfix' (\\x -> f x y)@
 --
 -- [Sliding]
---      @'mfix' ('GHC.Internal.Control.Monad.liftM' h . f)  =  'GHC.Internal.Control.Monad.liftM' h ('mfix' (f . h))@,
+--      @'mfix' ('Control.Monad.liftM' h . f)  =  'Control.Monad.liftM' h ('mfix' (f . h))@,
 --      for strict @h@.
 --
 -- [Nesting]
@@ -110,7 +110,7 @@ instance MonadFix (Either e) where
 instance MonadFix (ST s) where
         mfix = fixST
 
--- Instances of GHC.Internal.Data.Monoid wrappers
+-- Instances of Data.Monoid wrappers
 
 -- | @since base-4.8.0.0
 instance MonadFix Dual where
@@ -160,7 +160,7 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
         fstP (a :*: _) = a
         sndP (_ :*: b) = b
 
--- Instances for GHC.Internal.Data.Ord
+-- Instances for Data.Ord
 
 -- | @since base-4.12.0.0
 instance MonadFix Down where

@@ -64,10 +64,6 @@ module GHC.Internal.System.IO (
     writeFile,
     appendFile,
 
-    -- ** File locking
-
-    -- $locking
-
     -- * Operations on handles
 
     -- ** Determining and changing the size of a file
@@ -670,21 +666,3 @@ output_flags = std_flags    .|. o_CREAT
 std_flags, output_flags, rw_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 rw_flags     = output_flags .|. o_RDWR
-
--- $locking
--- Implementations should enforce as far as possible, at least locally to the
--- Haskell process, multiple-reader single-writer locking on files.
--- That is, /there may either be many handles on the same file which manage input, or just one handle on the file which manages output/.  If any
--- open or semi-closed handle is managing a file for output, no new
--- handle can be allocated for that file.  If any open or semi-closed
--- handle is managing a file for input, new handles can only be allocated
--- if they do not manage output.  Whether two files are the same is
--- implementation-dependent, but they should normally be the same if they
--- have the same absolute path name and neither has been renamed, for
--- example.
---
--- /Warning/: the 'readFile' operation holds a semi-closed handle on
--- the file until the entire contents of the file have been consumed.
--- It follows that an attempt to write to a file (using 'writeFile', for
--- example) that was earlier opened by 'readFile' will usually result in
--- failure with 'GHC.Internal.System.IO.Error.isAlreadyInUseError'.

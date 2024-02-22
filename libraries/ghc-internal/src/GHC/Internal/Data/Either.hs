@@ -259,7 +259,7 @@ partitionEithers = foldr (either left right) ([],[])
 -- matching when one does not care about the value contained in the
 -- constructor:
 --
--- >>> import GHC.Internal.Control.Monad ( when )
+-- >>> import Control.Monad ( when )
 -- >>> let report e = when (isLeft e) $ putStrLn "ERROR"
 -- >>> report (Right 1)
 -- >>> report (Left "parse error")
@@ -290,7 +290,7 @@ isLeft (Right _) = False
 -- matching when one does not care about the value contained in the
 -- constructor:
 --
--- >>> import GHC.Internal.Control.Monad ( when )
+-- >>> import Control.Monad ( when )
 -- >>> let report e = when (isRight e) $ putStrLn "SUCCESS"
 -- >>> report (Left "parse error")
 -- >>> report (Right 1)

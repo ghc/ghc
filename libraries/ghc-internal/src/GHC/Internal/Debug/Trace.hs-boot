@@ -26,8 +26,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Debug.Trace (
-        -- * Tracing
-        -- $tracing
         trace,
         traceId,
         traceShow,
@@ -36,14 +34,8 @@ module GHC.Internal.Debug.Trace (
         traceIO,
         traceM,
         traceShowM,
-
-        -- * Eventlog tracing
-        -- $eventlog_tracing
         traceEvent,
         traceEventIO,
-
-        -- * Execution phase markers
-        -- $markers
         traceMarker,
         traceMarkerIO,
   ) where

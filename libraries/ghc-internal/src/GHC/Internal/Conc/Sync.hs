@@ -271,7 +271,7 @@ thread; if you need foreign calls to be made by a particular OS
 thread, then use 'Control.Concurrent.forkOS' instead.
 
 The new thread inherits the /masked/ state of the parent (see
-'GHC.Internal.Control.Exception.mask').
+'GHC.Control.Exception.mask').
 
 The newly created thread has an exception handler that discards the
 exceptions 'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM', and

@@ -62,3 +62,28 @@ module Control.Monad
      ) where
 
 import GHC.Internal.Control.Monad
+
+{- $naming
+
+The functions in this library use the following naming conventions:
+
+* A postfix \'@M@\' always stands for a function in the Kleisli category:
+  The monad type constructor @m@ is added to function results
+  (modulo currying) and nowhere else.  So, for example,
+
+> filter  ::              (a ->   Bool) -> [a] ->   [a]
+> filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
+
+* A postfix \'@_@\' changes the result type from @(m a)@ to @(m ())@.
+  Thus, for example:
+
+> sequence  :: Monad m => [m a] -> m [a]
+> sequence_ :: Monad m => [m a] -> m ()
+
+* A prefix \'@m@\' generalizes an existing function to a monadic form.
+  Thus, for example:
+
+> filter  ::                (a -> Bool) -> [a] -> [a]
+> mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a
+
+-}

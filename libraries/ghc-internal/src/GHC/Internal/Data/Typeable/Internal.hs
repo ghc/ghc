@@ -472,7 +472,7 @@ mkTrApp a b -- See Note [Kind caching], Wrinkle 2
 
 -- | Construct a representation for a type application that
 -- may be a saturated arrow type. This is renamed to mkTrApp in
--- GHC.Internal.Type.Reflection.Unsafe
+-- Type.Reflection.Unsafe
 mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                   TypeRep (a :: k1 -> k2)
                -> TypeRep (b :: k1)
