@@ -1,4 +1,4 @@
---command sh ./hadrian/ghci
+--command sh -c "HADRIAN_ARGS=-j ./hadrian/ghci -j"
 --reload compiler
 --reload ghc
 --reload includes
