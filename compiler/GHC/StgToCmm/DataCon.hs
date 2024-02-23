@@ -331,14 +331,6 @@ For example, to return from a function the constructor `Nothing`, instead of
 allocating on the heap a word for `Nothing_con_info` and returning the pointer
 to it tagged `+1`, we can simply return `Nothing_closure+1`.
 
-We must consider three distinct situations of saturated applications of
-constructors that take no runtime-relevant arguments in which we can use a
-precomputed static closure:
-
-Conveniently, if either the worker or the wrapper for a given data
-constructor takes no arguments whatsoever, it will become piece of
-static data that we can use for this purpose.
-
 Examples:
 
   > data  Maybe a  =  Nothing | Just a
@@ -357,6 +349,13 @@ Examples:
   is thus (unlike the worker) an arity-zero data object that we can
   safely substitute for allocated Refl-constructed objects.
 
+  In general, whenever a data constructor wrapper takes no arguments,
+  its definition will consist of a single saturated application of the
+  corresponding worker, where any value arguments in that application
+  must be zero-width coercion arguments.  So if the wrapper has arity
+  zero it is always safe to use it in the precomputed-static-closure
+  optimization.
+
 
   > data Example3 = Example3Con {-# UNPACK #-} !()
 
@@ -367,50 +366,31 @@ Examples:
   a separate wrapper exists.
 
 
-  > data Example4 = NoWrapper (# #)
+  > data State s = S# (State# s)
 
-  The worker function `NoWrapper` takes one zero-width arg, an empty
-  unboxed tuple.  Since all of its args are zero-width, we could in
-  principle apply the precomputed-static-closure optimization to it,
-  but we would have to create a dedicated closure specifically for this
-  purpose: We cannot use the worker (it is a function with arity one)
-  and no separate wrapper even exists.
+  This data type is used internally by the lazy ST monad.  The worker
+  function `S#` takes one arg, a zero-width state token.  Since all of
+  its args are zero-width, we could in principle apply the
+  precomputed-static-closure optimization to it, but we would have to
+  create a dedicated closure specifically for this purpose: We cannot
+  use the worker (it is a function with arity one) and no separate
+  wrapper even exists.
 
   Creating such a dedicated closure is left as future work.
 
 
-TODO: decide how much of the below examples to retain
+Conveniently, if either the worker or the wrapper for a given data
+constructor takes no arguments whatsoever, it will become a piece of
+static data that we can safely use for this purpose:
 
-As an example, since (2) and (3) might be hard to visualise, consider the datatype:
+ * If the worker takes no arguments whatsoever, then its definition in
+   STG will be a single StgConApp with no arguments.
 
-  data TCon2 a where
-    TCon2 :: TCon2 ()
+ * If the wrapper takes no arguments whatsoever, then its definition
+   will consist of a single saturated application of the corresponding
+   worker.  (For a GADT constructor like Refl above, this application
+   will have some zero-width coercion arguments.)
 
-and its STG representation post-unarisation:
-
-  G.$WTCon2 :: G.TCon2 ()
-      = G.TCon2! [];
-
-  G.TCon2 :: forall {a}. (a GHC.Prim.~# ()) => G.TCon2 a
-      = {} \r [void_0E] G.TCon2 [];
-
-and the C--:
-
-  section ""data" . G.$WTCon2_closure" {
-      G.$WTCon2_closure:
-          const G.TCon2_con_info; -- Static constructor info
-  }
-
-  section ""data" . G.TCon2_closure" {
-      G.TCon2_closure:
-          const G.TCon2_info;    -- Static function info
-  }
-
-The precomputed static closure for `$WTCon2` is `$WTCon2_closure+1`, and the
-precomputed static closure for `TCon2` is also `$WTCon2_closure+1`; that is,
-all saturated data con applications of `TCon2` and `$WTCon2` are compiled to
-`$WTCon2_closure+1` instead of an allocation on the heap and
-tagging of its pointer.
 -}
 
 -- (precomputedStaticConInfo_maybe cfg id con args)

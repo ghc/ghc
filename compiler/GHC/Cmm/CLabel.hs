@@ -1372,14 +1372,15 @@ entry.
 Note [Closure and info labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a function 'foo', we have:
-   foo_info    : Points to the info table describing foo's closure
-                 (and entry code for foo with tables next to code)
+   foo_info:     Points to the info table describing foo's closure
+   foo_entry:    Entry code for saturated calls to foo
    foo_closure : Static (no-free-var) closure only:
                  points to the statically-allocated closure
 
 For a data constructor (such as Just or Nothing), we also have:
-    Just_con_info: Info table for objects built with the data constructor;
-                   the first word of such a heap-allocated Just object
+    Just_con_info:  Info table for objects built with the data constructor;
+                    the first word of such a heap-allocated Just object
+    Just_con_entry: The entry code for such an object (applies a pointer tag)
 
   The *worker function* for a data constructor also gets code:
     Just_info:     Info table for the *worker function*, an
@@ -1403,6 +1404,12 @@ somewhat. (TODO: Point to the code for exporting/not-exporting these.)
 What about a data constructor wrapper like $WCon?  They are ordinary
 functions as far as code generation is concerned.  In particular,
 $WCon_info should be an exported symbol (if it exists).
+
+  QUESTION: What happens if a single module contains two non-nullary
+  data constructors, named "X" and "X_con"? Then we will generate a
+  label Module.X_con_info for use with objects created by the "X"
+  constructor and another seemingly identical label Module.X_con_info
+  which is the info table for the worker function "X_con".  Is this OK?
 
 
 
