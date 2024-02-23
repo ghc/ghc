@@ -116,10 +116,10 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
   sp_id <- newSysLocalDs ManyTy sp_ty
   work_uniq <- newUnique
   work_export_name <- uniqueCFunName
-  deRefStablePtr_id <- lookupGhcInternalVarId "GHC.Stable" "deRefStablePtr"
+  deRefStablePtr_id <- lookupGhcInternalVarId "GHC.Internal.Stable" "deRefStablePtr"
   unsafeDupablePerformIO_id <-
     lookupGhcInternalVarId
-      "GHC.IO.Unsafe"
+      "GHC.Internal.IO.Unsafe"
       "unsafeDupablePerformIO"
   let work_id =
         mkExportedVanillaId
@@ -171,7 +171,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
       adjustor_js_src
       mUnitId
       PlayRisky
-  mkJSCallback_id <- lookupGhcInternalVarId "GHC.Wasm.Prim.Exports" "mkJSCallback"
+  mkJSCallback_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "mkJSCallback"
   let wrap_rhs =
         mkCoreLams [tv | Bndr tv _ <- tv_bndrs]
           $ mkApps
@@ -312,16 +312,16 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
         )
     _ -> do
       io_tycon <- dsLookupTyCon ioTyConName
-      jsval_ty <- mkTyConTy <$> lookupGhcInternalTyCon "GHC.Wasm.Prim.Types" "JSVal"
+      jsval_ty <- mkTyConTy <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
       bindIO_id <- dsLookupGlobalId bindIOName
       returnIO_id <- dsLookupGlobalId returnIOName
       promise_id <- newSysLocalDs ManyTy jsval_ty
-      blockPromise_id <- lookupGhcInternalVarId "GHC.Wasm.Prim.Imports" "stg_blockPromise"
+      blockPromise_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" "stg_blockPromise"
       msgPromise_id <-
-        lookupGhcInternalVarId "GHC.Wasm.Prim.Imports" $ "stg_messagePromise" ++ ffiType res_ty
+        lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" $ "stg_messagePromise" ++ ffiType res_ty
       unsafeDupablePerformIO_id <-
         lookupGhcInternalVarId
-          "GHC.IO.Unsafe"
+          "GHC.Internal.IO.Unsafe"
           "unsafeDupablePerformIO"
       rhs <-
         importBindingRHS
@@ -419,7 +419,7 @@ importBindingRHS mUnitId safety cfun_name tvs arg_tys orig_res_ty res_trans =
       Nothing -> do
         unsafeDupablePerformIO_id <-
           lookupGhcInternalVarId
-            "GHC.IO.Unsafe"
+            "GHC.Internal.IO.Unsafe"
             "unsafeDupablePerformIO"
         io_data_con <- dsLookupDataCon ioDataConName
         let ccall_res_ty =
@@ -610,9 +610,9 @@ dsWasmJSExport fn_id co ext_name = do
       res_ty_str = ffiType res_ty
   args <- newSysLocalsDs arg_tys
   promiseRes_id <-
-    lookupGhcInternalVarId "GHC.Wasm.Prim.Exports" $ "js_promiseResolve" ++ res_ty_str
-  runIO_id <- lookupGhcInternalVarId "GHC.Wasm.Prim.Exports" "runIO"
-  runNonIO_id <- lookupGhcInternalVarId "GHC.Wasm.Prim.Exports" "runNonIO"
+    lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" $ "js_promiseResolve" ++ res_ty_str
+  runIO_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "runIO"
+  runNonIO_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "runNonIO"
   let work_id =
         mkExportedVanillaId
           ( mkExternalName
