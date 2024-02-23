@@ -44,19 +44,23 @@ function h$hs_remWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_timesWord64(h1,l1,h2,l2) {
-  var a = W64(h1,l1);
-  var b = W64(h2,l2);
-  var r = BigInt.asUintN(64, a * b);
-  TRACE_ARITH("Word64: " + a + " * " + b + " ==> " + r)
-  RETURN_W64(r);
+  var rh = h$mul2Word32(l1,l2);
+  var rl = h$ret1;
+
+  rh += Math.imul(l1,h2)>>>0;
+  rh += Math.imul(l2,h1)>>>0;
+  rh >>>= 0;
+
+  TRACE_ARITH("Word64: " + (h1,l1) + " * " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_minusWord64(h1,l1,h2,l2) {
-  var a = (BigInt(h1) << BigInt(32)) | BigInt(l1>>>0);
-  var b = (BigInt(h2) << BigInt(32)) | BigInt(l2>>>0);
-  var r = BigInt.asUintN(64, a - b);
-  TRACE_ARITH("Word64: " + a + " - " + b + " ==> " + r)
-  RETURN_W64(r);
+  var l  = l1-l2;
+  var rl = l>>>0;
+  var rh = (h1-h2-(l!=rl?1:0))>>>0;
+  TRACE_ARITH("Word64: " + (h1,l1) + " - " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_plusWord64(h1,l1,h2,l2) {
@@ -68,11 +72,15 @@ function h$hs_plusWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_timesInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r)
-  RETURN_I64(r);
+  var rh = h$mul2Word32(l1,l2);
+  var rl = h$ret1;
+
+  rh += Math.imul(l1,h2)|0;
+  rh += Math.imul(l2,h1)|0;
+  rh |= 0;
+
+  TRACE_ARITH("Int64: " + (h1,l1) + " * " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_quotInt64(h1,l1,h2,l2) {
@@ -92,19 +100,19 @@ function h$hs_remInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_plusInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a + b);
-  TRACE_ARITH("Int64: " + a + " + " + b + " ==> " + r)
-  RETURN_I64(r);
+  var l  = l1+l2;
+  var rl = l>>>0;
+  var rh = (h1+h2+(l!=rl?1:0))|0;
+  TRACE_ARITH("Int64: " + (h1,l1) + " + " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_minusInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a - b);
-  TRACE_ARITH("Int64: " + a + " - " + b + " ==> " + r)
-  RETURN_I64(r);
+  var l  = l1-l2;
+  var rl = l>>>0;
+  var rh = (h1-h2-(l!=rl?1:0))|0;
+  TRACE_ARITH("Int64: " + (h1,l1) + " - " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_uncheckedShiftLWord64(h,l,n) {
