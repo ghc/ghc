@@ -608,8 +608,11 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
             do
               final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing []
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
+              -- extra_decl is not used any more after writing the interface in the interpreter mode
+              -- since byte-code is already generated.
+              let final_iface' = final_iface { mi_extra_decls = Nothing }
               bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
-              return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
+              return ([], final_iface', emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
 
 runUnlitPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
