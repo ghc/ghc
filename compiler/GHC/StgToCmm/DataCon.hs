@@ -404,7 +404,9 @@ precomputedStaticConInfo_maybe cfg binder con []
   | isNullaryRepDataCon con
   = use_name (dataConName con)
   | Just wrapper <- dataConWrapId_maybe con
-  , idArity wrapper == 0 -- This might be pre-unarise arity, but that's OK
+  -- check the wrapper's LFInfo to avoid wondering whether an arity of
+  -- zero could possibly mean "unknown arity" for a DataCon wrapper
+  , Just (LFCon {}) <- idLFInfo_maybe wrapper
   = use_name (varName wrapper)
   where
     use_name name
