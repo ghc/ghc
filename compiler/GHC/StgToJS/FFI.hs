@@ -45,7 +45,7 @@ import qualified Data.List as L
 genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStgStat, ExprResult)
 genPrimCall ctx (PrimCall lbl _) args t = do
   j <- parseFFIPattern False False False ("h$" ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
-  return (j, ExprInline Nothing)
+  return (j, ExprInline)
 
 -- | generate the actual call
 {-
@@ -193,7 +193,7 @@ genForeignCall _ctx
   , Just pairs <- getObjectKeyValuePairs args = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
       return ( (|=) obj (ValExpr (JHash $ listToUniqMap pairs'))
-             , ExprInline Nothing
+             , ExprInline
              )
 
 genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
@@ -211,7 +211,7 @@ genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
         | otherwise = "h$callDynamic"
 
     exprResult | async     = ExprCont
-               | otherwise = ExprInline Nothing
+               | otherwise = ExprInline
 
     catchExcep = (cconv == JavaScriptCallConv) &&
                  playSafe safety || playInterruptible safety

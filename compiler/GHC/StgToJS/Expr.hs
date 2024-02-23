@@ -98,11 +98,11 @@ genExpr ctx stg = case stg of
   StgLit l      -> do
     ls <- genLit l
     let r = assignToExprCtx ctx ls
-    pure (r,ExprInline Nothing)
+    pure (r,ExprInline)
   StgConApp con _n args _ -> do
     as <- concatMapM genArg args
     c <- genCon ctx con as
-    return (c, ExprInline (Just as))
+    return (c, ExprInline)
   StgOpApp (StgFCallOp f _) args t
     -> genForeignCall ctx f t (concatMap typex_expr $ ctxTarget ctx) args
   StgOpApp (StgPrimOp op) args t
@@ -561,12 +561,9 @@ genCase ctx bnd e at alts l
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))
                   $ ctx
       (ej, r) <- genExpr ctx' e
-      let d = case r of
-                ExprInline d0 -> d0
-                ExprCont -> pprPanic "genCase: expression was not inline"
-                                     (pprStgExpr panicStgPprOpts e)
+      massert (r == ExprInline)
 
-      (aj, ar) <- genAlts ctx bnd at d alts
+      (aj, ar) <- genAlts ctx bnd at alts
       (saveCCS,restoreCCS) <- ifProfilingM $ do
         ccsVar <- freshIdent
         pure ( ccsVar ||= toJExpr jCurrentCCS
@@ -655,7 +652,7 @@ genRet ctx e at as l = freshIdent >>= f
       restoreCCS    <- ifProfilingM . pop_handle_CCS $ pure (jCurrentCCS, SlotUnknown)
       rlne          <- popLneFrame False lneLive ctx'
       rlnev         <- verifyRuntimeReps lneVars
-      (alts, _altr) <- genAlts ctx' e at Nothing as
+      (alts, _altr) <- genAlts ctx' e at as
       return $ decs <> load <> loadv <> ras <> rasv <> restoreCCS <> rlne <> rlnev <> alts <>
                returnStack
 
@@ -666,10 +663,9 @@ genAlts :: HasDebugCallStack
         => ExprCtx        -- ^ lhs to assign expression result to
         -> Id             -- ^ id being matched
         -> AltType        -- ^ type
-        -> Maybe [JStgExpr]  -- ^ if known, fields in datacon from earlier expression
         -> [CgStgAlt]     -- ^ the alternatives
         -> G (JStgStat, ExprResult)
-genAlts ctx e at me alts = do
+genAlts ctx e at alts = do
   (st, er) <- case at of
 
     PolyAlt -> case alts of
@@ -705,15 +701,6 @@ genAlts ctx e at me alts = do
       | [_alt] <- alts
       , isUnboxedTupleTyCon tc
       -> panic "genAlts: unexpected unboxed tuple"
-
-    AlgAlt _tc
-      | Just es <- me
-      , [GenStgAlt (DataAlt dc) bs expr] <- alts
-      , not (isUnboxableCon dc)
-      -> do
-        bsi <- mapM identsForId bs
-        (ej, er) <- genExpr ctx expr
-        return (declAssignAll (concat bsi) es <> ej, er)
 
     AlgAlt _tc
       | [alt] <- alts
@@ -784,13 +771,13 @@ normalizeBranches ctx brs
     | branchResult (fmap branch_result brs) == ExprCont =
         (ExprCont, map mkCont brs)
     | otherwise =
-        (ExprInline Nothing, brs)
+        (ExprInline, brs)
   where
     mkCont b = case branch_result b of
-      ExprInline{} -> b { branch_stat   = branch_stat b <> assignAll jsRegsFromR1
-                                                                     (concatMap typex_expr $ ctxTarget ctx)
-                        , branch_result = ExprCont
-                        }
+      ExprInline -> b { branch_stat   = branch_stat b <> assignAll jsRegsFromR1
+                                                                   (concatMap typex_expr $ ctxTarget ctx)
+                      , branch_result = ExprCont
+                      }
       _ -> b
 
 -- | Load an unboxed tuple. "Loading" means getting all 'Idents' from the input
@@ -935,7 +922,7 @@ branchResult = \case
   (ExprCont:_)         -> ExprCont
   (_:es)
     | elem ExprCont es -> ExprCont
-    | otherwise        -> ExprInline Nothing
+    | otherwise        -> ExprInline
 
 -- | Push return arguments onto the stack. The 'Bool' tracks whether the value
 -- is already on the stack or not, used in 'StgToJS.Stack.pushOptimized'.
@@ -1052,5 +1039,5 @@ genPrimOp ctx op args t = do
   -- fixme: should we preserve/check the primreps?
   jsm <- liftIO initJSM
   return $ case runJSM jsm prim_gen of
-             PrimInline s -> (s, ExprInline Nothing)
+             PrimInline s -> (s, ExprInline)
              PRPrimCall s -> (s, ExprCont)

@@ -113,7 +113,7 @@ genApp ctx i args
         let profArg = if prof then [jCafCCS] else []
         a <- genArg x
         return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
-               , ExprInline Nothing
+               , ExprInline
                )
 
     -- let-no-escape
@@ -131,14 +131,14 @@ genApp ctx i args
     | [] <- args
     , getUnique i == proxyHashKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
-    = return (top |= null_, ExprInline Nothing)
+    = return (top |= null_, ExprInline)
 
     -- unboxed tuple or strict type: return fields individually
     | [] <- args
     , isUnboxedTupleType (idType i) || isStrictType (idType i)
     = do
       a <- storeIdFields i (ctxTarget ctx)
-      return (a, ExprInline Nothing)
+      return (a, ExprInline)
 
     -- Handle alternative heap object representation: in some cases, a heap
     -- object is not represented as a JS object but directly as a number or a
@@ -164,7 +164,7 @@ genApp ctx i args
       case is of
         [i'] ->
           return ( c |= if_ (isObject i') (closureField1 i') i'
-                 , ExprInline Nothing
+                 , ExprInline
                  )
         _ -> panic "genApp: invalid size"
 
@@ -182,7 +182,7 @@ genApp ctx i args
                              (appS "throw" [String "unexpected thunk"]) -- yuck
                              mempty
                  _   -> mempty
-      return (a `mappend` ww, ExprInline Nothing)
+      return (a `mappend` ww, ExprInline)
 
 
     -- Case: "newtype" datacon wrapper
@@ -200,7 +200,7 @@ genApp ctx i args
                 [StgVarArg a'] -> a'
                 _              -> panic "genApp: unexpected arg"
           if isStrictId a' || ctxIsEvaluated a'
-            then return (t |= ai, ExprInline Nothing)
+            then return (t |= ai, ExprInline)
             else return (returnS (app "h$e" [ai]), ExprCont)
         _ -> panic "genApp: invalid size"
 
