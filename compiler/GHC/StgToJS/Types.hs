@@ -357,7 +357,7 @@ data PrimRes
 
 data ExprResult
   = ExprCont
-  | ExprInline (Maybe [JStgExpr])
+  | ExprInline
   deriving (Eq)
 
 newtype ExprValData = ExprValData [JStgExpr]
