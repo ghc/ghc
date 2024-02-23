@@ -28,6 +28,7 @@ import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Types (LambdaFormInfo(..))
 
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
