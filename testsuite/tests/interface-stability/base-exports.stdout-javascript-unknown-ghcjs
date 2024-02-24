@@ -211,7 +211,7 @@ module Control.Concurrent.QSemN where
   waitQSemN :: QSemN -> GHC.Types.Int -> GHC.Types.IO ()
 
 module Control.Exception where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type AllocationLimitExceeded :: *
   data AllocationLimitExceeded = AllocationLimitExceeded
   type ArithException :: *
@@ -239,6 +239,8 @@ module Control.Exception where
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
     {-# MINIMAL #-}
+  type ExceptionWithContext :: * -> *
+  data ExceptionWithContext a = ExceptionWithContext GHC.Internal.Exception.Context.ExceptionContext a
   type Handler :: * -> *
   data Handler a = forall e. Exception e => Handler (e -> GHC.Types.IO a)
   type IOException :: *
@@ -262,10 +264,12 @@ module Control.Exception where
   type SomeAsyncException :: *
   data SomeAsyncException = forall e. Exception e => SomeAsyncException e
   type SomeException :: *
-  data SomeException = forall e. Exception e => SomeException e
+  data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   type TypeError :: *
   newtype TypeError = TypeError GHC.Internal.Base.String
+  addExceptionContext :: forall a. GHC.Internal.Exception.Context.ExceptionAnnotation a => a -> SomeException -> SomeException
   allowInterrupt :: GHC.Types.IO ()
+  annotateIO :: forall e a. GHC.Internal.Exception.Context.ExceptionAnnotation e => e -> GHC.Types.IO a -> GHC.Types.IO a
   assert :: forall a. GHC.Types.Bool -> a -> a
   asyncExceptionFromException :: forall e. Exception e => SomeException -> GHC.Internal.Maybe.Maybe e
   asyncExceptionToException :: forall e. Exception e => e -> SomeException
@@ -286,6 +290,7 @@ module Control.Exception where
   mask :: forall b. ((forall a. GHC.Types.IO a -> GHC.Types.IO a) -> GHC.Types.IO b) -> GHC.Types.IO b
   mask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
   onException :: forall a b. GHC.Types.IO a -> GHC.Types.IO b -> GHC.Types.IO a
+  someExceptionContext :: SomeException -> GHC.Internal.Exception.Context.ExceptionContext
   throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. Exception e => e -> a
   throwIO :: forall e a. Exception e => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Internal.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
@@ -293,6 +298,16 @@ module Control.Exception where
   tryJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either b a)
   uninterruptibleMask :: forall b. ((forall a. GHC.Types.IO a -> GHC.Types.IO a) -> GHC.Types.IO b) -> GHC.Types.IO b
   uninterruptibleMask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
+
+module Control.Exception.Annotation where
+  -- Safety: None
+  type ExceptionAnnotation :: * -> Constraint
+  class ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable a => ExceptionAnnotation a where
+    displayExceptionAnnotation :: a -> GHC.Internal.Base.String
+    default displayExceptionAnnotation :: GHC.Internal.Show.Show a => a -> GHC.Internal.Base.String
+    {-# MINIMAL #-}
+  type SomeExceptionAnnotation :: *
+  data SomeExceptionAnnotation = forall a. ExceptionAnnotation a => SomeExceptionAnnotation a
 
 module Control.Exception.Base where
   -- Safety: Safe
@@ -348,7 +363,7 @@ module Control.Exception.Base where
   type SomeAsyncException :: *
   data SomeAsyncException = forall e. Exception e => SomeAsyncException e
   type SomeException :: *
-  data SomeException = forall e. Exception e => SomeException e
+  data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   type TypeError :: *
   newtype TypeError = TypeError GHC.Internal.Base.String
   assert :: forall a. GHC.Types.Bool -> a -> a
@@ -387,6 +402,16 @@ module Control.Exception.Base where
   typeError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   uninterruptibleMask :: forall b. ((forall a. GHC.Types.IO a -> GHC.Types.IO a) -> GHC.Types.IO b) -> GHC.Types.IO b
   uninterruptibleMask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
+
+module Control.Exception.Context where
+  -- Safety: None
+  type ExceptionContext :: *
+  data ExceptionContext = ExceptionContext [GHC.Internal.Exception.Context.SomeExceptionAnnotation]
+  addExceptionAnnotation :: forall a. GHC.Internal.Exception.Context.ExceptionAnnotation a => a -> ExceptionContext -> ExceptionContext
+  displayExceptionContext :: ExceptionContext -> GHC.Internal.Base.String
+  emptyExceptionContext :: ExceptionContext
+  getAllExceptionAnnotations :: ExceptionContext -> [GHC.Internal.Exception.Context.SomeExceptionAnnotation]
+  getExceptionAnnotations :: forall a. GHC.Internal.Exception.Context.ExceptionAnnotation a => ExceptionContext -> [a]
 
 module Control.Monad where
   -- Safety: Safe
@@ -5234,7 +5259,7 @@ module GHC.Exception where
     displayException :: e -> GHC.Internal.Base.String
     {-# MINIMAL #-}
   type SomeException :: *
-  data SomeException = forall e. Exception e => SomeException e
+  data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   type SrcLoc :: *
   data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
   divZeroException :: SomeException
@@ -5262,7 +5287,7 @@ module GHC.Exception.Type where
     displayException :: e -> GHC.Internal.Base.String
     {-# MINIMAL #-}
   type SomeException :: *
-  data SomeException = forall e. Exception e => SomeException e
+  data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   divZeroException :: SomeException
   overflowException :: SomeException
   ratioZeroDenomException :: SomeException
@@ -14177,6 +14202,7 @@ instance forall a b c d e. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid
 instance GHC.Internal.Base.Monoid () -- Defined in ‘GHC.Internal.Base’
 instance forall a k (b :: k). GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
+instance GHC.Internal.Base.Monoid GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
 instance GHC.Internal.Base.Monoid Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -14225,6 +14251,7 @@ instance GHC.Internal.Base.Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
 instance forall a k (b :: k). GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
+instance GHC.Internal.Base.Semigroup GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
 instance GHC.Internal.Base.Semigroup Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -14695,6 +14722,7 @@ instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.FixIOEx
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.IOException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.SomeAsyncException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.Type.ArithException -- Defined in ‘GHC.Internal.Exception.Type’
+instance forall a. GHC.Internal.Exception.Type.Exception a => GHC.Internal.Exception.Type.Exception (GHC.Internal.Exception.Type.ExceptionWithContext a) -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.Type.SomeException -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.ErrorCall -- Defined in ‘GHC.Internal.Exception’
@@ -15314,6 +15342,7 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.Exception.IOErrorType -- Defined
 instance GHC.Internal.Show.Show GHC.Internal.IO.Exception.IOException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Exception.SomeAsyncException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.Type.ArithException -- Defined in ‘GHC.Internal.Exception.Type’
+instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Exception.Type.ExceptionWithContext a) -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.Type.SomeException -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.ErrorCall -- Defined in ‘GHC.Internal.Exception’
 instance GHC.Internal.Show.Show GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’

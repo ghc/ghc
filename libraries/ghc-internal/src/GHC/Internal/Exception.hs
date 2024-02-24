@@ -4,7 +4,10 @@
            , MagicHash
            , PatternSynonyms
   #-}
-{-# LANGUAGE DataKinds, PolyKinds #-}
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -32,6 +35,10 @@ module GHC.Internal.Exception
 
       -- * 'SomeException'
     , SomeException(..)
+
+      -- * Exception context
+    , someExceptionContext
+    , addExceptionContext
 
       -- * Throwing
     , throw

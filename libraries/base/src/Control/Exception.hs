@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 --
@@ -30,13 +30,27 @@
 --
 
 module Control.Exception
-    (-- *  The Exception type
+    (-- * The 'SomeException' type
      SomeException(..),
+     -- ** The 'Exception' class
      Exception(..),
+     addExceptionContext,
+     someExceptionContext,
+     annotateIO,
+     ExceptionWithContext(..),
+     -- * Concrete exception types
      IOException,
      ArithException(..),
      ArrayException(..),
      AssertionFailed(..),
+     NoMethodError(..),
+     PatternMatchFail(..),
+     RecConError(..),
+     RecSelError(..),
+     RecUpdError(..),
+     ErrorCall(..),
+     TypeError(..),
+     -- ** Asynchronous exceptions
      SomeAsyncException(..),
      AsyncException(..),
      asyncExceptionToException,
@@ -48,13 +62,6 @@ module Control.Exception
      AllocationLimitExceeded(..),
      CompactionFailed(..),
      Deadlock(..),
-     NoMethodError(..),
-     PatternMatchFail(..),
-     RecConError(..),
-     RecSelError(..),
-     RecUpdError(..),
-     ErrorCall(..),
-     TypeError(..),
      -- *  Throwing exceptions
      throw,
      throwIO,
@@ -107,6 +114,8 @@ module Control.Exception
      ) where
 
 import GHC.Internal.Control.Exception
+import GHC.Internal.Exception.Type
+import GHC.Internal.IO (annotateIO)
 
 {- $catching
 

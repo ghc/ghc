@@ -67,7 +67,9 @@ Library
         , Control.Category
         , Control.Concurrent.MVar
         , Control.Exception
+        , Control.Exception.Annotation
         , Control.Exception.Base
+        , Control.Exception.Context
         , Control.Monad
         , Control.Monad.Fail
         , Control.Monad.Fix
