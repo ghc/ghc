@@ -189,18 +189,17 @@ instance Show SomeAsyncException where
 -- | @since base-4.7.0.0
 instance Exception SomeAsyncException
 
--- |@since base-4.7.0.0
+-- | @since base-4.7.0.0
 asyncExceptionToException :: Exception e => e -> SomeException
 asyncExceptionToException = toException . SomeAsyncException
 
--- |@since base-4.7.0.0
+-- | @since base-4.7.0.0
 asyncExceptionFromException :: Exception e => SomeException -> Maybe e
 asyncExceptionFromException x = do
     SomeAsyncException a <- fromException x
     cast a
 
-
--- |Asynchronous exceptions.
+-- | Asynchronous exceptions.
 data AsyncException
   = StackOverflow
         -- ^The current thread\'s stack exceeded its limit.
