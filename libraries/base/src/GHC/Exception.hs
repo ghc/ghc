@@ -49,3 +49,9 @@ module GHC.Exception
     ) where
 
 import GHC.Internal.Exception
+
+-- XXX: This is a temporary workaround to ensure correct build ordering
+-- despite #24436 since `GHC.Internal.Stack` has a .hs-boot file which
+-- `ghc -M` does not track correctly.
+-- This dependency should be removed when #24436 is fixed.
+import GHC.Internal.Stack ()
