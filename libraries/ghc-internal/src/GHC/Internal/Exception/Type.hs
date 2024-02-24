@@ -1,5 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -25,7 +28,18 @@
 
 module GHC.Internal.Exception.Type
        ( Exception(..)    -- Class
-       , SomeException(..), ArithException(..)
+       , SomeException(..)
+       , someExceptionContext
+       , addExceptionContext
+       , mapExceptionContext
+         -- * Exception context
+       , HasExceptionContext
+       , ExceptionContext(..)
+       , emptyExceptionContext
+       , mergeExceptionContext
+       , ExceptionWithContext(..)
+         -- * Arithmetic exceptions
+       , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
@@ -35,15 +49,32 @@ import GHC.Internal.Data.Typeable (Typeable, cast)
    -- loop: GHC.Internal.Data.Typeable -> GHC.Internal.Err -> GHC.Internal.Exception
 import GHC.Internal.Base
 import GHC.Internal.Show
+import GHC.Internal.Exception.Context
+
+type HasExceptionContext = (?exceptionContext :: ExceptionContext)
 
 {- |
 The @SomeException@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeException@.
 -}
-data SomeException = forall e . Exception e => SomeException e
+data SomeException = forall e. (Exception e, HasExceptionContext) => SomeException e
 
--- | @since base-3.0
+-- | View the 'ExceptionContext' of a 'SomeException'.
+someExceptionContext :: SomeException -> ExceptionContext
+someExceptionContext (SomeException _) = ?exceptionContext
+
+-- | Add more 'ExceptionContext' to a 'SomeException'.
+addExceptionContext :: ExceptionAnnotation a => a -> SomeException -> SomeException
+addExceptionContext ann =
+    mapExceptionContext (addExceptionAnnotation ann)
+
+mapExceptionContext :: (ExceptionContext -> ExceptionContext) -> SomeException -> SomeException
+mapExceptionContext f se@(SomeException e) =
+    let ?exceptionContext = f (someExceptionContext se)
+    in SomeException e
+
+-- | @since 3.0
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
 
@@ -134,10 +165,12 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
+    -- | @toException@ should produce a 'SomeException' with no attached 'ExceptionContext'.
     toException   :: e -> SomeException
     fromException :: SomeException -> Maybe e
 
-    toException = SomeException
+    toException e = SomeException e
+      where ?exceptionContext = emptyExceptionContext
     fromException (SomeException e) = cast e
 
     -- | Render this exception value in a human-friendly manner.
@@ -151,11 +184,39 @@ class (Typeable e, Show e) => Exception e where
 -- | @since base-4.8.0.0
 instance Exception Void
 
--- | @since base-3.0
+-- | This drops any attached 'ExceptionContext'.
+--
+-- @since base-3.0
 instance Exception SomeException where
-    toException se = se
+    toException (SomeException e) =
+        let ?exceptionContext = emptyExceptionContext
+        in SomeException e
     fromException = Just
-    displayException (SomeException e) = displayException e
+    displayException (SomeException e) =
+        displayException e ++ "\n" ++ displayContext ?exceptionContext
+
+displayContext :: ExceptionContext -> String
+displayContext (ExceptionContext anns0) = go anns0
+  where
+    go (SomeExceptionAnnotation ann : anns) = displayExceptionAnnotation ann ++ "\n" ++ go anns
+    go [] = ""
+
+-- | Wraps a particular exception exposing its 'ExceptionContext'. Intended to
+-- be used when 'catch'ing exceptions in cases where access to the context is
+-- desired.
+data ExceptionWithContext a = ExceptionWithContext ExceptionContext a
+
+instance Show a => Show (ExceptionWithContext a) where
+    showsPrec _ (ExceptionWithContext _ e) = showString "ExceptionWithContext _ " . shows e
+
+instance Exception a => Exception (ExceptionWithContext a) where
+    toException (ExceptionWithContext ctxt e) =
+        SomeException e
+      where ?exceptionContext = ctxt
+    fromException se = do
+        e <- fromException se
+        return (ExceptionWithContext (someExceptionContext se) e)
+    displayException = displayException . toException
 
 -- |Arithmetic exceptions.
 data ArithException

@@ -33,6 +33,7 @@ module GHC.Internal.IO (
         unsafePerformIO, unsafeInterleaveIO,
         unsafeDupablePerformIO, unsafeDupableInterleaveIO,
         noDuplicate,
+        annotateIO,
 
         -- To and from ST
         stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
@@ -50,10 +51,12 @@ module GHC.Internal.IO (
 import GHC.Internal.Base
 import GHC.Internal.ST
 import GHC.Internal.Exception
+import GHC.Internal.Exception.Type (addExceptionContext)
 import GHC.Internal.Show
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
+import GHC.Internal.Exception.Context ( ExceptionAnnotation )
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
@@ -187,10 +190,11 @@ catch   :: Exception e
         -> IO a
 -- See #exceptions_and_strictness#.
 catch (IO io) handler = IO $ catch# io handler'
-    where handler' e = case fromException e of
-                       Just e' -> unIO (handler e')
-                       Nothing -> raiseIO# e
-
+  where
+    handler' e =
+      case fromException e of
+        Just e' -> unIO (handler e')
+        Nothing -> raiseIO# e
 
 -- | Catch any 'Exception' type in the 'IO' monad.
 --
@@ -199,7 +203,17 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
-    where handler' (SomeException e) = unIO (handler e)
+  where
+    handler' (SomeException e) = unIO (handler e)
+
+-- | Execute an 'IO' action, adding the given 'ExceptionContext'
+-- to any thrown synchronous exceptions.
+--
+-- @since base-2.20.0.0
+annotateIO :: forall e a. ExceptionAnnotation e => e -> IO a -> IO a
+annotateIO ann (IO io) = IO (catch# io handler)
+  where
+    handler se = raiseIO# (addExceptionContext ann se)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch

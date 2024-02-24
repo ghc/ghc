@@ -181,6 +181,7 @@ Library
         GHC.Internal.Err
         GHC.Internal.Event.TimeOut
         GHC.Internal.Exception
+        GHC.Internal.Exception.Context
         GHC.Internal.Exception.Type
         GHC.Internal.ExecutionStack
         GHC.Internal.ExecutionStack.Internal
