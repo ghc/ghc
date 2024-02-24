@@ -1,1 +1,6 @@
 runghc.exe: defer-type-errors: rawSystem: does not exist (No such file or directory)
+HasCallStack backtrace:
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:<line>:<column> in <package-id>:GHC.Internal.IO
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception
+  ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception

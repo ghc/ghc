@@ -238,6 +238,7 @@ module Control.Exception where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
+    backtraceDesired :: e -> GHC.Types.Bool
     {-# MINIMAL #-}
   type ExceptionWithContext :: * -> *
   data ExceptionWithContext a = ExceptionWithContext GHC.Internal.Exception.Context.ExceptionContext a
@@ -291,8 +292,8 @@ module Control.Exception where
   mask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
   onException :: forall a b. GHC.Types.IO a -> GHC.Types.IO b -> GHC.Types.IO a
   someExceptionContext :: SomeException -> GHC.Internal.Exception.Context.ExceptionContext
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. Exception e => e -> a
-  throwIO :: forall e a. Exception e => e -> GHC.Types.IO a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::GHC.Internal.Stack.Types.CallStack, Exception e) => e -> a
+  throwIO :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Internal.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
   try :: forall e a. Exception e => GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either e a)
   tryJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either b a)
@@ -308,6 +309,17 @@ module Control.Exception.Annotation where
     {-# MINIMAL #-}
   type SomeExceptionAnnotation :: *
   data SomeExceptionAnnotation = forall a. ExceptionAnnotation a => SomeExceptionAnnotation a
+
+module Control.Exception.Backtrace where
+  -- Safety: None
+  type BacktraceMechanism :: *
+  data BacktraceMechanism = CostCentreBacktrace | HasCallStackBacktrace | ExecutionBacktrace | IPEBacktrace
+  type Backtraces :: *
+  data Backtraces = ...
+  collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Types.IO Backtraces
+  displayBacktraces :: Backtraces -> GHC.Internal.Base.String
+  getBacktraceMechanismState :: BacktraceMechanism -> GHC.Types.IO GHC.Types.Bool
+  setBacktraceMechanismState :: BacktraceMechanism -> GHC.Types.Bool -> GHC.Types.IO ()
 
 module Control.Exception.Base where
   -- Safety: Safe
@@ -337,6 +349,7 @@ module Control.Exception.Base where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
+    backtraceDesired :: e -> GHC.Types.Bool
     {-# MINIMAL #-}
   type FixIOException :: *
   data FixIOException = FixIOException
@@ -394,8 +407,8 @@ module Control.Exception.Base where
   patError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recConError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recSelError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. Exception e => e -> a
-  throwIO :: forall e a. Exception e => e -> GHC.Types.IO a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::GHC.Internal.Stack.Types.CallStack, Exception e) => e -> a
+  throwIO :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Internal.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
   try :: forall e a. Exception e => GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either e a)
   tryJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either b a)
@@ -5288,6 +5301,7 @@ module GHC.Exception where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
+    backtraceDesired :: e -> GHC.Types.Bool
     {-# MINIMAL #-}
   type SomeException :: *
   data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
@@ -5304,7 +5318,7 @@ module GHC.Exception where
   prettySrcLoc :: SrcLoc -> GHC.Internal.Base.String
   ratioZeroDenomException :: SomeException
   showCCSStack :: [GHC.Internal.Base.String] -> [GHC.Internal.Base.String]
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. Exception e => e -> a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::CallStack, Exception e) => e -> a
   underflowException :: SomeException
 
 module GHC.Exception.Type where
@@ -5316,6 +5330,7 @@ module GHC.Exception.Type where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
+    backtraceDesired :: e -> GHC.Types.Bool
     {-# MINIMAL #-}
   type SomeException :: *
   data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
@@ -7499,7 +7514,7 @@ module GHC.IO where
   noDuplicate :: IO ()
   onException :: forall a b. IO a -> IO b -> IO a
   stToIO :: forall a. GHC.Internal.ST.ST GHC.Prim.RealWorld a -> IO a
-  throwIO :: forall e a. GHC.Internal.Exception.Type.Exception e => e -> IO a
+  throwIO :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Exception.Type.Exception e) => e -> IO a
   unIO :: forall a. IO a -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, a #)
   uninterruptibleMask :: forall b. ((forall a. IO a -> IO a) -> IO b) -> IO b
   uninterruptibleMask_ :: forall a. IO a -> IO a
@@ -7782,7 +7797,7 @@ module GHC.IO.Exception where
   cannotCompactPinned :: GHC.Internal.Exception.Type.SomeException
   heapOverflow :: GHC.Internal.Exception.Type.SomeException
   ioError :: forall a. IOError -> GHC.Types.IO a
-  ioException :: forall a. IOException -> GHC.Types.IO a
+  ioException :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOException -> GHC.Types.IO a
   stackOverflow :: GHC.Internal.Exception.Type.SomeException
   unsupportedOperation :: IOError
   untangle :: GHC.Prim.Addr# -> GHC.Internal.Base.String -> GHC.Internal.Base.String
@@ -11674,6 +11689,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined 
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.AllocationLimitExceeded -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.ArrayException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.AssertionFailed -- Defined in ‘GHC.Internal.IO.Exception’
@@ -11688,6 +11704,7 @@ instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.IOExcep
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.SomeAsyncException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.Type.ArithException -- Defined in ‘GHC.Internal.Exception.Type’
 instance forall a. GHC.Internal.Exception.Type.Exception a => GHC.Internal.Exception.Type.Exception (GHC.Internal.Exception.Type.ExceptionWithContext a) -- Defined in ‘GHC.Internal.Exception.Type’
+instance forall e. GHC.Internal.Exception.Type.Exception e => GHC.Internal.Exception.Type.Exception (GHC.Internal.Exception.Type.NoBacktrace e) -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.Type.SomeException -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Exception.ErrorCall -- Defined in ‘GHC.Internal.Exception’
@@ -12306,6 +12323,7 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.Exception.IOException -- Defined
 instance GHC.Internal.Show.Show GHC.Internal.IO.Exception.SomeAsyncException -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.Type.ArithException -- Defined in ‘GHC.Internal.Exception.Type’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Exception.Type.ExceptionWithContext a) -- Defined in ‘GHC.Internal.Exception.Type’
+instance forall e. GHC.Internal.Show.Show e => GHC.Internal.Show.Show (GHC.Internal.Exception.Type.NoBacktrace e) -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.Type.SomeException -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Show.Show GHC.Internal.Exception.ErrorCall -- Defined in ‘GHC.Internal.Exception’
 instance GHC.Internal.Show.Show GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’

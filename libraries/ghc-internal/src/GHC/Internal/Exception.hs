@@ -54,6 +54,7 @@ module GHC.Internal.Exception
     , ErrorCall(..,ErrorCall)
     , errorCallException
     , errorCallWithCallStackException
+    , toExceptionWithBacktrace
 
       -- * Reexports
       -- Re-export CallStack and SrcLoc from GHC.Types
@@ -69,6 +70,7 @@ import GHC.Internal.Data.OldList
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack.CCS
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc)
+import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectBacktraces)
 import GHC.Internal.Exception.Type
 
 -- | Throw an exception.  Exceptions may be thrown from purely
@@ -77,8 +79,19 @@ import GHC.Internal.Exception.Type
 -- WARNING: You may want to use 'throwIO' instead so that your pure code
 -- stays exception-free.
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
-         Exception e => e -> a
-throw e = raise# (toException e)
+         (?callStack :: CallStack, Exception e) => e -> a
+throw e =
+    let !se = unsafePerformIO (toExceptionWithBacktrace e)
+    in raise# se
+
+-- | @since base-4.20.0.0
+toExceptionWithBacktrace :: (HasCallStack, Exception e)
+                         => e -> IO SomeException
+toExceptionWithBacktrace e
+  | backtraceDesired e = do
+      bt <- collectBacktraces
+      return (addExceptionContext bt (toException e))
+  | otherwise = return (toException e)
 
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
@@ -112,7 +125,7 @@ errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
     implicitParamCallStack = prettyCallStackLines stk
     ccsCallStack = showCCSStack ccsStack
     stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
-  return $ toException (ErrorCallWithLocation s stack)
+  toExceptionWithBacktrace (ErrorCallWithLocation s stack)
 
 showCCSStack :: [String] -> [String]
 showCCSStack [] = []

@@ -68,6 +68,7 @@ Library
         , Control.Concurrent.MVar
         , Control.Exception
         , Control.Exception.Annotation
+        , Control.Exception.Backtrace
         , Control.Exception.Base
         , Control.Exception.Context
         , Control.Monad
