@@ -23,6 +23,8 @@ common warnings
 library
     import:           warnings
     exposed-modules:  GHC.Profiling.Eras
+    if arch(wasm32)
+        exposed-modules:  GHC.Wasm.Prim
     other-extensions:
     build-depends:    base ^>=4.19,
                       ghc-internal >= 0.1 && < 0.2

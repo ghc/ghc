@@ -165,7 +165,7 @@ types in JSFFI. Some caveats to keep in mind:
 
 In addition to the above types, JSFFI supports the ``JSVal`` type and
 its ``newtype``\ s as argument/result types. ``JSVal`` is defined in
-``GHC.Wasm.Prim`` in ``ghc-internal``, which represents an opaque
+``GHC.Wasm.Prim`` in ``ghc-experimental``, which represents an opaque
 reference to a JavaScript value.
 
 ``JSVal``\ s are first-class Haskell values on the Haskell heap. You can

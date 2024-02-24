@@ -22,7 +22,7 @@ at all, so we can't pretend the old posix style polling works at all.
 
 Since we can do JSFFI async imports now, it's super easy to implement
 threadDelay using setTimeout() in JavaScript, and an implementation
-has indeed been added in GHC.Wasm.Prim.Conc.Internal. But how do we
+has indeed been added in GHC.Internal.Wasm.Prim.Conc.Internal. But how do we
 make the user-facing GHC.Internal.Conc.IO.threadDelay switch to it in browser
 environments and fall back to the stg_delay# implementation otherwise?
 
