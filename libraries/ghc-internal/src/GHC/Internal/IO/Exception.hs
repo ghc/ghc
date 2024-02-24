@@ -61,6 +61,7 @@ import GHC.Internal.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Data.OldList ( intercalate )
 import {-# SOURCE #-} GHC.Internal.Stack.CCS
+import GHC.Internal.Stack.Types (HasCallStack)
 import GHC.Internal.Foreign.C.Types
 
 import GHC.Internal.Data.Typeable ( cast )
@@ -310,7 +311,7 @@ data ExitCode
 -- | @since base-4.1.0.0
 instance Exception ExitCode
 
-ioException     :: IOException -> IO a
+ioException     :: HasCallStack => IOException -> IO a
 ioException err = throwIO err
 
 -- | Raise an 'IOError' in the 'IO' monad.

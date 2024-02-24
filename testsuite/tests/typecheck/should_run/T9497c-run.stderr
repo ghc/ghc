@@ -15,3 +15,10 @@ T9497c-run: T9497c-run.hs:2:8: error: [GHC-88464]
           (imported from ‘Prelude’ at T9497c-run.hs:1:1
            (and originally defined in ‘GHC.Internal.Base’))
 (deferred type error)
+HasCallStack backtrace:
+    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+
+
+

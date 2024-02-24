@@ -51,12 +51,13 @@ module GHC.Internal.IO (
 import GHC.Internal.Base
 import GHC.Internal.ST
 import GHC.Internal.Exception
-import GHC.Internal.Exception.Type (addExceptionContext)
+import GHC.Internal.Exception.Type (NoBacktrace(..))
 import GHC.Internal.Show
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Internal.Exception.Context ( ExceptionAnnotation )
+import GHC.Internal.Stack.Types ( HasCallStack )
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
@@ -254,8 +255,10 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- for a more technical introduction to how GHC optimises around precise vs.
 -- imprecise exceptions.
 --
-throwIO :: Exception e => e -> IO a
-throwIO e = IO (raiseIO# (toException e))
+throwIO :: (HasCallStack, Exception e) => e -> IO a
+throwIO e = do
+    se <- toExceptionWithBacktrace e
+    IO (raiseIO# se)
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
@@ -329,8 +332,9 @@ getMaskingState  = IO $ \s ->
                              _  -> MaskedInterruptible #)
 
 onException :: IO a -> IO b -> IO a
-onException io what = io `catchException` \e -> do _ <- what
-                                                   throwIO (e :: SomeException)
+onException io what = io `catchException` \e -> do
+    _ <- what
+    throwIO $ NoBacktrace (e :: SomeException)
 
 -- | Executes an IO computation with asynchronous
 -- exceptions /masked/.  That is, any thread which attempts to raise

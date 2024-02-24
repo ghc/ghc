@@ -1,3 +1,9 @@
 cgrun045: hello world!
-CallStack (from ImplicitParams):
+CallStack (from HasCallStack):
   error, called at cgrun045.hs:6:13 in main:Main
+HasCallStack backtrace:
+    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:128:3 in ghc-internal:GHC.Internal.Exception
+
+
+

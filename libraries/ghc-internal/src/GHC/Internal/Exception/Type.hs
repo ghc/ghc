@@ -32,6 +32,7 @@ module GHC.Internal.Exception.Type
        , someExceptionContext
        , addExceptionContext
        , mapExceptionContext
+       , NoBacktrace(..)
          -- * Exception context
        , HasExceptionContext
        , ExceptionContext(..)
@@ -181,6 +182,9 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
+    backtraceDesired :: e -> Bool
+    backtraceDesired _ = True
+
 -- | @since base-4.8.0.0
 instance Exception Void
 
@@ -192,6 +196,7 @@ instance Exception SomeException where
         let ?exceptionContext = emptyExceptionContext
         in SomeException e
     fromException = Just
+    backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) =
         displayException e ++ "\n" ++ displayContext ?exceptionContext
 
@@ -200,6 +205,14 @@ displayContext (ExceptionContext anns0) = go anns0
   where
     go (SomeExceptionAnnotation ann : anns) = displayExceptionAnnotation ann ++ "\n" ++ go anns
     go [] = ""
+
+newtype NoBacktrace e = NoBacktrace e
+    deriving (Show)
+
+instance Exception e => Exception (NoBacktrace e) where
+    fromException = fmap NoBacktrace . fromException
+    toException (NoBacktrace e) = toException e
+    backtraceDesired _ = False
 
 -- | Wraps a particular exception exposing its 'ExceptionContext'. Intended to
 -- be used when 'catch'ing exceptions in cases where access to the context is
@@ -216,6 +229,7 @@ instance Exception a => Exception (ExceptionWithContext a) where
     fromException se = do
         e <- fromException se
         return (ExceptionWithContext (someExceptionContext se) e)
+    backtraceDesired (ExceptionWithContext _ e) = backtraceDesired e
     displayException = displayException . toException
 
 -- |Arithmetic exceptions.

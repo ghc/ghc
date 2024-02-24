@@ -1,5 +1,12 @@
-UnsatDefer.exe: UnsatDefer.hs:20:7: error: [GHC-22250]
+UnsatDefer: UnsatDefer.hs:20:7: error: [GHC-22250]
     • Equality is not reflexive on Double
     • In the expression: reflexiveEq 0 (0 :: Double)
       In an equation for ‘foo’: foo = reflexiveEq 0 (0 :: Double)
 (deferred type error)
+HasCallStack backtrace:
+    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+
+
+
