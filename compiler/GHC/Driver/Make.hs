@@ -2404,7 +2404,7 @@ cyclicModuleErr mss
     show_path :: [ModuleGraphNode] -> SDoc
     show_path []  = panic "show_path"
     show_path [m] = ppr_node m <+> text "imports itself"
-    show_path (m1:m2:ms) = vcat ( nest 6 (ppr_node m1)
+    show_path (m1:m2:ms) = vcat ( nest 14 (ppr_node m1)
                                 : nest 6 (text "imports" <+> ppr_node m2)
                                 : go ms )
        where
