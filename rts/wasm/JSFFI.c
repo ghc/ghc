@@ -7,7 +7,7 @@
 
 extern HsBool rts_JSFFI_flag;
 extern HsStablePtr rts_threadDelay_impl;
-extern StgClosure ghczminternal_GHCziWasmziPrimziConcziInternal_threadDelay_closure;
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
 
 int __main_void(void);
 
@@ -20,7 +20,7 @@ int __main_argc_argv(int argc, char *argv[]) {
   hs_init_ghc(&argc, &argv, __conf);
   // See Note [threadDelay on wasm] for details.
   rts_JSFFI_flag = HS_BOOL_TRUE;
-  rts_threadDelay_impl = getStablePtr((StgPtr)&ghczminternal_GHCziWasmziPrimziConcziInternal_threadDelay_closure);
+  rts_threadDelay_impl = getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
   return 0;
 }
 
@@ -73,7 +73,7 @@ typedef __externref_t HsJSVal;
 typedef StgWord JSValKey;
 
 extern const StgInfoTable stg_JSVAL_info;
-extern const StgInfoTable ghczminternal_GHCziWasmziPrimziTypes_JSVal_con_info;
+extern const StgInfoTable ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info;
 
 // See Note [JSVal representation for wasm] for detailed explanation.
 
@@ -112,7 +112,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   }
 
   HaskellObj box = (HaskellObj)allocate(cap, CONSTR_sizeW(3, 0));
-  SET_HDR(box, &ghczminternal_GHCziWasmziPrimziTypes_JSVal_con_info, CCS_SYSTEM);
+  SET_HDR(box, &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info, CCS_SYSTEM);
   box->payload[0] = p;
   box->payload[1] = (HaskellObj)w;
   box->payload[2] = NULL;
@@ -129,7 +129,7 @@ STATIC_INLINE HsJSVal rts_getJSValzh(HaskellObj p) {
 
 HsJSVal rts_getJSVal(HaskellObj);
 HsJSVal rts_getJSVal(HaskellObj box) {
-  ASSERT(UNTAG_CLOSURE(box)->header.info == &ghczminternal_GHCziWasmziPrimziTypes_JSVal_con_info);
+  ASSERT(UNTAG_CLOSURE(box)->header.info == &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info);
   return rts_getJSValzh(UNTAG_CLOSURE(box)->payload[0]);
 }
 
@@ -140,7 +140,7 @@ INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
 
 extern const StgInfoTable stg_jsffi_block_info;
 extern const StgInfoTable stg_scheduler_loop_info;
-extern StgClosure ghczminternal_GHCziWasmziPrimziImports_raiseJSException_closure;
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
 
 // schedule a future round of RTS scheduler loop via setImmediate(),
 // to avoid jamming the JavaScript main thread
@@ -216,7 +216,7 @@ mk_rtsPromiseResolve(Bool)
 __attribute__((export_name("rts_promiseReject")))
 void rts_promiseReject(HsStablePtr, HsJSVal);
 void rts_promiseReject(HsStablePtr sp, HsJSVal js_err)
-  mk_rtsPromiseCallback(rts_apply(cap, &ghczminternal_GHCziWasmziPrimziImports_raiseJSException_closure, rts_mkJSVal(cap, js_err)))
+  mk_rtsPromiseCallback(rts_apply(cap, &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure, rts_mkJSVal(cap, js_err)))
 
 __attribute__((export_name("rts_freeStablePtr")))
 void rts_freeStablePtr(HsStablePtr);
