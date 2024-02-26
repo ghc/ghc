@@ -205,7 +205,7 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-MinBootGhcVersion="9.4"
+MinBootGhcVersion="9.6"
 FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[$MinBootGhcVersion],
     [AC_MSG_ERROR([GHC version $MinBootGhcVersion or later is required to compile GHC.])])
 
