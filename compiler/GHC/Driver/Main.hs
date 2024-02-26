@@ -974,8 +974,11 @@ loadByteCode iface mod_sum = do
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
-                                (HomeModInfo iface details' emptyHomeModInfoLinkable)
+    let -- For memory efficiency, HPT is not populated with serialized core bindings.
+        act hpt  =
+          let iface' = iface { mi_extra_decls = Nothing }
+          in addToHpt hpt (moduleName $ mi_module iface')
+                          (HomeModInfo iface' details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
@@ -999,8 +1002,11 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
   pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
   where
     go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+        let act hpt  =
+              -- For memory efficiency, HPT is not populated with serialized core bindings.
+              let mod_iface' = mod_iface { mi_extra_decls = Nothing }
+               in addToHpt hpt (moduleName $ mi_module mod_iface')
+                               (HomeModInfo mod_iface' details emptyHomeModInfoLinkable)
         types_var <- newIORef (md_types details)
         let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
         let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }

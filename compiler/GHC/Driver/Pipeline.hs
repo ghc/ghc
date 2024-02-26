@@ -246,7 +246,10 @@ compileOne' mHscMessage
    -- See Note [ModDetails and --make mode]
    details <- initModDetails plugin_hsc_env iface
    linkable' <- traverse (initWholeCoreBindings plugin_hsc_env iface details) (homeMod_bytecode linkable)
-   return $! HomeModInfo iface details (linkable { homeMod_bytecode = linkable' })
+   -- extra_decl is not used any more after generating byte code
+   let iface' = iface { mi_extra_decls = Nothing }
+   --
+   return $! HomeModInfo iface' details (linkable { homeMod_bytecode = linkable' })
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
