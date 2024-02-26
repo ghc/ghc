@@ -139,7 +139,7 @@ keepAliveUnfRules :: Domain d => Id -> IdEnv d -> d
 keepAliveUnfRules x = keepAliveVars (nonDetEltsUniqSet $ bndrRuleAndUnfoldingIds x)
 
 evalConApp :: (Trace d, Domain d, HasBind d) => DataCon -> [d] -> d
-evalConApp dc args = case compareLength rep_ty_bndrs args of
+evalConApp dc args = case compareLength args rep_ty_bndrs of
   EQ -> con dc args
   GT -> stuck                                             -- oversaturated  => stuck
   LT -> mkPap rest_bndrs $ \etas -> con dc (args ++ etas) -- undersaturated => PAP
@@ -186,7 +186,7 @@ eval (Let b@(NonRec x rhs) body) env =
        (\ds -> step Let1 (eval body (extendVarEnv env x (step (Lookup x) (only ds)))))
 eval (Let b@(Rec binds) body) env =
   bind (BindLet b)
-       [\ds -> keepAliveUnfRules x env `seq_`
+       [\ds -> keepAliveUnfRules x (new_env ds) `seq_`
                eval rhs  (new_env ds)  | (x,rhs) <- binds]
        (\ds -> step Let1 (eval body (new_env ds)))
   where
