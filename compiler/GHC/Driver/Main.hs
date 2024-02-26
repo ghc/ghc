@@ -971,8 +971,10 @@ loadByteCode iface mod_sum = do
 add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> HscEnv
 add_iface_to_hpt iface details =
   hscUpdateHPT $ \ hpt ->
-    addToHpt hpt (moduleName (mi_module iface))
-    (HomeModInfo iface details emptyHomeModInfoLinkable)
+    addToHpt hpt (moduleName (mi_module iface'))
+    (HomeModInfo iface' details emptyHomeModInfoLinkable)
+  where
+    iface' = iface { mi_extra_decls = Nothing }
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
