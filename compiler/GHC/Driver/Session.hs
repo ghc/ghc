@@ -3872,6 +3872,11 @@ default_PIC platform =
                                          -- always generate PIC. See
                                          -- #10597 for more
                                          -- information.
+
+    -- On RISC-V, we need to always have PIC enabled. Otherwise, the stack
+    -- protector emits relocations that cannot be resolved by our linker. The
+    -- addresses for the canary are too high to fit in 32bits.
+    (OSLinux,   ArchRISCV64) -> [Opt_PIC]
     _                      -> []
 
 -- General flags that are switched on/off when other general flags are switched
