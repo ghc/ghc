@@ -203,7 +203,6 @@ _darcs/
 /utils/runghc/runghc.cabal
 /utils/gen-dll/gen-dll.cabal
 /utils/ghc-pkg/ghc-pkg.cabal
-utils/lndir/fs.*
 utils/unlit/fs.*
 libraries/ghc-internal/include/fs.h
 libraries/ghc-internal/cbits/fs.c

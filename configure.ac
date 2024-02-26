@@ -547,7 +547,6 @@ AC_MSG_NOTICE([done.])
 dnl ** Copy the files from the "fs" utility into the right folders.
 dnl --------------------------------------------------------------
 AC_MSG_NOTICE([Creating links for in-tree file handling routines])
-ln -f utils/fs/fs.* utils/lndir/
 ln -f utils/fs/fs.* utils/unlit/
 ln -f utils/fs/fs.* rts/
 ln -f utils/fs/fs.h libraries/ghc-internal/include/
@@ -1086,4 +1085,3 @@ For more information on how to configure your GHC build, see
 VALIDATE_GHC_TOOLCHAIN([hadrian/cfg/default.target],[hadrian/cfg/default.target.ghc-toolchain])
 
 rm -Rf acargs acghc-toolchain actmp-ghc-toolchain
-

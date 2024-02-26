@@ -94,6 +94,4 @@ whitespace:
 				rts/win32/veh_excn.h\
 				utils/genprimopcode/Parser.y\
 				utils/genprimopcode/Syntax.hs\
-				utils/lndir/lndir-Xos.h\
-				utils/lndir/lndir-Xosdefs.h\
   )
