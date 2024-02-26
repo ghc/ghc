@@ -408,7 +408,7 @@ opsysVariables AArch64 (Darwin {}) =
           , "LANG" =: "en_US.UTF-8"
           , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
           -- Fonts can't be installed on darwin
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx"
+          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
           ]
 opsysVariables Amd64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "x86_64-darwin"
@@ -422,12 +422,12 @@ opsysVariables Amd64 (Darwin {}) =
           , "LANG" =: "en_US.UTF-8"
           , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
           -- Fonts can't be installed on darwin
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx"
+          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
 
           ]
 opsysVariables _ (Windows {}) =
   mconcat [ "MSYSTEM" =: "CLANG64"
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx"
+          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
           , "LANG" =: "en_US.UTF-8"
           , "CABAL_INSTALL_VERSION" =: "3.8.1.0"
           , "GHC_VERSION" =: "9.4.3" ]
@@ -437,7 +437,6 @@ alpineVariables = mconcat
   [ -- Due to #20266
     "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
-  , "HADRIAN_ARGS" =: "--docs=no-sphinx"
     -- encoding004: due to lack of locale support
     -- T10458, ghcilink002: due to #17869
     -- linker_unload_native: due to lack of dlinfo() support
@@ -451,9 +450,6 @@ distroVariables Alpine318 = alpineVariables
 distroVariables Centos7 = mconcat [
     "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "BROKEN_TESTS" =: "T22012" -- due to #23979
-  ]
-distroVariables Rocky8 = mconcat [
-  "HADRIAN_ARGS" =: "--docs=no-sphinx"
   ]
 distroVariables Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images

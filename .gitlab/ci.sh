@@ -160,6 +160,8 @@ function mingw_init() {
 
   # We always use mingw64 Python to avoid path length issues like #17483.
   export PYTHON="/mingw64/bin/python3"
+  # And need to use sphinx-build from the environment
+  export SPHINXBUILD="/mingw64/bin/sphinx-build.exe"
 }
 
 # This will contain GHC's local native toolchain
@@ -315,7 +317,7 @@ function fetch_cabal() {
           fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
       fi
 
-      start_section "fetch GHC"
+      start_section "fetch cabal"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
         MSYS_*|MINGW*)
@@ -342,7 +344,7 @@ function fetch_cabal() {
           mv cabal "$toolchain/bin"
           ;;
       esac
-      end_section "fetch GHC"
+      end_section "fetch cabal"
   fi
 }
 
