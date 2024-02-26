@@ -1118,6 +1118,72 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs = do
   annotateSig opts id sig
   pure $! S2 final_env weak_fvs
 
+_dmdAnalRhsSig2
+  :: TopLevelFlag
+  -> RecFlag
+  -> AnalEnv -> SubDemand
+  -> Id -> CoreExpr
+  -> AnalM (SPair AnalEnv WeakDmds)
+-- Process the RHS of the binding, add the strictness signature
+-- to the Id, and augment the environment with the signature as well.
+-- See Note [NOINLINE and strictness]
+_dmdAnalRhsSig2 top_lvl rec_flag env let_sd id rhs = do
+  let
+    threshold_arity = thresholdArity id rhs
+    rhs_dmd = mkCalledOnceDmds threshold_arity body_dmd
+    body_dmd
+      | isJoinId id
+      -- See Note [Demand analysis for join points]
+      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+      --     threshold_arity matches the join arity of the join point
+      -- See Note [Unboxed demand on function bodies returning small products]
+      = unboxedWhenSmall env rec_flag (resultType_maybe id) let_sd
+      | otherwise
+      -- See Note [Unboxed demand on function bodies returning small products]
+      = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
+
+  rhs_dmd_ty <- dmdAnal'' env rhs_dmd rhs
+
+  let
+    (lam_bndrs, _) = collectBinders rhs
+    DmdType rhs_env rhs_dmds = rhs_dmd_ty
+    final_rhs_dmds = finaliseArgBoxities env id threshold_arity rhs_dmds
+                                         (de_div rhs_env) lam_bndrs
+  -- Attach the demands to the outer lambdas of this expression
+  -- NB: zipWithM_, not zipWithEqualM_, in contrast to annotateBndrsDemands.
+  -- We might have more demands than binders (PAP), hence don't panic (#22997).
+  zipWithM_ (annotate da_demands) (filter isId lam_bndrs) final_rhs_dmds
+
+  let
+    -- See Note [Aggregated demand for cardinality]
+    -- FIXME: That Note doesn't explain the following lines at all. The reason
+    --        is really much different: When we have a recursive function, we'd
+    --        have to also consider the free vars of the strictness signature
+    --        when checking whether we found a fixed-point. That is expensive;
+    --        we only want to check whether argument demands of the sig changed.
+    --        reuseEnv makes it so that the FV results are stable as long as the
+    --        last argument demands were. Strictness won't change. But used-once
+    --        might turn into used-many even if the signature was stable and
+    --        we'd have to do an additional iteration. reuseEnv makes sure that
+    --        we never get used-once info for FVs of recursive functions.
+    --        See #14816 where we try to get rid of reuseEnv.
+    rhs_env1 = case rec_flag of
+                Recursive    -> reuseEnv rhs_env
+                NonRecursive -> rhs_env
+
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds id)
+
+    -- See Note [Lazy and unleashable free variables]
+    !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
+    sig        = mkDmdSigForArity threshold_arity (DmdType sig_env final_rhs_dmds)
+    opts       = ae_opts env
+    !final_env = extendAnalEnv top_lvl env id sig
+
+  -- pprTraceM "dmdAnalRhsSig" (ppr id $$ ppr let_sd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs)
+  annotateSig opts id sig
+  pure $! S2 final_env weak_fvs
+
 splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
 splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
   where (!weak_fvs, !sig_fvs) = partitionUFM isWeakDmd fvs
@@ -3055,7 +3121,7 @@ bindRhsSig rec_flag x e rhs env let_sd = do
     sig        = mkDmdSigForArity threshold_arity (DmdType sig_env final_rhs_dmds)
     opts       = ae_opts env
 
-  -- pprTraceM "bindRhsSig" (ppr x $$ ppr let_sd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs)
+  -- pprTraceM "bindRhsSig" (ppr x $$ ppr let_sd $$ ppr rhs_dmds $$ ppr rhs_dmd_ty $$ ppr rhs_env2 $$ ppr sig_env $$ ppr sig $$ ppr weak_fvs)
   annotateSig opts x sig
   pure $! S2 sig weak_fvs
 
@@ -3086,6 +3152,7 @@ bindFix top_lvl pairs rhss env let_sd
       -- Note [Lazy and unleashable free variables]
       let weak_fvs = plusVarEnvList $ map (de_fvs . dmdSigDmdEnv) sigs'
           weak_fv' = plusVarEnv_C plusDmd weak_fv $ mapVarEnv (const topDmd) weak_fvs
+      -- pprTraceM "abort" (ppr (zip bndrs sigs'))
       pure $! S2 sigs' weak_fv'
 
     -- The fixed-point varies the DmdSig stored in the AnalEnv for bndrs, and
@@ -3119,9 +3186,13 @@ bindFix top_lvl pairs rhss env let_sd
       pure $! S2 sigs' weak_fv'
       where
         do_one (S2 sigs weak_fv) ((id, e), rhs, i) = do
+          -- S2 env' _weak_fv1 <- dmdAnalRhsSig2 top_lvl Recursive (next_env sigs) let_sd id e
+          -- let (_,sig,_) = expectJust "Blah" $ lookupSigEnv env' id
           -- pprTraceM "my_downRhs" (ppr id $$ ppr (idDmdSig id) $$ ppr sig)
           -- NB: No surrogate needed, because
           S2 sig' weak_fv1 <- bindRhsSig Recursive id e (rhs (map sig2DmdHnf sigs)) (next_env sigs) let_sd
+          -- when (isDeadEndSig sig /= isDeadEndSig sig') $
+          --   pprTraceM "ARGH" (ppr id $$ ppr sig $$ ppr sig')
           let !weak_fv' = plusVarEnv_C plusDmd weak_fv weak_fv1
           let !sigs' = updateListAt i sig' sigs -- URGHHHHH
           pure $! S2 sigs' weak_fv'
@@ -3137,9 +3208,9 @@ dmdAnal :: AnalEnv
 dmdAnal env sd e = do
   let _old = discardAnnotations $ dmdAnal'' env sd e
   _new <- sPair2DmdType <$> eval e (mapVarEnv f (ae_sigs env)) env sd
-  -- warnPprTraceM (_new /= _old) "URGH" (ppr e $$ ppr sd $$ text "old:" <+> ppr _old $$ text "new:" <+> ppr _new)
+  -- when (de_div (dt_env _new) /= de_div (dt_env _old)) (pprTraceM "URGH" (ppr e $$ ppr sd $$ text "old:" <+> ppr _old $$ text "new:" <+> ppr _new))
   -- pprTraceM "_dmdAnal" (ppr e $$ ppr sd <+> arrow <+> ppr _new)
   -- dmdAnal'' env sd e
-  pure $! _old
+  pure $! _new
   where
     f (x, sig, _top_lvl) = step (Lookup x) (sig2DmdHnf sig)
