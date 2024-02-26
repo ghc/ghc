@@ -1,5 +1,6 @@
 #include "elf_reloc_riscv64.h"
 #include "Rts.h"
+#include "Stg.h"
 #include "elf.h"
 #include "elf_plt.h"
 #include "elf_util.h"
@@ -152,7 +153,7 @@ void setUType(inst_t *loc, uint32_t val) {
   write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
 }
 
-void setIType(inst_t *loc, uint32_t val) {
+void setIType(inst_t *loc, int32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
   IF_DEBUG(linker, debugBelch("setIType: hi 0x%lx lo 0x%lx\n", hi, lo));
@@ -352,7 +353,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
  * @return The new computed addend.
  */
 int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
-                      int64_t addend) {
+                      int64_t addend, ObjectCode *oc) {
 
   /* Position where something is relocated */
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
@@ -385,8 +386,68 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     return S + A - P;
   case R_RISCV_LO12_I:
     return S + A;
-  case R_RISCV_PCREL_LO12_I:
-    return S - P;
+    // Quoting LLVM docs: For R_RISCV_PC_INDIRECT (R_RISCV_PCREL_LO12_{I,S}),
+    // the symbol actually points the corresponding R_RISCV_PCREL_HI20
+    // relocation, and the target VA is calculated using PCREL_HI20's symbol.
+  case R_RISCV_PCREL_LO12_S:
+    FALLTHROUGH;
+  case R_RISCV_PCREL_LO12_I: {
+    // Lookup related HI20 relocation and use that value. I'm still confused why
+    // relocations aren't pure, but this is how LLVM does it. And, calculating
+    // the lower 12 bit without any relation ship to the GOT entry's address
+    // makes no sense either.
+    for (ElfRelocationATable *relaTab = oc->info->relaTable; relaTab != NULL;
+         relaTab = relaTab->next) {
+      /* only relocate interesting sections */
+      if (SECTIONKIND_OTHER == oc->sections[relaTab->targetSectionIndex].kind)
+        continue;
+
+      Section *targetSection = &oc->sections[relaTab->targetSectionIndex];
+
+      for (unsigned i = 0; i < relaTab->n_relocations; i++) {
+
+        Elf_Rela *rel_prime = &relaTab->relocations[i];
+
+        addr_t P_prime =
+            (addr_t)((uint8_t *)targetSection->start + rel_prime->r_offset);
+
+        if (P_prime != S) {
+          // S points to the P of the corresponding *_HI20 relocation.
+          continue;
+        }
+
+        ElfSymbol *symbol_prime =
+            findSymbol(oc, relaTab->sectionHeader->sh_link,
+                       ELF64_R_SYM((Elf64_Xword)rel_prime->r_info));
+
+        CHECK(0x0 != symbol_prime);
+
+        /* take explicit addend */
+        int64_t addend_prime = rel_prime->r_addend;
+
+        uint64_t type_prime = ELF64_R_TYPE(rel_prime->r_info);
+
+        if (type_prime == R_RISCV_PCREL_HI20 ||
+            type_prime == R_RISCV_GOT_HI20 ||
+            type_prime == R_RISCV_TLS_GD_HI20 ||
+            type_prime == R_RISCV_TLS_GOT_HI20) {
+          IF_DEBUG(linker,
+                   debugBelch(
+                       "Found matching relocation: %s (P: 0x%lx, S: 0x%lx, "
+                       "sym-name: %s) -> %s (P: 0x%lx, S: 0x%lx, sym-name: %s)",
+                       relocationTypeToString(rel->r_info), P, S, symbol->name,
+                       relocationTypeToString(rel_prime->r_info), P_prime,
+                       symbol_prime->addr, symbol_prime->name));
+          return computeAddend(targetSection, (Elf_Rel *)rel_prime,
+                               symbol_prime, addend_prime, oc);
+        }
+      }
+    }
+    debugBelch("Missing HI relocation for %s: P 0x%lx S 0x%lx %s\n",
+               relocationTypeToString(rel->r_info), P, S, symbol->name);
+    abort();
+  }
+
   case R_RISCV_RVC_JUMP:
     return S + A - P;
   case R_RISCV_RVC_BRANCH:
@@ -408,20 +469,33 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     return (S + A) - P;
   }
   case R_RISCV_ADD8:
+    FALLTHROUGH;
   case R_RISCV_ADD16:
+    FALLTHROUGH;
   case R_RISCV_ADD32:
+    FALLTHROUGH;
   case R_RISCV_ADD64:
+    FALLTHROUGH;
     return S + A; // Add V when the value is set
   case R_RISCV_SUB6:
+    FALLTHROUGH;
   case R_RISCV_SUB8:
+    FALLTHROUGH;
   case R_RISCV_SUB16:
+    FALLTHROUGH;
   case R_RISCV_SUB32:
+    FALLTHROUGH;
   case R_RISCV_SUB64:
+    FALLTHROUGH;
     return S + A; // Subtract from V when value is set
   case R_RISCV_SET6:
+    FALLTHROUGH;
   case R_RISCV_SET8:
+    FALLTHROUGH;
   case R_RISCV_SET16:
+    FALLTHROUGH;
   case R_RISCV_SET32:
+    FALLTHROUGH;
     return S + A;
   case R_RISCV_RELAX:
   case R_RISCV_ALIGN:
@@ -433,8 +507,6 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_GOT_HI20:
     // reduced G + GOT to GOT_S - This might be wrong!
     return GOT_S + A - P;
-  case R_RISCV_PCREL_LO12_S:
-    return S - P;
   default:
     debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
                ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
@@ -467,7 +539,7 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
       /* decode implicit addend */
       int64_t addend = decodeAddendRISCV64(targetSection, rel);
 
-      addend = computeAddend(targetSection, rel, symbol, addend);
+      addend = computeAddend(targetSection, rel, symbol, addend, oc);
       encodeAddendRISCV64(targetSection, rel, addend);
     }
   }
@@ -491,7 +563,7 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
       /* take explicit addend */
       int64_t addend = rel->r_addend;
 
-      addend = computeAddend(targetSection, (Elf_Rel *)rel, symbol, addend);
+      addend = computeAddend(targetSection, (Elf_Rel *)rel, symbol, addend, oc);
       encodeAddendRISCV64(targetSection, (Elf_Rel *)rel, addend);
     }
   }
