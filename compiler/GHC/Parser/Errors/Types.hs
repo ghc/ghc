@@ -389,7 +389,7 @@ data PsMessage
    | PsErrIllegalRoleName !FastString [Role]
 
    -- | Invalid type signature
-   | PsErrInvalidTypeSignature !(LHsExpr GhcPs)
+   | PsErrInvalidTypeSignature !PsInvalidTypeSignature !(LHsExpr GhcPs)
 
    -- | Unexpected type in declaration
    | PsErrUnexpectedTypeInDecl !(LHsType GhcPs)
@@ -480,6 +480,11 @@ data PsErrParseDetails
     -- ^ Did we parse a \"pattern\" keyword?
   }
 
+data PsInvalidTypeSignature
+  = PsErrInvalidTypeSig_Qualified
+  | PsErrInvalidTypeSig_DataCon
+  | PsErrInvalidTypeSig_Other
+
 -- | Is the parsed pattern recursive?
 data PatIsRecursive
   = YesPatIsRecursive
@@ -530,6 +535,7 @@ data NumUnderscoreReason
    = NumUnderscore_Integral
    | NumUnderscore_Float
    deriving (Show,Eq,Ord)
+
 
 data LexErrKind
    = LexErrKind_EOF        -- ^ End of input

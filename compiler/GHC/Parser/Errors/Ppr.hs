@@ -455,11 +455,17 @@ instance Diagnostic PsMessage where
     PsErrIllegalRoleName role _nearby
       -> mkSimpleDecorated $
            text "Illegal role name" <+> quotes (ppr role)
-    PsErrInvalidTypeSignature lhs
-      -> mkSimpleDecorated $
-           text "Invalid type signature:"
-           <+> ppr lhs
-           <+> text ":: ..."
+    PsErrInvalidTypeSignature reason lhs
+      -> mkSimpleDecorated $ case reason of
+           PsErrInvalidTypeSig_DataCon   -> text "Invalid data constructor" <+> quotes (ppr lhs) <+>
+                                            text "in type signature" <> colon $$
+                                            text "You can only define data constructors in data type declarations."
+           PsErrInvalidTypeSig_Qualified -> text "Invalid qualified name in type signature."
+           PsErrInvalidTypeSig_Other     -> text "Invalid type signature" <> colon $$
+                                            text "A type signature should be of form" <+>
+                                            placeHolder "variables" <+> dcolon <+> placeHolder "type" <>
+                                            dot
+            where placeHolder = angleBrackets . text
     PsErrUnexpectedTypeInDecl t what tc tparms equals_or_where
        -> mkSimpleDecorated $
             vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -779,15 +785,17 @@ instance Diagnostic PsMessage where
         sug_missingdo _                                     = Nothing
     PsErrParseRightOpSectionInPat{}               -> noHints
     PsErrIllegalRoleName _ nearby                 -> [SuggestRoles nearby]
-    PsErrInvalidTypeSignature lhs                 ->
+    PsErrInvalidTypeSignature reason lhs          ->
         if | foreign_RDR `looks_like` lhs
            -> [suggestExtension LangExt.ForeignFunctionInterface]
            | default_RDR `looks_like` lhs
            -> [suggestExtension LangExt.DefaultSignatures]
            | pattern_RDR `looks_like` lhs
            -> [suggestExtension LangExt.PatternSynonyms]
+           | PsErrInvalidTypeSig_Qualified <- reason
+           -> [SuggestTypeSignatureRemoveQualifier]
            | otherwise
-           -> [SuggestTypeSignatureForm]
+           -> []
       where
         -- A common error is to forget the ForeignFunctionInterface flag
         -- so check for that, and suggest.  cf #3805
