@@ -40,14 +40,14 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Types.Origin
 import GHC.Tc.Solver
-import GHC.Tc.Solver.Monad ( runTcS )
+import GHC.Tc.Solver.Monad( runTcS, runTcSWithEvBinds )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
 import GHC.Tc.Utils.Unify( DeepSubsumptionFlag(..), tcSkolemise, unifyType, buildImplicationFor )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
+import GHC.Tc.Types.Evidence( HsWrapper, TcEvBinds(..), (<.>) )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Zonk.TcType
 
@@ -809,14 +809,38 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 
--- SPECIALISE expressions
--- Example: f :: forall a. Ord a => a -> Bool -> blah
---          {-# SPECIALISE forall x. f (x::Int) True #-}
--- We typecheck, and generate (SpecPragE [x] (f @Int dOrdInt x True))
--- Then when desugaring we generate
---      $sf x = <f-rhs> @Int dOrdInt x True
---      RULE forall d x. f @Int d x True = $sf x
--- The thing in the SpecPragE is very very like the LHS of a RULE
+{- Note [SPECIALISE for expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ToDo; write this Note
+The thing in the SpecPragE is very very like the LHS of a RULE
+
+Example:
+  f :: forall a b. (Eq a, Eq b, Ord c) => a -> b -> c -> Bool -> blah
+  {-# SPECIALISE forall x y. f (x::Int) y y True #-}
+
+We want to generate:
+
+  RULE forall @a d1 d2 d3 x xs.
+     f @Int @p @p (d1::Eq p) (d2::Eq p) (d3::Ord Int) y y True
+        = $sf @p d1 y
+  $sf @p (d1::Eq p) (y::p)
+     = let d3 = $fOrdInt
+           d2 = d1
+       in <f-rhs> @p @p @Int (d1::Eq p) (d2::Eq p) (d3::OrdInt) y y True
+
+Note that
+
+* In the RULE we have separate binders for `d1` and `d2` even though
+  they are the same (Eq p) dictionary. Reason: we don't want to force
+  them to be visibly equal at the call site.
+
+* Simpilarly in the RULE we quantify over (d3::Ord Int), again so as
+  not to force the caller to be passing the constant $fOrdInt from
+  `instance Ord Int`
+
+* But we pass only `d1` to `$sf`, and reconstitute `d2` and `d3` there.
+
+-}
 
 tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
   = do { skol_info <- mkSkolemInfo (SpecESkol nm)
@@ -828,50 +852,42 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
                     do { (spec_e', rho) <- tcInferRho spec_e
                        ; return (id_bndrs, spec_e', rho) } }
 
-       -- Solve unfication constraints, and zonk
-       ; _ <- setTcLevel tc_lvl $ solveWantedsTcM wanted
+       -- Solve unfication constraints
+       ; _ <- setTcLevel tc_lvl $ runTcS $ solveWanteds wanted
 
        -- Apply the unifications
        ; seed_tys <- liftZonkM (mapM zonkTcType (rho : map idType id_bndrs))
 
        ; let (quant_cts, residual_wanted) = getRuleQuantCts wanted
              quant_preds = ctsPreds quant_cts
-             grown_tcvs  = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
 
        ; dvs <- candidateQTyVarsOfTypes (quant_preds ++ seed_tys)
-       ; let weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
+       ; let grown_tcvs = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
+       ;     weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
        ; skol_info <- mkSkolemInfo (SpecESkol nm)
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
-       ; (implic, ev_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
-                                  quant_evs residual_wanted
+       ; bound_evs <- mk_quant_evs quant_cts
+       ; (implic, ev_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info)
+                                                   qtkvs bound_evs residual_wanted
        ; emitImplications implic
 
-       ; spec_binds_var <- TcM.newTcEvBinds
+       ; spec_binds_var <- newTcEvBinds
        ; spec_cts <- setTcLevel tc_lvl $
                      runTcSWithEvBinds spec_binds_var $
-                     solveWanteds quant_cts
+                     solveWanteds (mkSimpleWC quant_cts)
 
-       ; bound_evs <- mapM mk_quant_ev quant_cts
-       ; spec_evs  <- mapM mk_quant_ev (bagToList spec_cts)
+       ; spec_evs  <- mk_quant_evs spec_cts
 
-       ; let bndrs'  = mkTcRuleBndrs bndrs (qtkvs ++ bound_evs ++ id_bnrs)
-             full_e' = mkHsDictLet ev_binds spec_e'
+       ; let bndrs'   = mkTcRuleBndrs bndrs (qtkvs ++ bound_evs ++ id_bndrs)
+             lhs_expr = mkHsDictLet ev_binds spec_e'
        ; traceTc "tcSpecPrag:SpecSigE" $
          vcat [ text "bndrs:" <+> ppr bndrs'
               , text "full_e:" <+> ppr full_e'
               , text "inl:" <+> ppr inl ]
-       ; return [SpecPragE (qtvs ++ id_bndrs)
-                           bound_evs full_e'
-                           spec_evs (TcEvBinds spec_binds_var)
+       ; return [SpecPragE (qtkvs ++ bound_evs ++ id_bndrs) lhs_expr
+                           (qtkvs ++ spec_evs  ++ id_bndrs) (TcEvBinds spec_binds_var)
                            inl] }
 
---   forall @a d1 d2 d3 x xs.
---      f @a @Int (d1::Eq a) (d2::OrdInt) (d3::Eq a) (x:xs)
---         = $sf @a d1 x xs
---   $sf @a d1 x xs
---      = let d2 = $fOrdInt
---            d3 = d1
---        in <f-rhs> @a @Int (d1::Eq a) (d2::OrdInt) (d3::Eq a) (x:xs)
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 
@@ -1064,8 +1080,8 @@ tcRule (HsRule { rd_ext  = ext
              weeded_dvs = weedOutCandidates weed_out dvs
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
-                                , text "forall_tkvs:" <+> ppr forall_tkvs
-                                , text "quant_cands:" <+> ppr quant_cands
+                                , text "dvs:" <+> ppr dvs
+                                , text "weeded_dvs:" <+> ppr weeded_dvs
                                 , text "dont_default:" <+> ppr dont_default
                                 , text "residual_lhs_wanted:" <+> ppr residual_lhs_wanted
                                 , text "qtkvs:" <+> ppr qtkvs
@@ -1345,7 +1361,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
        -- Note [The SimplifyRule Plan] step 3
        ; let (quant_cts, residual_lhs_wanted) = getRuleQuantCts lhs_wanted
-       ; quant_evs <- mapM mk_quant_ev quant_cts
+       ; quant_evs <- mk_quant_evs quant_cts
 
        ; traceTc "simplifyRule" $
          vcat [ text "LHS of rule" <+> doubleQuotes (ftext name)
@@ -1358,17 +1374,19 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
        ; return (quant_evs, residual_lhs_wanted, dont_default) }
 
-mk_quant_ev :: Ct -> TcM EvVar
-mk_quant_ev ct
-  | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
-  = case dest of
-      EvVarDest ev_id -> return ev_id
-      HoleDest hole   -> -- See Note [Quantifying over coercion holes]
-                         do { ev_id <- newEvVar pred
-                            ; fillCoercionHole hole (mkCoVarCo ev_id)
-                            ; return ev_id }
-mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
-
+mk_quant_evs :: Cts -> TcM [EvVar]
+mk_quant_evs cts
+  = mapM mk_one (bagToList cts)
+  where
+    mk_one ct
+     | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
+     = case dest of
+         EvVarDest ev_id -> return ev_id
+         HoleDest hole   -> -- See Note [Quantifying over coercion holes]
+                            do { ev_id <- newEvVar pred
+                               ; fillCoercionHole hole (mkCoVarCo ev_id)
+                               ; return ev_id }
+    mk_one ct = pprPanic "mk_quant_ev" (ppr ct)
 
 getRuleQuantCts :: WantedConstraints -> (Cts, WantedConstraints)
 -- Extract all the constraints we can quantify over,

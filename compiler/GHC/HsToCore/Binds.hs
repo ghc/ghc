@@ -830,7 +830,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
     finishSpecPrag mb_poly_rhs spec_bndrs (core_app (Var poly_id)) spec_inl
 
 
-dsSpec mb_poly_rhs (L loc (SpecPragE bndrs spec_e spec_inl))
+dsSpec mb_poly_rhs (L loc (SpecPragE lhs_bndrs lhs_e
+                                     spec_inl))
   | RuleBndrs { rb_tmvs = tm_bndrs } <- bndrs
   = putSrcSpanDs loc $
     do { core_spec_e <- dsLExpr spec_e
@@ -838,27 +839,30 @@ dsSpec mb_poly_rhs (L loc (SpecPragE bndrs spec_e spec_inl))
 
        ; finishSpecPrag mb_poly_rhs bndrs' core_spec_e spec_inl }
 
-finishSpecPrag :: Maybe CoreExpr -> [Var] -> CoreExpr -> InlinePragma
+finishSpecPrag :: Maybe CoreExpr  -- See the first param of dsSpec
+               -> [Var]           -- LHS binders
+               -> CoreExpr        -- LHS pattern
+               -> InlinePragma
                -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-finishSpecPrag mb_poly_rhs bndrs rule_lhs spec_inl
+finishSpecPrag mb_poly_rhs spec_bndrs rule_lhs spec_inl
   = do { dflags <- getDynFlags
-       ; case decomposeRuleLhs dflags bndrs rule_lhs (mkVarSet bndrs) of {
+       ; case decomposeRuleLhs dflags spec_bndrs rule_lhs (mkVarSet spec_bndrs) of {
            Left msg    -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, poly_id, rule_lhs_args) ->
 
     do { this_mod <- getModule
-       ; uniq <- newUnique
+       ; uniq     <- newUnique
        ; let poly_name  = idName poly_id
              spec_occ   = mkSpecOcc (getOccName poly_name)
              spec_name  = mkInternalName uniq spec_occ (getSrcSpan poly_name)
-             spec_ty    = mkLamTypes rule_bndrs (exprType rule_lhs)
-             fn_unf     = realIdUnfolding poly_id
+             spec_ty    = mkLamTypes spec_bndrs (exprType rule_lhs)
              poly_rhs   = specFunBody poly_id mb_poly_rhs
              id_inl     = idInlinePragma poly_id
              inl_prag   = specFunInlinePrag mb_poly_rhs poly_id id_inl spec_inl
              rule_act   = specRuleActivation id_inl spec_inl
 
              simpl_opts = initSimpleOpts dflags
+             fn_unf     = realIdUnfolding poly_id
              spec_unf   = specUnfolding simpl_opts rule_bndrs mk_app rule_lhs_args fn_unf
              spec_id    = mkLocalId spec_name ManyTy spec_ty
                             -- Specialised binding is toplevel, hence Many.
@@ -867,10 +871,11 @@ finishSpecPrag mb_poly_rhs bndrs rule_lhs spec_inl
 
              rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
-                               (mkVarApps (Var spec_id) rule_bndrs)
+                               (mkVarApps (Var spec_id) spec_bndrs)
 
              mk_app e = mkApps e rule_lhs_args
-             spec_rhs = mkLams rule_bndrs (mkApps poly_rhs rule_lhs_args)
+             spec_rhs = mkLams spec_bndrs $
+                        mkApps poly_rhs rule_lhs_args
 
        ; dsWarnOrphanRule rule
 
@@ -1013,6 +1018,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                    --                                    , text "args2:" <+> ppr args2
                    --                                    ]) $
                    Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
@@ -1037,7 +1043,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
             Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
-                lhs_fvs = exprsFreeVars args
+                lhs_fvs       = exprsFreeVars args
                 all_fvs       = lhs_fvs `unionVarSet` rhs_fvs
                 trimmed_bndrs = filter (`elemVarSet` all_fvs) orig_bndrs
                 unbound       = filterOut (`elemVarSet` lhs_fvs) trimmed_bndrs
@@ -1045,12 +1051,13 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
 
                 -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
                 -- and extra dict binders: Note [Free dictionaries on rule LHS]
-                extra_bndrs = scopedSort extra_tvs ++ extra_dicts
+                extra_bndrs = scopedSort extra_tvs {- ++ extra_dicts -}
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
-                extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
-                  | d <- extra_vars, isDictId d ]
+-- ToDo: I think this is not needed any more
+--                extra_dicts =
+--                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
+--                  | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v
                   | v <- exprsFreeVarsList args

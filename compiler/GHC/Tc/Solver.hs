@@ -2042,8 +2042,7 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
        ; traceTc "decideQuantifiedTyVars" (vcat
            [ text "tau_tys =" <+> ppr tau_tys
            , text "candidates =" <+> ppr candidates
-           , text "cand_kvs =" <+> ppr cand_kvs
-           , text "cand_tvs =" <+> ppr cand_tvs
+           , text "dvs =" <+> ppr dvs
            , text "tau_tys =" <+> ppr tau_tys
            , text "seed_tys =" <+> ppr seed_tys
            , text "seed_tcvs =" <+> ppr (tyCoVarsOfTypes seed_tys)
