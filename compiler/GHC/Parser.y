@@ -1913,7 +1913,7 @@ rule    :: { LRuleDecl GhcPs }
          {%runPV (unECP $4) >>= \ $4 ->
            runPV (unECP $6) >>= \ $6 ->
            amsA' (sLL $1 $> $ HsRule
-                                   { rd_ext = (((fstOf3 $3) (mj AnnEqual $5 : (fst $2))), getSTRINGs $1)
+                                   { rd_ext = (((fst $3) (mj AnnEqual $5 : (fst $2))), getSTRINGs $1)
                                    , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
                                    , rd_act = snd $2 `orElse` AlwaysActive
                                    , rd_bndrs = snd $3
@@ -2746,7 +2746,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | '{-# SPECIALISE' activation rule_foralls exp '#-}'
              {% runPV (unECP $4) >>= \ $4 ->
-                acsA (\cs ->
+                amsA' (
                 let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                             (NoUserInlinePrag, FunLike)
                                             (snd $2)

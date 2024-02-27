@@ -1342,8 +1342,8 @@ instance Outputable CandidatesQTvs where
                                              , text "dv_tvs =" <+> ppr tvs
                                              , text "dv_cvs =" <+> ppr cvs ])
 
-weedOutCandidates :: (DTyVarSet -> DTyVarSet) -> CandidateQTVs -> CandidateQTVs
-weedOutCandidate weed_out dv@(DV { dv_kvs = kvs; dv_tvs = tvs })
+weedOutCandidates :: (DTyVarSet -> DTyVarSet) -> CandidatesQTvs -> CandidatesQTvs
+weedOutCandidates weed_out dv@(DV { dv_kvs = kvs, dv_tvs = tvs })
   = dv { dv_kvs = weed_out kvs, dv_tvs = weed_out tvs }
 
 isEmptyCandidates :: CandidatesQTvs -> Bool
