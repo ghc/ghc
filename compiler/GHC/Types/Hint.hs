@@ -54,6 +54,7 @@ data AvailableBindings
   | UnnamedBinding
   -- ^ An unknown binding (i.e. too complicated to turn into a 'Name')
 
+
 data LanguageExtensionHint
   = -- | Suggest to enable the input extension. This is the hint that
     -- GHC emits if this is not a \"known\" fix, i.e. this is GHC giving
@@ -297,13 +298,13 @@ data GhcHint
     -}
   | SuggestQualifyStarOperator
 
-    {-| Suggests that a type signature should have form <variable> :: <type>
+    {-| Suggests that for a type signature 'M.x :: ...' the qualifier should be omitted
         in order to be accepted by GHC.
 
         Triggered by: 'GHC.Parser.Errors.Types.PsErrInvalidTypeSignature'
-        Test case(s): parser/should_fail/T3811
+        Test case(s): module/mod98
     -}
-  | SuggestTypeSignatureForm
+  | SuggestTypeSignatureRemoveQualifier
 
     {-| Suggests to move an orphan instance (for a typeclass or a type or data
         family), or to newtype-wrap it.

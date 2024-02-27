@@ -1,5 +1,4 @@
 
 readFail031.hs:4:3: error: [GHC-94426]
-    Invalid type signature: (:+) :: ...
-    Suggested fix:
-      A type signature should be of form <variables> :: <type>
+    Invalid data constructor ‘(:+)’ in type signature:
+    You can only define data constructors in data type declarations.

@@ -225,3 +225,5 @@ test('ListTuplePunsFail2', extra_files(['ListTuplePunsFail2.hs']), ghci_script, 
 test('ListTuplePunsFail3', extra_files(['ListTuplePunsFail3.hs']), ghci_script, ['ListTuplePunsFail3.script'])
 test('ListTuplePunsFail4', extra_files(['ListTuplePunsFail4.hs']), ghci_script, ['ListTuplePunsFail4.script'])
 test('ListTuplePunsFail5', extra_files(['ListTuplePunsFail5.hs']), ghci_script, ['ListTuplePunsFail5.script'])
+test('T17879a', normal, compile_fail, [''])
+test('T17879b', normal, compile_fail, [''])
