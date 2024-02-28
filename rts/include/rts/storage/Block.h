@@ -10,6 +10,10 @@
 
 #include "ghcconfig.h"
 
+#if !defined(CMINUSMINUS)
+#include "rts/storage/HeapAlloc.h"
+#endif
+
 /* The actual block and megablock-size constants are defined in
  * rts/include/Constants.h, all constants here are derived from these.
  */
@@ -190,6 +194,7 @@ typedef struct bdescr_ {
 EXTERN_INLINE bdescr *Bdescr(StgPtr p);
 EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 {
+  ASSERT(HEAP_ALLOCED_GC(p));
   return (bdescr *)
     ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT))
      | ((W_)p & ~MBLOCK_MASK)
