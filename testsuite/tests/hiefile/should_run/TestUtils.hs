@@ -10,6 +10,7 @@ module TestUtils
   ) where
 
 import System.Environment
+import Data.List (sort)
 import Data.Tree
 import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc
@@ -20,13 +21,13 @@ import qualified GHC.Utils.Outputable as O
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
- 
+
 import GHC.Driver.Session
 import GHC.SysTools
 
 makeNc :: IO NameCache
 makeNc = initNameCache 'z' []
- 
+
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
@@ -53,7 +54,7 @@ explainEv df hf refmap point = do
   putStrLn $ replicate 26 '='
   putStr $ drawForest ptrees
   where
-    trees = getEvidenceTreesAtPoint hf refmap point
+    trees = sort $ getEvidenceTreesAtPoint hf refmap point
 
     ptrees = fmap (pprint . fmap expandType) <$> trees
 

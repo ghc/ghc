@@ -107,7 +107,13 @@ data EvidenceInfo a
   , evidenceSpan :: RealSrcSpan
   , evidenceType :: a
   , evidenceDetails :: Maybe (EvVarSource, Scope, Maybe Span)
-  } deriving (Eq,Ord,Functor)
+  } deriving (Eq, Functor)
+
+instance Ord a => Ord (EvidenceInfo a) where
+  compare (EvidenceInfo name span typ dets) (EvidenceInfo name' span' typ' dets') =
+    case stableNameCmp name name' of
+      EQ -> compare (span, typ, dets) (span', typ', dets')
+      r -> r
 
 instance (Outputable a) => Outputable (EvidenceInfo a) where
   ppr (EvidenceInfo name span typ dets) =

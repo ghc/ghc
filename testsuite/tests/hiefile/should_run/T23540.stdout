@@ -124,22 +124,6 @@ At point (49,14), we found:
 At point (61,7), we found:
 ==========================
 ┌
-│ $dFunctor at T23540.hs:1:1, of type: Functor Identity'
-│     is an evidence variable bound by a let, depending on: [$fFunctorIdentity']
-│           with scope: ModuleScope
-│           
-│     Defined at <no location info>
-└
-|
-`- ┌
-   │ $fFunctorIdentity' at T23540.hs:54:10-26, of type: Functor Identity'
-   │     is an evidence variable bound by an instance of class Functor
-   │           with scope: ModuleScope
-   │           
-   │     Defined at T23540.hs:54:10
-   └
-
-┌
 │ $dApplicative at T23540.hs:1:1, of type: Applicative Identity'
 │     is an evidence variable bound by a let, depending on: [$fApplicativeIdentity']
 │           with scope: ModuleScope
@@ -153,6 +137,22 @@ At point (61,7), we found:
    │           with scope: ModuleScope
    │           
    │     Defined at T23540.hs:56:10
+   └
+
+┌
+│ $dFunctor at T23540.hs:1:1, of type: Functor Identity'
+│     is an evidence variable bound by a let, depending on: [$fFunctorIdentity']
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $fFunctorIdentity' at T23540.hs:54:10-26, of type: Functor Identity'
+   │     is an evidence variable bound by an instance of class Functor
+   │           with scope: ModuleScope
+   │           
+   │     Defined at T23540.hs:54:10
    └
 
 ==========================
@@ -202,6 +202,22 @@ At point (69,4), we found:
 At point (82,6), we found:
 ==========================
 ┌
+│ $dNum at T23540.hs:1:1, of type: Num Modulo1
+│     is an evidence variable bound by a let, depending on: [$fNumModulo1]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $fNumModulo1 at T23540.hs:10:10-20, of type: Num Modulo1
+   │     is an evidence variable bound by an instance of class Num
+   │           with scope: ModuleScope
+   │           
+   │     Defined at T23540.hs:10:10
+   └
+
+┌
 │ $dOrd at T23540.hs:1:1, of type: Ord Modulo1
 │     is an evidence variable bound by a let, depending on: [$fOrdModulo1]
 │           with scope: ModuleScope
@@ -217,18 +233,3 @@ At point (82,6), we found:
    │     Defined at T23540.hs:8:35
    └
 
-┌
-│ $dNum at T23540.hs:1:1, of type: Num Modulo1
-│     is an evidence variable bound by a let, depending on: [$fNumModulo1]
-│           with scope: ModuleScope
-│           
-│     Defined at <no location info>
-└
-|
-`- ┌
-   │ $fNumModulo1 at T23540.hs:10:10-20, of type: Num Modulo1
-   │     is an evidence variable bound by an instance of class Num
-   │           with scope: ModuleScope
-   │           
-   │     Defined at T23540.hs:10:10
-   └
