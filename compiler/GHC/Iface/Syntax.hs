@@ -25,6 +25,8 @@ module GHC.Iface.Syntax (
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
         IfaceLFInfo(..), IfaceTopBndrInfo(..),
+        IfaceImport(..),
+        ImpIfaceList(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -63,6 +65,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name.Set
 import GHC.Core.Coercion.Axiom ( BranchIndex )
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.CostCentre
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
@@ -106,6 +109,13 @@ infixl 3 &&&
 ************************************************************************
 -}
 
+data IfaceImport = IfaceImport ImpDeclSpec ImpIfaceList
+
+data ImpIfaceList
+  = ImpIfaceAll -- ^ no user import list
+  | ImpIfaceExplicit !IfGlobalRdrEnv
+  | ImpIfaceEverythingBut !NameSet
+
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
 -- 'IfaceDecl').
 type IfaceTopBndr = Name
@@ -128,7 +138,6 @@ putIfaceTopBndr bh name =
       tbl ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
           putEntry tbl bh (BindingName name)
-
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -2725,6 +2734,14 @@ instance Binary IfaceCompleteMatch where
 *                                                                      *
 ************************************************************************
 -}
+
+instance NFData IfaceImport where
+  rnf (IfaceImport a b) = rnf a `seq` rnf b
+
+instance NFData ImpIfaceList where
+  rnf ImpIfaceAll = ()
+  rnf (ImpIfaceEverythingBut ns) = rnf ns
+  rnf (ImpIfaceExplicit gre) = rnf gre
 
 instance NFData IfaceDecl where
   rnf = \case

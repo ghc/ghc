@@ -318,6 +318,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_th_needed_deps = th_needed_deps_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
+                tcg_import_decls   = [],
                 tcg_used_gres     = used_gre_var,
                 tcg_dus            = emptyDUs,
 
