@@ -946,8 +946,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     mk_boxer boxers = DCB (\ ty_args src_vars ->
                       do { let (ex_vars, term_vars) = splitAtList ex_tvs src_vars
                                subst1 = zipTvSubst univ_tvs ty_args
-                               subst2 = extendTCvSubstList subst1 ex_tvs
-                                                           (mkTyCoVarTys ex_vars)
+                               subst2 = foldl2 extendTvSubstWithClone subst1 ex_tvs ex_vars
                          ; (rep_ids, binds) <- go subst2 boxers term_vars
                          ; return (ex_vars ++ rep_ids, binds) } )
 

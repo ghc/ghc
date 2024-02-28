@@ -114,3 +114,4 @@ test('T19969', [grep_errmsg('LoopBreaker')], compile, ['-ddump-simpl -dsuppress-
 test('T19883', normal, compile, [''])
 test('T22719', normal, compile, ['-ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T23550', normal, compile, [''])
+test('T24489', normal, compile, ['-O'])
