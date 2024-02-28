@@ -145,12 +145,7 @@ bindistRules = do
         installTo NotRelocatable installPrefix
 
     phony "binary-dist-dir" $ do
-        -- We 'need' all binaries and libraries
-        all_pkgs <- stagePackages Stage1
-        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
-        cross <- flag CrossCompiling
-        iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -163,6 +158,22 @@ bindistRules = do
             ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
             rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
                                -/- "include"
+
+        -- We 'need' all binaries and libraries
+        all_pkgs <- stagePackages Stage1
+        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
+        cross <- flag CrossCompiling
+        iserv_targets <- if cross then pure [] else iservBins
+
+        let lib_exe_targets = (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+
+        let doc_target = if cross then [] else ["docs"]
+
+        let other_targets = map (bindistFilesDir -/-) (["configure", "Makefile"] ++ bindistInstallFiles)
+        let all_targets = lib_exe_targets ++ doc_target ++ other_targets
+
+        -- Better parallelism if everything is needed together.
+        need all_targets
 
         -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
         -- and populate it with Stage2 build results
@@ -232,7 +243,6 @@ bindistRules = do
         cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
 
 
-        unless cross $ need ["docs"]
 
         -- TODO: we should only embed the docs that have been generated
         -- depending on the current settings (flavours' "ghcDocs" field and
@@ -274,8 +284,6 @@ bindistRules = do
         -- We then 'need' all the files necessary to configure and install
         -- (as in, './configure [...] && make install') this build on some
         -- other machine.
-        need $ map (bindistFilesDir -/-)
-                  (["configure", "Makefile"] ++ bindistInstallFiles)
         copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
         generateBuildMk >>= writeFile' (bindistFilesDir -/- "build.mk")
         copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
