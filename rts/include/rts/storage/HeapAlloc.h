@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #if defined(THREADED_RTS)
 // needed for HEAP_ALLOCED below
 extern SpinLock gc_alloc_block_sync;
@@ -227,5 +225,3 @@ StgBool HEAP_ALLOCED_GC(const void *p)
 #else
 # error HEAP_ALLOCED not defined
 #endif
-
-#include "EndPrivate.h"

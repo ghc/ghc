@@ -20,7 +20,7 @@
 #include "Storage.h"
 #include "CNF.h"
 #include "Hash.h"
-#include "HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 #include "BlockAlloc.h"
 #include "Trace.h"
 #include "sm/ShouldCompact.h"

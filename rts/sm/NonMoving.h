@@ -11,7 +11,7 @@
 #if !defined(CMINUSMINUS)
 
 #include <string.h>
-#include "HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 #include "NonMovingMark.h"
 
 #include "BeginPrivate.h"

@@ -13,7 +13,7 @@
 
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
-#include "sm/HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>

@@ -32,7 +32,7 @@
 #include "sm/NonMoving.h"
 #include "sm/NonMovingMark.h"
 #include "Profiling.h" // prof_arena
-#include "HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.

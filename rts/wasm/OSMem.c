@@ -52,7 +52,7 @@
 
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
-#include "sm/HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 
 #include <__macro_PAGESIZE.h>
 

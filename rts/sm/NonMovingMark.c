@@ -14,7 +14,7 @@
 #include "NonMovingShortcut.h"
 #include "NonMoving.h"
 #include "BlockAlloc.h"  /* for countBlocks */
-#include "HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 #include "Task.h"
 #include "Trace.h"
 #include "HeapUtils.h"

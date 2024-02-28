@@ -303,6 +303,7 @@ library
                         rts/storage/Closures.h
                         rts/storage/FunTypes.h
                         rts/storage/Heap.h
+                        rts/storage/HeapAlloc.h
                         rts/storage/GC.h
                         rts/storage/InfoTables.h
                         rts/storage/MBlock.h

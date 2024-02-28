@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 
 #include "BeginPrivate.h"
 

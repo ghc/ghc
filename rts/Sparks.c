@@ -16,7 +16,7 @@
 #include "Sparks.h"
 #include "ThreadLabels.h"
 #include "sm/NonMovingMark.h"
-#include "sm/HeapAlloc.h"
+#include "rts/storage/HeapAlloc.h"
 
 #if defined(THREADED_RTS)
 
