@@ -14,6 +14,8 @@ import Data.Maybe (Maybe)
 import Data.String (String)
 import Data.Int (Int)
 
+import Control.DeepSeq
+
 import GHC.Hs.Doc -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 {-
@@ -47,6 +49,9 @@ data ImportDeclQualifiedStyle
 -- files and signature files are treated equivalently.
 data IsBootInterface = NotBoot | IsBoot
     deriving (Eq, Ord, Show, Data)
+
+instance NFData IsBootInterface where
+  rnf = rwhnf
 
 -- | Import Declaration
 --
@@ -85,6 +90,9 @@ data ImportDecl pass
 -- used, and therefore everything but what was listed should be imported
 data ImportListInterpretation = Exactly | EverythingBut
     deriving (Eq, Data)
+
+instance NFData ImportListInterpretation where
+  rnf = rwhnf
 
 -- | Located Import or Export
 type LIE pass = XRec pass (IE pass)

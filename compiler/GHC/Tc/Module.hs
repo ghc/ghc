@@ -373,7 +373,7 @@ tcRnModuleTcRnM hsc_env mod_sum
 
 tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM TcGblEnv
 tcRnImports hsc_env import_decls
-  = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
+  = do  { (rn_imports, imp_user_spec, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
@@ -402,6 +402,7 @@ tcRnImports hsc_env import_decls
             gbl {
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
+              tcg_import_decls = imp_user_spec,
               tcg_rn_imports   = rn_imports,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)

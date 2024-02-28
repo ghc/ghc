@@ -189,7 +189,7 @@ reportModuleDecls unit_id modl_nm
       Nothing -> fail "Failed to find module"
       Just mod_info -> return mod_info
 
-    Just name_ppr_ctx <- mkNamePprCtxForModule mod_info
+    name_ppr_ctx <- mkNamePprCtxForModule modl mod_info
     let names = GHC.modInfoExports mod_info
         sorted_names = sortBy (compare `on` nameOccName) names
 

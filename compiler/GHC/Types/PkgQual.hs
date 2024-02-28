@@ -22,8 +22,8 @@ data RawPkgQual
 -- package qualifier.
 data PkgQual
   = NoPkgQual       -- ^ No package qualifier
-  | ThisPkg  UnitId -- ^ Import from home-unit
-  | OtherPkg UnitId -- ^ Import from another unit
+  | ThisPkg  !UnitId -- ^ Import from home-unit
+  | OtherPkg !UnitId -- ^ Import from another unit
   deriving (Data, Ord, Eq)
 
 instance Outputable RawPkgQual where

@@ -25,7 +25,7 @@ module GHCi.UI.Monad (
         ActionStats(..), runAndPrintStats, runWithStats, printStats,
 
         printForUserNeverQualify,
-        printForUserModInfo, printForUserGlobalRdrEnv,
+        printForUserGlobalRdrEnv,
         printForUser, printForUserPartWay, prettyLocations,
 
         compileGHCiExpr,
@@ -364,9 +364,6 @@ printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
 printForUserNeverQualify doc = do
   dflags <- GHC.getInteractiveDynFlags
   liftIO $ Ppr.printForUser dflags stdout neverQualify AllTheWay doc
-
-printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
-printForUserModInfo info = printForUserGlobalRdrEnv (GHC.modInfoRdrEnv info)
 
 printForUserGlobalRdrEnv :: (GhcMonad m, Outputable info)
                          => Maybe (GlobalRdrEnvX info) -> SDoc -> m ()
