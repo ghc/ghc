@@ -635,10 +635,12 @@ mergeSignatures
                                             -- because we need module
                                             -- LocalSig (from the local
                                             -- export list) to match it!
-                                            is_mod  = mi_module ireq_iface,
-                                            is_as   = mod_name,
-                                            is_qual = False,
-                                            is_dloc = locA loc
+                                            is_mod      = mi_module ireq_iface,
+                                            is_as       = mod_name,
+                                            is_pkg_qual = NoPkgQual,
+                                            is_qual     = False,
+                                            is_isboot   = NotBoot,
+                                            is_dloc     = locA loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv $ gresFromAvails hsc_env (Just ispec) as1
                             setGblEnv tcg_env {

@@ -42,6 +42,7 @@ import           GHC.Driver.Monad
 import           GHC.Driver.Env
 import           GHC.Driver.Ppr
 import           GHC.Types.Name
+import           GHC.Tc.Types
 import           GHC.Types.Name.Reader
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
@@ -59,7 +60,7 @@ data ModInfo = ModInfo
       -- ^ Generated set of information about all spans in the
       -- module that correspond to some kind of identifier for
       -- which there will be type info and/or location info.
-    , modinfoRdrEnv     :: !(Strict.Maybe IfGlobalRdrEnv)
+    , modinfoRdrEnv     :: !IfGlobalRdrEnv
       -- ^ What's in scope in the module.
     , modinfoLastUpdate :: !UTCTime
       -- ^ The timestamp of the file used to generate this record.
@@ -313,27 +314,19 @@ getModInfo name = do
     p <- parseModule m
     typechecked <- typecheckModule p
     let allTypes = processAllTypeCheckedModule typechecked
-        module_info = tm_checked_module_info typechecked
-        !rdr_env = case modInfoRdrEnv module_info of
-          Just rdrs -> Strict.Just rdrs
-            -- NB: this has already been deeply forced; no need to do that again.
-            -- See test case T15369 and Note [Forcing GREInfo] in GHC.Types.GREInfo.
-          Nothing   -> Strict.Nothing
+    let !rdr_env = tcg_rdr_env (fst $ tm_internals_ typechecked)
     ts <- liftIO $ getModificationTime $ srcFilePath m
     return $
       ModInfo
         { modinfoSummary    = m
         , modinfoSpans      = allTypes
-        , modinfoRdrEnv     = rdr_env
+        , modinfoRdrEnv     = forceGlobalRdrEnv rdr_env
         , modinfoLastUpdate = ts
         }
 
 -- | Get the 'Name's from the 'GlobalRdrEnv' of the 'ModInfo', if any.
 modInfo_rdrs :: ModInfo -> [Name]
-modInfo_rdrs mi =
-  case modinfoRdrEnv mi of
-    Strict.Nothing  -> []
-    Strict.Just env -> map greName $ globalRdrEnvElts env
+modInfo_rdrs mi = map greName $ globalRdrEnvElts $ modinfoRdrEnv mi
 
 -- | Get ALL source spans in the module.
 processAllTypeCheckedModule :: TypecheckedModule -> [SpanInfo]

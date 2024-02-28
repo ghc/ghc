@@ -43,6 +43,8 @@ module GHC.Tc.Types(
         -- Renamer types
         ErrCtxt,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
+        ImportUserSpec(..),
+        ImpUserList(..),
         mkModDeps,
 
         -- Typechecker types
@@ -179,6 +181,30 @@ import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 
+-- | The import specification as written by the user, including
+-- the list of explicitly imported names. Used in 'ModIface' to
+-- allow GHCi to reconstruct the top level environment on demand.
+--
+-- This is distinct from 'ImportSpec' because we don't want to store
+-- the list of explicitly imported names along with each 'GRE'
+--
+-- We don't want to store the entire GlobalRdrEnv for modules that
+-- are imported without explicit export lists, as these may grow
+-- to be very large. However, GlobalRdrEnvs which are the result
+-- of explicit import lists are typically quite small.
+--
+-- Why do we not store something like (Maybe (ImportListInterpretation, [IE GhcPs]) in such a case?
+-- Because we don't want to store source syntax including annotations in
+-- interface files.
+data ImportUserSpec
+  = ImpUserSpec { ius_decl :: !ImpDeclSpec
+                , ius_imports :: !ImpUserList
+                }
+
+data ImpUserList
+  = ImpUserAll -- ^ no user import list
+  | ImpUserExplicit !GlobalRdrEnv
+  | ImpUserEverythingBut !NameSet
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -504,6 +530,12 @@ data TcGblEnv
           --    - imp_trust_own_pkg is used for Safe Haskell in interfaces
           --      (mkIfaceTc, as well as in "GHC.Driver.Main")
           --    - To create the Dependencies field in interface (mkDependencies)
+
+
+          -- This field tracks the user-written imports of a module, so they can be
+          -- recorded in an interface file in order to reconstruct the top-level environment
+          -- if necessary for GHCi.
+        tcg_import_decls :: ![ImportUserSpec],
 
           -- These three fields track unused bindings and imports
           -- See Note [Tracking unused binding and imports]

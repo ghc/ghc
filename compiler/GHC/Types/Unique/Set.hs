@@ -55,6 +55,7 @@ import Data.Coerce
 import GHC.Utils.Outputable
 import Data.Data
 import qualified Data.Semigroup as Semi
+import Control.DeepSeq
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,6 +66,9 @@ import qualified Data.Semigroup as Semi
 
 newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
+
+instance NFData a => NFData (UniqSet a) where
+  rnf = forceUniqSet rnf
 
 emptyUniqSet :: UniqSet a
 emptyUniqSet = UniqSet emptyUFM
@@ -200,3 +204,7 @@ pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 -- It's OK to use nonDetUFMToList here because we only use it for
 -- pretty-printing.
 pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet
+
+
+forceUniqSet :: (a -> ()) -> UniqSet a -> ()
+forceUniqSet f (UniqSet fm) = seqEltsUFM f fm
