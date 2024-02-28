@@ -51,7 +51,7 @@ module GHC.Types.Name.Reader (
         GlobalRdrEnvX, GlobalRdrEnv, IfGlobalRdrEnv,
         emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
         extendGlobalRdrEnv, greOccName,
-        pprGlobalRdrEnv, globalRdrEnvElts,
+        pprGlobalRdrEnv, globalRdrEnvElts, globalRdrEnvLocal,
 
         -- ** Looking up 'GlobalRdrElt's
         FieldsOrSelectors(..), filterFieldGREs, allowGRE,
@@ -121,6 +121,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
     ( NameEnv, nonDetNameEnvElts, emptyNameEnv, extendNameEnv_Acc )
 import GHC.Types.Name.Set
+import GHC.Types.PkgQual
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -935,6 +936,9 @@ emptyGlobalRdrEnv = emptyOccEnv
 
 globalRdrEnvElts :: GlobalRdrEnvX info -> [GlobalRdrEltX info]
 globalRdrEnvElts env = nonDetFoldOccEnv (++) [] env
+
+globalRdrEnvLocal :: GlobalRdrEnvX info -> GlobalRdrEnvX info
+globalRdrEnvLocal = mapOccEnv (filter isLocalGRE)
 
 -- | Drop all 'GREInfo' fields in a 'GlobalRdrEnv' in order to
 -- avoid space leaks.
@@ -1780,7 +1784,9 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
         old_mod_name = moduleName old_mod
         id_spec      = ImpDeclSpec { is_mod = old_mod
                                    , is_as = old_mod_name
+                                   , is_pkg_qual = NoPkgQual
                                    , is_qual = True
+                                   , is_isboot = NotBoot
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
     set_qual :: ImportSpec -> ImportSpec
@@ -1939,9 +1945,14 @@ data ImpDeclSpec
                                    -- TODO: either should be Module, or there
                                    -- should be a Maybe UnitId here too.
         is_as       :: !ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
+        is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
-        is_dloc     :: !SrcSpan     -- ^ The location of the entire import declaration
+        is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
+        is_isboot   :: !IsBootInterface -- ^ Was this a SOURCE import?
     } deriving (Eq, Data)
+
+instance NFData ImpDeclSpec where
+  rnf = rwhnf -- Already strict in all fields
 
 -- | Import Item Specification
 --

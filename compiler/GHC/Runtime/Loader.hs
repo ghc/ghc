@@ -49,6 +49,7 @@ import GHC.Core.TyCon       ( TyCon(tyConName) )
 import GHC.Types.SrcLoc        ( noSrcSpan )
 import GHC.Types.Name    ( Name, nameModule, nameModule_maybe )
 import GHC.Types.Id      ( idType )
+import GHC.Types.PkgQual
 import GHC.Types.TyThing
 import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
 import GHC.Types.Name.Reader
@@ -57,7 +58,7 @@ import GHC.Types.Unique.DFM
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
 import GHC.Driver.Config.Diagnostic ( initIfaceMessageOpts )
-import GHC.Unit.Module   ( Module, ModuleName, thisGhcUnit, GenModule(moduleUnit) )
+import GHC.Unit.Module   ( Module, ModuleName, thisGhcUnit, GenModule(moduleUnit), IsBootInterface(NotBoot) )
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Env
 
@@ -357,8 +358,8 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
             case mb_iface of
                 Just iface -> do
                     -- Try and find the required name in the exports
-                    let decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod_name
-                                                , is_qual = False, is_dloc = noSrcSpan }
+                    let decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod_name, is_pkg_qual = NoPkgQual
+                                                , is_qual = False, is_dloc = noSrcSpan, is_isboot = NotBoot }
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv
                             $ gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)

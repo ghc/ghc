@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -24,6 +25,7 @@ module GHC.Runtime.Eval (
         setupBreakpoint,
         back, forward,
         setContext, getContext,
+        mkTopLevEnv,
         getNamesInScope,
         getRdrNamesInScope,
         moduleIsInterpreted,
@@ -53,6 +55,8 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config
 
+import GHC.Rename.Names (importsFromIface)
+
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
 import GHC.Runtime.Heap.Inspect
@@ -75,6 +79,7 @@ import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
 
 import GHC.Iface.Env       ( newInteractiveBinder )
+import GHC.Iface.Load      ( loadSrcInterface )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
@@ -813,14 +818,9 @@ findGlobalRdrEnv :: HscEnv -> [InteractiveImport]
 findGlobalRdrEnv hsc_env imports
   = do { idecls_env <- hscRnImportDecls hsc_env idecls
                     -- This call also loads any orphan modules
-       ; return $ case partitionWith mkEnv imods of
-         (err : _, _)     -> Left err
-         ([], imods_env0) ->
-            -- Need to rehydrate the 'GlobalRdrEnv' to recover the 'GREInfo's.
-            -- This is done in order to avoid space leaks.
-            -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
-            let imods_env = map (hydrateGlobalRdrEnv get_GRE_info) imods_env0
-            in Right (foldr plusGlobalRdrEnv idecls_env imods_env)
+       ; partitionWithM mkEnv imods >>= \case
+           (err : _, _)     -> return $ Left err
+           ([], imods_env)  -> return $ Right (foldr plusGlobalRdrEnv idecls_env imods_env)
        }
   where
     idecls :: [LImportDecl GhcPs]
@@ -829,23 +829,34 @@ findGlobalRdrEnv hsc_env imports
     imods :: [ModuleName]
     imods = [m | IIModule m <- imports]
 
-    mkEnv mod = case mkTopLevEnv (hsc_HPT hsc_env) mod of
-      Left err -> Left (mod, err)
-      Right env -> Right env
+    mkEnv mod = mkTopLevEnv hsc_env mod >>= \case
+      Left err -> pure $ Left (mod, err)
+      Right env -> pure $ Right env
 
-    get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
-
-mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String IfGlobalRdrEnv
-mkTopLevEnv hpt modl
+mkTopLevEnv :: HscEnv -> ModuleName -> IO (Either String GlobalRdrEnv)
+mkTopLevEnv hsc_env modl
   = case lookupHpt hpt modl of
-      Nothing -> Left "not a home module"
+      Nothing -> pure $ Left "not a home module"
       Just details ->
-         case mi_globals (hm_iface details) of
-                Nothing  -> Left "not interpreted"
-                Just env -> Right env
-    -- It's OK to be lazy here; we force the GlobalRdrEnv before storing it
-    -- in ModInfo; see GHCi.UI.Info.
-    -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+         case mi_top_env (hm_iface details) of
+                Nothing  -> pure $ Left "not interpreted"
+                Just (IfaceTopEnv exports imports) -> do
+                  imports_env <-
+                        runInteractiveHsc hsc_env
+                      $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env
+                      $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
+                      $ forM imports $ \iface_import -> do
+                        let ImpUserSpec spec details = tcIfaceImport hsc_env iface_import
+                        iface <- loadSrcInterface (text "imported by GHCi") (moduleName $ is_mod spec) (is_isboot spec) (is_pkg_qual spec)
+                        pure $ case details of
+                          ImpUserAll -> importsFromIface hsc_env iface spec Nothing
+                          ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
+                          ImpUserExplicit x -> x
+                  let get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
+                  let exports_env = hydrateGlobalRdrEnv get_GRE_info exports
+                  pure $ Right $ plusGlobalRdrEnv imports_env exports_env
+  where
+    hpt = hsc_HPT hsc_env
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
@@ -861,7 +872,7 @@ moduleIsInterpreted modl = withSession $ \h ->
  if notHomeModule (hsc_home_unit h) modl
         then return False
         else case lookupHpt (hsc_HPT h) (moduleName modl) of
-                Just details       -> return (isJust (mi_globals (hm_iface details)))
+                Just details       -> return (isJust (mi_top_env (hm_iface details)))
                 _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
