@@ -14,6 +14,8 @@ Extracting imported and top-level names in scope
 
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordFieldLabel,
+        importsFromIface,
+        ImportUserSpec(..),
         extendGlobalRdrEnvRn,
         gresFromAvails,
         calculateAvails,
@@ -107,7 +109,6 @@ import qualified Data.Set as S
 import System.FilePath  ((</>))
 import System.IO
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -200,7 +201,7 @@ with yes we have gone with no for now.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
 rnImports :: [(LImportDecl GhcPs, SDoc)]
-          -> RnM ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+          -> RnM ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImports imports = do
     tcg_env <- getGblEnv
     -- NB: want an identity module here, because it's OK for a signature
@@ -211,14 +212,14 @@ rnImports imports = do
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
-    let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
+    let (decls, imp_user_spec, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
     let merged_import_avail = clobberSourceImports imp_avails
     dflags <- getDynFlags
     let final_import_avail  =
           merged_import_avail { imp_dep_direct_pkgs = S.fromList (implicitPackageDeps dflags)
                                                         `S.union` imp_dep_direct_pkgs merged_import_avail}
-    return (decls, rdr_env, final_import_avail, hpc_usage)
+    return (decls, imp_user_spec, rdr_env, final_import_avail, hpc_usage)
 
   where
     clobberSourceImports imp_avails =
@@ -231,19 +232,20 @@ rnImports imports = do
         combJ (GWIB _ IsBoot) x = Just x
         combJ r _               = Just r
     -- See Note [Combining ImportAvails]
-    combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
-            -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+    combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
+            -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine ss =
-      let (decls, rdr_env, imp_avails, hpc_usage, finsts) = foldr
+      let (decls, imp_user_spec, rdr_env, imp_avails, hpc_usage, finsts) = foldr
             plus
-            ([], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
+            ([], [], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
             ss
-      in (decls, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
+      in (decls, imp_user_spec, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
             hpc_usage)
 
-    plus (decl,  gbl_env1, imp_avails1, hpc_usage1)
-         (decls, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
+    plus (decl,  us, gbl_env1, imp_avails1, hpc_usage1)
+         (decls, uss, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
       = ( decl:decls,
+          us:uss,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
           imp_avails1' `plusImportAvails` imp_avails2,
           hpc_usage1 || hpc_usage2,
@@ -294,8 +296,6 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 23s before, and 11s after.
 -}
 
-
-
 -- | Given a located import declaration @decl@ from @this_mod@,
 -- calculate the following pieces of information:
 --
@@ -312,7 +312,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
 rnImportDecl :: Module -> (LImportDecl GhcPs, SDoc)
-             -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+             -> RnM (LImportDecl GhcRn, ImportUserSpec , GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = raw_pkg_qual
@@ -393,18 +393,17 @@ rnImportDecl this_mod
     let imp_mod = mi_module iface
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
-                                  is_dloc = locA loc, is_as = qual_mod_name }
+                                  is_dloc = locA loc, is_as = qual_mod_name,
+                                  is_pkg_qual = pkg_qual, is_isboot = want_boot }
 
     -- filter the imports according to the import declaration
-    (new_imp_details, gres) <- filterImports hsc_env iface imp_spec imp_details
+    (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details
 
     -- for certain error messages, we’d like to know what could be imported
     -- here, if everything were imported
-    potential_gres <- mkGlobalRdrEnv . snd <$> filterImports hsc_env iface imp_spec Nothing
+    potential_gres <- (\(_,_,x) -> x) <$> filterImports hsc_env iface imp_spec Nothing
 
-    let gbl_env = mkGlobalRdrEnv gres
-
-        is_hiding | Just (EverythingBut,_) <- imp_details = True
+    let is_hiding | Just (EverythingBut,_) <- imp_details = True
                   | otherwise                             = False
 
         -- should the import be safe?
@@ -416,7 +415,7 @@ rnImportDecl this_mod
     let home_unit = hsc_home_unit hsc_env
         other_home_units = hsc_all_home_unit_ids hsc_env
         imv = ImportedModsVal
-            { imv_name        = qual_mod_name
+            { imv_name        = is_as imp_spec
             , imv_span        = locA loc
             , imv_is_safe     = mod_safe'
             , imv_is_hiding   = is_hiding
@@ -444,7 +443,7 @@ rnImportDecl this_mod
           , ideclImportList = new_imp_details
           }
 
-    return (L loc new_imp_decl, gbl_env, imports, mi_hpc iface)
+    return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, imports, mi_hpc iface)
 
 
 -- | Rename raw package imports
@@ -1188,6 +1187,14 @@ gresFromAvail hsc_env prov avail =
 gresFromAvails :: HscEnv -> Maybe ImportSpec -> [AvailInfo] -> [GlobalRdrElt]
 gresFromAvails hsc_env prov = concatMap (gresFromAvail hsc_env prov)
 
+importsFromIface :: HscEnv -> ModIface -> ImpDeclSpec -> Maybe NameSet -> GlobalRdrEnv
+importsFromIface hsc_env iface decl_spec hidden = mkGlobalRdrEnv $ case hidden of
+    Nothing -> all_gres
+    Just hidden_names -> filter (not . (`elemNameSet` hidden_names) . greName) all_gres
+  where
+    all_gres = gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+    imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
+
 filterImports
     :: HasDebugCallStack
     => HscEnv
@@ -1197,13 +1204,10 @@ filterImports
     -> Maybe (ImportListInterpretation, LocatedL [LIE GhcPs])
          -- ^ Whether this is a "hiding" import list
     -> RnM (Maybe (ImportListInterpretation, LocatedL [LIE GhcRn]), -- Import spec w/ Names
-            [GlobalRdrElt])                   -- Same again, but in GRE form
+            ImpUserList,                      -- same, but designed for storage in interfaces
+            GlobalRdrEnv)                   -- Same again, but in GRE form
 filterImports hsc_env iface decl_spec Nothing
-  = return (Nothing, gresFromAvails hsc_env (Just imp_spec) all_avails)
-  where
-    all_avails = mi_exports iface
-    imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
-
+  = return (Nothing, ImpUserAll, importsFromIface hsc_env iface decl_spec Nothing)
 filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
   = do  -- check for errors, convert RdrNames to Names
         items1 <- mapM lookup_lie import_items
@@ -1213,20 +1217,18 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                 -- NB we may have duplicates, and several items
                 --    for the same parent; e.g N(x) and N(y)
 
-            gres = case want_hiding of
+            (gres, imp_user_list) = case want_hiding of
               Exactly ->
-                concatMap (gresFromIE decl_spec) items2
+                let gre_env = mkGlobalRdrEnv $ concatMap (gresFromIE decl_spec) items2
+                in (gre_env, ImpUserExplicit gre_env)
               EverythingBut ->
                 let hidden_names = mkNameSet $ concatMap (map greName . snd) items2
-                    keep n = not (n `elemNameSet` hidden_names)
-                    all_gres = gresFromAvails hsc_env (Just hiding_spec) all_avails
-                in filter (keep . greName) all_gres
+                in (importsFromIface hsc_env iface decl_spec (Just hidden_names), ImpUserEverythingBut hidden_names)
 
-        return (Just (want_hiding, L l (map fst items2)), gres)
+        return (Just (want_hiding, L l (map fst items2)), imp_user_list, gres)
   where
     import_mod = mi_module iface
     all_avails = mi_exports iface
-    hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     imp_occ_env = mkImportOccEnv hsc_env decl_spec all_avails
 
     -- Look up a parent (type constructor, class or data constructor)

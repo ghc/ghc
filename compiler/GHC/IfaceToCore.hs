@@ -28,6 +28,7 @@ module GHC.IfaceToCore (
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
         tcIfaceOneShot, tcTopIfaceBindings,
+        tcIfaceImport,
         hydrateCgBreakInfo
  ) where
 
@@ -54,6 +55,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Env
 
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -111,6 +113,7 @@ import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Make
@@ -2176,3 +2179,12 @@ hydrateCgBreakInfo CgBreakInfo{..} = do
     result_ty <- tcIfaceType cgb_resty
     mbVars <- mapM (traverse (\(if_gbl, offset) -> (,offset) <$> bindIfaceId if_gbl return)) cgb_vars
     return (mbVars, result_ty)
+
+-- | This function is only used to construct the environment for GHCi,
+-- so we make up fake locations
+tcIfaceImport :: HscEnv -> IfaceImport -> ImportUserSpec
+tcIfaceImport _ (IfaceImport spec ImpIfaceAll) = ImpUserSpec spec ImpUserAll
+tcIfaceImport _ (IfaceImport spec (ImpIfaceEverythingBut ns)) = ImpUserSpec spec (ImpUserEverythingBut ns)
+tcIfaceImport hsc_env (IfaceImport spec (ImpIfaceExplicit gre)) = ImpUserSpec spec (ImpUserExplicit (hydrateGlobalRdrEnv get_GRE_info gre))
+  where
+    get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
