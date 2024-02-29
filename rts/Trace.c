@@ -929,6 +929,12 @@ void traceNonmovingHeapCensus(uint16_t blk_size,
         postNonmovingHeapCensus(blk_size, census);
 }
 
+void traceNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments)
+{
+    if (eventlog_enabled && TRACE_nonmoving_gc)
+        postNonmovingPrunedSegments(pruned_segments, free_segments);
+}
+
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
 {
 #if defined(DEBUG)

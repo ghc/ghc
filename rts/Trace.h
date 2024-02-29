@@ -332,6 +332,7 @@ void traceConcSweepEnd(void);
 void traceConcUpdRemSetFlush(Capability *cap);
 void traceNonmovingHeapCensus(uint16_t blk_size,
                               const struct NonmovingAllocCensus *census);
+void traceNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments);
 
 void traceIPE(const InfoProvEnt *ipe);
 void flushTrace(void);

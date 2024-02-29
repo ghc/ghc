@@ -1313,7 +1313,7 @@ dec_running (void)
     ACQUIRE_LOCK(&gc_running_mutex);
 #endif
 
-    StgWord r = atomic_dec(&gc_running_threads);
+    StgWord r = atomic_dec(&gc_running_threads, 1);
 
 #if defined(THREADED_RTS)
     if (r == 0) {
