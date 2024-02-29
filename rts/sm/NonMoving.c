@@ -248,6 +248,8 @@ static void nonmovingBumpEpoch(void) {
  *
  *  - Note [Allocator sizes] goes into detail about our choice of allocator sizes.
  *
+ *  - Note [Segment allocation strategy] explains our segment allocation strategy.
+ *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
  *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
@@ -560,6 +562,21 @@ static void nonmovingBumpEpoch(void) {
  *
  * See #23340
  *
+ * Note [Segment allocation strategy]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Non-moving segments must be aligned. In order, to efficiently service these
+ * allocations, we allocate segments in bulk
+ * We allocate an entire megablocks worth of segments at once.
+ * All unused segments are placed on the `nonmovingHeap.free` list.
+ *
+ * Symmetrically, we only de-allocate segments if all the segments in a megablock are free-able, ie,
+ * are on `nonmovingHeap.free`. We prune the free list in `nonmovingPruneFreeSegmentList`.
+ * Note that during pruning of the free list, free segments are not available for use by the
+ * mutator. This might lead to extra allocation of segments. But the risk is low as just after sweep
+ * there is usually a large amount of partially full segments, and pruning the free list is quite
+ * quick.
+ *
+ * See #24150
  */
 
 memcount nonmoving_segment_live_words = 0;
@@ -578,19 +595,6 @@ static void nonmovingExitConcurrentWorker(void);
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
-    // See Note [Live data accounting in nonmoving collector].
-    if (RELAXED_LOAD(&nonmovingHeap.n_free) > NONMOVING_MAX_FREE) {
-        bdescr *bd = Bdescr((StgPtr) seg);
-        ACQUIRE_SM_LOCK;
-        ASSERT(oldest_gen->n_blocks >= bd->blocks);
-        ASSERT(oldest_gen->n_words >= BLOCK_SIZE_W * bd->blocks);
-        oldest_gen->n_blocks -= bd->blocks;
-        oldest_gen->n_words  -= BLOCK_SIZE_W * bd->blocks;
-        freeGroup(bd);
-        RELEASE_SM_LOCK;
-        return;
-    }
-
     SET_SEGMENT_STATE(seg, FREE);
     while (true) {
         struct NonmovingSegment *old = nonmovingHeap.free;
@@ -599,6 +603,102 @@ void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
             break;
     }
     __sync_add_and_fetch(&nonmovingHeap.n_free, 1);
+}
+
+static int
+cmp_segment_ptr (const void *x, const void *y)
+{
+    const struct NonMovingSegment *p1 = *(const struct NonMovingSegment**)x;
+    const struct NonMovingSegment *p2 = *(const struct NonMovingSegment**)y;
+    if (p1 > p2) return +1;
+    else if (p1 < p2) return -1;
+    else return 0;
+}
+
+// Prune the free list of segments that can be freed.
+// Segments can be freed if all segments from a mblock are on the free list.
+void nonmovingPruneFreeSegmentList(void)
+{
+  // Atomically grab the entire free list.
+  struct NonmovingSegment *free;
+  size_t length;
+  while (true) {
+    free = ACQUIRE_LOAD(&nonmovingHeap.free);
+    length = ACQUIRE_LOAD(&nonmovingHeap.n_free);
+    if (cas((StgVolatilePtr) &nonmovingHeap.free,
+            (StgWord) free,
+            (StgWord) NULL) == (StgWord) free) {
+        __sync_sub_and_fetch(&nonmovingHeap.n_free, length);
+        break;
+    }
+    // Save the current free list so the sanity checker can see these segments.
+    nonmovingHeap.saved_free = free;
+  }
+
+  // Sort the free list by address.
+  struct NonmovingSegment **sorted = stgMallocBytes(sizeof(struct NonmovingSegment*) * length, "sorted free segment list");
+  for(size_t i = 0; i<length; i++) {
+    sorted[i] = free;
+    free = free->link;
+  }
+  // we should have reached the end of the free list
+  ASSERT(free == NULL);
+
+  qsort(sorted, length, sizeof(struct NonmovingSegment*), cmp_segment_ptr);
+
+  // Walk the sorted list and either:
+  // - free segments if the entire megablock is free
+  // - put it back on the free list
+  size_t new_length = 0;
+  size_t free_in_megablock = 0;
+  // iterate through segments by megablock
+  for(size_t i = 0; i<length; i+=free_in_megablock) {
+    // count of free segments in the current megablock
+    free_in_megablock = 1;
+    for(;i + free_in_megablock < length; free_in_megablock++) {
+      if (((W_)sorted[i] & ~MBLOCK_MASK) != ((W_)sorted[i + free_in_megablock] & ~MBLOCK_MASK))
+        break;
+    }
+    if (free_in_megablock < BLOCKS_PER_MBLOCK / NONMOVING_SEGMENT_BLOCKS) {
+      // the entire block isn't free so put it back on the list
+      for(size_t j = 0; j < free_in_megablock;j++){
+        struct NonmovingSegment *last = free;
+        free = sorted[i+j];
+        free->link = last;
+        new_length++;
+      }
+    } else {
+      // the megablock is free, so let's free all the segments.
+      ACQUIRE_SM_LOCK;
+      for(size_t j = 0; j < free_in_megablock;j++){
+        bdescr *bd = Bdescr((StgPtr)sorted[i+j]);
+        freeGroup(bd);
+      }
+      RELEASE_SM_LOCK;
+    }
+  }
+  stgFree(sorted);
+  // If we have any segments left over, then put them back on the free list.
+  if(free) {
+    struct NonmovingSegment* tail = free;
+    while(tail->link) {
+      tail = tail->link;
+    }
+    while (true) {
+      struct NonmovingSegment* rest = ACQUIRE_LOAD(&nonmovingHeap.free);
+      tail->link = rest;
+      if (cas((StgVolatilePtr) &nonmovingHeap.free,
+              (StgWord) rest,
+              (StgWord) free) == (StgWord) rest) {
+          __sync_add_and_fetch(&nonmovingHeap.n_free, new_length);
+          break;
+      }
+    }
+  }
+  // See Note [Live data accounting in nonmoving collector].
+  oldest_gen->n_blocks -= (length - new_length) * NONMOVING_SEGMENT_BLOCKS;
+  oldest_gen->n_words  -= (length - new_length) * NONMOVING_SEGMENT_SIZE;
+  nonmovingHeap.saved_free = NULL;
 }
 
 void nonmovingInitAllocator(struct NonmovingAllocator* alloc, uint16_t block_size)
@@ -1216,6 +1316,7 @@ concurrent_marking:
     nonmovingSweepStableNameTable();
 
     nonmovingSweep();
+    nonmovingPruneFreeSegmentList();
     ASSERT(nonmovingHeap.sweep_list == NULL);
     debugTrace(DEBUG_nonmoving_gc, "Finished sweeping.");
     traceConcSweepEnd();

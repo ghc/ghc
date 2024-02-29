@@ -119,16 +119,16 @@ extern uint8_t nonmoving_alloca_dense_cnt;
 // NONMOVING_SEGMENT_SIZE (in bytes)
 extern uint8_t nonmoving_alloca_cnt;
 
-// maximum number of free segments to hold on to
-#define NONMOVING_MAX_FREE 16
-
 struct NonmovingHeap {
     struct NonmovingAllocator *allocators;
-    // free segment list. This is a cache where we keep up to
-    // NONMOVING_MAX_FREE segments to avoid thrashing the block allocator.
+    // free segment list. This is a cache where we keep segments
+    // belonging to megablocks that are only partially free.
     // Note that segments in this list are still counted towards
     // oldest_gen->n_blocks.
     struct NonmovingSegment *free;
+    // saved free segment list, so the sanity checker can
+    // see the segments while the free list is being pruned.
+    struct NonmovingSegment *saved_free;
     // how many segments in free segment list? accessed atomically.
     unsigned int n_free;
 
@@ -172,6 +172,7 @@ void nonmovingCollect(StgWeak **dead_weaks,
                       bool concurrent);
 
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
+void nonmovingPruneFreeSegmentList(void);
 
 INLINE_HEADER unsigned long log2_ceil(unsigned long x)
 {
