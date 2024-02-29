@@ -22,7 +22,9 @@ which one can do this:
    others.  For instance:
    ```
    for f in testsuite/tests/interface-stability/base-exports.stdout-*; do
-     git show | sed -e "s/base-exports.stdout/$(basename $f)/" | patch -p1
+     git show testsuite/tests/interface-stability \
+       | sed -e "s/base-exports.stdout/$(basename $f)/" \
+       | patch -p1
    done
    ```
    In the case of conflicts, increasing the fuzz factor (using `-F`) can be
