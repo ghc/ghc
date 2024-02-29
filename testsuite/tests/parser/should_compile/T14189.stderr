@@ -2,7 +2,7 @@
 ==================== Renamer ====================
 
 (Just
- ((,,,)
+ ((,,,,)
   (HsGroup
    (NoExtField)
    (XValBindsLR
@@ -316,6 +316,13 @@
        [{Name: T14189.MyType}
        ,{Name: T14189.f}
        ,{Name: T14189.NT}])])])
-  (Nothing)))
-
-
+  (Nothing)
+  (Just
+  (L
+    (EpAnn
+    (EpaSpan { T14189.hs:1:8-13 })
+    (AnnListItem
+      [])
+    (EpaComments
+      []))
+    {ModuleName: T14189}))))

@@ -297,8 +297,8 @@ tcRnModuleTcRnM hsc_env mod_sum
         -- We will rename it properly after renaming everything else so that
         -- haddock can link the identifiers
         ; tcg_env <- return (tcg_env
-                              { tcg_doc_hdr = fmap (\(WithHsDocIdentifiers str _) -> WithHsDocIdentifiers str [])
-                                                                                 <$> maybe_doc_hdr })
+                              { tcg_hdr_info = (fmap (\(WithHsDocIdentifiers str _) -> WithHsDocIdentifiers str [])
+                                                <$> maybe_doc_hdr , maybe_mod ) })
         ; -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
@@ -347,7 +347,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                       -- Rename the module header properly after we have renamed everything else
                       ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
                       ; tcg_env <- return (tcg_env
-                                            { tcg_doc_hdr = maybe_doc_hdr })
+                                            { tcg_hdr_info = (maybe_doc_hdr, maybe_mod) })
 
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
@@ -3115,14 +3115,15 @@ runRenamerPlugin gbl_env hs_group = do
 -- exception/signal an error.
 type RenamedStuff =
         (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                Maybe (LHsDoc GhcRn)))
+                Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)))
 
 -- | Extract the renamed information from TcGblEnv.
 getRenamedStuff :: TcGblEnv -> RenamedStuff
 getRenamedStuff tc_result
   = fmap (\decls -> ( decls, tcg_rn_imports tc_result
-                    , tcg_rn_exports tc_result, tcg_doc_hdr tc_result ) )
+                    , tcg_rn_exports tc_result, doc_hdr, name_hdr ))
          (tcg_rn_decls tc_result)
+  where (doc_hdr, name_hdr) = tcg_hdr_info tc_result
 
 runTypecheckerPlugin :: ModSummary -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum gbl_env = do

@@ -63,12 +63,12 @@ extractDocs dflags
                , tcg_imports = import_avails
                , tcg_insts = insts
                , tcg_fam_insts = fam_insts
-               , tcg_doc_hdr = mb_doc_hdr
+               , tcg_hdr_info = mb_hdr_info
                , tcg_th_docs = th_docs_var
                , tcg_type_env = ty_env
                } = do
     th_docs <- liftIO $ readIORef th_docs_var
-    let doc_hdr = (unLoc <$> mb_doc_hdr)
+    let doc_hdr = unLoc <$> fst mb_hdr_info
         ExtractedTHDocs th_hdr th_decl_docs th_arg_docs th_inst_docs = extractTHDocs th_docs
         mod_docs
          =  Docs

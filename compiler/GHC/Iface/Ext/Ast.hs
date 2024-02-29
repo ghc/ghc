@@ -210,7 +210,8 @@ call and just recurse directly in to the subexpressions.
 -- These synonyms match those defined in compiler/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
-                         , Maybe (LHsDoc GhcRn) )
+                         , Maybe (LHsDoc GhcRn)
+                         , Maybe (XRec GhcRn ModuleName) )
 type TypecheckedSource = LHsBinds GhcTc
 
 
@@ -321,8 +322,9 @@ getCompressedAsts ts rs top_ev_binds insts tcs =
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
   -> HieASTs Type
-enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
+enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs =
   runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
+    modName <- toHie (IEC Export <$> modName)
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . ideclExt . unLoc) imports
@@ -344,7 +346,8 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
               (realSrcSpanEnd   $ nodeSpan (NE.last children))
 
         flat_asts = concat
-          [ tasts
+          [ modName
+          , tasts
           , rasts
           , imps
           , exps

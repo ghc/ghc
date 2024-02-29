@@ -346,7 +346,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_merged         = [],
                 tcg_dfun_n         = dfun_n_var,
                 tcg_keep           = keep_var,
-                tcg_doc_hdr        = Nothing,
+                tcg_hdr_info        = (Nothing,Nothing),
                 tcg_hpc            = False,
                 tcg_main           = Nothing,
                 tcg_self_boot      = NoSelfBoot,

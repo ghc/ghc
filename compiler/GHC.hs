@@ -1157,7 +1157,7 @@ instance DesugaredMod DesugaredModule where
 
 type ParsedSource      = Located (HsModule GhcPs)
 type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                          Maybe (LHsDoc GhcRn))
+                          Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName))
 type TypecheckedSource = LHsBinds GhcTc
 
 -- NOTE:

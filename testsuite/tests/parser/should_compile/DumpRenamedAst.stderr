@@ -2,7 +2,7 @@
 ==================== Renamer ====================
 
 (Just
- ((,,,)
+ ((,,,,)
   (HsGroup
    (NoExtField)
    (XValBindsLR
@@ -2367,6 +2367,16 @@
               {Name: GHC.Types.Type})))
            (Nothing)))])))))]
   (Nothing)
-  (Nothing)))
+  (Nothing)
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { DumpRenamedAst.hs:4:8-21 })
+     (AnnListItem
+      [])
+     (EpaComments
+      []))
+    {ModuleName: DumpRenamedAst}))))
+
 
 

@@ -523,8 +523,8 @@ mergeSignatures
         tcg_rn_decls   = tcg_rn_decls   orig_tcg_env,
         -- Annotations
         tcg_ann_env    = tcg_ann_env    orig_tcg_env,
-        -- Documentation header
-        tcg_doc_hdr    = tcg_doc_hdr orig_tcg_env
+        -- Documentation header and located module name
+        tcg_hdr_info    = tcg_hdr_info orig_tcg_env
         -- tcg_dus?
         -- tcg_th_used           = tcg_th_used orig_tcg_env,
         -- tcg_th_splice_used    = tcg_th_splice_used orig_tcg_env

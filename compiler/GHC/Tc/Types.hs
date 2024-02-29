@@ -605,7 +605,9 @@ data TcGblEnv
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
-        tcg_doc_hdr   :: Maybe (LHsDoc GhcRn), -- ^ Maybe Haddock header docs
+        tcg_hdr_info   :: (Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)),
+        -- ^ Maybe Haddock header docs and Maybe located module name
+
         tcg_hpc       :: !AnyHpcUsage,       -- ^ @True@ if any part of the
                                              --  prog uses hpc instrumentation.
            -- NB. BangPattern is to fix a leak, see #15111
