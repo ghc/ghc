@@ -17,7 +17,10 @@
   * Always use `safe` call to `read` for regular files and block devices on unix if the RTS is multi-threaded, regardless of `O_NONBLOCK`.
     ([CLC proposal #166](https://github.com/haskell/core-libraries-committee/issues/166))
   * Export List from Data.List ([CLC proposal #182](https://github.com/haskell/core-libraries-committee/issues/182)).
-  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Add `{-# WARNING in "x-data-list-nonempty-unzip" #-}` to `Data.List.NonEmpty.unzip`.
+    Use `{-# OPTIONS_GHC -Wno-x-data-list-nonempty-unzip #-}` to disable it.
+     ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86)
+     and [CLC proposal #258](https://github.com/haskell/core-libraries-committee/issues/258))
   * Add `System.Mem.performMajorGC` ([CLC proposal #230](https://github.com/haskell/core-libraries-committee/issues/230))
   * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
   * Implement `many` and `some` methods of `instance Alternative (Compose f g)` explicitly. ([CLC proposal #181](https://github.com/haskell/core-libraries-committee/issues/181))
