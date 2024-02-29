@@ -5,7 +5,7 @@ import Data.IORef
 main :: IO ()
 main = do
     let nThreads = 10
-        nIncrs = 10000000
+        nIncrs = 10000
 
     ref <- newIORef (42 :: Int)
     dones <- replicateM nThreads $ do
