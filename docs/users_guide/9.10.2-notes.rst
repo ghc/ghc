@@ -39,6 +39,9 @@ Runtime system
   Users who have fine-tuned the :rts-flag:`-F ⟨factor⟩`, :rts-flag:`-Fd ⟨factor⟩`, or :rts-flag:`-O ⟨size⟩` flags,
   and use the non-moving GC, should see if adjustments are needed in light of this change.
 
+- Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
+
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

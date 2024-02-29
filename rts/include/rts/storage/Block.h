@@ -323,6 +323,10 @@ bdescr *allocGroupOnNode(uint32_t node, W_ n);
 //
 bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
 
+// Allocate a MBlock worth of `n` block sized chunks aligned at `n`-block boundry.
+// This returns a linked list of `bdescr` of length `BLOCKS_PER_MBLOCK / n`.
+bdescr *allocMBlockAlignedGroupOnNode(uint32_t node, W_ n);
+
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
 {
