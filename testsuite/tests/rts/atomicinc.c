@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     CHECK(j == 1);
     CHECK(i == 1);
 
-    j = atomic_dec(&i);
+    j = atomic_dec(&i,1);
     CHECK(j == 0);
     CHECK(i == 0);
 

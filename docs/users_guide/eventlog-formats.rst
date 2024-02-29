@@ -855,6 +855,9 @@ A typical non-moving collection cycle will look something like the following:
 12. A :event-type:`NONMOVING_HEAP_CENSUS` event will be emitted describing the
     fragmentation state of the non-moving heap.
 
+13. A :event-type:`NONMOVING_PRUNED_SEGMENTS` event will be emitted showing
+    information about freeing of segments.
+
 
 .. event-type:: CONC_MARK_BEGIN
 
@@ -928,6 +931,17 @@ heap.
    :field Word32: number of live blocks.
 
    Describes the occupancy of the *blk_sz* sub-heap.
+
+.. event-type:: NONMOVING_PRUNED_SEGMENTS
+
+   :tag: 208
+   :length: fixed
+   :field Word32: number of pruned segments.
+   :field Word32: number of segments remaining on the free list.
+
+   Report the amount of segments pruned and those remaining on the nonmoving
+   heap's segment free list. Segments will be retained on the free list until
+   the entire megablock containing them can be freed.
 
 .. _ticky-event-format:
 

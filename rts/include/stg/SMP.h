@@ -82,13 +82,13 @@ EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n
 EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
 
 /*
- * Atomic decrement
+ * Atomic subtraction by the provided quantity.
  *
- * atomic_dec(p) {
- *   return --(*p);
+ * atomic_dec(p, n) {
+ *   return ((*p) -= n);
  * }
  */
-EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p);
+EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p, StgWord n);
 
 /*
  * Busy-wait nop: this is a hint to the CPU that we are currently in a
@@ -480,9 +480,9 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
 }
 
 EXTERN_INLINE StgWord
-atomic_dec(StgVolatilePtr p)
+atomic_dec(StgVolatilePtr p, StgWord decr)
 {
-    return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST);
+    return __atomic_sub_fetch(p, decr, __ATOMIC_SEQ_CST);
 }
 
 /*
@@ -634,9 +634,9 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
 }
 
 INLINE_HEADER StgWord
-atomic_dec(StgVolatilePtr p)
+atomic_dec(StgVolatilePtr p, StgWord decr)
 {
-    return --(*p);
+    return ((*p) -= decr);
 }
 #endif
 

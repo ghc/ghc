@@ -1154,6 +1154,15 @@ void postNonmovingHeapCensus(uint16_t blk_size,
     RELEASE_LOCK(&eventBufMutex);
 }
 
+void postNonmovingPrunedSegments(uint32_t pruned_segments, uint32_t free_segments)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_NONMOVING_PRUNED_SEGMENTS);
+    postWord32(&eventBuf, pruned_segments);
+    postWord32(&eventBuf, free_segments);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
 void closeBlockMarker (EventsBuf *ebuf)
 {
     if (ebuf->marker)
