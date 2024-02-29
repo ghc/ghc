@@ -1238,6 +1238,7 @@ countNonMovingHeap(struct NonmovingHeap *heap)
     }
     ret += countNonMovingSegments(heap->sweep_list);
     ret += countNonMovingSegments(heap->free);
+    ret += countNonMovingSegments(heap->saved_free);
     return ret;
 }
 

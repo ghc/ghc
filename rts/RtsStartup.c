@@ -454,7 +454,7 @@ hs_exit_(bool wait_foreign)
     uint32_t g, i;
 
     // N.B. atomic_dec returns the new value.
-    StgInt init_count = (StgInt)atomic_dec(&hs_init_count);
+    StgInt init_count = (StgInt)atomic_dec(&hs_init_count, 1);
     if (init_count > 0) {
         // ignore until it's the last one
         return;
