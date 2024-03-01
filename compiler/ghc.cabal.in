@@ -117,6 +117,7 @@ Library
                    filepath   >= 1   && < 1.6,
                    os-string  >= 2.0.1 && < 2.1,
                    template-haskell == 2.22.*,
+                   os-string  >= 2.0.1 && < 2.1,
                    hpc        >= 0.6 && < 0.8,
                    transformers >= 0.5 && < 0.7,
                    exceptions == 0.10.*,

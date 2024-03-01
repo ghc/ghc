@@ -1,6 +1,17 @@
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 -- | Module location
 module GHC.Unit.Module.Location
-   ( ModLocation(..)
+   ( ModLocation
+    ( ..
+    , ml_hs_file
+    , ml_hi_file
+    , ml_dyn_hi_file
+    , ml_obj_file
+    , ml_dyn_obj_file
+    , ml_hie_file
+    )
+   , pattern ModLocation
    , addBootSuffix
    , addBootSuffix_maybe
    , addBootSuffixLocn_maybe
@@ -11,15 +22,19 @@ module GHC.Unit.Module.Location
 where
 
 import GHC.Prelude
+
+import GHC.Data.OsPath
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+
+import qualified System.OsString as OsString
 
 -- | Module Location
 --
 -- Where a module lives on the file system: the actual locations
 -- of the .hs, .hi, .dyn_hi, .o, .dyn_o and .hie files, if we have them.
 --
--- For a module in another unit, the ml_hs_file and ml_obj_file components of
+-- For a module in another unit, the ml_hs_file_ospath and ml_obj_file_ospath components of
 -- ModLocation are undefined.
 --
 -- The locations specified by a ModLocation may or may not
@@ -38,31 +53,31 @@ import GHC.Utils.Outputable
 -- boot suffixes in mkOneShotModLocation.
 
 data ModLocation
-   = ModLocation {
-        ml_hs_file   :: Maybe FilePath,
+   = OsPathModLocation {
+        ml_hs_file_ospath   :: Maybe OsPath,
                 -- ^ The source file, if we have one.  Package modules
                 -- probably don't have source files.
 
-        ml_hi_file   :: FilePath,
+        ml_hi_file_ospath   :: OsPath,
                 -- ^ Where the .hi file is, whether or not it exists
                 -- yet.  Always of form foo.hi, even if there is an
                 -- hi-boot file (we add the -boot suffix later)
 
-        ml_dyn_hi_file :: FilePath,
+        ml_dyn_hi_file_ospath :: OsPath,
                 -- ^ Where the .dyn_hi file is, whether or not it exists
                 -- yet.
 
-        ml_obj_file  :: FilePath,
+        ml_obj_file_ospath  :: OsPath,
                 -- ^ Where the .o file is, whether or not it exists yet.
                 -- (might not exist either because the module hasn't
                 -- been compiled yet, or because it is part of a
                 -- unit with a .a file)
 
-        ml_dyn_obj_file :: FilePath,
+        ml_dyn_obj_file_ospath :: OsPath,
                 -- ^ Where the .dy file is, whether or not it exists
                 -- yet.
 
-        ml_hie_file  :: FilePath
+        ml_hie_file_ospath  :: OsPath
                 -- ^ Where the .hie file is, whether or not it exists
                 -- yet.
   } deriving Show
@@ -71,18 +86,18 @@ instance Outputable ModLocation where
    ppr = text . show
 
 -- | Add the @-boot@ suffix to .hs, .hi and .o files
-addBootSuffix :: FilePath -> FilePath
-addBootSuffix path = path ++ "-boot"
+addBootSuffix :: OsPath -> OsPath
+addBootSuffix path = path `mappend` os "-boot"
 
 -- | Remove the @-boot@ suffix to .hs, .hi and .o files
-removeBootSuffix :: FilePath -> FilePath
-removeBootSuffix "-boot" = []
-removeBootSuffix (x:xs)  = x : removeBootSuffix xs
-removeBootSuffix []      = error "removeBootSuffix: no -boot suffix"
-
+removeBootSuffix :: OsPath -> OsPath
+removeBootSuffix pathWithBootSuffix =
+  case OsString.stripSuffix (os "-boot") pathWithBootSuffix of
+    Just path -> path
+    Nothing -> error "removeBootSuffix: no -boot suffix"
 
 -- | Add the @-boot@ suffix if the @Bool@ argument is @True@
-addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
+addBootSuffix_maybe :: IsBootInterface -> OsPath -> OsPath
 addBootSuffix_maybe is_boot path = case is_boot of
   IsBoot -> addBootSuffix path
   NotBoot -> path
@@ -95,22 +110,50 @@ addBootSuffixLocn_maybe is_boot locn = case is_boot of
 -- | Add the @-boot@ suffix to all file paths associated with the module
 addBootSuffixLocn :: ModLocation -> ModLocation
 addBootSuffixLocn locn
-  = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
-         , ml_hi_file  = addBootSuffix (ml_hi_file locn)
-         , ml_dyn_hi_file = addBootSuffix (ml_dyn_hi_file locn)
-         , ml_obj_file = addBootSuffix (ml_obj_file locn)
-         , ml_dyn_obj_file = addBootSuffix (ml_dyn_obj_file locn)
-         , ml_hie_file = addBootSuffix (ml_hie_file locn) }
+  = locn { ml_hs_file_ospath = fmap addBootSuffix (ml_hs_file_ospath locn)
+         , ml_hi_file_ospath  = addBootSuffix (ml_hi_file_ospath locn)
+         , ml_dyn_hi_file_ospath = addBootSuffix (ml_dyn_hi_file_ospath locn)
+         , ml_obj_file_ospath = addBootSuffix (ml_obj_file_ospath locn)
+         , ml_dyn_obj_file_ospath = addBootSuffix (ml_dyn_obj_file_ospath locn)
+         , ml_hie_file_ospath = addBootSuffix (ml_hie_file_ospath locn) }
 
 -- | Add the @-boot@ suffix to all output file paths associated with the
 -- module, not including the input file itself
 addBootSuffixLocnOut :: ModLocation -> ModLocation
 addBootSuffixLocnOut locn
-  = locn { ml_hi_file  = addBootSuffix (ml_hi_file locn)
-         , ml_dyn_hi_file = addBootSuffix (ml_dyn_hi_file locn)
-         , ml_obj_file = addBootSuffix (ml_obj_file locn)
-         , ml_dyn_obj_file = addBootSuffix (ml_dyn_obj_file locn)
-         , ml_hie_file = addBootSuffix (ml_hie_file locn)
+  = locn { ml_hi_file_ospath = addBootSuffix (ml_hi_file_ospath locn)
+         , ml_dyn_hi_file_ospath = addBootSuffix (ml_dyn_hi_file_ospath locn)
+         , ml_obj_file_ospath = addBootSuffix (ml_obj_file_ospath locn)
+         , ml_dyn_obj_file_ospath = addBootSuffix (ml_dyn_obj_file_ospath locn)
+         , ml_hie_file_ospath = addBootSuffix (ml_hie_file_ospath locn)
          }
 
+-- ----------------------------------------------------------------------------
+-- Helpers for backwards compatibility
+-- ----------------------------------------------------------------------------
 
+pattern ModLocation :: Maybe FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> ModLocation
+pattern ModLocation
+  { ml_hs_file
+  , ml_hi_file
+  , ml_dyn_hi_file
+  , ml_obj_file
+  , ml_dyn_obj_file
+  , ml_hie_file
+  } <- OsPathModLocation
+    { ml_hs_file_ospath = (fmap unsafeDecodeUtf -> ml_hs_file)
+    , ml_hi_file_ospath = (unsafeDecodeUtf -> ml_hi_file)
+    , ml_dyn_hi_file_ospath = (unsafeDecodeUtf -> ml_dyn_hi_file)
+    , ml_obj_file_ospath = (unsafeDecodeUtf -> ml_obj_file)
+    , ml_dyn_obj_file_ospath = (unsafeDecodeUtf -> ml_dyn_obj_file)
+    , ml_hie_file_ospath = (unsafeDecodeUtf -> ml_hie_file)
+    } where
+      ModLocation ml_hs_file ml_hi_file ml_dyn_hi_file ml_obj_file ml_dyn_obj_file ml_hie_file
+        = OsPathModLocation
+          { ml_hs_file_ospath = fmap unsafeEncodeUtf ml_hs_file
+          , ml_hi_file_ospath = unsafeEncodeUtf ml_hi_file
+          , ml_dyn_hi_file_ospath = unsafeEncodeUtf ml_dyn_hi_file
+          , ml_obj_file_ospath = unsafeEncodeUtf ml_obj_file
+          , ml_dyn_obj_file_ospath = unsafeEncodeUtf ml_dyn_obj_file
+          , ml_hie_file_ospath = unsafeEncodeUtf ml_hie_file
+          }
