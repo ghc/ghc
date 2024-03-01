@@ -14,6 +14,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Data.Maybe
+import GHC.Data.OsPath
 import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.Env
@@ -55,13 +56,13 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
             InstalledNotFound files mb_pkg
                 | Just pkg <- mb_pkg
                 , notHomeUnitId mhome_unit pkg
-                -> not_found_in_package pkg files
+                -> not_found_in_package pkg $ fmap unsafeDecodeUtf files
 
                 | null files
                 -> NotAModule
 
                 | otherwise
-                -> CouldntFindInFiles files
+                -> CouldntFindInFiles $ fmap unsafeDecodeUtf files
 
             _ -> panic "cantFindInstalledErr"
 
