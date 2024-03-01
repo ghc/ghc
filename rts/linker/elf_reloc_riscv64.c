@@ -73,8 +73,8 @@ char *relocationTypeToString(Elf64_Xword type) {
 
 typedef uint64_t addr_t;
 
-int64_t decodeAddendRISCV64(Section *section, Elf_Rel *rel) STG_NORETURN;
-bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend);
+int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel) STG_NORETURN;
+bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
 
 /* regular instructions are 32bit */
 typedef uint32_t inst_t;
@@ -83,7 +83,7 @@ typedef uint32_t inst_t;
 typedef uint16_t cinst_t;
 
 // TODO: Decide which functions should be static and/or inlined.
-int64_t decodeAddendRISCV64(Section *section STG_UNUSED,
+int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
   debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not "
              "supported.");
@@ -146,10 +146,11 @@ uint32_t setLO12_S(uint32_t insn, uint32_t imm) {
          (extractBits(imm, 4, 0) << 7);
 }
 
-void setUType(inst_t *loc, uint32_t val) {
+void setUType(inst_t *loc, int32_t val) {
   const unsigned bits = 32;
-  uint64_t hi = val + 0x800;
+  uint32_t hi = val + 0x800;
   checkInt(loc, SignExtend64(hi, bits) >> 12, 20);
+  debugBelch("setUType: hi 0x%x val 0x%x\n", hi, val);
   write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
 }
 
@@ -227,7 +228,7 @@ void setCJType(cinst_t *loc, uint32_t val) {
   write16le(loc, insn);
 }
 
-bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
+bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
   IF_DEBUG(
       linker,
@@ -352,7 +353,7 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int64_t addend) {
  * @param addend  The existing addend. Either explicit or implicit.
  * @return The new computed addend.
  */
-int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
+int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
                       int64_t addend, ObjectCode *oc) {
 
   /* Position where something is relocated */
@@ -504,9 +505,11 @@ int64_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     return 0;
   case R_RISCV_32_PCREL:
     return S + A - P;
-  case R_RISCV_GOT_HI20:
+  case R_RISCV_GOT_HI20: {
     // reduced G + GOT to GOT_S - This might be wrong!
-    return GOT_S + A - P;
+    int32_t result = GOT_S + A - P;
+    return result;
+  }
   default:
     debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
                ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
