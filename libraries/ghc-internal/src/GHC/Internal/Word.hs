@@ -592,7 +592,13 @@ instance Integral Word32 where
     mod    x y = rem x y
     divMod x y = quotRem x y
 
-    toInteger (W32# x#)             = integerFromWord# (word32ToWord# x#)
+    toInteger (W32# x#) =
+#if WORD_SIZE_IN_BITS > 32
+      -- In this case the conversion to Int# cannot overflow.
+      IS (word2Int# (word32ToWord# x#))
+#else
+      integerFromWord# (word32ToWord# x#)
+#endif
 
 -- | @since base-2.01
 instance Bits Word32 where
