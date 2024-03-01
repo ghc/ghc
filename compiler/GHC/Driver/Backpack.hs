@@ -51,7 +51,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
@@ -67,13 +66,13 @@ import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
-import GHC.Unit.Home.ModInfo
 
 import GHC.Linker.Types
 
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
+import GHC.Data.OsPath (unsafeEncodeUtf, os)
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.Data.OsPath as OsPath
@@ -92,6 +91,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Types.Error (mkUnknownDiagnostic)
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -342,15 +344,18 @@ buildUnit session cid insts lunit = do
 
         -- Compile relevant only
         hsc_env <- getSession
-        let home_mod_infos = eltsUDFM (hsc_HPT hsc_env)
-            linkables = map (expectJust "bkp link" . homeModInfoObject)
-                      . filter ((==HsSrcFile) . mi_hsc_src . hm_iface)
-                      $ home_mod_infos
+        let takeLinkables x
+              | mi_hsc_src (hm_iface x) == HsSrcFile
+              = [Just $ expectJust "bkp link" $ homeModInfoObject x]
+              | otherwise
+              = [Nothing]
+        linkables <- liftIO $ catMaybes <$> concatHpt takeLinkables (hsc_HPT hsc_env)
+        let
             getOfiles LM{ linkableUnlinked = us } = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
             state     = hsc_units hsc_env
 
-        let compat_fs = unitIdFS cid
+            compat_fs = unitIdFS cid
             compat_pn = PackageName compat_fs
             unit_id   = homeUnitId (hsc_home_unit hsc_env)
 
@@ -444,15 +449,15 @@ addUnit u = do
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
 
-    let unit_env = ue_setUnits unit_state $ ue_setUnitDbs (Just dbs) $ UnitEnv
+    let unit_env = UnitEnv
           { ue_platform  = targetPlatform dflags
           , ue_namever   = ghcNameVersion dflags
           , ue_current_unit = homeUnitId home_unit
 
           , ue_home_unit_graph =
-                unitEnv_singleton
+                HUG.unitEnv_singleton
                     (homeUnitId home_unit)
-                    (mkHomeUnitEnv dflags (ue_hpt old_unit_env) (Just home_unit))
+                    (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
           , ue_index
           }
@@ -775,7 +780,7 @@ summariseRequirement pn mod_name = do
 
     let PackageName pn_fs = pn
     let location = mkHomeModLocation2 fopts mod_name
-                    (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
+                    (unsafeEncodeUtf $ unpackFS pn_fs </> moduleNameSlashes mod_name) (os "hsig")
 
     env <- getBkpEnv
     src_hash <- liftIO $ getFileHash (bkp_filename env)
@@ -859,12 +864,12 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- these filenames to figure out where the hi files go.
     -- A travesty!
     let location0 = mkHomeModLocation2 fopts modname
-                             (unpackFS unit_fs </>
+                             (unsafeEncodeUtf $ unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of
-                                HsigFile   -> "hsig"
-                                HsBootFile -> "hs-boot"
-                                HsSrcFile  -> "hs")
+                                HsigFile   -> os "hsig"
+                                HsBootFile -> os "hs-boot"
+                                HsSrcFile  -> os "hs")
     -- DANGEROUS: bootifying can POISON the module finder cache
     let location = case hsc_src of
                         HsBootFile -> addBootSuffixLocnOut location0

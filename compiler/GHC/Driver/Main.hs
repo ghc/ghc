@@ -164,7 +164,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -264,6 +264,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
 import GHC.Data.Bag
+import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
@@ -300,7 +301,9 @@ import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-
+import Data.Bifunctor
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.PackageTable
 
 {- **********************************************************************
 %*                                                                      *
@@ -309,11 +312,13 @@ import GHC.Cmm.Config (CmmConfig)
 %********************************************************************* -}
 
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
-newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv top_dir dflags = do
+  hpt <- emptyHomePackageTable
+  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) (home_unit_graph hpt)
   where
-    home_unit_graph = unitEnv_singleton
+    home_unit_graph hpt = HUG.unitEnv_singleton
                         (homeUnitId_ dflags)
-                        (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
+                        (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt Nothing)
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
@@ -321,7 +326,7 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
-    let dflags = homeUnitEnv_dflags $ unitEnv_lookup cur_unit home_unit_graph
+    let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup cur_unit home_unit_graph
     unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
     llvm_config <- initLlvmConfigCache top_dir
     return HscEnv { hsc_dflags         = top_dynflags
@@ -967,23 +972,22 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> IO ()
+add_iface_to_hpt iface details = do
+  let !iface' = set_mi_extra_decls Nothing iface
+  hscInsertHPT (HomeModInfo iface' details emptyHomeModInfoLinkable)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let -- For memory efficiency, HPT is not populated with serialized core bindings.
-        act hpt  =
-          let iface' = iface { mi_extra_decls = Nothing }
-          in addToHpt hpt (moduleName $ mi_module iface')
-                          (HomeModInfo iface' details' emptyHomeModInfoLinkable)
-    let !hsc_env' = hscUpdateHPT act hsc_env
+    add_iface_to_hpt iface details' hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
-    genModDetails hsc_env' iface
+    genModDetails hsc_env iface
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
@@ -1001,14 +1005,10 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
   pure $ LM utc_time this_mod $ {- stub_uls ++ -} bytecode_uls
   where
     go (CoreBindings fi) = do
-        let act hpt  =
-              -- For memory efficiency, HPT is not populated with serialized core bindings.
-              let mod_iface' = mod_iface { mi_extra_decls = Nothing }
-               in addToHpt hpt (moduleName $ mi_module mod_iface')
-                               (HomeModInfo mod_iface' details emptyHomeModInfoLinkable)
         types_var <- newIORef (md_types details)
         let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        let hsc_env' = hsc_env { hsc_type_env_vars = kv }
+        add_iface_to_hpt mod_iface details hsc_env'
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
@@ -1223,7 +1223,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           withTiming logger
               (text "WriteIface"<+>brackets (text iface_name))
               (const ())
-              (writeIface logger profile iface_name iface)
+              (writeIface logger profile (flagsToIfCompression dflags) iface_name iface)
 
     if (write_interface || force_write_interface) then do
 
@@ -1282,7 +1282,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             GHC.Utils.Touch.touch hie_file
     else
         -- See Note [Strictness in ModIface]
-        forceModIface iface
+        return ()
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1642,7 +1642,7 @@ hscCheckSafe' m l = do
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
             hug       = hsc_HUG hsc_env
-            iface     = lookupIfaceByModule hug pkgIfaceT m
+        iface <- liftIO $ lookupIfaceByModule hug pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk
@@ -2124,12 +2124,13 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
              rawCmms
         return stub_c_exists
   where
-    no_loc = ModLocation{ ml_hs_file  = Just original_filename,
-                          ml_hi_file  = panic "hscCompileCmmFile: no hi file",
-                          ml_obj_file = panic "hscCompileCmmFile: no obj file",
-                          ml_dyn_obj_file = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_dyn_hi_file  = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_hie_file = panic "hscCompileCmmFile: no hie file"}
+    no_loc = OsPathModLocation
+        { ml_hs_file_ospath  = Just $ unsafeEncodeUtf original_filename,
+          ml_hi_file_ospath  = panic "hscCompileCmmFile: no hi file",
+          ml_obj_file_ospath = panic "hscCompileCmmFile: no obj file",
+          ml_dyn_obj_file_ospath = panic "hscCompileCmmFile: no dyn obj file",
+          ml_dyn_hi_file_ospath  = panic "hscCompileCmmFile: no dyn obj file",
+          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file"}
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -2363,12 +2364,13 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
-    let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
-                                      ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
-                                      ml_obj_file  = panic "hsDeclsWithLocation:ml_obj_file",
-                                      ml_dyn_obj_file = panic "hsDeclsWithLocation:ml_dyn_obj_file",
-                                      ml_dyn_hi_file = panic "hsDeclsWithLocation:ml_dyn_hi_file",
-                                      ml_hie_file  = panic "hsDeclsWithLocation:ml_hie_file" }
+    let iNTERACTIVELoc = OsPathModLocation
+            { ml_hs_file_ospath   = Nothing,
+              ml_hi_file_ospath   = panic "hsDeclsWithLocation:ml_hi_file_ospath",
+              ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
+              ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
+              ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
+              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath" }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
@@ -2648,12 +2650,13 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
   {- Lint if necessary -}
   lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
-  let this_loc = ModLocation{ ml_hs_file   = Nothing,
-                              ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
-                              ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
-                              ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
-                              ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
-                              ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
+  let this_loc = OsPathModLocation
+          { ml_hs_file_ospath   = Nothing,
+            ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",
+            ml_obj_file_ospath  = panic "hscCompileCoreExpr':ml_obj_file_ospath",
+            ml_dyn_obj_file_ospath = panic "hscCompileCoreExpr': ml_obj_file_ospath",
+            ml_dyn_hi_file_ospath  = panic "hscCompileCoreExpr': ml_dyn_hi_file_ospath",
+            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath" }
 
   -- Ensure module uniqueness by giving it a name like "GhciNNNN".
   -- This uniqueness is needed by the JS linker. Without it we break the 1-1

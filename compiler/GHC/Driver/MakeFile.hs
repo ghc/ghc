@@ -32,6 +32,8 @@ import GHC.Driver.Pipeline.Monad (PipelineOutput (NoOutputFile))
 import GHC.Driver.Session (pgm_F)
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.OsPath (unsafeDecodeUtf, OsPath, OsString)
+import qualified GHC.Data.OsPath as OS
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SourceError
@@ -243,15 +245,15 @@ processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode
   updateJson m_dep_json (updateDepJSON include_pkg_deps pp dep_node deps)
   writeDependencies include_pkg_deps root hdl extra_suffixes dep_node deps
   where
-    extra_suffixes = depSuffixes dflags
+    extra_suffixes = map OS.os (depSuffixes dflags)
     include_pkg_deps = depIncludePkgDeps dflags
-    src_file = msHsFilePath node
+    src_file = msHsFileOsPath node
     dep_node =
       DepNode {
         dn_mod = ms_mod node,
         dn_src = src_file,
-        dn_obj = msObjFilePath node,
-        dn_hi = msHiFilePath node,
+        dn_obj = msObjFileOsPath node,
+        dn_hi = msHiFileOsPath node,
         dn_boot = isBootSummary node,
         dn_options = Set.fromList (ms_opts node)
       }
@@ -285,7 +287,7 @@ processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode
     cpp_deps = do
       session <- Session <$> newIORef hsc_env
       parsedMod <- reflectGhc (GHC.parseModule node) session
-      pure (DepCpp <$> GHC.pm_extra_src_files parsedMod)
+      pure (DepCpp . OS.os <$> GHC.pm_extra_src_files parsedMod)
 
     -- Emit a dependency for each import
     import_deps is_boot idecls =
@@ -309,7 +311,7 @@ findDependency hsc_env srcloc pkg imp dep_boot = do
     Found loc dep_mod ->
       pure DepHi {
         dep_mod,
-        dep_path = ml_hi_file loc,
+        dep_path = ml_hi_file_ospath loc,
         dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod),
         dep_local,
         dep_boot
@@ -329,7 +331,7 @@ writeDependencies ::
   Bool ->
   FilePath ->
   Handle ->
-  [FilePath] ->
+  [OsString] ->
   DepNode ->
   [Dep] ->
   IO ()
@@ -373,7 +375,7 @@ writeDependencies include_pkgs root hdl suffixes node deps =
     DepNode {dn_src, dn_obj, dn_hi, dn_boot} = node
 
 -----------------------------
-writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
+writeDependency :: FilePath -> Handle -> [OsPath] -> OsPath -> IO ()
 -- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
 --      t1 t2 : dep
 writeDependency root hdl targets dep
@@ -381,25 +383,25 @@ writeDependency root hdl targets dep
            --     c:/foo/...
            -- on cygwin as make gets confused by the :
            -- Making relative deps avoids some instances of this.
-           dep' = makeRelative root dep
-           forOutput = escapeSpaces . reslash Forwards . normalise
+           dep' = OS.makeRelative (OS.os root) dep
+           forOutput = escapeSpaces . reslash Forwards . unsafeDecodeUtf . OS.normalise
            output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
        hPutStrLn hdl output
 
 -----------------------------
 insertSuffixes
-        :: FilePath     -- Original filename;   e.g. "foo.o"
-        -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
-        -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
+        :: OsPath     -- Original filename;   e.g. "foo.o"
+        -> [OsString]     -- Suffix prefixes      e.g. ["x_", "y_"]
+        -> [OsPath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
         -- Note that the extra bit gets inserted *before* the old suffix
         -- We assume the old suffix contains no dots, so we know where to
         -- split it
 insertSuffixes file_name extras
-  = [ basename <.> (extra ++ suffix) | extra <- extras ]
+  = [ basename OS.<.> (extra `mappend` suffix) | extra <- extras ]
   where
-    (basename, suffix) = case splitExtension file_name of
+    (basename, suffix) = case OS.splitExtension file_name of
                          -- Drop the "." from the extension
-                         (b, s) -> (b, drop 1 s)
+                         (b, s) -> (b, OS.drop 1 s)
 
 
 -----------------------------------------------------------------

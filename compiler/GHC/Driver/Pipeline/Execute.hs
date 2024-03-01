@@ -58,6 +58,7 @@ import GHC.Iface.Make
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
 import GHC.Data.StringBuffer
+import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Types.SourceError
 import GHC.Unit.Finder
 import Data.IORef
@@ -610,7 +611,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
               -- extra_decl is not used any more after writing the interface in the interpreter mode
               -- since byte-code is already generated.
-              let final_iface' = final_iface { mi_extra_decls = Nothing }
+              let final_iface' = set_mi_extra_decls Nothing final_iface
               bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface', emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
@@ -772,7 +773,7 @@ mkOneShotModLocation :: PipeEnv -> DynFlags -> HscSource -> ModuleName -> IO Mod
 mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     let PipeEnv{ src_basename=basename,
              src_suffix=suff } = pipe_env
-    let location1 = mkHomeModLocation2 fopts mod_name basename suff
+    let location1 = mkHomeModLocation2 fopts mod_name (unsafeEncodeUtf basename) (unsafeEncodeUtf suff)
 
     -- Boot-ify it if necessary
     let location2
@@ -784,11 +785,11 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     -- This can't be done in mkHomeModuleLocation because
     -- it only applies to the module being compiles
     let ohi = outputHi dflags
-        location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
+        location3 | Just fn <- ohi = location2{ ml_hi_file_ospath = unsafeEncodeUtf  fn }
                   | otherwise      = location2
 
     let dynohi = dynOutputHi dflags
-        location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file = fn }
+        location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file_ospath = unsafeEncodeUtf fn }
                   | otherwise         = location3
 
     -- Take -o into account if present
@@ -802,10 +803,10 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
         location5 | Just ofile <- expl_o_file
                   , let dyn_ofile = fromMaybe (ofile -<.> dynObjectSuf_ dflags) expl_dyn_o_file
                   , isNoLink (ghcLink dflags)
-                  = location4 { ml_obj_file = ofile
-                              , ml_dyn_obj_file = dyn_ofile }
+                  = location4 { ml_obj_file_ospath = unsafeEncodeUtf ofile
+                              , ml_dyn_obj_file_ospath = unsafeEncodeUtf dyn_ofile }
                   | Just dyn_ofile <- expl_dyn_o_file
-                  = location4 { ml_dyn_obj_file = dyn_ofile }
+                  = location4 { ml_dyn_obj_file_ospath = unsafeEncodeUtf dyn_ofile }
                   | otherwise = location4
     return location5
     where

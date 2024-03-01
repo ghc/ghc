@@ -9,8 +9,8 @@
 module GHC.Data.Strict (
     Maybe(Nothing, Just),
     fromMaybe,
+    GHC.Data.Strict.maybe,
     Pair(And),
-
     -- Not used at the moment:
     --
     -- Either(Left, Right),
@@ -18,6 +18,7 @@ module GHC.Data.Strict (
   ) where
 
 import GHC.Prelude hiding (Maybe(..), Either(..))
+
 import Control.Applicative
 import Data.Semigroup
 import Data.Data
@@ -28,6 +29,10 @@ data Maybe a = Nothing | Just !a
 fromMaybe :: a -> Maybe a -> a
 fromMaybe d Nothing = d
 fromMaybe _ (Just x) = x
+
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe d _ Nothing = d
+maybe _ f (Just x) = f x
 
 apMaybe :: Maybe (a -> b) -> Maybe a -> Maybe b
 apMaybe (Just f) (Just x) = Just (f x)

@@ -14,8 +14,9 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Panic.Plain
+import GHC.Iface.Type (putIfaceType)
 
-fingerprintBinMem :: BinHandle -> IO Fingerprint
+fingerprintBinMem :: WriteBinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
   where
     f bs =
@@ -26,7 +27,7 @@ fingerprintBinMem bh = withBinBuffer bh f
         in fp `seq` return fp
 
 computeFingerprint :: (Binary a)
-                   => (BinHandle -> Name -> IO ())
+                   => (WriteBinHandle -> Name -> IO ())
                    -> a
                    -> IO Fingerprint
 computeFingerprint put_nonbinding_name a = do
@@ -34,12 +35,16 @@ computeFingerprint put_nonbinding_name a = do
     put_ bh a
     fingerprintBinMem bh
   where
-    set_user_data bh =
-      setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
+    set_user_data bh = setWriterUserData bh $ mkWriterUserData
+      [ mkSomeBinaryWriter $ mkWriter putIfaceType
+      , mkSomeBinaryWriter $ mkWriter put_nonbinding_name
+      , mkSomeBinaryWriter $ simpleBindingNameWriter $ mkWriter putNameLiterally
+      , mkSomeBinaryWriter $ mkWriter putFS
+      ]
 
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.
-putNameLiterally :: BinHandle -> Name -> IO ()
+putNameLiterally :: WriteBinHandle -> Name -> IO ()
 putNameLiterally bh name = assert (isExternalName name) $ do
     put_ bh $! nameModule name
     put_ bh $! nameOccName name

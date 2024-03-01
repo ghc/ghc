@@ -1,6 +1,7 @@
 
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 
@@ -63,6 +64,7 @@ import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
+import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv)
@@ -75,7 +77,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
-import GHC.Unit.Home.ModInfo (lookupHpt)
+import GHC.Unit.Home.PackageTable (lookupHpt)
 
 import Data.Array
 import Data.Coerce (coerce)
@@ -119,14 +121,14 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
-             mapM schemeTopBind flattened_binds
+             FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
              (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
-           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
         cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs
           (case modBreaks of
@@ -388,22 +390,22 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs mod) rhs) = do
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
   current_mod_breaks <- getCurrentModBreaks
-  case break_info hsc_env mod current_mod current_mod_breaks of
-    Nothing -> pure code
-    Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr, modBreaks_ccs = cc_arr} -> do
-      platform <- profilePlatform <$> getProfile
-      let idOffSets = getVarOffSets platform d p fvs
-          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-          breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
-      newBreakInfo tick_no breakInfo
-      let cc | Just interp <- hsc_interp hsc_env
-            , interpreterProfiled interp
-            = cc_arr ! tick_no
-            | otherwise = toRemotePtr nullPtr
-          breakInstr = BRK_FUN breaks (fromIntegral tick_no) mod_ptr cc
-      return $ breakInstr `consOL` code
+  break_info hsc_env mod current_mod current_mod_breaks >>= \case
+      Nothing -> pure code
+      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr, modBreaks_ccs = cc_arr} -> do
+        platform <- profilePlatform <$> getProfile
+        let idOffSets = getVarOffSets platform d p fvs
+            ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+            toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+            toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+        newBreakInfo tick_no breakInfo
+        let cc | Just interp <- hsc_interp hsc_env
+              , interpreterProfiled interp
+              = cc_arr ! tick_no
+              | otherwise = toRemotePtr nullPtr
+            breakInstr = BRK_FUN breaks (fromIntegral tick_no) mod_ptr cc
+        return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 -- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
@@ -431,14 +433,14 @@ break_info ::
   Module ->
   Module ->
   Maybe ModBreaks ->
-  Maybe ModBreaks
+  BcM (Maybe ModBreaks)
 break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
-  = check_mod_ptr =<< current_mod_breaks
-  | Just hp <- lookupHpt (hsc_HPT hsc_env) (moduleName mod)
-  = check_mod_ptr (getModBreaks hp)
+  = pure $ check_mod_ptr =<< current_mod_breaks
   | otherwise
-  = Nothing
+  = ioToBc (lookupHpt (hsc_HPT hsc_env) (moduleName mod)) >>= \case
+      Just hp -> pure $ check_mod_ptr (getModBreaks hp)
+      Nothing -> pure Nothing
   where
     check_mod_ptr mb
       | mod_ptr <- modBreaks_module mb
