@@ -828,9 +828,10 @@ We want to generate:
   RULE forall @a d1 d2 d3 x xs.
      f @Int @p @p (d1::Eq p) (d2::Eq p) (d3::Ord Int) y y True
         = $sf @p d1 y
-  $sf @p (d1::Eq p) (y::p)
-     = let d3 = $fOrdInt
-           d2 = d1
+  $sf @p (dx::Eq p) (y::p)
+     = let d1 = dx
+           d2 = dx
+           d3 = $fOrdInt
        in <f-rhs> @p @p @Int (d1::Eq p) (d2::Eq p) (d3::OrdInt) y y True
 
 Note that
@@ -848,7 +849,8 @@ Note that
 -}
 
 tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
-  = do { skol_info <- mkSkolemInfo (SpecESkol nm)
+  = do { let skol_info_anon = SpecESkol nm
+       ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tc_lvl, wanted, (id_bndrs, spec_e', rho))
             <- pushLevelAndCaptureConstraints $
                do { (tv_bndrs, id_bndrs) <- tcRuleBndrs skol_info bndrs
@@ -863,36 +865,48 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
        -- Apply the unifications
        ; seed_tys <- liftZonkM (mapM zonkTcType (rho : map idType id_bndrs))
 
+       -- Quantify
        ; let (quant_cts, residual_wanted) = getRuleQuantCts wanted
              quant_preds = ctsPreds quant_cts
-
+             quant_wc    = mkSimpleWC quant_cts
        ; dvs <- candidateQTyVarsOfTypes (quant_preds ++ seed_tys)
        ; let grown_tcvs = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
        ;     weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
-       ; skol_info <- mkSkolemInfo (SpecESkol nm)
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
-       ; bound_evs <- mk_quant_evs quant_cts
-       ; (implic, ev_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info)
-                                                   qtkvs bound_evs residual_wanted
-       ; emitImplications implic
 
-       ; spec_binds_var <- newTcEvBinds
-       ; spec_cts <- setTcLevel tc_lvl $
-                     runTcSWithEvBinds spec_binds_var $
-                     solveWanteds (mkSimpleWC quant_cts)
+       -- Left hand side of the RULE
+       ; rule_evs <- mk_quant_evs quant_cts
+       ; (implic1, lhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
+                                                     qtkvs rule_evs residual_wanted
+       ; let lhs_expr = mkHsDictLet lhs_binds spec_e'
 
-       ; spec_evs  <- mk_quant_evs spec_cts
+       -- Right hand side of the RULE
+       ; (spec_cts, _) <- setTcLevel tc_lvl $ runTcS $
+                          solveWanteds quant_wc
 
-       ; let bndrs'   = mkTcRuleBndrs bndrs (qtkvs ++ bound_evs ++ id_bndrs)
-             lhs_expr = mkHsDictLet ev_binds spec_e'
+       -- No need to zonk; any unifications have happened already
+       ; let min_spec_cts :: [Ct]
+             min_spec_cts = mkMinimalBySCs ctPred $
+                            bagToList             $
+                            approximateWC True spec_cts
+
+       -- rhs_binds uses spec_evs to build rule_evs
+       ; spec_evs < mapM (newEvVar . ctPred) min_spec_cts
+       ; (implic2, rhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
+                                                     qtkvs spec_evs quant_wc
+
+       ; emitImplications (implic1 `unionBags` implic2)
+
        ; traceTc "tcSpecPrag:SpecSigE" $
          vcat [ text "bndrs:" <+> ppr bndrs'
               , text "full_e:" <+> ppr full_e'
               , text "inl:" <+> ppr inl ]
-       ; return [SpecPragE (qtkvs ++ bound_evs ++ id_bndrs) lhs_expr
-                           (qtkvs ++ spec_evs  ++ id_bndrs) (TcEvBinds spec_binds_var)
-                           inl] }
-
+       ; return [SpecPragE { spe_bndrs      = qtkvs ++ rule_evs ++ id_bndrs
+                           , spe_lhs        = lhs_expr
+                           , spe_rhs        = map ctEvTerm min_spec_cst
+                           , spe_spec_bndrs = qtkvs ++ spec_evs ++ id_bndrs
+                           , spe_spec_binds = rhs_binds
+                           , spe_inl = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 

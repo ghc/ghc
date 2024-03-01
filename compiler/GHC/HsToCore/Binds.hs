@@ -844,7 +844,9 @@ finishSpecPrag :: Maybe CoreExpr  -- See the first param of dsSpec
                -> CoreExpr        -- LHS pattern
                -> InlinePragma
                -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-finishSpecPrag mb_poly_rhs spec_bndrs rule_lhs spec_inl
+finishSpecPrag mb_poly_rhs rule_bndrs rule_lhs
+               spec_bndrs spec_bindsno
+               spec_inl
   = do { dflags <- getDynFlags
        ; case decomposeRuleLhs dflags spec_bndrs rule_lhs (mkVarSet spec_bndrs) of {
            Left msg    -> do { diagnosticDs msg; return Nothing } ;
