@@ -8,6 +8,7 @@ import qualified Data.Map as Map
 
 import GHC.BaseDir
 import GHC.Platform.ArchOS
+import System.FilePath
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead str = case reads str of
@@ -41,6 +42,12 @@ getTargetArchOS
 getTargetArchOS settingsFile settings =
   ArchOS <$> readRawSetting settingsFile settings "target arch"
          <*> readRawSetting settingsFile settings "target os"
+
+getGlobalPackageDb :: FilePath -> RawSettings -> Either String FilePath
+getGlobalPackageDb settingsFile settings = do
+  rel_db <- getRawSetting settingsFile settings "Raw Global Package DB"
+  return (dropFileName settingsFile </> rel_db)
+
 
 
 getRawSetting
