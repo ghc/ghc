@@ -1578,8 +1578,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        let (root_errs, rootSummariesOk) = partitionEithers rootSummaries -- #17549
            root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
-       (deps, pkg_deps, map0) <- loopSummaries rootSummariesOk (M.empty, Set.empty, root_map)
-       let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env) (hsc_all_home_unit_ids hsc_env) (Set.toList pkg_deps)
+       (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
+       let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env)
        let unit_env = hsc_unit_env hsc_env
        let tmpfs    = hsc_tmpfs    hsc_env
 
@@ -1673,19 +1673,19 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         -- This loops over all the mod summaries in the dependency graph, accumulates the actual dependencies for each module/unit
         loopSummaries :: [ModSummary]
-              -> (M.Map NodeKey ModuleGraphNode, Set.Set (UnitId, UnitId),
+              -> (M.Map NodeKey ModuleGraphNode,
                     DownsweepCache)
-              -> IO ((M.Map NodeKey ModuleGraphNode), Set.Set (UnitId, UnitId), DownsweepCache)
+              -> IO ((M.Map NodeKey ModuleGraphNode), DownsweepCache)
         loopSummaries [] done = return done
-        loopSummaries (ms:next) (done, pkgs, summarised)
+        loopSummaries (ms:next) (done, summarised)
           | Just {} <- M.lookup k done
-          = loopSummaries next (done, pkgs, summarised)
+          = loopSummaries next (done, summarised)
           -- Didn't work out what the imports mean yet, now do that.
           | otherwise = do
-             (final_deps, pkgs1, done', summarised') <- loopImports (calcDeps ms) done summarised
+             (final_deps, done', summarised') <- loopImports (calcDeps ms) done summarised
              -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
-             (_, _, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
-             loopSummaries next (M.insert k (ModuleNode final_deps ms) done'', pkgs1 `Set.union` pkgs, summarised'')
+             (_, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
+             loopSummaries next (M.insert k (ModuleNode final_deps ms) done'', summarised'')
           where
             k = NodeKey_Module (msKey ms)
 
@@ -1705,18 +1705,17 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO ([NodeKey], Set.Set (UnitId, UnitId),
-
+             -> IO ([NodeKey],
                   M.Map NodeKey ModuleGraphNode, DownsweepCache)
                         -- The result is the completed NodeMap
-        loopImports [] done summarised = return ([], Set.empty, done, summarised)
+        loopImports [] done summarised = return ([], done, summarised)
         loopImports ((home_uid,mb_pkg, gwib) : ss) done summarised
           | Just summs <- M.lookup cache_key summarised
           = case summs of
               [Right ms] -> do
                 let nk = NodeKey_Module (msKey ms)
-                (rest, pkgs, summarised', done') <- loopImports ss done summarised
-                return (nk: rest, pkgs, summarised', done')
+                (rest, summarised', done') <- loopImports ss done summarised
+                return (nk: rest, summarised', done')
               [Left _err] ->
                 loopImports ss done summarised
               _errs ->  do
@@ -1728,69 +1727,77 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                                        Nothing excl_mods
                case mb_s of
                    NotThere -> loopImports ss done summarised
-                   External uid -> do
-                    (other_deps, pkgs, done', summarised') <- loopImports ss done summarised
-                    return (other_deps, Set.insert (homeUnitId home_unit, uid) pkgs, done', summarised')
+                   External _ -> do
+                    (other_deps, done', summarised') <- loopImports ss done summarised
+                    return (other_deps, done', summarised')
                    FoundInstantiation iud -> do
-                    (other_deps, pkgs, done', summarised') <- loopImports ss done summarised
-                    return (NodeKey_Unit iud : other_deps, pkgs, done', summarised')
+                    (other_deps, done', summarised') <- loopImports ss done summarised
+                    return (NodeKey_Unit iud : other_deps, done', summarised')
                    FoundHomeWithError (_uid, e) ->  loopImports ss done (Map.insert cache_key [(Left e)] summarised)
                    FoundHome s -> do
-                     (done', pkgs1, summarised') <-
-                       loopSummaries [s] (done, Set.empty, Map.insert cache_key [Right s] summarised)
-                     (other_deps, pkgs2, final_done, final_summarised) <- loopImports ss done' summarised'
+                     (done', summarised') <-
+                       loopSummaries [s] (done, Map.insert cache_key [Right s] summarised)
+                     (other_deps, final_done, final_summarised) <- loopImports ss done' summarised'
 
                      -- MP: This assumes that we can only instantiate non home units, which is probably fair enough for now.
-                     return (NodeKey_Module (msKey s) : other_deps, pkgs1 `Set.union` pkgs2, final_done, final_summarised)
+                     return (NodeKey_Module (msKey s) : other_deps, final_done, final_summarised)
           where
             cache_key = (home_uid, mb_pkg, unLoc <$> gwib)
             home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
 
--- This function checks then important property that if both p and q are home units
+-- | This function checks then important property that if both p and q are home units
 -- then any dependency of p, which transitively depends on q is also a home unit.
-checkHomeUnitsClosed ::  UnitEnv -> Set.Set UnitId -> [(UnitId, UnitId)] -> [DriverMessages]
--- Fast path, trivially closed.
-checkHomeUnitsClosed ue home_id_set home_imp_ids
-  | Set.size home_id_set == 1 = []
-  | otherwise =
-  let res = foldMap loop home_imp_ids
-  -- Now check whether everything which transitively depends on a home_unit is actually a home_unit
-  -- These units are the ones which we need to load as home packages but failed to do for some reason,
-  -- it's a bug in the tool invoking GHC.
-      bad_unit_ids = Set.difference res home_id_set
-  in if Set.null bad_unit_ids
-        then []
-        else [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
-
+--
+-- See Note [Multiple Home Units], section 'Closure Property'.
+checkHomeUnitsClosed ::  UnitEnv -> [DriverMessages]
+checkHomeUnitsClosed ue
+    | Set.null bad_unit_ids = []
+    | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
   where
+    home_id_set = unitEnv_keys $ ue_home_unit_graph ue
+    bad_unit_ids = upwards_closure Set.\\ home_id_set
     rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
-    -- TODO: This could repeat quite a bit of work but I struggled to write this function.
-    -- Which units transitively depend on a home unit
-    loop :: (UnitId, UnitId) -> Set.Set UnitId -- The units which transitively depend on a home unit
-    loop (from_uid, uid) =
-      let us = ue_findHomeUnitEnv from_uid ue in
-      let um = unitInfoMap (homeUnitEnv_units us) in
-      case lookupUniqMap um uid of
-        Nothing -> pprPanic "uid not found" (ppr uid)
-        Just ui ->
-          let depends = unitDepends ui
-              home_depends = Set.fromList depends `Set.intersection` home_id_set
-              other_depends = Set.fromList depends `Set.difference` home_id_set
-          in
-            -- Case 1: The unit directly depends on a home_id
-            if not (null home_depends)
-              then
-                let res = foldMap (loop . (from_uid,)) other_depends
-                in Set.insert uid res
-             -- Case 2: Check the rest of the dependencies, and then see if any of them depended on
-              else
-                let res = foldMap (loop . (from_uid,)) other_depends
-                in
-                  if not (Set.null res)
-                    then Set.insert uid res
-                    else res
+
+    graph :: Graph (Node UnitId UnitId)
+    graph = graphFromEdgedVerticesUniq graphNodes
+
+    -- downwards closure of graph
+    downwards_closure
+      = graphFromEdgedVerticesUniq [ DigraphNode uid uid (Set.toList deps)
+                                   | (uid, deps) <- M.toList (allReachable graph node_key)]
+
+    inverse_closure = transposeG downwards_closure
+
+    upwards_closure = Set.fromList $ map node_key $ reachablesG inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
+
+    all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
+    all_unit_direct_deps
+      = unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
+      where
+        go rest this this_uis =
+           plusUniqMap_C Set.union
+             (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
+             rest
+           where
+             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
+             this_units = homeUnitEnv_units this_uis
+             this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
+
+    graphNodes :: [Node UnitId UnitId]
+    graphNodes = go Set.empty home_id_set
+      where
+        go done todo
+          = case Set.minView todo of
+              Nothing -> []
+              Just (uid, todo')
+                | Set.member uid done -> go done todo'
+                | otherwise -> case lookupUniqMap all_unit_direct_deps uid of
+                    Nothing -> pprPanic "uid not found" (ppr (uid, all_unit_direct_deps))
+                    Just depends ->
+                      let todo'' = (depends Set.\\ done) `Set.union` todo'
+                      in DigraphNode uid uid (Set.toList depends) : go (Set.insert uid done) todo''
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs template haskell. We enable codegen to
