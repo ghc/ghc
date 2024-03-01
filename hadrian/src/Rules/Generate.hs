@@ -422,6 +422,7 @@ generateSettings = do
         , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
+        , ("Relative Global Package DB", return "package.conf.d" )
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of

@@ -3611,7 +3611,8 @@ compilerInfo dflags
        ("GHC Profiled",                showBool hostIsProfiled),
        ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
-       -- The path of the global package database used by GHC
+       -- This is always an absolute path, unlike "Relative Global Package DB" which is
+       -- in the settings file.
        ("Global Package DB",           globalPackageDatabasePath dflags)
       ]
   where
