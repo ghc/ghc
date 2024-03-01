@@ -74,6 +74,7 @@ import GHC.Linker.Types
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
+import GHC.Data.OsPath (unsafeEncodeUtf, os)
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.Data.EnumSet as EnumSet
@@ -772,7 +773,7 @@ summariseRequirement pn mod_name = do
 
     let PackageName pn_fs = pn
     let location = mkHomeModLocation2 fopts mod_name
-                    (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
+                    (unsafeEncodeUtf $ unpackFS pn_fs </> moduleNameSlashes mod_name) (os "hsig")
 
     env <- getBkpEnv
     src_hash <- liftIO $ getFileHash (bkp_filename env)
@@ -855,12 +856,12 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- these filenames to figure out where the hi files go.
     -- A travesty!
     let location0 = mkHomeModLocation2 fopts modname
-                             (unpackFS unit_fs </>
+                             (unsafeEncodeUtf $ unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of
-                                HsigFile   -> "hsig"
-                                HsBootFile -> "hs-boot"
-                                HsSrcFile  -> "hs")
+                                HsigFile   -> os "hsig"
+                                HsBootFile -> os "hs-boot"
+                                HsSrcFile  -> os "hs")
     -- DANGEROUS: bootifying can POISON the module finder cache
     let location = case hsc_src of
                         HsBootFile -> addBootSuffixLocnOut location0

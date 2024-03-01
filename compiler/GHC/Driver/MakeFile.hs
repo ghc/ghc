@@ -24,6 +24,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.OsPath (unsafeDecodeUtf)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SourceError
@@ -252,7 +253,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
           -- files if the module has a corresponding .hs-boot file (#14482)
         ; when (isBootSummary node == IsBoot) $ do
             let hi_boot = msHiFilePath node
-            let obj     = removeBootSuffix (msObjFilePath node)
+            let obj     = unsafeDecodeUtf $ removeBootSuffix (msObjFileOsPath node)
             forM_ extra_suffixes $ \suff -> do
                let way_obj     = insertSuffixes obj     [suff]
                let way_hi_boot = insertSuffixes hi_boot [suff]
@@ -297,7 +298,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
         | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+        -> return (Just (unsafeDecodeUtf $ addBootSuffix_maybe is_boot (ml_hi_file_ospath loc)))
 
         -- Not in this package: we don't need a dependency
         | otherwise

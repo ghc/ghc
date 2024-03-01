@@ -3,6 +3,7 @@
 {-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -76,6 +77,7 @@ module GHC (
         ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
         mgLookupModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
+        pattern ModLocation,
         getModSummary,
         getModuleGraph,
         isLoaded,

@@ -17,6 +17,11 @@ module GHC.Unit.Module.ModSummary
    , msHsFilePath
    , msObjFilePath
    , msDynObjFilePath
+   , msHsFileOsPath
+   , msHiFileOsPath
+   , msDynHiFileOsPath
+   , msObjFileOsPath
+   , msDynObjFileOsPath
    , msDeps
    , isBootSummary
    , findTarget
@@ -38,6 +43,7 @@ import GHC.Types.Target
 import GHC.Types.PkgQual
 
 import GHC.Data.Maybe
+import GHC.Data.OsPath (OsPath)
 import GHC.Data.StringBuffer ( StringBuffer )
 
 import GHC.Utils.Fingerprint
@@ -145,6 +151,13 @@ msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msDynHiFilePath ms = ml_dyn_hi_file (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
+
+msHsFileOsPath, msDynHiFileOsPath, msHiFileOsPath, msObjFileOsPath, msDynObjFileOsPath :: ModSummary -> OsPath
+msHsFileOsPath  ms = expectJust "msHsFilePath" (ml_hs_file_ospath  (ms_location ms))
+msHiFileOsPath  ms = ml_hi_file_ospath  (ms_location ms)
+msDynHiFileOsPath ms = ml_dyn_hi_file_ospath (ms_location ms)
+msObjFileOsPath ms = ml_obj_file_ospath (ms_location ms)
+msDynObjFileOsPath ms = ml_dyn_obj_file_ospath (ms_location ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
 isBootSummary :: ModSummary -> IsBootInterface
