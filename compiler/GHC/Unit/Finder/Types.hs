@@ -9,6 +9,7 @@ where
 
 import GHC.Prelude
 import GHC.Unit
+import qualified GHC.Data.Strict as Strict
 import qualified Data.Map as M
 import GHC.Fingerprint
 import GHC.Platform.Ways
@@ -16,6 +17,7 @@ import GHC.Platform.Ways
 import Data.IORef
 import GHC.Data.FastString
 import qualified Data.Set as Set
+import System.OsPath (OsPath)
 
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
@@ -31,7 +33,7 @@ data FinderCache = FinderCache { fcModuleCache :: (IORef FinderCacheState)
 data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
   | InstalledNoPackage UnitId
-  | InstalledNotFound [FilePath] (Maybe UnitId)
+  | InstalledNotFound [OsPath] (Maybe UnitId)
 
 -- | The result of searching for an imported module.
 --
@@ -70,7 +72,7 @@ data FindResult
 --
 -- Should be taken from 'DynFlags' via 'initFinderOpts'.
 data FinderOpts = FinderOpts
-  { finder_importPaths :: [FilePath]
+  { finder_importPaths :: [OsPath]
       -- ^ Where are we allowed to look for Modules and Source files
   , finder_lookupHomeInterfaces :: Bool
       -- ^ When looking up a home module:
@@ -88,17 +90,17 @@ data FinderOpts = FinderOpts
   , finder_enableSuggestions :: Bool
       -- ^ If we encounter unknown modules, should we suggest modules
       -- that have a similar name.
-  , finder_workingDirectory :: Maybe FilePath
+  , finder_workingDirectory :: Strict.Maybe OsPath
   , finder_thisPackageName  :: Maybe FastString
   , finder_hiddenModules    :: Set.Set ModuleName
   , finder_reexportedModules :: Set.Set ModuleName
-  , finder_hieDir :: Maybe FilePath
-  , finder_hieSuf :: String
-  , finder_hiDir :: Maybe FilePath
-  , finder_hiSuf :: String
-  , finder_dynHiSuf :: String
-  , finder_objectDir :: Maybe FilePath
-  , finder_objectSuf :: String
-  , finder_dynObjectSuf :: String
-  , finder_stubDir :: Maybe FilePath
+  , finder_hieDir :: Strict.Maybe OsPath
+  , finder_hieSuf :: OsPath
+  , finder_hiDir :: Strict.Maybe OsPath
+  , finder_hiSuf :: OsPath
+  , finder_dynHiSuf :: OsPath
+  , finder_objectDir :: Strict.Maybe OsPath
+  , finder_objectSuf :: OsPath
+  , finder_dynObjectSuf :: OsPath
+  , finder_stubDir :: Strict.Maybe OsPath
   } deriving Show
