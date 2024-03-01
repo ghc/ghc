@@ -297,7 +297,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
         | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+        -> return (Just (unsafeDecodeUtf $ addBootSuffix_maybe is_boot (ml_hi_file_ loc)))
 
         -- Not in this package: we don't need a dependency
         | otherwise

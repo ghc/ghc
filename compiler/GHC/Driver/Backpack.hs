@@ -772,7 +772,7 @@ summariseRequirement pn mod_name = do
 
     let PackageName pn_fs = pn
     let location = mkHomeModLocation2 fopts mod_name
-                    (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
+                    (unsafeEncodeUtf $ unpackFS pn_fs </> moduleNameSlashes mod_name) (unsafeEncodeUtf "hsig")
 
     env <- getBkpEnv
     src_hash <- liftIO $ getFileHash (bkp_filename env)
@@ -855,12 +855,12 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- these filenames to figure out where the hi files go.
     -- A travesty!
     let location0 = mkHomeModLocation2 fopts modname
-                             (unpackFS unit_fs </>
+                             (unsafeEncodeUtf $ unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of
-                                HsigFile   -> "hsig"
-                                HsBootFile -> "hs-boot"
-                                HsSrcFile  -> "hs")
+                                HsigFile   -> unsafeEncodeUtf "hsig"
+                                HsBootFile -> unsafeEncodeUtf "hs-boot"
+                                HsSrcFile  -> unsafeEncodeUtf "hs")
     -- DANGEROUS: bootifying can POISON the module finder cache
     let location = case hsc_src of
                         HsBootFile -> addBootSuffixLocnOut location0

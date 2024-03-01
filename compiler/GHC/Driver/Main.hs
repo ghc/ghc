@@ -262,6 +262,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
 import GHC.Data.Bag
+import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
@@ -286,6 +287,7 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
 import System.IO
+import System.OsPath (OsPath)
 import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
 
@@ -541,9 +543,9 @@ hscParse' mod_summary
                             $ filter (not . isPrefixOf "<")
                             $ map unpackFS
                             $ srcfiles pst
-                srcs1 = case ml_hs_file (ms_location mod_summary) of
-                          Just f  -> filter (/= FilePath.normalise f) srcs0
-                          Nothing -> srcs0
+                srcs1 = case ml_hs_file_ (ms_location mod_summary) of
+                          Strict.Just f  -> filter (/= FilePath.normalise (unsafeDecodeUtf f)) srcs0
+                          Strict.Nothing -> srcs0
 
             -- sometimes we see source files from earlier
             -- preprocessing stages that cannot be found, so just
@@ -2087,12 +2089,12 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
              rawCmms
         return stub_c_exists
   where
-    no_loc = ModLocation{ ml_hs_file  = Just original_filename,
-                          ml_hi_file  = panic "hscCompileCmmFile: no hi file",
-                          ml_obj_file = panic "hscCompileCmmFile: no obj file",
-                          ml_dyn_obj_file = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_dyn_hi_file  = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_hie_file = panic "hscCompileCmmFile: no hie file"}
+    no_loc = ModLocation{ ml_hs_file_  = Strict.Just $ unsafeEncodeUtf original_filename,
+                          ml_hi_file_  = panic "hscCompileCmmFile: no hi file",
+                          ml_obj_file_ = panic "hscCompileCmmFile: no obj file",
+                          ml_dyn_obj_file_ = panic "hscCompileCmmFile: no dyn obj file",
+                          ml_dyn_hi_file_  = panic "hscCompileCmmFile: no dyn obj file",
+                          ml_hie_file_ = panic "hscCompileCmmFile: no hie file"}
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -2327,12 +2329,12 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
-    let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
-                                      ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
-                                      ml_obj_file  = panic "hsDeclsWithLocation:ml_obj_file",
-                                      ml_dyn_obj_file = panic "hsDeclsWithLocation:ml_dyn_obj_file",
-                                      ml_dyn_hi_file = panic "hsDeclsWithLocation:ml_dyn_hi_file",
-                                      ml_hie_file  = panic "hsDeclsWithLocation:ml_hie_file" }
+    let iNTERACTIVELoc = ModLocation{ ml_hs_file_   = Strict.Nothing,
+                                      ml_hi_file_   = panic "hsDeclsWithLocation:ml_hi_file",
+                                      ml_obj_file_  = panic "hsDeclsWithLocation:ml_obj_file",
+                                      ml_dyn_obj_file_ = panic "hsDeclsWithLocation:ml_dyn_obj_file",
+                                      ml_dyn_hi_file_ = panic "hsDeclsWithLocation:ml_dyn_hi_file",
+                                      ml_hie_file_  = panic "hsDeclsWithLocation:ml_hie_file" }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
@@ -2611,12 +2613,12 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
   {- Lint if necessary -}
   lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
-  let this_loc = ModLocation{ ml_hs_file   = Nothing,
-                              ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
-                              ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
-                              ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
-                              ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
-                              ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
+  let this_loc = ModLocation{ ml_hs_file_   = Strict.Nothing,
+                              ml_hi_file_   = panic "hscCompileCoreExpr':ml_hi_file",
+                              ml_obj_file_  = panic "hscCompileCoreExpr':ml_obj_file",
+                              ml_dyn_obj_file_ = panic "hscCompileCoreExpr': ml_obj_file",
+                              ml_dyn_hi_file_  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
+                              ml_hie_file_  = panic "hscCompileCoreExpr':ml_hie_file" }
 
   -- Ensure module uniqueness by giving it a name like "GhciNNNN".
   -- This uniqueness is needed by the JS linker. Without it we break the 1-1

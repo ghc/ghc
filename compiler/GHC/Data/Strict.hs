@@ -9,8 +9,11 @@
 module GHC.Data.Strict (
     Maybe(Nothing, Just),
     fromMaybe,
+    GHC.Data.Strict.maybe,
     Pair(And),
-
+    expectJust,
+    fromLazy,
+    toLazy,
     -- Not used at the moment:
     --
     -- Either(Left, Right),
@@ -18,9 +21,12 @@ module GHC.Data.Strict (
   ) where
 
 import GHC.Prelude hiding (Maybe(..), Either(..))
+import GHC.Stack.Types
+
 import Control.Applicative
 import Data.Semigroup
 import Data.Data
+import qualified Data.Maybe as Lazy
 
 data Maybe a = Nothing | Just !a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Data)
@@ -29,6 +35,10 @@ fromMaybe :: a -> Maybe a -> a
 fromMaybe d Nothing = d
 fromMaybe _ (Just x) = x
 
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe d _ Nothing = d
+maybe _ f (Just x) = f x
+
 apMaybe :: Maybe (a -> b) -> Maybe a -> Maybe b
 apMaybe (Just f) (Just x) = Just (f x)
 apMaybe _ _ = Nothing
@@ -36,6 +46,19 @@ apMaybe _ _ = Nothing
 altMaybe :: Maybe a -> Maybe a -> Maybe a
 altMaybe Nothing r = r
 altMaybe l _ = l
+
+fromLazy :: Lazy.Maybe a -> Maybe a
+fromLazy (Lazy.Just a) = Just a
+fromLazy Lazy.Nothing = Nothing
+
+toLazy :: Maybe a -> Lazy.Maybe a
+toLazy (Just a) = Lazy.Just a
+toLazy Nothing = Lazy.Nothing
+
+expectJust :: HasCallStack => String -> Maybe a -> a
+{-# INLINE expectJust #-}
+expectJust _   (Just x) = x
+expectJust err Nothing  = error ("expectJust " ++ err)
 
 instance Semigroup a => Semigroup (Maybe a) where
   Nothing <> b       = b
