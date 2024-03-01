@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Generate $DEPTH layers of packages with $WIDTH modules on each layer
+# Every package on layer N depends on all the packages on layer N-1
+# unitTop imports all the units from the last layer
+DEPTH=8
+WIDTH=8
+for i in $(seq -w 1 $WIDTH); do
+  mkdir unit-p0M$i
+  echo "module DummyLevel0M$i where" > unit-p0M$i/DummyLevel0M$i.hs;
+  cat > unit-p0M$i/unit-p0M$i.cabal <<EOF
+name: unit-p0M$i
+version: 0.1.0.0
+build-type: Simple
+cabal-version: >=1.10
+library
+  default-language: Haskell2010
+  exposed-modules: DummyLevel0M$i
+  build-depends: base
+EOF
+done
+for l in $(seq 1 $DEPTH); do
+  for i in $(seq -w 1 $WIDTH); do
+    mkdir unit-p${l}M$i
+    cat > unit-p${l}M$i/unit-p${l}M$i.cabal <<EOF
+name: unit-p${l}M$i
+version: 0.1.0.0
+build-type: Simple
+cabal-version: >=1.10
+library
+  default-language: Haskell2010
+  exposed-modules: DummyLevel${l}M$i
+  build-depends: base
+EOF
+    echo "module DummyLevel${l}M$i where" > unit-p${l}M$i/DummyLevel${l}M$i.hs;
+    for j in $(seq -w 1 $WIDTH); do
+      echo "    , unit-p$((l-1))M$j" >> unit-p${l}M$i/unit-p${l}M$i.cabal
+      echo "import DummyLevel$((l-1))M$j" >> unit-p${l}M$i/DummyLevel${l}M$i.hs;
+    done
+  done
+done
+mkdir top1
+echo "module Top1 where" > top1/Top1.hs
+echo "-package-db ./tmp.d -i -itop1 Top1 -this-unit-id unit-top1 -package base" > unitTop1;
+for j in $(seq -w 1 $WIDTH); do
+  echo "-package unit-p${DEPTH}M$j" >> unitTop1;
+  echo "import DummyLevel${DEPTH}M$j" >> top1/Top1.hs;
+done
+mkdir top2
+echo "module Top2 where" > top2/Top2.hs
+echo "-package-db ./tmp.d -i  -itop2 Top2 -this-unit-id unit-top2 -package base" > unitTop2;
+for j in $(seq -w 2 $WIDTH); do
+  echo "-package unit-p${DEPTH}M$j" >> unitTop2;
+  echo "import DummyLevel${DEPTH}M$j" >> top2/Top2.hs;
+done
