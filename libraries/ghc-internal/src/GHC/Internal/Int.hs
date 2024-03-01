@@ -1226,7 +1226,7 @@ a `shiftLInt64#` b  = uncheckedIShiftL64# a b `andInt64#` intToInt64# (shift_mas
 
 
 shiftRAInt64# :: Int64# -> Int# -> Int64#
-a `shiftRAInt64#` b | isTrue# (b >=# 64#) = intToInt64# (negateInt# (a `ltInt64#` (intToInt64# 0#)))
+a `shiftRAInt64#` b | isTrue# (b >=# 64#) = a `uncheckedIShiftRA64#` 63#
                     | otherwise           = a `uncheckedIShiftRA64#` b
 
 

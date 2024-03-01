@@ -436,38 +436,36 @@ primOpRules nm = \case
                                     , identityPlatform onei
                                     , mulFoldingRules IntMulOp intOps
                                     ]
-   IntMul2Op   -> mkPrimOpRule nm 2 [ do
-                                        [Lit (LitNumber _ l1), Lit (LitNumber _ l2)] <- getArgs
-                                        platform <- getPlatform
-                                        let r = l1 * l2
-                                        pure $ mkCoreUnboxedTuple
-                                          [ Lit (if platformInIntRange platform r then zeroi platform else onei platform)
-                                          , mkIntLitWrap platform (r `shiftR` platformWordSizeInBits platform)
-                                          , mkIntLitWrap platform r
-                                          ]
+   IntMul2Op   -> mkPrimOpRule nm 2 $
+     [ do
+         [Lit (LitNumber _ l1), Lit (LitNumber _ l2)] <- getArgs
+         platform <- getPlatform
+         let r = l1 * l2
+         pure $ mkCoreUnboxedTuple
+           [ Lit (if platformInIntRange platform r then zeroi platform else onei platform)
+           , mkIntLitWrap platform (r `shiftR` platformWordSizeInBits platform)
+           , mkIntLitWrap platform r
+           ]
 
-                                    , zeroElem >>= \z ->
-                                        pure (mkCoreUnboxedTuple [z,z,z])
+     , zeroElem >>= \z ->
+         pure (mkCoreUnboxedTuple [z,z,z])
 
-                                      -- timesInt2# 1# other
-                                      -- ~~~>
-                                      -- (# 0#, 0# -# (other >># (WORD_SIZE_IN_BITS-1)), other #)
-                                      -- The second element is the sign bit
-                                      -- repeated to fill a word.
-                                    , identityPlatform onei >>= \other -> do
-                                        platform <- getPlatform
-                                        pure $ mkCoreUnboxedTuple
-                                          [ Lit (zeroi platform)
-                                          , mkCoreApps (Var (primOpId IntSubOp))
-                                              [ Lit (zeroi platform)
-                                              , mkCoreApps (Var (primOpId IntSrlOp))
-                                                [ other
-                                                , mkIntLit platform (fromIntegral (platformWordSizeInBits platform - 1))
-                                                ]
-                                              ]
-                                          , other
-                                          ]
-                                    ]
+       -- timesInt2# 1# other
+       -- ~~~>
+       -- (# 0#, other `uncheckedIShiftRA#` (WORD_SIZE_IN_BITS-1), other #)
+       --
+       -- The second element is the sign bit repeated to fill a word.
+     , identityPlatform onei >>= \other -> do
+         platform <- getPlatform
+         pure $ mkCoreUnboxedTuple
+           [ Lit (zeroi platform)
+           , mkCoreApps (Var (primOpId IntSraOp))
+             [ other
+             , mkIntLit platform (toInteger (platformWordSizeInBits platform - 1))
+             ]
+           , other
+           ]
+     ]
    IntQuotOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
                                     , leftZero
                                     , rightIdentityPlatform onei

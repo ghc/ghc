@@ -2416,7 +2416,7 @@ a `iShiftL#` b = (a `uncheckedIShiftL#` b) `andI#` shift_mask WORD_SIZE_IN_BITS#
 -- (which must be non-negative).
 -- The "RA" means "right, arithmetic" (as opposed to RL for logical)
 iShiftRA# :: Int# -> Int# -> Int#
-a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = negateInt# (a <# 0#)
+a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = a `uncheckedIShiftRA#` (WORD_SIZE_IN_BITS# -# 1#)
                 | otherwise                          = a `uncheckedIShiftRA#` b
 
 -- | Shift the argument right (unsigned) by the specified number of bits
