@@ -49,6 +49,10 @@ def prep_base():
     shutil.copy('config.guess', 'libraries/base')
     shutil.copy('config.sub', 'libraries/base')
 
+def prep_ghc_internal():
+    shutil.copy('config.guess', 'libraries/ghc-internal')
+    shutil.copy('config.sub', 'libraries/ghc-internal')
+
 def build_copy_file(pkg: Package, f: Path):
     target = Path('_build') / 'stage1' / pkg.path / 'build' / f
     dest = pkg.path / f
@@ -93,6 +97,8 @@ PACKAGES = {
     pkg.name: pkg
     for pkg in [
         Package('base', Path("libraries/base"), prep_base),
+        Package('ghc-internal', Path("libraries/ghc-internal"), prep_ghc_internal),
+        Package('ghc-experimental', Path("libraries/ghc-experimental"), no_prep),
         Package('ghc-prim', Path("libraries/ghc-prim"), prep_ghc_prim),
         Package('integer-gmp', Path("libraries/integer-gmp"), no_prep),
         Package('ghc-bignum', Path("libraries/ghc-bignum"), prep_ghc_bignum),
