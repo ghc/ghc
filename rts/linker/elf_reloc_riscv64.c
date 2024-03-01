@@ -230,14 +230,13 @@ void setCJType(cinst_t *loc, uint32_t val) {
 
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend) {
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
-  IF_DEBUG(
-      linker,
-      debugBelch(
-          "Relocation type %s 0x%lx (%lu) symbol 0x%lx addend 0x%lx (%lu / "
-          "%ld) P 0x%lx\n",
-          relocationTypeToString(rel->r_info), ELF64_R_TYPE(rel->r_info),
-          ELF64_R_TYPE(rel->r_info), ELF64_R_SYM(rel->r_info), addend, addend,
-          addend, P));
+  IF_DEBUG(linker,
+           debugBelch(
+               "Relocation type %s 0x%lx (%lu) symbol 0x%lx addend 0x%x (%u / "
+               "%d) P 0x%lx\n",
+               relocationTypeToString(rel->r_info), ELF64_R_TYPE(rel->r_info),
+               ELF64_R_TYPE(rel->r_info), ELF64_R_SYM(rel->r_info), addend,
+               addend, addend, P));
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32_PCREL:
   case R_RISCV_32:
@@ -439,8 +438,11 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
                        relocationTypeToString(rel->r_info), P, S, symbol->name,
                        relocationTypeToString(rel_prime->r_info), P_prime,
                        symbol_prime->addr, symbol_prime->name));
-          return computeAddend(targetSection, (Elf_Rel *)rel_prime,
-                               symbol_prime, addend_prime, oc);
+          int32_t result = computeAddend(targetSection, (Elf_Rel *)rel_prime,
+                                         symbol_prime, addend_prime, oc);
+          IF_DEBUG(linker,
+            debugBelch("Result of computeAddend: 0x%x (%d)\n", result, result));
+          return result;
         }
       }
     }
@@ -463,10 +465,9 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
         abort(/* could not find or make stub */);
       }
     }
-    IF_DEBUG(
-        linker,
-        debugBelch("S = 0x%lx  A = 0x%lx  P = 0x%lx  (S + A) - P = 0x%lx \n", S,
-                   A, P, (S + A) - P));
+    IF_DEBUG(linker, debugBelch("R_RISCV_CALL_PLT: S = 0x%lx A = 0x%lx P = "
+                                "0x%lx (S + A) - P = 0x%lx \n",
+                                S, A, P, (S + A) - P));
     return (S + A) - P;
   }
   case R_RISCV_ADD8:
@@ -506,9 +507,9 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_32_PCREL:
     return S + A - P;
   case R_RISCV_GOT_HI20: {
-    // reduced G + GOT to GOT_S - This might be wrong!
-    int32_t result = GOT_S + A - P;
-    return result;
+    // Ensure that the GOT entry is set up.
+    CHECK(0x0 != GOT_S);
+    return GOT_S + A - P;
   }
   default:
     debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
