@@ -1270,8 +1270,14 @@ arityLam id (AT oss div)
 floatIn :: Cost -> ArityType -> ArityType
 -- We have something like (let x = E in b),
 -- where b has the given arity type.
-floatIn IsCheap     at = at
-floatIn IsExpensive at = addWork at
+-- NB: be as lazy as possible in the Cost-of-E argument;
+--     we can often get away without ever looking at it
+--     See Note [Care with nested expressions]
+floatIn ch at@(AT lams div)
+  = case lams of
+      []                 -> at
+      (IsExpensive,_):_  -> at
+      (_,os):lams        -> AT ((ch,os):lams) div
 
 addWork :: ArityType -> ArityType
 -- Add work to the outermost level of the arity type
@@ -1353,6 +1359,25 @@ the True and False branches:
 That gives \1.T (see Note [Combining case branches: andWithTail],
 first bullet).  So 'go2' gets an arityType of \(C?)(C1).T, which is
 what we want.
+
+Note [Care with nested expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    arityType (Just <big-expressions>)
+We will take
+    arityType Just = AT [(IsCheap,os)] topDiv
+and then do
+    arityApp (AT [(IsCheap os)] topDiv) (exprCost <big-expression>)
+The result will be AT [] topDiv.  It doesn't matter what <big-expresison>
+is!  The same is true of
+    arityType (let x = <rhs> in <body>)
+where the cost of <rhs> doesn't matter unless <body> has a useful
+arityType.
+
+TL;DR in `floatIn`, do not to look at the Cost argument until you have to.
+
+I found this when looking at #24471, although I don't think it was really
+the main culprit.
 
 Note [Combining case branches: andWithTail]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1576,7 +1601,7 @@ arityType env (Case scrut bndr _ alts)
   = alts_type
 
   | otherwise            -- In the remaining cases we may not push
-  = addWork alts_type -- evaluation of the scrutinee in
+  = addWork alts_type    -- evaluation of the scrutinee in
   where
     env' = delInScope env bndr
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs

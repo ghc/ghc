@@ -712,3 +712,7 @@ test ('LookupFusion',
       [collect_stats('bytes allocated',2), when(wordsize(32), skip)],
       compile_and_run,
       ['-O2 -package base'])
+
+test('T24471',
+     [req_th, collect_compiler_stats('all', 5)],
+     multimod_compile, ['T24471', '-v0 -O'])
