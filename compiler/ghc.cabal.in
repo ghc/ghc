@@ -414,6 +414,7 @@ Library
         GHC.Data.FastString
         GHC.Data.FastString.Env
         GHC.Data.FiniteMap
+        GHC.Data.FlatBag
         GHC.Data.Graph.Base
         GHC.Data.Graph.Color
         GHC.Data.Graph.Collapse
