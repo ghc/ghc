@@ -17,7 +17,7 @@ description:
 
 extra-tmp-files:
     autom4te.cache
-    base.buildinfo
+    ghc-internal.buildinfo
     config.log
     config.status
     include/EventConfig.h
@@ -25,8 +25,8 @@ extra-tmp-files:
 
 extra-source-files:
     aclocal.m4
-    base.buildinfo.in
-    changelog.md
+    ghc-internal.buildinfo.in
+    CHANGELOG.md
     configure
     configure.ac
     include/CTypes.h
