@@ -1469,8 +1469,7 @@ cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; let arg_ty      = exprType arg1
              is_unlifted = isUnliftedType arg_ty
-             dec         = wantFloatLocal NonRecursive dmd is_unlifted
-                                                  floats1 arg1
+             dec         = wantFloatLocal NonRecursive dmd is_unlifted floats1 arg1
        ; (floats2, arg2) <- executeFloatDecision dec floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
@@ -1482,23 +1481,29 @@ cpeArg env dmd arg
          then return (floats2, arg2)
          else do { v <- newVar arg_ty
                  -- See Note [Eta expansion of arguments in CorePrep]
-                 ; let arg3 = cpeEtaExpandArg env arg2
+                 ; let arity = cpeArgArity env dec arg2
+                       arg3  = cpeEtaExpand arity arg2
                        arg_float = mkNonRecFloat env dmd is_unlifted v arg3
                  ; return (snocFloat floats2 arg_float, varToCoreExpr v) }
        }
 
-cpeEtaExpandArg :: CorePrepEnv -> CoreArg -> CoreArg
+cpeArgArity :: CorePrepEnv -> FloatDecision -> CoreArg -> Arity
 -- ^ See Note [Eta expansion of arguments in CorePrep]
-cpeEtaExpandArg env arg = cpeEtaExpand arity arg
-  where
-    arity | Just ao <- cp_arityOpts (cpe_config env) -- Just <=> -O1 or -O2
-          , not (has_join_in_tail_context arg)
+-- Returning 0 means "no eta-expansion"; see cpeEtaExpand
+cpeArgArity env float_decision arg
+  | FloatNone <- float_decision
+  = 0    -- Crucial short-cut
+         -- See wrinkle (EA2) in Note [Eta expansion of arguments in CorePrep]
+
+  | Just ao <- cp_arityOpts (cpe_config env) -- Just <=> -O1 or -O2
+  , not (has_join_in_tail_context arg)
             -- See Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep]
-          = case exprEtaExpandArity ao arg of
-              Nothing -> 0
-              Just at -> arityTypeArity at
-          | otherwise
-          = exprArity arg -- this is cheap enough for -O0
+  = case exprEtaExpandArity ao arg of
+      Nothing -> 0
+      Just at -> arityTypeArity at
+
+  | otherwise
+  = exprArity arg -- this is cheap enough for -O0
 
 has_join_in_tail_context :: CoreExpr -> Bool
 -- ^ Identify the cases where we'd generate invalid `CpeApp`s as described in
@@ -1510,34 +1515,10 @@ has_join_in_tail_context (Tick _ e)            = has_join_in_tail_context e
 has_join_in_tail_context (Case _ _ _ alts)     = any has_join_in_tail_context (rhssOfAlts alts)
 has_join_in_tail_context _                     = False
 
-{-
-Note [Eta expansion of arguments with join heads]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Note [Eta expansion for join points] in GHC.Core.Opt.Arity
-Eta expanding the join point would introduce crap that we can't
-generate code for
-
-------------------------------------------------------------------------------
--- Building the saturated syntax
--- ---------------------------------------------------------------------------
-
-Note [Eta expansion of hasNoBinding things in CorePrep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-maybeSaturate deals with eta expanding to saturate things that can't deal with
-unsaturated applications (identified by 'hasNoBinding', currently
-foreign calls, unboxed tuple/sum constructors, and representation-polymorphic
-primitives such as 'coerce' and 'unsafeCoerce#').
-
-Historical Note: Note that eta expansion in CorePrep used to be very fragile
-due to the "prediction" of CAFfyness that we used to make during tidying.
-We previously saturated primop
-applications here as well but due to this fragility (see #16846) we now deal
-with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
--}
-
 maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
 maybeSaturate fn expr n_args unsat_ticks
   | hasNoBinding fn        -- There's no binding
+    -- See Note [Eta expansion of hasNoBinding things in CorePrep]
   = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
 
   | mark_arity > 0 -- A call-by-value function. See Note [CBV Function Ids]
@@ -1567,24 +1548,14 @@ maybeSaturate fn expr n_args unsat_ticks
     fn_arity      = idArity fn
     excess_arity  = (max fn_arity mark_arity) - n_args
     sat_expr      = cpeEtaExpand excess_arity expr
-    applied_marks = n_args >= (length . dropWhile (not . isMarkedCbv) . reverse . expectJust "maybeSaturate" $ (idCbvMarks_maybe fn))
+    applied_marks = n_args >= (length . dropWhile (not . isMarkedCbv) .
+                               reverse . expectJust "maybeSaturate" $ (idCbvMarks_maybe fn))
     -- For join points we never eta-expand (See Note [Do not eta-expand join points])
-    -- so we assert all arguments that need to be passed cbv are visible so that the backend can evalaute them if required..
-{-
-************************************************************************
-*                                                                      *
-                Simple GHC.Core operations
-*                                                                      *
-************************************************************************
--}
+    -- so we assert all arguments that need to be passed cbv are visible so that the
+    -- backend can evalaute them if required..
 
-{-
--- -----------------------------------------------------------------------------
---      Eta reduction
--- -----------------------------------------------------------------------------
-
-Note [Eta expansion]
-~~~~~~~~~~~~~~~~~~~~~
+{- Note [Eta expansion]
+~~~~~~~~~~~~~~~~~~~~~~~
 Eta expand to match the arity claimed by the binder Remember,
 CorePrep must not change arity
 
@@ -1602,6 +1573,19 @@ NB2: we have to be careful that the result of etaExpand doesn't
    to establish.  One possible cause is eta expanding inside of
    an SCC note - we're now careful in etaExpand to make sure the
    SCC is pushed inside any new lambdas that are generated.
+
+Note [Eta expansion of hasNoBinding things in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+maybeSaturate deals with eta expanding to saturate things that can't deal
+with unsaturated applications (identified by 'hasNoBinding', currently
+foreign calls, unboxed tuple/sum constructors, and representation-polymorphic
+primitives such as 'coerce' and 'unsafeCoerce#').
+
+Historical Note: Note that eta expansion in CorePrep used to be very fragile
+due to the "prediction" of CAFfyness that we used to make during tidying.  We
+previously saturated primop applications here as well but due to this
+fragility (see #16846) we now deal with this another way, as described in
+Note [Primop wrappers] in GHC.Builtin.PrimOps.
 
 Note [Eta expansion and the CorePrep invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1685,6 +1669,22 @@ There is a nasty Wrinkle:
       This scenario occurs rarely; hence it's OK to generate sub-optimal code.
       The alternative would be to fix Note [Eta expansion for join points], but
       that's quite challenging due to unfoldings of (recursive) join points.
+
+(EA2) In cpeArgArity, if float_decision = FloatNone) the `arg` will look like
+           let <binds> in rhs
+      where <binds> is non-empty and can't be floated out of a lazy context (see
+      `wantFloatLocal`). So we can't eta-expand it anyway, so we can return 0
+      forthwith.  Without this short-cut we will call exprEtaExpandArity on the
+      `arg`, and <binds> might be enormous. exprEtaExpandArity be very expensive
+      on this: it uses arityType, and may look at <binds>.
+
+      On the other hand, if float_decision = FloatAll, there will be no
+      let-bindings around 'arg'; they will have floated out.  So
+      exprEtaExpandArity is cheap.
+
+      This can make a huge difference on deeply nested expressions like
+         f (f (f (f (f  ...))))
+      #24471 is a good example, where Prep took 25% of compile time!
 -}
 
 cpeEtaExpand :: Arity -> CpeRhs -> CpeRhs
@@ -1899,7 +1899,7 @@ instance Outputable FloatInfo where
 -- See Note [Floating in CorePrep]
 -- and Note [BindInfo and FloatInfo]
 data FloatingBind
-  = Float !CoreBind !BindInfo !FloatInfo
+  = Float !CoreBind !BindInfo !FloatInfo    -- Never a join-point binding
   | UnsafeEqualityCase !CoreExpr !CoreBndr !AltCon ![CoreBndr]
   | FloatTick CoreTickish
 
@@ -2126,19 +2126,16 @@ data FloatDecision
   | FloatAll
 
 executeFloatDecision :: FloatDecision -> Floats -> CpeRhs -> UniqSM (Floats, CpeRhs)
-executeFloatDecision dec floats rhs = do
-  let (float,stay) = case dec of
-        _ | isEmptyFloats floats -> (emptyFloats,emptyFloats)
-        FloatNone                -> (emptyFloats, floats)
-        FloatAll                 -> (floats, emptyFloats)
-  -- Wrap `stay` around `rhs`.
-  -- NB: `rhs` might have lambdas, and we can't
-  --     put them inside a wrapBinds, which expects a `CpeBody`.
-  if isEmptyFloats stay -- Fast path where we don't need to call `rhsToBody`
-    then return (float, rhs)
-    else do
-      (floats', body) <- rhsToBody rhs
-      return (float, wrapBinds stay $ wrapBinds floats' body)
+executeFloatDecision dec floats rhs
+  = case dec of
+      FloatAll                 -> return (floats, rhs)
+      FloatNone
+        | isEmptyFloats floats -> return (emptyFloats, rhs)
+        | otherwise            -> do { (floats', body) <- rhsToBody rhs
+                                     ; return (emptyFloats, wrapBinds floats $
+                                                            wrapBinds floats' body) }
+            -- FloatNone case: `rhs` might have lambdas, and we can't
+            -- put them inside a wrapBinds, which expects a `CpeBody`.
 
 wantFloatTop :: Floats -> FloatDecision
 wantFloatTop fs

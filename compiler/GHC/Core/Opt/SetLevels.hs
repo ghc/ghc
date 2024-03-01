@@ -643,7 +643,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
   = lvlExpr env e     -- See Note [Case MFEs]
 
 lvlMFE env strict_ctxt ann_expr
-  |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
+  | not float_me
+  || floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || hasFreeJoin env fvs   -- If there is a free join, don't float
                            -- See Note [Free join points]
@@ -652,8 +653,9 @@ lvlMFE env strict_ctxt ann_expr
          -- how it will be represented at runtime.
          -- See Note [Representation polymorphism invariants] in GHC.Core
   || notWorthFloating expr abs_vars
-  || not float_me
-  =     -- Don't float it out
+         -- Test notWorhtFloating last;
+         -- See Note [Large free-variable sets]
+  = -- Don't float it out
     lvlExpr env ann_expr
 
   |  float_is_new_lam || exprIsTopLevelBindable expr expr_ty
@@ -821,6 +823,28 @@ It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
 I think this is obsolete; the flag seems always on.]
+
+Note [Large free-variable sets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #24471 we had something like
+     x1 = I# 1
+     ...
+     x1000 = I# 1000
+     foo = f x1 (f x2 (f x3 ....))
+So every sub-expression in `foo` has lots and lots of free variables.  But
+none of these sub-expressions float anywhere; the entire float-out pass is a
+no-op.
+
+In lvlMFE, we want to find out quickly if the MFE is not-floatable; that is
+the common case.  In #24471 it turned out that we were testing `abs_vars` (a
+relatively complicated calculation that takes at least O(n-free-vars) time to
+compute) for every sub-expression.
+
+Better instead to test `float_me` early. That still involves looking at
+dest_lvl, which means looking at every free variable, but the constant factor
+is a lot better.
+
+ToDo: find a way to fix the bad asymptotic complexity.
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
