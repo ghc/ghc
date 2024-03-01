@@ -60,10 +60,10 @@ linkBCO interp le bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
-  lits <- mapM (fmap fromIntegral . lookupLiteral interp le) (ssElts lits0)
-  ptrs <- mapM (resolvePtr interp le bco_ix) (ssElts ptrs0)
+  lits <- mapM (fmap fromIntegral . lookupLiteral interp le) (elemsFlatBag lits0)
+  ptrs <- mapM (resolvePtr interp le bco_ix) (elemsFlatBag ptrs0)
   return (ResolvedBCO isLittleEndian arity insns bitmap
-              (listArray (0, fromIntegral (sizeSS lits0)-1) lits)
+              (listArray (0, fromIntegral (sizeFlatBag lits0)-1) lits)
               (addListToSS emptySS ptrs))
 
 lookupLiteral :: Interp -> LinkerEnv -> BCONPtr -> IO Word

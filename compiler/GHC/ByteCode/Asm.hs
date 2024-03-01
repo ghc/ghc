@@ -71,9 +71,9 @@ bcoFreeNames bco
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
         = unionManyUniqDSets (
-             mkUniqDSet [ n | BCOPtrName n <- ssElts ptrs ] :
-             mkUniqDSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
-             map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
+             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag ptrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag nonptrs ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag ptrs ]
           )
 
 -- -----------------------------------------------------------------------------
@@ -215,7 +215,7 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
   let asm_insns = ssElts final_insns
       insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
       bitmap_arr = mkBitmapArray bsize bitmap
-      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr final_lits final_ptrs
+      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSizedSeq final_lits) (fromSizedSeq final_ptrs)
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
   -- objects, since they might get run too early.  Disable this until

@@ -18,12 +18,13 @@ module GHC.ByteCode.Types
   , CgBreakInfo(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
+  , FlatBag, sizeFlatBag, fromSizedSeq, elemsFlatBag
   ) where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
-import GHC.Data.SizedSeq
+import GHC.Data.FlatBag
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
@@ -154,8 +155,8 @@ data UnlinkedBCO
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
         unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
         unlinkedBCOBitmap :: !(UArray Int Word64),      -- bitmap
-        unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
+        unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
+        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
    }
 
 instance NFData UnlinkedBCO where
@@ -210,8 +211,8 @@ seqCgBreakInfo CgBreakInfo{..} =
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
-             ppr (sizeSS lits), text "lits",
-             ppr (sizeSS ptrs), text "ptrs" ]
+             ppr (sizeFlatBag lits), text "lits",
+             ppr (sizeFlatBag ptrs), text "ptrs" ]
 
 instance Outputable CgBreakInfo where
    ppr info = text "CgBreakInfo" <+>
