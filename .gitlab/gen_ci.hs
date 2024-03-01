@@ -960,7 +960,7 @@ job_groups =
     -- (see Note [Object unloading]).
     fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 linker_unload_native")
 
-    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
+    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
 
     tsan_jobs =
       modifyJobs

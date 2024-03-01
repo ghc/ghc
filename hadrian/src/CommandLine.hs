@@ -17,7 +17,6 @@ import System.Environment
 import qualified System.Directory as Directory
 
 import qualified Data.Set as Set
-import Data.Maybe
 
 data TestSpeed = TestSlow | TestNormal | TestFast deriving (Show, Eq)
 
@@ -114,7 +113,7 @@ data DocArgs = DocArgs
   } deriving (Eq, Show)
 
 defaultDocArgs :: DocArgs
-defaultDocArgs = DocArgs { docsBaseUrl = "../%pkg%" }
+defaultDocArgs = DocArgs { docsBaseUrl = "../%pkgid%" }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Left "hadrian --configure has been deprecated (see #20167). Please run ./boot; ./configure manually"
@@ -192,11 +191,11 @@ readTestOnlyPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testO
 readTestSkipPerf :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestSkipPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testSkipPerf = True } }
 
-readHaddockBaseUrl :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readHaddockBaseUrl base_url = Right $ \flags ->
-  flags { docsArgs = (docsArgs flags) { docsBaseUrl = base_url' } }
+readHaddockBaseUrl :: Either String (CommandLineArgs -> CommandLineArgs)
+readHaddockBaseUrl = Right $ \flags ->
+  flags { docsArgs = (docsArgs flags) { docsBaseUrl = base_url } }
 
-  where base_url' = fromMaybe "https://hackage.haskell.org/package/%pkg%/docs" base_url
+  where base_url = "/package/%pkg%/docs"
 
 
 readTestRootDirs :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
@@ -320,8 +319,8 @@ optDescrs =
         "Destination path for the bindist 'install' rule"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
-    , Option [] ["haddock-base-url"] (OptArg readHaddockBaseUrl "BASE_URL")
-        "Generate documentation suitable for upload to hackage or for another base URL (for example a local hackage server)."
+    , Option [] ["haddock-for-hackage"] (NoArg readHaddockBaseUrl)
+        "Generate documentation suitable for upload to a hackage server."
     ]
 
 -- | A type-indexed map containing Hadrian command line arguments to be passed
