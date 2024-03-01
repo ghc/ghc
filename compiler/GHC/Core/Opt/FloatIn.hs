@@ -25,14 +25,14 @@ import GHC.Core
 import GHC.Core.Unfold( ExprSize(..), sizeExpr,
                         UnfoldingOpts(..), defaultUnfoldingOpts )
 import GHC.Core.Opt.Arity( isOneShotBndr )
-import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
+-- import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood, idUnfolding )
+import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -792,7 +792,7 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
   | otherwise
   = go floaters (initDropBox here_fvs) (map initDropBox fork_fvs)
   where
-    n_alts = length fork_fvs
+--    n_alts = length fork_fvs
 
     go :: RevFloatInBinds -> DropBox -> [DropBox]
        -> (RevFloatInBinds, [RevFloatInBinds])
@@ -831,9 +831,9 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           -- See Note [Duplicating floats into case alternatives]
           dont_float_into_alts
-            = (n_used_alts == n_alts)
+            = -- (n_used_alts == n_alts) ||
                  -- Don't float in if used in all alternatives
-              || (n_used_alts > 1 && not (floatIsDupable platform bind))
+              (n_used_alts > 1 && not (floatIsDupable platform bind))
                  -- Nor if used in multiple alts and not small
 
           new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe
@@ -874,17 +874,22 @@ wrapFloats (FB _ _ fl : bs) e = wrapFloats bs (wrapFloat fl e)
 
 floatIsDupable :: Platform -> FloatBind -> Bool
 floatIsDupable _ (FloatCase scrut _ _ _) = small_enough_e scrut
-floatIsDupable _ (FloatLet (Rec prs))    = all small_enough_b prs
-floatIsDupable _ (FloatLet (NonRec b r)) = small_enough_b (b,r)
+floatIsDupable _ (FloatLet bind)         = bindIsDupable bind
+
+bindIsDupable :: CoreBind -> Bool
+bindIsDupable bind
+  | isJoinBind bind        = False  -- No point in duplicating join points
+bindIsDupable (Rec prs)    = all small_enough_b prs
+bindIsDupable (NonRec b r) = small_enough_b (b,r)
 
 small_enough_b :: (Id,CoreExpr) -> Bool
-small_enough_b (b,_) = smallEnoughToInline defaultUnfoldingOpts (idUnfolding b)
+small_enough_b (_,rhs) = small_enough_e rhs
 
 small_enough_e :: CoreExpr -> Bool
 small_enough_e e
-  = case sizeExpr opts (unfoldingCreationThreshold opts) [] e of
-      TooBig -> False
-      SizeIs n _ _ -> n < unfoldingUseThreshold opts
+  = case sizeExpr opts (unfoldingUseThreshold opts) [] e of
+      TooBig    -> False
+      SizeIs {} -> True
   where
     opts = defaultUnfoldingOpts
 
