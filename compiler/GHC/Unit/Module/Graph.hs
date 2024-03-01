@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Unit.Module.Graph
-   ( ModuleGraph
+   ( ModuleGraph(..)
    , ModuleGraphNode(..)
    , nodeDependencies
    , emptyMG
@@ -26,6 +26,7 @@ module GHC.Unit.Module.Graph
    , moduleGraphModulesBelow
    , mgReachable
    , mgQuery
+   , mgHasHoles
 
    , moduleGraphNodes
    , SummaryNode
@@ -57,7 +58,7 @@ import GHC.Data.Graph.Directed.Reachability
 import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
-import GHC.Types.SourceFile ( hscSourceString )
+import GHC.Types.SourceFile ( hscSourceString, isHsigFile )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
@@ -165,6 +166,7 @@ data ModuleGraph = ModuleGraph
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
   , mg_home_map :: ModuleNameHomeMap
     -- ^ For each module name, which home-unit UnitIds define it together with the set of units for which the listing is complete.
+  , mg_has_holes :: Bool
   }
 
 -- | Map a function 'f' over all the 'ModSummaries'.
@@ -230,7 +232,18 @@ mgHomeModuleMap :: ModuleGraph -> ModuleNameHomeMap
 mgHomeModuleMap = mg_home_map
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (Set.empty, Map.empty)
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (Set.empty, Map.empty) False
+
+  {-
+-- | A function you should not need to use, or desire to use. Only used
+-- in one place, `GHC.Iface.Load` to facilitate a misimplementation in Backpack.
+mgHasHoles :: ModuleGraph -> Bool
+mgHasHoles ModuleGraph{..} = mg_has_holes
+-}
+
+--------------------------------------------------------------------------------
+-- ** Reachability
+--------------------------------------------------------------------------------
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -245,6 +258,7 @@ extendMG ModuleGraph{..} deps ms = ModuleGraph
   { mg_mss = new_mss
   , mg_graph = mkTransDeps new_mss
   , mg_home_map = mkHomeModuleMap new_mss
+  , mg_has_holes = False
   }
   where
     new_mss = ModuleNode deps ms : mg_mss
@@ -459,4 +473,7 @@ mgQuery mg nka nkb = isReachable td_map na nb where
   (td_map, lookup_node) = mg_graph mg
   na = expectJust "mgQuery:a" $ lookup_node nka
   nb = expectJust "mgQuery:b" $ lookup_node nkb
+
+mgHasHoles :: ModuleGraph -> Bool
+mgHasHoles = mg_has_holes
 

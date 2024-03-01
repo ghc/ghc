@@ -479,10 +479,10 @@ renamePkgQual unit_env query mn mb_pkg = case mb_pkg of
       | uid <- S.toList hpt_deps
       ]
 
-    units = ue_units unit_env
+    unit_state = ue_homeUnitState unit_env
 
     hpt_deps :: S.Set UnitId
-    hpt_deps  = homeUnitDepends units
+    hpt_deps  = homeUnitDepends unit_state
 
 hscRenameRawPkgQual ::
   MonadIO m =>

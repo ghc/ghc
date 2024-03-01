@@ -117,6 +117,7 @@ Library
                    filepath   >= 1   && < 1.6,
                    os-string  >= 2.0.1 && < 2.1,
                    template-haskell == 2.22.*,
+                   os-string  >= 2.0.1 && < 2.1,
                    hpc        >= 0.6 && < 0.8,
                    transformers >= 0.5 && < 0.7,
                    exceptions == 0.10.*,
@@ -415,6 +416,7 @@ Library
         GHC.Data.FastString
         GHC.Data.FastString.Env
         GHC.Data.FiniteMap
+        GHC.Data.FlatBag
         GHC.Data.Graph.Base
         GHC.Data.Graph.Color
         GHC.Data.Graph.Collapse
@@ -896,7 +898,9 @@ Library
         GHC.Unit.Finder
         GHC.Unit.Finder.Types
         GHC.Unit.Home
+        GHC.Unit.Home.Graph
         GHC.Unit.Home.ModInfo
+        GHC.Unit.Home.PackageTable
         GHC.Unit.Info
         GHC.Unit.Module
         GHC.Unit.Module.Deps

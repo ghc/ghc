@@ -28,6 +28,8 @@ module GHC.Iface.Syntax (
         IfaceImport(..),
         ImpIfaceList(..),
 
+        IfaceDeclBoxed(..), mkBoxedDecl,
+
         -- * Binding names
         IfaceTopBndr,
         putIfaceTopBndr, getIfaceTopBndr,
@@ -97,6 +99,7 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
 import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
+import Data.Proxy
 
 infixl 3 &&&
 
@@ -128,15 +131,40 @@ type IfaceTopBndr = Name
   -- We don't serialise the namespace onto the disk though; rather we
   -- drop it when serialising and add it back in when deserialising.
 
-getIfaceTopBndr :: BinHandle -> IO IfaceTopBndr
+getIfaceTopBndr :: ReadBinHandle -> IO IfaceTopBndr
 getIfaceTopBndr bh = get bh
 
-putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
+putIfaceTopBndr :: WriteBinHandle -> IfaceTopBndr -> IO ()
 putIfaceTopBndr bh name =
-    case getUserData bh of
-      UserData{ ud_put_binding_name = put_binding_name } ->
+    case findUserDataWriter (Proxy @BindingName) bh of
+      tbl ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
-          put_binding_name bh name
+          putEntry tbl bh (BindingName name)
+
+-- | A wrapper around IfaceDecl which separates parts which are needed eagerly from parts which are needed lazily.
+data IfaceDeclBoxed
+  = IfaceDeclBoxed {
+    ifBoxedFingerprint :: !Fingerprint,
+    ifBoxedName :: !IfaceTopBndr,
+    ifBoxedImplicitBndrs :: ![OccName],
+    ifBoxedDecl :: IfaceDecl
+  }
+
+mkBoxedDecl :: Fingerprint -> IfaceDecl -> IfaceDeclBoxed
+mkBoxedDecl fingerprint decl = IfaceDeclBoxed fingerprint (ifName decl) (ifaceDeclImplicitBndrs decl) decl
+
+instance Binary IfaceDeclBoxed where
+  put_ bh (IfaceDeclBoxed fingerprint name implicitBndrs decl) = do
+    put_ bh fingerprint
+    put_ bh name
+    put_ bh implicitBndrs
+    lazyPut bh decl
+  get bh = do
+    fingerprint <- get bh
+    name <- get bh
+    implicitBndrs <- get @[OccName] bh
+    decl <- lazyGet bh
+    return $ IfaceDeclBoxed fingerprint name implicitBndrs decl
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -586,11 +614,12 @@ ifaceConDeclImplicitBndrs (IfCon {
        -- different fingerprint!  So we calculate the fingerprint of
        -- each binder by combining the fingerprint of the whole
        -- declaration with the name of the binder. (#5614, #7215)
-ifaceDeclFingerprints :: Fingerprint -> IfaceDecl -> [(OccName,Fingerprint)]
-ifaceDeclFingerprints hash decl
-  = (getOccName decl, hash) :
+ifaceDeclFingerprints :: IfaceDeclBoxed -> [(OccName,Fingerprint)]
+ifaceDeclFingerprints (IfaceDeclBoxed hash name implicitBndrs _)
+  = (getOccName name, hash) :
     [ (occ, computeFingerprint' (hash,occ))
-    | occ <- ifaceDeclImplicitBndrs decl ]
+    -- TODO: maybe more laziness here
+    | occ <- implicitBndrs ]
   where
      computeFingerprint' =
        unsafeDupablePerformIO
@@ -639,6 +668,7 @@ data IfaceExpr
        -- See GHC.Types.Literal Note [Rubbish literals] item (6)
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
+
 
 data IfaceTickish
   = IfaceHpcTick    Module Int               -- from HpcTick x
@@ -1034,7 +1064,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
       pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
         pprBooleanFormula
-          (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
+          (\_ def -> cparen (isLexSym def) (ppr def)) 0 (fmap ifLclNameFS minDef) <+>
         text "#-}"
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
@@ -2453,13 +2483,13 @@ instance Binary IfGuidance where
                     c <- get bh
                     return (IfWhen a b c)
 
-putUnfoldingCache :: BinHandle -> IfUnfoldingCache -> IO ()
+putUnfoldingCache :: WriteBinHandle -> IfUnfoldingCache -> IO ()
 putUnfoldingCache bh (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
                                      , uf_is_work_free = wf, uf_expandable = exp }) = do
     let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp
     putByte bh b
 
-getUnfoldingCache :: BinHandle -> IO IfUnfoldingCache
+getUnfoldingCache :: ReadBinHandle -> IO IfUnfoldingCache
 getUnfoldingCache bh = do
     b <- getByte bh
     let hnf     = testBit b 3

@@ -46,6 +46,7 @@ import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
@@ -60,6 +61,10 @@ import System.FilePath
 import System.Directory
 import GHC.Utils.Logger (Logger)
 import Control.Monad ((<$!>))
+import GHC.Driver.Env
+import {-# SOURCE #-} GHC.Driver.Main
+import Data.Time.Clock
+import GHC.Unit.Home.Graph
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -253,7 +258,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
-      case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
+      lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
         Just hmi -> do
           let iface = hm_iface hmi
           pure (LinkExternal (LinkOnlyPackages iface) (mi_module iface), hmi)
@@ -301,7 +306,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       DotO file ModuleObject -> do
         massert (osuf `isSuffixOf` file)
         let file_base = fromJust (stripExtension osuf file)
-            new_file = file_base <.> new_osuf
+            new_file = file_base -<.> new_osuf
         ok <- doesFileExist new_file
         if (not ok)
             then dieWith opts span $

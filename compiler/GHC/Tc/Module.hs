@@ -150,6 +150,7 @@ import GHC.Types.SourceFile
 import GHC.Types.PkgQual
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
 import GHC.Unit.Types
 import GHC.Unit.State
@@ -379,18 +380,17 @@ tcRnImports hsc_env import_decls
 
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
-        ; let { -- We want instance declarations from all home-package
+        ; let unitId = homeUnitId $ hsc_home_unit hsc_env
+              mnwib = GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env))
+        ;       -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
                 -- ourselves.  The 'except ourselves' is so that we don't
                 -- get the instances from this module's hs-boot file.  This
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_fam_insts) =
-
-                    hptInstancesBelow hsc_env (homeUnitId $ hsc_home_unit hsc_env) (GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env)))
-
-              } ;
+              ; (home_insts, home_fam_insts) <- liftIO $
+                    hugInstancesBelow hsc_env unitId mnwib
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
@@ -2006,6 +2006,9 @@ runTcInteractive hsc_env thing_inside
                   qual <- hscRenameRawPkgQual hsc_env (unLoc $ ideclName i) (ideclPkgQual i)
                   getOrphans (unLoc (ideclName i)) qual
 
+
+       ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
+
        ; let imports = emptyImportAvails { imp_orphs = orphs }
 
              upd_envs (gbl_env, lcl_env) = (gbl_env', lcl_env')
@@ -2029,8 +2032,6 @@ runTcInteractive hsc_env thing_inside
 
        ; updEnvs upd_envs thing_inside }
   where
-    (home_insts, home_fam_insts) = hptAllInstances hsc_env
-
     icxt                     = hsc_IC hsc_env
     (ic_insts, ic_finsts)    = ic_instances icxt
     (lcl_ids, top_ty_things) = partitionWith is_closed (ic_tythings icxt)
