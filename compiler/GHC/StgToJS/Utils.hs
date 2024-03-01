@@ -341,10 +341,16 @@ collectIds unfloated b =
   in  seqList xs `seq` xs
   where
     acceptId i = all ($ i) [not . isForbidden] -- fixme test this: [isExported[isGlobalId, not.isForbidden]
-    -- the GHC.Prim module has no js source file
     isForbidden i
-      | Just m <- nameModule_maybe (getName i) = m == gHC_PRIM
-      | otherwise = False
+      -- the GHC.Prim module has no js source file
+      | Just m <- nameModule_maybe (getName i)
+      , m == gHC_PRIM
+      = True
+      -- unboxed tuples have no definition
+      | isUnboxedTupleDataConLikeName (getName i)
+      = True
+      | otherwise
+      = False
 
 -----------------------------------------------------
 -- Live vars
