@@ -93,10 +93,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       -- pragmas in the modules source code. Used to infer
       -- safety of module.
       ms_hspp_opts
-      , ms_location =
-        ModLocation
-          { ml_hie_file
-          }
+      , ms_location = modl
       } = mod_sum
 
     dflags = ms_hspp_opts
@@ -228,7 +225,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     Interface
       { ifaceMod = mdl
       , ifaceIsSig = is_sig
-      , ifaceHieFile = ml_hie_file
+      , ifaceHieFile = ml_hie_file modl
       , ifaceInfo = info
       , ifaceDoc = Documentation header_doc mod_warning
       , ifaceRnDoc = Documentation Nothing Nothing

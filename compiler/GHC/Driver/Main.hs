@@ -264,6 +264,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
 import GHC.Data.Bag
+import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
@@ -2111,12 +2112,13 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
              rawCmms
         return stub_c_exists
   where
-    no_loc = ModLocation{ ml_hs_file  = Just original_filename,
-                          ml_hi_file  = panic "hscCompileCmmFile: no hi file",
-                          ml_obj_file = panic "hscCompileCmmFile: no obj file",
-                          ml_dyn_obj_file = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_dyn_hi_file  = panic "hscCompileCmmFile: no dyn obj file",
-                          ml_hie_file = panic "hscCompileCmmFile: no hie file"}
+    no_loc = OsPathModLocation
+        { ml_hs_file_ospath  = Just $ unsafeEncodeUtf original_filename,
+          ml_hi_file_ospath  = panic "hscCompileCmmFile: no hi file",
+          ml_obj_file_ospath = panic "hscCompileCmmFile: no obj file",
+          ml_dyn_obj_file_ospath = panic "hscCompileCmmFile: no dyn obj file",
+          ml_dyn_hi_file_ospath  = panic "hscCompileCmmFile: no dyn obj file",
+          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file"}
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -2351,12 +2353,13 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
-    let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
-                                      ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
-                                      ml_obj_file  = panic "hsDeclsWithLocation:ml_obj_file",
-                                      ml_dyn_obj_file = panic "hsDeclsWithLocation:ml_dyn_obj_file",
-                                      ml_dyn_hi_file = panic "hsDeclsWithLocation:ml_dyn_hi_file",
-                                      ml_hie_file  = panic "hsDeclsWithLocation:ml_hie_file" }
+    let iNTERACTIVELoc = OsPathModLocation
+            { ml_hs_file_ospath   = Nothing,
+              ml_hi_file_ospath   = panic "hsDeclsWithLocation:ml_hi_file_ospath",
+              ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
+              ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
+              ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
+              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath" }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
@@ -2635,12 +2638,13 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
   {- Lint if necessary -}
   lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
-  let this_loc = ModLocation{ ml_hs_file   = Nothing,
-                              ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
-                              ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
-                              ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
-                              ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
-                              ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
+  let this_loc = OsPathModLocation
+          { ml_hs_file_ospath   = Nothing,
+            ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",
+            ml_obj_file_ospath  = panic "hscCompileCoreExpr':ml_obj_file_ospath",
+            ml_dyn_obj_file_ospath = panic "hscCompileCoreExpr': ml_obj_file_ospath",
+            ml_dyn_hi_file_ospath  = panic "hscCompileCoreExpr': ml_dyn_hi_file_ospath",
+            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath" }
 
   -- Ensure module uniqueness by giving it a name like "GhciNNNN".
   -- This uniqueness is needed by the JS linker. Without it we break the 1-1

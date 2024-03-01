@@ -76,6 +76,7 @@ import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
+import GHC.Data.OsPath     ( unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1837,7 +1838,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
                      let dyn_tn = tn -<.> dynsuf
                      addFilesToClean tmpfs dynLife [dyn_tn]
-                     return (tn, dyn_tn)
+                     return (unsafeEncodeUtf tn, unsafeEncodeUtf dyn_tn)
                  -- We don't want to create .o or .hi files unless we have been asked
                  -- to by the user. But we need them, so we patch their locations in
                  -- the ModSummary with temporary files.
@@ -1846,8 +1847,8 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                  -- If ``-fwrite-interface` is specified, then the .o and .hi files
                  -- are written into `-odir` and `-hidir` respectively.  #16670
                  if gopt Opt_WriteInterface dflags
-                   then return ((ml_hi_file ms_location, ml_dyn_hi_file ms_location)
-                               , (ml_obj_file ms_location, ml_dyn_obj_file ms_location))
+                   then return ((ml_hi_file_ospath ms_location, ml_dyn_hi_file_ospath ms_location)
+                               , (ml_obj_file_ospath ms_location, ml_dyn_obj_file_ospath ms_location))
                    else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
                             <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
                let new_dflags = case enable_spec of
@@ -1856,10 +1857,10 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                                   EnableByteCodeAndObject -> (gopt_set dflags Opt_ByteCodeAndObjectCode) { backend = defaultBackendOf ms}
                let ms' = ms
                      { ms_location =
-                         ms_location { ml_hi_file = hi_file
-                                     , ml_obj_file = o_file
-                                     , ml_dyn_hi_file = dyn_hi_file
-                                     , ml_dyn_obj_file = dyn_o_file }
+                         ms_location { ml_hi_file_ospath = hi_file
+                                     , ml_obj_file_ospath = o_file
+                                     , ml_dyn_hi_file_ospath = dyn_hi_file
+                                     , ml_dyn_obj_file_ospath = dyn_o_file }
                      , ms_hspp_opts = updOptLevel 0 $ new_dflags
                      }
                -- Recursive call to catch the other cases
@@ -2044,7 +2045,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         let fopts = initFinderOpts (hsc_dflags hsc_env)
 
         -- Make a ModLocation for this file
-        let location = mkHomeModLocation fopts pi_mod_name src_fn
+        let location = mkHomeModLocation fopts pi_mod_name (unsafeEncodeUtf src_fn)
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
