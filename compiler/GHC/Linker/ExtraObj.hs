@@ -159,7 +159,7 @@ mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_packages = do
      else return []
 
   where
-    unit_state = ue_units unit_env
+    unit_state = ue_homeUnitState unit_env
     platform   = ue_platform unit_env
     link_opts info = hcat
         [ -- "link info" section (see Note [LinkInfo section])

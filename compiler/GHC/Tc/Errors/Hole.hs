@@ -76,7 +76,7 @@ import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
 import GHC.Hs.Doc
-import GHC.Unit.Module.ModIface ( ModIface_(..) )
+import GHC.Unit.Module.ModIface ( mi_docs )
 import GHC.Iface.Load  ( loadInterfaceForName )
 
 import GHC.Builtin.Utils (knownKeyNames)

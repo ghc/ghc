@@ -21,7 +21,7 @@ import GHC.Platform.ArchOS
 
 import GHC.SysTools
 
-import GHC.Unit.Env
+import GHC.Unit.Env as UnitEnv
 import GHC.Unit.Info
 import GHC.Unit.State
 import GHC.Unit.Types
@@ -74,7 +74,7 @@ doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> FilePath -> FilePa
 doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
-    let unit_state = ue_units unit_env
+    let unit_state = ue_homeUnitState unit_env
     pkg_include_dirs <- mayThrowUnitErr
                         (collectIncludeDirs <$> preloadUnitsInfo unit_env)
     -- MP: This is not quite right, the headers which are supposed to be installed in

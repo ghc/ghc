@@ -34,7 +34,6 @@ import GHC.Runtime.Context
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 
-import GHC.Data.FastString
 import GHC.Data.FastString.Env
 
 import GHC.Types.Var
@@ -190,10 +189,10 @@ setNameModule (Just m) n =
 ************************************************************************
 -}
 
-tcIfaceLclId :: FastString -> IfL Id
+tcIfaceLclId :: IfLclName -> IfL Id
 tcIfaceLclId occ
   = do  { lcl <- getLclEnv
-        ; case lookupFsEnv (if_id_env lcl) occ of
+        ; case lookupFsEnv (if_id_env lcl) (ifLclNameFS occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM $
               vcat
@@ -209,10 +208,10 @@ extendIfaceIdEnv ids
     in env { if_id_env = id_env' }
 
 
-tcIfaceTyVar :: FastString -> IfL TyVar
+tcIfaceTyVar :: IfLclName -> IfL TyVar
 tcIfaceTyVar occ
   = do  { lcl <- getLclEnv
-        ; case lookupFsEnv (if_tv_env lcl) occ of
+        ; case lookupFsEnv (if_tv_env lcl) (ifLclNameFS occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
@@ -220,15 +219,15 @@ tcIfaceTyVar occ
 lookupIfaceTyVar :: IfaceTvBndr -> IfL (Maybe TyVar)
 lookupIfaceTyVar (occ, _)
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) (ifLclNameFS occ)) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
 lookupIfaceVar (IfaceIdBndr (_, occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_id_env lcl) occ) }
+        ; return (lookupFsEnv (if_id_env lcl) (ifLclNameFS occ)) }
 lookupIfaceVar (IfaceTvBndr (occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) (ifLclNameFS occ)) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars

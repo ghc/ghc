@@ -1,6 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE UnliftedNewtypes           #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -8,6 +10,7 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
+  , BCOByteArray(..), mkBCOByteArray
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
@@ -18,12 +21,13 @@ module GHC.ByteCode.Types
   , CgBreakInfo(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
+  , FlatBag, sizeFlatBag, fromSizedSeq, elemsFlatBag
   ) where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
-import GHC.Data.SizedSeq
+import GHC.Data.FlatBag
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
@@ -34,10 +38,10 @@ import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI
 import Control.DeepSeq
+import GHCi.ResolvedBCO ( BCOByteArray(..), mkBCOByteArray )
 
 import Foreign
 import Data.Array
-import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -51,7 +55,7 @@ import Language.Haskell.Syntax.Module.Name (ModuleName)
 -- Compiled Byte Code
 
 data CompiledByteCode = CompiledByteCode
-  { bc_bcos   :: [UnlinkedBCO]
+  { bc_bcos   :: FlatBag UnlinkedBCO
     -- ^ Bunch of interpretable bindings
 
   , bc_itbls  :: ItblEnv
@@ -76,7 +80,7 @@ newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
   deriving (Show, NFData)
 
 instance Outputable CompiledByteCode where
-  ppr CompiledByteCode{..} = ppr bc_bcos
+  ppr CompiledByteCode{..} = ppr $ elemsFlatBag bc_bcos
 
 -- Not a real NFData instance, because ModBreaks contains some things
 -- we can't rnf
@@ -166,10 +170,10 @@ data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
-        unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
-        unlinkedBCOBitmap :: !(UArray Int Word64),      -- bitmap
-        unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
+        unlinkedBCOInstrs :: !(BCOByteArray Word16),      -- insns
+        unlinkedBCOBitmap :: !(BCOByteArray Word),      -- bitmap
+        unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
+        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
    }
 
 instance NFData UnlinkedBCO where
@@ -224,8 +228,8 @@ seqCgBreakInfo CgBreakInfo{..} =
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
-             ppr (sizeSS lits), text "lits",
-             ppr (sizeSS ptrs), text "ptrs" ]
+             ppr (sizeFlatBag lits), text "lits",
+             ppr (sizeFlatBag ptrs), text "ptrs" ]
 
 instance Outputable CgBreakInfo where
    ppr info = text "CgBreakInfo" <+>

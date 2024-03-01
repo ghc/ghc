@@ -12,10 +12,14 @@ module GHC.Data.OsPath
   , (</>)
   , (<.>)
   , splitSearchPath
+  , splitExtension
   , isRelative
+  , makeRelative
+  , normalise
   , dropTrailingPathSeparator
   , takeDirectory
-  , isSuffixOf
+  , OS.isSuffixOf
+  , OS.drop
   , doesDirectoryExist
   , doesFileExist
   , getDirectoryContents
@@ -31,8 +35,9 @@ import GHC.Utils.Outputable qualified as Outputable
 import GHC.Utils.Panic (panic)
 
 import System.OsPath
-import System.OsString (isSuffixOf)
+import qualified System.OsString as OS (isSuffixOf, drop)
 import System.Directory.OsPath (doesDirectoryExist, doesFileExist, getDirectoryContents, createDirectoryIfMissing)
+
 import System.Directory.Internal (os)
 
 -- | Decode an 'OsPath' to 'FilePath', throwing an 'error' if decoding failed.

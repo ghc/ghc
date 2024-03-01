@@ -2,6 +2,7 @@ module Language.Haskell.Syntax.Type where
 
 import Data.Bool
 import Data.Eq
+import Data.Ord
 
 {-
 ************************************************************************
@@ -17,5 +18,6 @@ data PromotionFlag
   | IsPromoted
 
 instance Eq PromotionFlag
+instance Ord PromotionFlag
 
 isPromoted :: PromotionFlag -> Bool

@@ -94,6 +94,7 @@ import GHC.Utils.Fingerprint
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -395,14 +396,13 @@ seqHValue interp unit_env ref =
     status <- interpCmd interp (Seq hval)
     handleSeqHValueStatus interp unit_env status
 
-evalBreakInfo :: HomePackageTable -> EvalBreakpoint -> BreakInfo
-evalBreakInfo hpt (EvalBreakpoint ix mod_name) =
-  BreakInfo modl ix
-  where
-    modl = mi_module $
-           hm_iface $
-           expectJust "evalBreakInfo" $
+evalBreakInfo :: HomePackageTable -> EvalBreakpoint -> IO BreakInfo
+evalBreakInfo hpt (EvalBreakpoint ix mod_name) = do
+  modl <-  mi_module .
+           hm_iface .
+           expectJust "evalBreakInfo"  <$>
            lookupHpt hpt (mkModuleName mod_name)
+  pure $ BreakInfo modl ix
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
@@ -412,25 +412,27 @@ handleSeqHValueStatus interp unit_env eval_status =
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      let bp = evalBreakInfo (ue_hpt unit_env) <$> maybe_break
-          sdocBpLoc = brackets . ppr . getSeqBpSpan
+      bp <- traverse (evalBreakInfo (ue_hpt unit_env)) maybe_break
+      let sdocBpLoc = fmap brackets . fmap ppr . getSeqBpSpan
+      sbp <- sdocBpLoc bp
       putStrLn ("*** Ignoring breakpoint " ++
-            (showSDocUnsafe $ sdocBpLoc bp))
+            (showSDocUnsafe $ sbp))
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
         status <- interpCmd interp (ResumeSeq hval)
         handleSeqHValueStatus interp unit_env status
     (EvalComplete _ r) -> return r
   where
-    getSeqBpSpan :: Maybe BreakInfo -> SrcSpan
+    getSeqBpSpan :: Maybe BreakInfo -> IO SrcSpan
     -- Just case: Stopped at a breakpoint, extract SrcSpan information
     -- from the breakpoint.
-    getSeqBpSpan (Just BreakInfo{..}) =
-      (modBreaks_locs (breaks breakInfo_module)) ! breakInfo_number
+    getSeqBpSpan (Just BreakInfo{..}) = do
+      hm <- breaks breakInfo_module
+      pure $ (modBreaks_locs hm) ! breakInfo_number
     -- Nothing case - should not occur!
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
-    getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
-    breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
+    getSeqBpSpan Nothing = pure $ mkGeneralSrcSpan (fsLit "<unknown>")
+    breaks mod = getModBreaks . expectJust "getSeqBpSpan" <$>
       lookupHpt (ue_hpt unit_env) (moduleName mod)
 
 

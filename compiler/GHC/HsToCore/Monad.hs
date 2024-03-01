@@ -254,13 +254,14 @@ mkDsEnvsFromTcGbl :: MonadIO m
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
        ; eps <- liftIO $ hscEPS hsc_env
+       ; sigs <- liftIO $ hugCompleteSigs (hsc_unit_env hsc_env)
        ; let unit_env = hsc_unit_env hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
              rdr_env  = tcg_rdr_env tcg_env
              fam_inst_env = tcg_fam_inst_env tcg_env
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             complete_matches = hptCompleteSigs hsc_env         -- from the home package
+             complete_matches = sigs         -- from the home package
                                 ++ tcg_complete_matches tcg_env -- from the current module
                                 ++ eps_complete_matches eps     -- from imports
              -- re-use existing next_wrapper_num to ensure uniqueness
@@ -295,17 +296,17 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; msg_var <- newIORef emptyMessages
        ; eps <- liftIO $ hscEPS hsc_env
        ; query <- liftIO $ hscUnitIndexQuery hsc_env
+       ; sigs  <- hugCompleteSigs (hsc_unit_env hsc_env)
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             complete_matches = hptCompleteSigs hsc_env     -- from the home package
+             complete_matches = sigs     -- from the home package
                                 ++ local_complete_matches  -- from the current module
                                 ++ eps_complete_matches eps -- from imports
 
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds binds
-
              envs  = mkDsEnvs unit_env query this_mod rdr_env type_env
                               fam_inst_env ptc msg_var cc_st_var
                               next_wrapper_num complete_matches

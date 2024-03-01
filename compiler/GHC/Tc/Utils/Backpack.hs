@@ -87,6 +87,7 @@ import Control.Monad
 import Data.List (find)
 
 import GHC.Iface.Errors.Types
+import Data.Function ((&))
 
 checkHsigDeclM :: ModIface -> TyThing -> TyThing -> TcRn ()
 checkHsigDeclM sig_iface sig_thing real_thing = do
@@ -369,8 +370,8 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
 thinModIface avails iface =
-    iface {
-        mi_exports = avails,
+    iface
+        & set_mi_exports avails
         -- mi_fixities = ...,
         -- mi_warns = ...,
         -- mi_anns = ...,
@@ -378,13 +379,12 @@ thinModIface avails iface =
         -- perhaps there might be two IfaceTopBndr that are the same
         -- OccName but different Name.  Requires better understanding
         -- of invariants here.
-        mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls
+        & set_mi_decls  (exported_decls ++ non_exported_decls ++ dfun_decls)
         -- mi_insts = ...,
         -- mi_fam_insts = ...,
-    }
   where
-    decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
-    filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)
+    decl_pred occs name = nameOccName name `elemOccSet` occs
+    filter_decls occs = filter (decl_pred occs . ifBoxedName) (mi_decls iface)
 
     exported_occs = mkOccSet [ nameOccName n
                              | a <- avails
@@ -392,13 +392,13 @@ thinModIface avails iface =
     exported_decls = filter_decls exported_occs
 
     non_exported_occs = mkOccSet [ occName n
-                                 | (_, d) <- exported_decls
+                                 | IfaceDeclBoxed _ _ _ d <- exported_decls
                                  , n <- ifaceDeclNeverExportedRefs d ]
     non_exported_decls = filter_decls non_exported_occs
 
     dfun_pred IfaceId{ ifIdDetails = IfDFunId } = True
     dfun_pred _ = False
-    dfun_decls = filter (dfun_pred . snd) (mi_decls iface)
+    dfun_decls = filter (dfun_pred . ifBoxedDecl) (mi_decls iface)
 
 -- | The list of 'Name's of *non-exported* 'IfaceDecl's which this
 -- 'IfaceDecl' may refer to.  A non-exported 'IfaceDecl' should be kept

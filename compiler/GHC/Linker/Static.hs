@@ -71,7 +71,7 @@ linkBinary = linkBinary' False
 linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
-        unit_state = ue_units unit_env
+        unit_state = ue_homeUnitState unit_env
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
         arch_os   = platformArchOS platform

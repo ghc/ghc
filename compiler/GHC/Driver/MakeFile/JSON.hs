@@ -31,7 +31,7 @@ import GHC.Unit
 import GHC.Utils.Json
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import System.FilePath (normalise)
+import GHC.Data.OsPath
 
 --------------------------------------------------------------------------------
 -- Output helpers
@@ -92,9 +92,9 @@ writeJsonOutput =
 data DepNode =
   DepNode {
     dn_mod :: Module,
-    dn_src :: FilePath,
-    dn_obj :: FilePath,
-    dn_hi :: FilePath,
+    dn_src :: OsPath,
+    dn_obj :: OsPath,
+    dn_hi :: OsPath,
     dn_boot :: IsBootInterface,
     dn_options :: Set.Set String
   }
@@ -102,14 +102,14 @@ data DepNode =
 data Dep =
   DepHi {
     dep_mod :: Module,
-    dep_path :: FilePath,
+    dep_path :: OsPath,
     dep_unit :: Maybe UnitInfo,
     dep_local :: Bool,
     dep_boot :: IsBootInterface
   }
   |
   DepCpp {
-    dep_path :: FilePath
+    dep_path :: OsPath
   }
 
 --------------------------------------------------------------------------------
@@ -125,10 +125,10 @@ instance Semigroup PackageDeps where
 
 data Deps =
   Deps {
-    sources :: Set.Set FilePath,
+    sources :: Set.Set OsPath,
     modules :: (Set.Set ModuleName, Set.Set ModuleName),
     packages :: PackageDeps,
-    cpp :: Set.Set FilePath,
+    cpp :: Set.Set OsPath,
     options :: Set.Set String,
     preprocessor :: Maybe FilePath
   }
@@ -141,7 +141,7 @@ instance ToJson DepJSON where
   json (DepJSON m) =
     JSObject [
       (moduleNameString target, JSObject [
-        ("sources", array sources normalise),
+        ("sources", array sources (unsafeDecodeUtf . normalise)),
         ("modules", array (fst modules) moduleNameString),
         ("modules-boot", array (snd modules) moduleNameString),
         ("packages",
@@ -150,7 +150,7 @@ instance ToJson DepJSON where
             ((name, unit_id, package_id), mods) <- Map.toList packages
           ]
         ),
-        ("cpp", array cpp id),
+        ("cpp", array cpp unsafeDecodeUtf),
         ("options", array options id),
         ("preprocessor", maybe JSNull JSString preprocessor)
       ])

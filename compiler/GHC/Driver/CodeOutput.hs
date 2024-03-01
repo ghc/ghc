@@ -35,6 +35,7 @@ import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
+import GHC.Data.OsPath (unsafeDecodeUtf)
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
@@ -308,8 +309,8 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
           case mkStubPaths (initFinderOpts dflags) (moduleName mod) location of
             Nothing -> pure False
             Just stub_h -> do
-              createDirectoryIfMissing True (takeDirectory stub_h)
-              outputForeignStubs_help stub_h stub_h_output_w
+              createDirectoryIfMissing True (takeDirectory (unsafeDecodeUtf stub_h))
+              outputForeignStubs_help (unsafeDecodeUtf stub_h) stub_h_output_w
                     ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         putDumpFileMaybe logger Opt_D_dump_foreign

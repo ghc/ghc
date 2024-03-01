@@ -36,7 +36,7 @@ Executable ghc
                    bytestring >= 0.9 && < 0.13,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
-                   filepath   >= 1   && < 1.6,
+                   filepath   >= 1.5 && < 1.6,
                    containers >= 0.5 && < 0.8,
                    transformers >= 0.5 && < 0.7,
                    ghc-boot      == @ProjectVersionMunged@,

@@ -35,6 +35,7 @@ import GHC.Utils.Panic
 
 import GHC.Core.TyCon
 import GHC.Data.FastString
+import GHC.Data.FlatBag
 import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
@@ -72,9 +73,9 @@ bcoFreeNames bco
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
         = unionManyUniqDSets (
-             mkUniqDSet [ n | BCOPtrName n <- ssElts ptrs ] :
-             mkUniqDSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
-             map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
+             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag ptrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag nonptrs ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag ptrs ]
           )
 
 -- -----------------------------------------------------------------------------
@@ -91,7 +92,7 @@ bcoFreeNames bco
 assembleBCOs
   :: Interp
   -> Profile
-  -> [ProtoBCO Name]
+  -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> AddrEnv
   -> Maybe ModBreaks
@@ -132,7 +133,7 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
 -- top-level string literal bindings] in GHC.StgToByteCode for some discussion
 -- about why.
 --
-mallocStrings :: Interp -> [UnlinkedBCO] -> IO [UnlinkedBCO]
+mallocStrings ::  Interp -> FlatBag UnlinkedBCO -> IO (FlatBag UnlinkedBCO)
 mallocStrings interp ulbcos = do
   let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
   ptrs <- interpCmd interp (MallocStrings bytestrings)
@@ -173,7 +174,7 @@ assembleOneBCO interp profile pbco = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   ubco <- assembleBCO (profilePlatform profile) pbco
-  [ubco'] <- mallocStrings interp [ubco]
+  UnitFlatBag ubco' <- mallocStrings interp (UnitFlatBag ubco)
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
@@ -216,9 +217,9 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
              (text "bytecode instruction count mismatch")
 
   let asm_insns = ssElts final_insns
-      insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
-      bitmap_arr = mkBitmapArray bsize bitmap
-      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr final_lits final_ptrs
+      !insns_arr =  mkBCOByteArray $ Array.listArray (0 :: Int, fromIntegral n_insns - 1) asm_insns
+      !bitmap_arr = mkBCOByteArray $ mkBitmapArray bsize bitmap
+      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSizedSeq final_lits) (fromSizedSeq final_ptrs)
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
   -- objects, since they might get run too early.  Disable this until
@@ -227,7 +228,7 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
 
   return ul_bco
 
-mkBitmapArray :: Word -> [StgWord] -> UArray Int Word64
+mkBitmapArray :: Word -> [StgWord] -> UArray Int Word
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.
