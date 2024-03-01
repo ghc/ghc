@@ -23,12 +23,13 @@ module GHC.ByteCode.Types
   , CgBreakInfo(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
+  , FlatBag, sizeFlatBag, fromSizedSeq, elemsFlatBag
   ) where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
-import GHC.Data.SizedSeq
+import GHC.Data.FlatBag
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
@@ -42,7 +43,6 @@ import Control.DeepSeq
 import Foreign
 import Data.Array as A
 import Data.Array.Base  ( UArray(..) )
-import Data.Array
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -52,8 +52,6 @@ import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
 import Language.Haskell.Syntax.Module.Name (ModuleName)
 import GHC.Base (ByteArray#)
-import Data.Array.Unboxed (UArray)
-import Data.Array.Base (UArray(..))
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -186,8 +184,8 @@ data UnlinkedBCO
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
         unlinkedBCOInstrs :: !BCOInstrs,      -- insns
         unlinkedBCOBitmap :: !BCOBitmap,      -- bitmap
-        unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
+        unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
+        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
    }
 
 instance NFData UnlinkedBCO where
@@ -242,8 +240,8 @@ seqCgBreakInfo CgBreakInfo{..} =
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
-             ppr (sizeSS lits), text "lits",
-             ppr (sizeSS ptrs), text "ptrs" ]
+             ppr (sizeFlatBag lits), text "lits",
+             ppr (sizeFlatBag ptrs), text "ptrs" ]
 
 instance Outputable CgBreakInfo where
    ppr info = text "CgBreakInfo" <+>
