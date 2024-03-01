@@ -28,7 +28,7 @@ import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
-import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
+import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy, getGlobalPackageDb, RawSettings)
 import GHC.Platform.Host (hostPlatformArchOS)
 import GHC.UniqueSubdir (uniqueSubdir)
 import qualified GHC.Data.ShortText as ST
@@ -582,6 +582,21 @@ allPackagesInStack = concatMap packages
 stackUpTo :: FilePath -> PackageDBStack -> PackageDBStack
 stackUpTo to_modify = dropWhile ((/= to_modify) . location)
 
+readFromSettingsFile :: FilePath
+                      -> (FilePath -> RawSettings -> Either String b)
+                      -> IO (Either String b)
+readFromSettingsFile settingsFile f = do
+  settingsStr <- readFile settingsFile
+  pure $ do
+    mySettings <- case maybeReadFuzzy settingsStr of
+      Just s -> pure $ Map.fromList s
+      -- It's excusable to not have a settings file (for now at
+      -- least) but completely inexcusable to have a malformed one.
+      Nothing -> Left $ "Can't parse settings file " ++ show settingsFile
+    case f settingsFile mySettings of
+      Right archOS -> Right archOS
+      Left e -> Left e
+
 getPkgDatabases :: Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
                 -> Bool    -- use the user db
@@ -605,24 +620,38 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
   -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
   let err_msg = "missing --global-package-db option, location of global package database unknown\n"
-  global_conf <-
+  (top_dir, global_conf) <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
         -- See Note [Base Dir] for more information on the base dir / top dir.
         [] -> do mb_dir <- getBaseDir
                  case mb_dir of
                    Nothing  -> die err_msg
                    Just dir -> do
-                     r <- lookForPackageDBIn dir
-                     case r of
-                       Nothing -> die ("Can't find package database in " ++ dir)
-                       Just path -> return path
-        fs -> return (last fs)
+                     -- Look for where it is given in the settings file, if marked there.
+                     let settingsFile = dir </> "settings"
+                     exists_settings_file <- doesFileExist settingsFile
+                     erel_db <-
+                      if exists_settings_file
+                          then readFromSettingsFile settingsFile getGlobalPackageDb
+                          else pure (Left ("Settings file doesn't exist: " ++ settingsFile))
 
-  -- The value of the $topdir variable used in some package descriptions
-  -- Note that the way we calculate this is slightly different to how it
-  -- is done in ghc itself. We rely on the convention that the global
-  -- package db lives in ghc's libdir.
-  top_dir <- absolutePath (takeDirectory global_conf)
+                     case erel_db of
+                      Right rel_db -> return (dir, dir </> rel_db)
+                      -- If the version of GHC doesn't have this field or the settings file
+                      -- doesn't exist for some reason, look in the libdir.
+                      Left err -> do
+                        r <- lookForPackageDBIn dir
+                        case r of
+                          Nothing -> die (unlines [err, ("Fallback: Can't find package database in " ++ dir)])
+                          Just path -> return (dir, path)
+        fs -> do
+          -- The value of the $topdir variable used in some package descriptions
+          -- Note that the way we calculate this is slightly different to how it
+          -- is done in ghc itself. We rely on the convention that the global
+          -- package db lives in ghc's libdir.
+          let pkg_db = last fs
+          top_dir <- absolutePath (takeDirectory pkg_db)
+          return (top_dir, pkg_db)
 
   let no_user_db = FlagNoUserDb `elem` my_flags
 
@@ -641,16 +670,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
             warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
             warn "cannot know target platform so guessing target == host (native compiler)."
             pure hostPlatformArchOS
-          True -> do
-            settingsStr <- readFile settingsFile
-            mySettings <- case maybeReadFuzzy settingsStr of
-              Just s -> pure $ Map.fromList s
-              -- It's excusable to not have a settings file (for now at
-              -- least) but completely inexcusable to have a malformed one.
-              Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-            case getTargetArchOS settingsFile mySettings of
-              Right archOS -> pure archOS
+          True ->
+            readFromSettingsFile settingsFile getTargetArchOS >>= \case
+              Right v -> pure v
               Left e -> die e
+
         let subdir = uniqueSubdir targetArchOS
 
             getFirstSuccess :: [IO a] -> IO (Maybe a)

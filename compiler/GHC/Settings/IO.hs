@@ -112,8 +112,14 @@ initSettings top_dir = do
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
   arSupportsDashL         <- getBooleanSetting "ar supports -L"
 
-  let globalpkgdb_path = installed "package.conf.d"
-      ghc_usage_msg_path  = installed "ghc-usage.txt"
+
+  -- The package database is either a relative path to the location of the settings file
+  -- OR an absolute path.
+  -- In case the path is absolute then top_dir </> abs_path == abs_path
+  --         the path is relative then top_dir </> rel_path == top_dir </> rel_path
+  globalpkgdb_path <- installed <$> getSetting "Relative Global Package DB"
+
+  let ghc_usage_msg_path  = installed "ghc-usage.txt"
       ghci_usage_msg_path = installed "ghci-usage.txt"
 
   -- For all systems, unlit, split, mangle are GHC utilities
