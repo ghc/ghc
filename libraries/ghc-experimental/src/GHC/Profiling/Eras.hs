@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | TODO move this module into ghc-internals
 module GHC.Profiling.Eras ( setUserEra
                      , getUserEra
                      , incrementUserEra
