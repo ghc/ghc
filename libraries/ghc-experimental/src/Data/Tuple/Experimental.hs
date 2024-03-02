@@ -161,3 +161,4 @@ module Data.Tuple.Experimental (
 import GHC.Tuple
 import GHC.Types
 import GHC.Classes
+import GHC.Num.BigNat () -- for build ordering
