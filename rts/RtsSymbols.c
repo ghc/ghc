@@ -971,6 +971,13 @@ extern char **environ;
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
+#if defined(riscv64_HOST_ARCH)
+#define RTS_ARCH_LIBGCC_SYMBOLS \
+  SymI_NeedsProto(__clzdi2)
+#else
+#define RTS_ARCH_LIBGCC_SYMBOLS
+#endif
+
 // Symbols defined by libgcc/compiler-rt for AArch64's outline atomics.
 #if defined(HAVE_ARM_OUTLINE_ATOMICS)
 #include "ARMOutlineAtomicsSymbols.h"
@@ -1023,6 +1030,7 @@ RTS_DARWIN_ONLY_SYMBOLS
 RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
+RTS_ARCH_LIBGCC_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
@@ -1065,6 +1073,7 @@ RtsSymbolVal rtsSyms[] = {
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
+      RTS_ARCH_LIBGCC_SYMBOLS
       RTS_FINI_ARRAY_SYMBOLS
       RTS_LIBFFI_SYMBOLS
       RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
