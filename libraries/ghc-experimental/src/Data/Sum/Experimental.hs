@@ -81,3 +81,6 @@ module Data.Sum.Experimental (
 ) where
 
 import GHC.Types
+
+-- stupid build-order workaround until #23942 is properly fixed
+import GHC.Base ()

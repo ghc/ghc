@@ -27,4 +27,7 @@ import GHC.Internal.IO.Encoding.Iconv
 #else
     ( ) where
 
+-- stupid build-order workaround until #23942 is properly fixed
+import Prelude ()
+
 #endif

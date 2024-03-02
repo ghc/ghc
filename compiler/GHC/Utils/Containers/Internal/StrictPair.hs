@@ -4,6 +4,10 @@
 
 module GHC.Utils.Containers.Internal.StrictPair (StrictPair(..), toPair) where
 
+-- stupid build-order workaround until #23942 is properly fixed
+import GHC.Base ()
+
+
 -- | The same as a regular Haskell pair, but
 --
 -- @

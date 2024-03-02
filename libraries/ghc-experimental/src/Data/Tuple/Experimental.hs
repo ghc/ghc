@@ -161,3 +161,6 @@ module Data.Tuple.Experimental (
 import GHC.Tuple
 import GHC.Types
 import GHC.Classes
+
+-- stupid build-order workaround until #23942 is properly fixed
+import GHC.Base ()
