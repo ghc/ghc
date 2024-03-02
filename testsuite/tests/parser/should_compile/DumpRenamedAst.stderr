@@ -273,10 +273,7 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (AnnParen
-                   (AnnParens)
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                  (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:13:11-16 })
@@ -367,10 +364,7 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (AnnParen
-                   (AnnParens)
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                  (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:13:27-35 })
@@ -507,10 +501,7 @@
                (EpaComments
                 []))
               (HsListTy
-               (AnnParen
-                (AnnParensSquare)
-                (EpaSpan { DumpRenamedAst.hs:12:27 })
-                (EpaSpan { DumpRenamedAst.hs:12:29 }))
+               (AnnParen AnnParensSquare (EpaSpan { DumpRenamedAst.hs:12:27 }) (EpaSpan { DumpRenamedAst.hs:12:29 }))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:12:28 })
@@ -605,10 +596,7 @@
               (EpaComments
                []))
              (HsListTy
-              (AnnParen
-               (AnnParensSquare)
-               (EpaSpan { DumpRenamedAst.hs:11:16 })
-               (EpaSpan { DumpRenamedAst.hs:11:18 }))
+              (AnnParen AnnParensSquare (EpaSpan { DumpRenamedAst.hs:11:16 }) (EpaSpan { DumpRenamedAst.hs:11:18 }))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:11:17 })
@@ -793,10 +781,7 @@
               (EpaComments
                []))
              (HsParTy
-              (AnnParen
-               (AnnParens)
-               (EpaDelta (SameLine 0) [])
-               (EpaDelta (SameLine 0) []))
+              (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:23-36 })
@@ -896,10 +881,7 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen
-                 (AnnParens)
-                 (EpaDelta (SameLine 0) [])
-                 (EpaDelta (SameLine 0) []))
+                (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:19:43-51 })
@@ -1009,10 +991,7 @@
                    (EpaComments
                     []))
                   (HsParTy
-                   (AnnParen
-                    (AnnParens)
-                    (EpaDelta (SameLine 0) [])
-                    (EpaDelta (SameLine 0) []))
+                   (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                    (L
                     (EpAnn
                      (EpaSpan { DumpRenamedAst.hs:20:11-33 })
@@ -1347,10 +1326,7 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (AnnParen
-                   (AnnParens)
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                  (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:22:26-28 })
@@ -1819,10 +1795,7 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen
-                 (AnnParens)
-                 (EpaDelta (SameLine 0) [])
-                 (EpaDelta (SameLine 0) []))
+                (AnnParen AnnParens (EpaDelta (SameLine 0) []) (EpaDelta (SameLine 0) []))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:24:18-26 })
@@ -2066,10 +2039,7 @@
                (EpaComments
                 []))
               (HsListTy
-               (AnnParen
-                (AnnParensSquare)
-                (EpaSpan { DumpRenamedAst.hs:31:12 })
-                (EpaSpan { DumpRenamedAst.hs:31:14 }))
+               (AnnParen AnnParensSquare (EpaSpan { DumpRenamedAst.hs:31:12 }) (EpaSpan { DumpRenamedAst.hs:31:14 }))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:31:13 })
@@ -2122,10 +2092,7 @@
                  (EpaComments
                   []))
                 (HsListTy
-                 (AnnParen
-                  (AnnParensSquare)
-                  (EpaSpan { DumpRenamedAst.hs:32:10 })
-                  (EpaSpan { DumpRenamedAst.hs:32:12 }))
+                 (AnnParen AnnParensSquare (EpaSpan { DumpRenamedAst.hs:32:10 }) (EpaSpan { DumpRenamedAst.hs:32:12 }))
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:32:11 })

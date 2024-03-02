@@ -71,6 +71,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationEpaLocation
               `extQ` annotationNoEpAnns
               `extQ` addEpAnn
+              `extQ` annParen
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
@@ -173,27 +174,21 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             srcSpan :: SrcSpan -> SDoc
             srcSpan ss = case bs of
              BlankSrcSpan -> text "{ ss }"
-             NoBlankSrcSpan -> braces $ char ' ' <>
-                             (hang (ppr ss) 1
-                                   -- TODO: show annotations here
-                                   (text ""))
-             BlankSrcSpanFile -> braces $ char ' ' <>
-                             (hang (pprUserSpan False ss) 1
-                                   -- TODO: show annotations here
-                                   (text ""))
+             NoBlankSrcSpan -> braces $ char ' ' <> (ppr ss) <> char ' '
+             BlankSrcSpanFile -> braces $ char ' ' <> (pprUserSpan False ss) <> char ' '
 
             realSrcSpan :: RealSrcSpan -> SDoc
             realSrcSpan ss = case bs of
              BlankSrcSpan -> text "{ ss }"
-             NoBlankSrcSpan -> braces $ char ' ' <>
-                             (hang (ppr ss) 1
-                                   -- TODO: show annotations here
-                                   (text ""))
-             BlankSrcSpanFile -> braces $ char ' ' <>
-                             (hang (pprUserRealSpan False ss) 1
-                                   -- TODO: show annotations here
-                                   (text ""))
+             NoBlankSrcSpan -> braces $ char ' ' <> (ppr ss) <> char ' '
+             BlankSrcSpanFile -> braces $ char ' ' <> (pprUserRealSpan False ss) <> char ' '
 
+            annParen :: AnnParen -> SDoc
+            annParen (AnnParen a o c) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnParen"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnParen"
+                        $$ vcat [ppr a, epaAnchor o, epaAnchor c]
 
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of
