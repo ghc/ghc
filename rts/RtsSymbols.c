@@ -981,8 +981,11 @@ extern char **environ;
 #endif
 
 #if defined(riscv64_HOST_ARCH)
+// See https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
+// as reference for the following built-ins.
 #define RTS_ARCH_LIBGCC_SYMBOLS \
-  SymI_NeedsProto(__clzdi2)
+  SymI_NeedsProto(__clzdi2) \
+  SymI_NeedsProto(__ctzdi2)
 #else
 #define RTS_ARCH_LIBGCC_SYMBOLS
 #endif
