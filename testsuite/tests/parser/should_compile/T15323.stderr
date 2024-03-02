@@ -163,10 +163,7 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen
-                 (AnnParens)
-                 (EpaSpan { T15323.hs:6:31 })
-                 (EpaSpan { T15323.hs:6:36 }))
+                (AnnParen AnnParens (EpaSpan { T15323.hs:6:31 }) (EpaSpan { T15323.hs:6:36 }))
                 (L
                  (EpAnn
                   (EpaSpan { T15323.hs:6:32-35 })

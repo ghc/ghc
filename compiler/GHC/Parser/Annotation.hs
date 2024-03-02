@@ -745,7 +745,7 @@ data ParenType
   = AnnParens       -- ^ '(', ')'
   | AnnParensHash   -- ^ '(#', '#)'
   | AnnParensSquare -- ^ '[', ']'
-  deriving (Eq, Ord, Data)
+  deriving (Eq, Ord, Data, Show)
 
 -- | Maps the 'ParenType' to the related opening and closing
 -- AnnKeywordId. Used when actually printing the item.
@@ -1452,6 +1452,8 @@ instance (Outputable a, OutputableBndr e)
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
 
+instance Outputable ParenType where
+  ppr t = text (show t)
 
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts

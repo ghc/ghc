@@ -200,10 +200,7 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (AnnParen
-                   (AnnParens)
-                   (EpaSpan { Test20239.hs:7:50 })
-                   (EpaSpan { Test20239.hs:7:86 }))
+                  (AnnParen AnnParens (EpaSpan { Test20239.hs:7:50 }) (EpaSpan { Test20239.hs:7:86 }))
                   (L
                    (EpAnn
                     (EpaSpan { Test20239.hs:7:51-85 })
@@ -272,10 +269,7 @@
                         (EpaComments
                          []))
                        (HsParTy
-                        (AnnParen
-                         (AnnParens)
-                         (EpaSpan { Test20239.hs:7:68 })
-                         (EpaSpan { Test20239.hs:7:85 }))
+                        (AnnParen AnnParens (EpaSpan { Test20239.hs:7:68 }) (EpaSpan { Test20239.hs:7:85 }))
                         (L
                          (EpAnn
                           (EpaSpan { Test20239.hs:7:69-84 })
@@ -340,10 +334,7 @@
                             (EpaComments
                              []))
                            (HsTupleTy
-                            (AnnParen
-                             (AnnParens)
-                             (EpaSpan { Test20239.hs:7:83 })
-                             (EpaSpan { Test20239.hs:7:84 }))
+                            (AnnParen AnnParens (EpaSpan { Test20239.hs:7:83 }) (EpaSpan { Test20239.hs:7:84 }))
                             (HsBoxedOrConstraintTuple)
                             [])))))))))))))])
              (Nothing)))])

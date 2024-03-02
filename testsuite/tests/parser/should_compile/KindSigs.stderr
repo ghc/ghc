@@ -268,10 +268,7 @@
         (EpaComments
          []))
        (HsTupleTy
-        (AnnParen
-         (AnnParens)
-         (EpaSpan { KindSigs.hs:15:14 })
-         (EpaSpan { KindSigs.hs:15:51 }))
+        (AnnParen AnnParens (EpaSpan { KindSigs.hs:15:14 }) (EpaSpan { KindSigs.hs:15:51 }))
         (HsBoxedOrConstraintTuple)
         [(L
           (EpAnn
@@ -468,10 +465,7 @@
         (EpaComments
          []))
        (HsTupleTy
-        (AnnParen
-         (AnnParensHash)
-         (EpaSpan { KindSigs.hs:16:15-16 })
-         (EpaSpan { KindSigs.hs:16:53-54 }))
+        (AnnParen AnnParensHash (EpaSpan { KindSigs.hs:16:15-16 }) (EpaSpan { KindSigs.hs:16:53-54 }))
         (HsUnboxedTuple)
         [(L
           (EpAnn
@@ -649,10 +643,7 @@
         (EpaComments
          []))
        (HsListTy
-        (AnnParen
-         (AnnParensSquare)
-         (EpaSpan { KindSigs.hs:19:12 })
-         (EpaSpan { KindSigs.hs:19:26 }))
+        (AnnParen AnnParensSquare (EpaSpan { KindSigs.hs:19:12 }) (EpaSpan { KindSigs.hs:19:26 }))
         (L
          (EpAnn
           (EpaSpan { KindSigs.hs:19:14-24 })
@@ -756,10 +747,7 @@
              (EpaComments
               []))
             (HsParTy
-             (AnnParen
-              (AnnParens)
-              (EpaSpan { KindSigs.hs:22:8 })
-              (EpaSpan { KindSigs.hs:22:20 }))
+             (AnnParen AnnParens (EpaSpan { KindSigs.hs:22:8 }) (EpaSpan { KindSigs.hs:22:20 }))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:9-19 })
@@ -847,10 +835,7 @@
                (EpaComments
                 []))
               (HsParTy
-               (AnnParen
-                (AnnParens)
-                (EpaSpan { KindSigs.hs:22:33 })
-                (EpaSpan { KindSigs.hs:22:44 }))
+               (AnnParen AnnParens (EpaSpan { KindSigs.hs:22:33 }) (EpaSpan { KindSigs.hs:22:44 }))
                (L
                 (EpAnn
                  (EpaSpan { KindSigs.hs:22:34-43 })
@@ -868,10 +853,7 @@
                    (EpaComments
                     []))
                   (HsTupleTy
-                   (AnnParen
-                    (AnnParens)
-                    (EpaSpan { KindSigs.hs:22:34 })
-                    (EpaSpan { KindSigs.hs:22:35 }))
+                   (AnnParen AnnParens (EpaSpan { KindSigs.hs:22:34 }) (EpaSpan { KindSigs.hs:22:35 }))
                    (HsBoxedOrConstraintTuple)
                    []))
                  (L
@@ -1362,10 +1344,7 @@
              (EpaComments
               []))
             (HsListTy
-             (AnnParen
-              (AnnParensSquare)
-              (EpaSpan { KindSigs.hs:28:34 })
-              (EpaSpan { KindSigs.hs:28:39 }))
+             (AnnParen AnnParensSquare (EpaSpan { KindSigs.hs:28:34 }) (EpaSpan { KindSigs.hs:28:39 }))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:28:35-38 })
@@ -1519,10 +1498,7 @@
            (EpaComments
             []))
           (HsParTy
-           (AnnParen
-            (AnnParens)
-            (EpaSpan { KindSigs.hs:34:9 })
-            (EpaSpan { KindSigs.hs:34:22 }))
+           (AnnParen AnnParens (EpaSpan { KindSigs.hs:34:9 }) (EpaSpan { KindSigs.hs:34:22 }))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:34:10-21 })
