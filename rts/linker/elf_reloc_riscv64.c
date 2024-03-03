@@ -150,7 +150,7 @@ void setUType(inst_t *loc, int32_t val) {
   const unsigned bits = 32;
   uint32_t hi = val + 0x800;
   checkInt(loc, SignExtend64(hi, bits) >> 12, 20);
-  debugBelch("setUType: hi 0x%x val 0x%x\n", hi, val);
+  IF_DEBUG(linker, debugBelch("setUType: hi 0x%x val 0x%x\n", hi, val));
   write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
 }
 
