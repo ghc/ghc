@@ -90,22 +90,24 @@ int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
   abort(/* we don't support Rel locations yet. */);
 }
 
-// Sign-extend the number in the bottom B bits of X to a 64-bit integer.
-// Requires 0 < B <= 64.
-int64_t SignExtend64(uint64_t X, unsigned B) {
+// Sign-extend the number in the bottom B bits of X to a 32-bit integer.
+// Requires 0 < B <= 32. (32 bit is sufficient as we can only encode 20 + 12 =
+// 32 bit in a relocation pair.)
+int32_t SignExtend32(uint32_t X, unsigned B) {
   assert(B > 0 && "Bit width can't be 0.");
-  assert(B <= 64 && "Bit width out of range.");
-  return (int64_t)(X << (64 - B)) >> (64 - B);
+  assert(B <= 32 && "Bit width out of range.");
+  return (int32_t)(X << (32 - B)) >> (32 - B);
 }
 
 // Make sure that V can be represented as an N bit signed integer.
-void checkInt(inst_t *loc, int64_t v, int n) {
-  if (v != SignExtend64(v, n)) {
-    debugBelch("Relocation at 0x%x is out of range. value: 0x%lx (%ld), "
-               "sign-extended value: 0x%lx (%ld), max bits 0x%x (%d)\n",
-               *loc, v, v, SignExtend64(v, n), SignExtend64(v, n), n, n);
+void checkInt(inst_t *loc, int32_t v, int n) {
+  if (v != SignExtend32(v, n)) {
+    debugBelch("Relocation at 0x%x is out of range. value: 0x%x (%d), "
+               "sign-extended value: 0x%x (%d), max bits 0x%x (%d)\n",
+               *loc, v, v, SignExtend32(v, n), SignExtend32(v, n), n, n);
   }
 }
+
 // RISCV is little-endian by definition.
 void write8le(uint8_t *p, uint8_t v) { *p = v; }
 
@@ -149,7 +151,7 @@ uint32_t setLO12_S(uint32_t insn, uint32_t imm) {
 void setUType(inst_t *loc, int32_t val) {
   const unsigned bits = 32;
   uint32_t hi = val + 0x800;
-  checkInt(loc, SignExtend64(hi, bits) >> 12, 20);
+  checkInt(loc, SignExtend32(hi, bits) >> 12, 20);
   IF_DEBUG(linker, debugBelch("setUType: hi 0x%x val 0x%x\n", hi, val));
   write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
 }
