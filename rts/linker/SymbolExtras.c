@@ -153,7 +153,7 @@ void ocProtectExtras(ObjectCode* oc)
 }
 
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
 SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target )
@@ -189,9 +189,12 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
     extra->addr = target;
     memcpy(extra->jumpIsland, jmp, 8);
 #endif /* x86_64_HOST_ARCH */
-
+#if defined(riscv64_HOST_ARCH)
+    // Fake GOT entry (used like GOT, but located in symbol extras)
+    extra->addr = target;
+#endif
     return extra;
 }
-#endif /* powerpc_HOST_ARCH || x86_64_HOST_ARCH */
+#endif /* powerpc_HOST_ARCH || x86_64_HOST_ARCH || riscv64_HOST_ARCH */
 #endif /* !x86_64_HOST_ARCH) || !mingw32_HOST_OS */
 #endif // NEED_SYMBOL_EXTRAS

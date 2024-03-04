@@ -1,6 +1,8 @@
 #include "elf_reloc_riscv64.h"
+#include "LinkerInternals.h"
 #include "Rts.h"
 #include "Stg.h"
+#include "SymbolExtras.h"
 #include "elf.h"
 #include "elf_plt.h"
 #include "elf_util.h"
@@ -442,8 +444,8 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
                        symbol_prime->addr, symbol_prime->name));
           int32_t result = computeAddend(targetSection, (Elf_Rel *)rel_prime,
                                          symbol_prime, addend_prime, oc);
-          IF_DEBUG(linker,
-            debugBelch("Result of computeAddend: 0x%x (%d)\n", result, result));
+          IF_DEBUG(linker, debugBelch("Result of computeAddend: 0x%x (%d)\n",
+                                      result, result));
           return result;
         }
       }
@@ -509,9 +511,28 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
   case R_RISCV_32_PCREL:
     return S + A - P;
   case R_RISCV_GOT_HI20: {
-    // Ensure that the GOT entry is set up.
-    CHECK(0x0 != GOT_S);
-    return GOT_S + A - P;
+    // TODO: Allocating extra memory for every symbol just to play this trick
+    // seems to be a bit obscene. (GOT relocations hitting local symbols
+    // happens, but not very often.) It would be better to allocate only what we
+    // really need.
+
+    // There are two cases here: 1. The symbol is public and has an entry in the
+    // GOT. 2. It's local and has no corresponding GOT entry. The first case is
+    // easy: We simply calculate the addend with the GOT address. In the second
+    // case we create a symbol extra entry and pretend it's the GOT.
+    if (GOT_S != 0) {
+      // 1. Public symbol with GOT entry.
+      return GOT_S + A - P;
+    } else {
+      // 2. Fake GOT entry with symbol extra entry.
+      SymbolExtra *symbolExtra = makeSymbolExtra(oc, ELF_R_SYM(rel->r_info), S);
+      addr_t* FAKE_GOT_S = &symbolExtra->addr;
+      addr_t res = (addr_t) FAKE_GOT_S + A - P;
+      IF_DEBUG(linker, debugBelch("R_RISCV_GOT_HI20 w/ SymbolExtra = %p , "
+                                  "entry = 0x%lx , reloc-addend = 0x%lu ",
+                                  symbolExtra, FAKE_GOT_S, res));
+      return res;
+    }
   }
   default:
     debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
