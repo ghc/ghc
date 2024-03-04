@@ -73,6 +73,7 @@ stageBootPackages = return
   , deriveConstants
   , genprimopcode
   , unlit
+  , genapply
   ]
 
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
@@ -112,7 +113,6 @@ stage0Packages = do
              , transformers
              , unlit
              , hp2ps
-             , genapply
              , if windowsHost then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
@@ -132,7 +132,6 @@ stage1Packages = do
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget Stage1
-    jsTarget   <- isJsTarget Stage2
 
     let when c xs = if c then xs else mempty
 
@@ -164,8 +163,6 @@ stage1Packages = do
         , hpcBin
         , if winTarget then win32 else unix
         ] ++
-        [ genapply | not jsTarget ]
-        ++
         [ iserv
         , runGhc
         , ghcToolchainBin
