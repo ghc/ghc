@@ -235,8 +235,8 @@ generateRules = do
 
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
-            go gen file = generate file (semiEmptyTarget stage) gen
-        (prefix -/- "settings") %> go generateSettings
+            go gen file = generate file (semiEmptyTarget (succStage stage)) gen
+        (prefix -/- "settings") %> \out -> go (generateSettings out) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
@@ -356,21 +356,26 @@ templateRules = do
 ghcWrapper :: Stage -> Expr String
 ghcWrapper (Stage0 {}) = error "Stage0 GHC does not require a wrapper script to run."
 ghcWrapper stage  = do
-    dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath (PackageDbLoc stage Final)
     ghcPath <- expr $ (</>) <$> topDirectory
                             <*> programPath (vanillaContext (predStage stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
-                               ++ (if stage == Stage1
-                                     then ["-no-global-package-db"
-                                          , "-package-env=-"
-                                          , "-package-db " ++ dbPath
-                                          ]
-                                     else [])
                                ++ [ "$@" ]
 
-generateSettings :: Expr String
-generateSettings = do
+generateSettings :: FilePath -> Expr String
+generateSettings settingsFile = do
     ctx <- getContext
+    stage <- getStage
+
+    package_db_path <- expr $ do
+      let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
+      case stage of
+        Stage0 {} -> error "Unable to generate settings for stage0"
+        Stage1 -> get_pkg_db Stage1
+        Stage2 -> get_pkg_db Stage1
+        Stage3 -> get_pkg_db Stage2
+
+    let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
+
     settings <- traverse sequence $
         [ ("C compiler command",   queryTarget ccPath)
         , ("C compiler flags",     queryTarget ccFlags)
@@ -422,7 +427,7 @@ generateSettings = do
         , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
-        , ("Relative Global Package DB", return "package.conf.d" )
+        , ("Relative Global Package DB", pure rel_pkg_db)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of

@@ -13,8 +13,6 @@ import Hadrian.Oracles.TextFile
 import Oracles.Setting (topDirectory, setting, Setting(..))
 import Packages
 import Settings.Program (programContext)
-import Hadrian.Oracles.Path
-import System.Directory (makeAbsolute)
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -81,15 +79,12 @@ testRTSSettings = do
     file <- testConfigFile
     words <$> lookupValueOrError Nothing file "GhcRTSWays"
 
-absoluteBuildRoot :: Action FilePath
-absoluteBuildRoot = (fixAbsolutePathOnWindows  =<< liftIO . makeAbsolute =<< buildRoot)
-
 -- | Directory to look for binaries.
 --   We assume that required programs are present in the same binary directory
 --   in which ghc is stored and that they have their conventional name.
 getBinaryDirectory :: String -> Action FilePath
 getBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
-getBinaryDirectory "stage1" = liftM2 (-/-) absoluteBuildRoot  (pure "stage1-test/bin/")
+getBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath stage0InTree)
 getBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 getBinaryDirectory "stage3" = liftM2 (-/-) topDirectory (stageBinPath Stage2)
 getBinaryDirectory "stage-cabal" = do
@@ -101,7 +96,7 @@ getBinaryDirectory compiler = pure $ takeDirectory compiler
 -- | Get the path to the given @--test-compiler@.
 getCompilerPath :: String -> Action FilePath
 getCompilerPath "stage0" = setting SystemGhc
-getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure ("stage1-test/bin/ghc" <.> exe))
+getCompilerPath "stage1" = liftM2 (-/-) topDirectory (fullPath stage0InTree ghc)
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
 getCompilerPath "stage-cabal" = do
