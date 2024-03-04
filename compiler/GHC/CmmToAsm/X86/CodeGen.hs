@@ -3209,7 +3209,6 @@ genFMA3Code :: Width
             -> FMASign
             -> CmmExpr -> CmmExpr -> CmmExpr -> NatM Register
 genFMA3Code w signs x y z = do
-
   -- For the FMA instruction, we want to compute x * y + z
   --
   -- There are three possible instructions we could emit:
@@ -3230,17 +3229,45 @@ genFMA3Code w signs x y z = do
   --
   -- Currently we follow neither of these optimisations,
   -- opting to always use fmadd213 for simplicity.
+  --
+  -- We would like to compute the result directly into the requested register.
+  -- To do so we must first compute `x` into the destination register. This is
+  -- only possible if the other arguments don't use the destination register.
+  -- We check for this and if there is a conflict we move the result only after
+  -- the computation. See #24496 how this went wrong in the past.
   let rep = floatFormat w
   (y_reg, y_code) <- getNonClobberedReg y
-  (z_reg, z_code) <- getNonClobberedReg z
+  (z_op, z_code) <- getNonClobberedOperand z
   x_code <- getAnyReg x
+  x_tmp <- getNewRegNat rep
   let
      fma213 = FMA3 rep signs FMA213
-     code dst
-        = y_code `appOL`
+
+     code, code_direct, code_mov :: Reg -> InstrBlock
+     -- Ideal: Compute the result directly into dst
+     code_direct dst = x_code  dst   `snocOL`
+                       fma213 z_op y_reg dst
+     -- Fallback: Compute the result into a tmp reg and then move it.
+     code_mov dst    = x_code x_tmp `snocOL`
+                       fma213 z_op y_reg x_tmp `snocOL`
+                       MOV rep (OpReg x_tmp) (OpReg dst)
+
+     code dst =
+         y_code `appOL`
           z_code `appOL`
-          x_code dst `snocOL`
-          fma213 (OpReg z_reg) y_reg dst
+          ( if arg_regs_conflict then code_mov dst else code_direct dst )
+
+      where
+
+        arg_regs_conflict =
+          y_reg == dst ||
+          case z_op of
+            OpReg z_reg -> z_reg == dst
+            OpAddr amode -> dst `elem` addrModeRegs amode
+            OpImm {} -> False
+
+  -- NB: Computing the result into a desired register using Any can be tricky.
+  -- So for now, we keep it simple. (See #24496).
   return (Any rep code)
 
 -----------

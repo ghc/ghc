@@ -75,3 +75,10 @@ test('FMA_ConstantFold'
 
 test('T21624', normal, compile_and_run, [''])
 test('T23071', ignore_stdout, compile_and_run, [''])
+test('T24496'
+    , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
+      , js_skip # JS backend doesn't have an FMA implementation
+      , when(arch('wasm32'), skip)
+      , when(have_llvm(), extra_ways(["optllvm"]))
+      ]
+    , compile_and_run, ['-O'])
