@@ -186,6 +186,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.ringBell           = false;
     RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
 
+    // 1 TBytes
+    RtsFlags.GcFlags.addressSpaceSize   = (StgWord64)1 << 40;
+
     RtsFlags.DebugFlags.scheduler       = false;
     RtsFlags.DebugFlags.interpreter     = false;
     RtsFlags.DebugFlags.weak            = false;
@@ -552,6 +555,11 @@ usage_text[] = {
 "  -xq        The allocation limit given to a thread after it receives",
 "             an AllocationLimitExceeded exception. (default: 100k)",
 "",
+#if defined(USE_LARGE_ADDRESS_SPACE)
+"  -xr        The size of virtual memory address space reserved by the",
+"             two step allocator (default: 1T)",
+"",
+#endif
 "  -Mgrace=<n>",
 "             The amount of allocation after the program receives a",
 "             HeapOverflow exception before the exception is thrown again, if",
@@ -1820,6 +1828,12 @@ error = true;
                           / BLOCK_SIZE;
                   break;
 
+                case 'r':
+                    OPTION_UNSAFE;
+                    RtsFlags.GcFlags.addressSpaceSize
+                      = decodeSize(rts_argv[arg], 3, MBLOCK_SIZE, HS_WORD64_MAX);
+                    break;
+
                   default:
                     OPTION_SAFE;
                     errorBelch("unknown RTS option: %s",rts_argv[arg]);
@@ -2118,7 +2132,9 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
         m = atof(s);
         c = s[strlen(s)-1];
 
-        if (c == 'g' || c == 'G')
+        if (c == 't' || c == 'T')
+            m *= (StgWord64)1024*1024*1024*1024;
+        else if (c == 'g' || c == 'G')
             m *= 1024*1024*1024;
         else if (c == 'm' || c == 'M')
             m *= 1024*1024;
@@ -2737,4 +2753,3 @@ doingErasProfiling( void )
             || RtsFlags.ProfFlags.eraSelector != 0);
 }
 #endif /* PROFILING */
-

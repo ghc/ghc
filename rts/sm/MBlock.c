@@ -659,20 +659,14 @@ initMBlocks(void)
 
 #if defined(USE_LARGE_ADDRESS_SPACE)
     {
-        W_ size;
-#if defined(aarch64_HOST_ARCH)
-        size = (W_)1 << 38; // 1/4 TByte
-#else
-        size = (W_)1 << 40; // 1 TByte
-#endif
         void *startAddress = NULL;
         if (RtsFlags.GcFlags.heapBase) {
             startAddress = (void*) RtsFlags.GcFlags.heapBase;
         }
-        void *addr = osReserveHeapMemory(startAddress, &size);
+        void *addr = osReserveHeapMemory(startAddress, &RtsFlags.GcFlags.addressSpaceSize);
 
         mblock_address_space.begin = (W_)addr;
-        mblock_address_space.end = (W_)addr + size;
+        mblock_address_space.end = (W_)addr + RtsFlags.GcFlags.addressSpaceSize;
         mblock_high_watermark = (W_)addr;
     }
 #elif SIZEOF_VOID_P == 8

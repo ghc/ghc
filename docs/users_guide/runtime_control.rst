@@ -368,6 +368,18 @@ Miscellaneous RTS options
     thread can execute its exception handlers. The ``-xq`` controls the
     size of this additional quota.
 
+.. rts-flag:: -xr ⟨size⟩
+
+    :default: 1T
+
+    This option controls the size of virtual memory address space
+    reserved by the two step allocator on a 64-bit platform. It can be
+    useful in scenarios where even reserving a large address range
+    without committing can be expensive (e.g. WSL1), or when you
+    actually have enough physical memory and want to support a Haskell
+    heap larger than 1T. ``-xr`` is a no-op if GHC is configured with
+    ``--disable-large-address-space`` or if the platform is 32-bit.
+
 .. _rts-options-gc:
 
 RTS options to control the garbage collector

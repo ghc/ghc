@@ -232,6 +232,11 @@ Runtime system
 - Add a :rts-flag:`--no-automatic-time-samples` flag which stops time profiling samples being automatically started on
   startup. Time profiling can be controlled manually using functions in ``GHC.Profiling``.
 
+- Add a :rts-flag:`-xr ⟨size⟩` which controls the size of virtual
+  memory address space reserved by the two step allocator on a 64-bit
+  platform. The default size is now 1T on aarch64 as well. See
+  :ghc-ticket:`24498`.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

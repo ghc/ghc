@@ -3,7 +3,7 @@ test('testblockalloc',
      compile_and_run, [''])
 
 test('testmblockalloc',
-     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0'),
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0 -xr0.125T'),
       when(arch('wasm32'), skip)], # MBlocks can't be freed on wasm32, see Note [Megablock allocator on wasm] in rts
      compile_and_run, [''])
 # -I0 is important: the idle GC will run the memory leak detector,
