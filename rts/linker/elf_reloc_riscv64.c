@@ -356,8 +356,9 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend) {
  * @param addend  The existing addend. Either explicit or implicit.
  * @return The new computed addend.
  */
-int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
+int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *rel, ElfSymbol *symbol,
                       int64_t addend, ObjectCode *oc) {
+  Section * section = &oc->sections[relaTab->targetSectionIndex];
 
   /* Position where something is relocated */
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
@@ -372,9 +373,9 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
 
   int64_t A = addend;
 
-  IF_DEBUG(linker, debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx\n",
+  IF_DEBUG(linker, debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx relNo %u\n",
                               relocationTypeToString(rel->r_info), P, S,
-                              symbol->name, GOT_S, A));
+                              symbol->name, GOT_S, A, relNo));
   switch (ELF64_R_TYPE(rel->r_info)) {
   case R_RISCV_32:
     return S + A;
@@ -400,20 +401,11 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
     // relocations aren't pure, but this is how LLVM does it. And, calculating
     // the lower 12 bit without any relation ship to the GOT entry's address
     // makes no sense either.
-    for (ElfRelocationATable *relaTab = oc->info->relaTable; relaTab != NULL;
-         relaTab = relaTab->next) {
-      /* only relocate interesting sections */
-      if (SECTIONKIND_OTHER == oc->sections[relaTab->targetSectionIndex].kind)
-        continue;
-
-      Section *targetSection = &oc->sections[relaTab->targetSectionIndex];
-
-      for (unsigned i = 0; i < relaTab->n_relocations; i++) {
-
+      for (unsigned i = relNo; i >= 0 ; i--) {
         Elf_Rela *rel_prime = &relaTab->relocations[i];
 
         addr_t P_prime =
-            (addr_t)((uint8_t *)targetSection->start + rel_prime->r_offset);
+            (addr_t)((uint8_t *)section->start + rel_prime->r_offset);
 
         if (P_prime != S) {
           // S points to the P of the corresponding *_HI20 relocation.
@@ -438,17 +430,16 @@ int32_t computeAddend(Section *section, Elf_Rel *rel, ElfSymbol *symbol,
           IF_DEBUG(linker,
                    debugBelch(
                        "Found matching relocation: %s (P: 0x%lx, S: 0x%lx, "
-                       "sym-name: %s) -> %s (P: 0x%lx, S: 0x%lx, sym-name: %s)",
+                       "sym-name: %s) -> %s (P: 0x%lx, S: 0x%lx, sym-name: %s, relNo: %u)",
                        relocationTypeToString(rel->r_info), P, S, symbol->name,
                        relocationTypeToString(rel_prime->r_info), P_prime,
-                       symbol_prime->addr, symbol_prime->name));
-          int32_t result = computeAddend(targetSection, (Elf_Rel *)rel_prime,
+                       symbol_prime->addr, symbol_prime->name, i));
+          int32_t result = computeAddend(relaTab, i, (Elf_Rel *)rel_prime,
                                          symbol_prime, addend_prime, oc);
           IF_DEBUG(linker, debugBelch("Result of computeAddend: 0x%x (%d)\n",
                                       result, result));
           return result;
         }
-      }
     }
     debugBelch("Missing HI relocation for %s: P 0x%lx S 0x%lx %s\n",
                relocationTypeToString(rel->r_info), P, S, symbol->name);
@@ -566,7 +557,7 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
       /* decode implicit addend */
       int64_t addend = decodeAddendRISCV64(targetSection, rel);
 
-      addend = computeAddend(targetSection, rel, symbol, addend, oc);
+      addend = computeAddend((ElfRelocationATable*) relTab, i, rel, symbol, addend, oc);
       encodeAddendRISCV64(targetSection, rel, addend);
     }
   }
@@ -590,7 +581,7 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
       /* take explicit addend */
       int64_t addend = rel->r_addend;
 
-      addend = computeAddend(targetSection, (Elf_Rel *)rel, symbol, addend, oc);
+      addend = computeAddend(relaTab, i, (Elf_Rel *)rel, symbol, addend, oc);
       encodeAddendRISCV64(targetSection, (Elf_Rel *)rel, addend);
     }
   }
