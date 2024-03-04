@@ -22,22 +22,7 @@ bool needGotSlot(Elf_Sym *symbol) {
          ELF_ST_BIND(symbol->st_info) == STB_WEAK
          // Section symbols exist primarily for relocation
          // and as such may need a GOT slot.
-         || ELF_ST_TYPE(symbol->st_info) == STT_SECTION
-#if defined(riscv64_HOST_ARCH)
-         // RISCV relies much on relocations and relaxations, leaving most of
-         // the addressing mode heavy lifting to the linker. We're using LA to
-         // load local label addresses (e.g. to access `*_closure`.) This
-         // implies (in the medany memory model) relocation via the GOT unless
-         // the instruction gets relaxed to e.g. direct or PC-relative
-         // addressing. So, for now, we've got the special case to add GOT
-         // symbols for all local labels here. This could be optimized by e.g.
-         // adding symbols to GOT on demand: I.e. if we spot a symbol related
-         // relocation which cannot be relaxed to direct or PC-relative
-         // addressing, then add it to GOT (otherwise not.)
-         || (ELF_ST_BIND(symbol->st_info) == STB_LOCAL &&
-             ELF_ST_TYPE(symbol->st_info) == STT_NOTYPE && symbol->st_name != 0)
-#endif
-      ;
+         || ELF_ST_TYPE(symbol->st_info) == STT_SECTION;
 }
 
 bool
