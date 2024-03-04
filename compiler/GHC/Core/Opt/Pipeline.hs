@@ -327,12 +327,11 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- off one layer of a recursive function (concretely, I saw this
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
-        runWhen cse $ CoreCSE,
-
-        -- New opportunities for float-in
-        runWhen do_float_in CoreDoFloatInwards,
-
-        simplify "post-O2",
+        -- Also SpecConstr yields new FloatIn possibilities
+        runWhen (liberate_case || spec_constr) $ CoreDoPasses
+           [ runWhen cse CoreCSE
+           , runWhen do_float_in CoreDoFloatInwards
+           , runWhen (cse || do_float_in) $ simplify "post-O2" ],
 
         ---------  End of -O2 passes --------------
 
