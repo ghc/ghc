@@ -792,7 +792,7 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
   | otherwise
   = go floaters (initDropBox here_fvs) (map initDropBox fork_fvs)
   where
---    n_alts = length fork_fvs
+    n_alts = length fork_fvs
 
     go :: RevFloatInBinds -> DropBox -> [DropBox]
        -> (RevFloatInBinds, [RevFloatInBinds])
@@ -819,6 +819,11 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           n_used_alts = count id used_in_flags -- returns number of Trues in list.
 
+          not_thunky = case bind of
+                         FloatCase{}           -> True
+                         FloatLet (NonRec _ r) -> exprIsHNF r
+                         FloatLet (Rec prs)    -> all (exprIsHNF . snd) prs
+
           cant_push
             | is_case
             = -- The alternatives of a case expresison
@@ -831,8 +836,8 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           -- See Note [Duplicating floats into case alternatives]
           dont_float_into_alts
-            = -- (n_used_alts == n_alts) ||
-                 -- Don't float in if used in all alternatives
+            = (n_used_alts == n_alts && not_thunky) ||
+                 -- Don't float in if used in all alternatives and not a thunk
               (n_used_alts > 1 && not (floatIsDupable platform bind))
                  -- Nor if used in multiple alts and not small
 
