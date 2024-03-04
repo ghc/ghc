@@ -1709,6 +1709,8 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 recordMutableGen_GC((StgClosure *)p,gen_no);
                 continue;
             }
+            case WEAK:
+              continue;
             default:
                 ;
             }
