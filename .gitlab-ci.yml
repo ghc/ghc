@@ -416,7 +416,7 @@ hadrian-ghc-in-ghci:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   variables:
-    GHC_FLAGS: -Werror
+    GHC_FLAGS: -Werror -Wwarn=unused-imports
   tags:
     - x86_64-linux
   script:
@@ -428,7 +428,7 @@ hadrian-ghc-in-ghci:
     - "echo '  ghc-options: -Werror'  >> hadrian/cabal.project.local"
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - export CORES="$(mk/detect-cpu-count.sh)"
-    - echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n2 | grep "Ok,"
+    - echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci-multi -j$CORES | tail -n2 | grep "Ok,"
   after_script:
     - .gitlab/ci.sh save_cache
     - cat ci_timings.txt
