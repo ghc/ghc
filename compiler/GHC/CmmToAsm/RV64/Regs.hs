@@ -16,12 +16,15 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
+firstFpRegNo :: RegNo
+firstFpRegNo = 32
+
 -- | All machine register numbers.
 allMachRegNos :: [RegNo]
 allMachRegNos = intRegs ++ fpRegs
   where
     intRegs = [0 .. 31]
-    fpRegs = [32 .. 63]
+    fpRegs = [firstFpRegNo .. 63]
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
@@ -116,21 +119,19 @@ virtualRegSqueeze cls vr
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
-realRegSqueeze cls rr
- = case cls of
-        RcInteger
-         -> case rr of
-                RealRegSingle regNo
-                        | regNo < 32    -> 1     -- first fp reg is 32
-                        | otherwise     -> 0
-
-        RcDouble
-         -> case rr of
-                RealRegSingle regNo
-                        | regNo < 32    -> 0
-                        | otherwise     -> 1
-
-        _other -> 0
+realRegSqueeze cls rr =
+  case cls of
+    RcInteger ->
+      case rr of
+        RealRegSingle regNo
+          | regNo < firstFpRegNo -> 1
+          | otherwise -> 0
+    RcDouble ->
+      case rr of
+        RealRegSingle regNo
+          | regNo < firstFpRegNo -> 0
+          | otherwise -> 1
+    _other -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -141,11 +142,11 @@ mkVirtualReg u format
         FF64    -> VirtualRegD u
         _       -> panic "RV64.mkVirtualReg"
 
-{-# INLINE classOfRealReg      #-}
+{-# INLINE classOfRealReg #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-        | i < 32        = RcInteger
-        | otherwise     = RcDouble
+  | i < firstFpRegNo = RcInteger
+  | otherwise = RcDouble
 
 regDotColor :: RealReg -> SDoc
 regDotColor reg
