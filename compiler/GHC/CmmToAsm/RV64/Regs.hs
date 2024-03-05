@@ -26,6 +26,7 @@ allMachRegNos = intRegs ++ fpRegs
     intRegs = [0 .. 31]
     fpRegs = [firstFpRegNo .. 63]
 
+-- TODO: Haddock
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
@@ -34,12 +35,14 @@ allocatableRegs platform
    = let isFree = freeReg platform
      in  map RealRegSingle $ filter isFree allMachRegNos
 
+-- TODO: Haddock
 -- argRegs is the set of regs which are read for an n-argument call to C.
 allGpArgRegs :: [Reg]
 allGpArgRegs = map regSingle [10..17]
 allFpArgRegs :: [Reg]
 allFpArgRegs = map regSingle [42..49]
 
+-- TODO: Haddock
 -- STG:
 -- 19: Base
 -- 20: Sp
@@ -67,12 +70,12 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      FastString
+  | ImmLit      FastString -- TODO: unused?
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational
-  | ImmConstantSum Imm Imm
-  | ImmConstantDiff Imm Imm
+  | ImmConstantSum Imm Imm -- TODO: unused?
+  | ImmConstantDiff Imm Imm  -- TODO: unused?
   deriving (Eq, Show)
 
 litToImm :: CmmLit -> Imm
@@ -88,6 +91,7 @@ litToImm (CmmLabelDiffOff l1 l2 off _)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
+-- TODO: Mention which CmmLit constructor didn't match.
 litToImm _                   = panic "RV64.Regs.litToImm: no match"
 
 
