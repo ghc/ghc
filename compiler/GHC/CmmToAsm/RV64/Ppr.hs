@@ -328,8 +328,6 @@ pprOp plat op = case op of
   OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <+> char '#' <> int i
   OpImm im          -> pprIm plat im
   OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
-  -- TODO: Address computation always use registers as 64bit -- is this correct?
-  OpAddr (AddrRegReg r1 r2) -> pprPanic "No Reg-Reg addressing mode in Riscv" (text $ show op) -- char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
   OpAddr (AddrRegImm r1 im) -> pprImm plat im <> char '(' <> pprReg W64 r1 <> char ')'
   OpAddr (AddrReg r1)       -> text "0(" <+> pprReg W64 r1 <+> char ')'
 
