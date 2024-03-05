@@ -127,6 +127,10 @@ instance Exception GhcException where
           PlainProgramError str -> ProgramError str
     | otherwise = Nothing
 
+  -- Explicitly omit ExceptionContext since we generally don't
+  -- want backtraces and other context in GHC's user errors.
+  displayException exc = showGhcExceptionUnsafe exc ""
+
 instance Show GhcException where
   showsPrec _ e = showGhcExceptionUnsafe e
 
