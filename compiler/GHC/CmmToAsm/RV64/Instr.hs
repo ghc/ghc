@@ -390,10 +390,10 @@ mkSpillInstr config reg delta slot =
     fmt = case reg of
       RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
       _ -> FF64
-    mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
+    mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToIp imm = ANN (text "Spill: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
     addSpToIp = ANN (text "Spill: IP <- SP + IP ") $ ADD ip ip sp
-    mkStrIp = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
+    mkStrIp = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
 
     off = spillSlotToOffset slot
 
@@ -416,10 +416,10 @@ mkLoadInstr _config reg delta slot =
     fmt = case reg of
       RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
       _ -> FF64
-    mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
+    mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToIp imm = ANN (text "Reload: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
     addSpToIp = ANN (text "Reload: IP <- SP + IP ") $ ADD ip ip sp
-    mkLdrIp = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
+    mkLdrIp = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
 
     off = spillSlotToOffset slot
 
@@ -795,10 +795,6 @@ data Operand
         | OpAddr AddrMode       -- memory reference
         deriving (Eq, Show)
 
--- Smart constructors
-opReg :: Width -> Reg -> Operand
-opReg = OpReg
-
 -- Note [The made-up RISCV64 IP register]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -817,98 +813,101 @@ opReg = OpReg
 -- X31 is a caller-saved register. I.e. there are no guarantees about what the
 -- callee does with it. That's exactly what we want here.
 
-zero_reg, ra_reg, sp_reg, ip_reg :: Reg
-zero_reg = RegReal (RealRegSingle 0)
-ra_reg = RegReal (RealRegSingle 1)
-sp_reg = RegReal (RealRegSingle 2)
-ip_reg = RegReal (RealRegSingle 31)
+zeroReg, raReg, spMachReg, ipReg :: Reg
+zeroReg = regSingle 0
+raReg = regSingle 1
+-- | Not to be confused with the `CmmReg` `spReg`
+spMachReg = regSingle 2
+ipReg = regSingle 31
+
+operandFromReg :: Reg -> Operand
+operandFromReg = OpReg W64
+
+operandFromRegNo :: RegNo -> Operand
+operandFromRegNo = operandFromReg . regSingle
 
 zero, ra, sp, gp, tp, fp, ip :: Operand
-zero = OpReg W64 zero_reg
-ra  = OpReg W64 ra_reg
-sp  = OpReg W64 sp_reg
-gp  = OpReg W64 (RegReal (RealRegSingle 3))
-tp  = OpReg W64 (RegReal (RealRegSingle 4))
-fp  = OpReg W64 (RegReal (RealRegSingle 8))
-ip = OpReg W64 ip_reg
+zero = operandFromReg zeroReg
+ra  = operandFromReg raReg
+sp  = operandFromReg spMachReg
+gp  = operandFromRegNo 3
+tp  = operandFromRegNo 4
+fp  = operandFromRegNo 8
+ip = operandFromReg ipReg
 
-_x :: Int -> Operand
-_x i = OpReg W64 (RegReal (RealRegSingle i))
 x0,  x1,  x2,  x3,  x4,  x5,  x6,  x7  :: Operand
 x8,  x9,  x10, x11, x12, x13, x14, x15 :: Operand
 x16, x17, x18, x19, x20, x21, x22, x23 :: Operand
 x24, x25, x26, x27, x28, x29, x30, x31 :: Operand
-x0  = OpReg W64 (RegReal (RealRegSingle  0))
-x1  = OpReg W64 (RegReal (RealRegSingle  1))
-x2  = OpReg W64 (RegReal (RealRegSingle  2))
-x3  = OpReg W64 (RegReal (RealRegSingle  3))
-x4  = OpReg W64 (RegReal (RealRegSingle  4))
-x5  = OpReg W64 (RegReal (RealRegSingle  5))
-x6  = OpReg W64 (RegReal (RealRegSingle  6))
-x7  = OpReg W64 (RegReal (RealRegSingle  7))
-x8  = OpReg W64 (RegReal (RealRegSingle  8))
-x9  = OpReg W64 (RegReal (RealRegSingle  9))
-x10 = OpReg W64 (RegReal (RealRegSingle 10))
-x11 = OpReg W64 (RegReal (RealRegSingle 11))
-x12 = OpReg W64 (RegReal (RealRegSingle 12))
-x13 = OpReg W64 (RegReal (RealRegSingle 13))
-x14 = OpReg W64 (RegReal (RealRegSingle 14))
-x15 = OpReg W64 (RegReal (RealRegSingle 15))
-x16 = OpReg W64 (RegReal (RealRegSingle 16))
-x17 = OpReg W64 (RegReal (RealRegSingle 17))
-x18 = OpReg W64 (RegReal (RealRegSingle 18))
-x19 = OpReg W64 (RegReal (RealRegSingle 19))
-x20 = OpReg W64 (RegReal (RealRegSingle 20))
-x21 = OpReg W64 (RegReal (RealRegSingle 21))
-x22 = OpReg W64 (RegReal (RealRegSingle 22))
-x23 = OpReg W64 (RegReal (RealRegSingle 23))
-x24 = OpReg W64 (RegReal (RealRegSingle 24))
-x25 = OpReg W64 (RegReal (RealRegSingle 25))
-x26 = OpReg W64 (RegReal (RealRegSingle 26))
-x27 = OpReg W64 (RegReal (RealRegSingle 27))
-x28 = OpReg W64 (RegReal (RealRegSingle 28))
-x29 = OpReg W64 (RegReal (RealRegSingle 29))
-x30 = OpReg W64 (RegReal (RealRegSingle 30))
-x31 = OpReg W64 (RegReal (RealRegSingle 31))
+x0  = operandFromRegNo  0
+x1  = operandFromRegNo  1
+x2  = operandFromRegNo  2
+x3  = operandFromRegNo  3
+x4  = operandFromRegNo  4
+x5  = operandFromRegNo  5
+x6  = operandFromRegNo  6
+x7  = operandFromRegNo  7
+x8  = operandFromRegNo  8
+x9  = operandFromRegNo  9
+x10 = operandFromRegNo 10
+x11 = operandFromRegNo 11
+x12 = operandFromRegNo 12
+x13 = operandFromRegNo 13
+x14 = operandFromRegNo 14
+x15 = operandFromRegNo 15
+x16 = operandFromRegNo 16
+x17 = operandFromRegNo 17
+x18 = operandFromRegNo 18
+x19 = operandFromRegNo 19
+x20 = operandFromRegNo 20
+x21 = operandFromRegNo 21
+x22 = operandFromRegNo 22
+x23 = operandFromRegNo 23
+x24 = operandFromRegNo 24
+x25 = operandFromRegNo 25
+x26 = operandFromRegNo 26
+x27 = operandFromRegNo 27
+x28 = operandFromRegNo 28
+x29 = operandFromRegNo 29
+x30 = operandFromRegNo 30
+x31 = operandFromRegNo 31
 
-_d :: Int -> Operand
-_d = OpReg W64 . RegReal . RealRegSingle
 d0,  d1,  d2,  d3,  d4,  d5,  d6,  d7  :: Operand
 d8,  d9,  d10, d11, d12, d13, d14, d15 :: Operand
 d16, d17, d18, d19, d20, d21, d22, d23 :: Operand
 d24, d25, d26, d27, d28, d29, d30, d31 :: Operand
-d0  = OpReg W64 (RegReal (RealRegSingle 32))
-d1  = OpReg W64 (RegReal (RealRegSingle 33))
-d2  = OpReg W64 (RegReal (RealRegSingle 34))
-d3  = OpReg W64 (RegReal (RealRegSingle 35))
-d4  = OpReg W64 (RegReal (RealRegSingle 36))
-d5  = OpReg W64 (RegReal (RealRegSingle 37))
-d6  = OpReg W64 (RegReal (RealRegSingle 38))
-d7  = OpReg W64 (RegReal (RealRegSingle 39))
-d8  = OpReg W64 (RegReal (RealRegSingle 40))
-d9  = OpReg W64 (RegReal (RealRegSingle 41))
-d10 = OpReg W64 (RegReal (RealRegSingle 42))
-d11 = OpReg W64 (RegReal (RealRegSingle 43))
-d12 = OpReg W64 (RegReal (RealRegSingle 44))
-d13 = OpReg W64 (RegReal (RealRegSingle 45))
-d14 = OpReg W64 (RegReal (RealRegSingle 46))
-d15 = OpReg W64 (RegReal (RealRegSingle 47))
-d16 = OpReg W64 (RegReal (RealRegSingle 48))
-d17 = OpReg W64 (RegReal (RealRegSingle 49))
-d18 = OpReg W64 (RegReal (RealRegSingle 50))
-d19 = OpReg W64 (RegReal (RealRegSingle 51))
-d20 = OpReg W64 (RegReal (RealRegSingle 52))
-d21 = OpReg W64 (RegReal (RealRegSingle 53))
-d22 = OpReg W64 (RegReal (RealRegSingle 54))
-d23 = OpReg W64 (RegReal (RealRegSingle 55))
-d24 = OpReg W64 (RegReal (RealRegSingle 56))
-d25 = OpReg W64 (RegReal (RealRegSingle 57))
-d26 = OpReg W64 (RegReal (RealRegSingle 58))
-d27 = OpReg W64 (RegReal (RealRegSingle 59))
-d28 = OpReg W64 (RegReal (RealRegSingle 60))
-d29 = OpReg W64 (RegReal (RealRegSingle 61))
-d30 = OpReg W64 (RegReal (RealRegSingle 62))
-d31 = OpReg W64 (RegReal (RealRegSingle 63))
+d0  = operandFromRegNo 32
+d1  = operandFromRegNo 33
+d2  = operandFromRegNo 34
+d3  = operandFromRegNo 35
+d4  = operandFromRegNo 36
+d5  = operandFromRegNo 37
+d6  = operandFromRegNo 38
+d7  = operandFromRegNo 39
+d8  = operandFromRegNo 40
+d9  = operandFromRegNo 41
+d10 = operandFromRegNo 42
+d11 = operandFromRegNo 43
+d12 = operandFromRegNo 44
+d13 = operandFromRegNo 45
+d14 = operandFromRegNo 46
+d15 = operandFromRegNo 47
+d16 = operandFromRegNo 48
+d17 = operandFromRegNo 49
+d18 = operandFromRegNo 50
+d19 = operandFromRegNo 51
+d20 = operandFromRegNo 52
+d21 = operandFromRegNo 53
+d22 = operandFromRegNo 54
+d23 = operandFromRegNo 55
+d24 = operandFromRegNo 56
+d25 = operandFromRegNo 57
+d26 = operandFromRegNo 58
+d27 = operandFromRegNo 59
+d28 = operandFromRegNo 60
+d29 = operandFromRegNo 61
+d30 = operandFromRegNo 62
+d31 = operandFromRegNo 63
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
