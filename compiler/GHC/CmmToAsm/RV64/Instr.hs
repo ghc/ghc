@@ -204,12 +204,12 @@ regUsageOfInstr platform instr = case instr of
 -- ZR: Zero, RA: Return Address, SP: Stack Pointer, GP: Global Pointer, TP: Thread Pointer, FP: Frame Pointer
 -- BR: Base, SL: SpLim
 callerSavedRegisters :: [Reg]
-callerSavedRegisters
-    = map regSingle [5..7]
-    ++ map regSingle [10..17]
-    ++ map regSingle [28..31]
-    ++ map regSingle [32..39]
-    ++ map regSingle [42..49]
+callerSavedRegisters =
+  map regSingle [t0RegNo .. t2RegNo]
+    ++ map regSingle [a0RegNo .. a7RegNo]
+    ++ map regSingle [t3RegNo .. t6RegNo]
+    ++ map regSingle [ft0RegNo .. ft7RegNo]
+    ++ map regSingle [fa0RegNo .. fa7RegNo]
 
 -- | Apply a given mapping to all the register references in this
 -- instruction.
@@ -842,9 +842,9 @@ x1  = operandFromRegNo  1
 x2  = operandFromRegNo  2
 x3  = operandFromRegNo  3
 x4  = operandFromRegNo  4
-x5  = operandFromRegNo  5
+x5  = operandFromRegNo  x5RegNo
 x6  = operandFromRegNo  6
-x7  = operandFromRegNo  7
+x7  = operandFromRegNo  x7RegNo
 x8  = operandFromRegNo  8
 x9  = operandFromRegNo  9
 x10 = operandFromRegNo x10RegNo
@@ -865,7 +865,7 @@ x24 = operandFromRegNo 24
 x25 = operandFromRegNo 25
 x26 = operandFromRegNo 26
 x27 = operandFromRegNo 27
-x28 = operandFromRegNo 28
+x28 = operandFromRegNo x28RegNo
 x29 = operandFromRegNo 29
 x30 = operandFromRegNo 30
 x31 = operandFromRegNo x31RegNo
@@ -881,7 +881,7 @@ d3  = operandFromRegNo 35
 d4  = operandFromRegNo 36
 d5  = operandFromRegNo 37
 d6  = operandFromRegNo 38
-d7  = operandFromRegNo 39
+d7  = operandFromRegNo d7RegNo
 d8  = operandFromRegNo 40
 d9  = operandFromRegNo 41
 d10 = operandFromRegNo d10RegNo

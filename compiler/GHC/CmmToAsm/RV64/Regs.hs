@@ -20,13 +20,32 @@ import GHC.Platform
 x0RegNo :: RegNo
 x0RegNo = 0
 
+x5RegNo, t0RegNo :: RegNo
+x5RegNo = 5
+t0RegNo = x5RegNo
+
+x7RegNo, t2RegNo :: RegNo
+x7RegNo = 7
+t2RegNo = x7RegNo
+
+x28RegNo, t3RegNo :: RegNo
+x28RegNo = 28
+t3RegNo = x28RegNo
+
 -- | Last integer register number. Used as IP register.
-x31RegNo :: RegNo
+x31RegNo, t6RegNo, ipRegNo :: RegNo
 x31RegNo = 31
+t6RegNo = x31RegNo
+ipRegNo = x31RegNo
 
 -- | First floating point register.
-d0RegNo :: RegNo
+d0RegNo, ft0RegNo :: RegNo
 d0RegNo = 32
+ft0RegNo = d0RegNo
+
+d7RegNo, ft7RegNo :: RegNo
+d7RegNo = 39
+ft7RegNo = d7RegNo
 
 -- | Last floating point register.
 d31RegNo :: RegNo
