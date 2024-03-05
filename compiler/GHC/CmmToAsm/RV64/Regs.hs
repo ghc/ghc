@@ -16,43 +16,58 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-firstFpRegNo :: RegNo
-firstFpRegNo = 32
+-- | First integer register number. @zero@ register.
+x0RegNo :: RegNo
+x0RegNo = 0
+
+-- | Last integer register number. Used as IP register.
+x31RegNo :: RegNo
+x31RegNo = 31
+
+-- | First floating point register.
+d0RegNo :: RegNo
+d0RegNo = 32
+
+-- | Last floating point register.
+d31RegNo :: RegNo
+d31RegNo = 63
+
+a0RegNo :: RegNo
+a0RegNo = 10
+
+a7RegNo :: RegNo
+a7RegNo = 17
+
+fa0RegNo :: RegNo
+fa0RegNo = 42
+
+fa7RegNo :: RegNo
+fa7RegNo = 49
 
 -- | All machine register numbers.
 allMachRegNos :: [RegNo]
 allMachRegNos = intRegs ++ fpRegs
   where
-    intRegs = [0 .. 31]
-    fpRegs = [firstFpRegNo .. 63]
+    intRegs = [x0RegNo .. x31RegNo]
+    fpRegs = [d0RegNo .. d31RegNo]
 
--- TODO: Haddock
--- allocatableRegs is allMachRegNos with the fixed-use regs removed.
--- i.e., these are the regs for which we are prepared to allow the
--- register allocator to attempt to map VRegs to.
+-- | Registers available to the register allocator.
+--
+-- These are all registers minus those with a fixed role in RISCV ABI (zero, lr,
+-- sp, gp, tp, fp, ip) and GHC RTS (Base, Sp, Hp, HpLim, R1..R8, F1..F6,
+-- D1..D6.)
 allocatableRegs :: Platform -> [RealReg]
-allocatableRegs platform
-   = let isFree = freeReg platform
-     in  map RealRegSingle $ filter isFree allMachRegNos
+allocatableRegs platform =
+  let isFree = freeReg platform
+   in map RealRegSingle $ filter isFree allMachRegNos
 
--- TODO: Haddock
--- argRegs is the set of regs which are read for an n-argument call to C.
+-- | Integer argument registers according to the calling convention
 allGpArgRegs :: [Reg]
-allGpArgRegs = map regSingle [10..17]
+allGpArgRegs = map regSingle [a0RegNo .. a7RegNo]
+
+-- | Floating point argument registers according to the calling convention
 allFpArgRegs :: [Reg]
-allFpArgRegs = map regSingle [42..49]
-
--- TODO: Haddock
--- STG:
--- 19: Base
--- 20: Sp
--- 21: Hp
--- 22-27: R1-R6
--- 28: SpLim
-
--- This is the STG Sp reg.
--- sp :: Reg
--- sp = regSingle 20
+allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
 -- addressing modes ------------------------------------------------------------
 
@@ -128,12 +143,12 @@ realRegSqueeze cls rr =
     RcInteger ->
       case rr of
         RealRegSingle regNo
-          | regNo < firstFpRegNo -> 1
+          | regNo < d0RegNo -> 1
           | otherwise -> 0
     RcDouble ->
       case rr of
         RealRegSingle regNo
-          | regNo < firstFpRegNo -> 0
+          | regNo < d0RegNo -> 0
           | otherwise -> 1
     _other -> 0
 
@@ -149,7 +164,7 @@ mkVirtualReg u format
 {-# INLINE classOfRealReg #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-  | i < firstFpRegNo = RcInteger
+  | i < d0RegNo = RcInteger
   | otherwise = RcDouble
 
 regDotColor :: RealReg -> SDoc

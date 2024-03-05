@@ -388,7 +388,7 @@ mkSpillInstr config reg delta slot =
       ]
   where
     fmt = case reg of
-      RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
+      RegReal (RealRegSingle n) | n < d0RegNo -> II64
       _ -> FF64
     mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToIp imm = ANN (text "Spill: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
@@ -414,7 +414,7 @@ mkLoadInstr _config reg delta slot =
       ]
   where
     fmt = case reg of
-      RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
+      RegReal (RealRegSingle n) | n < d0RegNo -> II64
       _ -> FF64
     mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToIp imm = ANN (text "Reload: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
@@ -839,7 +839,7 @@ x0,  x1,  x2,  x3,  x4,  x5,  x6,  x7  :: Operand
 x8,  x9,  x10, x11, x12, x13, x14, x15 :: Operand
 x16, x17, x18, x19, x20, x21, x22, x23 :: Operand
 x24, x25, x26, x27, x28, x29, x30, x31 :: Operand
-x0  = operandFromRegNo  0
+x0  = operandFromRegNo  x0RegNo
 x1  = operandFromRegNo  1
 x2  = operandFromRegNo  2
 x3  = operandFromRegNo  3
@@ -870,13 +870,13 @@ x27 = operandFromRegNo 27
 x28 = operandFromRegNo 28
 x29 = operandFromRegNo 29
 x30 = operandFromRegNo 30
-x31 = operandFromRegNo 31
+x31 = operandFromRegNo x31RegNo
 
 d0,  d1,  d2,  d3,  d4,  d5,  d6,  d7  :: Operand
 d8,  d9,  d10, d11, d12, d13, d14, d15 :: Operand
 d16, d17, d18, d19, d20, d21, d22, d23 :: Operand
 d24, d25, d26, d27, d28, d29, d30, d31 :: Operand
-d0  = operandFromRegNo 32
+d0  = operandFromRegNo d0RegNo
 d1  = operandFromRegNo 33
 d2  = operandFromRegNo 34
 d3  = operandFromRegNo 35
@@ -907,7 +907,7 @@ d27 = operandFromRegNo 59
 d28 = operandFromRegNo 60
 d29 = operandFromRegNo 61
 d30 = operandFromRegNo 62
-d31 = operandFromRegNo 63
+d31 = operandFromRegNo d31RegNo
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
