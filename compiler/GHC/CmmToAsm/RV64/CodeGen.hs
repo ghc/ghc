@@ -502,7 +502,7 @@ getRegister' config plat expr =
 
     CmmLit lit ->
       case lit of
-        CmmInt 0 w -> pure $ Fixed (intFormat w) zero_reg nilOL
+        CmmInt 0 w -> pure $ Fixed (intFormat w) zeroReg nilOL
         CmmInt i w ->
                      -- narrowU is important: Negative immediates may be
                      -- sign-extended on load!
@@ -1762,8 +1762,8 @@ genCCall target dest_regs arg_regs bid = do
             if hint == SignedHint
               then
                 code_r
-                  `appOL` signExtend w W64 r ip_reg
-                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ip_reg) str
+                  `appOL` signExtend w W64 r ipReg
+                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ipReg) str
               else
                 code_r
                   `snocOL` ann (text "Pass unsigned argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
