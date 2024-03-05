@@ -86,30 +86,28 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      FastString -- TODO: unused?
+  | ImmLit      FastString
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational
-  | ImmConstantSum Imm Imm -- TODO: unused?
-  | ImmConstantDiff Imm Imm  -- TODO: unused?
+  | ImmConstantSum Imm Imm
+  | ImmConstantDiff Imm Imm
   deriving (Eq, Show)
 
 litToImm :: CmmLit -> Imm
-litToImm (CmmInt i w)        = ImmInteger (narrowS w i)
-                -- narrow to the width: a CmmInt might be out of
-                -- range, but we assume that ImmInteger only contains
-                -- in-range values.  A signed value should be fine here.
-litToImm (CmmFloat f W32)    = ImmFloat f
-litToImm (CmmFloat f W64)    = ImmDouble f
-litToImm (CmmLabel l)        = ImmCLbl l
+litToImm (CmmInt i w) = ImmInteger (narrowS w i)
+-- narrow to the width: a CmmInt might be out of
+-- range, but we assume that ImmInteger only contains
+-- in-range values.  A signed value should be fine here.
+litToImm (CmmFloat f W32) = ImmFloat f
+litToImm (CmmFloat f W64) = ImmDouble f
+litToImm (CmmLabel l) = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
-litToImm (CmmLabelDiffOff l1 l2 off _)
-                             = ImmConstantSum
-                               (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
-                               (ImmInt off)
--- TODO: Mention which CmmLit constructor didn't match.
-litToImm _                   = panic "RV64.Regs.litToImm: no match"
-
+litToImm (CmmLabelDiffOff l1 l2 off _) =
+  ImmConstantSum
+    (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
+    (ImmInt off)
+litToImm l = panic $ "RV64.Regs.litToImm: no match for " ++ show l
 
 -- == To satisfy GHC.CmmToAsm.Reg.Target =======================================
 
