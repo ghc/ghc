@@ -16,8 +16,12 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
+-- | All machine register numbers.
 allMachRegNos :: [RegNo]
-allMachRegNos = [0 .. 31] ++ [32 .. 63]
+allMachRegNos = intRegs ++ fpRegs
+  where
+    intRegs = [0 .. 31]
+    fpRegs = [32 .. 63]
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
