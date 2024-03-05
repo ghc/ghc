@@ -980,7 +980,8 @@ makeFarBranches info_env blocks
 
     -- 262144 (2^20 / 4) instructions are allowed; let's keep some distance, as
     -- we have pseudo-insns that are pretty-printed as multiple instructions,
-    -- and it's just not worth the effort to calculate things exactly. The
+    -- and it's just not worth the effort to calculate things exactly as linker
+    -- relaxations are applied later (optimizing away our flaws.) The
     -- conservative guess here is that every instruction does not emit more than
     -- two in the mean.
     nearLimit = 131072 - mapSize info_env * maxRetInfoTableSizeW
