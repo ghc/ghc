@@ -161,7 +161,6 @@ regUsageOfInstr platform instr = case instr of
                               (filter (interesting platform) dst)
 
         regAddr :: AddrMode -> [Reg]
-        regAddr (AddrRegReg r1 r2) = [r1, r2]
         regAddr (AddrRegImm r1 _)  = [r1]
         regAddr (AddrReg r1)       = [r1]
         regOp :: Operand -> [Reg]
@@ -302,7 +301,6 @@ patchRegsOfInstr instr env = case instr of
         patchTarget (TReg r) = TReg (env r)
         patchTarget t = t
         patchAddr :: AddrMode -> AddrMode
-        patchAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)
         patchAddr (AddrRegImm r1 i)  = AddrRegImm (env r1) i
         patchAddr (AddrReg r) = AddrReg (env r)
 --------------------------------------------------------------------------------

@@ -73,14 +73,11 @@ allGpArgRegs = map regSingle [a0RegNo .. a7RegNo]
 allFpArgRegs :: [Reg]
 allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
--- addressing modes ------------------------------------------------------------
-
--- TODO: AddrRegReg constructor is never used.  Remove it?
+-- | Addressing modes
 data AddrMode
-        = AddrRegReg    Reg Reg
-        | AddrRegImm    Reg Imm
-        | AddrReg       Reg
-        deriving (Eq, Show)
+  = AddrRegImm Reg Imm
+  | AddrReg Reg
+  deriving (Eq, Show)
 
 -- -----------------------------------------------------------------------------
 -- Immediates
