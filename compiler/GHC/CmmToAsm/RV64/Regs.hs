@@ -32,17 +32,21 @@ d0RegNo = 32
 d31RegNo :: RegNo
 d31RegNo = 63
 
-a0RegNo :: RegNo
-a0RegNo = 10
+a0RegNo, x10RegNo :: RegNo
+x10RegNo = 10
+a0RegNo = x10RegNo
 
-a7RegNo :: RegNo
-a7RegNo = 17
+a7RegNo, x17RegNo :: RegNo
+x17RegNo = 17
+a7RegNo = x17RegNo
 
-fa0RegNo :: RegNo
-fa0RegNo = 42
+fa0RegNo, d10RegNo :: RegNo
+d10RegNo = 42
+fa0RegNo = d10RegNo
 
-fa7RegNo :: RegNo
-fa7RegNo = 49
+fa7RegNo, d17RegNo :: RegNo
+d17RegNo = 49
+fa7RegNo = d17RegNo
 
 -- | All machine register numbers.
 allMachRegNos :: [RegNo]
