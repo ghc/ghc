@@ -388,7 +388,7 @@ mkSpillInstr config reg delta slot =
       ]
   where
     fmt = case reg of
-      RegReal (RealRegSingle n) | n < 32 -> II64
+      RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
       _ -> FF64
     mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
     movImmToIp imm = ANN (text "Spill: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
@@ -414,7 +414,7 @@ mkLoadInstr _config reg delta slot =
       ]
   where
     fmt = case reg of
-      RegReal (RealRegSingle n) | n < 32 -> II64
+      RegReal (RealRegSingle n) | n < firstFpRegNo -> II64
       _ -> FF64
     mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
     movImmToIp imm = ANN (text "Reload: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
