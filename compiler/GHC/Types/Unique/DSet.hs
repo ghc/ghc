@@ -132,7 +132,7 @@ mapUniqDSet f (UniqDSet m) = UniqDSet $ unsafeCastUDFMKey $ mapUDFM f m
 -- mapping from DFM.
 
 strictFoldUniqDSet :: (a -> r -> r) -> r -> UniqDSet a -> r
-strictFoldUniqDSet k r s = foldl' (\r e -> k e r) r $
+strictFoldUniqDSet k r s = foldl' (\ !r e -> k e r) r $
                            uniqDSetToList s
 
 -- Two 'UniqDSet's are considered equal if they contain the same
