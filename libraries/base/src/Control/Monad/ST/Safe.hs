@@ -10,7 +10,7 @@
 -- Stability   :  stable
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- This library provides support for /strict/ state threads, as
+-- This module provides support for /strict/ state threads, as
 -- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
 -- Jones /Lazy Functional State Threads/.
 --

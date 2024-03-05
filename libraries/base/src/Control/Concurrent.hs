@@ -147,7 +147,7 @@ by using 'forkOS' instead of 'forkIO'.
 Haskell threads can communicate via 'MVar's, a kind of synchronised
 mutable variable (see "Control.Concurrent.MVar").  Several common
 concurrency abstractions can be built from 'MVar's, and these are
-provided by the "Control.Concurrent" library.
+provided by the "Control.Concurrent" module.
 In GHC, threads may also communicate via exceptions.
 -}
 
@@ -384,7 +384,7 @@ foreign import ccall safe "fdReady"
       multiple Haskell threads can be involved in external calls
       simultaneously.
 
-      The "System.IO" library manages multiplexing in its own way.  On
+      The "System.IO" module manages multiplexing in its own way.  On
       Windows systems it uses @safe@ foreign calls to ensure that
       threads doing I\/O operations don't block the whole runtime,
       whereas on Unix systems all the currently blocked I\/O requests
@@ -401,7 +401,7 @@ foreign import ccall safe "fdReady"
       If you don't use the @-threaded@ option, then the runtime does
       not make use of multiple OS threads.  Foreign calls will block
       all other running Haskell threads until the call returns.  The
-      "System.IO" library still does multiplexing, so there can be multiple
+      "System.IO" module still does multiplexing, so there can be multiple
       threads doing I\/O, and this is handled internally by the runtime using
       @select@.
 -}

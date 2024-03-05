@@ -32,7 +32,7 @@
 -- alive for ever.  One way to solve this is to purge the table
 -- occasionally, by deleting entries whose keys have died.
 --
--- The weak pointers in this library
+-- The weak pointers in this module
 -- support another approach, called /finalization/.
 -- When the key referred to by a weak pointer dies, the storage manager
 -- arranges to run a programmer-specified finalizer.  In the case of memo
@@ -43,7 +43,7 @@
 -- key\/value pair might itself contain a pointer to the key.
 -- So the memo table keeps the value alive, which keeps the key alive,
 -- even though there may be no other references to the key so both should
--- die.  The weak pointers in this library provide a slight
+-- die.  The weak pointers in this module provide a slight
 -- generalisation of the basic weak-pointer idea, in which each
 -- weak pointer actually contains both a key and a value.
 --

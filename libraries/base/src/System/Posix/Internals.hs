@@ -17,7 +17,7 @@
 -- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
 -- change rapidly without much warning.
 --
--- This library is built on *every* platform, including Win32.
+-- This module is built on *every* platform, including Win32.
 --
 -- Non-POSIX compliant in order to support the following features:
 --  * S_ISSOCK (no sockets in POSIX)

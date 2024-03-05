@@ -9,7 +9,7 @@
 -- Stability   :  stable
 -- Portability :  non-portable (local universal quantification in ReadP)
 --
--- A general library for representation and manipulation of versions.
+-- A general API for representation and manipulation of versions.
 --
 -- Versioning schemes are many and varied, so the version
 -- representation provided by this library is intended to be a

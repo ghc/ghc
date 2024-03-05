@@ -7,7 +7,7 @@
 -- |
 -- This module is an internal GHC module.  It declares the constants used
 -- in the implementation of type-level natural numbers.  The programmer interface
--- for working with type-level naturals should be defined in a separate library.
+-- for working with type-level naturals should be defined in a separate module.
 --
 -- @since 4.10.0.0
 --

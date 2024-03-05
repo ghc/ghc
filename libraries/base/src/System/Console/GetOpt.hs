@@ -10,7 +10,7 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- This library provides facilities for parsing the command-line options
+-- This module provides facilities for parsing the command-line options
 -- in a standalone program.  It is essentially a Haskell port of the GNU
 -- @getopt@ library.
 --

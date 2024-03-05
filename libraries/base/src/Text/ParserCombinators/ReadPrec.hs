@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
 --
--- This library defines parser combinators for precedence parsing.
+-- This module defines parser combinators for precedence parsing.
 
 module Text.ParserCombinators.ReadPrec
     (ReadPrec,

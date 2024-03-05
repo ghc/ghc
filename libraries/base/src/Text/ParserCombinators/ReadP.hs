@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (local universal quantification)
 --
--- This is a library of parser combinators, originally written by Koen Claessen.
+-- This is a module of parser combinators, originally written by Koen Claessen.
 -- It parses all alternatives in parallel, so it never keeps hold of
 -- the beginning of the input string, a common source of space leaks with
 -- other parsers.  The @('+++')@ choice combinator is genuinely commutative;

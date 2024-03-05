@@ -65,7 +65,7 @@ import GHC.Internal.Control.Monad
 
 {- $naming
 
-The functions in this library use the following naming conventions:
+The functions in this module use the following naming conventions:
 
 * A postfix \'@M@\' always stands for a function in the Kleisli category:
   The monad type constructor @m@ is added to function results

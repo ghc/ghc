@@ -10,7 +10,7 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- The standard IO library.
+-- The standard IO API.
 --
 
 module System.IO
