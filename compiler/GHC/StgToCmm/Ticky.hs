@@ -809,7 +809,7 @@ bumpTickyEntryCount lbl = do
 bumpTickyAllocd :: CLabel -> Int -> FCode ()
 bumpTickyAllocd lbl bytes = do
   platform <- getPlatform
-  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform))) bytes
+  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_allocd (platformConstants platform))) bytes
 
 bumpTickyTagSkip :: CLabel -> FCode ()
 bumpTickyTagSkip lbl = do
