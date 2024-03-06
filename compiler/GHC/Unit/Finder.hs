@@ -325,13 +325,13 @@ modLocationCache fc mod do_this = do
 addModuleToFinder :: FinderCache -> Module -> ModLocation -> IO ()
 addModuleToFinder fc mod loc = do
   let imod = toUnitId <$> mod
-  addToFinderCache fc imod (InstalledFound loc imod)
+  addToFinderCache fc imod (InstalledFound (ensureNonBootLocation loc) imod)
 
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder fc home_unit mod_name loc = do
   let mod = mkHomeInstalledModule home_unit mod_name
-  addToFinderCache fc mod (InstalledFound loc mod)
+  addToFinderCache fc mod (InstalledFound (ensureNonBootLocation loc) mod)
   return (mkHomeModule home_unit mod_name)
 
 -- -----------------------------------------------------------------------------

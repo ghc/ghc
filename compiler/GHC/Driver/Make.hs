@@ -2044,28 +2044,47 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
         let fopts = initFinderOpts (hsc_dflags hsc_env)
+            src_path = unsafeEncodeUtf src_fn
 
-        -- Make a ModLocation for this file
-        let location = mkHomeModLocation fopts pi_mod_name (unsafeEncodeUtf src_fn)
+            is_boot = case takeExtension src_fn of
+              ".hs-boot" -> IsBoot
+              ".lhs-boot" -> IsBoot
+              _ -> NotBoot
+
+            (path_without_boot, hsc_src)
+              | isHaskellSigFilename src_fn = (src_path, HsigFile)
+              | IsBoot <- is_boot = (removeBootSuffix src_path, HsBootFile)
+              | otherwise = (src_path, HsSrcFile)
+
+            -- Make a ModLocation for the Finder, who only has one entry for
+            -- each @ModuleName@, and therefore needs to use the locations for
+            -- the non-boot files.
+            location_without_boot =
+              mkHomeModLocation fopts pi_mod_name path_without_boot
+
+            -- Make a ModLocation for this file, adding the @-boot@ suffix to
+            -- all paths if the original was a boot file.
+            location
+              | IsBoot <- is_boot
+              = addBootSuffixLocn location_without_boot
+              | otherwise
+              = location_without_boot
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ do
           let home_unit = hsc_home_unit hsc_env
           let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit pi_mod_name location
+          addHomeModuleToFinder fc home_unit pi_mod_name location_without_boot
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = NotBoot
-            , nms_hsc_src =
-                if isHaskellSigFilename src_fn
-                   then HsigFile
-                   else HsSrcFile
+            , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
             , nms_preimps = preimps
+            , nms_opts = pi_mod_opts
             }
 
 checkSummaryHash
@@ -2230,11 +2249,11 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = is_boot
             , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
             , nms_preimps = preimps
+            , nms_opts = pi_mod_opts
             }
 
 -- | Convenience named arguments for 'makeNewModSummary' only used to make
@@ -2243,11 +2262,11 @@ data MakeNewModSummary
   = MakeNewModSummary
       { nms_src_fn :: FilePath
       , nms_src_hash :: Fingerprint
-      , nms_is_boot :: IsBootInterface
       , nms_hsc_src :: HscSource
       , nms_location :: ModLocation
       , nms_mod :: Module
       , nms_preimps :: PreprocessedImports
+      , nms_opts :: ![String]
       }
 
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ModSummary
@@ -2276,6 +2295,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
             ((,) NoPkgQual . noLoc <$> extra_sig_imports) ++
             ((,) NoPkgQual . noLoc <$> implicit_sigs) ++
             pi_theimps
+        , ms_opts = nms_opts
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
         , ms_hie_date = hie_timestamp
@@ -2293,6 +2313,7 @@ data PreprocessedImports
       , pi_hspp_buf :: StringBuffer
       , pi_mod_name_loc :: SrcSpan
       , pi_mod_name :: ModuleName
+      , pi_mod_opts :: ![String]
       }
 
 -- Preprocess the source file and get its imports
@@ -2308,12 +2329,13 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
-  (pi_srcimps', pi_theimps', pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
+  ((pi_srcimps', pi_theimps', pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name), pi_mod_opts)
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
+          let mopts = map unLoc $ snd $ getOptions popts pi_hspp_buf src_fn
+          pure $ ((, mopts) <$>) $ first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
   let rn_imps = fmap (\(pk, lmn@(L _ mn)) -> (rn_pkg_qual mn pk, lmn))
   let pi_srcimps = rn_imps pi_srcimps'

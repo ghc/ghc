@@ -1,5 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 -- | Module location
 module GHC.Unit.Module.Location
    ( ModLocation
@@ -19,6 +20,7 @@ module GHC.Unit.Module.Location
    , addBootSuffixLocnOut
    , removeBootSuffix
    , mkFileSrcSpan
+   , ensureNonBootLocation
    )
 where
 
@@ -31,6 +33,8 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString (mkFastString)
 
 import qualified System.OsString as OsString
+
+import Data.List (stripPrefix)
 
 -- | Module Location
 --
@@ -169,3 +173,16 @@ pattern ModLocation
           , ml_dyn_obj_file_ospath = unsafeEncodeUtf ml_dyn_obj_file
           , ml_hie_file_ospath = unsafeEncodeUtf ml_hie_file
           }
+
+ensureNonBootLocation :: ModLocation -> ModLocation
+ensureNonBootLocation ModLocation {..} =
+  ModLocation {
+    ml_hs_file = strip <$> ml_hs_file,
+    ml_hi_file = strip ml_hi_file,
+    ml_dyn_hi_file = strip ml_dyn_hi_file,
+    ml_obj_file = strip ml_obj_file,
+    ml_dyn_obj_file = strip ml_dyn_obj_file,
+    ml_hie_file = strip ml_hie_file
+  }
+  where
+    strip p = maybe p reverse (stripPrefix "toob-" (reverse p))
