@@ -120,7 +120,6 @@ Library
         GHC.Internal.Data.Functor.Utils
         GHC.Internal.Data.IORef
         GHC.Internal.Data.Ix
-        GHC.Internal.Data.Kind
         GHC.Internal.Data.List
         GHC.Internal.Data.Maybe
         GHC.Internal.Data.Monoid
