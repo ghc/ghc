@@ -599,10 +599,10 @@ pprInstr platform instr = case instr of
     UGE -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
     UGT -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l ]
-    OLT | isFloatOp l && isFloatOp r -> line $ binOp ("\tflt." ++ floatOpPrecision platform l r)
-    OLE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfle." ++ floatOpPrecision platform l r)
-    OGT | isFloatOp l && isFloatOp r -> line $ binOp ("\tfgt." ++ floatOpPrecision platform l r)
-    OGE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfge." ++ floatOpPrecision platform l r)
+    FLT | isFloatOp l && isFloatOp r -> line $ binOp ("\tflt." ++ floatOpPrecision platform l r)
+    FLE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfle." ++ floatOpPrecision platform l r)
+    FGT | isFloatOp l && isFloatOp r -> line $ binOp ("\tfgt." ++ floatOpPrecision platform l r)
+    FGE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfge." ++ floatOpPrecision platform l r)
     x  -> pprPanic "RV64.ppr: unhandled CSET conditional" (text (show x) <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
@@ -715,19 +715,20 @@ floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingle
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
 floatOpPrecision p l r = pprPanic "Cannot determine floating point precission" (text "op1" <+> pprOp p l <+> text "op2" <+> pprOp p r)
 
-pprBcond :: IsLine doc => Cond -> doc
+pprBcond :: (IsLine doc) => Cond -> doc
 pprBcond c = text "b" <> pprCond c
-
-pprCond :: IsLine doc => Cond -> doc
-pprCond c = case c of
-    EQ  -> text "eq"
-    NE  -> text "ne"
-    SLT -> text "lt"
-    SLE -> text "le"
-    SGE -> text "ge"
-    SGT -> text "gt"
-    ULT -> text "ltu"
-    ULE -> text "leu"
-    UGE -> text "geu"
-    UGT -> text "gtu"
-    _   -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
+  where
+    pprCond :: (IsLine doc) => Cond -> doc
+    pprCond c = case c of
+      EQ -> text "eq"
+      NE -> text "ne"
+      SLT -> text "lt"
+      SLE -> text "le"
+      SGE -> text "ge"
+      SGT -> text "gt"
+      ULT -> text "ltu"
+      ULE -> text "leu"
+      UGE -> text "geu"
+      UGT -> text "gtu"
+      -- BCOND cannot handle floating point comparisons / registers
+      _ -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
