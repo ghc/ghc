@@ -92,7 +92,6 @@ regUsageOfInstr platform instr = case instr of
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
   SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   DIV dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   REM dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   REMU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -113,12 +112,9 @@ regUsageOfInstr platform instr = case instr of
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
-  MOVK dst src             -> usage (regOp src, regOp dst)
   -- ORI's third operand is always an immediate
   ORI dst src1 _           -> usage (regOp src1, regOp dst)
   XORI dst src1 _          -> usage (regOp src1, regOp dst)
-  ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  TST src1 src2            -> usage (regOp src1 ++ regOp src2, [])
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
@@ -130,8 +126,6 @@ regUsageOfInstr platform instr = case instr of
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
   CSET dst l r _           -> usage (regOp l ++ regOp r, regOp dst)
-  CBZ src _                -> usage (regOp src, [])
-  CBNZ src _               -> usage (regOp src, [])
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   -- STLR _ src dst      L     -> usage (regOp src ++ regOp dst, [])
@@ -226,7 +220,6 @@ patchRegsOfInstr instr env = case instr of
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
     SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
-    SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
     DIV o1 o2 o3   -> DIV (patchOp o1) (patchOp o2) (patchOp o3)
     REM o1 o2 o3   -> REM (patchOp o1) (patchOp o2) (patchOp o3)
     REMU o1 o2 o3  -> REMU (patchOp o1) (patchOp o2) (patchOp o3)
@@ -249,12 +242,9 @@ patchRegsOfInstr instr env = case instr of
     LSL o1 o2 o3   -> LSL  (patchOp o1) (patchOp o2) (patchOp o3)
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
-    MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
     -- o3 cannot be a register for ORI (always an immediate)
     ORI o1 o2 o3   -> ORI  (patchOp o1) (patchOp o2) (patchOp o3)
     XORI o1 o2 o3  -> XORI  (patchOp o1) (patchOp o2) (patchOp o3)
-    ROR o1 o2 o3   -> ROR  (patchOp o1) (patchOp o2) (patchOp o3)
-    TST o1 o2      -> TST  (patchOp o1) (patchOp o2)
 
     -- 4. Branch Instructions --------------------------------------------------
     J t            -> J (patchTarget t)
@@ -267,8 +257,6 @@ patchRegsOfInstr instr env = case instr of
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
     CSET o l r c   -> CSET (patchOp o) (patchOp l) (patchOp r) c
-    CBZ o l        -> CBZ (patchOp o) l
-    CBNZ o l       -> CBNZ (patchOp o) l
     -- 7. Load and Store Instructions ------------------------------------------
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
     -- STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
@@ -307,8 +295,6 @@ patchRegsOfInstr instr env = case instr of
 isJumpishInstr :: Instr -> Bool
 isJumpishInstr instr = case instr of
   ANN _ i -> isJumpishInstr i
-  CBZ {} -> True
-  CBNZ {} -> True
   J {} -> True
   B {} -> True
   B_FAR {} -> True
@@ -320,8 +306,6 @@ isJumpishInstr instr = case instr of
 -- | Get the `BlockId`s of the jump destinations (if any)
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
-jumpDestsOfInstr (CBZ _ t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (CBNZ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B_FAR t) = [t]
@@ -338,8 +322,6 @@ patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
 patchJumpInstr instr patchF =
   case instr of
     ANN d i -> ANN d (patchJumpInstr i patchF)
-    CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
-    CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
     J (TBlock bid) -> J (TBlock (patchF bid))
     B (TBlock bid) -> B (TBlock (patchF bid))
     B_FAR bid -> B_FAR (patchF bid)
@@ -638,9 +620,6 @@ data Instr
 
     -- TODO: Rename: MULH
     | SMULH Operand Operand Operand
-    -- TODO: unused
-    | SMULL Operand Operand Operand
-
     | DIVU Operand Operand Operand -- rd = rn ÷ rm
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
@@ -661,18 +640,8 @@ data Instr
     -- | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     -- | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
     | MOV Operand Operand -- rd = rn  or  rd = #i
-    -- TODO: Unused
-    | MOVK Operand Operand
-    -- | MOVN Operand Operand
-    -- | MOVZ Operand Operand
-    -- TODO: unused
-    | ORN Operand Operand Operand -- rd = rn | ~op2
     | ORI Operand Operand Operand -- rd = rn | op2
     | XORI Operand Operand Operand -- rd = rn `xor` imm
-    -- TODO: unused
-    | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    -- TODO: unused
-    | TST Operand Operand -- rn & op2
     -- Load and stores.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     -- | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
@@ -686,10 +655,6 @@ data Instr
     -- This is a synthetic operation.
     | CSET Operand Operand Operand Cond   -- if(o2 cond o3) op <- 1 else op <- 0
 
-    -- TODO: Unused
-    | CBZ Operand Target  -- if op == 0, then branch.
-    -- TODO: Unused
-    | CBNZ Operand Target -- if op /= 0, then branch.
     -- Branching.
     -- TODO: Unused
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
@@ -729,22 +694,18 @@ instrCon i =
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
       ADD{} -> "ADD"
       OR{} -> "OR"
-      -- CMN{} -> "CMN"
-      -- CMP{} -> "CMP"
       MUL{} -> "MUL"
       NEG{} -> "NEG"
       DIV{} -> "DIV"
       REM{} -> "REM"
       REMU{} -> "REMU"
       SMULH{} -> "SMULH"
-      SMULL{} -> "SMULL"
       SUB{} -> "SUB"
       DIVU{} -> "DIVU"
       SBFM{} -> "SBFM"
       UBFM{} -> "UBFM"
       UBFX{} -> "UBFX"
       AND{} -> "AND"
-      -- ANDS{} -> "ANDS"
       ASR{} -> "ASR"
       BIC{} -> "BIC"
       BICS{} -> "BICS"
@@ -752,22 +713,12 @@ instrCon i =
       LSL{} -> "LSL"
       LSR{} -> "LSR"
       MOV{} -> "MOV"
-      MOVK{} -> "MOVK"
-      ORN{} -> "ORN"
       ORI{} -> "ORI"
       XORI{} -> "ORI"
-      ROR{} -> "ROR"
-      TST{} -> "TST"
       STR{} -> "STR"
-      -- STLR{} -> "STLR"
       LDR{} -> "LDR"
       LDRU{} -> "LDRU"
-      -- LDAR{} -> "LDAR"
-      -- STP{} -> "STP"
-      -- LDP{} -> "LDP"
       CSET{} -> "CSET"
-      CBZ{} -> "CBZ"
-      CBNZ{} -> "CBNZ"
       J{} -> "J"
       B{} -> "B"
       B_FAR{} -> "B_FAR"
