@@ -14,8 +14,8 @@ module GHC.Driver.MakeFile.JSON
 where
 
 import Data.IORef
-import Data.Map.Strict qualified as Map
-import Data.Set qualified as Set
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import GHC.Prelude
 import GHC.Utils.Json
 import GHC.Utils.Misc

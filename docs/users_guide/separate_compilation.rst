@@ -1519,6 +1519,29 @@ generation are:
     is only a temporary file that GHC will always generate, it is not output as
     a dependency.
 
+.. ghc-flag:: -dep-json ⟨file⟩
+    :shortdesc: Also emit ⟨file⟩ as a JSON file containing dependencies
+    :type: dynamic
+    :category: redirect-output
+
+    In addition to the makefile, also emit ⟨file⟩ as a JSON file
+    containing the same dependencies info, so it can be parsed by
+    external build systems. The JSON file contains a single object,
+    mapping each target to a list of dependencies.
+
+.. ghc-flag:: -opt-json ⟨file⟩
+    :shortdesc: Also emit ⟨file⟩ as a JSON file containing ``OPTIONS`` and ``LANGUAGE`` pragmas of the source file
+    :type: dynamic
+    :category: redirect-output
+
+    In addition to the makefile, also emit ⟨file⟩ as a JSON file
+    containing ``OPTIONS`` and ``LANGUAGE`` pragmas of the source
+    file, so it can be parsed by external build systems. The JSON file
+    contains a single object, mapping each source file to a list of
+    options. Each ``LANGUAGE`` pragma is represented as an option as
+    well, e.g. ``{-# LANGUAGE TemplateHaskell #-}`` is represented as
+    ``"-XTemplateHaskell"``.
+
 .. _orphan-modules:
 
 Orphan modules and instance declarations
