@@ -165,10 +165,8 @@ regUsageOfInstr platform instr = case instr of
         regAddr (AddrReg r1)       = [r1]
         regOp :: Operand -> [Reg]
         regOp (OpReg _ r1) = [r1]
-        regOp (OpRegShift _ r1 _ _) = [r1]
         regOp (OpAddr a) = regAddr a
         regOp (OpImm _) = []
-        regOp (OpImmShift _ _ _) = []
         regTarget :: Target -> [Reg]
         regTarget (TBlock _) = []
         regTarget (TLabel _) = []
@@ -292,7 +290,6 @@ patchRegsOfInstr instr env = case instr of
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
-        patchOp (OpRegShift w r m s) = OpRegShift w (env r) m s
         patchOp (OpAddr a) = OpAddr (patchAddr a)
         patchOp op = op
         patchTarget :: Target -> Target
@@ -762,24 +759,9 @@ data Target
     | TLabel CLabel
     | TReg   Reg
 
-
-data ShiftMode
-    = SLSL | SLSR | SASR | SROR
-    deriving (Eq, Show)
-
-
--- We can also add ExtShift to Extension.
--- However at most 3bits.
-type ExtShift = Int
--- at most 6bits
-type RegShift = Int
-
 data Operand
         = OpReg Width Reg            -- register
-        | OpRegShift Width Reg ShiftMode RegShift     -- rm, <shift>, <0-64>
         | OpImm Imm            -- immediate value
-        -- TODO: Does OpImmShift exist in RV64?
-        | OpImmShift Imm ShiftMode RegShift
         | OpAddr AddrMode       -- memory reference
         deriving (Eq, Show)
 
