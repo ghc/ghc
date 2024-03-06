@@ -30,6 +30,7 @@ import GHC.Utils.Panic
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack
+import GHC.Platform.Reg.Class
 
 -- | LR and FP (8 byte each) are the prologue of each stack frame
 stackFrameHeaderSize :: Int
@@ -454,10 +455,22 @@ isMetaInstr instr
 mkRegRegMoveInstr :: Reg -> Reg -> Instr
 mkRegRegMoveInstr src dst = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
 
--- | Take the source and destination from this reg -> reg move instruction
--- or Nothing if it's not one
+-- | Take the source and destination registers from a move instruction of same
+-- register class (`RegClass`).
+--
+-- The idea is to identify moves that can be eliminated by the register
+-- allocator: If the source register serves no special purpose, one could
+-- continue using it; saving one move instruction. For this, the register kinds
+-- (classes) must be the same (no conversion involved.)
 takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
---takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = Just (src, dst)
+takeRegRegMoveInstr (MOV (OpReg _fmt dst) (OpReg _fmt' src))
+  | classOfReg dst == classOfReg src = pure (src, dst)
+  where
+    classOfReg ::Reg -> RegClass
+    classOfReg reg
+      = case reg of
+        RegVirtual vr -> classOfVirtualReg vr
+        RegReal rr -> classOfRealReg rr
 takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
