@@ -117,6 +117,9 @@ instance Outputable PackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
+instance Ord PackageId where
+    PackageId p1 `compare` PackageId p2 = p1 `lexicalCompareFS` p2
+
 unitPackageIdString :: GenUnitInfo u -> String
 unitPackageIdString pkg = unpackFS str
   where

@@ -366,7 +366,7 @@ The available mode flags are:
 
 .. ghc-flag:: -M
     :shortdesc: generate dependency information suitable for use in a
-        ``Makefile``; see :ref:`makefile-dependencies` for details.
+        ``Makefile`` or as JSON; see :ref:`makefile-dependencies` for details.
     :type: mode
     :category: modes
 

@@ -12,24 +12,31 @@ module GHC.Data.OsPath
   , (</>)
   , (<.>)
   , splitSearchPath
+  , splitExtension
   , isRelative
+  , makeRelative
+  , normalise
   , dropTrailingPathSeparator
   , takeDirectory
   , isSuffixOf
+  , OS.drop
   , doesDirectoryExist
   , doesFileExist
   , getDirectoryContents
   , createDirectoryIfMissing
+  , pprOsPath
   )
   where
 
 import GHC.Prelude
 
 import GHC.Utils.Misc (HasCallStack)
+import GHC.Utils.Outputable qualified as Outputable
 import GHC.Utils.Panic (panic)
 
 import System.OsPath
 import System.OsString (isSuffixOf)
+import qualified System.OsString as OS (drop)
 import System.Directory.OsPath (doesDirectoryExist, doesFileExist, getDirectoryContents, createDirectoryIfMissing)
 import System.Directory.Internal (os)
 
@@ -38,3 +45,6 @@ import System.Directory.Internal (os)
 unsafeDecodeUtf :: HasCallStack => OsPath -> FilePath
 unsafeDecodeUtf p =
   either (\err -> panic $ "Failed to decodeUtf \"" ++ show p ++ "\", because: " ++ show err) id (decodeUtf p)
+
+pprOsPath :: HasCallStack => OsPath -> Outputable.SDoc
+pprOsPath = Outputable.text . unsafeDecodeUtf

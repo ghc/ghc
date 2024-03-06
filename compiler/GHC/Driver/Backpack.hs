@@ -811,6 +811,7 @@ summariseRequirement pn mod_name = do
         ms_bytecode_date = Nothing,
         ms_srcimps = [],
         ms_textual_imps = ((,,) NormalLevel NoPkgQual . noLoc) <$> extra_sig_imports,
+        ms_opts = [],
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
                         hsmodExt = XModulePs {
@@ -916,6 +917,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
                            -- extra imports
                            ++ ((,,) NormalLevel NoPkgQual . noLoc <$> extra_sig_imports)
                            ++ ((,,) NormalLevel NoPkgQual . noLoc <$> implicit_sigs),
+            ms_opts = [],
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
