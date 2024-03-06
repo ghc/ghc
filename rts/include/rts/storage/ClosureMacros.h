@@ -147,17 +147,10 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 #if defined(PROFILING)
 /*
   The following macro works for both retainer profiling and LDV profiling. For
- retainer profiling, 'era' remains 0, so by setting the 'ldvw' field we also set
- 'rs' to zero.
-
- Note that we don't have to bother handling the 'flip' bit properly[1] since the
- retainer profiling code will just set 'rs' to NULL upon visiting a closure with
- an invalid 'flip' bit anyways.
-
- See Note [Profiling heap traversal visited bit] for details.
-
- [1]: Technically we should set 'rs' to `NULL | flip`.
+ retainer profiling, we set 'trav' to 0, which is an invalid
+ RetainerSet.
  */
+
 /*
   MP: Various other places use the check era > 0 to check whether LDV profiling
   is enabled. The use of these predicates here is the reason for including RtsFlags.h in
@@ -168,17 +161,14 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 */
 #define SET_PROF_HDR(c, ccs_) \
   { \
-  (c)->header.prof.ccs = ccs_; \
-  if (doingLDVProfiling()) { \
-    LDV_RECORD_CREATE((c)); \
-  } \
-\
-  if (doingRetainerProfiling()) { \
-    LDV_RECORD_CREATE((c)); \
-  }; \
-  if (doingErasProfiling()){ \
-    ERA_RECORD_CREATE((c)); \
-  }; \
+    (c)->header.prof.ccs = ccs_; \
+    if (doingLDVProfiling()) { \
+      LDV_RECORD_CREATE((c)); \
+    } else if (doingRetainerProfiling()) { \
+      (c)->header.prof.hp.trav = 0; \
+    } else if (doingErasProfiling()){ \
+      ERA_RECORD_CREATE((c)); \
+    } \
   }
 
 #else
