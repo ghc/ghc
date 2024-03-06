@@ -1,0 +1,2 @@
+{"A.o":["A.hs"],"B.o":["A.hi","B.hs"],"C.o":["A.hi","C.hs"],"D.o":["B.hi","C.hi","D.hs"]}
+{"A.hs":["-XStrict","-fexpose-all-unfoldings"],"B.hs":[],"C.hs":[],"D.hs":[]}

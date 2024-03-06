@@ -704,6 +704,12 @@ addDepExcludeMod m d
 addDepSuffix :: FilePath -> DynFlags -> DynFlags
 addDepSuffix s d = d { depSuffixes = s : depSuffixes d }
 
+setDepJSON :: FilePath -> DynFlags -> DynFlags
+setDepJSON f d = d { depJSON = Just f }
+
+setOptJSON :: FilePath -> DynFlags -> DynFlags
+setOptJSON f d = d { optJSON = Just f }
+
 addCmdlineFramework f d = d { cmdlineFrameworks = f : cmdlineFrameworks d}
 
 addGhcVersionFile :: FilePath -> DynFlags -> DynFlags
@@ -1158,6 +1164,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "include-pkg-deps"
         (noArg (setDepIncludePkgDeps True))
   , make_ord_flag defGhcFlag "exclude-module"          (hasArg addDepExcludeMod)
+  , make_ord_flag defGhcFlag "dep-json"                (hasArg setDepJSON)
+  , make_ord_flag defGhcFlag "opt-json"                (hasArg setOptJSON)
 
         -------- Linking ----------------------------------------------------
   , make_ord_flag defGhcFlag "no-link"

@@ -509,6 +509,7 @@ Library
         GHC.Driver.Main
         GHC.Driver.Make
         GHC.Driver.MakeFile
+        GHC.Driver.MakeFile.JSON
         GHC.Driver.Monad
         GHC.Driver.Phases
         GHC.Driver.Pipeline

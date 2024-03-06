@@ -16,9 +16,11 @@ where
 import GHC.Prelude
 
 import qualified GHC
+import GHC.Data.Maybe
 import GHC.Driver.Monad
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
+import GHC.Driver.MakeFile.JSON
 import GHC.Utils.Misc
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
@@ -33,6 +35,7 @@ import Data.List (partition)
 import GHC.Utils.TmpFs
 
 import GHC.Iface.Load (cannotFindModule)
+import GHC.Iface.Errors.Types
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
@@ -48,10 +51,8 @@ import System.FilePath
 import System.IO
 import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when, forM_ )
-import Data.Maybe       ( isJust )
 import Data.IORef
 import qualified Data.Set as Set
-import GHC.Iface.Errors.Types
 
 -----------------------------------------------------------------
 --
@@ -92,7 +93,6 @@ doMkDependHS srcs = do
     GHC.setTargets targets
     let excl_mods = depExcludeMods dflags
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
-
     -- Sort into dependency order
     -- There should be no cycles
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
@@ -104,20 +104,14 @@ doMkDependHS srcs = do
     -- and complaining about cycles
     hsc_env <- getSession
     root <- liftIO getCurrentDirectory
-    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
+    let excl_mods = depExcludeMods dflags
+    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files) (mkd_dep_json files) (mkd_opt_json files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
     liftIO $ dumpModCycles logger module_graph
 
     -- Tidy up
     liftIO $ endMkDependHS logger files
-
-    -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
-    --exception; if that is not caught it's fine, but at least we have a
-    --chance to find out exactly what went wrong.  Uncomment the following
-    --line if you disagree.
-
-    --`GHC.ghcCatch` \_ -> io $ exitWith (ExitFailure 1)
 
 -----------------------------------------------------------------
 --
@@ -131,6 +125,10 @@ doMkDependHS srcs = do
 data MkDepFiles
   = MkDep { mkd_make_file :: FilePath,          -- Name of the makefile
             mkd_make_hdl  :: Maybe Handle,      -- Handle for the open makefile
+             -- | Output interface for the -dep-json file
+            mkd_dep_json  :: !(Maybe (JsonOutput DepJSON)),
+             -- | Output interface for the -opt-json file
+            mkd_opt_json  :: !(Maybe (JsonOutput OptJSON)),
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
@@ -173,13 +171,17 @@ beginMkDependHS logger tmpfs dflags = do
 
            return (Just makefile_hdl)
 
+  dep_json_ref <- mkJsonOutput initDepJSON (depJSON dflags)
+
+  opt_json_ref <- mkJsonOutput initOptJSON (optJSON dflags)
 
         -- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depStartMarker
 
   return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl,
+                  mkd_dep_json = dep_json_ref,
+                  mkd_opt_json = opt_json_ref,
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
-
 
 -----------------------------------------------------------------
 --
@@ -192,6 +194,8 @@ processDeps :: DynFlags
             -> [ModuleName]
             -> FilePath
             -> Handle           -- Write dependencies to here
+            -> Maybe (JsonOutput DepJSON)
+            -> Maybe (JsonOutput OptJSON)
             -> SCC ModuleGraphNode
             -> IO ()
 -- Write suitable dependencies to handle
@@ -209,20 +213,20 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags _ _ _ _ (CyclicSCC nodes)
+processDeps dflags _ _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $ GHC.cyclicModuleErr nodes
 
-processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps dflags _ _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $
         vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
              , nest 2 $ ppr node ]
-processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps _dflags _ _ _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
+processDeps dflags hsc_env excl_mods root hdl m_dep_json m_opt_json (AcyclicSCC (ModuleNode _ node))
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
@@ -236,17 +240,18 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
                            Nothing      -> return () ;
                            Just hi_file -> do
                      { let hi_files = insertSuffixes hi_file extra_suffixes
-                           write_dep (obj,hi) = writeDependency root hdl [obj] hi
+                           write_dep (obj,hi) = writeDependency root hdl m_dep_json [obj] hi
 
                         -- Add one dependency for each suffix;
                         -- e.g.         A.o   : B.hi
                         --              A.x_o : B.x_hi
                      ; mapM_ write_dep (obj_files `zip` hi_files) }}}
 
+        ; updateJson m_opt_json (updateOptJSON src_file (ms_opts node))
 
                 -- Emit std dependency of the object(s) on the source file
                 -- Something like       A.o : A.hs
-        ; writeDependency root hdl obj_files src_file
+        ; writeDependency root hdl m_dep_json obj_files src_file
 
           -- add dependency between objects and their corresponding .hi-boot
           -- files if the module has a corresponding .hs-boot file (#14482)
@@ -256,7 +261,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
             forM_ extra_suffixes $ \suff -> do
                let way_obj     = insertSuffixes obj     [suff]
                let way_hi_boot = insertSuffixes hi_boot [suff]
-               mapM_ (writeDependency root hdl way_obj) way_hi_boot
+               mapM_ (writeDependency root hdl m_dep_json way_obj) way_hi_boot
 
                 -- Emit a dependency for each CPP import
         ; when (depIncludeCppDeps dflags) $ do
@@ -266,7 +271,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
             -- fails to parse, which may not be desirable (see #16616).
           { session <- Session <$> newIORef hsc_env
           ; parsedMod <- reflectGhc (GHC.parseModule node) session
-          ; mapM_ (writeDependency root hdl obj_files)
+          ; mapM_ (writeDependency root hdl m_dep_json obj_files)
                   (GHC.pm_extra_src_files parsedMod)
           }
 
@@ -310,10 +315,10 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
              (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
 
 -----------------------------
-writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
+writeDependency :: FilePath -> Handle -> Maybe (JsonOutput DepJSON) -> [FilePath] -> FilePath -> IO ()
 -- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
 --      t1 t2 : dep
-writeDependency root hdl targets dep
+writeDependency root hdl m_dep_json targets dep
   = do let -- We need to avoid making deps on
            --     c:/foo/...
            -- on cygwin as make gets confused by the :
@@ -322,6 +327,7 @@ writeDependency root hdl targets dep
            forOutput = escapeSpaces . reslash Forwards . normalise
            output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
        hPutStrLn hdl output
+       updateJson m_dep_json (updateDepJSON targets dep')
 
 -----------------------------
 insertSuffixes
@@ -349,8 +355,9 @@ insertSuffixes file_name extras
 endMkDependHS :: Logger -> MkDepFiles -> IO ()
 
 endMkDependHS logger
-   (MkDep { mkd_make_file = makefile, mkd_make_hdl =  makefile_hdl,
-            mkd_tmp_file  = tmp_file, mkd_tmp_hdl  =  tmp_hdl })
+   (MkDep { mkd_make_file = makefile, mkd_make_hdl = makefile_hdl,
+            mkd_dep_json, mkd_opt_json,
+            mkd_tmp_file = tmp_file, mkd_tmp_hdl = tmp_hdl })
   = do
   -- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depEndMarker
@@ -372,6 +379,11 @@ endMkDependHS logger
         -- Copy the new makefile in place
   showPass logger "Installing new makefile"
   SysTools.copyFile tmp_file makefile
+
+  -- Write the dependency and option data to a json file if the corresponding
+  -- flags were specified.
+  writeJsonOutput mkd_dep_json
+  writeJsonOutput mkd_opt_json
 
 
 -----------------------------------------------------------------

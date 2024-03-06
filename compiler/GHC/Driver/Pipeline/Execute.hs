@@ -734,6 +734,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_hie_date     = hie_date,
                                 ms_ghc_prim_import = ghc_prim_imp,
                                 ms_textual_imps = imps,
+                                ms_opts         = [],
                                 ms_srcimps      = src_imps }
 
 
