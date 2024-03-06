@@ -28,7 +28,7 @@ module GHC.Core.Utils (
         trivial_expr_fold,
         exprIsDupable, exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkToDiscard, exprOkForSpecEval,
-        exprIsWorkFree, exprIsConLike,
+        exprIsWorkFree, exprIsConLike, exprIsDeadEnd,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
@@ -1493,9 +1493,97 @@ in this (which it previously was):
             in \w. v True
 -}
 
+---------------
+exprIsDeadEnd :: CoreExpr -> Bool
+-- See Note [Bottoming expressions]
+-- This function is, in effect, just a specialised (and hence cheap)
+--    version of cheapArityType:
+--    exprIsDeadEnd e = case cheapArityType e of
+--                         AT lams div -> null lams && isDeadEndDiv div
+-- See also exprBotStrictness_maybe, which uses cheapArityType
+exprIsDeadEnd e
+  = go 0 e
+  where
+    go :: Arity -> CoreExpr -> Bool
+    -- (go n e) = True <=> expr applied to n value args is bottom
+    go _ (Lit {})                = False
+    go _ (Type {})               = False
+    go _ (Coercion {})           = False
+    go n (App e a) | isTypeArg a = go n e
+                   | otherwise   = go (n+1) e
+    go n (Tick _ e)              = go n e
+    go n (Cast e _)              = go n e
+    go n (Let _ e)               = go n e
+    go n (Lam v e) | isTyVar v   = go n e
+                   | otherwise   = False
+
+    go _ (Case _ _ _ alts)       = null alts
+       -- See Note [Empty case alternatives] in GHC.Core
+
+    go n (Var v) | isDeadEndAppSig (idDmdSig v) n = True
+                 | isEmptyTy (idType v)           = True
+                 | otherwise                      = False
+
+{- Note [Bottoming expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A bottoming expression is guaranteed to diverge, or raise an
+exception.  We can test for it in two different ways, and exprIsDeadEnd
+checks for both of these situations:
+
+* Visibly-bottom computations.  For example
+      (error Int "Hello")
+  is visibly bottom.  The strictness analyser also finds out if
+  a function diverges or raises an exception, and puts that info
+  in its strictness signature.
+
+* Empty types.  If a type is empty, its only inhabitant is bottom.
+  For example:
+      data T
+      f :: T -> Bool
+      f = \(x:t). case x of Bool {}
+  Since T has no data constructors, the case alternatives are of course
+  empty.  However note that 'x' is not bound to a visibly-bottom value;
+  it's the *type* that tells us it's going to diverge.
+
+A GADT may also be empty even though it has constructors:
+        data T a where
+          T1 :: a -> T Bool
+          T2 :: T Int
+        ...(case (x::T Char) of {})...
+Here (T Char) is uninhabited.  A more realistic case is (Int ~ Bool),
+which is likewise uninhabited.
+-}
+
 --------------------
 exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
-exprIsWorkFree e = exprIsCheapX isWorkFreeApp e
+-- exprIsWorkFree e = exprIsCheapX isWorkFreeApp e
+exprIsWorkFree e = ok e
+  where
+    ok e = go 0 e
+
+    -- n is the number of value arguments
+    go n (Var v)                      = isWorkFreeApp v n
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Case scrut _ _ alts)        = ok_alts alts && ok scrut
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
+                    | otherwise       = go n e
+    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
+                    | otherwise       = go n f
+    go n (Let (NonRec _ r) e)         = go n e && ok r
+    go n (Let (Rec prs) e)            = go n e && all (ok . snd) prs
+
+    is_bot_alt (Alt _ _ r) = exprIsDeadEnd r
+
+    -- OK if max one work-free alt
+    ok_alts [] = True
+    ok_alts (Alt _ _ r : alts)
+      | exprIsDeadEnd r = ok_alts alts
+      | otherwise       = all is_bot_alt alts && ok r
 
 exprIsCheap :: CoreExpr -> Bool
 exprIsCheap e = exprIsCheapX isCheapApp e

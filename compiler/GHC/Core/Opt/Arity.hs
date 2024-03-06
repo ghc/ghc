@@ -1726,66 +1726,7 @@ exprArity e = go e
 
     go _                           = 0
 
----------------
-exprIsDeadEnd :: CoreExpr -> Bool
--- See Note [Bottoming expressions]
--- This function is, in effect, just a specialised (and hence cheap)
---    version of cheapArityType:
---    exprIsDeadEnd e = case cheapArityType e of
---                         AT lams div -> null lams && isDeadEndDiv div
--- See also exprBotStrictness_maybe, which uses cheapArityType
-exprIsDeadEnd e
-  = go 0 e
-  where
-    go :: Arity -> CoreExpr -> Bool
-    -- (go n e) = True <=> expr applied to n value args is bottom
-    go _ (Lit {})                = False
-    go _ (Type {})               = False
-    go _ (Coercion {})           = False
-    go n (App e a) | isTypeArg a = go n e
-                   | otherwise   = go (n+1) e
-    go n (Tick _ e)              = go n e
-    go n (Cast e _)              = go n e
-    go n (Let _ e)               = go n e
-    go n (Lam v e) | isTyVar v   = go n e
-                   | otherwise   = False
-
-    go _ (Case _ _ _ alts)       = null alts
-       -- See Note [Empty case alternatives] in GHC.Core
-
-    go n (Var v) | isDeadEndAppSig (idDmdSig v) n = True
-                 | isEmptyTy (idType v)           = True
-                 | otherwise                      = False
-
-{- Note [Bottoming expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A bottoming expression is guaranteed to diverge, or raise an
-exception.  We can test for it in two different ways, and exprIsDeadEnd
-checks for both of these situations:
-
-* Visibly-bottom computations.  For example
-      (error Int "Hello")
-  is visibly bottom.  The strictness analyser also finds out if
-  a function diverges or raises an exception, and puts that info
-  in its strictness signature.
-
-* Empty types.  If a type is empty, its only inhabitant is bottom.
-  For example:
-      data T
-      f :: T -> Bool
-      f = \(x:t). case x of Bool {}
-  Since T has no data constructors, the case alternatives are of course
-  empty.  However note that 'x' is not bound to a visibly-bottom value;
-  it's the *type* that tells us it's going to diverge.
-
-A GADT may also be empty even though it has constructors:
-        data T a where
-          T1 :: a -> T Bool
-          T2 :: T Int
-        ...(case (x::T Char) of {})...
-Here (T Char) is uninhabited.  A more realistic case is (Int ~ Bool),
-which is likewise uninhabited.
-
+{-
 Note [No free join points in arityType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we call arityType on this expression (EX1)
