@@ -329,6 +329,7 @@ data DynFlags = DynFlags {
   depIncludeCppDeps     :: Bool,
   depExcludeMods        :: [ModuleName],
   depSuffixes           :: [String],
+  depJSON               :: !(Maybe FilePath),
 
   --  Package flags
   packageDBFlags        :: [PackageDBFlag],
@@ -649,6 +650,7 @@ defaultDynFlags mySettings =
         depIncludeCppDeps = False,
         depExcludeMods    = [],
         depSuffixes       = [],
+        depJSON           = Nothing,
         -- end of ghc -M values
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,
