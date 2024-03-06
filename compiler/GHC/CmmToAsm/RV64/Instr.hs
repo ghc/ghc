@@ -165,7 +165,6 @@ regUsageOfInstr platform instr = case instr of
         regAddr (AddrReg r1)       = [r1]
         regOp :: Operand -> [Reg]
         regOp (OpReg _ r1) = [r1]
-        regOp (OpRegExt _ r1 _ _) = [r1]
         regOp (OpRegShift _ r1 _ _) = [r1]
         regOp (OpAddr a) = regAddr a
         regOp (OpImm _) = []
@@ -293,7 +292,6 @@ patchRegsOfInstr instr env = case instr of
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
-        patchOp (OpRegExt w r x s) = OpRegExt w (env r) x s
         patchOp (OpRegShift w r m s) = OpRegShift w (env r) m s
         patchOp (OpAddr a) = OpAddr (patchAddr a)
         patchOp op = op
@@ -765,13 +763,6 @@ data Target
     | TReg   Reg
 
 
--- Extension
--- {Unsigned|Signed}XT{Byte|Half|Word|Doube}
-data ExtMode
-    = EUXTB | EUXTH | EUXTW | EUXTX
-    | ESXTB | ESXTH | ESXTW | ESXTX
-    deriving (Eq, Show)
-
 data ShiftMode
     = SLSL | SLSR | SASR | SROR
     deriving (Eq, Show)
@@ -785,7 +776,6 @@ type RegShift = Int
 
 data Operand
         = OpReg Width Reg            -- register
-        | OpRegExt Width Reg ExtMode ExtShift -- rm, <ext>[, <shift left>]
         | OpRegShift Width Reg ShiftMode RegShift     -- rm, <shift>, <0-64>
         | OpImm Imm            -- immediate value
         -- TODO: Does OpImmShift exist in RV64?
@@ -906,13 +896,6 @@ d28 = operandFromRegNo 60
 d29 = operandFromRegNo 61
 d30 = operandFromRegNo 62
 d31 = operandFromRegNo d31RegNo
-
-opRegSExt :: Width -> Reg -> Operand
-opRegSExt W64 r = OpRegExt W64 r ESXTX 0
-opRegSExt W32 r = OpRegExt W32 r ESXTW 0
-opRegSExt W16 r = OpRegExt W16 r ESXTH 0
-opRegSExt W8  r = OpRegExt W8  r ESXTB 0
-opRegSExt w  _r = pprPanic "opRegSExt" (ppr w)
 
 fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
 fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
