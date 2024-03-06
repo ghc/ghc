@@ -307,7 +307,7 @@ test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
 test('T7919', [ when(fast(), skip)
               , omit_ghci
               , req_th
-              , when(platform('x86_64-unknown-linux'), fragile(22283))
+              , when(arch('i386') or platform('x86_64-unknown-linux'), fragile(22283))
               , js_fragile(24259)
               ]
               , compile_and_run, [config.ghc_th_way_flags])
