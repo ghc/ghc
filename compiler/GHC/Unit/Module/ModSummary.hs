@@ -75,6 +75,8 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [(PkgQual, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
+        ms_opts         :: ![String],
+          -- ^ OPTIONS and LANGUAGE pragmas of the source file
         ms_ghc_prim_import :: !Bool,
           -- ^ Whether the special module GHC.Prim was imported explicitly
         ms_parsed_mod   :: Maybe HsParsedModule,
@@ -192,5 +194,3 @@ findTarget ms ts =
         = f == f'  && ms_unitid summary == unitid
     _ `matches` _
         = False
-
-

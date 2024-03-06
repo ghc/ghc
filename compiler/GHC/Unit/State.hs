@@ -72,6 +72,7 @@ module GHC.Unit.State (
         implicitPackageDeps)
 where
 
+import Data.Foldable (find)
 import GHC.Prelude
 
 import GHC.Driver.DynFlags
@@ -901,8 +902,18 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
     ExposePackage _ arg (ModRenaming b rns) ->
        case findPackages prec_map pkg_map closure arg pkgs unusable of
          Left ps     -> Failed (PackageFlagErr flag ps)
-         Right (p:_) -> Succeeded vm'
+         Right ps@(p0:_) -> Succeeded vm'
           where
+           p | PackageArg _ <- arg = fromMaybe p0 mainPackage
+             | otherwise = p0
+
+           mainPackage = find (\ u -> isNothing (unitComponentName u)) matchFirst
+
+           matchFirst = filter (\ u -> unitPackageName u == firstName && unitPackageVersion u == firstVersion) ps
+
+           firstName = unitPackageName p0
+           firstVersion = unitPackageVersion p0
+
            n = fsPackageName p
 
            -- If a user says @-unit-id p[A=<A>]@, this imposes
@@ -1028,6 +1039,13 @@ matchingStr :: String -> UnitInfo -> Bool
 matchingStr str p
         =  str == unitPackageIdString p
         || str == unitPackageNameString p
+        || matchSublibrary
+  where
+    matchSublibrary
+      | Just (PackageName c) <- unitComponentName p
+      = str == (unitPackageNameString p ++ ":" ++ unpackFS c)
+      | otherwise
+      = False
 
 matchingId :: UnitId -> UnitInfo -> Bool
 matchingId uid p = uid == unitId p
