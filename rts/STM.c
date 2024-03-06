@@ -31,10 +31,8 @@
  * interface.  In the Haskell RTS this means it is suitable only for
  * non-THREADED_RTS builds.
  *
- * STM_CG_LOCK uses coarse-grained locking -- a single 'stm lock' is acquired
- * during an invocation on the STM interface.  Note that this does not mean that
- * transactions are simply serialized -- the lock is only held *within* the
- * implementation of stmCommitTransaction, stmWait etc.
+ * STM_CG_LOCK was a historic locking mode using coarse-grained locking
+ * It has been removed, look at the git history if you are interest in it.
  *
  * STM_FG_LOCKS uses fine-grained locking -- locking is done on a per-TVar basis
  * and, when committing a transaction, no locks are acquired for TVars that have
@@ -42,19 +40,14 @@
  *
  * Concurrency control is implemented in the functions:
  *
- *    lock_stm
- *    unlock_stm
  *    lock_tvar / cond_lock_tvar
  *    unlock_tvar
  *
- * The choice between STM_UNIPROC / STM_CG_LOCK / STM_FG_LOCKS affects the
+ * The choice between STM_UNIPROC / STM_FG_LOCKS affects the
  * implementation of these functions.
  *
- * lock_stm & unlock_stm are straightforward : they acquire a simple spin-lock
- * using STM_CG_LOCK, and otherwise they are no-ops.
- *
  * lock_tvar / cond_lock_tvar and unlock_tvar are more complex because they have
- * other effects (present in STM_UNIPROC and STM_CG_LOCK builds) as well as the
+ * other effects (present in STM_UNIPROC builds) as well as the
  * actual business of manipulating a lock (present only in STM_FG_LOCKS builds).
  * This is because locking a TVar is implemented by writing the lock holder's
  * TRec into the TVar's current_value field:
@@ -167,21 +160,12 @@ static int shake(void) {
 /*......................................................................*/
 
 #define IF_STM_UNIPROC(__X)  do { } while (0)
-#define IF_STM_CG_LOCK(__X)  do { } while (0)
 #define IF_STM_FG_LOCKS(__X) do { } while (0)
 
 #if defined(STM_UNIPROC)
 #undef IF_STM_UNIPROC
 #define IF_STM_UNIPROC(__X)  do { __X } while (0)
 static const StgBool config_use_read_phase = false;
-
-static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : lock_stm()", trec);
-}
-
-static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()", trec);
-}
 
 static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
                              StgTRecHeader *trec STG_UNUSED,
@@ -210,64 +194,9 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
                               StgTVar *s STG_UNUSED,
                               StgClosure *expected) {
   StgClosure *result;
-  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
+  // TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   result = ACQUIRE_LOAD(&s->current_value);
-  TRACE("%p : %s", trec, (result == expected) ? "success" : "failure");
-  return (result == expected);
-}
-#endif
-
-#if defined(STM_CG_LOCK) /*........................................*/
-
-#undef IF_STM_CG_LOCK
-#define IF_STM_CG_LOCK(__X)  do { __X } while (0)
-static const StgBool config_use_read_phase = false;
-static volatile StgTRecHeader *smp_locked = NULL;
-
-static void lock_stm(StgTRecHeader *trec) {
-  while (cas(&smp_locked, NULL, trec) != NULL) { }
-  TRACE("%p : lock_stm()", trec);
-}
-
-static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()", trec);
-  ASSERT(smp_locked == trec);
-  RELEASE_STORE(&smp_locked, 0);
-}
-
-static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
-                             StgTRecHeader *trec STG_UNUSED,
-                             StgTVar *s STG_UNUSED) {
-  StgClosure *result;
-  TRACE("%p : lock_tvar(%p)", trec, s);
-  ASSERT(smp_locked == trec);
-  result = ACQUIRE_LOAD(&s->current_value);
-  return result;
-}
-
-static void *unlock_tvar(Capability *cap,
-                         StgTRecHeader *trec STG_UNUSED,
-                         StgTVar *s,
-                         StgClosure *c,
-                         StgBool force_update) {
-  TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
-  ASSERT(smp_locked == trec);
-  if (force_update) {
-    StgClosure *old_value = ACQUIRE_LOAD(&s->current_value);
-    RELEASE_STORE(&s->current_value, c);
-    dirty_TVAR(cap, s, old_value);
-  }
-}
-
-static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
-                              StgTRecHeader *trec STG_UNUSED,
-                               StgTVar *s STG_UNUSED,
-                               StgClosure *expected) {
-  StgClosure *result;
-  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
-  ASSERT(smp_locked == trec);
-  result = ACQUIRE_LOAD(&s->current_value);
-  TRACE("%p : %d", result ? "success" : "failure");
+  // TRACE("%p : %s", trec, (result == expected) ? "success" : "failure");
   return (result == expected);
 }
 #endif
@@ -278,19 +207,11 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
 #define IF_STM_FG_LOCKS(__X) do { __X } while (0)
 static const StgBool config_use_read_phase = true;
 
-static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : lock_stm()", trec);
-}
-
-static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()", trec);
-}
-
 static StgClosure *lock_tvar(Capability *cap,
                              StgTRecHeader *trec,
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
-  TRACE("%p : lock_tvar(%p)", trec, s);
+  // TRACE("%p : lock_tvar(%p)", trec, s);
   do {
     const StgInfoTable *info;
     do {
@@ -313,7 +234,7 @@ static void unlock_tvar(Capability *cap,
                         StgTVar *s,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
-  TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
+  // TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(ACQUIRE_LOAD(&s->current_value) == (StgClosure *)trec);
   RELEASE_STORE(&s->current_value, c);
   dirty_TVAR(cap, s, (StgClosure *) trec);
@@ -325,14 +246,14 @@ static StgBool cond_lock_tvar(Capability *cap,
                               StgClosure *expected) {
   StgClosure *result;
   StgWord w;
-  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
+  // TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
   result = (StgClosure *)w;
   IF_NONMOVING_WRITE_BARRIER_ENABLED {
       if (result)
           updateRemembSetPushClosure(cap, expected);
   }
-  TRACE("%p : %s", trec, result ? "success" : "failure");
+  // TRACE("%p : %s", trec, result ? "success" : "failure");
   return (result == expected);
 }
 #endif
@@ -778,6 +699,8 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
                                                int acquire_all,
                                                int retain_ownership) {
   StgBool result;
+  TRACE("cap %d, trec %p : validate_and_acquire_ownership, all: %d, retrain: %d",
+         cap->no, trec, acquire_all, retain_ownership);
 
   if (shake()) {
     TRACE("%p : shake, pretending trec is invalid when it may not be", trec);
@@ -828,6 +751,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
       revert_ownership(cap, trec, acquire_all);
   }
 
+  // TRACE("%p : validate_and_acquire_ownership, result: %d", trec, result);
   return result;
 }
 
@@ -878,12 +802,10 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
 /************************************************************************/
 
 void stmPreGCHook (Capability *cap) {
-  lock_stm(NO_TREC);
   TRACE("stmPreGCHook");
   cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
   cap->free_trec_chunks = END_STM_CHUNK_LIST;
   cap->free_trec_headers = NO_TREC;
-  unlock_stm(NO_TREC);
 }
 
 /************************************************************************/
@@ -959,8 +881,6 @@ void stmAbortTransaction(Capability *cap,
          (trec -> state == TREC_WAITING) ||
          (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
-
   et = trec -> enclosing_trec;
   if (et == NO_TREC) {
     // We're a top-level transaction: remove any watch queue entries that
@@ -984,8 +904,6 @@ void stmAbortTransaction(Capability *cap,
   }
 
   trec -> state = TREC_ABORTED;
-  unlock_stm(trec);
-
   TRACE("%p : stmAbortTransaction done", trec);
 }
 
@@ -1013,20 +931,23 @@ void stmCondemnTransaction(Capability *cap,
          (trec -> state == TREC_WAITING) ||
          (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
   if (trec -> state == TREC_WAITING) {
     ASSERT(trec -> enclosing_trec == NO_TREC);
     TRACE("%p : stmCondemnTransaction condemning waiting transaction", trec);
     remove_watch_queue_entries_for_trec(cap, trec);
   }
   trec -> state = TREC_CONDEMNED;
-  unlock_stm(trec);
 
   TRACE("%p : stmCondemnTransaction done", trec);
 }
 
 /*......................................................................*/
 
+// Check if a transaction is known to be invalid by this point.
+// Currently we use this to:
+// * Eagerly abort invalid transactions from the scheduler.
+// * If an exception occured inside a transaction, decide weither or not to
+//   abort by checking if the transaction was valid.
 StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *t;
 
@@ -1036,11 +957,10 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
          (trec -> state == TREC_WAITING) ||
          (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
-
   t = trec;
   StgBool result = true;
   while (t != NO_TREC) {
+    // TODO: I don't think there is a need to lock any tvars here, all even less so.
     result &= validate_and_acquire_ownership(cap, t, true, false);
     t = t -> enclosing_trec;
   }
@@ -1048,8 +968,6 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   if (!result && trec -> state != TREC_WAITING) {
     trec -> state = TREC_CONDEMNED;
   }
-
-  unlock_stm(trec);
 
   TRACE("%p : stmValidateNestOfTransactions()=%d", trec, result);
   return result;
@@ -1087,8 +1005,6 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   TRACE("%p : stmCommitTransaction()", trec);
   ASSERT(trec != NO_TREC);
 
-  lock_stm(trec);
-
   ASSERT(trec -> enclosing_trec == NO_TREC);
   ASSERT((trec -> state == TREC_ACTIVE) ||
          (trec -> state == TREC_CONDEMNED));
@@ -1112,6 +1028,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
       max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
                                 (getNumCapabilities() * TOKEN_BATCH_SIZE));
       if (((max_concurrent_commits >> 32) > 0) || shake()) {
+        TRACE("STM - Max commit number exceeded");
         result = false;
       }
     }
@@ -1145,8 +1062,6 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
     }
   }
 
-  unlock_stm(trec);
-
   free_stg_trec_header(cap, trec);
 
   TRACE("%p : stmCommitTransaction()=%d", trec, result);
@@ -1161,8 +1076,6 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   ASSERT(trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
   TRACE("%p : stmCommitNestedTransaction() into %p", trec, trec -> enclosing_trec);
   ASSERT((trec -> state == TREC_ACTIVE) || (trec -> state == TREC_CONDEMNED));
-
-  lock_stm(trec);
 
   et = trec -> enclosing_trec;
   bool result = validate_and_acquire_ownership(cap, trec, (!config_use_read_phase), true);
@@ -1196,8 +1109,6 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
     }
   }
 
-  unlock_stm(trec);
-
   free_stg_trec_header(cap, trec);
 
   TRACE("%p : stmCommitNestedTransaction()=%d", trec, result);
@@ -1214,7 +1125,6 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
   ASSERT((trec -> state == TREC_ACTIVE) ||
          (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
   bool result = validate_and_acquire_ownership(cap, trec, true, true);
   if (result) {
     // The transaction is valid so far so we can actually start waiting.
@@ -1237,7 +1147,6 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
     // TRec.
 
   } else {
-    unlock_stm(trec);
     free_stg_trec_header(cap, trec);
   }
 
@@ -1249,7 +1158,6 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
 void
 stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
     revert_ownership(cap, trec, true);
-    unlock_stm(trec);
 }
 
 /*......................................................................*/
@@ -1263,7 +1171,6 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
   ASSERT((trec -> state == TREC_WAITING) ||
          (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
   bool result = validate_and_acquire_ownership(cap, trec, true, true);
   TRACE("%p : validation %s", trec, result ? "succeeded" : "failed");
   if (result) {
@@ -1280,7 +1187,6 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
     }
     free_stg_trec_header(cap, trec);
   }
-  unlock_stm(trec);
 
   TRACE("%p : stmReWait()=%d", trec, result);
   return result;
