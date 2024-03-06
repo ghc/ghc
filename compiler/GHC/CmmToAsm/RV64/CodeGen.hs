@@ -911,10 +911,10 @@ getRegister' config plat expr =
         -- SLT is the same. ULE, and ULT will not return true for NaN.
         -- This is a bit counter-intuitive. Don't let yourself be fooled by
         -- the S/U prefix for floats, it's only meaningful for integers.
-        MO_F_Ge w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OGE))
-        MO_F_Le w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OLE)) -- x <= y <=> y > x
-        MO_F_Gt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OGT))
-        MO_F_Lt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OLT)) -- x < y <=> y >= x
+        MO_F_Ge w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FGE))
+        MO_F_Le w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FLE)) -- x <= y <=> y > x
+        MO_F_Gt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FGT))
+        MO_F_Lt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FLT)) -- x < y <=> y >= x
 
         -- Bitwise operations
         MO_And   w -> bitOp w (\d x y -> unitOL $ annExpr expr (AND d x y))
@@ -1278,10 +1278,10 @@ genCondJump bid expr = do
           MO_F_Eq w -> fbcond w EQ
           MO_F_Ne w -> fbcond w NE
 
-          MO_F_Gt w -> fbcond w OGT
-          MO_F_Ge w -> fbcond w OGE
-          MO_F_Lt w -> fbcond w OLT
-          MO_F_Le w -> fbcond w OLE
+          MO_F_Gt w -> fbcond w FGT
+          MO_F_Ge w -> fbcond w FGE
+          MO_F_Lt w -> fbcond w FLT
+          MO_F_Le w -> fbcond w FLE
 
           MO_Eq w   -> sbcond w EQ
           MO_Ne w   -> sbcond w NE
