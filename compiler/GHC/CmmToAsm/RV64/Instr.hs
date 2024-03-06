@@ -459,20 +459,34 @@ takeRegRegMoveInstr _ = Nothing
 mkJumpInstr :: BlockId -> [Instr]
 mkJumpInstr = pure . B . TBlock
 
+-- | Decrement @sp@ to allocate stack space.
+--
+-- The stack grows downwards, so we decrement the stack pointer by @n@ (bytes).
+-- This is dual to `mkStackDeallocInstr`. @sp@ is the RISCV stack pointer, not
+-- to be confused with the STG stack pointer.
 mkStackAllocInstr :: Platform -> Int -> [Instr]
 mkStackAllocInstr platform n
-    | n == 0 = []
-    | n > 0 && fitsIn12bitImm n = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
-    -- TODO: This case may be optimized with the IP register for large n-s
-    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt intMax12bit))) : mkStackAllocInstr platform (n - intMax12bit)
+  | n == 0 = []
+  | n > 0 && fitsIn12bitImm n = pure . ANN desc $ SUB sp sp (OpImm (ImmInt n))
+  -- TODO: This case may be optimized with the IP register for large n-s
+  | n > 0 = ANN desc (SUB sp sp (OpImm (ImmInt intMax12bit))) : mkStackAllocInstr platform (n - intMax12bit)
+  where
+    desc = text "Alloc More Stack:" <+> int n
 mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 
+-- | Increment SP to deallocate stack space.
+--
+-- The stack grows downwards, so we increment the stack pointer by @n@ (bytes).
+-- This is dual to `mkStackAllocInstr`. @sp@ is the RISCV stack pointer, not to
+-- be confused with the STG stack pointer.
 mkStackDeallocInstr :: Platform -> Int -> [Instr]
 mkStackDeallocInstr platform n
-    | n == 0 = []
-    | n > 0 && fitsIn12bitImm n = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
-    -- TODO: This case may be optimized with the IP register for large n-s
-    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt intMax12bit))) : mkStackDeallocInstr platform (n - intMax12bit)
+  | n == 0 = []
+  | n > 0 && fitsIn12bitImm n = pure . ANN desc $ ADD sp sp (OpImm (ImmInt n))
+  -- TODO: This case may be optimized with the IP register for large n-s
+  | n > 0 = ANN desc (ADD sp sp (OpImm (ImmInt intMax12bit))) : mkStackDeallocInstr platform (n - intMax12bit)
+  where
+    desc = text "Dealloc More Stack:" <+> int n
 mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
 --
