@@ -638,6 +638,7 @@ data Instr
 
     -- TODO: Rename: MULH
     | SMULH Operand Operand Operand
+    -- TODO: unused
     | SMULL Operand Operand Operand
 
     | DIVU Operand Operand Operand -- rd = rn ÷ rm
@@ -652,19 +653,25 @@ data Instr
     -- | AND Operand Operand Operand -- rd = rn & op2
     -- | ANDS Operand Operand Operand -- rd = rn & op2
     -- | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
+    -- TODO: unused
     | BIC Operand Operand Operand -- rd = rn & ~op2
+    -- TODO: unused
     | BICS Operand Operand Operand -- rd = rn & ~op2
     | XOR Operand Operand Operand -- rd = rn ⊕ op2
     -- | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     -- | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
     | MOV Operand Operand -- rd = rn  or  rd = #i
+    -- TODO: Unused
     | MOVK Operand Operand
     -- | MOVN Operand Operand
     -- | MOVZ Operand Operand
+    -- TODO: unused
     | ORN Operand Operand Operand -- rd = rn | ~op2
     | ORI Operand Operand Operand -- rd = rn | op2
     | XORI Operand Operand Operand -- rd = rn `xor` imm
+    -- TODO: unused
     | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
+    -- TODO: unused
     | TST Operand Operand -- rn & op2
     -- Load and stores.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
