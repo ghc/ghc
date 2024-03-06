@@ -924,7 +924,7 @@ makeFarBranches info_env blocks
       | otherwise =
           annotate addr targetAddr orig
       where
-        Just targetAddr = lookupUFM blockAddressMap tgtBid
+        targetAddr = fromJust $ lookupUFM blockAddressMap tgtBid
     makeFar _bid addr orig@(B (TBlock tgtBid))
       | abs (addr - targetAddr) >= nearLimit =
           annotate addr targetAddr $
@@ -932,7 +932,7 @@ makeFarBranches info_env blocks
       | otherwise =
           annotate addr targetAddr orig
       where
-        Just targetAddr = lookupUFM blockAddressMap tgtBid
+        targetAddr = fromJust $ lookupUFM blockAddressMap tgtBid
     makeFar bid addr (ANN desc other) = ANN desc $ makeFar bid addr other
     makeFar _bid _ other = other
 
