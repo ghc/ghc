@@ -593,7 +593,7 @@ pprInstr platform instr = case instr of
   BCOND_FAR c l r b t | isLabel t ->
     lines_ [ text "\t" <> pprBcond (negateCond c) <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform b <> text "_end"
            , text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform t
-           , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" 
+           , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0"
            ]
 
   BCOND_FAR _ _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
