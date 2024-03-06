@@ -305,17 +305,6 @@ negOp (OpImm (ImmInteger i)) = OpImm (ImmInteger (negate i))
 negOp op = pprPanic "RV64.negOp" (text $ show op)
 
 -- TODO: Is this used in RISCV?!
-pprExt :: IsLine doc => ExtMode -> doc
-pprExt EUXTB = text "uxtb"
-pprExt EUXTH = text "uxth"
-pprExt EUXTW = text "uxtw"
-pprExt EUXTX = text "uxtx"
-pprExt ESXTB = text "sxtb"
-pprExt ESXTH = text "sxth"
-pprExt ESXTW = text "sxtw"
-pprExt ESXTX = text "sxtx"
-
--- TODO: Is this used in RISCV?!
 pprShift :: IsLine doc => ShiftMode -> doc
 pprShift SLSL = text "lsl"
 pprShift SLSR = text "lsr"
@@ -325,8 +314,6 @@ pprShift SROR = text "ror"
 pprOp :: IsLine doc => Platform -> Operand -> doc
 pprOp plat op = case op of
   OpReg w r           -> pprReg w r
-  OpRegExt w r x 0 -> pprReg w r <> comma <+> pprExt x
-  OpRegExt w r x i -> pprReg w r <> comma <+> pprExt x <> comma <+> char '#' <> int i
   OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <+> char '#' <> int i
   OpImm im          -> pprIm plat im
   OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
