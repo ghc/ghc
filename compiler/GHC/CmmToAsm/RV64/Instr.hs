@@ -897,7 +897,7 @@ isEncodeableInWidth = isNbitEncodeable . widthInBits
 -- Conditional branch instructions can target labels in a range of +/- 4 KiB.
 -- The assembler can transform this into a J instruction targeting +/- 1MiB.
 -- There are rare cases where this is not enough (e.g. the Happy-generated
--- @Parser.hs@.) We need to manually transfer these into register based jumps
+-- @Parser.hs@.) We need to manually transform these into register based jumps
 -- using @ip@ (register reserved for calculations.) The trick is to invert the
 -- condition, do a far jump in the fall-through case or a short jump when the
 -- (inverted) condition is true.
