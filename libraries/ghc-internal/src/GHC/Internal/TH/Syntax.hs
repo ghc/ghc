@@ -1554,6 +1554,7 @@ data Info
         Name
         Type    -- What it is bound to
   deriving( Show, Eq, Ord, Data, Generic )
+{-# DEPRECATED PrimTyConI "TyConI is now produced instead." #-}
 
 -- | Obtained from 'reifyModule' in the 'Q' Monad.
 data ModuleInfo =

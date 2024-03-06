@@ -3,6 +3,7 @@
 ## 2.22.1.0
 
   * `Lift` instances were added for the `template-haskell` AST.
+  * `PrimTyConI` has been deprecated. `TyConI` will now be used to represent primitive types.
 
 ## 2.22.0.0
 

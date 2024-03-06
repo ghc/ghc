@@ -7,7 +7,8 @@ import GHC.Exts
 import Language.Haskell.TH
 
 f :: ()
-f = $(do PrimTyConI _ arity _ <- reify ''Proxy#
+f = $(do TyConI (DataD _ _ targs _ _ _) <- reify ''Proxy#
+         let arity = length targs
          unless (arity == 1) $
            fail $ "Unexpected arity for Proxy#: " ++ show arity
          [| () |])
