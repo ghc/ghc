@@ -60,7 +60,7 @@ import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv( compatibleBranches )
 import GHC.Core.Unify
-import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
+import GHC.Core.Opt.Arity    ( typeArity )
 
 import GHC.Core.Opt.Monad
 
