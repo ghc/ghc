@@ -1238,7 +1238,7 @@ module Data.Ix where
     {-# MINIMAL range, (index | GHC.Internal.Ix.unsafeIndex), inRange #-}
 
 module Data.Kind where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type Constraint :: *
   type Constraint = GHC.Prim.CONSTRAINT GHC.Types.LiftedRep
   type role FUN nominal representational representational
