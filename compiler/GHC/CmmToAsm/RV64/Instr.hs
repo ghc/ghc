@@ -299,53 +299,54 @@ patchRegsOfInstr instr env = case instr of
         patchAddr (AddrRegImm r1 i)  = AddrRegImm (env r1) i
         patchAddr (AddrReg r) = AddrReg (env r)
 --------------------------------------------------------------------------------
+
 -- | Checks whether this instruction is a jump/branch instruction.
+--
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
 isJumpishInstr :: Instr -> Bool
 isJumpishInstr instr = case instr of
-    ANN _ i -> isJumpishInstr i
-    CBZ{} -> True
-    CBNZ{} -> True
-    J{} -> True
-    B{} -> True
-    B_FAR{} -> True
-    BL{} -> True
-    BCOND{} -> True
-    BCOND_FAR{} -> True
-    _ -> False
+  ANN _ i -> isJumpishInstr i
+  CBZ {} -> True
+  CBNZ {} -> True
+  J {} -> True
+  B {} -> True
+  B_FAR {} -> True
+  BL {} -> True
+  BCOND {} -> True
+  BCOND_FAR {} -> True
+  _ -> False
 
--- | Checks whether this instruction is a jump/branch instruction.
--- One that can change the flow of control in a way that the
--- register allocator needs to worry about.
+-- | Get the `BlockId`s of the jump destinations (if any)
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
-jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (CBZ _ t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (CBNZ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B_FAR t) = [t]
-jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (BCOND _ _ _ t) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (BCOND_FAR _ _ _ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (BL t _ _) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND _ _ _ t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND_FAR _ _ _ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
 
--- | Change the destination of this jump instruction.
+-- | Change the destination of this (potential) jump instruction.
+--
 -- Used in the linear allocator when adding fixup blocks for join
 -- points.
 patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
-patchJumpInstr instr patchF
-    = case instr of
-        ANN d i -> ANN d (patchJumpInstr i patchF)
-        CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
-        CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
-        J (TBlock bid) -> J (TBlock (patchF bid))
-        B (TBlock bid) -> B (TBlock (patchF bid))
-        B_FAR bid -> B_FAR (patchF bid)
-        BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
-        BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
-        BCOND_FAR c o1 o2 b (TBlock bid) -> BCOND_FAR c o1 o2 b (TBlock (patchF bid))
-        _ -> panic $ "patchJumpInstr: " ++ instrCon instr
+patchJumpInstr instr patchF =
+  case instr of
+    ANN d i -> ANN d (patchJumpInstr i patchF)
+    CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
+    CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
+    J (TBlock bid) -> J (TBlock (patchF bid))
+    B (TBlock bid) -> B (TBlock (patchF bid))
+    B_FAR bid -> B_FAR (patchF bid)
+    BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
+    BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
+    BCOND_FAR c o1 o2 b (TBlock bid) -> BCOND_FAR c o1 o2 b (TBlock (patchF bid))
+    _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
 -- -----------------------------------------------------------------------------
 -- Note [Spills and Reloads]
@@ -367,11 +368,11 @@ patchJumpInstr instr patchF
 mkSpillInstr ::
   HasCallStack =>
   NCGConfig ->
-  Reg -> -- register to spill
-  Int -> -- current stack delta
-  Int -> -- spill slot to use
+  Reg -> -- ^ register to spill
+  Int -> -- ^ current stack delta
+  Int -> -- ^ spill slot to use
   [Instr]
-mkSpillInstr config reg delta slot =
+mkSpillInstr _config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
     imm ->
@@ -392,9 +393,9 @@ mkSpillInstr config reg delta slot =
 
 mkLoadInstr
    :: NCGConfig
-   -> Reg       -- register to load
-   -> Int       -- current stack delta
-   -> Int       -- spill slot to use
+   -> Reg       -- ^ register to load
+   -> Int       -- ^ current stack delta
+   -> Int       -- ^ spill slot to use
    -> [Instr]
 
 mkLoadInstr _config reg delta slot =
@@ -416,33 +417,37 @@ mkLoadInstr _config reg delta slot =
 
     off = spillSlotToOffset slot
 
-  --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
 takeDeltaInstr :: Instr -> Maybe Int
 takeDeltaInstr (ANN _ i) = takeDeltaInstr i
 takeDeltaInstr (DELTA i) = Just i
 takeDeltaInstr _         = Nothing
 
--- Not real instructions.  Just meta data
+-- | Not real instructions.  Just meta data
 isMetaInstr :: Instr -> Bool
-isMetaInstr instr
- = case instr of
-    ANN _ i     -> isMetaInstr i
-    COMMENT{}   -> True
-    MULTILINE_COMMENT{} -> True
-    LOCATION{}  -> True
-    LDATA{}     -> True
-    NEWBLOCK{}  -> True
-    DELTA{}     -> True
+isMetaInstr instr =
+  case instr of
+    ANN _ i -> isMetaInstr i
+    COMMENT {} -> True
+    MULTILINE_COMMENT {} -> True
+    LOCATION {} -> True
+    LDATA {} -> True
+    NEWBLOCK {} -> True
+    DELTA {} -> True
     PUSH_STACK_FRAME -> True
     POP_STACK_FRAME -> True
-    _           -> False
+    _ -> False
 
 -- | Copy the value in a register to another one.
+--
 -- Must work for all register classes.
 mkRegRegMoveInstr :: Reg -> Reg -> Instr
-mkRegRegMoveInstr src dst = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
+mkRegRegMoveInstr src dst = ANN desc instr
+  where
+    desc = text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst
+    instr = MOV (operandFromReg dst) (operandFromReg src)
 
+-- TODO: Not implemented yet?
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one
 takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
@@ -451,7 +456,7 @@ takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
 mkJumpInstr :: BlockId -> [Instr]
-mkJumpInstr id = [B (TBlock id)]
+mkJumpInstr = pure . B . TBlock
 
 mkStackAllocInstr :: Platform -> Int -> [Instr]
 mkStackAllocInstr platform n
@@ -491,7 +496,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       alloc   = mkStackAllocInstr   platform delta
       dealloc = mkStackDeallocInstr platform delta
 
-      retargetList = (zip entries (map mkBlockId uniqs))
+      retargetList = zip entries (map mkBlockId uniqs)
 
       new_blockmap :: LabelMap BlockId
       new_blockmap = mapFromList retargetList
@@ -944,9 +949,9 @@ makeFarBranches info_env blocks
     -- 262144 (2^20 / 4) instructions are allowed; let's keep some distance, as
     -- we have pseudo-insns that are pretty-printed as multiple instructions,
     -- and it's just not worth the effort to calculate things exactly as linker
-    -- relaxations are applied later (optimizing away our flaws.) The
-    -- conservative guess here is that every instruction does not emit more than
-    -- two in the mean.
+    -- relaxations are applied later (optimizing away our flaws.) The educated
+    -- guess here is that every instruction does not emit more than two in the
+    -- mean.
     nearLimit = 131072 - mapSize info_env * maxRetInfoTableSizeW
 
     blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList

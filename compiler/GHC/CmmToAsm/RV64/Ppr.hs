@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
-
 module GHC.CmmToAsm.RV64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Prelude hiding (EQ)
