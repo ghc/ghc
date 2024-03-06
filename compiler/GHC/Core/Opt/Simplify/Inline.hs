@@ -366,8 +366,8 @@ tryUnfolding env logger id lone_variable arg_infos
     -- isWorkFree etc computations to take place.  That risks wasting effort for
     -- Ids that are never going to inline anyway.
     -- See Note [UnfoldingCache] in GHC.Core
-    UnfoldingCache{ uf_is_value = is_wf, uf_expandable = is_exp } = unf_cache
-         -- TEMP #22423: try is-value instead
+    UnfoldingCache{ uf_is_work_free = is_wf, uf_expandable = is_exp } = unf_cache
+         -- TEMP #22423: try is-value instead.  No GHC log 5 March 24.
 
     mk_doc some_benefit extra_doc yes_or_no
       = vcat [ text "arg infos" <+> ppr arg_infos
