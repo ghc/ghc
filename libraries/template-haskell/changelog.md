@@ -1,5 +1,8 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.23.0.0
+  * `PrimTyConI` has been deprecated. `TyConI` will now be used to represent primitive types.
+
 ## 2.22.0.0
 
   * The kind of `Code` was changed from `forall r. (Type -> Type) -> TYPE r -> Type`

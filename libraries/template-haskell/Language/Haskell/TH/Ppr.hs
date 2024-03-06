@@ -1,5 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
