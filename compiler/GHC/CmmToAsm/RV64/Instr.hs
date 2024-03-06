@@ -785,31 +785,6 @@ data Operand
         | OpAddr AddrMode       -- memory reference
         deriving (Eq, Show)
 
--- Note [The made-up RISCV64 IP register]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- RISCV64 has no inter-procedural register in its ABI. However, we need one to
--- make register spills/loads to/from high number slots. I.e. slot numbers that
--- do not fit in a 12bit integer which is used as immediate in the arithmetic
--- operations. Thus, we're marking one additional register (x31) as permanently
--- non-free and call it IP.
---
--- IP can be used as temporary register in all operations. Just be aware that it
--- may be clobbered as soon as you loose direct control over it (i.e. using IP
--- by-passes the register allocation/spilling mechanisms.) It should be fine to
--- use it as temporary register in a MachOp translation as long as you don't
--- rely on its value beyond this limited scope.
---
--- X31 is a caller-saved register. I.e. there are no guarantees about what the
--- callee does with it. That's exactly what we want here.
-
-zeroReg, raReg, spMachReg, ipReg :: Reg
-zeroReg = regSingle 0
-raReg = regSingle 1
--- | Not to be confused with the `CmmReg` `spReg`
-spMachReg = regSingle 2
-ipReg = regSingle 31
-
 operandFromReg :: Reg -> Operand
 operandFromReg = OpReg W64
 
