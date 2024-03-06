@@ -28,7 +28,7 @@ import GHC.Types.Unique.Supply
 
 import GHC.Utils.Panic
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 
 import GHC.Stack
 import qualified Data.List.NonEmpty as NE
@@ -465,14 +465,7 @@ mkJumpInstr = pure . B . TBlock
 -- This is dual to `mkStackDeallocInstr`. @sp@ is the RISCV stack pointer, not
 -- to be confused with the STG stack pointer.
 mkStackAllocInstr :: Platform -> Int -> [Instr]
-mkStackAllocInstr platform n
-  | n == 0 = []
-  | n > 0 && fitsIn12bitImm n = pure . ANN desc $ SUB sp sp (OpImm (ImmInt n))
-  -- TODO: This case may be optimized with the IP register for large n-s
-  | n > 0 = ANN desc (SUB sp sp (OpImm (ImmInt intMax12bit))) : mkStackAllocInstr platform (n - intMax12bit)
-  where
-    desc = text "Alloc More Stack:" <+> int n
-mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
+mkStackAllocInstr _platform = moveSp . negate
 
 -- | Increment SP to deallocate stack space.
 --
@@ -480,14 +473,21 @@ mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 -- This is dual to `mkStackAllocInstr`. @sp@ is the RISCV stack pointer, not to
 -- be confused with the STG stack pointer.
 mkStackDeallocInstr :: Platform -> Int -> [Instr]
-mkStackDeallocInstr platform n
+mkStackDeallocInstr _platform = moveSp
+
+moveSp :: Int -> [Instr]
+moveSp n
   | n == 0 = []
-  | n > 0 && fitsIn12bitImm n = pure . ANN desc $ ADD sp sp (OpImm (ImmInt n))
-  -- TODO: This case may be optimized with the IP register for large n-s
-  | n > 0 = ANN desc (ADD sp sp (OpImm (ImmInt intMax12bit))) : mkStackDeallocInstr platform (n - intMax12bit)
+  | n /= 0 && fitsIn12bitImm n = pure . ANN desc $ ADD sp sp (OpImm (ImmInt n))
+  | otherwise =
+      -- This ends up in three effective instructions. We could get away with
+      -- two for intMax12bit < n < 3 * intMax12bit by recursing once. However,
+      -- this way is likely less surprising.
+      [ ANN desc (MOV ip (OpImm (ImmInt n))),
+        ADD sp sp ip
+      ]
   where
-    desc = text "Dealloc More Stack:" <+> int n
-mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
+    desc = text "Move SP:" <+> int n
 
 --
 -- See Note [extra spill slots] in X86/Instr.hs
