@@ -92,14 +92,18 @@ allGpArgRegs = map regSingle [a0RegNo .. a7RegNo]
 allFpArgRegs :: [Reg]
 allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
+-- * Addressing modes
+
 -- | Addressing modes
 data AddrMode
-  = AddrRegImm Reg Imm
-  | AddrReg Reg
+  = -- | A register plus some integer, e.g. @8(sp)@ or @-16(sp)@. The offset
+    -- needs to fit into 12bits.
+    AddrRegImm Reg Imm
+  | -- | A register
+    AddrReg Reg
   deriving (Eq, Show)
 
--- -----------------------------------------------------------------------------
--- Immediates
+-- * Immediates
 
 data Imm
   = ImmInt      Int
