@@ -473,7 +473,6 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
   SMULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
-  SMULL o1 o2 o3 -> op3 (text "\tsmull") o1 o2 o3
   NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfneg.s") o1 o2
   NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfneg.d") o1 o2
   NEG o1 o2 -> op2 (text "\tneg") o1 o2
@@ -536,12 +535,8 @@ pprInstr platform instr = case instr of
         -- Surrender! Let the assembler figure out the right expressions with pseudo-op LI.
         -> lines_ [ text "\tli" <+> pprOp platform o1 <> comma <+>  pprOp platform o2 ]
     | otherwise                    -> op3 (text "\taddi") o1 o2 (OpImm (ImmInt 0))
-  MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
-  ORN o1 o2 o3  -> op3 (text "\torn") o1 o2 o3
   ORI o1 o2 o3  -> op3 (text "\tori") o1 o2 o3
   XORI o1 o2 o3 -> op3 (text "\txori") o1 o2 o3
-  ROR o1 o2 o3  -> op3 (text "\tror") o1 o2 o3
-  TST o1 o2     -> op2 (text "\ttst") o1 o2
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t             -> pprInstr platform (B t)
@@ -613,14 +608,6 @@ pprInstr platform instr = case instr of
                  | otherwise      = text "\tsltu"
       binOp :: (IsLine doc) => String -> doc
       binOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
-
-  CBZ o (TBlock bid) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
-  CBZ o (TLabel lbl) -> line $ text "\tbeq x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
-  CBZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
-
-  CBNZ o (TBlock bid) -> line $ text "\tbne x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
-  CBNZ o (TLabel lbl) -> line $ text "\tbne x0, " <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
-  CBNZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
