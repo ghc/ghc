@@ -1922,6 +1922,18 @@ instance Diagnostic TcRnMessage where
            , text "in a fixity signature"
            ]
 
+    TcRnOutOfArityTyVar ts_name tv_name -> mkDecorated
+      [ vcat [ text "The arity of" <+> quotes (ppr ts_name) <+> text "is insufficiently high to accommodate"
+             , text "an implicit binding for the" <+> quotes (ppr tv_name) <+> text "type variable." ]
+      , suggestion ]
+      where
+        suggestion =
+          text "Use" <+> quotes at_bndr     <+> text "on the LHS" <+>
+          text "or"  <+> quotes forall_bndr <+> text "on the RHS" <+>
+          text "to bring it into scope."
+        at_bndr     = char '@' <> ppr tv_name
+        forall_bndr = text "forall" <+> ppr tv_name <> text "."
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2555,6 +2567,8 @@ instance Diagnostic TcRnMessage where
     TcRnInvisPatWithNoForAll{}
       -> ErrorWithoutFlag
     TcRnNamespacedFixitySigWithoutFlag{}
+      -> ErrorWithoutFlag
+    TcRnOutOfArityTyVar{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3224,6 +3238,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNamespacedFixitySigWithoutFlag{}
       -> [suggestExtension LangExt.ExplicitNamespaces]
+    TcRnOutOfArityTyVar{}
+      -> noHints
 
   diagnosticCode = constructorCode
 
