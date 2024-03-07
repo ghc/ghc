@@ -361,12 +361,51 @@ data IfaceTyConInfo   -- Used only to guide pretty-printing
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
 
--- This smart constructor allows sharing of the two most common
--- cases. See #19194
+-- | This smart constructor allows sharing of the two most common
+-- cases. See Note [Sharing IfaceTyConInfo]
 mkIfaceTyConInfo :: PromotionFlag -> IfaceTyConSort -> IfaceTyConInfo
-mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = IfaceTyConInfo IsPromoted  IfaceNormalTyCon
-mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = IfaceTyConInfo NotPromoted IfaceNormalTyCon
-mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom        sort
+mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = promotedNormalTyConInfo
+mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = notPromotedNormalTyConInfo
+mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom sort
+
+{-# NOINLINE promotedNormalTyConInfo #-}
+-- | See Note [Sharing IfaceTyConInfo]
+promotedNormalTyConInfo :: IfaceTyConInfo
+promotedNormalTyConInfo = IfaceTyConInfo IsPromoted IfaceNormalTyCon
+
+{-# NOINLINE notPromotedNormalTyConInfo #-}
+-- | See Note [Sharing IfaceTyConInfo]
+notPromotedNormalTyConInfo :: IfaceTyConInfo
+notPromotedNormalTyConInfo = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+
+{-
+Note [Sharing IfaceTyConInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'IfaceTyConInfo' occurs an awful lot in 'ModIface', see #19194 for an example.
+But almost all of them are
+
+   IfaceTyConInfo IsPromoted IfaceNormalTyCon
+   IfaceTyConInfo NotPromoted IfaceNormalTyCon.
+
+The smart constructor `mkIfaceTyConInfo` arranges to share these instances,
+thus:
+
+  promotedNormalTyConInfo    = IfaceTyConInfo IsPromoted  IfaceNormalTyCon
+  notPromotedNormalTyConInfo = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+
+  mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = promotedNormalTyConInfo
+  mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = notPromotedNormalTyConInfo
+  mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom sort
+
+But ALAS, the (nested) CPR transform can lose this sharing, completely
+negating the effect of `mkIfaceTyConInfo`: see #24530 and #19326.
+
+Sticking-plaster solution: add a NOINLINE pragma to those top-level constants.
+When we fix the CPR bug we can remove the NOINLINE pragmas.
+
+This one change leads to an 15% reduction in residency for GHC when embedding
+'mi_extra_decls': see !12222.
+-}
 
 data IfaceMCoercion
   = IfaceMRefl
