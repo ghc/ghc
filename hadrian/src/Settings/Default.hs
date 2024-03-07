@@ -141,7 +141,7 @@ stage1Packages = do
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget Stage1
-    haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
+    haveCurses <- any (/= "") <$> traverse (flip buildSetting Stage1) [ CursesIncludeDir, CursesLibDir ]
 
     let when c xs = if c then xs else mempty
 

@@ -32,7 +32,6 @@ toolArgs = do
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     ways <- getLibraryWays
-    stage <- getStage
     useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
@@ -108,7 +107,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     context <- getContext
     distPath <- expr (Context.distDynDir context)
 
-    useSystemFfi <- expr (flag UseSystemFfi)
+    useSystemFfi <- staged (buildFlag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
     debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
