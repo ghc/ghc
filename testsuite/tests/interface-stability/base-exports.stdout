@@ -8105,7 +8105,7 @@ module GHC.IORef where
 module GHC.InfoProv where
   -- Safety: Safe
   type InfoProv :: *
-  data InfoProv = InfoProv {ipName :: GHC.Internal.Base.String, ipDesc :: GHC.Internal.ClosureTypes.ClosureType, ipTyDesc :: GHC.Internal.Base.String, ipLabel :: GHC.Internal.Base.String, ipMod :: GHC.Internal.Base.String, ipSrcFile :: GHC.Internal.Base.String, ipSrcSpan :: GHC.Internal.Base.String}
+  data InfoProv = InfoProv {ipName :: GHC.Internal.Base.String, ipDesc :: GHC.Internal.ClosureTypes.ClosureType, ipTyDesc :: GHC.Internal.Base.String, ipLabel :: GHC.Internal.Base.String, ipUnitId :: GHC.Internal.Base.String, ipMod :: GHC.Internal.Base.String, ipSrcFile :: GHC.Internal.Base.String, ipSrcSpan :: GHC.Internal.Base.String}
   type InfoProvEnt :: *
   data InfoProvEnt
   ipLoc :: InfoProv -> GHC.Internal.Base.String

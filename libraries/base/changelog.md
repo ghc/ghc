@@ -47,6 +47,7 @@
     matches a `data` or `data instance` declaration) with all of its
     constructors in scope and the levity of `t` is statically known,
     then the constraint `DataToTag t` can always be solved.
+  * `GHC.InfoProv.InfoProv` now provides a `ipUnitId :: String` field encoding the unit ID of the unit defining the info table ([CLC proposal #214](https://github.com/haskell/core-libraries-committee/issues/214))
 
     ([CLC proposal #104](https://github.com/haskell/core-libraries-committee/issues/104))
   * Add `sortOn` to `Data.List.NonEmpty`

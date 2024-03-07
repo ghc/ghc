@@ -18,6 +18,7 @@ typedef struct InfoProv_ {
     const char *closure_desc;
     const char *ty_desc;
     const char *label;
+    const char *unit_id;
     const char *module;
     const char *src_file;
     const char *src_span;
@@ -75,7 +76,6 @@ typedef struct IpeBufferListNode_ {
     // When TNTC is enabled, these will point to the entry code
     // not the info table itself.
     const StgInfoTable **tables;
-
     IpeBufferEntry *entries;
     StgWord entries_size; // decompressed size
 
@@ -83,6 +83,7 @@ typedef struct IpeBufferListNode_ {
     StgWord string_table_size; // decompressed size
 
     // Shared by all entries
+    StringIdx unit_id;
     StringIdx module_name;
 } IpeBufferListNode;
 
