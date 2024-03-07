@@ -26,15 +26,13 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
-import Oracles.Setting (bashPath, targetStage)
 import System.Exit
 import System.IO (stderr)
 
 import Base
 import Context
 import Oracles.Flag
-import Oracles.Setting (setting, Setting(..))
-import Oracles.Setting (settingsFileSetting, ToolchainSetting(..))
+import Oracles.Setting
 import Packages
 
 import GHC.IO.Encoding (getFileSystemEncoding)
@@ -240,10 +238,10 @@ instance H.Builder Builder where
         Ghc _ st -> do
             root <- buildRoot
             unlitPath  <- builderPath Unlit
-            distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
+            distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW st
             -- TODO: Check this is the right stage
             libffi_adjustors <- targetUseLibffiForAdjustors st
-            use_system_ffi <- flag UseSystemFfi
+            use_system_ffi <- buildFlag UseSystemFfi st
 
             return $ [ unlitPath ]
                   ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]

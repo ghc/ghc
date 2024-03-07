@@ -115,9 +115,9 @@ inTreeCompilerArgs stg = do
     platform    <- queryTargetTarget ghcStage targetPlatformTriple
     wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand
-    llvm_as_cmd <- settingsFileSetting ToolchainSetting_LlvmAsCommand
-    have_llvm <- liftIO (all isJust <$> mapM findExecutable [llc_cmd, llvm_as_cmd])
+    llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand ghcStage
+    llvm_as_cmd <- settingsFileSetting ToolchainSetting_LlvmAsCommand ghcStage
+    have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
 
     top         <- topDirectory
 

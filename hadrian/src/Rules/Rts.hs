@@ -54,9 +54,9 @@ withLibffi stage action = needLibffi stage
 -- See Note [Packaging libffi headers] in GHC.Driver.CodeOutput.
 copyLibffiHeader :: Stage -> FilePath -> Action ()
 copyLibffiHeader stage header = do
-    useSystemFfi <- flag UseSystemFfi
+    useSystemFfi <- buildFlag UseSystemFfi stage
     (fromStr, headerDir) <- if useSystemFfi
-        then ("system",) <$> libffiSystemHeaderDir
+        then ("system",) <$> libffiSystemHeaderDir stage
         else needLibffi stage
           >> ("custom",) <$> libffiHeaderDir stage
     copyFile
@@ -115,7 +115,7 @@ rtsLibffiLibrary stage way = do
     name    <- interpretInContext ((rtsContext stage) { way = way }) libffiName
     suf <- if wayUnit Dynamic way
                 then do
-                  extension <- setting DynamicExtension -- e.g., .dll or .so
+                  extension <- buildSetting DynamicExtension stage -- e.g., .dll or .so
                   let suffix = waySuffix (removeWayUnit Dynamic way)
                   return (suffix ++ extension)
                 -- Static suffix
@@ -129,7 +129,7 @@ rtsLibffiLibrary stage way = do
 needRtsLibffiTargets :: Stage -> Action [FilePath]
 needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage
-    useSystemFfi <- flag UseSystemFfi
+    useSystemFfi <- buildFlag UseSystemFfi stage
     jsTarget     <- isJsTarget stage
 
     -- Header files (in the rts build dir).

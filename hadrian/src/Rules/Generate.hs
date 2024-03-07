@@ -10,7 +10,6 @@ import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (lookupSystemConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -55,10 +54,9 @@ ghcInternalDependencies = do
 
 rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
-    stage   <- getStage
-    rtsPath <- expr (rtsBuildPath stage)
-    jsTarget <- expr (isJsTarget stage)
-    useSystemFfi <- expr (flag UseSystemFfi)
+    rtsPath <- staged rtsBuildPath
+    jsTarget <- staged isJsTarget
+    useSystemFfi <- staged (buildFlag UseSystemFfi)
 
     let -- headers common to native and JS RTS
         common_headers =
@@ -302,7 +300,7 @@ runInterpolations (Interpolations mk_substs) input = do
     return (subst input)
 
 -- | Interpolate the given variable with the value of the given 'Setting'.
-interpolateSetting :: String -> Setting -> Interpolations
+interpolateSetting :: String -> ProjectSetting -> Interpolations
 interpolateSetting name settng = interpolateVar name $ setting settng
 
 -- | Interpolate the @ProjectVersion@, @ProjectVersionMunged@, and @ProjectVersionForLib@ variables.
@@ -425,14 +423,14 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "SettingsUseDistroMINGW" $ settingsFileSetting ToolchainSetting_DistroMinGW
+    , interpolateVar "SettingsUseDistroMINGW" $ interp (staged (settingsFileSetting ToolchainSetting_DistroMinGW))
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
+    , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (buildFlag UseLibdw)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
@@ -512,8 +510,8 @@ generateSettings settingsFile = do
         , ("ar supports at file", queryTarget stage arSupportsAtFile')
         , ("ar supports -L",      queryTarget stage arSupportsDashL')
         , ("ranlib command", queryTarget stage ranlibPath)
-        , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
-        , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
+        , ("otool command", staged $ settingsFileSetting ToolchainSetting_OtoolCommand)
+        , ("install_name_tool command", staged $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
         , ("windres command", queryTarget stage (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
         , ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
@@ -525,14 +523,14 @@ generateSettings settingsFile = do
         , ("target has GNU nonexec stack", queryTarget stage (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
         , ("target has .ident directive",  queryTarget stage (yesNo . Toolchain.tgtSupportsIdentDirective))
         , ("target has subsections via symbols", queryTarget stage (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
-        , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
+        , ("target has libm", yesNo <$> staged (buildFlag TargetHasLibm))
         , ("Unregisterised", queryTarget stage (yesNo . tgtUnregisterised))
         , ("LLVM target", queryTarget stage tgtLlvmTarget)
-        , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
-        , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
-        , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
-        , ("LLVM llvm-as flags", expr $ settingsFileSetting ToolchainSetting_LlvmAsFlags)
-        , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
+        , ("LLVM llc command", staged $ settingsFileSetting ToolchainSetting_LlcCommand)
+        , ("LLVM opt command", staged $ settingsFileSetting ToolchainSetting_OptCommand)
+        , ("LLVM llvm-as command", staged $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
+        , ("LLVM llvm-as flags", staged $ settingsFileSetting ToolchainSetting_LlvmAsFlags)
+        , ("Use inplace MinGW toolchain", staged $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs stage)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter stage)
@@ -541,7 +539,7 @@ generateSettings settingsFile = do
         , ("Tables next to code", queryTarget stage (yesNo . tgtTablesNextToCode))
         , ("Leading underscore",  queryTarget stage (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> targetUseLibffiForAdjustors stage)
-        , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
+        , ("RTS expects libdw", yesNo <$> staged (buildFlag UseLibdw))
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
         ]

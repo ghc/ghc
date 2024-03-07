@@ -146,7 +146,7 @@ buildingCompilerStage' f = f . succStage <$> getStage
 --   compiler's RTS ways. See Note [Linking ghc-bin against threaded stage0 RTS]
 --   in Settings.Packages for details.
 threadedBootstrapper :: Predicate
-threadedBootstrapper = expr (flag BootstrapThreadedRts)
+threadedBootstrapper = staged (buildFlag BootstrapThreadedRts)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate

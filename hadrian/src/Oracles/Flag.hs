@@ -2,6 +2,7 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag,
+    BuildFlag(..), buildFlag,
     targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsSharedLibs,
     targetSupportsGhciObjects,
@@ -23,7 +24,8 @@ import qualified GHC.Toolchain as Toolchain
 import GHC.Platform.ArchOS
 
 data Flag = CrossCompiling
-          | CcLlvmBackend
+          | UseGhcToolchain
+data BuildFlag = CcLlvmBackend
           | GmpInTree
           | GmpFrameworkPref
           | UseSystemFfi
@@ -39,7 +41,15 @@ data Flag = CrossCompiling
           | UseLibbfd
           | UseLibpthread
           | NeedLibatomic
-          | UseGhcToolchain
+          | TargetHasLibm
+
+parseFlagResult :: String -> String -> Bool
+parseFlagResult key value =
+  if (value `notElem` ["YES", "NO", ""])
+    then error $ "Configuration flag "
+               ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
+    else value == "YES"
+
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
@@ -47,6 +57,12 @@ flag :: Flag -> Action Bool
 flag f = do
     let key = case f of
             CrossCompiling       -> "cross-compiling"
+            UseGhcToolchain      -> "use-ghc-toolchain"
+    parseFlagResult key <$> lookupSystemConfig key
+
+buildFlag :: BuildFlag -> Stage -> Action Bool
+buildFlag f st =
+    let key = case f of
             CcLlvmBackend        -> "cc-llvm-backend"
             GmpInTree            -> "intree-gmp"
             GmpFrameworkPref     -> "gmp-framework-preferred"
@@ -63,11 +79,13 @@ flag f = do
             UseLibbfd            -> "use-lib-bfd"
             UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
-            UseGhcToolchain      -> "use-ghc-toolchain"
-    value <- lookupSystemConfig key
-    when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
-        ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
-    return $ value == "YES"
+            TargetHasLibm        -> "target-has-libm"
+    in parseFlagResult key <$> (tgtConfig st key)
+  where
+    tgtConfig Stage0 {} = lookupHostBuildConfig
+    tgtConfig Stage1 = lookupHostBuildConfig
+    tgtConfig Stage2 = lookupTargetBuildConfig
+    tgtConfig Stage3 = lookupTargetBuildConfig
 
 -- | Get a configuration setting.
 getFlag :: Flag -> Expr c b Bool
