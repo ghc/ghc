@@ -606,6 +606,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInvisPatWithNoForAll"                      = 14964
   GhcDiagnosticCode "TcRnIllegalInvisibleTypePattern"               = 78249
   GhcDiagnosticCode "TcRnNamespacedFixitySigWithoutFlag"            = 78534
+  GhcDiagnosticCode "TcRnOutOfArityTyVar"                           = 84925
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482
