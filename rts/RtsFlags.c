@@ -1959,6 +1959,9 @@ static void normaliseRtsOpts (void)
     if (RtsFlags.GcFlags.maxHeapSize != 0 &&
         RtsFlags.GcFlags.heapSizeSuggestion >
         RtsFlags.GcFlags.maxHeapSize) {
+        errorBelch("Maximum heap size (-M) is smaller than suggested heap size (-H)\n"
+                   "Setting maximum heap size to suggested heap size ( %" FMT_Word64 " )",
+                   (StgWord64) RtsFlags.GcFlags.maxHeapSize * (StgWord64) BLOCK_SIZE);
         RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
     }
 
