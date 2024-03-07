@@ -87,7 +87,7 @@ libffiContext stage = do
 -- | The name of the library
 libffiName :: Expr String
 libffiName = do
-    useSystemFfi <- expr (flag UseSystemFfi)
+    useSystemFfi <- staged (buildFlag UseSystemFfi)
     if useSystemFfi
       then pure "ffi"
       else libffiLocalName Nothing
@@ -118,8 +118,8 @@ libffiHeaderDir stage = do
     path <- libffiBuildPath stage
     return $ path -/- "inst/include"
 
-libffiSystemHeaderDir :: Action FilePath
-libffiSystemHeaderDir = setting FfiIncludeDir
+libffiSystemHeaderDir :: Stage -> Action FilePath
+libffiSystemHeaderDir = buildSetting FfiIncludeDir
 
 fixLibffiMakefile :: FilePath -> String -> String
 fixLibffiMakefile top =

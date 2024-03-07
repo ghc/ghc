@@ -10,7 +10,7 @@ import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (lookupSystemConfig, getTargetTarget)
+import Hadrian.Oracles.TextFile (getTargetTarget)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -55,10 +55,9 @@ ghcInternalDependencies = do
 
 rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
-    stage   <- getStage
-    rtsPath <- expr (rtsBuildPath stage)
-    jsTarget <- expr (isJsTarget stage)
-    useSystemFfi <- expr (flag UseSystemFfi)
+    rtsPath <- staged rtsBuildPath
+    jsTarget <- staged isJsTarget
+    useSystemFfi <- staged (buildFlag UseSystemFfi)
 
     let -- headers common to native and JS RTS
         common_headers =
@@ -303,7 +302,7 @@ runInterpolations (Interpolations mk_substs) input = do
     return (subst input)
 
 -- | Interpolate the given variable with the value of the given 'Setting'.
-interpolateSetting :: String -> Setting -> Interpolations
+interpolateSetting :: String -> ProjectSetting -> Interpolations
 interpolateSetting name settng = interpolateVar name $ setting settng
 
 -- | Interpolate the @ProjectVersion@, @ProjectVersionMunged@, and @ProjectVersionForLib@ variables.
@@ -426,14 +425,14 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
+    , interpolateVar "EnableDistroToolchain" $ interp (staged (lookupSystemConfig "settings-use-distro-mingw"))
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ yesNo <$> getTarget tgtHasLibm
+    , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ yesNo <$> getTarget (isJust . tgtRTSWithLibdw)
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (\s -> queryTarget s (isJust . tgtRTSWithLibdw))
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
