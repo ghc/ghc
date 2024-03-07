@@ -92,6 +92,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import Control.Monad ((<$!>))
 
 {-
 ************************************************************************
@@ -242,8 +243,8 @@ instance Monoid IfaceAppArgs where
 -- coercion constructors, the lot.
 -- We have to tag them in order to pretty print them
 -- properly.
-data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
-                             , ifaceTyConInfo :: IfaceTyConInfo }
+data IfaceTyCon = IfaceTyCon { ifaceTyConName :: !IfExtName
+                             , ifaceTyConInfo :: !IfaceTyConInfo }
     deriving (Eq)
 
 -- | The various types of TyCons which have special, built-in syntax.
@@ -360,12 +361,33 @@ data IfaceTyConInfo   -- Used only to guide pretty-printing
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
 
--- This smart constructor allows sharing of the two most common
--- cases. See #19194
+-- | This smart constructor allows sharing of the two most common
+-- cases. See Note [Sharing IfaceTyConInfo]
 mkIfaceTyConInfo :: PromotionFlag -> IfaceTyConSort -> IfaceTyConInfo
-mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = IfaceTyConInfo IsPromoted  IfaceNormalTyCon
-mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = IfaceTyConInfo NotPromoted IfaceNormalTyCon
-mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom        sort
+mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = promotedNormalTyConInfo
+mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = notPromotedNormalTyConInfo
+mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom sort
+
+{-# NOINLINE promotedNormalTyConInfo #-}
+-- | See Note [Sharing IfaceTyConInfo]
+promotedNormalTyConInfo :: IfaceTyConInfo
+promotedNormalTyConInfo = IfaceTyConInfo IsPromoted IfaceNormalTyCon
+
+{-# NOINLINE notPromotedNormalTyConInfo #-}
+-- | See Note [Sharing IfaceTyConInfo]
+notPromotedNormalTyConInfo :: IfaceTyConInfo
+notPromotedNormalTyConInfo = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+
+{-
+Note [Sharing IfaceTyConInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'IfaceTyConInfo' occurs an awful lot in 'ModIface', see #19194 for an example.
+However, there are two mainly two different instances, that we don't to copy all
+the time! Sharing can save an awful lot in these situations.
+
+We make sure sharing happens and the optimiser doesn't attempt to inline it, by
+adding no inline top-level constants for the two most common cases.
+-}
 
 data IfaceMCoercion
   = IfaceMRefl
@@ -1974,7 +1996,7 @@ instance Binary IfaceTyConSort where
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = mkIfaceTyConInfo <$> get bh <*> get bh
+   get bh = mkIfaceTyConInfo <$!> get bh <*> get bh
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
