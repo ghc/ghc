@@ -2617,7 +2617,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
         ; checkForDuplicateScopedTyVars implicit_prs
-        ; checkForDisconnectedScopedTyVars flav all_tcbs implicit_prs
+        ; checkForDisconnectedScopedTyVars name flav all_tcbs implicit_prs
 
         -- Swizzle the Names so that the TyCon uses the user-declared implicit names
         -- E.g  type T :: k -> Type
@@ -2978,24 +2978,31 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
-checkForDisconnectedScopedTyVars :: TyConFlavour TyCon -> [TcTyConBinder]
+checkForDisconnectedScopedTyVars :: Name -> TyConFlavour TyCon -> [TcTyConBinder]
                                  -> [(Name,TcTyVar)] -> TcM ()
 -- See Note [Disconnected type variables]
+-- For the type synonym case see Note [Out of arity type variables]
 -- `scoped_prs` is the mapping gotten by unifying
 --    - the standalone kind signature for T, with
 --    - the header of the type/class declaration for T
-checkForDisconnectedScopedTyVars flav sig_tcbs scoped_prs
-  = when (needsEtaExpansion flav) $
+checkForDisconnectedScopedTyVars name flav all_tcbs scoped_prs
          -- needsEtaExpansion: see wrinkle (DTV1) in Note [Disconnected type variables]
-    mapM_ report_disconnected (filterOut ok scoped_prs)
+  | needsEtaExpansion flav     = mapM_ report_disconnected (filterOut ok scoped_prs)
+  | flav == TypeSynonymFlavour = mapM_ report_out_of_arity (filterOut ok scoped_prs)
+  | otherwise = pure ()
   where
-    sig_tvs = mkVarSet (binderVars sig_tcbs)
-    ok (_, tc_tv) = tc_tv `elemVarSet` sig_tvs
+    all_tvs = mkVarSet (binderVars all_tcbs)
+    ok (_, tc_tv) = tc_tv `elemVarSet` all_tvs
 
     report_disconnected :: (Name,TcTyVar) -> TcM ()
     report_disconnected (nm, _)
       = setSrcSpan (getSrcSpan nm) $
         addErrTc $ TcRnDisconnectedTyVar nm
+
+    report_out_of_arity :: (Name,TcTyVar) -> TcM ()
+    report_out_of_arity (tv_nm, _)
+      = setSrcSpan (getSrcSpan tv_nm) $
+        addErrTc $ TcRnOutOfArityTyVar name tv_nm
 
 checkForDuplicateScopedTyVars :: [(Name,TcTyVar)] -> TcM ()
 -- Check for duplicates
@@ -3083,6 +3090,63 @@ explicitly, rather than binding it implicitly via unification.
 
   The scoped-tyvar stuff is needed precisely for data/class/newtype declarations,
   where needsEtaExpansion is True.
+
+Note [Out of arity type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(Relevant ticket: #24470)
+Type synonyms have a special scoping rule that allows implicit quantification in
+the outermost kind signature:
+
+  type P_e :: k -> Type
+  type P_e @k = Proxy :: k -> Type     -- explicit binding
+
+  type P_i    = Proxy :: k -> Type     -- implicit binding (relies on the special rule)
+
+This is a deprecated feature (warning flag: -Wimplicit-rhs-quantification) but
+we have to support it for a couple more releases. It is explained in more detail
+in Note [Implicit quantification in type synonyms] in GHC.Rename.HsType.
+
+Type synonyms `P_e` and `P_i` are equivalent.  Both of them have kind
+`forall k. k -> Type` and arity 1. (Recall that the arity of a type synonym is
+the number of arguments it requires at use sites; the arity matter because
+unsaturated application of type families and type synonyms is not allowed).
+
+We start to see problems when implicit RHS quantification (as in `P_i`) is
+combined with a standalone king signature (like the one that `P_e` has).
+That is:
+
+  type P_i_sig :: k -> Type
+  type P_i_sig = Proxy :: k -> Type
+
+Per GHC Proposal #425, the arity of `P_i_sig` is determined /by the LHS only/,
+which has no binders. So the arity of `P_i_sig` is 0.
+At the same time, the legacy implicit quantification rule dictates that `k` is
+brought into scope, as if there was a binder `@k` on the LHS.
+
+We end up with a `k` that is in scope on the RHS but cannot be bound implicitly
+on the LHS without affecting the arity. This led to #24470 (a compiler crash)
+
+  GHC internal error: ‘k’ is not in scope during type checking,
+                      but it passed the renamer
+
+This problem occurs only if the arity of the type synonym is insufficiently
+high to accommodate an implicit binding. It can be worked around by adding an
+unused binder on the LHS:
+
+  type P_w :: k -> Type
+  type P_w @_w = Proxy :: k -> Type
+
+The variable `_w` is unused. The only effect of the `@_w` binder is that the
+arity of `P_w` is changed from 0 to 1. However, bumping the arity is exactly
+what's needed to make the implicit binding of `k` possible.
+
+All this is a rather unfortunate bit of accidental complexity that will go away
+when GHC drops support for implicit RHS quantification. In the meantime, we
+ought to produce a proper error message instead of a compiler panic, and we do
+that with a check in checkForDisconnectedScopedTyVars:
+
+  | flav == TypeSynonymFlavour = mapM_ report_out_of_arity (filterOut ok scoped_prs)
+
 -}
 
 {- *********************************************************************

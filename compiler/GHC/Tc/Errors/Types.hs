@@ -2272,6 +2272,8 @@ data TcRnMessage where
       where the implicitly-bound type type variables can't be matched up unambiguously
       with the ones from the signature. See Note [Disconnected type variables] in
       GHC.Tc.Gen.HsType.
+
+      Test cases: T24083
   -}
   TcRnDisconnectedTyVar :: !Name -> TcRnMessage
 
@@ -4266,6 +4268,24 @@ data TcRnMessage where
       Test cases: DefaultExceptionContext
   -}
   TcRnDefaultedExceptionContext :: CtLoc -> TcRnMessage
+
+  {-| TcRnOutOfArityTyVar is an error raised when the arity of a type synonym
+      (as determined by the SAKS and the LHS) is insufficiently high to
+      accommodate an implicit binding for a free variable that occurs in the
+      outermost kind signature on the RHS of the said type synonym.
+
+      Example:
+
+        type SynBad :: forall k. k -> Type
+        type SynBad = Proxy :: j -> Type
+
+      Test cases:
+        T24770a
+  -}
+  TcRnOutOfArityTyVar
+    :: Name -- ^ Type synonym's name
+    -> Name -- ^ Type variable's name
+    -> TcRnMessage
 
   deriving Generic
 
