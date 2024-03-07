@@ -13,7 +13,7 @@
 -- to read configuration or package metadata files and cache the parsing.
 -----------------------------------------------------------------------------
 module Hadrian.Oracles.TextFile (
-    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig, lookupValues,
+    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig, lookupHostBuildConfig, lookupTargetBuildConfig, lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, textFileOracle,
     getBuildTarget, getHostTarget, getTargetTarget,
     queryBuildTarget, queryHostTarget
@@ -51,6 +51,23 @@ lookupSystemConfig :: String -> Action String
 lookupSystemConfig = lookupValueOrError (Just configError) configFile
   where
     configError = "Perhaps you need to rerun ./configure"
+
+lookupHostBuildConfig :: String -> Action String
+lookupHostBuildConfig key = do
+  cross <- (== "YES") <$> lookupSystemConfig "cross-compiling"
+  -- If we are not cross compiling, the build the host compiler like the target.
+  let cfgFile = if cross then buildConfigFileHost else buildConfigFileTarget
+  lookupValueOrError (Just configError) cfgFile key
+  where
+    configError = "Perhaps you need to rerun ./configure"
+
+lookupTargetBuildConfig :: String -> Action String
+lookupTargetBuildConfig key =
+  lookupValueOrError (Just configError) buildConfigFileTarget key
+  where
+    configError = "Perhaps you need to rerun ./configure"
+
+
 
 -- | Lookup a list of values in a text file, tracking the result. Each line of
 -- the file is expected to have @key value1 value2 ...@ format.
@@ -104,6 +121,7 @@ getHostTarget = do
   -- MP: If we are not cross compiling then we should use the target file in order to
   -- build things for the host, in particular we want to use the configured values for the
   -- target for building the RTS (ie are we using Libffi for adjustors, and the wordsize)
+  -- TODO: Use "flag CrossCompiling"
   ht <- getTargetConfig hostTargetFile
   tt <- getTargetConfig targetTargetFile
   if (Toolchain.targetPlatformTriple ht) == (Toolchain.targetPlatformTriple tt)

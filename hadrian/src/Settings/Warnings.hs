@@ -10,16 +10,15 @@ import Packages
 -- | Default Haskell warning-related arguments.
 defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = do
-   stage <- getStage
    mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
-    , notM (flag CcLlvmBackend) ? arg "-optc-Wno-error=inline"
-    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas"
+    , notM (staged (buildFlag CcLlvmBackend)) ? arg "-optc-Wno-error=inline"
+    , staged (buildFlag CcLlvmBackend) ? arg "-optc-Wno-unknown-pragmas"
       -- Cabal can seemingly produce filepaths with incorrect case on filesystems
       -- with case-insensitive names. Ignore such issues for now as they seem benign.
       -- See #17798.
-    , isOsxTarget stage ? arg "-optP-Wno-nonportable-include-path"
-    , isWinTarget stage ? arg "-optP-Wno-nonportable-include-path"
+    , staged isOsxTarget ? arg "-optP-Wno-nonportable-include-path"
+    , staged isWinTarget ? arg "-optP-Wno-nonportable-include-path"
     ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.

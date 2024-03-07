@@ -30,10 +30,10 @@ packageArgs = do
 
         compilerStageOption f = buildingCompilerStage' . f =<< expr flavour
 
-    cursesIncludeDir <- getSetting CursesIncludeDir
-    cursesLibraryDir <- getSetting CursesLibDir
-    ffiIncludeDir  <- getSetting FfiIncludeDir
-    ffiLibraryDir  <- getSetting FfiLibDir
+    cursesIncludeDir <- staged (buildSetting CursesIncludeDir)
+    cursesLibraryDir <- staged (buildSetting CursesLibDir)
+    ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
+    ffiLibraryDir  <- staged (buildSetting FfiLibDir)
     stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
     mconcat
@@ -80,14 +80,14 @@ packageArgs = do
             [ andM [expr (ghcWithInterpreter stage), notStage0] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
-            , flag UseLibzstd `cabalFlag` "with-libzstd"
+            , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
             -- not being fixed to `ghc`, when building stage0, we must set
             -- -this-unit-id to `ghc` because the boot compiler expects that.
             -- We do it through a cabal flag in ghc.cabal
             , stageVersion < makeVersion [9,8,1] ? arg "+hadrian-stage0"
-            , flag StaticLibzstd `cabalFlag` "static-libzstd"
             , stage0 `cabalFlag` "bootstrap"
+            , staged (buildFlag StaticLibzstd) `cabalFlag` "static-libzstd"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
@@ -117,9 +117,9 @@ packageArgs = do
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
-          [ builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
+          [ builder (Cabal Flags) ? staged (buildFlag NeedLibatomic) `cabalFlag` "need-atomic"
 
-          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
+          , builder (Cc CompileC) ? (not <$> staged (buildFlag CcLlvmBackend)) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         -------------------------------- ghcBoot ------------------------------
@@ -239,8 +239,8 @@ packageArgs = do
 ghcBignumArgs :: Args
 ghcBignumArgs = package ghcBignum ? do
     -- These are only used for non-in-tree builds.
-    librariesGmp <- getSetting GmpLibDir
-    includesGmp <- getSetting GmpIncludeDir
+    librariesGmp <- staged (buildSetting GmpLibDir)
+    includesGmp <- staged (buildSetting GmpIncludeDir)
 
     backend <- getBignumBackend
     check   <- getBignumCheck
@@ -263,15 +263,15 @@ ghcBignumArgs = package ghcBignum ? do
 
                        -- enable in-tree support: don't depend on external "gmp"
                        -- library
-                     , flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+                     , staged (buildFlag GmpInTree) ? arg "--configure-option=--with-intree-gmp"
 
                        -- prefer framework over library (on Darwin)
-                     , flag GmpFrameworkPref ?
+                     , staged (buildFlag GmpFrameworkPref) ?
                        arg "--configure-option=--with-gmp-framework-preferred"
 
                        -- Ensure that the ghc-bignum package registration includes
                        -- knowledge of the system gmp's library and include directories.
-                     , notM (flag GmpInTree) ? cabalExtraDirs includesGmp librariesGmp
+                     , notM (staged (buildFlag GmpInTree)) ? cabalExtraDirs includesGmp librariesGmp
                      ]
                   ]
                _ -> mempty
@@ -300,15 +300,15 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory
-    useSystemFfi   <- getFlag UseSystemFfi
-    ffiIncludeDir  <- getSetting FfiIncludeDir
-    ffiLibraryDir  <- getSetting FfiLibDir
-    libdwIncludeDir   <- getSetting LibdwIncludeDir
-    libdwLibraryDir   <- getSetting LibdwLibDir
-    libnumaIncludeDir <- getSetting LibnumaIncludeDir
-    libnumaLibraryDir <- getSetting LibnumaLibDir
-    libzstdIncludeDir <- getSetting LibZstdIncludeDir
-    libzstdLibraryDir <- getSetting LibZstdLibDir
+    useSystemFfi   <- staged (buildFlag UseSystemFfi)
+    ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
+    ffiLibraryDir  <- staged (buildSetting FfiLibDir)
+    libdwIncludeDir   <- staged (buildSetting LibdwIncludeDir)
+    libdwLibraryDir   <- staged (buildSetting LibdwLibDir)
+    libnumaIncludeDir <- staged (buildSetting LibnumaIncludeDir)
+    libnumaLibraryDir <- staged (buildSetting LibnumaLibDir)
+    libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
+    libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
 
     x86 <- queryTarget stage (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
@@ -423,10 +423,10 @@ rtsPackageArgs = package rts ? do
           -- any warnings in the module. See:
           -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-          , (not <$> flag CcLlvmBackend) ?
+          , (not <$> staged (buildFlag CcLlvmBackend)) ?
             inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-          , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
+          , input "**/RetainerProfile.c" ? staged (buildFlag CcLlvmBackend) ?
             arg "-Wno-incompatible-pointer-types"
           ]
 
@@ -436,18 +436,18 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
           , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
-          , flag UseLibm                    `cabalFlag` "libm"
-          , flag UseLibrt                   `cabalFlag` "librt"
-          , flag UseLibdl                   `cabalFlag` "libdl"
+          , staged (buildFlag UseLibm)                    `cabalFlag` "libm"
+          , staged (buildFlag UseLibrt)                   `cabalFlag` "librt"
+          , staged (buildFlag UseLibdl)                   `cabalFlag` "libdl"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , targetUseLibffiForAdjustors stage     `cabalFlag` "libffi-adjustors"
-          , flag UseLibpthread              `cabalFlag` "need-pthread"
-          , flag UseLibbfd                  `cabalFlag` "libbfd"
-          , flag NeedLibatomic              `cabalFlag` "need-atomic"
-          , flag UseLibdw                   `cabalFlag` "libdw"
-          , flag UseLibnuma                 `cabalFlag` "libnuma"
-          , flag UseLibzstd                 `cabalFlag` "libzstd"
-          , flag StaticLibzstd              `cabalFlag` "static-libzstd"
+          , staged (buildFlag UseLibpthread)             `cabalFlag` "need-pthread"
+          , staged (buildFlag UseLibbfd    )              `cabalFlag` "libbfd"
+          , staged (buildFlag NeedLibatomic)              `cabalFlag` "need-atomic"
+          , staged (buildFlag UseLibdw     )              `cabalFlag` "libdw"
+          , staged (buildFlag UseLibnuma   )              `cabalFlag` "libnuma"
+          , staged (buildFlag UseLibzstd   )              `cabalFlag` "libzstd"
+          , staged (buildFlag StaticLibzstd)              `cabalFlag` "static-libzstd"
           , queryTargetTarget stage tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
           , ghcUnreg                        `cabalFlag` "unregisterised"
           , ghcEnableTNC                    `cabalFlag` "tables-next-to-code"
@@ -468,7 +468,7 @@ rtsPackageArgs = package rts ? do
         , builder HsCpp ? pure
           [ "-DTOP="             ++ show top ]
 
-        , builder HsCpp ? flag UseLibdw ? arg "-DUSE_LIBDW" ]
+        , builder HsCpp ? staged (buildFlag UseLibdw) ? arg "-DUSE_LIBDW" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the

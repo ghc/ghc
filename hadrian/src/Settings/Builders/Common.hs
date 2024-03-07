@@ -51,9 +51,9 @@ cppArgs = mempty
 cWarnings :: Args
 cWarnings = mconcat
     [ arg "-Wall"
-    , flag CcLlvmBackend ? arg "-Wno-unknown-pragmas"
-    , notM (flag CcLlvmBackend) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
-    , notM (flag CcLlvmBackend) ? arg "-Wno-error=inline" ]
+    , staged (buildFlag CcLlvmBackend) ? arg "-Wno-unknown-pragmas"
+    , notM (staged (buildFlag CcLlvmBackend)) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
+    , notM (staged (buildFlag CcLlvmBackend)) ? arg "-Wno-error=inline" ]
 
 packageDatabaseArgs :: Args
 packageDatabaseArgs = do

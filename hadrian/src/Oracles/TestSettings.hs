@@ -10,7 +10,7 @@ module Oracles.TestSettings
 
 import Base
 import Hadrian.Oracles.TextFile
-import Oracles.Setting (topDirectory, setting, Setting(..), crossStage)
+import Oracles.Setting (topDirectory, setting, ProjectSetting(..), crossStage)
 import Packages
 import Settings.Program (programContext)
 import Hadrian.Oracles.Path

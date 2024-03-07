@@ -1,7 +1,8 @@
 module Oracles.Setting (
     configFile,
     -- * Settings
-    Setting (..), setting, getSetting,
+    ProjectSetting (..), setting, getSetting,
+    BuildSetting(..), buildSetting,
     ToolchainSetting (..), settingsFileSetting,
 
     -- * Helpers
@@ -39,28 +40,14 @@ import GHC.Platform.ArchOS
 -- tracking the result in the Shake database.
 --
 -- * ROMES:TODO: How to handle target-platform-full?
-data Setting = CursesIncludeDir
-             | CursesLibDir
-             | DynamicExtension
-             | FfiIncludeDir
-             | FfiLibDir
-             | GhcMajorVersion
+data ProjectSetting =
+               GhcMajorVersion
              | GhcMinorVersion
              | GhcPatchLevel
              | GhcVersion
              | GhcSourcePath
              | LlvmMinVersion
              | LlvmMaxVersion
-             | GmpIncludeDir
-             | GmpLibDir
-             | IconvIncludeDir
-             | IconvLibDir
-             | LibdwIncludeDir
-             | LibdwLibDir
-             | LibnumaIncludeDir
-             | LibnumaLibDir
-             | LibZstdIncludeDir
-             | LibZstdLibDir
              | ProjectGitCommitId
              | ProjectName
              | ProjectVersion
@@ -74,6 +61,25 @@ data Setting = CursesIncludeDir
              | TargetPlatformFull
              | BourneShell
              | EmsdkVersion
+
+
+-- Things which configure how a specific stage is built
+data BuildSetting =
+               CursesIncludeDir
+             | CursesLibDir
+             | DynamicExtension
+             | FfiIncludeDir
+             | FfiLibDir
+             | GmpIncludeDir
+             | GmpLibDir
+             | IconvIncludeDir
+             | IconvLibDir
+             | LibdwIncludeDir
+             | LibdwLibDir
+             | LibnumaIncludeDir
+             | LibnumaLibDir
+             | LibZstdIncludeDir
+             | LibZstdLibDir
 
 -- TODO compute solely in Hadrian, removing these variables' definitions
 -- from aclocal.m4 whenever they can be calculated from other variables
@@ -95,13 +101,8 @@ data ToolchainSetting
 
 -- | Look up the value of a 'Setting' in @cfg/system.config@, tracking the
 -- result.
-setting :: Setting -> Action String
+setting :: ProjectSetting -> Action String
 setting key = lookupSystemConfig $ case key of
-    CursesIncludeDir   -> "curses-include-dir"
-    CursesLibDir       -> "curses-lib-dir"
-    DynamicExtension   -> "dynamic-extension"
-    FfiIncludeDir      -> "ffi-include-dir"
-    FfiLibDir          -> "ffi-lib-dir"
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
     GhcPatchLevel      -> "ghc-patch-level"
@@ -109,16 +110,6 @@ setting key = lookupSystemConfig $ case key of
     GhcSourcePath      -> "ghc-source-path"
     LlvmMinVersion     -> "llvm-min-version"
     LlvmMaxVersion     -> "llvm-max-version"
-    GmpIncludeDir      -> "gmp-include-dir"
-    GmpLibDir          -> "gmp-lib-dir"
-    IconvIncludeDir    -> "iconv-include-dir"
-    IconvLibDir        -> "iconv-lib-dir"
-    LibdwIncludeDir    -> "libdw-include-dir"
-    LibdwLibDir        -> "libdw-lib-dir"
-    LibnumaIncludeDir  -> "libnuma-include-dir"
-    LibnumaLibDir      -> "libnuma-lib-dir"
-    LibZstdIncludeDir  -> "libzstd-include-dir"
-    LibZstdLibDir      -> "libzstd-lib-dir"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
@@ -133,22 +124,51 @@ setting key = lookupSystemConfig $ case key of
     BourneShell        -> "bourne-shell"
     EmsdkVersion       -> "emsdk-version"
 
+buildSetting :: BuildSetting -> Stage -> Action String
+buildSetting key stage = tgtConfig stage $ case key of
+    CursesIncludeDir   -> "curses-include-dir"
+    CursesLibDir       -> "curses-lib-dir"
+    DynamicExtension   -> "dynamic-extension"
+    FfiIncludeDir      -> "ffi-include-dir"
+    FfiLibDir          -> "ffi-lib-dir"
+    GmpIncludeDir      -> "gmp-include-dir"
+    GmpLibDir          -> "gmp-lib-dir"
+    IconvIncludeDir    -> "iconv-include-dir"
+    IconvLibDir        -> "iconv-lib-dir"
+    LibdwIncludeDir    -> "libdw-include-dir"
+    LibdwLibDir        -> "libdw-lib-dir"
+    LibnumaIncludeDir  -> "libnuma-include-dir"
+    LibnumaLibDir      -> "libnuma-lib-dir"
+    LibZstdIncludeDir  -> "libzstd-include-dir"
+    LibZstdLibDir      -> "libzstd-lib-dir"
+  where
+    tgtConfig Stage0 {} = lookupHostBuildConfig
+    tgtConfig Stage1 = lookupHostBuildConfig
+    tgtConfig Stage2 = lookupTargetBuildConfig
+    tgtConfig Stage3 = lookupTargetBuildConfig
+
+
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
 -- See Note [tooldir: How GHC finds mingw on Windows]
 -- ROMES:TODO: This should be queryTargetTargetConfig
-settingsFileSetting :: ToolchainSetting -> Action String
-settingsFileSetting key = lookupSystemConfig $ case key of
+settingsFileSetting :: ToolchainSetting -> Stage -> Action String
+settingsFileSetting key stage = tgtConfig stage $ case key of
     ToolchainSetting_OtoolCommand           -> "settings-otool-command"
     ToolchainSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
     ToolchainSetting_LlcCommand             -> "settings-llc-command"
     ToolchainSetting_OptCommand             -> "settings-opt-command"
     ToolchainSetting_LlvmAsCommand          -> "settings-llvm-as-command"
     ToolchainSetting_DistroMinGW            -> "settings-use-distro-mingw" -- ROMES:TODO: This option doesn't seem to be in ghc-toolchain yet. It corresponds to EnableDistroToolchain
+  where
+    tgtConfig Stage0 {} = lookupHostBuildConfig
+    tgtConfig Stage1 = lookupHostBuildConfig
+    tgtConfig Stage2 = lookupTargetBuildConfig
+    tgtConfig Stage3 = lookupTargetBuildConfig
 
 -- | An expression that looks up the value of a 'Setting' in @cfg/system.config@,
 -- tracking the result.
-getSetting :: Setting -> Expr c b String
+getSetting :: ProjectSetting -> Expr c b String
 getSetting = expr . setting
 
 -- | The path to a Bourne shell interpreter.
@@ -251,7 +271,7 @@ libsuf :: Stage -> Way -> Action String
 libsuf st way
     | not (wayUnit Dynamic way) = return (waySuffix way ++ ".a") -- e.g., _p.a
     | otherwise = do
-        extension <- setting DynamicExtension -- e.g., .dll or .so
+        extension <- buildSetting DynamicExtension st-- e.g., .dll or .so
         version   <- ghcVersionStage st -- e.g. 8.4.4 or 8.9.xxxx
         let suffix = waySuffix (removeWayUnit Dynamic way)
         return (suffix ++ "-ghc" ++ version ++ extension)
