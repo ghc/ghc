@@ -28,14 +28,19 @@ int main(int argc, char *argv[]) {
     hs_exit();
 }
 
+static InfoProvEnt lookupIPE_(const char *where, const StgInfoTable *itbl) {
+    InfoProvEnt ent;
+    if (!lookupIPE(itbl, &ent)) {
+        barf("%s: Expected to find IPE entry", where);
+    }
+    return ent;
+}
+
 void shouldFindNothingInAnEmptyIPEMap(Capability *cap) {
     HaskellObj fortyTwo = UNTAG_CLOSURE(rts_mkInt(cap, 42));
-
-    InfoProvEnt *result = lookupIPE(get_itbl(fortyTwo));
-
-    if (result != NULL) {
-        errorBelch("Found entry in an empty IPE map!");
-        exit(1);
+    InfoProvEnt ent;
+    if (lookupIPE(get_itbl(fortyTwo), &ent)) {
+        barf("Found entry in an empty IPE map!");
     }
 }
 
@@ -60,20 +65,15 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
 
     registerInfoProvList(node);
 
-    InfoProvEnt *result = lookupIPE(get_itbl(fortyTwo));
+    InfoProvEnt result = lookupIPE_("shouldFindOneIfItHasBeenRegistered", get_itbl(fortyTwo));
 
-    if (result == NULL) {
-        errorBelch("shouldFindOneIfItHasBeenRegistered: Found no entry in IPE map!");
-        exit(1);
-    }
-
-    assertStringsEqual(result->prov.table_name, "table_name_042");
-    assertStringsEqual(result->prov.closure_desc, "closure_desc_042");
-    assertStringsEqual(result->prov.ty_desc, "ty_desc_042");
-    assertStringsEqual(result->prov.label, "label_042");
-    assertStringsEqual(result->prov.module, "module_042");
-    assertStringsEqual(result->prov.src_file, "src_file_042");
-    assertStringsEqual(result->prov.src_span, "src_span_042");
+    assertStringsEqual(result.prov.table_name, "table_name_042");
+    assertStringsEqual(result.prov.closure_desc, "closure_desc_042");
+    assertStringsEqual(result.prov.ty_desc, "ty_desc_042");
+    assertStringsEqual(result.prov.label, "label_042");
+    assertStringsEqual(result.prov.module, "module_042");
+    assertStringsEqual(result.prov.src_file, "src_file_042");
+    assertStringsEqual(result.prov.src_span, "src_span_042");
 
     return fortyTwo;
 }
@@ -100,22 +100,11 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
 
     registerInfoProvList(node);
 
-    InfoProvEnt *resultFortyTwo =
-      lookupIPE(get_itbl(fortyTwo));
-    InfoProvEnt *resultTwentyThree =
-      lookupIPE(get_itbl(twentyThree));
+    InfoProvEnt resultFortyTwo = lookupIPE_("shouldFindTwoIfTwoHaveBeenRegistered", get_itbl(fortyTwo));
+    assertStringsEqual(resultFortyTwo.prov.table_name, "table_name_042");
 
-    if (resultFortyTwo == NULL) {
-        errorBelch("shouldFindTwoIfTwoHaveBeenRegistered(42): Found no entry in IPE map!");
-        exit(1);
-    }
-    if (resultTwentyThree == NULL) {
-        errorBelch("shouldFindTwoIfTwoHaveBeenRegistered(23): Found no entry in IPE map!");
-        exit(1);
-    }
-
-    assertStringsEqual(resultFortyTwo->prov.table_name, "table_name_042");
-    assertStringsEqual(resultTwentyThree->prov.table_name, "table_name_023");
+    InfoProvEnt resultTwentyThree = lookupIPE_("shouldFindTwoIfTwoHaveBeenRegistered", get_itbl(twentyThree));
+    assertStringsEqual(resultTwentyThree.prov.table_name, "table_name_023");
 }
 
 void shouldFindTwoFromTheSameList(Capability *cap) {
@@ -142,20 +131,11 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
 
     registerInfoProvList(node);
 
-    InfoProvEnt *resultOne = lookupIPE(get_itbl(one));
-    InfoProvEnt *resultTwo = lookupIPE(get_itbl(two));
+    InfoProvEnt resultOne = lookupIPE_("shouldFindTwoFromTheSameList", get_itbl(one));
+    assertStringsEqual(resultOne.prov.table_name, "table_name_001");
 
-    if (resultOne == NULL) {
-        errorBelch("shouldFindTwoFromTheSameList(1): Found no entry in IPE map!");
-        exit(1);
-    }
-    if (resultTwo == NULL) {
-        errorBelch("shouldFindTwoFromTheSameList(2): Found no entry in IPE map!");
-        exit(1);
-    }
-
-    assertStringsEqual(resultOne->prov.table_name, "table_name_001");
-    assertStringsEqual(resultTwo->prov.table_name, "table_name_002");
+    InfoProvEnt resultTwo = lookupIPE_("shouldFindTwoFromTheSameList", get_itbl(two));
+    assertStringsEqual(resultTwo.prov.table_name, "table_name_002");
 }
 
 void shouldDealWithAnEmptyList(Capability *cap, HaskellObj fortyTwo) {
@@ -166,15 +146,8 @@ void shouldDealWithAnEmptyList(Capability *cap, HaskellObj fortyTwo) {
 
     registerInfoProvList(node);
 
-    InfoProvEnt *resultFortyTwo =
-        lookupIPE(get_itbl(fortyTwo));
-
-    if (resultFortyTwo == NULL) {
-        errorBelch("shouldDealWithAnEmptyList: Found no entry in IPE map!");
-        exit(1);
-    }
-
-    assertStringsEqual(resultFortyTwo->prov.table_name, "table_name_042");
+    InfoProvEnt resultFortyTwo = lookupIPE_("shouldDealWithAnEmptyList", get_itbl(fortyTwo));
+    assertStringsEqual(resultFortyTwo.prov.table_name, "table_name_042");
 }
 
 void assertStringsEqual(const char *s1, const char *s2) {

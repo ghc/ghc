@@ -86,4 +86,6 @@ typedef struct IpeBufferListNode_ {
 } IpeBufferListNode;
 
 void registerInfoProvList(IpeBufferListNode *node);
-InfoProvEnt *lookupIPE(const StgInfoTable *info);
+
+// Returns true on success, initializes `out`.
+bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);

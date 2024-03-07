@@ -29,7 +29,7 @@
 static StgWord getStackFrameCount(StgStack* stack);
 static StgWord getStackChunkClosureCount(StgStack* stack);
 static void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack);
-static StgClosure* createPtrClosure(Capability* cap, InfoProvEnt* ipe);
+static StgClosure* createPtrClosure(Capability* cap, const StgInfoTable* itbl);
 static StgMutArrPtrs* allocateMutableArray(StgWord size);
 
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
@@ -180,26 +180,8 @@ void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack) {
     StgPtr sp = last_stack->sp;
     StgPtr spBottom = last_stack->stack + last_stack->stack_size;
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
-      const StgInfoTable* infoTable = get_itbl((StgClosure *)sp);
-
-      // Add the IPE that was looked up by lookupIPE() to the MutableArray#.
-      // The "Info Table Provernance Entry Map" (IPE) idea is to use a pointer
-      // (address) to the info table to lookup entries, this is fulfilled in
-      // non-"Tables Next to Code" builds.
-      // When "Tables Next to Code" is used, the assembly label of the info table
-      // is between the info table and it's code. There's no other label in the
-      // assembly code which could be used instead, thus lookupIPE() is actually
-      // called with the code pointer of the info table.
-      // (As long as it's used consistently, this doesn't really matter - IPE uses
-      // the pointer only to connect an info table to it's provenance entry in the
-      // IPE map.)
-#if defined(TABLES_NEXT_TO_CODE)
-      InfoProvEnt* ipe = lookupIPE((StgInfoTable*) infoTable->code);
-#else
-      InfoProvEnt* ipe = lookupIPE(infoTable);
-#endif
-      arr->payload[index] = createPtrClosure(cap, ipe);
-
+      const StgInfoTable* infoTable = ((StgClosure *)sp)->header.info;
+      arr->payload[index] = createPtrClosure(cap, infoTable);
       index++;
     }
 
@@ -217,11 +199,11 @@ void copyPtrsToArray(Capability *cap, StgMutArrPtrs* arr, StgStack* stack) {
   }
 }
 
-// Create a GHC.Ptr (Haskell constructor: `Ptr InfoProvEnt`) pointing to the
-// IPE.
-StgClosure* createPtrClosure(Capability *cap, InfoProvEnt* ipe) {
+// Create a GHC.Ptr (Haskell constructor: `Ptr StgInfoTable`) pointing to the
+// info table.
+StgClosure* createPtrClosure(Capability *cap, const StgInfoTable* itbl) {
   StgClosure *p = (StgClosure *) allocate(cap, CONSTR_sizeW(0,1));
   SET_HDR(p, &ghczminternal_GHCziInternalziPtr_Ptr_con_info, CCS_SYSTEM);
-  p->payload[0] = (StgClosure*) ipe;
+  p->payload[0] = (StgClosure*) itbl;
   return TAG_CLOSURE(1, p);
 }

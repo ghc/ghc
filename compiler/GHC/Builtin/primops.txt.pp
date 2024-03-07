@@ -3849,10 +3849,9 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
 section "Info Table Origin"
 ------------------------------------------------------------------------
 primop WhereFromOp "whereFrom#" GenPrimOp
-   a -> State# s -> (# State# s, Addr# #)
-   { Returns the @InfoProvEnt @ for the info table of the given object
-     (value is @NULL@ if the table does not exist or there is no information
-     about the closure).}
+   a -> Addr# -> State# s -> (# State# s, Int# #)
+   { Fills the given buffer with the @InfoProvEnt@ for the info table of the
+     given object. Returns @1#@ on success and @0#@ otherwise.}
    with
    out_of_line = True
 
