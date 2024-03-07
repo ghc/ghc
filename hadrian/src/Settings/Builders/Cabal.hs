@@ -202,11 +202,11 @@ configureArgs cFlags' ldFlags' = do
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
-        , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
-        , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
-        , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
-        , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
-        , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
+        , conf "--with-iconv-includes"    $ arg =<< staged (buildSetting IconvIncludeDir)
+        , conf "--with-iconv-libraries"   $ arg =<< staged (buildSetting IconvLibDir)
+        , conf "--with-gmp-includes"      $ arg =<< staged (buildSetting GmpIncludeDir)
+        , conf "--with-gmp-libraries"     $ arg =<< staged (buildSetting GmpLibDir)
+        , conf "--with-curses-libraries"  $ arg =<< staged (buildSetting CursesLibDir)
         , conf "--host"                   $ arg =<< flip queryTarget targetPlatformTriple  . predStage' =<< getStage
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , ghcVersionH
