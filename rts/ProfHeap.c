@@ -448,18 +448,14 @@ initHeapProfiling(void)
         stem = stgMallocBytes(strlen(RtsFlags.CcFlags.outputFileNameStem) + 1, "initHeapProfiling");
         strcpy(stem, RtsFlags.CcFlags.outputFileNameStem);
     } else {
-
         stem = stgMallocBytes(strlen(prog_name) + 1, "initHeapProfiling");
         strcpy(stem, prog_name);
+
+        // Drop the platform's executable suffix if there is one
 #if defined(mingw32_HOST_OS)
-            // on Windows, drop the .exe suffix if there is one
-            {
-                char *suff;
-                suff = strrchr(stem,'.');
-                if (suff != NULL && !strcmp(suff,".exe")) {
-                    *suff = '\0';
-                }
-            }
+        dropExtension(stem, ".exe");
+#elif defined(wasm32_HOST_ARCH)
+        dropExtension(stem, ".wasm");
 #endif
     }
 

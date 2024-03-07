@@ -245,19 +245,14 @@ initProfilingLogFile(void)
     if (RtsFlags.CcFlags.outputFileNameStem) {
         stem = RtsFlags.CcFlags.outputFileNameStem;
     } else {
-        char *prog;
-
-        prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
+        char *prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
         strcpy(prog, prog_name);
+
+        // Drop the platform's executable suffix if there is one
 #if defined(mingw32_HOST_OS)
-        // on Windows, drop the .exe suffix if there is one
-        {
-            char *suff;
-            suff = strrchr(prog,'.');
-            if (suff != NULL && !strcmp(suff,".exe")) {
-                *suff = '\0';
-            }
-        }
+        dropExtension(prog, ".exe");
+#elif defined(wasm32_HOST_ARCH)
+        dropExtension(prog, ".wasm");
 #endif
         stem = prog;
     }

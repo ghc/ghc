@@ -456,3 +456,15 @@ void checkFPUStack(void)
     }
 #endif
 }
+
+// Drop the given extension from a filepath.
+void dropExtension(char *path, const char *extension) {
+    int ext_len = strlen(extension);
+    int path_len = strlen(path);
+    if (ext_len < path_len) {
+        char *s = &path[path_len - ext_len];
+        if (strcmp(s, extension) == 0) {
+            *s = '\0';
+        }
+    }
+}

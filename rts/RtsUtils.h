@@ -62,4 +62,7 @@ void checkFPUStack(void);
 #define xstr(s) str(s)
 #define str(s) #s
 
+// Drop the given extension from a filepath.
+void dropExtension(char *path, const char *extension);
+
 #include "EndPrivate.h"
