@@ -2329,14 +2329,13 @@ def write_file(f: Path, s: str) -> None:
 
 async def check_hp_ok(name: TestName) -> bool:
     opts = getTestOpts()
-    actual_name = name + exe_extension() if not opts.ignore_extension else name
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {actual_name}'.format(**locals())
+    hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
 
     hp2psResult = await runCmd(hp2psCmd, print_output=True)
 
-    actual_ps_path = in_testdir(actual_name, 'ps')
+    actual_ps_path = in_testdir(name, 'ps')
 
     if hp2psResult == 0:
         if actual_ps_path.exists():
@@ -2345,15 +2344,15 @@ async def check_hp_ok(name: TestName) -> bool:
                 if (gsResult == 0):
                     return True
                 else:
-                    print("hp2ps output for " + actual_name + " is not valid PostScript")
+                    print("hp2ps output for " + name + " is not valid PostScript")
                     return False
             else:
                 return True # assume postscript is valid without ghostscript
         else:
-            print("hp2ps did not generate PostScript for " + actual_name)
+            print("hp2ps did not generate PostScript for " + name)
             return  False
     else:
-        print("hp2ps error when processing heap profile for " + actual_name)
+        print("hp2ps error when processing heap profile for " + name)
         return False
 
 async def check_prof_ok(name: TestName, way: WayName) -> bool:
@@ -2365,7 +2364,7 @@ async def check_prof_ok(name: TestName, way: WayName) -> bool:
     if not expected_prof_path.exists():
         return True
 
-    actual_prof_file = add_suffix(name + exe_extension(), 'prof')
+    actual_prof_file = add_suffix(name, 'prof')
     actual_prof_path = in_testdir(actual_prof_file)
 
     if not actual_prof_path.exists():
