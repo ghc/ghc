@@ -197,6 +197,7 @@ Library
         GHC.Internal.GHCi.Helpers
         GHC.Internal.Generics
         GHC.Internal.InfoProv
+        GHC.Internal.InfoProv.Types
         GHC.Internal.IO
         GHC.Internal.IO.Buffer
         GHC.Internal.IO.BufferedIO

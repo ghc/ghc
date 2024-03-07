@@ -27,7 +27,7 @@ import GHC.Internal.Data.Maybe (catMaybes)
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
 import GHC.Internal.Exts () -- (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
-import GHC.Internal.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
+import GHC.Internal.InfoProv.Types (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Internal.Num
 import GHC.Internal.Stable
 import GHC.Internal.Text.Show
@@ -249,7 +249,7 @@ decode stackSnapshot = do
         { functionName = ipLabel infoProv,
           moduleName = ipMod infoProv,
           srcLoc = ipLoc infoProv,
-          closureType = ipDesc $ infoProv
+          closureType = ipDesc infoProv
         }
 
 getDecodedStackArray :: StackSnapshot -> IO [Ptr InfoProvEnt]

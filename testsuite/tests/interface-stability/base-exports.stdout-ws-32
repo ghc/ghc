@@ -12521,7 +12521,7 @@ instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.RTSFlags -- Defined in �
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.IOPort.IOPortException -- Defined in ‘GHC.Internal.IOPort’
-instance GHC.Internal.Show.Show GHC.Internal.InfoProv.InfoProv -- Defined in ‘GHC.Internal.InfoProv’
+instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
 instance GHC.Internal.Show.Show GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
@@ -12717,7 +12717,7 @@ instance GHC.Classes.Eq GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Inter
 instance GHC.Classes.Eq GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
 instance forall i e. GHC.Classes.Eq (GHC.Internal.IOArray.IOArray i e) -- Defined in ‘GHC.Internal.IOArray’
 instance forall a. GHC.Classes.Eq (GHC.Internal.IOPort.IOPort a) -- Defined in ‘GHC.Internal.IOPort’
-instance GHC.Classes.Eq GHC.Internal.InfoProv.InfoProv -- Defined in ‘GHC.Internal.InfoProv’
+instance GHC.Classes.Eq GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
 instance GHC.Classes.Eq GHC.Num.Integer.Integer -- Defined in ‘GHC.Num.Integer’
 instance GHC.Classes.Eq GHC.Num.BigNat.BigNat -- Defined in ‘GHC.Num.BigNat’
 instance GHC.Classes.Eq GHC.Num.Natural.Natural -- Defined in ‘GHC.Num.Natural’
