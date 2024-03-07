@@ -2145,7 +2145,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    ObjectCode* nc;
    void *hdl, *retval;
 
-   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF: %" PATH_FMT "\n", path));
 
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
@@ -2158,6 +2158,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    if (existing_oc && existing_oc->status != OBJECT_UNLOADED) {
      if (existing_oc->type == DYNAMIC_OBJECT) {
        retval = existing_oc->dlopen_handle;
+       IF_DEBUG(linker, debugBelch("loadNativeObj_ELF: Found existing OC for %" PATH_FMT " at %p\n", path, retval));
        goto success;
      }
      copyErrmsg(errmsg, "loadNativeObj_ELF: already loaded as non-dynamic object");

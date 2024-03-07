@@ -1,0 +1,6 @@
+Reading package info from "reuse.conf" ... done.
+73
+5
+loadNativeObj_ELF: Found existing OC for pkg-reuse/lib/libHSreuse-1.0-ghc9.9.20240125.so at 0x63b810
+loadNativeObj_ELF: Found existing OC for pkg-reuse/lib/libHSreuse-1.0-ghc9.9.20240125.so at 0x63b810
+loadNativeObj_ELF: Found existing OC for pkg-reuse/lib/libHSreuse-1.0-ghc9.9.20240125.so at 0x63b810
