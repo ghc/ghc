@@ -93,6 +93,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import Control.Monad ((<$!>))
 
 {-
 ************************************************************************
@@ -244,7 +245,18 @@ instance Monoid IfaceAppArgs where
 -- We have to tag them in order to pretty print them
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
-                             , ifaceTyConInfo :: IfaceTyConInfo }
+                             , ifaceTyConInfo :: !IfaceTyConInfo
+                             -- ^ We add a bang to this field as heap analysis
+                             -- showed that this constructor retains a thunk to
+                             -- a value that is usually shared.
+                             --
+                             -- See !12200 for how this bang saved ~10% residency
+                             -- when loading 'mi_extra_decls' on the agda
+                             -- code base.
+                             --
+                             -- See Note [Sharing IfaceTyConInfo] for why
+                             -- sharing is so important for 'IfaceTyConInfo'.
+                             }
     deriving (Eq)
 
 -- | The various types of TyCons which have special, built-in syntax.
@@ -2050,7 +2062,13 @@ instance Binary IfaceTyConSort where
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = mkIfaceTyConInfo <$> get bh <*> get bh
+   get bh = mkIfaceTyConInfo <$!> get bh <*> get bh
+    -- We want to make sure, when reading from disk, as the most common case
+    -- is supposed to be shared. Any thunk adds an additional indirection
+    -- making sharing less useful.
+    --
+    -- See !12200 for how this bang and the one in 'IfaceTyCon' reduces the
+    -- residency by ~10% when loading 'mi_extra_decls' from disk.
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
