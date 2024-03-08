@@ -1,0 +1,4 @@
+T24159_pat_parse_error_4.hs:4:4: error: [GHC-32181]
+    Illegal constraint context in pattern: ‘a’
+    Type syntax in patterns isn't supported at the time
+

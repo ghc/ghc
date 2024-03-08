@@ -382,10 +382,25 @@ type instance XEmbTy         GhcTc = DataConCantHappen
   -- A free-standing HsEmbTy is an error.
   -- Valid usages are immediately desugared into Type.
 
+type instance XForAll        GhcPs = NoExtField
+type instance XForAll        GhcRn = NoExtField
+type instance XForAll        GhcTc = DataConCantHappen
+
+type instance XQual          GhcPs = NoExtField
+type instance XQual          GhcRn = NoExtField
+type instance XQual          GhcTc = DataConCantHappen
+
+type instance XFunArr        GhcPs = NoExtField
+type instance XFunArr        GhcRn = NoExtField
+type instance XFunArr        GhcTc = DataConCantHappen
+
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
+
+arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> LocatedA (HsExpr GhcRn)
+arrowToHsExpr = expandHsArrow (HsVar noExtField)
 
 data AnnExplicitSum
   = AnnExplicitSum {
@@ -834,6 +849,21 @@ ppr_expr (HsStatic _ e)
 ppr_expr (HsEmbTy _ ty)
   = hsep [text "type", ppr ty]
 
+ppr_expr (HsQual _ ctxt ty)
+  = sep [ppr_context ctxt, ppr_lexpr ty]
+  where
+    ppr_context (L _ ctxt) =
+      case ctxt of
+        []       -> parens empty             <+> darrow
+        [L _ ty] -> ppr_expr ty              <+> darrow
+        _        -> parens (interpp'SP ctxt) <+> darrow
+
+ppr_expr (HsForAll _ tele ty)
+  = sep [pprHsForAll tele Nothing, ppr_lexpr ty]
+
+ppr_expr (HsFunArr _ arr arg res)
+  = sep [ppr_lexpr arg, pprHsArrow arr <+> ppr_lexpr res]
+
 ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x
   GhcTc -> ppr x
@@ -987,6 +1017,9 @@ hsExprNeedsParens prec = go
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (HsEmbTy{})                    = prec > topPrec
+    go (HsForAll{})                   = prec >= funPrec
+    go (HsQual{})                     = prec >= funPrec
+    go (HsFunArr{})                   = prec >= funPrec
     go (XExpr x) = case ghcPass @p of
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x
@@ -2387,6 +2420,7 @@ instance UnXRec p => Outputable (DotFieldOcc p) where
 -}
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnC
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
 

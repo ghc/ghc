@@ -1,6 +1,7 @@
-
 T22326_fail_top.hs:6:9: error: [GHC-35499]
-    • Illegal type expression.
-      A type expression must be used to instantiate a visible forall.
+    • Illegal keyword ‘type’
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
     • In the expression: type Int
       In an equation for ‘xtop’: xtop = type Int
+

@@ -843,10 +843,10 @@ type instance XBndrRequired DocNameI = NoExtField
 type instance XBndrInvisible DocNameI = NoExtField
 type instance XXBndrVis DocNameI = DataConCantHappen
 
-type instance XUnrestrictedArrow DocNameI = NoExtField
-type instance XLinearArrow DocNameI = NoExtField
-type instance XExplicitMult DocNameI = NoExtField
-type instance XXArrow DocNameI = DataConCantHappen
+type instance XUnrestrictedArrow _ DocNameI = NoExtField
+type instance XLinearArrow _ DocNameI = NoExtField
+type instance XExplicitMult _ DocNameI = NoExtField
+type instance XXArrow _ DocNameI = DataConCantHappen
 
 type instance XForAllTy DocNameI = EpAnn [AddEpAnn]
 type instance XQualTy DocNameI = EpAnn [AddEpAnn]

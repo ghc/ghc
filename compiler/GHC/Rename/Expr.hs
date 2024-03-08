@@ -611,7 +611,27 @@ rnExpr (ArithSeq _ _ seq)
 
 rnExpr (HsEmbTy _ ty)
   = do { (ty', fvs) <- rnHsWcType HsTypeCtx ty
+       ; checkTypeSyntaxExtension TypeKeywordSyntax
        ; return (HsEmbTy noExtField ty', fvs) }
+
+rnExpr (HsQual _ (L ann ctxt) ty)
+  = do { (ctxt', fvs_ctxt) <- mapAndUnzipM rnLExpr ctxt
+       ; (ty', fvs_ty) <- rnLExpr ty
+       ; checkTypeSyntaxExtension ContextArrowSyntax
+       ; return (HsQual noExtField (L ann ctxt') ty', plusFVs fvs_ctxt `plusFV` fvs_ty) }
+
+rnExpr (HsForAll _ tele expr)
+  = bindHsForAllTelescope HsTypeCtx tele $ \tele' ->
+    do { (expr', fvs) <- rnLExpr expr
+       ; checkTypeSyntaxExtension ForallTelescopeSyntax
+       ; return (HsForAll noExtField tele' expr', fvs) }
+
+rnExpr (HsFunArr _ mult arg res)
+  = do { (arg', fvs1) <- rnLExpr arg
+       ; (mult', fvs2) <- rnHsArrowWith rnLExpr mult
+       ; (res', fvs3) <- rnLExpr res
+       ; checkTypeSyntaxExtension FunctionArrowSyntax
+       ; return (HsFunArr noExtField mult' arg' res', plusFVs [fvs1, fvs2, fvs3]) }
 
 {-
 ************************************************************************
@@ -656,6 +676,19 @@ rnExpr (HsProc x pat body)
     rnPat (ArrowMatchCtxt ProcExpr) pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
+
+
+{-
+************************************************************************
+*                                                                      *
+        Type syntax
+*                                                                      *
+********************************************************************* -}
+
+checkTypeSyntaxExtension :: TypeSyntax -> RnM ()
+checkTypeSyntaxExtension syntax =
+  unlessXOptM (typeSyntaxExtension syntax) $
+  addErr (TcRnUnexpectedTypeSyntaxInTerms syntax)
 
 {-
 ************************************************************************

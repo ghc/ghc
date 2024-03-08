@@ -105,7 +105,7 @@ import Data.Function (on)
 import Data.List (sortBy, foldl1')
 import Data.Semigroup
 import GHC.Data.FastString
-import GHC.TypeLits (Symbol, KnownSymbol)
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString
@@ -372,6 +372,9 @@ data EpToken (tok :: Symbol)
   = NoEpTok
   | EpTok !EpaLocation
 
+instance KnownSymbol tok => Outputable (EpToken tok) where
+  ppr _ = text (symbolVal (Proxy @tok))
+
 -- | With @UnicodeSyntax@, there might be multiple ways to write the same
 -- token. For example an arrow could be either @->@ or @→@. This choice must be
 -- recorded in order to exactprint such tokens, so instead of @EpToken "->"@ we
@@ -383,6 +386,11 @@ data EpUniToken (tok :: Symbol) (utok :: Symbol)
 deriving instance Eq (EpToken tok)
 deriving instance KnownSymbol tok => Data (EpToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
+
+instance (KnownSymbol tok, KnownSymbol utok) => Outputable (EpUniToken tok utok) where
+  ppr NoEpUniTok                 = text $ symbolVal (Proxy @tok)
+  ppr (EpUniTok _ NormalSyntax)  = text $ symbolVal (Proxy @tok)
+  ppr (EpUniTok _ UnicodeSyntax) = text $ symbolVal (Proxy @utok)
 
 getEpTokenSrcSpan :: EpToken tok -> SrcSpan
 getEpTokenSrcSpan NoEpTok = noSrcSpan
@@ -1045,6 +1053,13 @@ instance HasLoc (EpAnn a) where
 instance HasLoc EpaLocation where
   getHasLoc (EpaSpan l) = l
   getHasLoc (EpaDelta l _ _) = l
+
+instance HasLoc (EpToken tok) where
+  getHasLoc = getEpTokenSrcSpan
+
+instance HasLoc (EpUniToken tok utok) where
+  getHasLoc NoEpUniTok = noSrcSpan
+  getHasLoc (EpUniTok l _) = getHasLoc l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan

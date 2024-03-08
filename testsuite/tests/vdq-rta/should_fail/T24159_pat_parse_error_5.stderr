@@ -1,0 +1,4 @@
+T24159_pat_parse_error_5.hs:4:4: error: [GHC-32181]
+    Illegal forall telescope in pattern: ‘forall a. b’
+    Type syntax in patterns isn't supported at the time
+

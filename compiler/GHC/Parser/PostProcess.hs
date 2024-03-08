@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiWayIf #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -92,7 +93,6 @@ module GHC.Parser.PostProcess (
         failOpFewArgs,
         failNotEnabledImportQualifiedPost,
         failImportQualifiedTwice,
-        requireExplicitNamespaces,
 
         SumOrTuple (..),
 
@@ -105,6 +105,9 @@ module GHC.Parser.PostProcess (
         ecpFromExp,
         ecpFromCmd,
         ecpFromPat,
+        ArrowParsingMode(..),
+        withArrowParsingMode, withArrowParsingMode',
+        setTelescopeBndrsNameSpace,
         PatBuilder,
         hsHoleExpr,
 
@@ -127,7 +130,7 @@ module GHC.Parser.PostProcess (
 import GHC.Prelude
 import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import GHC.Core.DataCon        ( DataCon, dataConTyCon )
+import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )
 import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
@@ -146,7 +149,7 @@ import GHC.Core.Type    ( Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
-                          unrestrictedFunTyCon , listTyCon_RDR )
+                          unrestrictedFunTyCon , listTyCon_RDR, unitDataCon )
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
@@ -841,7 +844,8 @@ mkGadtDecl loc names dcol ty = do
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
--- When parsing:
+--
+-- Case #1. When parsing:
 --
 -- > data T a = T | T1 Int
 --
@@ -853,6 +857,13 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- > data [] a = [] | a : [a]
 --
 -- For the exact-name case we return an original name.
+--
+-- Case #2. When parsing:
+--
+-- > x = fn (forall a. a)   -- RequiredTypeArguments
+--
+-- we use setRdrNameSpace to set the namespace of forall-bound variables.
+--
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
@@ -1179,6 +1190,42 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
     -- Append parens so that the original order in the source is maintained
     return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
 
+-- | The same as `checkContext`, but for expressions.
+--
+-- Validate the context constraints and break up a context into a list
+-- of predicates.
+--
+-- @
+--     (Eq a, Ord b)        -->  [Eq a, Ord b]
+--     Eq a                 -->  [Eq a]
+--     (Eq a)               -->  [Eq a]
+--     (((Eq a)))           -->  [Eq a]
+-- @
+checkContextExpr :: LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
+checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
+  check ([],[], cs) orig_expr
+  where
+    check :: ([EpaLocation],[EpaLocation],EpAnnComments)
+        -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
+    check (oparens,cparens,cs) (L _ (ExplicitTuple [AddEpAnn _ ap_open, AddEpAnn _ ap_close] tup_args boxity))
+             -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
+      | isBoxed boxity
+      , Just es <- tupArgsPresent_maybe tup_args
+      = mkCTuple (oparens ++ [ap_open], ap_close : cparens, cs) es
+    check (opi, cpi, csi) (L _ (HsPar (EpTok open_tok, EpTok close_tok) expr))
+      = check (opi ++ [open_tok], close_tok : cpi, csi) expr
+    check (oparens,cparens,cs) (L _ (HsVar _ (L (EpAnn _ (NameAnnOnly NameParens open closed []) _) name)))
+      | name == nameRdrName (dataConName unitDataCon)
+      = mkCTuple (oparens ++ [open], closed : cparens, cs) []
+    check _ _ = unprocessed
+
+    unprocessed =
+      return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_expr])
+
+    mkCTuple (oparens, cparens, cs) ts =
+      -- Append parens so that the original order in the source is maintained
+      return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
+
 checkImportDecl :: Maybe EpaLocation
                 -> Maybe EpaLocation
                 -> P ()
@@ -1230,7 +1277,8 @@ checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [HsCo
 -- SG: I think this function checks what Haskell2010 calls the `pat` and `lpat`
 -- productions
 checkPat loc cs (L l e@(PatBuilderVar (L ln c))) tyargs args
-  | isRdrDataCon c = return (L loc $ ConPat
+  | isRdrDataCon c || isRdrTc c
+  = return (L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
@@ -1278,7 +1326,7 @@ checkAPat loc e0 = do
      return (WildPat noExtField)
 
    PatBuilderOpApp l (L cl c) r anns
-     | isRdrDataCon c -> do
+     | isRdrDataCon c || isRdrTc c -> do
          l <- checkLPat l
          r <- checkLPat r
          return $ ConPat
@@ -1680,9 +1728,18 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "(# a)" (right operator section)
   mkHsSectionR_PV
     :: SrcSpan -> LocatedA (InfixOp b) -> LocatedA b -> PV (LocatedA b)
-  -- | Disambiguate "(a -> b)" (view pattern)
-  mkHsViewPatPV
-    :: SrcSpan -> LHsExpr GhcPs -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
+  -- | Disambiguate "(a -> b)" (view pattern or function type arrow)
+  mkHsArrowPV
+    :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsArrowOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
+  -- | Disambiguate "%m" to the left of "->" (multiplicity)
+  mkHsMultPV
+    :: EpToken "%" -> LocatedA b -> PV (EpUniToken "->" "→" -> HsArrowOf (LocatedA b) GhcPs)
+  -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
+  mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
+  -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
+  checkContextPV :: LocatedA b -> PV (LocatedC [LocatedA b])
+  -- | Disambiguate "a => b" (constraint context)
+  mkQualPV :: SrcSpan -> LocatedC [LocatedA b] -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "a@b" (as-pattern)
   mkHsAsPatPV
     :: SrcSpan -> LocatedN RdrName -> EpToken "@" -> LocatedA b -> PV (LocatedA b)
@@ -1808,8 +1865,18 @@ instance DisambECP (HsCmd GhcPs) where
     let pp_op = fromMaybe (panic "cannot print infix operator")
                           (ppr_infix_expr (unLoc op))
     in pp_op <> ppr c
-  mkHsViewPatPV l a b _ = cmdFail l $
-    ppr a <+> text "->" <+> ppr b
+  mkHsArrowPV l mode a arr b = cmdFail l $
+    case mode of  -- matching on the mode brings Outputable instances into scope
+      ArrowIsViewPat -> ppr a <+> pprHsArrow arr <+> ppr b
+      ArrowIsFunType -> ppr a <+> pprHsArrow arr <+> ppr b
+  mkHsMultPV pct mult = cmdFail l $
+    ppr pct <> ppr mult
+    where l = getHasLoc pct `combineSrcSpans` getHasLoc mult
+  mkHsForallPV l tele cmd = cmdFail l $
+    pprHsForAll tele Nothing <+> ppr cmd
+  checkContextPV ctxt = cmdFail (getLocA ctxt) $ ppr ctxt
+  mkQualPV l ctxt cmd = cmdFail l $
+    ppr ctxt <+> text "=>" <+> ppr cmd
   mkHsAsPatPV l v _ c = cmdFail l $
     pprPrefixOcc (unLoc v) <> text "@" <> ppr c
   mkHsLazyPatPV l c _ = cmdFail l $
@@ -1905,8 +1972,6 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsSectionR_PV l op e = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (SectionR noExtField op e)
-  mkHsViewPatPV l a b _ = addError (mkPlainErrorMsgEnvelope l $ PsErrViewPatInExpr a b)
-                          >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
   mkHsAsPatPV l v _ e   = addError (mkPlainErrorMsgEnvelope l $ PsErrTypeAppWithoutSpace (unLoc v) e)
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
   mkHsLazyPatPV l e   _ = addError (mkPlainErrorMsgEnvelope l $ PsErrLazyPatWithoutSpace e)
@@ -1917,6 +1982,21 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
       HsEmbTy toktype (mkHsWildCardBndrs ty)
+  mkHsArrowPV l mode arg arr res =
+    -- In expressions, (e1 -> e2) is always parsed as a function type,
+    -- even if ViewPatterns are enabled.
+    exprArrowParsingMode mode $
+    return $ L (noAnnSrcSpan l) $
+      HsFunArr noExtField arr arg res
+  mkHsMultPV pct t =
+    return $ mkMultExpr pct t
+  mkHsForallPV l telescope ty =
+    return $ L (noAnnSrcSpan l) $
+      HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
+  checkContextPV = checkContextExpr
+  mkQualPV l qual ty =
+    return $ L (noAnnSrcSpan l) $
+      HsQual noExtField qual ty
   rejectPragmaPV (L _ (OpApp _ _ _ e)) =
     -- assuming left-associative parsing of operators
     rejectPragmaPV e
@@ -1959,9 +2039,11 @@ instance DisambECP (PatBuilder GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (LitPat noExtField a))
   mkHsOverLitPV (L l a) = return $ L l (PatBuilderOverLit a)
   mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (PatBuilderPat (WildPat noExtField))
-  mkHsTySigPV l b sig anns = do
-    p <- checkLPat b
-    return $ L l (PatBuilderPat (SigPat anns p (mkHsPatSigType noAnn sig)))
+  mkHsTySigPV l p t anns = do
+    p' <- checkLPat p
+    let sig = mkHsPatSigType noAnn t
+    sig_pat <- addSigPatP l p' sig anns
+    return $ fmap PatBuilderPat sig_pat
   mkHsExplicitListPV l xs anns = do
     ps <- traverse checkLPat xs
     !cs <- getCommentsFor l
@@ -1984,10 +2066,27 @@ instance DisambECP (PatBuilder GhcPs) where
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (mkNPat lit (Just noSyntaxExpr) anns))
   mkHsSectionR_PV l op p = patFail l (PsErrParseRightOpSectionInPat (unLoc op) (unLoc p))
-  mkHsViewPatPV l a b anns = do
-    p <- checkLPat b
-    !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (ViewPat anns a p))
+  mkHsArrowPV l ArrowIsViewPat a arr b = do
+      p <- checkLPat b
+      !cs <- getCommentsFor l
+      return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (ViewPat tok a p))
+    where
+      tok :: EpUniToken "->" "→"
+      tok = case arr of
+        HsUnrestrictedArrow x -> x
+        _ -> -- unreachable case because in Parser.y the reduction rules for
+             -- (a %m -> b) and (a ->. b) use ArrowIsFunType
+             panic "mkHsArrowPV ArrowIsViewPat: expected HsUnrestrictedArrow"
+  mkHsArrowPV l ArrowIsFunType a arr b =
+    patFail l (PsErrTypeSyntaxInPat (PETS_FunctionArrow a arr b))
+  mkHsMultPV tok arg =
+    let l = getHasLoc tok `combineSrcSpans` getLocA arg in
+    patFail l (PsErrTypeSyntaxInPat (PETS_Multiplicity tok arg))
+  mkHsForallPV l tele body = patFail l (PsErrTypeSyntaxInPat (PETS_ForallTelescope tele body))
+  checkContextPV ctx = patFail (getLocA ctx) (PsErrTypeSyntaxInPat (PETS_ConstraintContext ctx))
+  mkQualPV _ _ _ =  -- unreachable because mkQualPV is only called on the result
+                    -- of checkContextPV, which fails in patterns
+                  panic "mkQualPV in a pattern"
   mkHsAsPatPV l v at e = do
     p <- checkLPat e
     !cs <- getCommentsFor l
@@ -2007,6 +2106,146 @@ instance DisambECP (PatBuilder GhcPs) where
     return $ L (noAnnSrcSpan l) $
       PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
   rejectPragmaPV _ = return ()
+
+-- For reasons of backwards compatibility, we can't simply add the pattern
+-- signature if the inner pattern is a view pattern. Consider:
+--      (f -> p :: t)
+-- There are two ways to parse it
+--      (f -> (p :: t))   -- legacy parse
+--      ((f -> p) :: t)   -- future parse
+-- The grammar in Parser.y is structured in such a way that we get the
+-- future parse by default. Until we're ready to make the breaking change,
+-- we need to do some extra work here to push the signature under the view
+-- pattern (and emit a warning).
+addSigPatP :: SrcSpanAnnA -> LPat GhcPs -> HsPatSigType GhcPs -> [AddEpAnn] -> PV (LPat GhcPs)
+addSigPatP l viewpat@(L _ ViewPat{}) sig anns =
+  -- Test case: T24159_viewpat
+  do { let futureParse = L l (SigPat anns viewpat sig)
+     ; legacyParse <- go viewpat
+     ; addPsMessage (locA l) (PsWarnViewPatternSignatures legacyParse futureParse)
+     ; return legacyParse }
+  where
+    sig_loc_no_comments :: SrcSpan
+    sig_loc_no_comments = getLocA (hsps_body sig)
+
+    -- Test case for comments and locations preservation: Test24159
+    go :: LPat GhcPs -> PV (LPat GhcPs)
+    go  (L (EpAnn (EpaSpan view_pat_loc) anns cs1) (ViewPat anns' e' p')) = do
+      sig' <- go  p'
+      let new_loc = view_pat_loc `combineSrcSpans` sig_loc_no_comments
+      cs2 <- getCommentsFor new_loc
+      let ep_ann_loc = EpAnn (spanAsAnchor new_loc) anns (cs1 Semi.<> cs2)
+      pure (L ep_ann_loc (ViewPat anns' e' sig'))
+
+    go p = pure $ L new_loc (SigPat anns p sig)
+      where new_loc = noAnnSrcSpan ((getLocA p) `combineSrcSpans` sig_loc_no_comments)
+
+addSigPatP l p sig anns = do
+  return $ L l (SigPat anns p sig)
+
+{- Note [Arrow parsing mode]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example:
+  f (K (a -> b)) = ()
+
+A pattern of the form (a -> b) could be parsed in one of two ways:
+  * a view pattern `viewfn -> pat` (with ViewPatterns)
+  * a function type `t1 -> t2`     (with RequiredTypeArguments)
+
+This depends on the enabled extensions:
+  NoViewPatterns, RequiredTypeArguments     =>  function type
+  NoViewPatterns, NoRequiredTypeArguments   =>  error (suggest ViewPatterns)
+  ViewPatterns,   RequiredTypeArguments     =>  view pattern
+  ViewPatterns,   NoRequiredTypeArguments   =>  view pattern
+
+The decision how to parse arrow patterns (p1 -> p2) is captured by the
+`ArrowParsingMode` data type, produced in `withArrowParsingMode` and
+consumed in `mkHsArrowPV`.
+
+Naively, one might expect to see the following definition:
+
+  -- a simple (but insufficient) definition
+  data ArrowParsingMode = ArrowIsViewPat | ArrowIsFunType
+
+However, there is a slight complication that leads us to parameterize these
+constructor with GADT type indices. In a pattern (p1 -> p2), what is the AST
+type to represent the LHS `p1`? It depends:
+  * if (p1 -> p2) is a view pattern,  `p1` is an HsExpr
+  * if (p1 -> p2) is a function type, `p1` is a  Pat (PatBuilder)
+
+And since the decision how to parse `p1` depends on the arrow parsing mode, we
+could try to encode the LHS type as a GADT index:
+
+  -- a less simple (but still insufficient) definition
+  data ArrowParsingMode lhs where
+    ArrowIsViewPat :: ArrowParsingMode (PatBuilder GhcPs)
+    ArrowIsFunType :: ArrowParsingMode (HsExpr GhcPs)
+
+This definition would suffice for parsing patterns, but remember that
+expressions, commands, and patterns are all parsed using a unified framework
+`DisambECP`, as described in Note [Ambiguous syntactic categories].
+
+In an expression (e1 -> e2), the LHS is always represented by an HsExpr.
+We can account for this with a further refinement of the definition:
+
+  -- actual definition
+  data ArrowParsingMode lhs rhs where
+    ArrowIsViewPat :: ArrowParsingMode (HsExpr GhcPs) b
+    ArrowIsFunType :: ArrowParsingMode b b
+
+So when parsing a view pattern, the LHS is an HsExpr; and when parsing a
+function type, the type of the LHS is assumed to match the type of the RHS,
+which works out just right both for expressions and patterns.
+-}
+
+-- The arrow parsing mode is selected depending on the enabled extensions and
+-- determines how we parse patterns of the form (p1 -> p2). See Note [Arrow parsing mode]
+data ArrowParsingMode lhs rhs where
+  ArrowIsViewPat :: ArrowParsingMode (HsExpr GhcPs) b   -- the LHS is always of type HsExpr
+  ArrowIsFunType :: ArrowParsingMode b b                -- the LHS is of the same type as RHS
+
+-- When parsing an expression (e1 -> e2), the LHS `e1` is an HsExpr regardless of
+-- the arrow parsing mode. `exprArrowParsingMode` proves this to the type checker.
+-- See Note [Arrow parsing mode]
+exprArrowParsingMode :: ArrowParsingMode lhs (HsExpr GhcPs) -> (lhs ~ HsExpr GhcPs => r) -> r
+exprArrowParsingMode ArrowIsViewPat k = k
+exprArrowParsingMode ArrowIsFunType k = k
+
+-- Check the enabled extensions and select the appropriate ArrowParsingMode,
+-- then pass it to a continuation. See Note [Arrow parsing mode]
+withArrowParsingMode :: DisambECP b => (forall lhs. DisambECP lhs => ArrowParsingMode lhs b -> PV r) -> PV r
+withArrowParsingMode cont = do
+  vpEnabled <- getBit ViewPatternsBit
+  rtaEnabled <- getBit RequiredTypeArgumentsBit
+  if | vpEnabled  -> cont ArrowIsViewPat
+     | rtaEnabled -> cont ArrowIsFunType
+     | otherwise  -> cont ArrowIsViewPat -- Error message should suggest ViewPatterns in patterns
+
+-- Type-restricted variant of `withArrowParsingMode` to aid type inference (#25103)
+withArrowParsingMode' :: DisambECP b => (forall lhs. DisambECP lhs => ArrowParsingMode lhs b -> PV (LocatedA b)) -> PV (LocatedA b)
+withArrowParsingMode' = withArrowParsingMode
+
+-- When a forall-type occurs in term syntax, forall-bound variables should
+-- inhabit the term namespace `varName` rather than the usual `tvName`.
+-- See Note [Types in terms].
+--
+-- Since type variable binders in a `HsForAllTelescope` produced by the
+-- `forall_telescope` nonterminal have their namespaces set to `tvName`,
+-- we use `setTelescopeBndrsNameSpace` to fix them up.
+setTelescopeBndrsNameSpace :: NameSpace -> HsForAllTelescope GhcPs -> HsForAllTelescope GhcPs
+setTelescopeBndrsNameSpace ns forall_telescope =
+  case forall_telescope of
+    HsForAllInvis x bndrs -> HsForAllInvis x (map set_bndr_ns bndrs)
+    HsForAllVis   x bndrs -> HsForAllVis   x (map set_bndr_ns bndrs)
+  where
+    set_bndr_ns :: LHsTyVarBndr flag GhcPs -> LHsTyVarBndr flag GhcPs
+    set_bndr_ns (L l bndr) =
+      L l $ case bndr of
+        UserTyVar   x flag rdr      -> UserTyVar   x flag (set_rdr_ns rdr)
+        KindedTyVar x flag rdr kind -> KindedTyVar x flag (set_rdr_ns rdr) kind
+
+    set_rdr_ns :: LocatedN RdrName -> LocatedN RdrName
+    set_rdr_ns (L l rdr) = L l (setRdrNameSpace rdr ns)
 
 -- | Ensure that a literal pattern isn't of type Addr#, Float#, Double#.
 checkUnboxedLitPat :: Located (HsLit GhcPs) -> PV ()
@@ -3116,10 +3355,7 @@ instance MonadP PV where
       PV_Ok acc{pv_warnings= w `addMessage` pv_warnings acc} ()
   addFatalError err =
     addError err >> PV (const PV_Failed)
-  getBit ext =
-    PV $ \ctx acc ->
-      let b = ext `xtest` pExtsBitmap (pv_options ctx) in
-      PV_Ok acc $! b
+  getParserOpts = PV $ \ctx acc -> PV_Ok acc $! pv_options ctx
   allocateCommentsP ss = PV $ \_ s ->
     if null (pv_comment_q s) then PV_Ok s emptyComments else  -- fast path
     let (comment_q', newAnns) = allocateComments ss (pv_comment_q s) in
@@ -3257,6 +3493,16 @@ mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
 mkMultTy pct t arr = HsExplicitMult (pct, arr) t
+
+mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> EpUniToken "->" "→" -> HsArrowOf (LHsExpr GhcPs) GhcPs
+mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
+  -- See #18888 for the use of (SourceText "1") above
+  = HsLinearArrow (EpPct1 pct1 arr)
+  where
+    -- The location of "%" combined with the location of "1".
+    pct1 :: EpToken "%1"
+    pct1 = epTokenWidenR pct (locA (getLoc t))
+mkMultExpr pct t arr = HsExplicitMult (pct, arr) t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
 mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))

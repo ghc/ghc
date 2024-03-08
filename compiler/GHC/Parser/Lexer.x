@@ -59,7 +59,7 @@ module GHC.Parser.Lexer (
    PState (..), initParserState, initPragState,
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
-   MonadP(..),
+   MonadP(..), getBit,
    getRealSrcLoc, getPState,
    failMsgP, failLocMsgP, srcParseFail,
    getPsErrorMessages, getPsMessages,
@@ -3063,6 +3063,8 @@ data ExtBits
   | OrPatternsBit
   | ExtendedLiteralsBit
   | ListTuplePunsBit
+  | ViewPatternsBit
+  | RequiredTypeArgumentsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -3145,6 +3147,8 @@ mkParserOpts extensionFlags diag_opts supported
       .|. OrPatternsBit               `xoptBit` LangExt.OrPatterns
       .|. ExtendedLiteralsBit         `xoptBit` LangExt.ExtendedLiterals
       .|. ListTuplePunsBit            `xoptBit` LangExt.ListTuplePuns
+      .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
+      .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
@@ -3234,8 +3238,9 @@ class Monad m => MonadP m where
   --   the parser will not produce any result, ending in a 'PFailed' state.
   addFatalError :: MsgEnvelope PsMessage -> m a
 
-  -- | Check if a given flag is currently set in the bitmap.
-  getBit :: ExtBits -> m Bool
+  -- | Get parser options
+  getParserOpts :: m ParserOpts
+
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that belong within the given span
   allocateCommentsP :: RealSrcSpan -> m EpAnnComments
@@ -3259,8 +3264,8 @@ instance MonadP P where
   addFatalError err =
     addError err >> P PFailed
 
-  getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
-                         in b `seq` POk s b
+  getParserOpts = P $ \s -> POk s $! options s
+
   allocateCommentsP ss = P $ \s ->
     if null (comment_q s) then POk s emptyComments else  -- fast path
     let (comment_q', newAnns) = allocateComments ss (comment_q s) in
@@ -3282,6 +3287,10 @@ instance MonadP P where
          comment_q = comment_q'
        } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') newAnns)
 
+-- | Check if a given flag is currently set in the bitmap.
+getBit :: MonadP m => ExtBits -> m Bool
+getBit ext = (\opts -> ext `xtest` pExtsBitmap opts) <$> getParserOpts
+
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
 getCommentsFor _ = return emptyComments
@@ -3297,9 +3306,9 @@ getFinalCommentsFor _ = return emptyComments
 getEofPos :: P (Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan))
 getEofPos = P $ \s@(PState { eof_pos = pos }) -> POk s pos
 
-addPsMessage :: SrcSpan -> PsMessage -> P ()
+addPsMessage :: MonadP m => SrcSpan -> PsMessage -> m ()
 addPsMessage srcspan msg = do
-  diag_opts <- (pDiagOpts . options) <$> getPState
+  diag_opts <- pDiagOpts <$> getParserOpts
   addWarning (mkPlainMsgEnvelope diag_opts srcspan msg)
 
 addTabWarning :: RealSrcSpan -> P ()

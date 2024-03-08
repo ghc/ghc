@@ -60,6 +60,7 @@ import GHC.Core.Utils
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 
 import GHC.Unit.Module
 
@@ -1683,6 +1684,25 @@ repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel .
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
+repE (HsQual _ (L _ ctx) body) = do
+  ctx' <- repLEs ctx
+  body' <- repLE body
+  rep2 constrainedEName [unC ctx', unC body']
+repE (HsForAll _ tele body) =
+  case tele of
+    HsForAllVis   _ tvs -> mk_forall forallVisEName tvs
+    HsForAllInvis _ tvs -> mk_forall forallEName    tvs
+  where
+    mk_forall :: RepTV flag flag' => Name -> [LHsTyVarBndr flag GhcRn] -> MetaM (Core (M TH.Exp))
+    mk_forall forall_name tvs =
+      addHsTyVarBinds FreshNamesOnly tvs $ \bndrs -> do
+        body' <- repLE body
+        rep2 forall_name [unC bndrs, unC body']
+repE (HsFunArr _ mult arg res) = do
+  fun  <- repFunArr mult
+  arg' <- repLE arg
+  res' <- repLE res
+  repApps fun [arg', res']
 repE e@(XExpr (ExpandedThingRn o x))
   | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
@@ -1697,6 +1717,18 @@ repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
+
+repFunArr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
+repFunArr HsUnrestrictedArrow{} = repConName unrestrictedFunTyConName
+repFunArr mult
+  = do { fun <- repConName fUNTyConName
+       ; mult' <- repLE (arrowToHsExpr mult)
+       ; repApp fun mult' }
+
+repConName :: Name -> MetaM (Core (M TH.Exp))
+repConName n = do
+  core_name <- lift $ globalVar n
+  repCon core_name
 
 {- Note [Quotation and rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2437,6 +2469,9 @@ repLit (MkC c) = rep2 litEName [c]
 
 repApp :: Core (M TH.Exp) -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
 repApp (MkC x) (MkC y) = rep2 appEName [x,y]
+
+repApps :: Core (M TH.Exp) -> [Core (M TH.Exp)] -> MetaM (Core (M TH.Exp))
+repApps = foldlM repApp
 
 repAppType :: Core (M TH.Exp) -> Core (M TH.Type) -> MetaM (Core (M TH.Exp))
 repAppType (MkC x) (MkC y) = rep2 appTypeEName [x,y]

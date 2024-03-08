@@ -446,6 +446,9 @@ dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
 dsExpr (HsEmbTy x _) = dataConCantHappen x
+dsExpr (HsQual x _ _) = dataConCantHappen x
+dsExpr (HsForAll x _ _) = dataConCantHappen x
+dsExpr (HsFunArr x _ _ _) = dataConCantHappen x
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim

@@ -259,6 +259,80 @@ extension field, The typechecker keeps HsRecSel as HsRecSel, and
 transforms the record-selector Name to an Id.
 -}
 
+{- Note [Types in terms]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Types-in-terms is a notion introduced by GHC Proposal #281. It refers
+to the extension of term syntax (HsExpr in the AST, infixexp2 in Parser.y)
+with constructs that previously could only occur at the type level:
+
+  * Function arrows: a -> b
+  * Multiplicity-polymorphic function arrows: a %m -> b (LinearTypes)
+  * Constraint arrows: a => b
+  * Universal quantification: forall a. b
+  * Visible universal quantification: forall a -> b
+
+This syntax can't be used to construct a type at the term level because `Type`
+is not inhabited by any terms. Its use is limited to required type arguments:
+
+  -- Error:
+  t :: Type
+  t = (Int -> String)
+    -- Not supported by GHC, `tcExpr` emits `TcRnIllegalTypeExpr`
+
+  -- OK:
+  s :: String
+  s = vfun (Int -> String)
+        -- Valid use in a required type argument,
+        -- see `expr_to_type` (GHC.Tc.Gen.App)
+    where
+      vfun :: forall t -> Typeable t => String
+      vfun t = show (typeRep @t)
+
+In GHC, types-in-terms are implemented by the following additions to the AST of
+expressions and their grammar:
+
+  -- Language/Haskell/Syntax/Expr.hs
+  data HsExpr p =
+    ...
+    | HsForAll (XForAll p) (HsForAllTelescope p) (LHsExpr p)
+    | HsQual (XQual p) (XRec p [LHsExpr p]) (LHsExpr p)
+    | HsFunArr (XFunArr p) (HsArrowOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
+
+  -- GHC/Parser.y
+  infixexp2 :: { ECP }
+    : infixexp %shift                  { ... }
+    | infixexp         '->'  infixexp2 { ... }
+    | infixexp expmult '->'  infixexp2 { ... }
+    | infixexp         '->.' infixexp2 { ... }
+    | expcontext       '=>'  infixexp2 { ... }
+    | forall_telescope infixexp2       { ... }
+
+These constructors and non-terminals mirror those found in HsType
+
+     HsType      |  HsExpr
+    -------------+-----------
+     HsForAllTy  |  HsForAll
+     HsFunTy     |  HsFunArr
+     HsQualTy    |  HsQual
+
+The resulting code duplication can be removed if we unify HsExpr and HsType
+into one type (#25121).
+
+Per the proposal, the constituents of types-in-terms are parsed and renamed
+as terms, and forall-bound variables inhabit the term namespace. Example:
+
+  h = \a -> g (forall a. Maybe a) a
+
+To ensure that the `a` in `Maybe a` refers to the innermost binding (i.e. to the
+forall-bound `a` and not to the lambda-bound `a`), we must consistently use the
+term namespace `varName` throughout the expression. We set the correct namespace
+using `setTelescopeBndrsNameSpace` in GHC.Parser.PostProcess and GHC.ThToHs.
+
+`exprCtOrigin` returns `Shouldn'tHappenOrigin` for types-in-terms because
+they either undergo the T2T translation `expr_to_type` in `tcVDQ` or result
+in `TcRnIllegalTypeExpr`.
+-}
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -573,9 +647,24 @@ data HsExpr p
   | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
 
   -- Embed the syntax of types into expressions.
-  -- Used with RequiredTypeArguments, e.g. fn (type (Int -> Bool))
+  -- Used with @RequiredTypeArguments@, e.g. @fn (type (Int -> Bool))@.
   | HsEmbTy   (XEmbTy p)
               (LHsWcType (NoGhcTc p))
+
+  -- | Forall-types @forall tvs. t@ and @forall tvs -> t@.
+  -- Used with @RequiredTypeArguments@, e.g. @fn (forall a. Proxy a)@.
+  -- See Note [Types in terms]
+  | HsForAll (XForAll p) (HsForAllTelescope p) (LHsExpr p)
+
+  -- Constrained types @ctx => t@.
+  -- Used with @RequiredTypeArguments@, e.g. @fn (Bounded a => a)@.
+  -- See Note [Types in terms]
+  | HsQual (XQual p) (XRec p [LHsExpr p]) (LHsExpr p)
+
+  -- | Function types @a -> b@.
+  -- Used with @RequiredTypeArguments@, e.g. @fn (Int -> Bool)@.
+  -- See Note [Types in terms]
+  | HsFunArr (XFunArr p) (HsArrowOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
 
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the

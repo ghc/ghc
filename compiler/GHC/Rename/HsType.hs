@@ -14,7 +14,7 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsTyLit,
+        rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnConDeclFields,
@@ -704,10 +704,15 @@ rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow _env (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField, emptyFVs)
-rnHsArrow _env (HsLinearArrow _) = return (HsLinearArrow noExtField, emptyFVs)
-rnHsArrow env (HsExplicitMult _ p)
-  = (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rnLHsTyKi env p
+rnHsArrow env = rnHsArrowWith (rnLHsTyKi env)
+
+rnHsArrowWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeVars))
+              -> HsArrowOf (LocatedA (mult GhcPs)) GhcPs
+              -> RnM (HsArrowOf (LocatedA (mult GhcRn)) GhcRn, FreeVars)
+rnHsArrowWith _rn (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField, emptyFVs)
+rnHsArrowWith _rn (HsLinearArrow _) = pure (HsLinearArrow noExtField, emptyFVs)
+rnHsArrowWith rn (HsExplicitMult _ p)
+  =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
 
 {-
 Note [Renaming HsCoreTys]

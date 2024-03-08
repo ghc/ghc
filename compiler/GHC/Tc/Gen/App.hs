@@ -978,6 +978,23 @@ expr_to_type earg =
       --           or   vfun (Int -> type Int)
       -- The T2T transformation can simply discard the herald and use the embedded type.
       unwrap_wc t
+    go (L l (HsFunArr _ mult arg res)) =
+      do { arg' <- go arg
+         ; mult' <- go_arrow mult
+         ; res' <- go res
+         ; return (L l (HsFunTy noExtField mult' arg' res'))}
+         where
+          go_arrow :: HsArrowOf (LHsExpr GhcRn) GhcRn -> TcM (HsArrow GhcRn)
+          go_arrow (HsUnrestrictedArrow{}) = pure (HsUnrestrictedArrow noExtField)
+          go_arrow (HsLinearArrow{}) = pure (HsLinearArrow noExtField)
+          go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
+    go (L l (HsForAll _ tele expr)) =
+      do { ty <- go expr
+         ; return (L l (HsForAllTy noExtField tele ty))}
+    go (L l (HsQual _ (L ann ctxt) expr)) =
+      do { ctxt' <- mapM go ctxt
+         ; ty <- go expr
+         ; return (L l (HsQualTy noExtField (L ann ctxt') ty)) }
     go (L l (HsVar _ lname)) =
       -- as per #281: variables and constructors (regardless of their namespace)
       -- are mapped directly, without modification.

@@ -243,6 +243,12 @@ pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) $ toList x
 pprExp _ (TypedBracketE e) = text "[||" <> ppr e <> text "||]"
 pprExp _ (TypedSpliceE e) = text "$$" <> pprExp appPrec e
 pprExp i (TypeE t) = parensIf (i > noPrec) $ text "type" <+> ppr t
+pprExp i (ForallVisE tvars body) =
+  parensIf (i >= funPrec) $ sep [pprForallVis tvars [], pprExp qualPrec body]
+pprExp i (ForallE tvars body) =
+  parensIf (i >= funPrec) $ sep [pprForall tvars [], pprExp qualPrec body]
+pprExp i (ConstrainedE ctx body) =
+  parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
@@ -1000,14 +1006,20 @@ instance Ppr Role where
     ppr InferR            = text "_"
 
 ------------------------------
+pprCtxWith :: Ppr a => (Precedence -> a -> Doc) -> [a] -> Doc
+pprCtxWith _ [] = empty
+pprCtxWith ppr_fun ts = ppr_ctx_preds_with ppr_fun funPrec ts <+> text "=>"
+
 pprCxt :: Cxt -> Doc
-pprCxt [] = empty
-pprCxt ts = ppr_cxt_preds funPrec ts <+> text "=>"
+pprCxt = pprCtxWith pprType
+
+ppr_ctx_preds_with :: Ppr a => (Precedence -> a -> Doc) -> Precedence -> [a] -> Doc
+ppr_ctx_preds_with _ _ [] = text "()"
+ppr_ctx_preds_with f p [t] = f p t
+ppr_ctx_preds_with _ _ ts = parens (commaSep ts)
 
 ppr_cxt_preds :: Precedence -> Cxt -> Doc
-ppr_cxt_preds _ [] = text "()"
-ppr_cxt_preds p [t] = pprType p t
-ppr_cxt_preds _ ts = parens (commaSep ts)
+ppr_cxt_preds = ppr_ctx_preds_with pprType
 
 ------------------------------
 instance Ppr Range where

@@ -22,7 +22,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module Language.Haskell.Syntax.Type (
         HsScaled(..),
         hsMult, hsScaledThing,
-        HsArrow(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
+        HsArrow, HsArrowOf(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -935,26 +935,28 @@ data HsTyLit pass
   | HsCharTy (XCharTy pass) Char
   | XTyLit   !(XXTyLit pass)
 
+type HsArrow pass = HsArrowOf (LHsType pass) pass
+
 -- | Denotes the type of arrows in the surface language
-data HsArrow pass
-  = HsUnrestrictedArrow !(XUnrestrictedArrow pass)
+data HsArrowOf mult pass
+  = HsUnrestrictedArrow !(XUnrestrictedArrow mult pass)
     -- ^ a -> b or a → b
 
-  | HsLinearArrow !(XLinearArrow pass)
+  | HsLinearArrow !(XLinearArrow mult pass)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
 
-  | HsExplicitMult !(XExplicitMult pass) !(LHsType pass)
+  | HsExplicitMult !(XExplicitMult mult pass) !mult
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-  | XArrow !(XXArrow pass)
+  | XArrow !(XXArrow mult pass)
 
-type family XUnrestrictedArrow p
-type family XLinearArrow       p
-type family XExplicitMult      p
-type family XXArrow            p
+type family XUnrestrictedArrow mult p
+type family XLinearArrow       mult p
+type family XExplicitMult      mult p
+type family XXArrow            mult p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.

@@ -112,6 +112,19 @@ instance Monad (CvtM' err) where
     Left err -> Left err
     Right (loc',v) -> unCvtM (k v) origin loc'
 
+-- | Return first success or first error.
+--
+-- Primary case should be the first because it
+-- would determine returned error message
+orOnFail :: CvtM' err a -> CvtM' err a -> CvtM' err a
+(CvtM m1) `orOnFail` (CvtM m2) = CvtM $ \origin l -> choose (m1 origin l) (m2 origin l)
+  where
+    choose r@Right{}  _         = r
+    choose _          r@Right{} = r
+    choose err@Left{} _         = err
+
+infixl 3 `orOnFail` -- The same fixity as for <|>
+
 mapCvtMError :: (err1 -> err2) -> CvtM' err1 a -> CvtM' err2 a
 mapCvtMError f (CvtM m) = CvtM $ \origin loc -> first f $ m origin loc
 
@@ -1031,7 +1044,7 @@ cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapLA (cvt e)
   where
     cvt (VarE s)   = do { s' <- vName s; wrapParLA (HsVar noExtField) s' }
-    cvt (ConE s)   = do { s' <- cName s; wrapParLA (HsVar noExtField) s' }
+    cvt (ConE s)   = do { s' <- dName s; wrapParLA (HsVar noExtField) s' }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)
@@ -1171,6 +1184,21 @@ cvtl e = wrapLA (cvt e)
                                ; return $ HsTypedBracket noAnn e' }
     cvt (TypeE t) = do { t' <- cvtType t
                        ; return $ HsEmbTy noAnn (mkHsWildCardBndrs t') }
+    cvt (ConstrainedE ctx body) = do { ctx' <- mapM cvtl ctx
+                                     ; body' <- cvtl body
+                                     ; return $ HsQual noExtField (L noAnn ctx') body' }
+    cvt (ForallE tvs body) =
+      do { tvs' <- cvtTvs tvs
+         ; body' <- cvtl body
+         ; let tele = setTelescopeBndrsNameSpace varName $
+                      mkHsForAllInvisTele noAnn tvs'
+         ; return $ HsForAll noExtField tele body' }
+    cvt (ForallVisE tvs body) =
+      do { tvs' <- cvtTvs tvs
+         ; body' <- cvtl body
+         ; let tele = setTelescopeBndrsNameSpace varName $
+                      mkHsForAllVisTele noAnn tvs'
+         ; return $ HsForAll noExtField tele body' }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
@@ -1442,7 +1470,7 @@ cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noAnn p' alt arity }
-cvtp (ConP s ts ps)    = do { s' <- cNameN s
+cvtp (ConP s ts ps)    = do { s' <- dNameN s
                             ; ps' <- cvtPats ps
                             ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
@@ -1453,7 +1481,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                                 , pat_args = PrefixCon pts pps
                                 }
                             }
-cvtp (InfixP p1 s p2)  = do { s' <- cNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
+cvtp (InfixP p1 s p2)  = do { s' <- dNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
                             ; wrapParLA gParPat $
                               ConPat
                                 { pat_con_ext = noAnn
@@ -2082,9 +2110,9 @@ mkHsOuterFamEqnTyVarBndrs = maybe mkHsOuterImplicit (mkHsOuterExplicit noAnn)
 --------------------------------------------------------------------
 
 -- variable names
-vNameN, cNameN, vcNameN, tNameN, tconNameN :: TH.Name -> CvtM (LocatedN RdrName)
-vNameL                                     :: TH.Name -> CvtM (LocatedA RdrName)
-vName,  cName,  vcName,  tName,  tconName  :: TH.Name -> CvtM RdrName
+vNameN, cNameN, vcNameN, tNameN, tconNameN, dNameN :: TH.Name -> CvtM (LocatedN RdrName)
+vNameL                                             :: TH.Name -> CvtM (LocatedA RdrName)
+vName,  cName,  vcName,  tName,  tconName,  dName  :: TH.Name -> CvtM RdrName
 
 -- Variable names
 vNameN n = wrapLN (vName n)
@@ -2094,6 +2122,10 @@ vName n = cvtName OccName.varName n
 -- Constructor function names; this is Haskell source, hence srcDataName
 cNameN n = wrapLN (cName n)
 cName n = cvtName OccName.dataName n
+
+-- Type or data constructor name
+dNameN n = wrapLN (dName n)
+dName n = cName n `orOnFail` tconName n
 
 -- Variable *or* constructor names; check by looking at the first char
 vcNameN n = wrapLN (vcName n)

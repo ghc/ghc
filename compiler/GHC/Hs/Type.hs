@@ -25,7 +25,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module GHC.Hs.Type (
         Mult, HsScaled(..),
         hsMult, hsScaledThing,
-        HsArrow(..), arrowToHsType,
+        HsArrow, HsArrowOf(..), arrowToHsType, expandHsArrow,
         EpLinearArrow(..),
         hsLinear, hsUnrestricted, isUnrestricted,
         pprHsArrow,
@@ -461,25 +461,19 @@ data EpLinearArrow
 instance NoAnn EpLinearArrow where
   noAnn = EpPct1 noAnn noAnn
 
-type instance XUnrestrictedArrow GhcPs = EpUniToken "->" "→"
-type instance XUnrestrictedArrow GhcRn = NoExtField
-type instance XUnrestrictedArrow GhcTc = NoExtField
+type instance XUnrestrictedArrow _ GhcPs = EpUniToken "->" "→"
+type instance XUnrestrictedArrow _ GhcRn = NoExtField
+type instance XUnrestrictedArrow _ GhcTc = NoExtField
 
-type instance XLinearArrow       GhcPs = EpLinearArrow
-type instance XLinearArrow       GhcRn = NoExtField
-type instance XLinearArrow       GhcTc = NoExtField
+type instance XLinearArrow       _ GhcPs = EpLinearArrow
+type instance XLinearArrow       _ GhcRn = NoExtField
+type instance XLinearArrow       _ GhcTc = NoExtField
 
-type instance XExplicitMult      GhcPs = (EpToken "%", EpUniToken "->" "→")
-type instance XExplicitMult      GhcRn = NoExtField
-type instance XExplicitMult      GhcTc = NoExtField
+type instance XExplicitMult      _ GhcPs = (EpToken "%", EpUniToken "->" "→")
+type instance XExplicitMult      _ GhcRn = NoExtField
+type instance XExplicitMult      _ GhcTc = NoExtField
 
-type instance XXArrow            (GhcPass _) = DataConCantHappen
-
-oneDataConHsTy :: HsType GhcRn
-oneDataConHsTy = HsTyVar noAnn NotPromoted (noLocA oneDataConName)
-
-manyDataConHsTy :: HsType GhcRn
-manyDataConHsTy = HsTyVar noAnn NotPromoted (noLocA manyDataConName)
+type instance XXArrow            _ (GhcPass _) = DataConCantHappen
 
 hsLinear :: forall p a. IsPass p => a -> HsScaled (GhcPass p) a
 hsLinear = HsScaled (HsLinearArrow x)
@@ -501,21 +495,24 @@ isUnrestricted :: HsArrow GhcRn -> Bool
 isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
 isUnrestricted _ = False
 
+arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
+arrowToHsType = expandHsArrow (HsTyVar noAnn NotPromoted)
+
 -- | Convert an arrow into its corresponding multiplicity. In essence this
 -- erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
-arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
-arrowToHsType (HsUnrestrictedArrow _) = noLocA manyDataConHsTy
-arrowToHsType (HsLinearArrow _) = noLocA oneDataConHsTy
-arrowToHsType (HsExplicitMult _ p) = p
+expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
+expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
+expandHsArrow mk_var (HsLinearArrow _) = noLocA (mk_var (noLocA oneDataConName))
+expandHsArrow _mk_var (HsExplicitMult _ p) = p
 
 instance
-      (OutputableBndrId pass) =>
-      Outputable (HsArrow (GhcPass pass)) where
+      (Outputable mult, OutputableBndrId pass) =>
+      Outputable (HsArrowOf mult (GhcPass pass)) where
   ppr arr = parens (pprHsArrow arr)
 
 -- See #18846
-pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
+pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsArrowOf mult (GhcPass pass) -> SDoc
 pprHsArrow (HsUnrestrictedArrow _) = pprArrowWithMultiplicity visArgTypeLike (Left False)
 pprHsArrow (HsLinearArrow _)       = pprArrowWithMultiplicity visArgTypeLike (Left True)
 pprHsArrow (HsExplicitMult _ p)    = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))

@@ -1,0 +1,18 @@
+T24159_viewpat.hs:8:5: warning: [GHC-00834] [-Wview-pattern-signatures (in -Wdefault)]
+    Found an unparenthesized pattern signature on the RHS of a view pattern.
+    This code might stop working in a future GHC release
+    due to a planned change to the precedence of view patterns,
+    unless the view function is an endofunction.
+      Current parse: ‘isJust -> (True :: Bool)’
+      Future parse: ‘(isJust -> True) :: Bool’
+    Suggested fix: Parenthesize the RHS of the view pattern
+
+T24159_viewpat.hs:11:5: warning: [GHC-00834] [-Wview-pattern-signatures (in -Wdefault)]
+    Found an unparenthesized pattern signature on the RHS of a view pattern.
+    This code might stop working in a future GHC release
+    due to a planned change to the precedence of view patterns,
+    unless the view function is an endofunction.
+      Current parse: ‘id -> isJust -> (True :: Bool)’
+      Future parse: ‘(id -> isJust -> True) :: Bool’
+    Suggested fix: Parenthesize the RHS of the view pattern
+
