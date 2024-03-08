@@ -1284,6 +1284,22 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsEmbTy _ ty ->
         [ toHie $ TS (ResolvedScopes []) ty
         ]
+      HsQual _ ctx body ->
+        [ toHie ctx
+        , toHie body
+        ]
+      HsForAll x tele body -> case hiePass @p of
+        HieRn ->
+          [ toHieForAllTele tele (getLocA body)
+          ]
+        HieTc -> dataConCantHappen x
+      HsFunArr x mult arg res -> case hiePass @p of
+        HieRn ->
+          [ toHie (arrowToHsExpr mult)
+          , toHie arg
+          , toHie res
+          ]
+        HieTc -> dataConCantHappen x
       HsTypedBracket xbracket b -> case hiePass @p of
         HieRn ->
           [ toHie b
@@ -1837,15 +1853,16 @@ instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
     HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
     HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
 
+toHieForAllTele ::  HsForAllTelescope GhcRn -> SrcSpan -> HieM [HieAST Type]
+toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
+  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
+toHieForAllTele (HsForAllInvis { hsf_invis_bndrs = bndrs }) loc =
+  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
+
 instance ToHie (LocatedA (HsType GhcRn)) where
   toHie (L span t) = concatM $ makeNode t (locA span) : case t of
       HsForAllTy _ tele body ->
-        let scope = mkScope $ getLocA body in
-        [ case tele of
-            HsForAllVis { hsf_vis_bndrs = bndrs } ->
-              toHie $ tvScopes (ResolvedScopes []) scope bndrs
-            HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-              toHie $ tvScopes (ResolvedScopes []) scope bndrs
+        [ toHieForAllTele tele (getLocA body)
         , toHie body
         ]
       HsQualTy _ ctx body ->
@@ -1946,6 +1963,12 @@ instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
       [ locOnly (locA span)
       , toHie tys
       ]
+
+instance HiePass p => ToHie (LocatedC [LocatedA (HsExpr (GhcPass p))]) where
+  toHie (L span exprs) = concatM $
+    [ locOnly (locA span)
+    , toHie exprs
+    ]
 
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of

@@ -117,6 +117,8 @@ module GHC.Tc.Errors.Types (
   , NonCanonicalDefinition(..)
   , NonCanonical_Monoid(..)
   , NonCanonical_Monad(..)
+  , TypeSyntax(..)
+  , typeSyntaxExtension
 
     -- * Errors for hs-boot and signature files
   , BadBootDecls(..)
@@ -4189,20 +4191,28 @@ data TcRnMessage where
   -}
   TcRnIllformedTypeArgument :: !(LHsExpr GhcRn) -> TcRnMessage
 
-  {-| TcRnIllegalTypeExpr is an error raised when an expression constructed
-      with the @type@ keyword occurs in a position that does not correspond
-      to a required type argument (visible forall).
+  {- TcRnIllegalTypeExpr is an error raised when an expression constructed with
+     type syntax (@type@, @->@, @=>@, @forall@) occurs in a position that
+     doesn't correspond to required type argument (visible forall).
 
-      Example:
+     Examples:
 
-        xtop = type Int                  -- not a function argument
-        xarg = length (type Int)         -- `length` does not expect a required type argument
+        -- Not a function argument:
+        xtop1 = type Int
+        xtop2 = (Int -> Int)
+        xtop3 = (forall a. a)
+        xtop4 = ((Show Int, Eq Bool) => Unit)
 
-      Test cases:
+        -- The function does not expect a type argument:
+        xarg1 = length (type Int)
+        xarg2 = show (Int -> Int)
+
+     Test cases:
         T22326_fail_app
         T22326_fail_top
+        T24159_type_syntax_tc_fail
   -}
-  TcRnIllegalTypeExpr :: TcRnMessage
+  TcRnIllegalTypeExpr :: TypeSyntax -> TcRnMessage
 
   {-| TcRnInvalidDefaultedTyVar is an error raised when a
       defaulting plugin proposes to default a type variable that is
@@ -4314,10 +4324,22 @@ data TcRnMessage where
           $(invisP (varT (newName "blah"))) <- aciton1
           ...
 
-     Test cases:
+     Test cases: T24557a T24557b T24557c T24557d
 
   -}
   TcRnMisplacedInvisPat :: HsTyPat GhcPs -> TcRnMessage
+
+  {- TcRnUnexpectedTypeSyntaxInTerms is an error that occurs
+     when type syntax is used in terms without -XRequiredTypeArguments
+     extension enabled
+
+     Examples:
+
+       idVis (forall a. forall b -> (a ~ Int, b ~ Bool) => a -> b)
+
+    Test cases: T24159_type_syntax_rn_fail
+  -}
+  TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
   deriving Generic
 
 ----
@@ -6789,3 +6811,18 @@ data TcRnNoDerivStratSpecifiedInfo where
     :: AssumedDerivingStrategy
     -> LHsSigWcType GhcRn -- ^ The instance signature (e.g @Show a => Show (T a)@)
     -> TcRnNoDerivStratSpecifiedInfo
+
+-- | Label for syntax that may occur in terms (expressions) only as part of a
+--   required type argument.
+data TypeSyntax
+  = TypeKeywordSyntax      -- ^ @type t@
+  | ContextArrowSyntax     -- ^ @ctx => t@
+  | FunctionArrowSyntax    -- ^ @t1 -> t2@
+  | ForallTelescopeSyntax  -- ^ @forall tvs. t@
+  deriving Generic
+
+typeSyntaxExtension :: TypeSyntax -> LangExt.Extension
+typeSyntaxExtension TypeKeywordSyntax     = LangExt.ExplicitNamespaces
+typeSyntaxExtension ContextArrowSyntax    = LangExt.RequiredTypeArguments
+typeSyntaxExtension FunctionArrowSyntax   = LangExt.RequiredTypeArguments
+typeSyntaxExtension ForallTelescopeSyntax = LangExt.RequiredTypeArguments

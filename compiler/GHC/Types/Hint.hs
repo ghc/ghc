@@ -499,6 +499,9 @@ data GhcHint
     AssumedDerivingStrategy -- ^ The deriving strategy we assumed
     (LHsSigWcType GhcRn) -- ^ The instance signature (e.g 'Show a => Show (T a)')
 
+  {-| Suggest add parens to pattern `e -> p :: t` -}
+  | SuggestParenthesizePatternRHS
+
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.
 --   There's no `Via` case because we never assume that.

@@ -429,6 +429,15 @@ fromThenToE x y z = do { a <- x; b <- y; c <- z;
 typeE :: Quote m => m Type -> m Exp
 typeE = fmap TypeE
 
+forallE :: Quote m => [m (TyVarBndr Specificity)] -> m Exp -> m Exp
+forallE tvars body = ForallE <$> sequenceA tvars <*> body
+
+forallVisE :: Quote m => [m (TyVarBndr ())] -> m Exp -> m Exp
+forallVisE tvars body = ForallVisE <$> sequenceA tvars <*> body
+
+constrainedE :: Quote m => [m Exp] -> m Exp -> m Exp
+constrainedE ctx body = ConstrainedE <$> sequenceA ctx <*> body
+
 -------------------------------------------------------------------------------
 -- *   Dec
 

@@ -1268,10 +1268,10 @@ instance Diagnostic TcRnMessage where
     TcRnIllformedTypeArgument e
       -> mkSimpleDecorated $
           hang (text "Ill-formed type argument:") 2 (ppr e)
-    TcRnIllegalTypeExpr
-      -> mkSimpleDecorated $
-          text "Illegal type expression." $$
-          text "A type expression must be used to instantiate a visible forall."
+    TcRnIllegalTypeExpr syntax -> mkSimpleDecorated $
+      vcat [ text "Illegal" <+> pprTypeSyntaxName syntax
+           , text "Type syntax may only be used in a required type argument,"
+           , text "i.e. to instantiate a visible forall." ]
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -1953,6 +1953,9 @@ instance Diagnostic TcRnMessage where
     TcRnMisplacedInvisPat tp -> mkSimpleDecorated $
       text "Invisible type pattern" <+> ppr tp <+> text "is not allowed here"
 
+    TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
+      text "Unexpected" <+> pprTypeSyntaxName syntax
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2592,6 +2595,8 @@ instance Diagnostic TcRnMessage where
     TcRnOutOfArityTyVar{}
       -> ErrorWithoutFlag
     TcRnMisplacedInvisPat{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedTypeSyntaxInTerms{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3271,6 +3276,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMisplacedInvisPat{}
       -> noHints
+    TcRnUnexpectedTypeSyntaxInTerms syntax
+      -> [suggestExtension (typeSyntaxExtension syntax)]
 
   diagnosticCode = constructorCode
 
@@ -6903,3 +6910,9 @@ zonkerMessageReason = \case
   ZonkerCannotDefaultConcrete {} -> ErrorWithoutFlag
 
 --------------------------------------------------------------------------------
+
+pprTypeSyntaxName :: TypeSyntax -> SDoc
+pprTypeSyntaxName TypeKeywordSyntax     = "keyword" <+> quotes "type"
+pprTypeSyntaxName ForallTelescopeSyntax = "forall telescope"
+pprTypeSyntaxName ContextArrowSyntax    = "context arrow (=>)"
+pprTypeSyntaxName FunctionArrowSyntax   = "function type arrow (->)"

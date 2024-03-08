@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 
 module GHC.Parser.Errors.Types where
 
@@ -141,6 +142,23 @@ data PsMessage
 
    | PsWarnOperatorWhitespace !FastString !OperatorWhitespaceOccurrence
 
+   {- | PsWarnViewPatternSignatures is a warning triggered by view patterns whose
+        RHS is an unparenthesised pattern signature. It warns on code that is
+        highly likely to break when the precedence of view patterns relative to
+        pattern signatures is changed per GHC Proposal #281. The suggested fix
+        is to add parentheses.
+
+        Example:
+          f1 (isJust -> True :: Bool) = ()
+
+        Suggested fix:
+          f1 (isJust -> (True :: Bool)) = ()
+
+        Test cases:
+          T24159_viewpat
+   -}
+   | PsWarnViewPatternSignatures !(LPat GhcPs) !(LPat GhcPs)
+
    -- | LambdaCase syntax used without the extension enabled
    | PsErrLambdaCase
 
@@ -266,9 +284,6 @@ data PsMessage
 
    -- | Arrow command-syntax in expression
    | PsErrArrowCmdInExpr !(HsCmd GhcPs)
-
-   -- | View-pattern in expression
-   | PsErrViewPatInExpr !(LHsExpr GhcPs) !(LHsExpr GhcPs)
 
    -- | Or-pattern in expression
    | PsErrOrPatInExpr !(LPat GhcPs)
@@ -467,6 +482,15 @@ data PsMessage
    -- | Or pattern used without -XOrPatterns
    | PsErrIllegalOrPat (LPat GhcPs)
 
+   -- | Temporary error until GHC gains support for type syntax in patterns.
+   --   Test cases: T24159_pat_parse_error_1
+   --               T24159_pat_parse_error_2
+   --               T24159_pat_parse_error_3
+   --               T24159_pat_parse_error_4
+   --               T24159_pat_parse_error_5
+   --               T24159_pat_parse_error_6
+   | PsErrTypeSyntaxInPat !PsErrTypeSyntaxDetails
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps
@@ -526,6 +550,19 @@ data PsErrPunDetails
   = PEP_QuoteDisambiguation
   | PEP_TupleSyntaxType
   | PEP_SumSyntaxType
+
+data PsErrTypeSyntaxDetails
+  = PETS_FunctionArrow
+      !(LocatedA (PatBuilder GhcPs))
+      !(HsArrowOf (LocatedA (PatBuilder GhcPs)) GhcPs)
+      !(LocatedA (PatBuilder GhcPs))
+  | PETS_Multiplicity
+      !(EpToken "%")
+      !(LocatedA (PatBuilder GhcPs))
+  | PETS_ForallTelescope
+      !(HsForAllTelescope GhcPs)
+      !(LocatedA (PatBuilder GhcPs))
+  | PETS_ConstraintContext !(LocatedA (PatBuilder GhcPs))
 
 noParseContext :: ParseContext
 noParseContext = ParseContext Nothing NoIncompleteDoBlock

@@ -1,0 +1,85 @@
+T24159_type_syntax_tc_fail.hs:9:10: error: [GHC-35499]
+    • Illegal function type arrow (->)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the first argument of ‘id’, namely ‘(Int -> Int)’
+      In the expression: id (Int -> Int) (+ 1)
+      In an equation for ‘f1’: f1 = id (Int -> Int) (+ 1)
+
+T24159_type_syntax_tc_fail.hs:12:7: error: [GHC-35499]
+    • Illegal function type arrow (->)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (Int %One -> Int) (\ x -> x)
+      In an equation for ‘f2’: f2 = (Int %One -> Int) (\ x -> x)
+
+T24159_type_syntax_tc_fail.hs:15:10: error: [GHC-35499]
+    • Illegal function type arrow (->)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the first argument of ‘id’, namely ‘(Int %1 -> Int)’
+      In the expression: id (Int %1 -> Int) (\ x -> x)
+      In an equation for ‘f3’: f3 = id (Int %1 -> Int) (\ x -> x)
+
+T24159_type_syntax_tc_fail.hs:18:7: error: [GHC-35499]
+    • Illegal function type arrow (->)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (Int %One -> Int) (\ x -> x)
+      In an equation for ‘f4’: f4 = (Int %One -> Int) (\ x -> x)
+
+T24159_type_syntax_tc_fail.hs:21:7: error: [GHC-35499]
+    • Illegal function type arrow (->)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (Int %1 -> Int) (\ x -> x)
+      In an equation for ‘f5’: f5 = (Int %1 -> Int) (\ x -> x)
+
+T24159_type_syntax_tc_fail.hs:24:7: error: [GHC-35499]
+    • Illegal forall telescope
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (forall a. a -> a) id
+      In an equation for ‘f6’: f6 = (forall a. a -> a) id
+
+T24159_type_syntax_tc_fail.hs:27:7: error: [GHC-35499]
+    • Illegal forall telescope
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (forall a -> a -> a) idVis
+      In an equation for ‘f7’: f7 = (forall a -> a -> a) idVis
+
+T24159_type_syntax_tc_fail.hs:30:9: error: [GHC-35499]
+    • Illegal forall telescope
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (forall a. a -> a) id
+      In an equation for ‘f8’: f8 a = (forall a. a -> a) id
+
+T24159_type_syntax_tc_fail.hs:33:7: error: [GHC-35499]
+    • Illegal context arrow (=>)
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (() => Int -> Int) id
+      In an equation for ‘f9’: f9 = (() => Int -> Int) id
+
+T24159_type_syntax_tc_fail.hs:36:8: error: [GHC-35499]
+    • Illegal forall telescope
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression: (forall a. Show a => a -> String) show
+      In an equation for ‘f10’:
+          f10 = (forall a. Show a => a -> String) show
+
+T24159_type_syntax_tc_fail.hs:39:8: error: [GHC-35499]
+    • Illegal forall telescope
+      Type syntax may only be used in a required type argument,
+      i.e. to instantiate a visible forall.
+    • In the expression:
+        (forall a1. forall b1 -> (a1 ~ Int, b1 ~ Bool) => a1 -> b1)
+          (\ _ _ -> True)
+      In an equation for ‘f11’:
+          f11
+            = (forall a1. forall b1 -> (a1 ~ Int, b1 ~ Bool) => a1 -> b1)
+                (\ _ _ -> True)
+

@@ -483,6 +483,9 @@ addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsEmbTy {})            = return e
+addTickHsExpr e@(HsQual {})             = return e
+addTickHsExpr e@(HsForAll {})           = return e
+addTickHsExpr e@(HsFunArr {})           = return e
 addTickHsExpr (HsLam x v mg)            = liftM (HsLam x v)
                                                 (addTickMatchGroup True mg)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)

@@ -62,7 +62,7 @@ templateHaskellNames = [
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName,
-    typeEName,
+    typeEName, forallEName, forallVisEName, constrainedEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -314,7 +314,8 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, lamCasesEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName, getFieldEName, projectionEName, typeEName :: Name
+    labelEName, implicitParamVarEName, getFieldEName, projectionEName, typeEName,
+    forallEName, forallVisEName, constrainedEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -356,6 +357,9 @@ implicitParamVarEName = libFun (fsLit "implicitParamVarE") implicitParamVarEIdKe
 getFieldEName         = libFun (fsLit "getFieldE")         getFieldEIdKey
 projectionEName       = libFun (fsLit "projectionE")       projectionEIdKey
 typeEName             = libFun (fsLit "typeE")             typeEIdKey
+forallEName           = libFun (fsLit "forallE")           forallEIdKey
+forallVisEName        = libFun (fsLit "forallVisE")        forallVisEIdKey
+constrainedEName      = libFun (fsLit "constrainedE")      constrainedEIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -883,7 +887,8 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
-    getFieldEIdKey, projectionEIdKey, typeEIdKey :: Unique
+    getFieldEIdKey, projectionEIdKey, typeEIdKey, forallEIdKey,
+    forallVisEIdKey, constrainedEIdKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
 litEIdKey              = mkPreludeMiscIdUnique 272
@@ -893,7 +898,7 @@ infixEIdKey            = mkPreludeMiscIdUnique 275
 infixAppIdKey          = mkPreludeMiscIdUnique 276
 sectionLIdKey          = mkPreludeMiscIdUnique 277
 sectionRIdKey          = mkPreludeMiscIdUnique 278
-lamEIdKey           = mkPreludeMiscIdUnique 279
+lamEIdKey              = mkPreludeMiscIdUnique 279
 lamCaseEIdKey          = mkPreludeMiscIdUnique 280
 lamCasesEIdKey         = mkPreludeMiscIdUnique 281
 tupEIdKey              = mkPreludeMiscIdUnique 282
@@ -921,6 +926,9 @@ mdoEIdKey              = mkPreludeMiscIdUnique 303
 getFieldEIdKey         = mkPreludeMiscIdUnique 304
 projectionEIdKey       = mkPreludeMiscIdUnique 305
 typeEIdKey             = mkPreludeMiscIdUnique 306
+forallEIdKey           = mkPreludeMiscIdUnique 802
+forallVisEIdKey        = mkPreludeMiscIdUnique 803
+constrainedEIdKey      = mkPreludeMiscIdUnique 804
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

@@ -850,7 +850,7 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
 
 -- ---------------------------------------------------------------------
 
-markArrow :: (Monad m, Monoid w) => HsArrow GhcPs -> EP w m (HsArrow GhcPs)
+markArrow :: (Monad m, Monoid w, ExactPrint a) => HsArrowOf a GhcPs -> EP w m (HsArrowOf a GhcPs)
 markArrow (HsUnrestrictedArrow arr) = do
   arr' <- markEpUniToken arr
   return (HsUnrestrictedArrow arr')
@@ -3234,6 +3234,22 @@ instance ExactPrint (HsExpr GhcPs) where
     t' <- markAnnotated t
     return (HsEmbTy toktype' t')
 
+  exact (HsFunArr _ mult arg res) = do
+    arg' <- markAnnotated arg
+    mult' <- markArrow mult
+    res' <- markAnnotated res
+    return (HsFunArr noExtField mult' arg' res')
+
+  exact (HsForAll _ tele body) = do
+    tele' <- markAnnotated tele
+    body' <- markAnnotated body
+    return (HsForAll noExtField tele' body')
+
+  exact (HsQual _ ctxt body) = do
+    ctxt' <- markAnnotated ctxt
+    body' <- markAnnotated body
+    return (HsQual noExtField ctxt' body')
+
   exact x = error $ "exact HsExpr for:" ++ showAst x
 
 -- ---------------------------------------------------------------------
@@ -4725,9 +4741,9 @@ instance ExactPrint (Pat GhcPs) where
   exact (ConPat an con details) = do
     (an', con', details') <- exactUserCon an con details
     return (ConPat an' con' details')
-  exact (ViewPat an expr pat) = do
+  exact (ViewPat tokarr expr pat) = do
     expr' <- markAnnotated expr
-    an0 <- markEpAnnL an lidl AnnRarrow
+    an0 <- markEpUniToken tokarr
     pat' <- markAnnotated pat
     return (ViewPat an0 expr' pat')
   exact (SplicePat x splice) = do

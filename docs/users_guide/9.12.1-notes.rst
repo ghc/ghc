@@ -40,6 +40,13 @@ Language
 - GHC now takes COMPLETE pragmas into consideration when deciding whether
   pattern matches in do notation are fallible.
 
+- As part of `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  GHC now accepts type syntax in expressions, namely function type arrow ``a -> b``,
+  constraint arrow ``a => b``, and ``forall`` telescopes: ::
+
+    g = f (forall a. Show a => a -> String)
+      where f :: forall a -> ...
+
 Compiler
 ~~~~~~~~
 
@@ -87,6 +94,8 @@ Compiler
 - Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
   on certain programs. (#24941)
 
+- A new warning :ghc-flag:`-Wview-pattern-signatures` is introduced to notify users about
+  future changes in parsing of view patterns in combination with pattern signatures
 
 GHCi
 ~~~~
