@@ -165,6 +165,18 @@ ObjectCode *loaded_objects;
 // map static closures to their ObjectCode.
 static OCSectionIndices *global_s_indices = NULL;
 
+// Is it safe for us to unload code?
+static bool safeToUnload(void)
+{
+    if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING) {
+        // We mustn't unload anything as the heap census may contain
+        // references into static data (e.g. cost centre names).
+        // See #24512.
+        return false;
+    }
+    return true;
+}
+
 static OCSectionIndices *createOCSectionIndices(void)
 {
     // TODO (osa): Maybe initialize as empty (without allocation) and allocate
@@ -456,6 +468,8 @@ bool prepareUnloadCheck(void)
 void checkUnload(void)
 {
     if (global_s_indices == NULL) {
+        return;
+    } else if (!safeToUnload()) {
         return;
     }
 
