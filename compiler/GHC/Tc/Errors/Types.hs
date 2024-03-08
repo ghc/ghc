@@ -4129,19 +4129,15 @@ data TcRnMessage where
       corresponding to a required type argument (visible forall)
       does not have a form that can be interpreted as a type pattern.
 
-      At the moment, only patterns constructed using the @type@ keyword
-      are considered well-formed, but this restriction will be relaxed
-      when part 2 of GHC Proposal #281 is implemented.
-
       Example:
 
         vfun :: forall (a :: k) -> ()
-        vfun x = ()
-        --   ^
-        --  expected `type x` instead of `x`
+        vfun !x = ()
+        --   ^^
+        -- bang-patterns not allowed as type patterns
 
       Test cases:
-          T22326_fail_raw_pat
+          T22326_fail_bang_pat
   -}
   TcRnIllformedTypePattern :: !(Pat GhcRn) -> TcRnMessage
 
@@ -4173,7 +4169,7 @@ data TcRnMessage where
         -- lambdas not allowed in type arguments
 
       Test cases:
-        T22326_fail_raw_arg
+        T22326_fail_lam_arg
   -}
   TcRnIllformedTypeArgument :: !(LHsExpr GhcRn) -> TcRnMessage
 
