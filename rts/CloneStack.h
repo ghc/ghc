@@ -15,7 +15,7 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
 void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
-StgMutArrPtrs* decodeClonedStack(Capability *cap, StgStack* stack);
+StgArrBytes* decodeClonedStack(Capability *cap, StgStack* stack);
 
 #include "BeginPrivate.h"
 

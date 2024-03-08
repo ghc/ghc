@@ -25,10 +25,12 @@ module GHC.Internal.Stack.CloneStack (
 import GHC.Internal.MVar
 import GHC.Internal.Data.Maybe (catMaybes)
 import GHC.Internal.Base
+import GHC.Internal.Foreign.Storable
 import GHC.Internal.Conc.Sync
 import GHC.Internal.IO (unsafeInterleaveIO)
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE, StgInfoTable)
 import GHC.Internal.Num
+import GHC.Internal.Real (div)
 import GHC.Internal.Stable
 import GHC.Internal.Text.Show
 import GHC.Internal.Ptr
@@ -39,7 +41,7 @@ import GHC.Internal.ClosureTypes
 -- @since base-4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
 
-foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr StgInfoTable) #)
+foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, ByteArray# #)
 
 foreign import prim "stg_cloneMyStackzh" cloneMyStack# :: State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -245,18 +247,21 @@ toStackEntry infoProv =
 getDecodedStackArray :: StackSnapshot -> IO [Maybe StackEntry]
 getDecodedStackArray (StackSnapshot s) =
   IO $ \s0 -> case decodeStack# s s0 of
-    (# s1, arr #) -> unIO (go arr (I# (sizeofArray# arr) - 1)) s1
+    (# s1, arr #) ->
+      let n = I# (sizeofByteArray# arr) `div` wordSize - 1
+       in unIO (go arr n) s1
   where
-    go :: Array# (Ptr StgInfoTable) -> Int -> IO [Maybe StackEntry]
+    go :: ByteArray# -> Int -> IO [Maybe StackEntry]
     go _stack (-1) = return []
     go stack i = do
       infoProv <- lookupIPE (stackEntryAt stack i)
       rest <- unsafeInterleaveIO $ go stack (i-1)
       return ((toStackEntry `fmap` infoProv) : rest)
 
-    stackEntryAt :: Array# (Ptr StgInfoTable) -> Int -> Ptr StgInfoTable
-    stackEntryAt stack (I# i) = case indexArray# stack i of
-      (# se #) -> se
+    stackEntryAt :: ByteArray# -> Int -> Ptr StgInfoTable
+    stackEntryAt stack (I# i) = Ptr (indexAddrArray# stack i)
+
+    wordSize = sizeOf (nullPtr :: Ptr ())
 
 prettyStackEntry :: StackEntry -> String
 prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =
