@@ -1391,6 +1391,8 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->prev              = NULL;
    oc->next_loaded_object = NULL;
    oc->mark              = object_code_mark_bit;
+   /* this will get cleared by the caller if object is not safely unloadable */
+   oc->unloadable        = true;
    oc->dependencies      = allocHashSet();
 
 #if defined(NEED_M32)

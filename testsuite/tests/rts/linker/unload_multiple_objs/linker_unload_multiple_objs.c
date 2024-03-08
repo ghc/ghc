@@ -64,7 +64,7 @@ void check_object_freed(char *obj_path) {
     OStatus st;
     st = getObjectLoadStatus(toPathchar(obj_path));
     if (st != OBJECT_NOT_LOADED) {
-        errorBelch("object %s status != OBJECT_NOT_LOADED", obj_path);
+        errorBelch("object %s status != OBJECT_NOT_LOADED, is %d instead", obj_path, st);
         exit(1);
     }
 }

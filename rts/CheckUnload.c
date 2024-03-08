@@ -478,8 +478,6 @@ void checkUnload(void)
         next = oc->next;
         ASSERT(oc->status == OBJECT_UNLOADED);
 
-        removeOCSectionIndices(s_indices, oc);
-
         // Symbols should be removed by unloadObj_.
         // NB (osa): If this assertion doesn't hold then freeObjectCode below
         // will corrupt symhash as keys of that table live in ObjectCodes. If
@@ -487,8 +485,17 @@ void checkUnload(void)
         // RTS) then it's probably because this assertion did not hold.
         ASSERT(oc->symbols == NULL);
 
-        freeObjectCode(oc);
-        n_unloaded_objects -= 1;
+        if (oc->unloadable) {
+            removeOCSectionIndices(s_indices, oc);
+            freeObjectCode(oc);
+            n_unloaded_objects -= 1;
+        } else {
+            // If we don't have enough information to
+            // accurately determine the reachability of
+            // the object then hold onto it.
+            oc->next = objects;
+            objects = oc;
+        }
     }
 
     old_objects = NULL;
