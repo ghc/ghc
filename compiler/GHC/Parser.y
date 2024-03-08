@@ -2749,41 +2749,63 @@ quasiquote :: { Located (HsUntypedSplice GhcPs) }
                                 ; quoterId = mkQual varName (qual, quoter) }
                             in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
 
-exp   :: { ECP }
-        : infixexp '::' ctype
+exp  :: { ECP } : exp_gen(infixexp)  { $1 }
+exp2 :: { ECP } : exp_gen(infixexp2) { $1 }
+
+exp_gen(IEXP) :: { ECP }
+        : IEXP '::' ctype
                                 { ECP $
                                    unECP $1 >>= \ $1 ->
                                    rejectPragmaPV $1 >>
                                    mkHsTySigPV (noAnnSrcSpan $ comb2 $1 $>) $1 $3
                                           [(mu AnnDcolon $2)] }
-        | infixexp '-<' exp     {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '-<' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu Annlarrowtail $2) $1 $3
                                                         HsFirstOrderApp True) }
-        | infixexp '>-' exp     {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '>-' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu Annrarrowtail $2) $3 $1
                                                       HsFirstOrderApp False) }
-        | infixexp '-<<' exp    {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '-<<' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnLarrowtail $2) $1 $3
                                                       HsHigherOrderApp True) }
-        | infixexp '>>-' exp    {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '>>-' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnRarrowtail $2) $3 $1
                                                       HsHigherOrderApp False) }
         -- See Note [%shift: exp -> infixexp]
-        | infixexp %shift       { $1 }
-        | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
+        | IEXP %shift              { $1 }
+        | exp_prag(exp_gen(IEXP))  { $1 } -- See Note [Pragmas and operator fixity]
 
         -- Embed types into expressions and patterns for required type arguments
         | 'type' atype
                 {% do { requireExplicitNamespaces (getLoc $1)
                       ; return $ ECP $ mkHsEmbTyPV (comb2 $1 $>) (epTok $1) $2 } }
+
+infixexp2 :: { ECP }
+        : infixexp %shift       { $1 }
+
+        -- View patterns and function arrows
+        | infixexp '->' infixexp2
+                                { ECP $
+                                  unECP $1 >>= \ $1 ->
+                                  unECP $3 >>= \ $3 ->
+                                  mkHsViewPatPV (comb2 $1 $>) $1 $3 [mu AnnRarrow $2] }
+        | infixexp mult '->'  infixexp2  { error "infixexp2: mult" }
+        | infixexp      '->.' infixexp2  { error "infixexp2: linear arr" }
+        | infixexp      '=>'  infixexp2  { error "infixexp2: double arr" }
+
+        | forall_telescope infixexp2     { error "infixexp2: forall" }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -3028,7 +3050,7 @@ aexp2   :: { ECP }
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
                                                 [mop $1,mcp $3]}
 
-        | '(' orpats ')'                {% do
+        | '(' orpats(exp2) ')'          {% do
                                               { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
                                               ; fmap ecpFromPat
                                                 (amsA' (sLL $1 $> (ParPat (epTok $1, epTok $>) pat))) }}
@@ -3130,7 +3152,7 @@ cvtopdecls0 :: { [LHsDecl GhcPs] }
 -- things that can appear unparenthesized as long as they're
 -- inside parens or delimited by commas
 texp :: { ECP }
-        : exp                { $1 }
+        : exp2               { $1 }
 
         -- Note [Parsing sections]
         -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3155,21 +3177,15 @@ texp :: { ECP }
                                 $1 >>= \ $1 ->
                                 mkHsSectionR_PV (comb2 $1 $>) (n2l $1) $2 }
 
-       -- View patterns get parenthesized above
-        | exp '->' texp   { ECP $
-                             unECP $1 >>= \ $1 ->
-                             unECP $3 >>= \ $3 ->
-                             mkHsViewPatPV (comb2 $1 $>) $1 $3 [mu AnnRarrow $2] }
-
-orpats :: { Located (NonEmpty (LPat GhcPs)) }
+orpats(EXP) :: { Located (NonEmpty (LPat GhcPs)) }
         -- See Note [%shift: orpats -> exp]
-        : exp %shift         {% do
-                                 { pat <- (checkPattern <=< runPV) (unECP $1)
-                                 ; return (sL1 pat (NE.singleton pat)) }}
-        | exp ';' orpats     {% do
-                                 { pat <- (checkPattern <=< runPV) (unECP $1)
-                                 ; pat <- addTrailingSemiA pat (getLoc $2)
-                                 ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
+        : EXP %shift            {% do
+                                    { pat <- (checkPattern <=< runPV) (unECP $1)
+                                    ; return (sL1 pat (NE.singleton pat)) }}
+        | EXP ';' orpats(EXP)   {% do
+                                    { pat <- (checkPattern <=< runPV) (unECP $1)
+                                    ; pat <- addTrailingSemiA pat (getLoc $2)
+                                    ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -3227,17 +3243,17 @@ list :: { forall b. DisambECP b => SrcSpan -> (AddEpAnn, AddEpAnn) -> PV (Locate
         | texp '..'  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
                                   amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (From $1))
                                       >>= ecpFromExp' }
-        | texp ',' exp '..' { \loc (ao,ac) ->
+        | texp ',' exp2 '..' { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    amsA' (L loc $ ArithSeq [ao,mj AnnComma $2,mj AnnDotdot $4,ac] Nothing (FromThen $1 $3))
                                        >>= ecpFromExp' }
-        | texp '..' exp  { \loc (ao,ac) ->
+        | texp '..' exp2  { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (FromTo $1 $3))
                                        >>= ecpFromExp' }
-        | texp ',' exp '..' exp { \loc (ao,ac) ->
+        | texp ',' exp2 '..' exp2 { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    unECP $5 >>= \ $5 ->
@@ -3433,9 +3449,9 @@ pat_syn_pat :: { LPat GhcPs }
 pat_syn_pat :  exp          {% (checkPattern <=< runPV) (unECP $1) }
 
 pat     :: { LPat GhcPs }
-pat     :  orpats      {% case unLoc $1 of
-                            pat :| [] -> return pat
-                            pats      -> hintOrPats (sL1a $1 (OrPat NoExtField pats)) }
+pat     :  orpats(exp)      {% case unLoc $1 of
+                                pat :| [] -> return pat
+                                pats      -> hintOrPats (sL1a $1 (OrPat NoExtField pats)) }
 
 
 -- 'pats1' does the same thing as 'pat', but returns it as a singleton
