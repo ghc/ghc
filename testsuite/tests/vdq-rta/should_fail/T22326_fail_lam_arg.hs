@@ -1,7 +1,7 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE RequiredTypeArguments #-}
 
-module T22326_fail_raw_arg where
+module T22326_fail_lam_arg where
 
 f :: forall (a :: k) -> ()
 f (type _) = ()
