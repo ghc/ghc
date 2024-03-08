@@ -101,10 +101,10 @@
 #  include <elf_abi.h>
 #endif
 
+#include "elf_got.h"
+
 #if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
-#  define NEED_GOT
 #  define NEED_PLT
-#  include "elf_got.h"
 #  include "elf_plt.h"
 #  include "elf_reloc.h"
 #endif
@@ -798,7 +798,7 @@ ocGetNames_ELF ( ObjectCode* oc )
          /* This is a non-empty .bss section.  Allocate zeroed space for
             it, and set its .sh_offset field such that
             ehdrC + .sh_offset == addr_of_zeroed_space.  */
-#if defined(NEED_GOT) || RTS_LINKER_USE_MMAP
+#if RTS_LINKER_USE_MMAP
           if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
               /* The space for bss sections is already preallocated */
               CHECK(oc->bssBegin != NULL);
@@ -1113,13 +1113,11 @@ ocGetNames_ELF ( ObjectCode* oc )
       }
    }
 
-#if defined(NEED_GOT)
    if(makeGot( oc ))
        errorBelch("Failed to create GOT for %s",
                   oc->archiveMemberName
                   ? oc->archiveMemberName
                   : oc->fileName);
-#endif
    result = 1;
    goto end;
 
@@ -1987,13 +1985,11 @@ ocResolve_ELF ( ObjectCode* oc )
         }
     }
 
-#if defined(NEED_GOT)
     if(fillGot( oc ))
         return 0;
     /* silence warnings */
     (void) shnum;
     (void) shdr;
-#endif /* NEED_GOT */
 
 #if defined(aarch64_HOST_ARCH)
     /* use new relocation design */
