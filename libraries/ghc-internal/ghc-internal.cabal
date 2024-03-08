@@ -1,6 +1,6 @@
 cabal-version:  3.0
 name:           ghc-internal
-version:        0.1.0.0
+version:        9.1001.0
 -- NOTE: Don't forget to update ./changelog.md
 
 license:        BSD-3-Clause
