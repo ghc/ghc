@@ -313,7 +313,13 @@ struct _ObjectCode {
     struct _ObjectCode *next_loaded_object;
 
     // Mark bit
+    // N.B. This is a full word as we CAS it.
     StgWord mark;
+
+    // Can this object be safely unloaded? Not true for
+    // dynamic objects when dlinfo is not available as
+    // we cannot determine liveness.
+    bool unloadable;
 
     // Set of dependencies (ObjectCode*) of the object file. Traverse
     // dependencies using `iterHashTable`.
@@ -376,7 +382,9 @@ struct _ObjectCode {
     /* handle returned from dlopen */
     void *dlopen_handle;
 
-    /* virtual memory ranges of loaded code */
+    /* virtual memory ranges of loaded code. NULL if no range information is
+     * available (e.g. if dlinfo is unavailable on the current platform).
+     */
     NativeCodeRange *nc_ranges;
 };
 
