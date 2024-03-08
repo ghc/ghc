@@ -2188,6 +2188,10 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
      goto dl_iterate_phdr_fail;
    }
+   nc->unloadable = true;
+#else
+   nc->nc_ranges = NULL;
+   nc->unloadable = false;
 #endif /* defined (HAVE_DLINFO) */
 
    insertOCSectionIndices(nc);
