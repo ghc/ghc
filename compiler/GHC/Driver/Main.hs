@@ -990,16 +990,16 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
         types_var <- newIORef (md_types details)
         let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
         let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-        -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
-        -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
-        -- reports a bug.
-        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
         LoadedBCOs <$> (unsafeInterleaveIO $ do
+                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
+                  -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
+                  -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
+                  -- reports a bug.
+                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
