@@ -434,7 +434,20 @@ mkRegRegMoveInstr src dst = ANN desc instr
 -- We have to be a bit careful here: A `MOV` can also mean an implicit
 -- conversion. This case is filtered out.
 takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
-takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = pure (src, dst)
+-- TODO: If this doesn't work (I don't understand WHY):
+-- ghc: panic! (the 'impossible' happened)
+--  GHC version 9.6.3:
+--        RV64.ppr: unhandled CSET conditional
+--  FLE t6, t0, ft0
+--  Call stack:
+--      CallStack (from HasCallStack):
+--        callStackDoc, called at compiler/GHC/Utils/Panic.hs:189:37 in ghc:GHC.Utils.Panic
+--        pprPanic, called at compiler/GHC/CmmToAsm/RV64/Ppr.hs:598:11 in ghc:GHC.CmmToAsm.RV64.Ppr
+--  CallStack (from HasCallStack):
+--    panic, called at compiler/GHC/Utils/Error.hs:454:29 in ghc:GHC.Utils.Error
+--
+-- Maybe, checking the format isn't enough and we have to check register types by their number?
+-- takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = pure (src, dst)
 takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
