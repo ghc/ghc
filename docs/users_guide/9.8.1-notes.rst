@@ -228,17 +228,6 @@ Runtime system
 
 - ``Data.Tuple`` now exports ``getSolo :: Solo a -> a``.
 
-- Exceptions can now carry arbitrary user-defined annotations via the new
-  :base-ref:`GHC.Exception.Type.ExceptionContext` implicit parameter of
-  ``SomeException``. These annotations are intended to be used to carry
-  context describing the provenance of an exception.
-
-- GHC now collects backtraces for synchronous exceptions. These are carried by
-  the exception via the ``ExceptionContext`` mechanism described above.
-  GHC supports several mechanisms by which backtraces can be collected which
-  can be individually enabled and disabled via
-  :base-ref:`GHC.Exception.Backtrace.setEnabledBacktraceMechanisms`.
-
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
