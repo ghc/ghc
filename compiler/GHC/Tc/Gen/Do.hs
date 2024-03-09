@@ -98,16 +98,16 @@ expand_do_stmts _ [stmt@(L loc (LastStmt _ (L body_loc body) _ ret_expr))]
         let expansion = genHsApp ret (L body_loc body)
         return $ mkExpandedStmtPopAt loc stmt expansion
 
-expand_do_stmts do_or_lc (stmt@(L loc (LetStmt _ bs)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
 --                      stmts ~~> stmts'
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'
-  do expand_stmts <- expand_do_stmts do_or_lc lstmts
+  do expand_stmts <- expand_do_stmts doFlavour lstmts
      let expansion = genHsLet bs expand_stmts
      return $ mkExpandedStmtPopAt loc stmt expansion
 
-expand_do_stmts do_or_lc (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
+expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   | SyntaxExprRn bind_op <- xbsrn_bindOp xbsrn
   , fail_op              <- xbsrn_failOp xbsrn
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (2) below
@@ -116,8 +116,8 @@ expand_do_stmts do_or_lc (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
 --                                   _   -> fail "Pattern match failure .."
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
-  = do expand_stmts <- expand_do_stmts do_or_lc lstmts
-       failable_expr <- mk_failable_expr do_or_lc pat expand_stmts fail_op
+  = do expand_stmts <- expand_do_stmts doFlavour lstmts
+       failable_expr <- mk_failable_expr doFlavour pat expand_stmts fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
@@ -126,19 +126,19 @@ expand_do_stmts do_or_lc (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
 
-expand_do_stmts do_or_lc (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
 -- See Note [BodyStmt] in Language.Haskell.Syntax.Expr
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (1) below
 --              stmts ~~> stmts'
 --    ----------------------------------------------
 --      e ; stmts ~~> (>>) e stmts'
-  do expand_stmts_expr <- expand_do_stmts do_or_lc lstmts
+  do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
                                   [ e
                                   , expand_stmts_expr ]
      return $ mkExpandedStmtPopAt loc stmt expansion
 
-expand_do_stmts do_or_lc
+expand_do_stmts doFlavour
        ((L loc (RecStmt { recS_stmts = L stmts_loc rec_stmts
                         , recS_later_ids = later_ids  -- forward referenced local ids
                         , recS_rec_ids = local_ids     -- ids referenced outside of the rec block
@@ -158,12 +158,12 @@ expand_do_stmts do_or_lc
 --                                           -> do { rec_stmts
 --                                                 ; return (local_only_ids ++ later_ids) } ))
 --                              (\ [ local_only_ids ++ later_ids ] -> stmts')
-  do expand_stmts <- expand_do_stmts do_or_lc lstmts
+  do expand_stmts <- expand_do_stmts doFlavour lstmts
      -- NB: No need to wrap the expansion with an ExpandedStmt
      -- as we want to flatten the rec block statements into its parent do block anyway
      return $ mkHsApps (wrapGenSpan bind_fun)                                           -- (>>=)
                       [ (wrapGenSpan mfix_fun) `mkHsApp` mfix_expr                      -- (mfix (do block))
-                      , genHsLamDoExp do_or_lc [ mkVisPat $ mkBigLHsVarPatTup all_ids ] --        (\ x ->
+                      , genHsLamDoExp doFlavour [ mkVisPat $ mkBigLHsVarPatTup all_ids ] --        (\ x ->
                                        expand_stmts                                     --               stmts')
                       ]
   where
@@ -179,15 +179,15 @@ expand_do_stmts do_or_lc
     do_stmts     :: XRec GhcRn [ExprLStmt GhcRn]
     do_stmts     = L stmts_loc $ rec_stmts ++ [return_stmt]
     do_block     :: LHsExpr GhcRn
-    do_block     = L loc $ HsDo noExtField do_or_lc do_stmts
+    do_block     = L loc $ HsDo noExtField doFlavour do_stmts
     mfix_expr    :: LHsExpr GhcRn
-    mfix_expr    = genHsLamDoExp do_or_lc [ mkVisPat $ wrapGenSpan (LazyPat noExtField $ mkBigLHsVarPatTup all_ids) ]
+    mfix_expr    = genHsLamDoExp doFlavour [ mkVisPat $ wrapGenSpan (LazyPat noExtField $ mkBigLHsVarPatTup all_ids) ]
                                           $ do_block
                              -- NB: LazyPat because we do not want to eagerly evaluate the pattern
                              -- and potentially loop forever
 
 
-expand_do_stmts do_or_lc ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
+expand_do_stmts doFlavour ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
 -- See Note [Applicative BodyStmt]
 --
 --                  stmts ~~> stmts'
@@ -197,7 +197,7 @@ expand_do_stmts do_or_lc ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
 -- Very similar to HsToCore.Expr.dsDo
 
 -- args are [(<$>, e1), (<*>, e2), .., ]
-  do { expr' <- unLoc <$> expand_do_stmts do_or_lc lstmts
+  do { expr' <- unLoc <$> expand_do_stmts doFlavour lstmts
      -- extracts pats and arg bodies (rhss) from args
      ; (pats_can_fail, rhss) <- unzip <$> mapM (do_arg . snd) args
 
@@ -211,7 +211,9 @@ expand_do_stmts do_or_lc ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
      ; let final_expr = case mb_join of
                           Just (SyntaxExprRn join_op) -> wrapGenSpan $ genHsApp join_op (wrapGenSpan expand_ado_expr)
                           _ -> wrapGenSpan expand_ado_expr
-     ; traceTc "expand_do_stmts AppStmt" (ppr final_expr)
+     ; traceTc "expand_do_stmts AppStmt" (vcat [ text "args:" <+> ppr args
+                                               , text "mb_join:" <+> ppr mb_join
+                                               , text "expansion:" <+> ppr final_expr])
      ; return final_expr
      }
   where
@@ -228,7 +230,7 @@ expand_do_stmts do_or_lc ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
                   , {- wrapGenSpan $ mkExpandedExpr (HsDo noExtField ctxt (wrapGenSpan stmts)) (unLoc expr)-} expr) }
 
     match_args :: (LPat GhcRn, FailOperator GhcRn) -> HsExpr GhcRn -> TcM (HsExpr GhcRn)
-    match_args (pat, fail_op) body = unLoc <$> mk_failable_expr do_or_lc pat (wrapGenSpan body) fail_op
+    match_args (pat, fail_op) body = unLoc <$> mk_failable_expr doFlavour pat (wrapGenSpan body) fail_op
 
     mk_apps :: HsExpr GhcRn -> (SyntaxExprRn, LHsExpr GhcRn) -> HsExpr GhcRn
     mk_apps l_expr (op, r_expr) =

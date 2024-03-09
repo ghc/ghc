@@ -68,6 +68,7 @@ module GHC.Tc.Utils.Monad(
   checkErr, checkErrAt,
   addMessages,
   discardWarnings, mkDetailedMessage,
+  dbgErrCtxt,
 
   -- * Usage environment
   tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
@@ -1229,7 +1230,7 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 -- do any tidying.
 addErrCtxt :: SDoc -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
+addErrCtxt msg thing_inside = dbgErrCtxt (addErrCtxtM (\env -> return (env, msg)) thing_inside)
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
@@ -1254,6 +1255,13 @@ pushCtxt :: ErrCtxt -> TcM a -> TcM a
 {-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
 pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 
+dbgErrCtxt :: TcM a -> TcM a
+dbgErrCtxt thing_inside =
+  do errCtxt <- getErrCtxt
+     info <- mkErrInfo emptyTidyEnv errCtxt
+     traceTc "--Debug Error Context--" (ppr info)
+     thing_inside
+
 updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 -- Do not update the context if we are in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
@@ -1262,8 +1270,8 @@ updCtxt ctxt env
   | otherwise = addLclEnvErrCtxt ctxt env
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt thing_inside = updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
-                          thing_inside
+popErrCtxt thing_inside = dbgErrCtxt $ updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
+                                       thing_inside
            where
              pop []       = []
              pop (_:msgs) = msgs
