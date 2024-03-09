@@ -124,6 +124,20 @@ Language
 
   The extension is enabled by default, establishing the usual behavior.
 
+- In accordance with GHC Proposal `#448 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0448-type-variable-scoping.rst>`_,
+  the :extension:`TypeAbstractions` extension has been extended to support
+  ``@``-binders in lambdas and function equations::
+
+    id :: forall a. a -> a
+    id @t x = x :: t
+    -- ^^ @-binder in a function equation
+
+    e = higherRank (\ @t -> ... )
+    --                ^^ @-binder in a lambda
+
+  This feature is an experimental alternative to :extension:`ScopedTypeVariables`,
+  see the :ref:`type-abstractions-in-functions` section.
+
 Compiler
 ~~~~~~~~
 

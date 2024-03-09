@@ -6,7 +6,7 @@ Type abstractions
 
     :since: 9.8.1
 
-    :status: Partially implemented
+    :status: Experimental
 
     Allow the use of type abstraction syntax.
 
@@ -21,6 +21,8 @@ and `#425 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/
 
 Type Abstractions in Patterns
 -----------------------------
+
+**Since:** GHC 9.2
 
 The type abstraction syntax can be used in patterns that match a data
 constructor. The syntax can't be used with record patterns or infix patterns.
@@ -98,6 +100,8 @@ matched, rather than ever referring to a variable from an outer scope. Type wild
 
 Type Abstractions in Functions
 ------------------------------
+
+**Since:** GHC 9.10
 
 Type abstraction syntax can be used in lambdas and function left-hand sides to
 bring into scope type variables associated with invisible ``forall``.
@@ -199,6 +203,8 @@ At the moment, an ``@``-binder is valid only in a limited set of circumstances:
 
 Invisible Binders in Type Declarations
 --------------------------------------
+
+**Since:** GHC 9.8
 
 Syntax
 ~~~~~~
