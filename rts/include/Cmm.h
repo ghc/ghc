@@ -698,7 +698,7 @@
 #define ACQUIRE_FENCE prim %fence_acquire();
 #define SEQ_CST_FENCE prim %fence_seq_cst();
 
-#if TSAN_ENABLED
+#if defined(TSAN_ENABLED)
 // This is may be efficient than a fence but TSAN can reason about it.
 #if WORD_SIZE_IN_BITS == 64
 #define ACQUIRE_FENCE_ON(x) if (1) { W_ tmp; (tmp) = prim %load_acquire64(x); }
