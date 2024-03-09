@@ -1,4 +1,3 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , NondecreasingIndentation
@@ -6,6 +5,9 @@
            , MagicHash
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
+
+#if defined(mingw32_HOST_OS)
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -20,23 +22,35 @@
 -- This module provides text encoding/decoding using iconv
 --
 -----------------------------------------------------------------------------
-
-module GHC.Internal.IO.Encoding.Iconv (
-#if !defined(mingw32_HOST_OS)
-   iconvEncoding, mkIconvEncoding,
-   localeEncodingName
-#endif
- ) where
-
-#include "MachDeps.h"
-#include "HsBaseConfig.h"
-
-#if defined(mingw32_HOST_OS)
+module GHC.Internal.IO.Encoding.Iconv () where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Types ()
 
 #else
+
+{-# LANGUAGE Safe #-}
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Internal.IO.Encoding.Iconv
+-- Copyright   :  (c) The University of Glasgow, 2008-2009
+-- License     :  see libraries/base/LICENSE
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
+--
+-- This module provides text encoding/decoding using iconv
+--
+-----------------------------------------------------------------------------
+module GHC.Internal.IO.Encoding.Iconv (
+   iconvEncoding, mkIconvEncoding,
+   localeEncodingName
+ ) where
+
+#include "MachDeps.h"
+#include "HsBaseConfig.h"
 
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String (withCAString, peekCAString)

@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -- |
@@ -15,8 +15,8 @@
 -- This module provides text encoding/decoding using iconv
 --
 
-module GHC.IO.Encoding.Iconv
 #if !defined(mingw32_HOST_OS)
+module GHC.IO.Encoding.Iconv
     (iconvEncoding,
      mkIconvEncoding,
      localeEncodingName
@@ -25,6 +25,8 @@ module GHC.IO.Encoding.Iconv
 import GHC.Internal.IO.Encoding.Iconv
 
 #else
-    ( ) where
+module GHC.IO.Encoding.Iconv ( ) where
+
+import GHC.Internal.Base () -- For build ordering
 
 #endif
