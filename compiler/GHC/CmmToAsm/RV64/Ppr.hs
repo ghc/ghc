@@ -393,15 +393,6 @@ pprReg w r = case r of
          -- no support for widths > W64.
          | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
-isIntOp :: Operand -> Bool
-isIntOp = not . isFloatOp
-
-isFloatOp :: Operand -> Bool
-isFloatOp (OpReg _ (RegReal (RealRegSingle i))) | i > 31 = True
-isFloatOp (OpReg _ (RegVirtual (VirtualRegF _))) = True
-isFloatOp (OpReg _ (RegVirtual (VirtualRegD _))) = True
-isFloatOp _ = False
-
 isSingleOp :: Operand -> Bool
 isSingleOp (OpReg W32 _) = True
 isSingleOp _ = False
