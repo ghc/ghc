@@ -136,7 +136,7 @@ function upload() {
 }
 
 function purge_all() {
-    dir="$(echo $rel_name | sed s/-release//)"
+    local dir="$(echo $rel_name | sed s/-release//)"
     # Purge CDN cache
     curl -X PURGE http://downloads.haskell.org/ghc/
     curl -X PURGE http://downloads.haskell.org/~ghc/
@@ -150,12 +150,18 @@ function purge_all() {
 }
 
 function purge_file() {
-    curl -X PURGE http://downloads.haskell.org/~ghc/$rel_name/$i
-    curl -X PURGE http://downloads.haskell.org/~ghc/$rel_name/$i/
-    curl -X PURGE http://downloads.haskell.org/~ghc/$rel_name/$i/docs/
-    curl -X PURGE http://downloads.haskell.org/ghc/$rel_name/$i
-    curl -X PURGE http://downloads.haskell.org/ghc/$rel_name/$i/
-    curl -X PURGE http://downloads.haskell.org/ghc/$rel_name/$i/docs/
+    dirs=(
+        "~ghc/$rel_name"
+        "ghc/$rel_name"
+        "~ghc/$ver"
+        "ghc/$ver"
+    )
+
+    for dir in ${dirs[@]}; do
+        curl -X PURGE http://downloads.haskell.org/$dir/$i
+        curl -X PURGE http://downloads.haskell.org/$dir/$i/
+        curl -X PURGE http://downloads.haskell.org/$dir/$i/docs/
+    done
 }
 
 function prepare_docs() {
