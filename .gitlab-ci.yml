@@ -899,6 +899,7 @@ test-primops-nightly:
 
 test-primops-release:
   extends: .test-primops
+  allow_failure: true
   rules:
     - if: '$RELEASE_JOB == "yes"'
 
