@@ -1,0 +1,29 @@
+#!/usr/bin/env -S make -f
+
+MAKEFLAGS += --no-builtin-rules
+MAKEFLAGS += --no-builtin-variables
+
+usage :
+	echo "recompress [dest files]"
+	exit 1
+
+%.gz : %.xz
+	echo "[xz->gz] $< to $@..."
+	xz -c $< | gzip -c > $@
+
+%.bz2 : %.xz
+	echo "[xz->bz2] $< to $@..."
+	xz -c $< | bzip2 -c > $@
+
+%.lz : %.xz
+	echo "[xz->lz] $< to $@..."
+	xz -c $< | lzip -c > $@
+
+%.zip : %.tar.xz
+	echo "[tarxz->zip] $< to $@..."
+	tmp="$(mktemp tmp.XXX)" && \
+		tar -C "$$tmp" -xf $< && \
+		cd "$$tmp" && \
+		zip -9 -r $@ * && \
+		rm -R "$$tmp"
+

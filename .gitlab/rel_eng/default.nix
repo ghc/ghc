@@ -27,6 +27,15 @@ let
     buildCommand = ''
       mkdir -p $out/bin
 
+      makeWrapper ${./recompress-all} $out/bin/recompress-all \
+        --prefix PATH : ${gnumake}/bin \
+        --prefix PATH : ${gnutar}/bin \
+        --prefix PATH : ${lzip}/bin \
+        --prefix PATH : ${bzip2}/bin \
+        --prefix PATH : ${gzip}/bin \
+        --prefix PATH : ${xz}/bin \
+        --prefix PATH : ${zip}/bin
+
       makeWrapper ${./upload.sh} $out/bin/upload.sh \
         --prefix PATH : ${moreutils}/bin \
         --prefix PATH : ${lftp}/bin \
@@ -35,8 +44,8 @@ let
         --prefix PATH : ${s3cmd}/bin \
         --prefix PATH : ${gnupg}/bin \
         --prefix PATH : ${pinentry}/bin \
-        --prefix PATH : ${parallel}/bin \
         --prefix PATH : ${python3}/bin \
+        --prefix PATH : $out/bin \
         --set ENTER_FHS_ENV ${bindistPrepEnv}/bin/enter-fhs \
         --set BASH ${bash}/bin/bash
 

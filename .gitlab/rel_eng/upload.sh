@@ -193,29 +193,21 @@ function prepare_docs() {
 
 function recompress() {
     set -Eeuo pipefail
-    combine <(basename -s .xz *.xz) not <(basename -s .lz *.lz) | \
-        parallel 'echo "Recompressing {}.xz to {}.lz"; unxz -c {}.xz | lzip - -o {}.lz'
+    needed=()
 
-    for darwin_bindist in $(ls ghc-*-darwin.tar.xz); do
-        local dest="$(basename $darwin_bindist .xz).bz2"
-        if [[ ! -f "$dest" ]]; then
-            echo "Recompressing Darwin bindist to bzip2..."
-            unxz -c "$darwin_bindist" | bzip2 > "$dest"
-        fi
+    for i in ghc-*.tar.xz; do
+        needed+=( "$(basename $i .xz).gz" )
     done
 
-    for windows_bindist in $(ls ghc-*-mingw32*.tar.xz); do
-      local tmp="$(mktemp -d tmp.XXX)"
-      local dest="$(realpath $(basename $windows_bindist .tar.xz).zip)"
-      echo $dest
-      if [[ ! -f "$dest" ]]; then
-          echo "Recompressing Windows bindist to zip..."
-          tar -C "$tmp" -xf "$windows_bindist"
-          ls $tmp
-          (cd "$tmp"; zip -9 -r "$dest" *)
-      fi
-      rm -R "$tmp"
+    for i in ghc-*-darwin.tar.xz; do
+        needed+=( "$(basename $i .xz).bz2" )
     done
+
+    for i in ghc-*-mingw32.tar.xz; do
+        needed+=( "$(basename $i .tar.xz).zip" )
+    done
+
+    recompress-all -l ${needed[@]}
 }
 
 function upload_docs() {
