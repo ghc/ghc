@@ -22,7 +22,7 @@ options:
 ```
 
 The script also requires the `.gitlab/jobs-metadata.yaml` file which can be generated
-by running `.gitlab/generate_jobs_metadata` script if you want to run it locally.
+by running `.gitlab/generate-ci/generate_jobs_metadata` script if you want to run it locally.
 
 
 ## CI Pipelines
