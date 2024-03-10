@@ -29,6 +29,13 @@ import GHC.Types.Avail
 import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Panic
+import GHC.Core.ConLike           (ConLike(..))
+import GHC.Core.TyCo.Rep          (Type(..))
+import GHC.Core.Type              (coreFullView, isFunTy, Var (..))
+import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTyCon )
+import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
+import GHC.Types.TyThing          (TyThing (..))
+import GHC.Types.Var              (isTyVar, isFUNArg)
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -371,24 +378,29 @@ type NodeIdentifiers a = M.Map Identifier (IdentifierDetails a)
 data IdentifierDetails a = IdentifierDetails
   { identType :: Maybe a
   , identInfo :: S.Set ContextInfo
+  , identEntityInfo :: S.Set EntityInfo
   } deriving (Eq, Functor, Foldable, Traversable)
 
+
 instance Outputable a => Outputable (IdentifierDetails a) where
-  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x)
+  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x) <+> ppr (identEntityInfo x)
 
 instance Semigroup (IdentifierDetails a) where
   d1 <> d2 = IdentifierDetails (identType d1 <|> identType d2)
                                (S.union (identInfo d1) (identInfo d2))
+                               (S.union (identEntityInfo d1) (identEntityInfo d2))
 
 instance Monoid (IdentifierDetails a) where
-  mempty = IdentifierDetails Nothing S.empty
+  mempty = IdentifierDetails Nothing S.empty S.empty
 
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
     put_ bh $ S.toList $ identInfo dets
+    put_ bh $ S.toList $ identEntityInfo dets
   get bh =  IdentifierDetails
     <$> get bh
+    <*> fmap S.fromDistinctAscList (get bh)
     <*> fmap S.fromDistinctAscList (get bh)
 
 
@@ -783,3 +795,84 @@ toHieName name
                                        (nameOccName name)
                                        (removeBufSpan $ nameSrcSpan name)
   | otherwise = LocalName (nameOccName name) (removeBufSpan $ nameSrcSpan name)
+
+
+{- Note [Capture Entity Information]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to capture the entity information for the identifier in HieAst, so that
+language tools and protocols can take advantage making use of it.
+
+Capture `EntityInfo` for a `Name` or `Id` in `renamedSource` or `typecheckedSource`
+if it is a name, we ask the env for the `TyThing` then compute the `EntityInfo` from tyThing
+if it is an Id, we compute the `EntityInfo` directly from Id
+
+see issue #24544 for more details
+-}
+
+
+-- | Entity information
+-- `EntityInfo` is a simplified version of `TyThing` and richer version than `Namespace` in `OccName`.
+-- It state the kind of the entity, such as `Variable`, `TypeVariable`, `DataConstructor`, etc..
+data EntityInfo
+  = EntityVariable
+  | EntityFunction
+  | EntityDataConstructor
+  | EntityTypeVariable
+  | EntityClassMethod
+  | EntityPatternSynonym
+  | EntityTypeConstructor
+  | EntityTypeClass
+  | EntityTypeSynonym
+  | EntityTypeFamily
+  | EntityRecordField
+  deriving (Eq, Ord, Enum, Show)
+
+
+instance Outputable EntityInfo where
+  ppr EntityVariable = text "variable"
+  ppr EntityFunction = text "function"
+  ppr EntityDataConstructor = text "data constructor"
+  ppr EntityTypeVariable = text "type variable"
+  ppr EntityClassMethod = text "class method"
+  ppr EntityPatternSynonym = text "pattern synonym"
+  ppr EntityTypeConstructor = text "type constructor"
+  ppr EntityTypeClass = text "type class"
+  ppr EntityTypeSynonym = text "type synonym"
+  ppr EntityTypeFamily = text "type family"
+  ppr EntityRecordField = text "record field"
+
+
+instance Binary EntityInfo where
+  put_ bh b = putByte bh (fromIntegral (fromEnum b))
+  get bh = do x <- getByte bh; pure $! toEnum (fromIntegral x)
+
+
+-- | Get the `EntityInfo` for an `Id`
+idEntityInfo :: Id -> S.Set EntityInfo
+idEntityInfo vid = S.fromList $ [EntityTypeVariable | isTyVar vid] <> [EntityFunction | isFunType $ varType vid]
+  <> [EntityRecordField | isRecordSelector vid] <> [EntityClassMethod | isClassOpId vid] <> [EntityVariable]
+  where
+    isFunType a = case coreFullView a of
+      ForAllTy _ t    -> isFunType t
+      FunTy { ft_af = flg, ft_res = rhs } -> isFUNArg flg || isFunType rhs
+      _x              -> isFunTy a
+
+-- | Get the `EntityInfo` for a `TyThing`
+tyThingEntityInfo :: TyThing -> S.Set EntityInfo
+tyThingEntityInfo ty = case ty of
+  AnId vid -> idEntityInfo vid
+  AConLike con -> case con of
+    RealDataCon _ -> S.singleton EntityDataConstructor
+    PatSynCon _   -> S.singleton EntityPatternSynonym
+  ATyCon tyCon -> S.fromList $ [EntityTypeSynonym | isTypeSynonymTyCon tyCon] <> [EntityTypeFamily | isFamilyTyCon tyCon]
+                  <> [EntityTypeClass | isClassTyCon tyCon] <> [EntityTypeConstructor]
+  ACoAxiom _ -> S.empty
+
+nameEntityInfo :: Name -> S.Set EntityInfo
+nameEntityInfo name
+  | isTyVarName name = S.fromList [EntityVariable, EntityTypeVariable]
+  | isDataConName name = S.singleton EntityDataConstructor
+  | isTcClsNameSpace (occNameSpace $ occName name) = S.singleton EntityTypeConstructor
+  | isFieldName name = S.fromList [EntityVariable, EntityRecordField]
+  | isVarName name = S.fromList [EntityVariable]
+  | otherwise = S.empty
