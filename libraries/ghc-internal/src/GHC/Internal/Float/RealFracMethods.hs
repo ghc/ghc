@@ -62,7 +62,8 @@ module GHC.Internal.Float.RealFracMethods
 import GHC.Num.Integer
 
 import GHC.Internal.Base hiding (uncheckedIShiftRA64#, uncheckedIShiftL64#)
-import GHC.Internal.Num ()
+import GHC.Internal.Num () -- instance Num Integer
+                           -- (We could remove uses with a little effort)
 
 #if WORD_SIZE_IN_BITS < 64
 

@@ -25,9 +25,8 @@ module GHC.Internal.Records
        ( HasField(..)
        ) where
 
--- The import of GHC.Internal.Base is for build ordering; see Notes in GHC.Internal.Base for
--- more info.
-import GHC.Internal.Base ()
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 
 -- | Constraint representing the fact that the field @x@ belongs to
 -- the record type @r@ and has field type @a@.  This will be solved

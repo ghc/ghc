@@ -62,7 +62,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkCoercionType
    , coercionKind, coercionLKind, coVarKindsTypesRole )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
-import {-# SOURCE #-} GHC.Core.Ppr ( )
+import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
 
 import GHC.Core.TyCo.Rep

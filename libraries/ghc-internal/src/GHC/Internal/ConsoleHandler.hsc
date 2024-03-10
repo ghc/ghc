@@ -22,7 +22,8 @@ module GHC.Internal.ConsoleHandler
 #if !defined(mingw32_HOST_OS)
         where
 
-import GHC.Internal.Base ()  -- dummy dependency
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 #else /* whole file */
         ( Handler(..)
         , installHandler

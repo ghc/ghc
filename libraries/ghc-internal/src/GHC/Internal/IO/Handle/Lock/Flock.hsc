@@ -10,7 +10,8 @@ module GHC.Internal.IO.Handle.Lock.Flock where
 #include "HsBaseConfig.h"
 
 #if !HAVE_FLOCK
-import GHC.Internal.Base () -- Make implicit dependency known to build system
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 #else
 
 #include <sys/file.h>

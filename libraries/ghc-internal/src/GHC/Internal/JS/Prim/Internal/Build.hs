@@ -4,7 +4,8 @@
 #if !defined(javascript_HOST_ARCH)
 module GHC.Internal.JS.Prim.Internal.Build () where
 
-import GHC.Internal.Base () -- for build ordering
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 
 #else
 {-# LANGUAGE ForeignFunctionInterface, JavaScriptFFI, GHCForeignImportPrim #-}

@@ -42,7 +42,9 @@ module GHC.Prim.Ext
   ) where
 
 import GHC.Prim
-import GHC.Types () -- Make implicit dependency known to build system
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 
 default () -- Double and Integer aren't available yet
 

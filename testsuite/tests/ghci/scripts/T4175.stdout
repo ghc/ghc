@@ -52,10 +52,12 @@ instance Semigroup a => Monoid (Maybe a)
   -- Defined in ‘GHC.Internal.Base’
 instance Semigroup a => Semigroup (Maybe a)
   -- Defined in ‘GHC.Internal.Base’
-instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] Ord a => Ord (Maybe a)
+  -- Defined in ‘GHC.Internal.Maybe’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Internal.Read’
 instance Show a => Show (Maybe a) -- Defined in ‘GHC.Internal.Show’
-instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] Eq a => Eq (Maybe a)
+  -- Defined in ‘GHC.Internal.Maybe’
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type Int :: *
 data Int = GHC.Types.I# GHC.Prim.Int#

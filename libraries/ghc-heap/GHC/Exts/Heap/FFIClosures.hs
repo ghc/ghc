@@ -41,7 +41,11 @@ module GHC.Exts.Heap.FFIClosures (module Reexport) where
 #if defined(PROFILING)
 import GHC.Exts.Heap.FFIClosures_ProfilingEnabled as Reexport
 import GHC.Exts.Heap.FFIClosures_ProfilingDisabled ()
+  -- See Note [No way-dependent imports] in GHC.Exts.Heap.Closures
+
 #else
 import GHC.Exts.Heap.FFIClosures_ProfilingDisabled as Reexport
 import GHC.Exts.Heap.FFIClosures_ProfilingEnabled ()
+  -- See Note [No way-dependent imports] in GHC.Exts.Heap.Closures
+
 #endif

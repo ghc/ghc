@@ -5,4 +5,3 @@ interfacePlugin: GHC.Internal.Float
 interfacePlugin: GHC.Prim.Ext
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)
-interfacePlugin: GHC.Num.BigNat
