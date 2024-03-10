@@ -63,7 +63,8 @@ module GHC.Builtin.Types.Prim(
         doublePrimTyCon,        doublePrimTy, doublePrimTyConName,
 
         statePrimTyCon,         mkStatePrimTy,
-        realWorldTyCon,         realWorldTy, realWorldStatePrimTy,
+        realWorldTyCon,         realWorldTy,
+        realWorldStatePrimTy,   realWorldMutableByteArrayPrimTy,
 
         proxyPrimTyCon,         mkProxyPrimTy,
 
@@ -1178,7 +1179,9 @@ realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
-
+realWorldMutableByteArrayPrimTy :: Type
+realWorldMutableByteArrayPrimTy
+  = mkMutableByteArrayPrimTy realWorldTy -- MutableByteArray# RealWorld
 
 mkProxyPrimTy :: Type -> Type -> Type
 mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]

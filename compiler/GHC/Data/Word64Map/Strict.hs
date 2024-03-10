@@ -248,4 +248,3 @@ module GHC.Data.Word64Map.Strict (
     ) where
 
 import GHC.Data.Word64Map.Strict.Internal
-import Prelude ()

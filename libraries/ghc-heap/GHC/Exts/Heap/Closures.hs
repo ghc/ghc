@@ -35,15 +35,24 @@ module GHC.Exts.Heap.Closures (
 import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Exts.Heap.Constants
 #if defined(PROFILING)
+import GHC.Exts.Heap.InfoTable () -- see Note [No way-dependent imports]
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
+import GHC.Exts.Heap.InfoTableProf () -- see Note [No way-dependent imports]
 
--- `ghc -M` currently doesn't properly account for ways when generating
--- dependencies (#15197). This import ensures correct build-ordering between
--- this module and GHC.Exts.Heap.InfoTableProf. It should be removed when #15197
--- is fixed.
-import GHC.Exts.Heap.InfoTableProf ()
+{-
+Note [No way-dependent imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`ghc -M` currently assumes that the imports for a module are the same
+in every way.  This is arguably a bug, but breaking this assumption by
+importing different things in different ways can cause trouble.  For
+example, this module in the profiling way imports and uses
+GHC.Exts.Heap.InfoTableProf.  When it was not also imported in the
+vanilla way, there were intermittent build failures due to this module
+being compiled in the profiling way before GHC.Exts.Heap.InfoTableProf
+in the profiling way. (#15197)
+-}
 #endif
 
 import GHC.Exts.Heap.ProfInfo.Types

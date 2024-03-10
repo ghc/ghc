@@ -7,7 +7,6 @@ module GHC.Internal.Real (Integral (..)) where
 
 import GHC.Classes (Ord)
 import GHC.Num.Integer (Integer)
-import GHC.Types ()
 
 import {-# SOURCE #-} GHC.Internal.Num (Num)
 import {-# SOURCE #-} GHC.Internal.Enum (Enum)

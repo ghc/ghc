@@ -109,7 +109,7 @@ Library
                    deepseq    >= 1.4 && < 1.6,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
-                   bytestring >= 0.9 && < 0.13,
+                   bytestring >= 0.11 && < 0.13,
                    binary     == 0.8.*,
                    time       >= 1.4 && < 1.13,
                    containers >= 0.6.2.1 && < 0.8,

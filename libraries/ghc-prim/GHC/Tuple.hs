@@ -29,9 +29,8 @@ module GHC.Tuple (
   Tuple60(..), Tuple61(..), Tuple62(..), Tuple63(..), Tuple64(..),
 ) where
 
-import GHC.CString ()  -- Make sure we do it first, so that the
-                       -- implicit Typeable stuff can see GHC.Types.TyCon
-                       -- and unpackCString# etc
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 
 default () -- Double and Integer aren't available yet
 

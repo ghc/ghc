@@ -32,7 +32,6 @@ module GHC.Internal.TypeError
   ) where
 
 import GHC.Internal.Data.Bool
-import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Internal.Base
 import GHC.Types (TYPE, Constraint, Symbol)
 
 {- Note [Custom type errors]

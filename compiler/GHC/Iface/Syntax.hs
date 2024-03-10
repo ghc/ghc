@@ -85,7 +85,7 @@ import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
-import GHC.Utils.Binary.Typeable ()
+import GHC.Utils.Binary.Typeable () -- instance Binary AnnPayload
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,

@@ -4,6 +4,11 @@
 
 module GHC.Utils.Containers.Internal.StrictPair (StrictPair(..), toPair) where
 
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Base ()
+
+default ()
+
 -- | The same as a regular Haskell pair, but
 --
 -- @

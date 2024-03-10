@@ -97,7 +97,6 @@ import GHC.Prim.Exception
 
 import GHC.Prim
 import GHC.Types
-import GHC.Tuple () -- See Note [Depend on GHC.Tuple] in GHC.Base
 
 default ()
 

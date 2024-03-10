@@ -26,7 +26,6 @@ import Control.Applicative ((<|>))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import GHC.Internal.Text.Read ()
 import Prelude
 
 -- | Lifted sum of functors.

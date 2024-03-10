@@ -14,8 +14,8 @@ import GHC.Prelude
 import GHC.Driver.Errors.Types
 import GHC.Driver.Flags
 import GHC.Driver.DynFlags
-import GHC.HsToCore.Errors.Ppr ()
-import GHC.Parser.Errors.Ppr ()
+import GHC.HsToCore.Errors.Ppr () -- instance Diagnostic DsMessage
+import GHC.Parser.Errors.Ppr () -- instance Diagnostic PsMessage
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Unit.Types
@@ -30,8 +30,8 @@ import Language.Haskell.Syntax.Decls (RuleDecl(..))
 import GHC.Tc.Errors.Types (TcRnMessage)
 import GHC.HsToCore.Errors.Types (DsMessage)
 import GHC.Iface.Errors.Types
-import GHC.Tc.Errors.Ppr ()
-import GHC.Iface.Errors.Ppr ()
+import GHC.Tc.Errors.Ppr () -- instance Diagnostic TcRnMessage
+import GHC.Iface.Errors.Ppr () -- instance Diagnostic IfaceMessage
 
 --
 -- Suggestions

@@ -30,6 +30,11 @@ import {-# SOURCE #-} GHC.Num.Integer
 import {-# SOURCE #-} GHC.Num.BigNat
 import {-# SOURCE #-} GHC.Num.Natural
 
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+-- (This module uses the empty tuple () and string literals.)
+import GHC.Tuple ()
+import GHC.CString ()
+
 default ()
 
 -- | ghc-bignum backend name
