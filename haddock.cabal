@@ -68,7 +68,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0 || ^>= 4.16.0.0 || ^>= 4.17.0.0 || ^>= 4.18.0.0 || ^>= 4.19.0.0
+    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0 || ^>= 4.16.0.0 || ^>= 4.17.0.0 || ^>= 4.18.0.0 || ^>= 4.19.0.0 || ^>= 4.20.0.0
 
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src,  haddock-library/src
@@ -83,7 +83,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       ghc-boot,
       ghc-boot-th,
-      ghc == 9.9.*,
+      ghc == 9.10.*,
       bytestring,
       parsec,
       text,
