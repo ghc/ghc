@@ -172,7 +172,6 @@ Library
         GHC.Internal.Conc.Signal
         GHC.Internal.Conc.Sync
         GHC.Internal.ConsoleHandler
-        GHC.Internal.Constants
         GHC.Internal.Desugar
         GHC.Internal.Encoding.UTF8
         GHC.Internal.Enum
