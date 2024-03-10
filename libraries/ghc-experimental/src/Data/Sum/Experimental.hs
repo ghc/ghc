@@ -80,5 +80,6 @@ module Data.Sum.Experimental (
   Sum63#,
 ) where
 
-import GHC.Num.BigNat () -- for build ordering
 import GHC.Types
+
+default ()

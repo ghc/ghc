@@ -19,6 +19,5 @@ module Data.Kind
      FUN
      ) where
 
-import GHC.Num.BigNat () -- for build ordering (#23942)
 import GHC.Prim (FUN)
 import GHC.Types (Type, Constraint)

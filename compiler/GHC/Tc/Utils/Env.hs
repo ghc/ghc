@@ -888,7 +888,7 @@ tcGetDefaultTys
 
 {-
 Note [Extended defaults]
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 In interactive mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
 Consider:

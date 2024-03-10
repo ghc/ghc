@@ -1,5 +1,6 @@
 -- TODO: Deprecate
 module GHC.Constants where
 
-import GHC.Base () -- dummy dependency
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types () -- for build ordering
 

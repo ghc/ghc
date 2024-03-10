@@ -430,7 +430,6 @@ basicKnownKeyNames
         naturalPowModName,
         naturalSizeInBaseName,
 
-        bignatFromWordListName,
         bignatEqName,
 
         -- Float/Double
@@ -1203,7 +1202,6 @@ integerFromNaturalName
    , naturalLogBaseName
    , naturalPowModName
    , naturalSizeInBaseName
-   , bignatFromWordListName
    , bignatEqName
    , bignatCompareName
    , bignatCompareWordName
@@ -1215,7 +1213,6 @@ bnnVarQual str key = varQual gHC_INTERNAL_NUM_NATURAL (fsLit str) key
 bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 
 -- Types and DataCons
-bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
 bignatEqName              = bnbVarQual "bigNatEq#"                 bignatEqIdKey
 bignatCompareName         = bnbVarQual "bigNatCompare"             bignatCompareIdKey
 bignatCompareWordName     = bnbVarQual "bigNatCompareWord#"        bignatCompareWordIdKey
@@ -2641,7 +2638,6 @@ integerFromNaturalIdKey
    , naturalLogBaseIdKey
    , naturalPowModIdKey
    , naturalSizeInBaseIdKey
-   , bignatFromWordListIdKey
    , bignatEqIdKey
    , bignatCompareIdKey
    , bignatCompareWordIdKey
@@ -2709,7 +2705,6 @@ naturalLogBaseIdKey        = mkPreludeMiscIdUnique 682
 naturalPowModIdKey         = mkPreludeMiscIdUnique 683
 naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 
-bignatFromWordListIdKey    = mkPreludeMiscIdUnique 690
 bignatEqIdKey              = mkPreludeMiscIdUnique 691
 bignatCompareIdKey         = mkPreludeMiscIdUnique 692
 bignatCompareWordIdKey     = mkPreludeMiscIdUnique 693

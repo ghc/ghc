@@ -2,7 +2,7 @@
 
 module GHC.Internal.IO.Handle.Types ( Handle ) where
 
--- See Note [Depend on GHC.Num.Integer] in GHC.Internal.Base
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Types ()
 
 data Handle

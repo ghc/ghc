@@ -19,7 +19,7 @@ import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Utils.Error (DiagOpts (..))
 import GHC.Driver.Errors.Types (GhcMessage, GhcMessageOpts (..), PsMessage, DriverMessage, DriverMessageOpts (..), checkBuildingCabalPackage)
-import GHC.Driver.Errors.Ppr ()
+import GHC.Driver.Errors.Ppr () -- Diagnostic instances
 import GHC.Tc.Errors.Types
 import GHC.HsToCore.Errors.Types
 import GHC.Types.Error

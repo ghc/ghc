@@ -19,6 +19,7 @@
 
 module GHC.ConsoleHandler () where
 
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import Prelude () -- for build ordering
 
 #else

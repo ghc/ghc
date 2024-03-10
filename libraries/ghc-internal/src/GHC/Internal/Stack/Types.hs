@@ -54,9 +54,7 @@ import cycle,
 import GHC.Classes (Eq)
 import GHC.Types (Char, Int)
 
--- Make implicit dependency known to build system
-import GHC.Tuple ()       -- See Note [Depend on GHC.Tuple] in GHC.Internal.Base
-import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Internal.Base
+default ()
 
 -- $setup
 -- >>> import Prelude

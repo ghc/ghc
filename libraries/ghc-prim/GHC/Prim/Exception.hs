@@ -13,6 +13,8 @@ module GHC.Prim.Exception
 where
 
 import GHC.Prim
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Types ()
 
 default () -- Double and Integer aren't available yet

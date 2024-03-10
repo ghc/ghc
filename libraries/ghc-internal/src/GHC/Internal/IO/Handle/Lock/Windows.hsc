@@ -10,7 +10,8 @@ module GHC.Internal.IO.Handle.Lock.Windows where
 #include "HsBaseConfig.h"
 
 #if !defined(mingw32_HOST_OS)
-import GHC.Internal.Base () -- Make implicit dependency known to build system
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 #else
 
 ##include <windows_cconv.h>

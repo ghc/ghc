@@ -14,7 +14,10 @@ module GHC.Internal.IO.Encoding.CodePage(
                             ) where
 
 #if !defined(mingw32_HOST_OS)
-import GHC.Internal.Base () -- Build ordering
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
+
 #else
 import GHC.Internal.Base
 import GHC.Internal.Show

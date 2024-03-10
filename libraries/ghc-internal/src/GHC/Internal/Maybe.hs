@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -- | Maybe type
@@ -7,7 +7,7 @@ module GHC.Internal.Maybe
    )
 where
 
-import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Internal.Base
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Classes
 
 default ()
@@ -28,5 +28,14 @@ default ()
 --
 data  Maybe a  =  Nothing | Just a
   deriving ( Eq  -- ^ @since base-2.01
-           , Ord -- ^ @since base-2.01
+
+           --, Ord -- ^ @since base-2.01
            )
+
+-- ???
+-- A non-standalone instance will slurp the interface file for GHC.Num.Integer.
+  -- During simplifyInstanceContexts, a call to GHC.Tc.Utils.Env.tcGetDefaultTys
+  -- apparently sees mb_defaults = Nothing and thus tries to bring in the
+  -- default "default" types, including Integer.  This seems wrong.
+deriving instance Ord a => Ord (Maybe a) -- ^ @since base-2.01
+

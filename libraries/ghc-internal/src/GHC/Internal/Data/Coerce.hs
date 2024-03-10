@@ -26,7 +26,3 @@ module GHC.Internal.Data.Coerce
         ) where
 import GHC.Prim (coerce)
 import GHC.Types (Coercible)
-
--- The import of GHC.Internal.Base is for build ordering; see Notes in GHC.Internal.Base for
--- more info.
-import GHC.Internal.Base ()

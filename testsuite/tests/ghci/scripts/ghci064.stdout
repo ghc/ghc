@@ -20,9 +20,11 @@ instance Semigroup w => Monoid (Maybe w)
 instance Read w => Read (Maybe w) -- Defined in ‘GHC.Internal.Read’
 instance Semigroup w => Semigroup (Maybe w)
   -- Defined in ‘GHC.Internal.Base’
-instance Ord w => Ord (Maybe w) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] Ord w => Ord (Maybe w)
+  -- Defined in ‘GHC.Internal.Maybe’
 instance Show w => Show (Maybe w) -- Defined in ‘GHC.Internal.Show’
-instance Eq w => Eq (Maybe w) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] Eq w => Eq (Maybe w)
+  -- Defined in ‘GHC.Internal.Maybe’
 instance GHC.Internal.Generics.Generic [w]
   -- Defined in ‘GHC.Internal.Generics’
 instance Monoid [w] -- Defined in ‘GHC.Internal.Base’

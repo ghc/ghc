@@ -32,7 +32,10 @@ module GHC.Internal.IO.Encoding.Iconv (
 #include "HsBaseConfig.h"
 
 #if defined(mingw32_HOST_OS)
-import GHC.Internal.Base () -- For build ordering
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
+
 #else
 
 import GHC.Internal.Foreign.C.Types

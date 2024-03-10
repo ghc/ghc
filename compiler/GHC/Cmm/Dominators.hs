@@ -23,7 +23,6 @@ where
 import GHC.Prelude
 
 import Data.Array.IArray
-import Data.Foldable()
 import qualified Data.Tree as Tree
 
 import Data.Word

@@ -6,7 +6,6 @@ module GHC.Internal.Num (Num (..)) where
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 
 import GHC.Num.Integer (Integer)
-import GHC.Types ()
 
 infixl 7  *
 infixl 6  +, -

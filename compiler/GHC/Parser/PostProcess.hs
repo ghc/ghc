@@ -139,7 +139,6 @@ import GHC.Types.SourceText
 import GHC.Parser.Types
 import GHC.Parser.Lexer
 import GHC.Parser.Errors.Types
-import GHC.Parser.Errors.Ppr ()
 import GHC.Utils.Lexeme ( okConOcc )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( Specificity(..) )

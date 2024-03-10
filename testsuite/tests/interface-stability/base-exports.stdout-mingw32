@@ -8541,7 +8541,7 @@ module GHC.MVar where
   tryTakeMVar :: forall a. MVar a -> GHC.Types.IO (GHC.Internal.Maybe.Maybe a)
 
 module GHC.Maybe where
-  -- Safety: None
+  -- Safety: Safe-Inferred
   type Maybe :: * -> *
   data Maybe a = Nothing | Just a
 
@@ -12885,7 +12885,7 @@ instance GHC.Classes.Eq GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int
 instance GHC.Classes.Eq GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Classes.Eq GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Classes.Eq GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
-instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Maybe’
 instance GHC.Classes.Eq GHC.Internal.Data.Semigroup.Internal.All -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall k (f :: k -> *) (a :: k). GHC.Classes.Eq (f a) => GHC.Classes.Eq (GHC.Internal.Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Classes.Eq GHC.Internal.Data.Semigroup.Internal.Any -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
@@ -13060,7 +13060,7 @@ instance GHC.Classes.Ord GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.In
 instance GHC.Classes.Ord GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Classes.Ord GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Classes.Ord GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
-instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Maybe’
+instance [safe] forall a. GHC.Classes.Ord a => GHC.Classes.Ord (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Maybe’
 instance GHC.Classes.Ord GHC.Internal.Data.Semigroup.Internal.All -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall k (f :: k -> *) (a :: k). GHC.Classes.Ord (f a) => GHC.Classes.Ord (GHC.Internal.Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Classes.Ord GHC.Internal.Data.Semigroup.Internal.Any -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’

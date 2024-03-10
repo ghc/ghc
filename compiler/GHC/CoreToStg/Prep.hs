@@ -14,7 +14,6 @@ module GHC.CoreToStg.Prep
    , CorePrepPgmConfig (..)
    , corePrepPgm
    , corePrepExpr
-   , mkConvertNumLiteral
    )
 where
 
@@ -24,11 +23,13 @@ import GHC.Platform
 
 import GHC.Driver.Flags
 
-import GHC.Tc.Utils.Env
 import GHC.Unit
 
 import GHC.Builtin.Names
+import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -60,14 +61,16 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
-import GHC.Types.Name   ( Name, NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
-import GHC.Types.TyThing
 import GHC.Types.Unique.Supply
 
-import Data.List        ( unfoldr )
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Builder as BB
+import Data.ByteString.Builder.Prim
+
 import Control.Monad
 
 {-
@@ -805,11 +808,10 @@ cpeRhsE env (Type ty)
   = return (emptyFloats, Type (cpSubstTy env ty))
 cpeRhsE env (Coercion co)
   = return (emptyFloats, Coercion (cpSubstCo env co))
-cpeRhsE env expr@(Lit (LitNumber nt i))
-   = case cp_convertNumLit (cpe_config env) nt i of
-      Nothing -> return (emptyFloats, expr)
-      Just e  -> cpeRhsE env e
-cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
+cpeRhsE env expr@(Lit lit)
+  | LitNumber LitNumBigNat i <- lit
+    = cpeBigNatLit env i
+  | otherwise = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {})  = cpeApp env expr
 
@@ -2301,9 +2303,7 @@ data CorePrepConfig = CorePrepConfig
   -- cases. This is helpful when debugging demand analysis or type
   -- checker bugs which can sometimes manifest as segmentation faults.
 
-  , cp_convertNumLit           :: !(LitNumType -> Integer -> Maybe CoreExpr)
-  -- ^ Convert some numeric literals (Integer, Natural) into their final
-  -- Core form.
+  , cp_platform                :: Platform
 
   , cp_arityOpts               :: !(Maybe ArityOpts)
   -- ^ Configuration for arity analysis ('exprEtaExpandArity').
@@ -2540,57 +2540,119 @@ wrapTicks floats expr
 -- Numeric literals
 -- ---------------------------------------------------------------------------
 
--- | Create a function that converts Bignum literals into their final CoreExpr
-mkConvertNumLiteral
-   :: Platform
-   -> HomeUnit
-   -> (Name -> IO TyThing)
-   -> IO (LitNumType -> Integer -> Maybe CoreExpr)
-mkConvertNumLiteral platform home_unit lookup_global = do
-   let
-      guardBignum act
-         | isHomeUnitInstanceOf home_unit primUnitId
-         = return $ panic "Bignum literals are not supported in ghc-prim"
-         | isHomeUnitInstanceOf home_unit bignumUnitId
-         = return $ panic "Bignum literals are not supported in ghc-bignum"
-         | otherwise = act
+-- | Converts Bignum literals into their final CoreExpr
+cpeBigNatLit
+   :: CorePrepEnv -> Integer -> UniqSM (Floats, CpeRhs)
+cpeBigNatLit env i = assert (i >= 0) $ do
+  let
+    platform = cp_platform (cpe_config env)
 
-      lookupBignumId n      = guardBignum (tyThingId <$> lookup_global n)
+    -- Per the documentation in GHC.Num.BigNat, a BigNat# is:
+    --   "Represented as an array of limbs (Word#) stored in
+    --   little-endian order (Word# themselves use machine order)."
+    --
+    --   "Invariant (canonical representation): higher Word# is non-zero."
+    -- So we need to break up the integer into target-word-sized chunks,
+    -- and encode each of them using the target's byte-order.
+    encodeBigNat
+      :: forall a. Num a => FixedPrim a -> BS.ByteString
+    encodeBigNat encodeWord
+      = BS.toStrict (BB.toLazyByteString (primUnfoldrFixed encodeWord f i))
+      -- (quadratic complexity due to repeated shifts... ok for now)
+      where
+        f 0 = Nothing
+        f x = let low  = fromInteger x :: a
+                  high = x `shiftR` bits
+              in Just (low, high)
+        bits = platformWordSizeInBits platform
 
-   -- The lookup is done here but the failure (panic) is reported lazily when we
-   -- try to access the `bigNatFromWordList` function.
-   --
-   -- If we ever get built-in ByteArray# literals, we could avoid the lookup by
-   -- directly using the Integer/Natural wired-in constructors for big numbers.
+    words :: BS.ByteString
+    words = case (platformWordSize platform, platformByteOrder platform) of
+      (PW4, LittleEndian) -> encodeBigNat word32LE
+      (PW4, BigEndian   ) -> encodeBigNat word32BE
+      (PW8, LittleEndian) -> encodeBigNat word64LE
+      (PW8, BigEndian   ) -> encodeBigNat word64BE
 
-   bignatFromWordListId <- lookupBignumId bignatFromWordListName
+  -- Ideally we would just generate a ByteArray# literal here:
+  --   pure (emptyFloats, Lit (LitByteArray words))
+  -- But sadly we don't have those yet, even in Core. (See also #17747.)
+  -- So instead we generate:
+  --   * An `Addr#` literal that contains the contents of the
+  --      `ByteArray#` we want to create.  This gets its own float.
+  --   * A call to `newByteArray#` with the appropriate size
+  --   * A call to `copyAddrToByteArray#` to initialize the `ByteArray#`
+  --   * A call to `unsafeFreezeByteArray#` to make the types match
+  litAddrId <- mkSysLocalM (fsLit "bigNatGuts") ManyTy addrPrimTy
+  -- returned from newByteArray#:
+  deadNewByteArrayTupleId
+    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") ManyTy $
+         mkTupleTy Unboxed [ realWorldStatePrimTy
+                           , realWorldMutableByteArrayPrimTy
+                           ]
+  stateTokenFromNewByteArrayId
+    <- mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
+  mutableByteArrayId
+    <- mkSysLocalM (fsLit "mba") ManyTy realWorldMutableByteArrayPrimTy
+  -- returned from copyAddrToByteArray#:
+  stateTokenFromCopyId
+    <- mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
+  -- returned from unsafeFreezeByteArray#:
+  deadFreezeTupleId
+    <- fmap (`setIdOccInfo` IAmDead) . mkSysLocalM (fsLit "tup") ManyTy $
+         mkTupleTy Unboxed [realWorldStatePrimTy, byteArrayPrimTy]
+  stateTokenFromFreezeId
+    <- (`setIdOccInfo` IAmDead) <$>
+         mkSysLocalM (fsLit "token") ManyTy realWorldStatePrimTy
+  byteArrayId <- mkSysLocalM (fsLit "ba") ManyTy byteArrayPrimTy
 
-   let
-      convertNumLit nt i = case nt of
-         LitNumBigNat  -> Just (convertBignatPrim i)
-         _             -> Nothing
+  let
+    litAddrRhs = Lit (LitString words)
+      -- not "mkLitString"; that does UTF-8 encoding, which we don't want here
+    litAddrFloat = mkNonRecFloat env topDmd True litAddrId litAddrRhs
 
-      convertBignatPrim i =
-         let
-            -- ByteArray# literals aren't supported (yet). Were they supported,
-            -- we would use them directly. We would need to handle
-            -- wordSize/endianness conversion between host and target
-            -- wordSize  = platformWordSize platform
-            -- byteOrder = platformByteOrder platform
+    contentsLength = mkIntLit platform (toInteger (BS.length words))
 
-            -- For now we build a list of Words and we produce
-            -- `bigNatFromWordList# list_of_words`
+    newByteArrayCall =
+      Var (primOpId NewByteArrayOp_Char)
+        `App` Type realWorldTy
+        `App` contentsLength
+        `App` Var realWorldPrimId
 
-            words = mkListExpr wordTy (reverse (unfoldr f i))
-               where
-                  f 0 = Nothing
-                  f x = let low  = x .&. mask
-                            high = x `shiftR` bits
-                        in Just (mkConApp wordDataCon [Lit (mkLitWord platform low)], high)
-                  bits = platformWordSizeInBits platform
-                  mask = 2 ^ bits - 1
+    copyContentsCall =
+      Var (primOpId CopyAddrToByteArrayOp)
+        `App` Type realWorldTy
+        `App` Var litAddrId
+        `App` Var mutableByteArrayId
+        `App` mkIntLit platform 0
+        `App` contentsLength
+        `App` Var stateTokenFromNewByteArrayId
 
-         in mkApps (Var bignatFromWordListId) [words]
+    unsafeFreezeCall =
+      Var (primOpId UnsafeFreezeByteArrayOp)
+        `App` Type realWorldTy
+        `App` Var mutableByteArrayId
+        `App` Var stateTokenFromCopyId
 
+    unboxed2tuple_altcon :: AltCon
+    unboxed2tuple_altcon = DataAlt (tupleDataCon Unboxed 2)
 
-   return convertNumLit
+    finalRhs =
+      Case newByteArrayCall deadNewByteArrayTupleId byteArrayPrimTy
+        [ Alt unboxed2tuple_altcon
+              [stateTokenFromNewByteArrayId, mutableByteArrayId]
+              copyContentsCase
+        ]
+
+    copyContentsCase =
+      Case copyContentsCall stateTokenFromCopyId byteArrayPrimTy
+        [ Alt DEFAULT [] unsafeFreezeCase
+        ]
+
+    unsafeFreezeCase =
+      Case unsafeFreezeCall deadFreezeTupleId byteArrayPrimTy
+        [ Alt unboxed2tuple_altcon
+              [stateTokenFromFreezeId, byteArrayId]
+              (Var byteArrayId)
+        ]
+
+  pure (emptyFloats `snocFloat` litAddrFloat, finalRhs)

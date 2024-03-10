@@ -29,7 +29,6 @@ import Control.Monad.Zip (MonadZip(mzipWith))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import GHC.Internal.Text.Read ()
 import Prelude
 
 -- | Lifted product of functors.

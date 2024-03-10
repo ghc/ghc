@@ -31,7 +31,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Driver.Errors.Types
-import GHC.Driver.Errors.Ppr ()
+import GHC.Driver.Errors.Ppr () -- instance Diagnostic DriverMessage
 import GHC.Utils.Outputable (text)
 
 import Data.Function

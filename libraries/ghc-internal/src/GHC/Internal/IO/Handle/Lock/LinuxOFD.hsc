@@ -10,7 +10,8 @@ module GHC.Internal.IO.Handle.Lock.LinuxOFD where
 #include "HsBaseConfig.h"
 
 #if !HAVE_OFD_LOCKING
-import GHC.Internal.Base () -- Make implicit dependency known to build system
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Types ()
 #else
 
 -- Not only is this a good idea but it also works around #17950.

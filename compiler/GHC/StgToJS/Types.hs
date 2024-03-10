@@ -26,7 +26,7 @@ import GHC.JS.JStg.Syntax
 import GHC.JS.Ident
 import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Make
-import GHC.JS.Ppr ()
+import GHC.JS.Ppr () -- expose Outputable instances to downstream modules
 
 import GHC.Stg.Syntax
 import GHC.Core.TyCon

@@ -326,8 +326,7 @@ import GHC.Internal.Err
 import GHC.Internal.Maybe
 import {-# SOURCE #-} GHC.Internal.IO (mkUserError, mplusIO)
 
-import GHC.Tuple (Solo (MkSolo)) -- Note [Depend on GHC.Tuple]
-import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
+import GHC.Tuple (Solo (MkSolo))
 
 -- See Note [Semigroup stimes cycle]
 import {-# SOURCE #-} GHC.Internal.Num (Num (..))
@@ -348,36 +347,118 @@ infixl 4 <*>, <*, *>, <**>
 default ()              -- Double isn't available yet
 
 {-
-Note [Depend on GHC.Num.Integer]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is special because GHC.CoreToStg.Prep.mkConvertNumLiteral
-lookups names in ghc-bignum interfaces to construct Integer literal values.
-Currently it reads the interface file whether or not the current module *has*
-any Integer literals, so it's important that GHC.Num.Integer is compiled before
-any other module.
+Note [Tracking dependencies on primitives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When desugaring certain program constructs, GHC will insert references
+to the primitives used to implement those constructs even if those
+primitives have not actually been imported.  For example, the function
+``fst (x,_) = x`` will be desugared using references to the 2-tuple
+data constructor, which lives in GHC.Tuple.
 
-The danger is that if the build system doesn't know about the implicit
-dependency on Integer, it'll compile some base module before GHC.Num.Integer,
-resulting in:
-  Failed to load interface for ‘GHC.Num.Integer’
-    There are files missing in the ‘ghc-bignum’ package,
+When bootstrapping GHC, it is important that we do not attempt to
+compile any such reference to GHC.Tuple before GHC.Tuple itself has
+been built, otherwise compilation will fail with an error like this one:
+    Failed to load interface for ‘GHC.Tuple’.
+    There are files missing in the ‘ghc-prim-0.10.0’ package,
+    try running 'ghc-pkg check'.
+    Use -v to see a list of the files searched for.
 
-To ensure that GHC.Num.Integer is there, we must ensure that there is a visible
-dependency on GHC.Num.Integer from every module in base.  We make GHC.Internal.Base
-depend on GHC.Num.Integer; and everything else either depends on GHC.Base,
-directly on GHC.Num.Integer, or does not have NoImplicitPrelude (and hence
-depends on Prelude).
+To prevent such errors, we insist that if any boot library module X
+implicitly depends on primitives in module Y, then the transitive
+imports of X must include Y.
 
-The lookup is only disabled for packages ghc-prim and ghc-bignum, which aren't
-allowed to contain any Integer literal.
+Such implicit dependencies can be introduced in at least the following ways:
 
+W1:
+  Common awkward dependencies:
+   * TypeRep metadata introduces references to GHC.Types in EVERY module.
+   * A String literal introduces a reference to GHC.CString, for either
+     unpackCString# or unpackCStringUtf8# depending on its contents.
+   * Tuple-notation introduces references to GHC.Tuple.
+   * Constraint tuples introduce references to GHC.Classes.
+   * Short lists like [3,8,2] produce references to GHC.Internal.Base.build
 
-Note [Depend on GHC.Tuple]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similarly, tuple syntax (or ()) creates an implicit dependency on
-GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
-GHC.Num.Integer] --- to explain this to the build system.  We make GHC.Internal.Base
-depend on GHC.Tuple, and everything else depends on GHC.Internal.Base or Prelude.
+  A module can transitively depend on all of these by importing any of
+  GHC.Internal.Base, GHC.Base, or Prelude.  The latter in particular
+  means that an explicit import for this reason is only necessary when
+  ImplicitPrelude is disabled, so this primarily comes up in the
+  dependencies of base and in the compiler itself.
+
+   * Most modules in ghc-internal import GHC.Internal.Base.
+   * Most modules in compiler/ import GHC.Prelude, which imports Prelude.
+   * Most hs-boot files that would otherwise have no imports can get
+     away with just importing GHC.Types.
+
+  Unfortunately, the requirement to transitively import these modules
+  when they are implicitly used is obscure and causes only /intermittent/
+  build failures, so enforcement of that requirement has historically
+  been pretty spotty, causing issues like #23942.
+
+  Improving this situation is discussed at #24520.
+
+W2:
+  Non-exhaustive pattern matches, incomplete record selectors,
+  missing record fields, and missing class instance methods all
+  introduce references to GHC.Internal.Control.Exception.Base.
+
+  These constructs are therefore not allowed in ghc-prim or ghc-bignum.
+  But since they generally have bad code smell and are avoided by
+  developers anyway, this restriction has not been very burdensome.
+
+W3:
+  Various "overloaded" bits of syntax:
+   * Overloaded integer literals introduce references to GHC.Internal.Num.
+     * Likewise overloaded fractional literals to GHC.Internal.Real
+     * Likewise overloaded string literals to GHC.Internal.Data.String
+     * Likewise overloaded list literals to GHC.Internal.IsList
+   * Overloaded labels introduce references to GHC.Internal.OverloadedLabels
+   * Uses of OverloadedRecordDot introduce references to GHC.Internal.Records.
+   * Do-notation introduces references to GHC.Internal.Base for Monad stuff.
+     * Likewise arrow-notation to GHC.Internal.Control.Arrow
+     * Likewise RecursiveDo stuff to GHC.Internal.Control.Monad.Fix
+   * (Does TemplateHaskellQuotes fall into this category as well?)
+
+  These are not problematic in practice.  For example, a program
+  that uses arrow-notation but does not otherwise import the Arrow
+  type class will almost certainly fail to type-check anyway.
+  (The "Arrow m" constraint will be very hard to solve!)
+
+W4:
+  Stock derived instances introduce references to various things.
+  Derived Eq instances can reference GHC.Magic.dataToTag#, for example.
+  But since any module containing a derived Eq instance must import Eq,
+  as long as the module which defines Eq imports GHC.Magic this cannot
+  cause trouble.
+
+  Embarrassingly, we do not follow this plan for the Lift class.
+  Derived Lift instances refer to machinery in Language.Haskell.TH.Lib,
+  which is not imported by the module Language.Haskell.TH.Syntax that
+  defines the Lift class.  This is still causing annoyance for boot
+  library maintainers as of March 2024:  See #22229.
+
+W5:
+  If no explicit "default" declaration is present, the assumed
+  "default (Integer, Double)" creates a dependency on GHC.Num.Integer
+  for the Integer type if defaulting is ever attempted during
+  type-checking.  (This doesn't apply to hs-boot files, which can't
+  be given "default" declarations anyway.)
+
+W6:
+  In the wasm backend, JSFFI imports and exports pull in a bunch of stuff;
+  see Note [Desugaring JSFFI static export] and Note [Desugaring JSFFI import]
+  in GHC.HsToCore.Foreign.Wasm.
+
+A complete list could probably be made by going through the known-key
+names in GHC.Builtin.Names and GHC.Builtin.Names.TH.  To test whether
+the transitive imports are sufficient for any single module, instruct
+the build system to build /only/ that module in stage 2.  For example,
+a command to check whether the transitive imports for GHC.Internal.Maybe
+are sufficient is:
+
+  hadrian/build -o_checkDeps _checkDeps/stage1/libraries/ghc-internal/build/GHC/Internal/Maybe.o
+
+Use the ".o-boot" suffix instead of ".o" to check an hs-boot file's
+transitive imports.
 
 
 Note [Semigroup stimes cycle]
@@ -388,12 +469,13 @@ stimes :: (Semigroup a, Integral b) => b -> a -> a
 This presents a problem.
 * We use Integral methods (quot, rem) and Num methods (-) in stimes definitions
   in this module. Num is a superclass of Integral.
-* Num is defined in GHC.Num, which imports GHC.Base.
-* Enum is defined in GHC.Enum, which imports GHC.Internal.Base and GHC.Num. Enum is a
-  superclass of Integral. We don't use any Enum methods here, but it is relevant
+* Num is defined in GHC.Internal.Num, which imports GHC.Internal.Base.
+* Enum is defined in GHC.Internal.Enum, which imports
+  GHC.Internal.Base and GHC.Internal.Num. Enum is a superclass of
+  Integral. We don't use any Enum methods here, but it is relevant
   (read on).
-* Integral is defined in GHC.Real, which imports GHC.Base, GHC.Num, and
-  GHC.Enum.
+* Integral is defined in GHC.Internal.Real, which imports
+  GHC.Internal.Base, GHC.Internal.Num, and GHC.Internal.Enum.
 
 We resolve this web of dependencies with hs-boot files. The rules
 https://ghc.gitlab.haskell.org/ghc/doc/users_guide/separate_compilation.html#how-to-compile-mutually-recursive-modules
