@@ -74,13 +74,13 @@ data Tuple2# a b = (#,#) a b
 (#  ,  #) :: a -> b -> Tuple2# a b
 (Int, Int) :: Tuple2 (*) (*)
 type T :: Tuple2 (*) (*)
-type T = (Int, Int) :: Tuple2 (*) (*)
+type T = (Int, Int)
   	-- Defined at <interactive>:19:1
 type S :: Solo (*)
-type S = MkSolo Int :: Solo (*)
+type S = MkSolo Int
   	-- Defined at <interactive>:20:1
 type L :: List (*)
-type L = [Int] :: List (*)
+type L = [Int]
   	-- Defined at <interactive>:21:1
 f :: Int -> Tuple2 Int Int -> Int
 (\ (_, _) -> ()) :: Tuple2 a b -> Unit

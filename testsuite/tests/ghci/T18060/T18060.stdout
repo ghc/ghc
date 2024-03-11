@@ -1,5 +1,5 @@
 type (->) :: * -> * -> *
-type (->) = FUN Many :: * -> * -> *
+type (->) = FUN Many
   	-- Defined in ‘GHC.Types’
 infixr -1 ->
 instance Monoid b => Monoid (a -> b)
