@@ -24,7 +24,8 @@ module GHC.Core.TyCon(
         mkRequiredTyConBinder,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderForAllTyFlag, tyConBndrVisForAllTyFlag, isNamedTyConBinder,
-        isVisibleTyConBinder, isInvisibleTyConBinder,
+        isVisibleTyConBinder, isInvisSpecTyConBinder, isInvisibleTyConBinder,
+        isInferredTyConBinder,
         isVisibleTcbVis, isInvisSpecTcbVis,
 
         -- ** Field labels
@@ -487,7 +488,7 @@ mkRequiredTyConBinder dep_set tv
   | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
   | otherwise               = mkAnonTyConBinder tv
 
-tyConBinderForAllTyFlag :: TyConBinder -> ForAllTyFlag
+tyConBinderForAllTyFlag :: VarBndr a TyConBndrVis -> ForAllTyFlag
 tyConBinderForAllTyFlag (Bndr _ vis) = tyConBndrVisForAllTyFlag vis
 
 tyConBndrVisForAllTyFlag :: TyConBndrVis -> ForAllTyFlag
@@ -513,9 +514,21 @@ isInvisSpecTcbVis :: TyConBndrVis -> Bool
 isInvisSpecTcbVis (NamedTCB Specified) = True
 isInvisSpecTcbVis _                    = False
 
+isInvisInferTcbVis :: TyConBndrVis -> Bool
+isInvisInferTcbVis (NamedTCB Inferred) = True
+isInvisInferTcbVis _                   = False
+
+isInvisSpecTyConBinder :: VarBndr tv TyConBndrVis -> Bool
+-- Works for IfaceTyConBinder too
+isInvisSpecTyConBinder (Bndr _ tcb_vis) = isInvisSpecTcbVis tcb_vis
+
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
+
+isInferredTyConBinder :: VarBndr var TyConBndrVis -> Bool
+-- Works for IfaceTyConBinder too
+isInferredTyConBinder (Bndr _ tcb_vis) = isInvisInferTcbVis tcb_vis
 
 -- Build the 'tyConKind' from the binders and the result kind.
 -- Keep in sync with 'mkTyConKind' in GHC.Iface.Type.

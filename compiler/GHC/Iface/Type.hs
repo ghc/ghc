@@ -44,6 +44,7 @@ module GHC.Iface.Type (
         SuppressBndrSig(..),
         UseBndrParens(..),
         PrintExplicitKinds(..),
+        PrintArityInvisibles(..),
         pprIfaceType, pprParendIfaceType, pprPrecIfaceType,
         pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
@@ -55,7 +56,8 @@ module GHC.Iface.Type (
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
         isIfaceRhoType,
 
-        suppressIfaceInvisibles,
+        suppressIfaceInvisibles, suppressIfaceInsignificantInvisibles,
+        visibleTypeVarOccurencies,
         stripIfaceInvisVars,
         stripInvisArgs,
 
@@ -98,6 +100,9 @@ import Data.Word (Word8)
 import Control.Arrow (first)
 import Control.DeepSeq
 import Control.Monad ((<$!>))
+import Data.List (dropWhileEnd)
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -619,6 +624,51 @@ suppressIfaceInvisibles (PrintExplicitKinds False) tys xs = suppress tys xs
         | isInvisibleTyConBinder k =     suppress ks xs
         | otherwise                = x : suppress ks xs
 
+newtype PrintArityInvisibles = MkPrintArityInvisibles Bool
+
+-- See Note [Print invisible binders in interface declarations]
+-- for the definition what binders are considered insignificant
+suppressIfaceInsignificantInvisibles :: PrintArityInvisibles
+                                     -> PrintExplicitKinds
+                                     -> Set.Set IfLclName
+                                     -> [IfaceTyConBinder]
+                                     -> [IfaceTyConBinder]
+suppressIfaceInsignificantInvisibles _ (PrintExplicitKinds True) _ tys = tys
+suppressIfaceInsignificantInvisibles
+  (MkPrintArityInvisibles arity_invisibles)
+  (PrintExplicitKinds False) mentioned_vars tys
+  = suppress tys
+    where
+      -- Consider this example:
+      --   type T :: forall k1 k2. Type
+      --   type T @a @b = b
+      -- `@a` is not mentioned on the RHS however we can't just
+      -- drop it because implicit argument positioning matters.
+      --
+      -- Hence just drop the end
+      only_mentioned_binders = dropWhileEnd (not . is_binder_mentioned)
+
+      is_binder_mentioned bndr = ifTyConBinderName bndr `Set.member` mentioned_vars
+
+      suppress_invisibles group =
+        applyWhen invis_group only_mentioned_binders bndrs
+        where
+          bndrs       = NonEmpty.toList group
+          invis_group = isInvisibleTyConBinder (NonEmpty.head group)
+
+      suppress_invisible_groups [] = []
+      suppress_invisible_groups [group] =
+          if arity_invisibles
+            then NonEmpty.toList group -- the last group affects arity
+            else suppress_invisibles group
+      suppress_invisible_groups (group : groups)
+        = suppress_invisibles group ++ suppress_invisible_groups groups
+
+      suppress
+        = suppress_invisible_groups                 -- Filter out insignificant invisible binders
+        . NonEmpty.groupWith isInvisibleTyConBinder -- Find chunks of @-binders
+        . filterOut          isInferredTyConBinder  -- We don't want to display @{binders}
+
 stripIfaceInvisVars :: PrintExplicitKinds -> [IfaceTyConBinder] -> [IfaceTyConBinder]
 stripIfaceInvisVars (PrintExplicitKinds True)  tyvars = tyvars
 stripIfaceInvisVars (PrintExplicitKinds False) tyvars
@@ -658,6 +708,29 @@ ifTypeIsVarFree ty = go ty
 
     go_args IA_Nil = True
     go_args (IA_Arg arg _ args) = go arg && go_args args
+
+visibleTypeVarOccurencies :: IfaceType -> Set.Set IfLclName
+-- Returns True if the type contains this name. Doesn't count
+-- invisible application
+-- Just used to control pretty printing
+visibleTypeVarOccurencies = go
+  where
+    (<>) = Set.union
+
+    go (IfaceTyVar var)         = Set.singleton var
+    go (IfaceFreeTyVar {})      = mempty
+    go (IfaceAppTy fun args)    = go fun <> go_args args
+    go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
+    go (IfaceForAllTy bndr ty)  = go (ifaceBndrType $ binderVar bndr) <> go ty
+    go (IfaceTyConApp _ args)   = go_args args
+    go (IfaceTupleTy _ _ args)  = go_args args
+    go (IfaceLitTy _)           = mempty
+    go (IfaceCastTy {})         = mempty -- Safe
+    go (IfaceCoercionTy {})     = mempty -- Safe
+
+    go_args IA_Nil = mempty
+    go_args (IA_Arg arg Required args) = go arg <> go_args args
+    go_args (IA_Arg _arg _ args) = go_args args
 
 {- Note [Substitution on IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
