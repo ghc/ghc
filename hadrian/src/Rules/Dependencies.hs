@@ -30,6 +30,7 @@ extra_dependencies =
     ,dep (containers, "Data.Set.Internal") th_internal
     ,dep (containers, "Data.Sequence.Internal") th_internal
     ,dep (containers, "Data.Graph") th_internal
+    ,dep (time, "Data.Time.Clock.Internal.UniversalTime") th_internal
     ]))
     ]
 
