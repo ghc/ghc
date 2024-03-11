@@ -549,12 +549,14 @@ busy_wait_nop(void)
 #define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 
 #if defined(TSAN_ENABLED)
+#if !defined(__clang__)
 #undef ACQUIRE_FENCE
 #undef RELEASE_FENCE
 #undef SEQ_CST_FENCE
 #define ACQUIRE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_ACQUIRE);)
 #define RELEASE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_RELEASE);)
 #define SEQ_CST_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_SEQ_CST);)
+#endif
 #define ACQUIRE_FENCE_ON(x) (void)ACQUIRE_LOAD(x)
 #else
 #define ACQUIRE_FENCE_ON(x) __atomic_thread_fence(__ATOMIC_ACQUIRE)
