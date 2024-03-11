@@ -15,11 +15,3 @@ HsWord64 ghc_unique_counter64 = 0;
 #if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 HsInt ghc_unique_inc     = 1;
 #endif
-
-// Only used on 32-bit non-JS platforms
-#if WORD_SIZE_IN_BITS != 64
-StgWord64 atomic_inc64(StgWord64 volatile* p, StgWord64 incr)
-{
-    return __atomic_fetch_add(p, incr, __ATOMIC_SEQ_CST);
-}
-#endif
