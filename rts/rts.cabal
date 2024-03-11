@@ -184,7 +184,6 @@ library
       if flag(thread-sanitizer)
         cc-options: -fsanitize=thread
         ld-options: -fsanitize=thread
-        extra-libraries: tsan
 
       if os(linux)
          -- the RTS depends upon libc. while this dependency is generally
