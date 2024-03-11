@@ -100,6 +100,7 @@ import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
+import qualified Data.Set as Set
 
 infixl 3 &&&
 
@@ -912,15 +913,226 @@ constraintIfaceKind :: IfaceKind
 constraintIfaceKind =
   IfaceTyConApp (IfaceTyCon constraintKindTyConName (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
 
+{- Note [Print invisible binders in interface declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Starting from GHC 9.8 it is possible to write invisible @-binders
+in type-level declarations. That feature introduced several challenges
+in interface declaration pretty printing (e.g. using the :info command
+inside GHCi) to overcome.
+
+Consider this example with a redundant type variable `a`:
+
+  type Id :: forall a b. b -> b
+  type Id x = x
+
+GHC will create system binders for kinds there to meet typechecking
+and compilation needs and that will turn that declaration into a less
+straightforward form with multiple @-binders:
+
+  type Id :: forall {k} (a :: k) b. b -> b
+  type Id @{k} @a @b x = x :: b
+
+This information isn't required for understanding in most cases,
+so GHC will hide it unless -fprint-explicit-kinds flag is supplied by the user.
+And here is what we get:
+
+  type Id :: forall {k} (a :: k) b. b -> b
+  type Id x = x
+
+However, there are several cases involving user-written @-binders
+when it is cruicial to show them to provide understanding of what's going on.
+First of all it can plainly appear on the right-hand side:
+
+  type T :: forall (a :: Type). Type
+  type T @x = Tuple2 x x
+
+Not only that, an invisible binder can be unused by itself, but have an
+impact on invisible binder positioning, e.g.:
+
+  type T :: forall (a :: Type) (b :: Type). Type
+  type T           @x          @y        = Tuple2 y y
+
+Here `x` is unused, but it is required to display, as `y` corresponds
+to `b` in the standalone kind signature.
+
+The last problem is related to non-generative type declarations (type
+synonyms and type families) only. It is not possible to partially
+apply them, hence it's important to understand what parts of a declaration's
+kind are related to the declaration itself. Here is a simple example:
+
+  type T1 :: forall k. k -> Maybe k
+  type T1 = Just
+
+  type T2 :: forall k. k -> Maybe k
+  type T2 @k = Just
+
+Both these type synonyms have the same kind signature, but they aren't
+the same! `T1` can be used in strictly more cases, for example, as
+an argument for a higher-order type:
+
+  type F :: (forall k. k -> Maybe k) -> Type
+
+  type R1 = F T1 -- Yes!
+  type R2 = F T2 -- No, that will not compile :(
+
+User-written invisible binders and "system" binders introduced by GHC
+are indistinguishable at this stage, hence we try to only print
+semantically significant binders by default.
+
+An invisible binder is considered significant when it meets at least
+one of the following two criteria:
+  - It visibly occurs in the declaration's body (See more about that below)
+  - It is followed by a significant binder,
+    so it affects positioning
+For non-generative type declarations (type synonyms and type families),
+there is one additional criterion:
+  - It is not followed by a visible binder, so it
+    affects the arity of a type declaration
+
+The overall solution consists of three functions:
+- `iface_decl_non_generative` decides whether the current declaration is
+   generative or not
+
+- `iface_decl_mentioned_vars` gives a Set of variables that
+  visibly occur in the declaration's body
+
+- `suppressIfaceInvisibles` uses information provided
+  by the first two functions to actually filter out insignificant
+  @-binders
+
+Here is what we consider "visibly occurs" in general and for
+each declaration type:
+
+- Variables that visibly occur in IfaceType are collected by the
+  `visibleTypeVarOccurencies` function.
+
+- Variables that visibly occur in IfaceAT are collected by `iface_at_mentioned_vars`
+  function. It accounts visible binders for associated data and type
+  families and for type families only, it counts invisible binders.
+  Associated types can't have definitions, so it's safe to drop all other
+  binders.
+
+- None of the type variables in IfaceData declared using GADT syntax doesn't are considered
+  as visibe occurrences. This is because each constructor has its own variables, e.g.:
+
+    type D :: forall (a :: Type). Type
+    data D @a where
+      MkD :: D @b
+      -- This is shorthand for:
+      -- MkD :: forall b. D @b
+
+- For IfaceData declared using Haskell98 syntax, a variable is considered visible
+  if it visibly occurs in at least one argument's type in at least one constructor.
+
+- For IfaceSynonym, a variable is considered visible if it visibly occurs
+  in the RHS type.
+
+- For IfaceFamily, a variable is considered visible if i occurs inside
+  an injectivity annotation, e.g.
+
+    type family F @a = r | r -> a
+
+- For IfaceClass, a variable is considered visible if it occurs at least
+  once inside a functional dependency annotation or in at least one method's
+  type signature, or if it visibly occurs in at least one associated type's
+  declaration (Visible occurrences in associated types are described above.)
+
+- IfacePatSyn, IfaceId and IfaceAxiom are irrelevant to this problem.
+-}
+
+iface_decl_generative :: IfaceDecl -> Bool
+iface_decl_generative IfaceSynonym{} = False
+iface_decl_generative IfaceFamily{ifFamFlav = rhs}
+  | IfaceDataFamilyTyCon <- rhs = True
+  | otherwise = False
+iface_decl_generative IfaceData{} = True
+iface_decl_generative IfaceId{} = True
+iface_decl_generative IfaceClass{} = True
+iface_decl_generative IfaceAxiom{} = True
+iface_decl_generative IfacePatSyn{} = True
+
+iface_at_mentioned_vars :: IfaceAT -> Set.Set IfLclName
+iface_at_mentioned_vars (IfaceAT decl _)
+  = Set.fromList . map ifTyConBinderName . suppress_vars $ binders
+  where
+    -- ifBinders is not total, so we assume here that associated types
+    -- cannot be IfaceId, IfaceAxiom or IfacePatSyn
+    binders = case decl of
+      IfaceFamily {ifBinders} -> ifBinders
+      IfaceData{ifBinders} -> ifBinders
+      IfaceSynonym{ifBinders} -> ifBinders
+      IfaceClass{ifBinders} -> ifBinders
+      IfaceId{} -> panic "IfaceId shoudn't be an associated type!"
+      IfaceAxiom{} -> panic "IfaceAxiom shoudn't be an associated type!"
+      IfacePatSyn {} -> panic "IfacePatSyn shoudn't be an associated type!"
+
+    suppress_arity = not (iface_decl_generative decl)
+
+    suppress_vars binders =
+      suppressIfaceInvisibles
+        -- We need to count trailing invisible binders for type families
+        (MkPrintArityInvisibles suppress_arity)
+        -- But this setting will simply count all invisible binderss
+        (PrintExplicitKinds False)
+        -- ...and associated types can't have a RHS
+        mempty
+        binders binders
+
+-- See Note [Print invisible binders in interface declarations]
+-- in particular, the parts about collecting visible occurrences
+iface_decl_mentioned_vars :: IfaceDecl -> Set.Set IfLclName
+iface_decl_mentioned_vars (IfaceData { ifCons = condecls, ifGadtSyntax = gadt })
+  | gadt = mempty
+  -- Get visible occurrences in each constructor in each alternative
+  | otherwise = Set.unions (map mentioned_con_vars cons)
+  where
+    mentioned_con_vars = Set.unions . map (visibleTypeVarOccurencies . snd) . ifConArgTys
+    cons = visibleIfConDecls condecls
+
+iface_decl_mentioned_vars (IfaceClass { ifFDs = fds, ifBody = IfAbstractClass })
+  = Set.unions (map fundep_names fds)
+  where
+    fundep_names fd = Set.fromList (fst fd) `Set.union` Set.fromList (snd fd)
+
+iface_decl_mentioned_vars
+  (IfaceClass { ifFDs    = fds
+              , ifBody = IfConcreteClass {
+                  ifATs = ats,
+                  ifSigs = sigs
+                }})
+  = Set.unions
+        [ Set.unions (map fundep_names fds)
+        , Set.unions (map iface_at_mentioned_vars ats)
+        , Set.unions (map (visibleTypeVarOccurencies . class_op_type) sigs)
+        ]
+  where
+    class_op_type (IfaceClassOp _bndr ty _default) = ty
+
+    fundep_names fd = Set.fromList (fst fd) `Set.union` Set.fromList (snd fd)
+
+iface_decl_mentioned_vars (IfaceSynonym {ifSynRhs  = poly_ty})
+  = visibleTypeVarOccurencies poly_ty
+
+-- Consider a binder to be a visible occurrence if it occurs inside an injectivity annotation.
+iface_decl_mentioned_vars (IfaceFamily { ifBinders = binders, ifResVar = res_var, ifFamInj = inj })
+  | Just{} <- res_var
+  , Injective injectivity <- inj
+  = Set.fromList . map (ifTyConBinderName . snd) . filter fst $ zip injectivity binders
+  | otherwise = mempty
+
+iface_decl_mentioned_vars IfacePatSyn{} = mempty
+iface_decl_mentioned_vars IfaceId{} = mempty
+iface_decl_mentioned_vars IfaceAxiom{} = mempty
+
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
-pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
-                             ifCtxt = context, ifResKind = kind,
-                             ifRoles = roles, ifCons = condecls,
-                             ifParent = parent,
-                             ifGadtSyntax = gadt,
-                             ifBinders = binders })
+pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
+                                  ifCtxt = context, ifResKind = kind,
+                                  ifRoles = roles, ifCons = condecls,
+                                  ifParent = parent,
+                                  ifGadtSyntax = gadt,
+                                  ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
                      , pp_ki_sig
@@ -946,8 +1158,10 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_kind    = ppUnless (ki_sig_printable || isIfaceLiftedTypeKind kind)
                           (dcolon <+> ppr kind)
 
+    decl_head = pprIfaceDeclHead decl suppress_bndr_sig context ss tycon binders
+
     pp_lhs = case parent of
-               IfNoParent -> pprIfaceDeclHead suppress_bndr_sig context ss tycon binders
+               IfNoParent -> decl_head
                IfDataInstance{}
                           -> text "instance" <+> pp_data_inst_forall
                                              <+> pprIfaceTyConParent parent
@@ -994,35 +1208,39 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_extra = vcat [pprCType ctype]
 
-pprIfaceDecl ss (IfaceClass { ifName  = clas
-                            , ifRoles = roles
-                            , ifFDs    = fds
-                            , ifBinders = binders
-                            , ifBody = IfAbstractClass })
+pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
+                                 , ifRoles = roles
+                                 , ifFDs    = fds
+                                 , ifBinders = binders
+                                 , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
-         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
+         , text "class" <+> decl_head <+> pprFundeps fds ]
   where
+    decl_head = pprIfaceDeclHead decl suppress_bndr_sig [] ss clas binders
+
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
 
-pprIfaceDecl ss (IfaceClass { ifName  = clas
-                            , ifRoles = roles
-                            , ifFDs    = fds
-                            , ifBinders = binders
-                            , ifBody = IfConcreteClass {
-                                ifATs = ats,
-                                ifSigs = sigs,
-                                ifClassCtxt = context,
-                                ifMinDef = minDef
-                              }})
+pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
+                                 , ifRoles = roles
+                                 , ifFDs    = fds
+                                 , ifBinders = binders
+                                 , ifBody = IfConcreteClass {
+                                     ifATs = ats,
+                                     ifSigs = sigs,
+                                     ifClassCtxt = context,
+                                     ifMinDef = minDef
+                                   }})
   = vcat [ pprClassRoles ss clas binders roles
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
-         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
+         , text "class" <+> decl_head <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef $ fromIfaceBooleanFormula minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
+
+      decl_head = pprIfaceDeclHead decl suppress_bndr_sig context ss clas binders
 
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
@@ -1055,18 +1273,19 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True
 
-pprIfaceDecl ss (IfaceSynonym { ifName    = tc
-                              , ifBinders = binders
-                              , ifSynRhs  = mono_ty
-                              , ifResKind = res_kind})
+pprIfaceDecl ss decl@(IfaceSynonym { ifName    = tc
+                                   , ifBinders = binders
+                                   , ifSynRhs  = poly_ty
+                                   , ifResKind = res_kind})
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
-           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau
-                  , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+         , hang (text "type" <+> decl_head <+> equals)
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau ])
          ]
   where
-    (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
+    (tvs, theta, tau) = splitIfaceSigmaTy poly_ty
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    decl_head = pprIfaceDeclHead decl suppress_bndr_sig [] ss tc binders
 
     -- See Note [Printing type abbreviations] in GHC.Iface.Type
     ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
@@ -1078,20 +1297,18 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
 
-pprIfaceDecl ss (IfaceFamily { ifName = tycon
-                             , ifFamFlav = rhs, ifBinders = binders
-                             , ifResKind = res_kind
-                             , ifResVar = res_var, ifFamInj = inj })
+pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
+                                  , ifFamFlav = rhs, ifBinders = binders
+                                  , ifResKind = res_kind
+                                  , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , text "data family" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+         , text "data family" <+> decl_head
          ]
 
   | otherwise
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type family"
-                   <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
-                   <+> pp_inj res_var inj
+         , hang (text "type family" <+> decl_head <+> pp_inj res_var inj
                    <+> ppShowRhs ss (pp_where rhs))
               2 (ppShowRhs ss (pp_rhs rhs))
            $$
@@ -1099,6 +1316,8 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
          ]
   where
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+
+    decl_head = pprIfaceDeclHead decl suppress_bndr_sig [] ss tycon binders
 
     pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
     pp_where _                              = empty
@@ -1188,7 +1407,12 @@ pprRoles :: (Role -> Bool) -> SDoc -> [IfaceTyConBinder]
          -> [Role] -> SDoc
 pprRoles suppress_if tyCon bndrs roles
   = sdocOption sdocPrintExplicitKinds $ \print_kinds ->
-      let froles = suppressIfaceInvisibles (PrintExplicitKinds print_kinds) bndrs roles
+      let froles =
+            suppressIfaceInvisibles
+              (MkPrintArityInvisibles False)
+              (PrintExplicitKinds print_kinds)
+              mempty
+              bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
@@ -1245,16 +1469,25 @@ pprIfaceTyConParent IfNoParent
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = pprIfaceTypeApp topPrec tc tys
 
-pprIfaceDeclHead :: SuppressBndrSig
+pprIfaceDeclHead :: IfaceDecl
+                 -> SuppressBndrSig
                  -> IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
                  -> SDoc
-pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
+pprIfaceDeclHead decl suppress_sig context ss tc_occ bndrs
   = sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
           <+> pprIfaceTyConBinders suppress_sig
-                (suppressIfaceInvisibles (PrintExplicitKinds print_kinds) bndrs bndrs) ]
+              (suppressIfaceInvisibles
+                (MkPrintArityInvisibles print_arity)
+                (PrintExplicitKinds print_kinds)
+                mentioned_vars
+                bndrs bndrs) ]
+  where
+    -- See Note [Print invisible binders in interface declarations]
+    mentioned_vars = iface_decl_mentioned_vars decl
+    print_arity = not (iface_decl_generative decl)
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr

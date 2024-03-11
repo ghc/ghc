@@ -2516,6 +2516,22 @@ commonly used commands.
     ⟨name⟩ has been loaded from a source file, then GHCi will also
     display the location of its definition in the source.
 
+    GHCi outputs type declarations (type synonyms, newtypes and datatypes,
+    classes, type and data families) with semantically significant invisible
+    @-binders.
+
+    An invisible binder is considered significant when it meets at least
+    one of the following two criteria:
+
+    - It visibly occurs in the declaration's body
+
+    - It is followed by a significant binder, so it affects positioning
+
+    For non-generative type declarations (type synonyms and type families)
+    there is one additional criterion:
+
+    - It is not followed by a visible binder, so it affects the arity of a type declaration
+
     For types and classes, GHCi also summarises instances that mention
     them. To avoid showing irrelevant information, an instance is shown
     only if (a) its head mentions ⟨name⟩, and (b) all the other things
