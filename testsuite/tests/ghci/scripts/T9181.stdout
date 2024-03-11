@@ -13,12 +13,10 @@ type (GHC.Internal.Data.Type.Ord.<=) x y =
   GHC.Internal.TypeError.Assert
     (x GHC.Internal.Data.Type.Ord.<=? y)
     (GHC.Internal.Data.Type.Ord.LeErrMsg x y)
-  :: Constraint
 type (GHC.Internal.Data.Type.Ord.<=?) :: forall k. k -> k -> Bool
 type (GHC.Internal.Data.Type.Ord.<=?) m n =
   GHC.Internal.Data.Type.Ord.OrdCond
     (GHC.Internal.Data.Type.Ord.Compare m n) True True False
-  :: Bool
 type GHC.Internal.TypeLits.AppendSymbol :: GHC.Types.Symbol
                                            -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.Internal.TypeLits.AppendSymbol a b

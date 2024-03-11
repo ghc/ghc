@@ -1,0 +1,250 @@
+:{
+{-# LANGUAGE TypeFamilies, TypeFamilyDependencies, DataKinds, TypeAbstractions, FunctionalDependencies, AllowAmbiguousTypes #-}
+
+import Data.Kind
+import Data.Data
+
+-- Check that we don't print binders that aren't included in the arity
+type T0 :: forall k. k -> Type
+type T0 = Proxy :: forall k. k -> Type
+
+-- ...and a variant where the arity isn't affected by the type signature
+type T1 :: forall k. k -> Type
+type T1 = Proxy
+
+-- ...and that we do print variables that are included in the arity
+type T2 :: forall k. k -> Type
+type T2 @k = Proxy
+
+-- ...but don't print invisible binders that don't visibly occur and don't affect the arity
+type T3 :: forall k. k -> Type
+type T3 a = Proxy a
+
+-- ...and print invisible binders that do visibly occur
+type T4 :: forall a. Type -> Type
+type T4 @a _b = Proxy a
+
+-- ...one more check that it is not affected by the user's input
+type T5 :: forall a. Type -> Type
+type T5 @a _b = Proxy _b
+
+-- ...and once again
+type T6 :: forall k. Type -> Type
+type T6 _a = ()
+
+-- ...now check that we don't mess up with positioning
+type T7 :: forall a b c. b -> forall d. Type
+type T7 @a @b @c f @d = b
+
+-- ...and that we count occurrences in theta
+type T8 :: forall (a :: Constraint). Type -> Type
+type T8 @a _ = forall x. a => x
+
+-- ...and in forall binder signatures
+type T9 :: forall (a :: Type). Type -> Type
+type T9 @a _ = forall (x :: a). Int
+
+-- That's all with type synonyms, let's check other sorts of type declarations
+
+-- Equatuions should not affect invisible binders for type families, but the arity matters
+type TF1 :: forall a (b :: Type). a -> forall (d :: Type). Type
+type family TF1 @a @b c @d where
+  forall   b d. TF1 @Type @b Int      @d = ()
+  forall a b d. TF1 @a    @b (_ :: a) @d = Bool
+
+-- Injectivity annotations should affect invisible binders. Also check that positioning works
+type TF2 :: forall (a :: Type) (b :: Type). Type -> forall (d :: Type). Type
+type family TF2 @a @b c @d = r | r -> b
+
+-- Data families are generative and can't have injectivity annotations
+-- hence no invisible binders should be printed
+type DF1 :: forall a (b :: Type). a -> forall (d :: Type). Type
+data family DF1 @a @b c @d
+
+-- Data families are generative, so the invisible binder @b isn't a visible usage
+type C1 :: forall (a :: Type) (b :: Type). Type -> Constraint
+class C1 @a @b c where
+  data AD a @b
+
+-- But type families aren't generative, hence the trailing binder @b occurs visibly
+type C2 :: forall (a :: Type) (b :: Type). Type -> Constraint
+class C2 @a @b c where
+  type AF a @b
+
+-- Check that trailing invisible binders are handled properly
+type C3 :: forall x. Constraint
+class C3 @x where {}
+
+-- And check that signatures are visible occurrences
+type C4 :: forall (a :: Type) (b :: Type). Constraint
+class C4 @a @b where
+  x :: a
+  y :: b
+
+-- Also check functional dependencies
+type C5 :: forall (a :: Type) (b :: Type). Type -> Constraint
+class C5 @a @b c | a -> c where {}
+
+-- GADTs should not have "visible" mentions of binders at a declaration's head
+type D1 :: forall a. Type
+data D1 @a where
+  MkD :: b -> D1 @b
+
+-- Haskell98-style declarations should work properly
+type D2 :: forall a (b :: Type). Type -> forall d. Type
+data D2 @a @b c @d = MkD2_1 | MkD2_2 Int b
+
+-- And now a lot of stuff suggested by @int-index
+
+data P a b
+
+type F1 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k1
+
+type F2 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F2 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k2
+
+type F3 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k3
+
+type F4 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k4
+
+type F5 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k5
+
+type F6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P k6
+
+type F1x2 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1x2 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k1,k2)
+
+type F1x3 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1x3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k1,k3)
+
+type F1x4 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k1,k4)
+
+type F1x5 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k1,k5)
+
+type F1x6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F1x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k1,k6)
+
+type F2x3 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F2x3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k2,k3)
+
+type F2x4 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F2x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k2,k4)
+
+type F2x5 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F2x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k2,k5)
+
+type F2x6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F2x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k2,k6)
+
+type F3x4 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F3x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k3,k4)
+
+type F3x5 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F3x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k3,k5)
+
+type F3x6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F3x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k3,k6)
+
+type F4x5 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F4x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k4,k5)
+
+type F4x6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F4x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k4,k6)
+
+type F5x6 :: forall k1 k2. k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> Type
+type F5x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k5,k6)
+
+:}
+
+:i T0
+:i T1
+:i T2
+:i T3
+:i T4
+:i T5
+:i T6
+:i T7
+:i T8
+:i T9
+:i TF1
+:i TF2
+:i DF1
+:i C1
+:i C2
+:i C3
+:i C4
+:i C5
+:i D1
+:i D2
+:i F1
+:i F2
+:i F3
+:i F4
+:i F5
+:i F6
+:i F1x2
+:i F1x3
+:i F1x4
+:i F1x5
+:i F1x6
+:i F2x3
+:i F2x4
+:i F2x5
+:i F2x6
+:i F3x4
+:i F3x5
+:i F3x6
+:i F4x5
+:i F4x6
+:i F5x6
+
+:set -fprint-explicit-kinds
+
+:i T0
+:i T1
+:i T2
+:i T3
+:i T4
+:i T5
+:i T6
+:i T7
+:i T8
+:i T9
+:i TF1
+:i TF2
+:i DF1
+:i C1
+:i C2
+:i C3
+:i C4
+:i C5
+:i D1
+:i D2
+:i F1
+:i F2
+:i F3
+:i F4
+:i F5
+:i F6
+:i F1x2
+:i F1x3
+:i F1x4
+:i F1x5
+:i F1x6
+:i F2x3
+:i F2x4
+:i F2x5
+:i F2x6
+:i F3x4
+:i F3x5
+:i F3x6
+:i F4x5
+:i F4x6
+:i F5x6

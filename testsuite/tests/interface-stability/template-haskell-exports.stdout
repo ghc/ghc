@@ -31,7 +31,7 @@ module Language.Haskell.TH where
   type Code :: (* -> *) -> forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
   newtype Code m a = Code {examineCode :: m (TExp a)}
   type CodeQ :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
-  type CodeQ = Code Q :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
+  type CodeQ = Code Q
   type Con :: *
   data Con = NormalC Name [BangType] | RecC Name [VarBangType] | InfixC BangType Name BangType | ForallC [TyVarBndr Specificity] Cxt Con | GadtC [Name] [BangType] Type | RecGadtC [Name] [VarBangType] Type
   type ConQ :: *
@@ -881,7 +881,7 @@ module Language.Haskell.TH.Lib where
   type ClauseQ :: *
   type ClauseQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Clause
   type CodeQ :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
-  type CodeQ = GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
+  type CodeQ = GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q
   type ConQ :: *
   type ConQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con
   type CxtQ :: *
@@ -1220,7 +1220,7 @@ module Language.Haskell.TH.Lib.Internal where
   type ClauseQ :: *
   type ClauseQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Clause
   type CodeQ :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
-  type CodeQ = GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
+  type CodeQ = GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q
   type ConQ :: *
   type ConQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con
   type CxtQ :: *

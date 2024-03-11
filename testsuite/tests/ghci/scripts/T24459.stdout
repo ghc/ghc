@@ -1,0 +1,313 @@
+type T0 :: forall k. k -> *
+type T0 = Proxy
+  	-- Defined at <interactive>:9:1
+type T1 :: forall k. k -> *
+type T1 = Proxy
+  	-- Defined at <interactive>:13:1
+type T2 :: forall k. k -> *
+type T2 @k = Proxy
+  	-- Defined at <interactive>:17:1
+type T3 :: forall k. k -> *
+type T3 a = Proxy a
+  	-- Defined at <interactive>:21:1
+type T4 :: forall {k} (a :: k). * -> *
+type T4 @a _b = Proxy a
+  	-- Defined at <interactive>:25:1
+type T5 :: forall {k} (a :: k). * -> *
+type T5 _b = Proxy _b
+  	-- Defined at <interactive>:29:1
+type T6 :: forall {k} (k1 :: k). * -> *
+type T6 _a = ()
+  	-- Defined at <interactive>:33:1
+type T7 :: forall {k} {k1} {k2} (a :: k) b (c :: k1).
+           b -> forall (d :: k2). *
+type T7 @a @b f @d = b
+  	-- Defined at <interactive>:37:1
+type T8 :: forall (a :: Constraint). * -> *
+type T8 @a b = forall x. a => x
+  	-- Defined at <interactive>:41:1
+type T9 :: forall a. * -> *
+type T9 @a b = forall (x :: a). Int
+  	-- Defined at <interactive>:45:1
+type TF1 :: forall a b. a -> forall d. *
+type family TF1 c @d where
+    TF1 Int = ()
+  forall a (_1 :: a) b d. TF1 _1 = Bool
+  	-- Defined at <interactive>:51:1
+type TF2 :: forall a b. * -> forall d. *
+type family TF2 @a @b c @d = r | r -> b
+  	-- Defined at <interactive>:57:1
+type DF1 :: forall a b. a -> forall d. *
+data family DF1 c
+  	-- Defined at <interactive>:62:1
+type C1 :: forall a b. * -> Constraint
+class C1 @a c where
+  type AD :: * -> forall b. *
+  data family AD a
+  	-- Defined at <interactive>:66:1
+type C2 :: forall a b. * -> Constraint
+class C2 @a @b c where
+  type AF :: * -> forall b. *
+  type family AF a @b
+  	-- Defined at <interactive>:71:1
+type C3 :: forall {k} (x :: k). Constraint
+class C3
+  	-- Defined at <interactive>:76:1
+type C4 :: forall a b. Constraint
+class C4 @a @b where
+  x :: a
+  y :: b
+  {-# MINIMAL x, y #-}
+  	-- Defined at <interactive>:80:1
+type C5 :: forall a b. * -> Constraint
+class C5 @a c | a -> c
+  	-- Defined at <interactive>:86:1
+type D1 :: forall {k} (a :: k). *
+data D1 where
+  MkD :: b -> D1
+  	-- Defined at <interactive>:90:1
+type role D2 phantom
+type D2 :: forall {k} {k1} (a :: k) b. * -> forall (d :: k1). *
+data D2 @a @b c = MkD2_1 | MkD2_2 Int b
+  	-- Defined at <interactive>:95:1
+type F1 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1 @k1 a b c d e @k6 = P k1
+  	-- Defined at <interactive>:102:1
+type F2 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2 @k1 @k2 a b c d e @k6 = P k2
+  	-- Defined at <interactive>:105:1
+type F3 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3 a b @k3 c d e @k6 = P k3
+  	-- Defined at <interactive>:108:1
+type F4 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4 a b @k3 @k4 c d e @k6 = P k4
+  	-- Defined at <interactive>:111:1
+type F5 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F5 a b @k3 @k4 @k5 c d e @k6 = P k5
+  	-- Defined at <interactive>:114:1
+type F6 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F6 a b c d e @k6 = P k6
+  	-- Defined at <interactive>:117:1
+type F1x2 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x2 @k1 @k2 a b c d e @k6 = P (k1, k2)
+  	-- Defined at <interactive>:120:1
+type F1x3 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x3 @k1 a b @k3 c d e @k6 = P (k1, k3)
+  	-- Defined at <interactive>:123:1
+type F1x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x4 @k1 a b @k3 @k4 c d e @k6 = P (k1, k4)
+  	-- Defined at <interactive>:126:1
+type F1x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x5 @k1 a b @k3 @k4 @k5 c d e @k6 = P (k1, k5)
+  	-- Defined at <interactive>:129:1
+type F1x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x6 @k1 a b c d e @k6 = P (k1, k6)
+  	-- Defined at <interactive>:132:1
+type F2x3 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x3 @k1 @k2 a b @k3 c d e @k6 = P (k2, k3)
+  	-- Defined at <interactive>:135:1
+type F2x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x4 @k1 @k2 a b @k3 @k4 c d e @k6 = P (k2, k4)
+  	-- Defined at <interactive>:138:1
+type F2x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P (k2, k5)
+  	-- Defined at <interactive>:141:1
+type F2x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x6 @k1 @k2 a b c d e @k6 = P (k2, k6)
+  	-- Defined at <interactive>:144:1
+type F3x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x4 a b @k3 @k4 c d e @k6 = P (k3, k4)
+  	-- Defined at <interactive>:147:1
+type F3x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x5 a b @k3 @k4 @k5 c d e @k6 = P (k3, k5)
+  	-- Defined at <interactive>:150:1
+type F3x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x6 a b @k3 c d e @k6 = P (k3, k6)
+  	-- Defined at <interactive>:153:1
+type F4x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4x5 a b @k3 @k4 @k5 c d e @k6 = P (k4, k5)
+  	-- Defined at <interactive>:156:1
+type F4x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4x6 a b @k3 @k4 c d e @k6 = P (k4, k6)
+  	-- Defined at <interactive>:159:1
+type F5x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F5x6 a b @k3 @k4 @k5 c d e @k6 = P (k5, k6)
+  	-- Defined at <interactive>:162:1
+type T0 :: forall k. k -> *
+type T0 = Proxy
+  	-- Defined at <interactive>:9:1
+type T1 :: forall k. k -> *
+type T1 = Proxy
+  	-- Defined at <interactive>:13:1
+type T2 :: forall k. k -> *
+type T2 @k = Proxy @{k}
+  	-- Defined at <interactive>:17:1
+type T3 :: forall k. k -> *
+type T3 @k a = Proxy @{k} a
+  	-- Defined at <interactive>:21:1
+type T4 :: forall {k} (a :: k). * -> *
+type T4 @{k} @a _b = Proxy @{k} a
+  	-- Defined at <interactive>:25:1
+type T5 :: forall {k} (a :: k). * -> *
+type T5 @{k} @a _b = Proxy @{*} _b
+  	-- Defined at <interactive>:29:1
+type T6 :: forall {k} (k1 :: k). * -> *
+type T6 @{k} @k1 _a = ()
+  	-- Defined at <interactive>:33:1
+type T7 :: forall {k} {k1} {k2} (a :: k) b (c :: k1).
+           b -> forall (d :: k2). *
+type T7 @{k} @{k1} @{k2} @a @b @c f @d = b
+  	-- Defined at <interactive>:37:1
+type T8 :: forall (a :: Constraint). * -> *
+type T8 @a b = forall x. a => x
+  	-- Defined at <interactive>:41:1
+type T9 :: forall a. * -> *
+type T9 @a b = forall (x :: a). Int
+  	-- Defined at <interactive>:45:1
+type TF1 :: forall a b. a -> forall d. *
+type family TF1 @a @b c @d where
+    TF1 @(*) @b Int @d = ()
+  forall a (_1 :: a) b d. TF1 @a @b _1 @d = Bool
+  	-- Defined at <interactive>:51:1
+type TF2 :: forall a b. * -> forall d. *
+type family TF2 @a @b c @d = r | r -> b
+  	-- Defined at <interactive>:57:1
+type DF1 :: forall a b. a -> forall d. *
+data family DF1 @a @b c @d
+  	-- Defined at <interactive>:62:1
+type C1 :: forall a b. * -> Constraint
+class C1 @a @b c where
+  type AD :: * -> forall b. *
+  data family AD a @b
+  	-- Defined at <interactive>:66:1
+type C2 :: forall a b. * -> Constraint
+class C2 @a @b c where
+  type AF :: * -> forall b. *
+  type family AF a @b
+  	-- Defined at <interactive>:71:1
+type C3 :: forall {k} (x :: k). Constraint
+class C3 @{k} @x
+  	-- Defined at <interactive>:76:1
+type C4 :: forall a b. Constraint
+class C4 @a @b where
+  x :: a
+  y :: b
+  {-# MINIMAL x, y #-}
+  	-- Defined at <interactive>:80:1
+type C5 :: forall a b. * -> Constraint
+class C5 @a @b c | a -> c
+  	-- Defined at <interactive>:86:1
+type role D1 nominal nominal
+type D1 :: forall {k} (a :: k). *
+data D1 @{k} @a where
+  MkD :: b -> D1 @{*} @b
+  	-- Defined at <interactive>:90:1
+type role D2 nominal nominal nominal nominal phantom nominal
+type D2 :: forall {k} {k1} (a :: k) b. * -> forall (d :: k1). *
+data D2 @{k} @{k1} @a @b c @d = MkD2_1 | MkD2_2 Int b
+  	-- Defined at <interactive>:95:1
+type F1 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k1
+  	-- Defined at <interactive>:102:1
+type F2 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k2
+  	-- Defined at <interactive>:105:1
+type F3 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k3
+  	-- Defined at <interactive>:108:1
+type F4 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k4
+  	-- Defined at <interactive>:111:1
+type F5 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k5
+  	-- Defined at <interactive>:114:1
+type F6 :: forall k1 k2.
+           k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} k6
+  	-- Defined at <interactive>:117:1
+type F1x2 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x2 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k1, k2)
+  	-- Defined at <interactive>:120:1
+type F1x3 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k1, k3)
+  	-- Defined at <interactive>:123:1
+type F1x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k1, k4)
+  	-- Defined at <interactive>:126:1
+type F1x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k1, k5)
+  	-- Defined at <interactive>:129:1
+type F1x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F1x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k1, k6)
+  	-- Defined at <interactive>:132:1
+type F2x3 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x3 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k2, k3)
+  	-- Defined at <interactive>:135:1
+type F2x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k2, k4)
+  	-- Defined at <interactive>:138:1
+type F2x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k2, k5)
+  	-- Defined at <interactive>:141:1
+type F2x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F2x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k2, k6)
+  	-- Defined at <interactive>:144:1
+type F3x4 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x4 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k3, k4)
+  	-- Defined at <interactive>:147:1
+type F3x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k3, k5)
+  	-- Defined at <interactive>:150:1
+type F3x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F3x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k3, k6)
+  	-- Defined at <interactive>:153:1
+type F4x5 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4x5 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k4, k5)
+  	-- Defined at <interactive>:156:1
+type F4x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F4x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k4, k6)
+  	-- Defined at <interactive>:159:1
+type F5x6 :: forall k1 k2.
+             k1 -> k2 -> forall k3 k4 k5. k3 -> k4 -> k5 -> forall k6. k6 -> *
+type F5x6 @k1 @k2 a b @k3 @k4 @k5 c d e @k6 = P @{*} @{k6} (k5, k6)
+  	-- Defined at <interactive>:162:1
