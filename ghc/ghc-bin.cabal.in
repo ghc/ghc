@@ -61,7 +61,7 @@ Executable ghc
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.8.*,
             exceptions     == 0.10.*,
-            time           >= 1.8 && < 1.13
+            time           >= 1.8 && < 1.15
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Other-Modules:
             GHCi.Leak
