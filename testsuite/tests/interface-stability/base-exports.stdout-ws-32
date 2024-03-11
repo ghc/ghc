@@ -1012,7 +1012,7 @@ module Data.Fixed where
   type Fixed :: forall k. k -> *
   newtype Fixed a = MkFixed GHC.Num.Integer.Integer
   type HasResolution :: forall k. k -> Constraint
-  class HasResolution a where
+  class HasResolution @k a where
     resolution :: forall (p :: k -> *). p a -> GHC.Num.Integer.Integer
     {-# MINIMAL resolution #-}
   type Micro :: *
@@ -1781,27 +1781,27 @@ module Data.Type.Equality where
 module Data.Type.Ord where
   -- Safety: Safe
   type (<) :: forall {t}. t -> t -> Constraint
-  type (<) x y = GHC.Internal.TypeError.Assert (x <? y) (GHC.Internal.Data.Type.Ord.LtErrMsg x y) :: Constraint
+  type (<) x y = GHC.Internal.TypeError.Assert (x <? y) (GHC.Internal.Data.Type.Ord.LtErrMsg x y)
   type (<=) :: forall {t}. t -> t -> Constraint
-  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y) :: Constraint
+  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y)
   type (<=?) :: forall k. k -> k -> GHC.Types.Bool
-  type (<=?) m n = OrdCond (Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False :: GHC.Types.Bool
+  type (<=?) m n = OrdCond (Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False
   type (<?) :: forall k. k -> k -> GHC.Types.Bool
-  type (<?) m n = OrdCond (Compare m n) GHC.Types.True GHC.Types.False GHC.Types.False :: GHC.Types.Bool
+  type (<?) m n = OrdCond (Compare m n) GHC.Types.True GHC.Types.False GHC.Types.False
   type (>) :: forall {t}. t -> t -> Constraint
-  type (>) x y = GHC.Internal.TypeError.Assert (x >? y) (GHC.Internal.Data.Type.Ord.GtErrMsg x y) :: Constraint
+  type (>) x y = GHC.Internal.TypeError.Assert (x >? y) (GHC.Internal.Data.Type.Ord.GtErrMsg x y)
   type (>=) :: forall {t}. t -> t -> Constraint
-  type (>=) x y = GHC.Internal.TypeError.Assert (x >=? y) (GHC.Internal.Data.Type.Ord.GeErrMsg x y) :: Constraint
+  type (>=) x y = GHC.Internal.TypeError.Assert (x >=? y) (GHC.Internal.Data.Type.Ord.GeErrMsg x y)
   type (>=?) :: forall k. k -> k -> GHC.Types.Bool
-  type (>=?) m n = OrdCond (Compare m n) GHC.Types.False GHC.Types.True GHC.Types.True :: GHC.Types.Bool
+  type (>=?) m n = OrdCond (Compare m n) GHC.Types.False GHC.Types.True GHC.Types.True
   type (>?) :: forall k. k -> k -> GHC.Types.Bool
-  type (>?) m n = OrdCond (Compare m n) GHC.Types.False GHC.Types.False GHC.Types.True :: GHC.Types.Bool
+  type (>?) m n = OrdCond (Compare m n) GHC.Types.False GHC.Types.False GHC.Types.True
   type Compare :: forall k. k -> k -> GHC.Types.Ordering
   type family Compare a b
   type Max :: forall k. k -> k -> k
-  type Max m n = OrdCond (Compare m n) n n m :: k
+  type Max m n = OrdCond (Compare m n) n n m
   type Min :: forall k. k -> k -> k
-  type Min m n = OrdCond (Compare m n) m m n :: k
+  type Min m n = OrdCond (Compare m n) m m n
   type OrdCond :: forall k. GHC.Types.Ordering -> k -> k -> k -> k
   type family OrdCond o lt eq gt where
     forall k (lt :: k) (eq :: k) (gt :: k). OrdCond GHC.Types.LT lt eq gt = lt
@@ -3207,7 +3207,7 @@ module GHC.Base where
     many :: forall a. f a -> f [a]
     {-# MINIMAL empty, (<|>) #-}
   type Any :: forall k. k
-  type family Any where
+  type family Any @k where
   type Applicative :: (* -> *) -> Constraint
   class Functor f => Applicative f where
     pure :: forall a. a -> f a
@@ -3336,7 +3336,7 @@ module GHC.Base where
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
-  type LiftedRep = BoxedRep Lifted :: RuntimeRep
+  type LiftedRep = BoxedRep Lifted
   type List :: * -> *
   data List a = ...
   type role MVar# nominal representational
@@ -3449,7 +3449,7 @@ module GHC.Base where
   type TypeLitSort :: *
   data TypeLitSort = TypeLitSymbol | TypeLitNat | TypeLitChar
   type UnliftedRep :: RuntimeRep
-  type UnliftedRep = BoxedRep Unlifted :: RuntimeRep
+  type UnliftedRep = BoxedRep Unlifted
   type UnliftedType :: *
   type UnliftedType = TYPE UnliftedRep
   type VecCount :: *
@@ -3459,7 +3459,7 @@ module GHC.Base where
   type Void :: *
   data Void
   type Void# :: ZeroBitType
-  type Void# = (# #) :: ZeroBitType
+  type Void# = (# #)
   type Weak# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   data Weak# a
   type WithDict :: Constraint -> * -> Constraint
@@ -3505,7 +3505,7 @@ module GHC.Base where
   type WordBox :: TYPE WordRep -> *
   data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
-  type ZeroBitRep = TupleRep '[] :: RuntimeRep
+  type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
   absentErr :: forall a. a
@@ -5406,7 +5406,7 @@ module GHC.Exts where
   type Addr# :: TYPE AddrRep
   data Addr#
   type Any :: forall k. k
-  type family Any where
+  type family Any @k where
   type Array# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   data Array# a
   type ArrayArray# :: UnliftedType
@@ -5533,7 +5533,7 @@ module GHC.Exts where
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
-  type LiftedRep = BoxedRep Lifted :: RuntimeRep
+  type LiftedRep = BoxedRep Lifted
   type List :: * -> *
   data List a = ...
   type role MVar# nominal representational
@@ -5608,7 +5608,7 @@ module GHC.Exts where
   TypeLitNat :: GHC.Types.TypeLitSort
   TypeLitSymbol :: GHC.Types.TypeLitSort
   type UnliftedRep :: RuntimeRep
-  type UnliftedRep = BoxedRep Unlifted :: RuntimeRep
+  type UnliftedRep = BoxedRep Unlifted
   type UnliftedType :: *
   type UnliftedType = TYPE UnliftedRep
   type VecCount :: *
@@ -5616,7 +5616,7 @@ module GHC.Exts where
   type VecElem :: *
   data VecElem = Int8ElemRep | Int16ElemRep | Int32ElemRep | Int64ElemRep | Word8ElemRep | Word16ElemRep | Word32ElemRep | Word64ElemRep | FloatElemRep | DoubleElemRep
   type Void# :: ZeroBitType
-  type Void# = (# #) :: ZeroBitType
+  type Void# = (# #)
   type Weak# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   data Weak# a
   type WithDict :: Constraint -> * -> Constraint
@@ -5662,7 +5662,7 @@ module GHC.Exts where
   type WordBox :: TYPE WordRep -> *
   data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
-  type ZeroBitRep = TupleRep '[] :: RuntimeRep
+  type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
   acosDouble# :: Double# -> Double#
@@ -7397,7 +7397,7 @@ module GHC.Generics where
   type C :: *
   data C
   type C1 :: forall {k}. Meta -> (k -> *) -> k -> *
-  type C1 = M1 C :: Meta -> (k -> *) -> k -> *
+  type C1 = M1 C
   type Constructor :: forall {k}. k -> Constraint
   class Constructor c where
     conName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t c f a -> [GHC.Types.Char]
@@ -7407,7 +7407,7 @@ module GHC.Generics where
   type D :: *
   data D
   type D1 :: forall {k}. Meta -> (k -> *) -> k -> *
-  type D1 = M1 D :: Meta -> (k -> *) -> k -> *
+  type D1 = M1 D
   type Datatype :: forall {k}. k -> Constraint
   class Datatype d where
     datatypeName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t d f a -> [GHC.Types.Char]
@@ -7429,7 +7429,7 @@ module GHC.Generics where
     to :: forall x. Rep a x -> a
     {-# MINIMAL from, to #-}
   type Generic1 :: forall k. (k -> *) -> Constraint
-  class Generic1 f where
+  class Generic1 @k f where
     type Rep1 :: forall k. (k -> *) -> k -> *
     type family Rep1 f
     from1 :: forall (a :: k). f a -> Rep1 f a
@@ -7454,14 +7454,14 @@ module GHC.Generics where
   type R :: *
   data R
   type Rec0 :: forall {k}. * -> k -> *
-  type Rec0 = K1 R :: * -> k -> *
+  type Rec0 = K1 R
   type role Rec1 representational nominal
   type Rec1 :: forall k. (k -> *) -> k -> *
   newtype Rec1 f p = Rec1 {unRec1 :: f p}
   type S :: *
   data S
   type S1 :: forall {k}. Meta -> (k -> *) -> k -> *
-  type S1 = M1 S :: Meta -> (k -> *) -> k -> *
+  type S1 = M1 S
   type Selector :: forall {k}. k -> Constraint
   class Selector s where
     selName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t s f a -> [GHC.Types.Char]
@@ -7478,24 +7478,24 @@ module GHC.Generics where
   data U1 p = U1
   UAddr :: forall k (p :: k). GHC.Prim.Addr# -> URec (GHC.Internal.Ptr.Ptr ()) p
   type UAddr :: forall {k}. k -> *
-  type UAddr = URec (GHC.Internal.Ptr.Ptr ()) :: k -> *
+  type UAddr = URec (GHC.Internal.Ptr.Ptr ())
   UChar :: forall k (p :: k). GHC.Prim.Char# -> URec GHC.Types.Char p
   type UChar :: forall {k}. k -> *
-  type UChar = URec GHC.Types.Char :: k -> *
+  type UChar = URec GHC.Types.Char
   UDouble :: forall k (p :: k). GHC.Prim.Double# -> URec GHC.Types.Double p
   type UDouble :: forall {k}. k -> *
-  type UDouble = URec GHC.Types.Double :: k -> *
+  type UDouble = URec GHC.Types.Double
   UFloat :: forall k (p :: k). GHC.Prim.Float# -> URec GHC.Types.Float p
   type UFloat :: forall {k}. k -> *
-  type UFloat = URec GHC.Types.Float :: k -> *
+  type UFloat = URec GHC.Types.Float
   UInt :: forall k (p :: k). GHC.Prim.Int# -> URec GHC.Types.Int p
   type UInt :: forall {k}. k -> *
-  type UInt = URec GHC.Types.Int :: k -> *
+  type UInt = URec GHC.Types.Int
   type URec :: forall k. * -> k -> *
   data family URec a p
   UWord :: forall k (p :: k). GHC.Prim.Word# -> URec GHC.Types.Word p
   type UWord :: forall {k}. k -> *
-  type UWord = URec GHC.Types.Word :: k -> *
+  type UWord = URec GHC.Types.Word
   type role V1 phantom
   type V1 :: forall k. k -> *
   data V1 p
@@ -8583,7 +8583,7 @@ module GHC.Num.BigNat where
   type BigNat :: *
   data BigNat = BN# {unBigNat :: BigNat#}
   type BigNat# :: GHC.Types.UnliftedType
-  type BigNat# = GHC.Num.WordArray.WordArray# :: GHC.Types.UnliftedType
+  type BigNat# = GHC.Num.WordArray.WordArray#
   bigNatAdd :: BigNat# -> BigNat# -> BigNat#
   bigNatAddWord :: BigNat# -> GHC.Types.Word -> BigNat#
   bigNatAddWord# :: BigNat# -> GHC.Prim.Word# -> BigNat#
@@ -9357,7 +9357,7 @@ module GHC.Stack where
   type CostCentreStack :: *
   data CostCentreStack
   type HasCallStack :: Constraint
-  type HasCallStack = ?callStack::CallStack :: Constraint
+  type HasCallStack = ?callStack::CallStack
   type SrcLoc :: *
   data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
   callStack :: HasCallStack => CallStack
@@ -9418,7 +9418,7 @@ module GHC.Stack.Types where
   type CallStack :: *
   data CallStack = EmptyCallStack | PushCallStack [GHC.Types.Char] SrcLoc CallStack | FreezeCallStack CallStack
   type HasCallStack :: Constraint
-  type HasCallStack = ?callStack::CallStack :: Constraint
+  type HasCallStack = ?callStack::CallStack
   type SrcLoc :: *
   data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
   emptyCallStack :: CallStack
@@ -9573,9 +9573,9 @@ module GHC.TypeLits where
   type (-) :: Natural -> Natural -> Natural
   type family (-) a b
   type (<=) :: forall {t}. t -> t -> Constraint
-  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y) :: Constraint
+  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y)
   type (<=?) :: forall k. k -> k -> GHC.Types.Bool
-  type (<=?) m n = GHC.Internal.Data.Type.Ord.OrdCond (GHC.Internal.Data.Type.Ord.Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False :: GHC.Types.Bool
+  type (<=?) m n = GHC.Internal.Data.Type.Ord.OrdCond (GHC.Internal.Data.Type.Ord.Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False
   type AppendSymbol :: Symbol -> Symbol -> Symbol
   type family AppendSymbol a b
   type CharToNat :: GHC.Types.Char -> Natural
@@ -9692,9 +9692,9 @@ module GHC.TypeNats where
   type (-) :: Natural -> Natural -> Natural
   type family (-) a b
   type (<=) :: forall {t}. t -> t -> Constraint
-  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y) :: Constraint
+  type (<=) x y = GHC.Internal.TypeError.Assert (x <=? y) (GHC.Internal.Data.Type.Ord.LeErrMsg x y)
   type (<=?) :: forall k. k -> k -> GHC.Types.Bool
-  type (<=?) m n = GHC.Internal.Data.Type.Ord.OrdCond (GHC.Internal.Data.Type.Ord.Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False :: GHC.Types.Bool
+  type (<=?) m n = GHC.Internal.Data.Type.Ord.OrdCond (GHC.Internal.Data.Type.Ord.Compare m n) GHC.Types.True GHC.Types.True GHC.Types.False
   type CmpNat :: Natural -> Natural -> GHC.Types.Ordering
   type family CmpNat a b
   type Div :: Natural -> Natural -> Natural

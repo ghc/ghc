@@ -33,6 +33,10 @@ Compiler
 GHCi
 ~~~~
 
+- :ghci-cmd:`:info` now outputs type declarations with @-binders that are
+  considered semantically significant. See the documentation for :ghci-cmd:`:info`
+  itself for a more detailed explanation.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

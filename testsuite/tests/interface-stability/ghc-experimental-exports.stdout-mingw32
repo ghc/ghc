@@ -1480,9 +1480,9 @@ module Data.Tuple.Experimental where
   class a => CSolo a
     {-# MINIMAL #-}
   type CTuple0 :: Constraint
-  type CTuple0 = () :: Constraint :: Constraint
+  type CTuple0 = () :: Constraint
   type CTuple1 :: Constraint -> Constraint
-  type CTuple1 = CSolo :: Constraint -> Constraint
+  type CTuple1 = CSolo
   type CTuple10 :: Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint
   class (a, b, c, d, e, f, g, h, i, j) => CTuple10 a b c d e f g h i j
     {-# MINIMAL #-}
@@ -2637,11 +2637,11 @@ module Data.Tuple.Experimental where
   type Tuple0 :: *
   type Tuple0 = ()
   type Tuple0# :: GHC.Types.ZeroBitType
-  type Tuple0# = (# #) :: GHC.Types.ZeroBitType
+  type Tuple0# = (# #)
   type Tuple1 :: * -> *
-  type Tuple1 = Solo :: * -> *
+  type Tuple1 = Solo
   type Tuple1# :: * -> TYPE (GHC.Types.TupleRep '[GHC.Types.LiftedRep])
-  type Tuple1# = Solo# :: * -> TYPE (GHC.Types.TupleRep '[GHC.Types.LiftedRep])
+  type Tuple1# = Solo#
   type Tuple10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
   data Tuple10 a b c d e f g h i j = ...
   type Tuple10# :: forall (k0 :: GHC.Types.RuntimeRep) (k1 :: GHC.Types.RuntimeRep) (k2 :: GHC.Types.RuntimeRep) (k3 :: GHC.Types.RuntimeRep) (k4 :: GHC.Types.RuntimeRep) (k5 :: GHC.Types.RuntimeRep) (k6 :: GHC.Types.RuntimeRep) (k7 :: GHC.Types.RuntimeRep) (k8 :: GHC.Types.RuntimeRep) (k9 :: GHC.Types.RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE k8 -> TYPE k9 -> TYPE (GHC.Types.TupleRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9])
@@ -4341,7 +4341,7 @@ module GHC.PrimOps where
   type Addr# :: TYPE AddrRep
   data Addr#
   type Any :: forall k. k
-  type family Any where
+  type family Any @k where
   type Array# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   data Array# a
   type ArrayArray# :: UnliftedType
@@ -4468,7 +4468,7 @@ module GHC.PrimOps where
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
-  type LiftedRep = BoxedRep Lifted :: RuntimeRep
+  type LiftedRep = BoxedRep Lifted
   type List :: * -> *
   data List a = ...
   type role MVar# nominal representational
@@ -4543,7 +4543,7 @@ module GHC.PrimOps where
   TypeLitNat :: GHC.Types.TypeLitSort
   TypeLitSymbol :: GHC.Types.TypeLitSort
   type UnliftedRep :: RuntimeRep
-  type UnliftedRep = BoxedRep Unlifted :: RuntimeRep
+  type UnliftedRep = BoxedRep Unlifted
   type UnliftedType :: *
   type UnliftedType = TYPE UnliftedRep
   type VecCount :: *
@@ -4551,7 +4551,7 @@ module GHC.PrimOps where
   type VecElem :: *
   data VecElem = Int8ElemRep | Int16ElemRep | Int32ElemRep | Int64ElemRep | Word8ElemRep | Word16ElemRep | Word32ElemRep | Word64ElemRep | FloatElemRep | DoubleElemRep
   type Void# :: ZeroBitType
-  type Void# = (# #) :: ZeroBitType
+  type Void# = (# #)
   type Weak# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   data Weak# a
   type WithDict :: Constraint -> * -> Constraint
@@ -4597,7 +4597,7 @@ module GHC.PrimOps where
   type WordBox :: TYPE WordRep -> *
   data WordBox a = MkWordBox a
   type ZeroBitRep :: RuntimeRep
-  type ZeroBitRep = TupleRep '[] :: RuntimeRep
+  type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
   acosDouble# :: Double# -> Double#
@@ -6332,9 +6332,9 @@ module Prelude.Experimental where
   class a => CSolo a
     {-# MINIMAL #-}
   type CTuple0 :: Constraint
-  type CTuple0 = () :: Constraint :: Constraint
+  type CTuple0 = () :: Constraint
   type CTuple1 :: Constraint -> Constraint
-  type CTuple1 = CSolo :: Constraint -> Constraint
+  type CTuple1 = CSolo
   type CTuple10 :: Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint -> Constraint
   class (a, b, c, d, e, f, g, h, i, j) => CTuple10 a b c d e f g h i j
     {-# MINIMAL #-}
@@ -8963,11 +8963,11 @@ module Prelude.Experimental where
   type Tuple0 :: *
   type Tuple0 = ()
   type Tuple0# :: GHC.Types.ZeroBitType
-  type Tuple0# = (# #) :: GHC.Types.ZeroBitType
+  type Tuple0# = (# #)
   type Tuple1 :: * -> *
-  type Tuple1 = Solo :: * -> *
+  type Tuple1 = Solo
   type Tuple1# :: * -> TYPE (GHC.Types.TupleRep '[GHC.Types.LiftedRep])
-  type Tuple1# = Solo# :: * -> TYPE (GHC.Types.TupleRep '[GHC.Types.LiftedRep])
+  type Tuple1# = Solo#
   type Tuple10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
   data Tuple10 a b c d e f g h i j = ...
   type Tuple10# :: forall (k0 :: GHC.Types.RuntimeRep) (k1 :: GHC.Types.RuntimeRep) (k2 :: GHC.Types.RuntimeRep) (k3 :: GHC.Types.RuntimeRep) (k4 :: GHC.Types.RuntimeRep) (k5 :: GHC.Types.RuntimeRep) (k6 :: GHC.Types.RuntimeRep) (k7 :: GHC.Types.RuntimeRep) (k8 :: GHC.Types.RuntimeRep) (k9 :: GHC.Types.RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE k8 -> TYPE k9 -> TYPE (GHC.Types.TupleRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9])
