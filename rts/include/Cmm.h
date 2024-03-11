@@ -700,9 +700,9 @@
 
 #if defined(TSAN_ENABLED)
 // This is may be efficient than a fence but TSAN can reason about it.
-#if WORD_SIZE_IN_BITS == 64
+#if SIZEOF_W == 8
 #define ACQUIRE_FENCE_ON(x) if (1) { W_ tmp; (tmp) = prim %load_acquire64(x); }
-#elif WORD_SIZE_IN_BITS == 32
+#elif SIZEOF_W == 4
 #define ACQUIRE_FENCE_ON(x) if (1) { W_ tmp; (tmp) = prim %load_acquire32(x); }
 #endif
 #else
