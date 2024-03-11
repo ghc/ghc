@@ -175,18 +175,19 @@ install_lib: lib/settings
 	@dest="$(DESTDIR)$(ActualLibsDir)"; \
 	cd lib; \
 	for i in `$(FIND) . -type f`; do \
-		$(INSTALL_DIR) "$$dest/`dirname $$i`" ; \
+		dir="`dirname $$i`" ; \
+		$(INSTALL_DIR) "$$dest/$$dir" ; \
 		case $$i in \
 		  *.a) \
-		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ; \
+		    $(INSTALL_DATA) $$i "$$dest/$$dir" ; \
 		    $(RANLIB_CMD) "$$dest"/$$i ;; \
 		  *.dll) \
-		    $(INSTALL_PROGRAM) $$i "$$dest/`dirname $$i`" ; \
+		    $(INSTALL_PROGRAM) $$i "$$dest/$$dir" ; \
 		    $(STRIP_CMD) "$$dest"/$$i ;; \
 		  *.so) \
-		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
+		    $(INSTALL_SHLIB) $$i "$$dest/$$dir" ;; \
 		  *.dylib) \
-		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
+		    $(INSTALL_SHLIB) $$i "$$dest/$$dir" ;; \
 		  *.mjs) \
 		    $(INSTALL_SCRIPT) $$i "$$dest/`dirname $$i`" ;; \
 		  *) \
