@@ -339,7 +339,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string Llvm = "llvm"
     flavour_string Dwarf = "debug_info"
     flavour_string FullyStatic = "fully_static"
-    flavour_string ThreadSanitiser = "thread_sanitizer"
+    flavour_string ThreadSanitiser = "thread_sanitizer_cmm"
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
 
@@ -969,9 +969,9 @@ job_groups =
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , validateBuilds Amd64 (Linux Debian10) unreg
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , -- Nightly allowed to fail: #22520
+     , -- More work is needed to address TSAN failures: #22520
        modifyNightlyJobs allowFailure
-         (modifyValidateJobs manual tsan_jobs)
+         (modifyValidateJobs (allowFailure . manual) tsan_jobs)
      , -- Nightly allowed to fail: #22343
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
@@ -1039,7 +1039,7 @@ job_groups =
          -- Haddock is large enough to make TSAN choke without massive quantities of
          -- memory.
         . addVariable "HADRIAN_ARGS" "--docs=none") $
-      validateBuilds Amd64 (Linux Debian10) tsan
+      validateBuilds Amd64 (Linux Debian12) tsan
 
     make_wasm_jobs cfg =
       modifyJobs
@@ -1083,6 +1083,7 @@ platform_mapping = Map.map go combined_result
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
                 , "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static"
+                , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate"
                 , "nightly-x86_64-linux-deb10-validate"
