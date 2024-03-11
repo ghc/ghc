@@ -49,15 +49,15 @@ import Foreign.Storable
 #endif
 
 #if defined(NO_FETCH_ADD)
-import GHC.Exts ( atomicCasWord64Addr#, eqWord64# )
+import GHC.Exts ( atomicCasWord64Addr#, eqWord64#, readWord64OffAddr# )
 #else
-import GHC.Exts( fetchAddWordAddr#, word64ToWord#, wordToWord64# )
+import GHC.Exts( fetchAddWordAddr#, word64ToWord# )
 #endif
 
 import GHC.Exts ( Addr#, State#, Word64#, RealWorld )
-
+import GHC.Int ( Int(..) )
 import GHC.Word( Word64(..) )
-import GHC.Exts( plusWord64#, readWord64OffAddr# )
+import GHC.Exts( plusWord64#, int2Word#, wordToWord64# )
 
 {-
 ************************************************************************
@@ -258,9 +258,9 @@ genSym :: IO Word64
 genSym = do
     let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
     let !(Ptr counter) = ghc_unique_counter64
-    let !(Ptr inc_ptr) = ghc_unique_inc
-    u <- IO $ \s0 -> case readWord64OffAddr# inc_ptr 0# s0 of
-        (# s1, inc #) -> case fetchAddWord64Addr# counter inc s1 of
+    I# inc# <- peek ghc_unique_inc
+    let !inc = wordToWord64# (int2Word# inc#)
+    u <- IO $ \s1 -> case fetchAddWord64Addr# counter inc s1 of
             (# s2, val #) ->
                 let !u = W64# (val `plusWord64#` inc) .&. mask
                 in (# s2, u #)
