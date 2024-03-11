@@ -1,20 +1,20 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling A[sig]           ( p\A.hsig, nothing )
-  [2 of 2] Compiling M                ( p\M.hs, nothing )
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling M                ( p/M.hs, nothing )
 [2 of 3] Processing q
   Instantiating q
-  [1 of 1] Compiling A                ( q\A.hs, bkpfail46.out\q\A.o )
+  [1 of 1] Compiling A                ( q/A.hs, bkpfail46.out/q/A.o )
 [3 of 3] Processing r
   Instantiating r
   [1 of 1] Including p[A=q:A]
     Instantiating p[A=q:A]
-    [1 of 2] Compiling A[sig]           ( p\A.hsig, bkpfail46.out\p\p-HVmFlcYSefiK5n1aDP1v7x\A.o )
+    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail46.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
 
 bkpfail46.bkp:16:9: error: [GHC-15843]
     • Type constructor ‘K’ has conflicting definitions in the module
       and its hsig file.
       Main module: type K :: * -> Constraint
-                   type K a = GHC.Classes.Eq a :: Constraint
+                   type K a = GHC.Classes.Eq a
         Hsig file: type K :: * -> Constraint
                    class K a
       Illegal parameterized type synonym in implementation of abstract data.

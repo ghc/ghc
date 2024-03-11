@@ -56,7 +56,8 @@ module GHC.Iface.Type (
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
         isIfaceRhoType,
 
-        suppressIfaceInvisibles,
+        suppressIfaceInvisibles, suppressIfaceInsignificantInvisibles,
+        ifTypeVarVisiblyOccurs,
         stripIfaceInvisVars,
         stripInvisArgs,
 
@@ -99,6 +100,8 @@ import Data.Word (Word8)
 import Control.Arrow (first)
 import Control.DeepSeq
 import Control.Monad ((<$!>))
+import Data.List (dropWhileEnd)
+import qualified Data.List.NonEmpty as NonEmpty
 
 {-
 ************************************************************************
@@ -623,6 +626,42 @@ suppressIfaceInvisibles (PrintExplicitKinds False) tys xs = suppress tys xs
         | isInvisibleTyConBinder k =     suppress ks xs
         | otherwise                = x : suppress ks xs
 
+-- An invisible binder is considered significant when it meets at least
+-- one of the following three criteria:
+--   - It visibly occurs in the RHS type
+--   - It is not followed by a visible binder, so it
+--     affects the arity of a type synonym
+--   - It is followed by a significant binder,
+--     so it affects positioning
+suppressIfaceInsignificantInvisibles :: (IfaceTyConBinder -> Bool)
+                                     -> PrintExplicitKinds
+                                     -> [IfaceTyConBinder]
+                                     -> [IfaceTyConBinder]
+suppressIfaceInsignificantInvisibles _             (PrintExplicitKinds True)  tys = tys
+suppressIfaceInsignificantInvisibles mentioned_var (PrintExplicitKinds False) tys = suppress tys
+    where
+      -- Consider this example:
+      --   type T :: forall k1 k2. Type
+      --   type T @a @b = b
+      -- `@a` is not mentioned on the RHS however we can't just
+      -- drop it because implicit argument positioning matters.
+      --
+      -- Hence just drop the end
+      mentioned_vars = dropWhileEnd (not . mentioned_var)
+
+      suppress_invisible_groups [] = []
+      suppress_invisible_groups [group] = NonEmpty.toList group -- the last group affects arity
+      suppress_invisible_groups (group : groups)
+        = applyWhen invis_group mentioned_vars bndrs ++ suppress_invisible_groups groups
+        where
+          bndrs       = NonEmpty.toList group
+          invis_group = isInvisibleTyConBinder (NonEmpty.head group)
+
+      suppress
+        = suppress_invisible_groups                 -- Filter out insignificant invisible binders
+        . NonEmpty.groupWith isInvisibleTyConBinder -- Find chunks of @-binders
+        . filterOut          isInferredTyConBinder  -- We don't want to display @{binders}
+
 stripIfaceInvisVars :: PrintExplicitKinds -> [IfaceTyConBinder] -> [IfaceTyConBinder]
 stripIfaceInvisVars (PrintExplicitKinds True)  tyvars = tyvars
 stripIfaceInvisVars (PrintExplicitKinds False) tyvars
@@ -662,6 +701,27 @@ ifTypeIsVarFree ty = go ty
 
     go_args IA_Nil = True
     go_args (IA_Arg arg _ args) = go arg && go_args args
+
+ifTypeVarVisiblyOccurs :: IfLclName -> IfaceType -> Bool
+-- Returns True if the type contains this name. Doesn't count
+-- invisible application
+-- Just used to control pretty printing
+ifTypeVarVisiblyOccurs name ty = go ty
+  where
+    go (IfaceTyVar var)         = var == name
+    go (IfaceFreeTyVar {})      = False
+    go (IfaceAppTy fun args)    = go fun || go_args args
+    go (IfaceFunTy _ w arg res) = go w || go arg || go res
+    go (IfaceForAllTy bndr ty)  = go (ifaceBndrType (binderVar bndr)) || go ty
+    go (IfaceTyConApp _ args)  = go_args args
+    go (IfaceTupleTy _ _ args) = go_args args
+    go (IfaceLitTy _)          = False
+    go (IfaceCastTy {})        = False -- Safe
+    go (IfaceCoercionTy {})    = False -- Safe
+
+    go_args IA_Nil = False
+    go_args (IA_Arg arg Required args) = go arg || go_args args
+    go_args (IA_Arg _arg _ args) = go_args args
 
 {- Note [Substitution on IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

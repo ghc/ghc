@@ -1,0 +1,50 @@
+:set -XTypeAbstractions
+
+:{
+import Data.Kind
+import Data.Data
+
+type T7 :: forall a b c. b -> forall d. Type
+type T7 @a @b @c f @d = b
+
+type T6 :: forall k. Type -> Type
+type T6 _a = ()
+
+type T5 :: forall a. Type -> Type
+type T5 @a _b = Proxy _b
+
+type T4 :: forall a. Type -> Type
+type T4 @a _b = Proxy a
+
+type T3 :: forall k. k -> Type
+type T3 a = Proxy a
+
+type T2 :: forall k. k -> Type
+type T2 @k = Proxy
+
+type T1 :: forall k. k -> Type
+type T1 = Proxy
+
+type T0 :: forall k. k -> Type
+type T0 = Proxy :: forall k. k -> Type
+:}
+
+:i T0
+:i T1
+:i T2
+:i T3
+:i T4
+:i T5
+:i T6
+:i T7
+
+:set -fprint-explicit-kinds
+
+:i T0
+:i T1
+:i T2
+:i T3
+:i T4
+:i T5
+:i T6
+:i T7

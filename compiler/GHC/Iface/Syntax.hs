@@ -98,6 +98,7 @@ import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
+import qualified Data.Set as Set
 
 infixl 3 &&&
 
@@ -1051,16 +1052,17 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
 
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifBinders = binders
-                              , ifSynRhs  = mono_ty
+                              , ifSynRhs  = poly_ty
                               , ifResKind = res_kind})
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
-           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau
-                  , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+         , hang (text "type" <+> decl_head <+> equals)
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau ])
          ]
   where
-    (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
+    (tvs, theta, tau) = splitIfaceSigmaTy poly_ty
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    decl_head = pprIfaceDeclHeadWith invisibles_suppressor suppress_bndr_sig [] ss tc binders
 
     -- See Note [Printing type abbreviations] in GHC.Iface.Type
     ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
@@ -1071,6 +1073,10 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
+
+    invisibles_suppressor =
+      suppressIfaceInsignificantInvisibles
+        (\var -> ifTyConBinderName var `ifTypeVarVisiblyOccurs` tau)
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon
                              , ifFamFlav = rhs, ifBinders = binders
@@ -1083,9 +1089,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
 
   | otherwise
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type family"
-                   <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
-                   <+> pp_inj res_var inj
+         , hang (text "type family" <+> decl_head <+> pp_inj res_var inj
                    <+> ppShowRhs ss (pp_where rhs))
               2 (ppShowRhs ss (pp_rhs rhs))
            $$
@@ -1093,6 +1097,8 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
          ]
   where
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+
+    decl_head = pprIfaceDeclHeadWith invisibles_suppressor suppress_bndr_sig [] ss tycon binders
 
     pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
     pp_where _                              = empty
@@ -1129,6 +1135,16 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
+
+    invisibles_suppressor =
+      suppressIfaceInsignificantInvisibles
+        (\var -> ifTyConBinderName var `Set.member` mentioned_vars)
+
+    mentioned_vars
+      | Just{} <- res_var
+      , Injective injectivity <- inj
+      = Set.fromList . map (ifTyConBinderName . snd) . filter fst $ zip injectivity binders
+      | otherwise = mempty
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatUnivBndrs = univ_bndrs, ifPatExBndrs = ex_bndrs,
@@ -1239,16 +1255,26 @@ pprIfaceTyConParent IfNoParent
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = pprIfaceTypeApp topPrec tc tys
 
+
+-- The most common use case of `pprIfaceDeclHeadWith`
 pprIfaceDeclHead :: SuppressBndrSig
                  -> IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
                  -> SDoc
-pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
+pprIfaceDeclHead
+  = pprIfaceDeclHeadWith (\pk bndrs -> suppressIfaceInvisibles pk bndrs bndrs)
+
+pprIfaceDeclHeadWith :: (PrintExplicitKinds -> [IfaceTyConBinder] -> [IfaceTyConBinder])
+                     -> SuppressBndrSig
+                     -> IfaceContext -> ShowSub -> Name
+                     -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
+                     -> SDoc
+pprIfaceDeclHeadWith suppress_invisibles suppress_sig context ss tc_occ bndrs
   = sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
           <+> pprIfaceTyConBinders suppress_sig
-                (suppressIfaceInvisibles (PrintExplicitKinds print_kinds) bndrs bndrs) ]
+                (suppress_invisibles (PrintExplicitKinds print_kinds) bndrs) ]
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr

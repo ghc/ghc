@@ -1,0 +1,50 @@
+type T0 :: forall k. k -> *
+type T0 = Proxy
+  	-- Defined at <interactive>:29:1
+type T1 :: forall k. k -> *
+type T1 = Proxy
+  	-- Defined at <interactive>:26:1
+type T2 :: forall k. k -> *
+type T2 @k = Proxy
+  	-- Defined at <interactive>:23:1
+type T3 :: forall k. k -> *
+type T3 a = Proxy a
+  	-- Defined at <interactive>:20:1
+type T4 :: forall {k} (a :: k). * -> *
+type T4 @a _b = Proxy a
+  	-- Defined at <interactive>:17:1
+type T5 :: forall {k} (a :: k). * -> *
+type T5 _b = Proxy _b
+  	-- Defined at <interactive>:14:1
+type T6 :: forall {k} (k1 :: k). * -> *
+type T6 _a = ()
+  	-- Defined at <interactive>:11:1
+type T7 :: forall {k} {k1} {k2} (a :: k) b (c :: k1).
+           b -> forall (d :: k2). *
+type T7 @a @b f @d = b
+  	-- Defined at <interactive>:8:1
+type T0 :: forall k. k -> *
+type T0 = Proxy
+  	-- Defined at <interactive>:29:1
+type T1 :: forall k. k -> *
+type T1 = Proxy
+  	-- Defined at <interactive>:26:1
+type T2 :: forall k. k -> *
+type T2 @k = Proxy @{k}
+  	-- Defined at <interactive>:23:1
+type T3 :: forall k. k -> *
+type T3 @k a = Proxy @{k} a
+  	-- Defined at <interactive>:20:1
+type T4 :: forall {k} (a :: k). * -> *
+type T4 @{k} @a _b = Proxy @{k} a
+  	-- Defined at <interactive>:17:1
+type T5 :: forall {k} (a :: k). * -> *
+type T5 @{k} @a _b = Proxy @{*} _b
+  	-- Defined at <interactive>:14:1
+type T6 :: forall {k} (k1 :: k). * -> *
+type T6 @{k} @k1 _a = ()
+  	-- Defined at <interactive>:11:1
+type T7 :: forall {k} {k1} {k2} (a :: k) b (c :: k1).
+           b -> forall (d :: k2). *
+type T7 @{k} @{k1} @{k2} @a @b @c f @d = b
+  	-- Defined at <interactive>:8:1

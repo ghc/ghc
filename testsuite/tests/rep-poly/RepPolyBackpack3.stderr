@@ -1,19 +1,19 @@
 [1 of 3] Processing sig
-  [1 of 1] Compiling Sig[sig]         ( sig\Sig.hsig, nothing )
+  [1 of 1] Compiling Sig[sig]         ( sig/Sig.hsig, nothing )
 [2 of 3] Processing impl
   Instantiating impl
-  [1 of 1] Compiling Impl             ( impl\Impl.hs, RepPolyBackpack3.out\impl\Impl.o )
+  [1 of 1] Compiling Impl             ( impl/Impl.hs, RepPolyBackpack3.out/impl/Impl.o )
 [3 of 3] Processing main
   Instantiating main
   [1 of 1] Including sig[Sig=impl:Impl]
     Instantiating sig[Sig=impl:Impl]
-    [1 of 1] Compiling Sig[sig]         ( sig\Sig.hsig, RepPolyBackpack3.out\sig\sig-Absk5cIXTXe6UYhGMYGber\Sig.o )
+    [1 of 1] Compiling Sig[sig]         ( sig/Sig.hsig, RepPolyBackpack3.out/sig/sig-Absk5cIXTXe6UYhGMYGber/Sig.o )
 
 RepPolyBackpack3.bkp:17:5: error: [GHC-15843]
     • Type constructor ‘Rep’ has conflicting definitions in the module
       and its hsig file.
       Main module: type Rep :: GHC.Types.RuntimeRep
-                   type Rep = T :: GHC.Types.RuntimeRep
+                   type Rep = T
         Hsig file: type Rep :: GHC.Types.RuntimeRep
                    data Rep
       Illegal implementation of abstract data: Invalid type family ‘T’.
