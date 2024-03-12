@@ -20,7 +20,7 @@
                   non-conflicting transactions to commit in parallel.
                   The implementation treats reads optimistically --
                   extra versioning information is retained in the
-                  saw_update_by field of the TVars so that they do not
+                  num_updates field of the TVars so that they do not
                   need to be locked for reading.
 
   STM.C contains more details about the locking schemes used.
@@ -84,16 +84,23 @@ void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
    Validation
    ----------
 
-  Test whether the specified transaction record, and all those within which
-  it is nested, are still valid.
+   Test whether the specified transaction record, and all those within which
+   it is nested, are still valid.
 
-  Note: the caller can assume that once stmValidateTransaction has
-  returned false for a given trec then that transaction will never
-  again be valid -- we rely on this in Schedule.c when kicking invalid
-  threads at GC (in case they are stuck looping)
+   stmValidateNestOfTransactions - optimistically
+      - Can return false positives when tvars are locked.
+      - Faster
+      - Does not take any locks
+
+   stmValidateNestOfTransactions - pessimistic
+      - Can return false negatives.
+      - Slower
+      - Takes locks, negatively affecting performance of other threads.
+      - Most importantly - no false positives!
+
 */
 
-StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec);
+StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec, StgBool optimistically);
 
 /*----------------------------------------------------------------------
 
@@ -110,7 +117,7 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec);
    Note that, for nested operations, validity here is solely in terms
    of the specified trec: it does not say whether those that it may be
    nested are themselves valid.  Callers can check this with
-   stmValidateNestOfTransactions.
+   stmValidateNestOfTransactionsPessimistic.
 
    The user of the STM should ensure that it is always safe to assume that a
    transaction context is not valid when in fact it is (i.e. to return false in

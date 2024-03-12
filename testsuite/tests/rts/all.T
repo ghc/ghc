@@ -609,3 +609,5 @@ test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), skip),
                    pre_cmd('$MAKE -s --no-print-directory IOManager.hs')],
                   compile_and_run, [''])
+
+test('T24142', [req_target_smp], compile_and_run, ['-threaded -with-rtsopts "-N2"'])
