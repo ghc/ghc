@@ -1,5 +1,4 @@
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
-
 -- | Functions for converting Core things to interface file things.
 module GHC.CoreToIface
     ( -- * Binders

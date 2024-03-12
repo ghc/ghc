@@ -9,7 +9,7 @@ This module defines interface types and binders
 
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
-
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dsuppress-all #-}
 module GHC.Iface.Type (
         IfExtName, IfLclName,
 
@@ -92,7 +92,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
-import Control.Monad ((<$!>))
+import Data.Proxy
 
 {-
 ************************************************************************
@@ -243,9 +243,9 @@ instance Monoid IfaceAppArgs where
 -- coercion constructors, the lot.
 -- We have to tag them in order to pretty print them
 -- properly.
-data IfaceTyCon = IfaceTyCon { ifaceTyConName :: !IfExtName
-                             , ifaceTyConInfo :: !IfaceTyConInfo }
-    deriving (Eq)
+data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
+                             , ifaceTyConInfo :: IfaceTyConInfo }
+    deriving (Eq, Ord)
 
 -- | The various types of TyCons which have special, built-in syntax.
 data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
@@ -265,7 +265,7 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- that is actually being applied to two types
                       -- of the same kind.  This affects pretty-printing
                       -- only: see Note [Equality predicates in IfaceType]
-                    deriving (Eq)
+                    deriving (Eq, Ord)
 
 instance Outputable IfaceTyConSort where
   ppr IfaceNormalTyCon         = text "normal"
@@ -359,7 +359,7 @@ data IfaceTyConInfo   -- Used only to guide pretty-printing
                       -- should be printed as 'D to distinguish it from
                       -- an existing type constructor D.
                    , ifaceTyConSort       :: IfaceTyConSort }
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 -- | This smart constructor allows sharing of the two most common
 -- cases. See Note [Sharing IfaceTyConInfo]
@@ -1979,11 +1979,12 @@ instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
+  put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
 
-   get bh = do n <- get bh
-               i <- get bh
-               return (IfaceTyCon n i)
+  get bh = do
+    n <- get bh
+    i <- get bh
+    return (IfaceTyCon n i)
 
 instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0
@@ -2002,7 +2003,7 @@ instance Binary IfaceTyConSort where
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = mkIfaceTyConInfo <$!> get bh <*> get bh
+   get bh = mkIfaceTyConInfo <$> get bh <*> get bh
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit

@@ -300,7 +300,7 @@ mkIface_ hsc_env
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
-        _ = maybeGlobalRdrEnv rdr_env
+        rdrs = maybeGlobalRdrEnv rdr_env
 
     ModIface {
           mi_module      = this_mod,
