@@ -94,6 +94,7 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
 import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
+import Data.Proxy
 
 infixl 3 &&&
 
@@ -123,10 +124,10 @@ getIfaceTopBndr bh = get bh
 
 putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
 putIfaceTopBndr bh name =
-    case getUserData bh of
-      UserData{ ud_put_binding_name = put_binding_name } ->
+    case findUserDataWriter (Proxy @BindingName) bh of
+      tbl ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
-          put_binding_name bh name
+          putEntry tbl bh (BindingName name)
 
 
 data IfaceDecl

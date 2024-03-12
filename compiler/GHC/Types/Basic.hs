@@ -1010,7 +1010,7 @@ data TupleSort
   = BoxedTuple
   | UnboxedTuple
   | ConstraintTuple
-  deriving( Eq, Data )
+  deriving( Eq, Data, Ord )
 
 instance Outputable TupleSort where
   ppr ts = text $

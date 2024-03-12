@@ -29,7 +29,6 @@ module GHC.Iface.Binary (
 
 import GHC.Prelude
 
-import GHC.Tc.Utils.Monad
 import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Unit
 import GHC.Unit.Module.ModIface
@@ -39,6 +38,7 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Data.FastMutInt
+import GHC.Data.FastString (FastString)
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
@@ -121,6 +121,8 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     pure (src_hash, bh)
 
 -- | Read an interface file.
+--
+-- See Note [Iface Binary Serialisation] for details.
 readBinIface
   :: Profile
   -> NameCache
@@ -156,22 +158,28 @@ getWithUserData name_cache bh = do
 -- Reading names has the side effect of adding them into the given NameCache.
 getTables :: NameCache -> BinHandle -> IO BinHandle
 getTables name_cache bh = do
-    -- Read the dictionary
-    -- The next word in the file is a pointer to where the dictionary is
-    -- (probably at the end of the file)
-    dict <- Binary.forwardGet bh (getDictionary bh)
+    fsReaderTable <- initFastStringReaderTable
+    nameReaderTable <- initNameReaderTable name_cache
 
-    -- Initialise the user-data field of bh
-    let bh_fs = setUserData bh $ newReadState (error "getSymtabName")
-                                              (getDictFastString dict)
 
-    symtab <- Binary.forwardGet bh_fs (getSymbolTable bh_fs name_cache)
+    -- The order of these deserialisation matters!
+    --
+    -- See Note [Iface Binary Serialiser Order] for details.
+    fsTable <- Binary.forwardGet bh (getTable fsReaderTable bh)
+    let
+      fsReader = mkReaderFromTable fsReaderTable fsTable
+      bhFs = addReaderToUserData (mkSomeBinaryReader fsReader) bh
 
-    -- It is only now that we know how to get a Name
-    return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
-                                           (getDictFastString dict)
+    nameTable <- Binary.forwardGet bh (getTable nameReaderTable bhFs)
+    let
+      nameReader = mkReaderFromTable nameReaderTable nameTable
+      bhName = addReaderToUserData (mkSomeBinaryReader nameReader) bhFs
 
--- | Write an interface file
+    pure bhName
+
+-- | Write an interface file.
+--
+-- See Note [Iface Binary Serialisation] for details.
 writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
 writeBinIface profile traceBinIface hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
@@ -225,43 +233,35 @@ putWithUserData traceBinIface bh payload = do
 --
 -- It returns (number of names, number of FastStrings, payload write result)
 --
-putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int,Int,b)
-putWithTables bh put_payload = do
-    -- initialize state for the name table and the FastString table.
-    symtab_next <- newFastMutInt 0
-    symtab_map <- newIORef emptyUFM
-    let bin_symtab = BinSymbolTable
-                      { bin_symtab_next = symtab_next
-                      , bin_symtab_map  = symtab_map
-                      }
+-- See Note [Iface Binary Serialiser Order]
+putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int, Int, b)
+putWithTables bh' put_payload = do
+  (fast_wt, fsWriter) <- initFastStringWriterTable
+  (name_wt, nameWriter) <- initNameWriterTable
 
-    (bh_fs, bin_dict, put_dict) <- initFSTable bh
+  let writerUserData = mkWriterUserData
+        [ mkSomeBinaryWriter @FastString fsWriter
+        , mkSomeBinaryWriter @Name nameWriter
+        , mkSomeBinaryWriter @BindingName  $ mkWriter (\bh name -> putEntry nameWriter bh (getBindingName name))
+        ]
+  let bh = setWriterUserData bh' writerUserData
 
-    (fs_count,(name_count,r)) <- forwardPut bh (const put_dict) $ do
+  (fs_count : name_count : _, r) <-
+    -- The order of these entries matters!
+    --
+    -- See Note [Iface Binary Serialiser Order] for details.
+    putAllTables bh [fast_wt, name_wt] $ do
+      put_payload bh
 
-      -- NB. write the dictionary after the symbol table, because
-      -- writing the symbol table may create more dictionary entries.
-      let put_symtab = do
-            name_count <- readFastMutInt symtab_next
-            symtab_map  <- readIORef symtab_map
-            putSymbolTable bh_fs name_count symtab_map
-            pure name_count
-
-      forwardPut bh_fs (const put_symtab) $ do
-
-        -- BinHandle with FastString and Name writing support
-        let ud_fs = getUserData bh_fs
-        let ud_name = ud_fs
-                        { ud_put_nonbinding_name = putName bin_dict bin_symtab
-                        , ud_put_binding_name    = putName bin_dict bin_symtab
-                        }
-        let bh_name = setUserData bh ud_name
-
-        put_payload bh_name
-
-    return (name_count, fs_count, r)
-
-
+  return (name_count, fs_count, r)
+ where
+  putAllTables _ [] act = do
+    a <- act
+    pure ([], a)
+  putAllTables bh (x : xs) act = do
+    (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
+      putAllTables bh xs act
+    pure (r : res, a)
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
@@ -273,9 +273,148 @@ binaryInterfaceMagic platform
  | otherwise            = FixedLengthEncoding 0x1face64
 
 
+{-
+Note [Iface Binary Serialisation]
+~~~~~~~~~~~~~~~~~~~
+When we serialise a 'ModIface', many symbols are redundant.
+For example, there can be many duplicated 'FastString's and 'Name's.
+To save space, we deduplicate duplicated symbols, such as 'FastString' and 'Name',
+by maintaining a table of already seen symbols.
+When serialising a symbol, we lookup whether we have encountered the symbol before.
+If yes, we write the index of the symbol, otherwise we generate a new index and store it in the table.
+
+Besides saving a lot of disk space, this additionally enables us to automatically share
+these symbols when we read the 'ModIface' from disk, without additional mechanisms such as 'FastStringTable'.
+
+To add a deduplication table for a type, let us assume 'IfaceTyCon', you need to do the following:
+
+* The 'Binary' instance 'IfaceTyCon' needs to dynamically look up the serialiser instead of
+  directly serialising itself. It needs to look up the serialiser in the 'ReaderUserData' and
+  'WriterUserData' respectively.
+
+  For example:
+
+  @
+    instance Binary IfaceTyCon where
+      put_ bh ty = case findUserDataWriter (Proxy @IfaceTyCon) bh of
+        tbl -> putEntry tbl bh ty
+      get bh  = case findUserDataReader (Proxy @IfaceTyCon) bh of
+        tbl -> getEntry tbl bh
+  @
+
+* Whenever a value of 'IfaceTyCon' is serialised, the real serialisation function needs to
+  be configured in the User Data.
+
+  For example, for 'IfaceTyCon':
+
+  @
+    let bh0 :: WriteBinHandle = ...
+        putIfaceTyCon = ... -- Serialises 'IfaceTyCon' to disk
+        bh = addWriterToUserData (mkSomeBinaryWriter putIfaceTyCon) bh0
+  @
+
+  Naturally, you have to do something similar for reading values of 'IfaceTyCon'.
+
+  Now, here we can introduce the deduplication table!
+  Instead of specifying 'putIfaceTyCon', which writes a value of 'IfaceTyCon' directly to disk,
+  we provide a function that looks up values in a 'Map' and remembers the offset
+  of each value we have already seen.
+  Instead of serialising the full 'IfaceTyCon', we only write the index of the value to disk.
+
+* Storing the deduplication table.
+
+  After the deduplicating the elements in the payload (e.g., 'ModIface'), we now have a deduplication
+  table full with all the values.
+  We serialise this table to disk using the real serialiser (e.g., 'putIfaceTyCon').
+
+
+Note [Iface Binary Serialiser Order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Serialisation of 'ModIface' uses tables to deduplicate symbols that occur often.
+
+After 'ModIface' has been written to disk, we write the deduplication tables.
+Writing a table may add additional entries to *other* deduplication tables, thus
+we need to make sure that the symbol table we serialise only depends on
+deduplication tables that haven't been written to disk yet.
+
+For example, assume we maintain deduplication tables for 'FastString' and 'Name'.
+The symbol 'Name' depends on 'FastString', so serialising a 'Name' may add a 'FastString'
+to the 'FastString' deduplication table.
+Thus, 'Name' table needs to be serialised to disk before the 'FastString' table.
+
+When we read the 'ModIface' from disk, we consequentially need to read the 'FastString'
+deduplication table from disk, before we can deserialise the 'Name' deduplication table.
+Therefore, before we serialise the tables, we write forward pointers that allow us to jump ahead
+to the table we need to deserialise first.
+
+Here, a visualisation of the table structure we currently have:
+
+┌──────────────┐
+│   Headers    │
+├──────────────┤
+│   Ptr FS     ├────────┐
+├──────────────┤        │
+│   Ptr Name   ├─────┐  │
+├──────────────┤     │  │
+│              │     │  │
+│   ModIface   │     │  │
+│   Payload    │     │  │
+│              │     │  │
+├──────────────┤     │  │
+│              │     │  │
+│  Name Table  │◄────┘  │
+│              │        │
+├──────────────┤        │
+│              │        │
+│   FS Table   │◄───────┘
+│              │
+└──────────────┘
+
+-}
+
+
 -- -----------------------------------------------------------------------------
 -- The symbol table
 --
+
+
+initNameReaderTable :: NameCache -> IO (ReaderTable Name)
+initNameReaderTable cache = do
+  return $
+    ReaderTable
+      { getTable = \bh -> getSymbolTable bh cache
+      , mkReaderFromTable = \tbl -> mkReader (getSymtabName tbl)
+      }
+
+data BinSymbolTable = BinSymbolTable {
+        bin_symtab_next :: !FastMutInt, -- The next index to use
+        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
+                                -- indexed by Name
+  }
+
+initNameWriterTable :: IO (WriterTable, BinaryWriter Name)
+initNameWriterTable = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef emptyUFM
+  let bin_symtab =
+        BinSymbolTable
+          { bin_symtab_next = symtab_next
+          , bin_symtab_map = symtab_map
+          }
+
+  let put_symtab bh = do
+        name_count <- readFastMutInt symtab_next
+        symtab_map <- readIORef symtab_map
+        putSymbolTable bh name_count symtab_map
+        pure name_count
+
+  return
+    ( WriterTable
+        { putTable = put_symtab
+        }
+    , mkWriter $ putName bin_symtab
+    )
+
 
 putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
 putSymbolTable bh name_count symtab = do
@@ -286,7 +425,7 @@ putSymbolTable bh name_count symtab = do
     mapM_ (\n -> serialiseName bh n symtab) names
 
 
-getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
+getSymbolTable :: BinHandle -> NameCache -> IO (SymbolTable Name)
 getSymbolTable bh name_cache = do
     sz <- get bh :: IO Int
     -- create an array of Names for the symbols and add them to the NameCache
@@ -331,8 +470,8 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: FSTable -> BinSymbolTable -> BinHandle -> Name -> IO ()
-putName _dict BinSymbolTable{
+putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
@@ -356,10 +495,9 @@ putName _dict BinSymbolTable{
             put_ bh (fromIntegral off :: Word32)
 
 -- See Note [Symbol table representation of names]
-getSymtabName :: NameCache
-              -> Dictionary -> SymbolTable
+getSymtabName :: SymbolTable Name
               -> BinHandle -> IO Name
-getSymtabName _name_cache _dict symtab bh = do
+getSymtabName symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
@@ -376,10 +514,3 @@ getSymtabName _name_cache _dict symtab bh = do
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
-
-data BinSymbolTable = BinSymbolTable {
-        bin_symtab_next :: !FastMutInt, -- The next index to use
-        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
-                                -- indexed by Name
-  }
-
