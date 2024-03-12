@@ -13,9 +13,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Utils.Binary
 import GHC.Unit.Module
-import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
@@ -31,10 +29,9 @@ import System.FilePath (normalise)
 -- NB: The 'Module' parameter is the 'Module' recorded by the *interface*
 -- file, not the actual 'Module' according to our 'DynFlags'.
 fingerprintDynFlags :: HscEnv -> Module
-                    -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint
 
-fingerprintDynFlags hsc_env this_mod nameio =
+fingerprintDynFlags hsc_env this_mod =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
         mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just mainFunIs else Nothing
                       -- see #5878
@@ -73,7 +70,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
         flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
 
     in -- pprTrace "flags" (ppr flags) $
-       computeFingerprint nameio flags
+       computeFingerprint flags
 
 -- Fingerprint the optimisation info. We keep this separate from the rest of
 -- the flags because GHCi users (especially) may wish to ignore changes in
@@ -81,9 +78,8 @@ fingerprintDynFlags hsc_env this_mod nameio =
 -- object files as they can.
 -- See Note [Ignoring some flag changes]
 fingerprintOptFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
                       -> IO Fingerprint
-fingerprintOptFlags DynFlags{..} nameio =
+fingerprintOptFlags DynFlags{..} =
       let
         -- See https://gitlab.haskell.org/ghc/ghc/issues/10923
         -- We used to fingerprint the optimisation level, but as Joachim
@@ -92,22 +88,21 @@ fingerprintOptFlags DynFlags{..} nameio =
         opt_flags = map fromEnum $ filter (`EnumSet.member` optimisationFlags)
                                           (EnumSet.toList generalFlags)
 
-      in computeFingerprint nameio opt_flags
+      in computeFingerprint opt_flags
 
 -- Fingerprint the HPC info. We keep this separate from the rest of
 -- the flags because GHCi users (especially) may wish to use an object
 -- file compiled for HPC when not actually using HPC.
 -- See Note [Ignoring some flag changes]
 fingerprintHpcFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
                       -> IO Fingerprint
-fingerprintHpcFlags dflags@DynFlags{..} nameio =
+fingerprintHpcFlags dflags@DynFlags{..} =
       let
         -- -fhpc, see https://gitlab.haskell.org/ghc/ghc/issues/11798
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
-      in computeFingerprint nameio hpc
+      in computeFingerprint hpc
 
 
 {- Note [path flags and recompilation]

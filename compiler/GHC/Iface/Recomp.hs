@@ -520,7 +520,7 @@ checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
 checkFlagHash hsc_env iface = do
     let logger   = hsc_logger hsc_env
     let old_hash = mi_flag_hash (mi_final_exts iface)
-    new_hash <- fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
+    new_hash <- fingerprintDynFlags hsc_env (mi_module iface)
     case old_hash == new_hash of
         True  -> up_to_date logger (text "Module flags unchanged")
         False -> out_of_date_hash logger FlagsChanged
@@ -533,7 +533,6 @@ checkOptimHash hsc_env iface = do
     let logger   = hsc_logger hsc_env
     let old_hash = mi_opt_hash (mi_final_exts iface)
     new_hash <- fingerprintOptFlags (hsc_dflags hsc_env)
-                                               putNameLiterally
     if | old_hash == new_hash
          -> up_to_date logger (text "Optimisation flags unchanged")
        | gopt Opt_IgnoreOptimChanges (hsc_dflags hsc_env)
@@ -549,7 +548,6 @@ checkHpcHash hsc_env iface = do
     let logger   = hsc_logger hsc_env
     let old_hash = mi_hpc_hash (mi_final_exts iface)
     new_hash <- fingerprintHpcFlags (hsc_dflags hsc_env)
-                                               putNameLiterally
     if | old_hash == new_hash
          -> up_to_date logger (text "HPC flags unchanged")
        | gopt Opt_IgnoreHpcChanges (hsc_dflags hsc_env)
@@ -960,7 +958,6 @@ addFingerprints
         -> IO ModIface
 addFingerprints hsc_env iface0
  = do
-   eps <- hscEPS hsc_env
    let
        decls = mi_decls iface0
        decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings $ mi_warns iface0)
@@ -1023,40 +1020,6 @@ addFingerprints hsc_env iface0
        groups :: [SCC IfaceDeclABI]
        groups = stronglyConnCompFromEdgedVerticesOrd edges
 
-       global_hash_fn = mkHashFun hsc_env eps
-
-        -- How to output Names when generating the data to fingerprint.
-        -- Here we want to output the fingerprint for each top-level
-        -- Name, whether it comes from the current module or another
-        -- module.  In this way, the fingerprint for a declaration will
-        -- change if the fingerprint for anything it refers to (transitively)
-        -- changes.
-       mk_put_name :: OccEnv (OccName,Fingerprint)
-                   -> BinHandle -> Name -> IO  ()
-       mk_put_name local_env bh name
-          | isWiredInName name  =  putNameLiterally bh name
-           -- wired-in names don't have fingerprints
-          | otherwise
-          = assertPpr (isExternalName name) (ppr name) $
-            let hash | nameModule name /= semantic_mod =  global_hash_fn name
-                     -- Get it from the REAL interface!!
-                     -- This will trigger when we compile an hsig file
-                     -- and we know a backing impl for it.
-                     -- See Note [Identity versus semantic module]
-                     | semantic_mod /= this_mod
-                     , not (isHoleModule semantic_mod) = global_hash_fn name
-                     | otherwise = return (snd (lookupOccEnv local_env (getOccName name)
-                           `orElse` pprPanic "urk! lookup local fingerprint"
-                                       (ppr name $$ ppr local_env)))
-                -- This panic indicates that we got the dependency
-                -- analysis wrong, because we needed a fingerprint for
-                -- an entity that wasn't in the environment.  To debug
-                -- it, turn the panic into a trace, uncomment the
-                -- pprTraces below, run the compile again, and inspect
-                -- the output and the generated .hi file with
-                -- --show-iface.
-            in hash >>= put_ bh
-
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
 
@@ -1067,23 +1030,18 @@ addFingerprints hsc_env iface0
                                 [(Fingerprint,IfaceDecl)])
 
        fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
-          = do let hash_fn = mk_put_name local_env
-                   decl = abiDecl abi
+          = do let decl = abiDecl abi
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
-               hash <- computeFingerprint hash_fn abi
+               hash <- computeFingerprint abi
                env' <- extend_hash_env local_env (hash,decl)
                return (env', (hash,decl) : decls_w_hashes)
 
        fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
           = do let stable_abis = sortBy cmp_abiNames abis
                    stable_decls = map abiDecl stable_abis
-               local_env1 <- foldM extend_hash_env local_env
-                                   (zip (map mkRecFingerprint [0..]) stable_decls)
-                -- See Note [Fingerprinting recursive groups]
-               let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                 -- put the cycle in a canonical order
-               hash <- computeFingerprint hash_fn stable_abis
+               hash <- computeFingerprint stable_abis
                let pairs = zip (map (bumpFingerprint hash) [0..]) stable_decls
                 -- See Note [Fingerprinting recursive groups]
                local_env2 <- foldM extend_hash_env local_env pairs
@@ -1156,11 +1114,10 @@ addFingerprints hsc_env iface0
    -- instances yourself, no need to consult hs-boot; if you do load the
    -- interface into EPS, you will see a duplicate orphan instance.
 
-   orphan_hash <- computeFingerprint (mk_put_name local_env)
-                                     (map ifDFun orph_insts, orph_rules, orph_fis)
+   orphan_hash <- computeFingerprint (map ifDFun orph_insts, orph_rules, orph_fis)
 
    -- Hash of the transitive things in dependencies
-   dep_hash <- computeFingerprint putNameLiterally
+   dep_hash <- computeFingerprint
                        (dep_sig_mods (mi_deps iface0),
                         dep_boot_mods (mi_deps iface0),
                         -- Trusted packages are like orphans
@@ -1170,7 +1127,7 @@ addFingerprints hsc_env iface0
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
-   export_hash <- computeFingerprint putNameLiterally
+   export_hash <- computeFingerprint
                       (mi_exports iface0,
                        orphan_hash,
                        dep_hash,
@@ -1229,11 +1186,11 @@ addFingerprints hsc_env iface0
    --   - (some of) dflags
    -- it returns two hashes, one that shouldn't change
    -- the abi hash and one that should
-   flag_hash <- fingerprintDynFlags hsc_env this_mod putNameLiterally
+   flag_hash <- fingerprintDynFlags hsc_env this_mod
 
-   opt_hash <- fingerprintOptFlags dflags putNameLiterally
+   opt_hash <- fingerprintOptFlags dflags
 
-   hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
+   hpc_hash <- fingerprintHpcFlags dflags
 
    plugin_hash <- fingerprintPlugins (hsc_plugins hsc_env)
 
@@ -1243,7 +1200,7 @@ addFingerprints hsc_env iface0
    --   - orphans
    --   - deprecations
    --   - flag abi hash
-   mod_hash <- computeFingerprint putNameLiterally
+   mod_hash <- computeFingerprint
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
                        mi_warns iface0)
@@ -1255,7 +1212,7 @@ addFingerprints hsc_env iface0
    --   - usages
    --   - deps (home and external packages, dependent files)
    --   - hpc
-   iface_hash <- computeFingerprint putNameLiterally
+   iface_hash <- computeFingerprint
                       (mod_hash,
                        mi_src_hash iface0,
                        ann_fn (mkVarOccFS (fsLit "module")),  -- See mkIfaceAnnCache
@@ -1593,57 +1550,6 @@ mkOrphMap get_key decls
         | NotOrphan occ <- get_key d
         = (extendOccEnv_Acc (:) Utils.singleton non_orphs occ d, orphs)
         | otherwise = (non_orphs, d:orphs)
-
--- -----------------------------------------------------------------------------
--- Look up parents and versions of Names
-
--- This is like a global version of the mi_hash_fn field in each ModIface.
--- Given a Name, it finds the ModIface, and then uses mi_hash_fn to get
--- the parent and version info.
-
-mkHashFun
-        :: HscEnv                       -- needed to look up versions
-        -> ExternalPackageState         -- ditto
-        -> (Name -> IO Fingerprint)
-mkHashFun hsc_env eps name
-  | isHoleModule orig_mod
-  = lookup (mkHomeModule home_unit (moduleName orig_mod))
-  | otherwise
-  = lookup orig_mod
-  where
-      home_unit = hsc_home_unit hsc_env
-      dflags = hsc_dflags hsc_env
-      hpt = hsc_HUG hsc_env
-      pit = eps_PIT eps
-      ctx = initSDocContext dflags defaultUserStyle
-      occ = nameOccName name
-      orig_mod = nameModule name
-      lookup mod = do
-        massertPpr (isExternalName name) (ppr name)
-        iface <- case lookupIfaceByModule hpt pit mod of
-                  Just iface -> return iface
-                  Nothing ->
-                      -- This can occur when we're writing out ifaces for
-                      -- requirements; we didn't do any /real/ typechecking
-                      -- so there's no guarantee everything is loaded.
-                      -- Kind of a heinous hack.
-                      initIfaceLoad hsc_env . withIfaceErr ctx
-                          $ withoutDynamicNow
-                            -- If you try and load interfaces when dynamic-too
-                            -- enabled then it attempts to load the dyn_hi and hi
-                            -- interface files. Backpack doesn't really care about
-                            -- dynamic object files as it isn't doing any code
-                            -- generation so -dynamic-too is turned off.
-                            -- Some tests fail without doing this (such as T16219),
-                            -- but they fail because dyn_hi files are not found for
-                            -- one of the dependencies (because they are deliberately turned off)
-                            -- Why is this check turned off here? That is unclear but
-                            -- just one of the many horrible hacks in the backpack
-                            -- implementation.
-                          $ loadInterface (text "lookupVers2") mod ImportBySystem
-        return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
-                  pprPanic "lookupVers1" (ppr mod <+> ppr occ))
-
 
 -- | Creates cached lookup for the 'mi_anns' field of ModIface
 -- Hackily, we use "module" as the OccName for any module-level annotations
