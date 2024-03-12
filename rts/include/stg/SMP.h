@@ -201,14 +201,15 @@ EXTERN_INLINE void busy_wait_nop(void);
  *   - StgWeak: finalizer
  *   - StgMVar: head, tail, value
  *   - StgMVarTSOQueue: link
- *   - StgTVar: current_value, first_watch_queue_entry
- *   - StgTVarWatchQueue: {next,prev}_queue_entry
- *   - StgTRecChunk: TODO
  *   - StgMutArrPtrs: payload
  *   - StgSmallMutArrPtrs: payload
  *   - StgThunk although this is a somewhat special case; see below
  *   - StgInd: indirectee
  *   - StgTSO: block_info
+
+ *   - StgTVar: current_value, first_watch_queue_entry
+ *   - StgTVarWatchQueue: {next,prev}_queue_entry
+ *   - StgTRecChunk: TODO
  *
  * Finally, non-pointer fields can be safely mutated without barriers as
  * they do not refer to other memory locations. Technically, concurrent

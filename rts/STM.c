@@ -359,6 +359,8 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
 // Allocation / deallocation functions that retain per-capability lists
 // of closures that can be re-used
 
+//TODO: I think some of these lack write barriers required by the non-moving gc.
+
 static StgTVarWatchQueue *alloc_stg_tvar_watch_queue(Capability *cap,
                                                      StgClosure *closure) {
   StgTVarWatchQueue *result = NULL;
@@ -681,6 +683,44 @@ static void revert_ownership(Capability *cap STG_UNUSED,
 
 /*......................................................................*/
 
+// validate_optimistic()
+StgBool validate_trec_optimistic (Capability *cap, StgTRecHeader *trec);
+
+StgBool validate_trec_optimistic (Capability *cap, StgTRecHeader *trec) {
+  StgBool result;
+  TRACE("cap %d, trec %p : validate_trec_optimistic",
+         cap->no, trec);
+
+  if (shake()) {
+    TRACE("%p : shake, pretending trec is invalid when it may not be", trec);
+    return false;
+  }
+
+  ASSERT((trec -> state == TREC_ACTIVE) ||
+         (trec -> state == TREC_WAITING) ||
+         (trec -> state == TREC_CONDEMNED));
+  result = !((trec -> state) == TREC_CONDEMNED);
+  if (result) {
+    FOR_EACH_ENTRY(trec, e, {
+      StgTVar *s;
+      s = e -> tvar;
+      StgClosure *current = RELAXED_LOAD(&s->current_value);
+      if(current != e->expected_value &&
+          //If the trec is locked we optimistically assume our trec will still be valid after it's unlocked.
+         (GET_INFO(UNTAG_CLOSURE(current)) != &stg_TREC_HEADER_info))
+      {   TRACE("%p : failed optimistic validate %p", trec, s);
+          result = false;
+          BREAK_FOR_EACH;
+      }
+    });
+  }
+
+
+  TRACE("%p : validate_trec_optimistic, result: %d", trec, result);
+  return result;
+}
+
+
 // validate_and_acquire_ownership : this performs the twin functions
 // of checking that the TVars referred to by entries in trec hold the
 // expected values and:
@@ -751,7 +791,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
       revert_ownership(cap, trec, acquire_all);
   }
 
-  // TRACE("%p : validate_and_acquire_ownership, result: %d", trec, result);
+  TRACE("%p : validate_and_acquire_ownership, result: %d", trec, result);
   return result;
 }
 
@@ -941,17 +981,124 @@ void stmCondemnTransaction(Capability *cap,
   TRACE("%p : stmCondemnTransaction done", trec);
 }
 
-/*......................................................................*/
+/*......................................................................
 
-// Check if a transaction is known to be invalid by this point.
-// Currently we use this to:
-// * Eagerly abort invalid transactions from the scheduler.
-// * If an exception occured inside a transaction, decide weither or not to
-//   abort by checking if the transaction was valid.
-StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
+Note [STM Validation]
+~~~~~~~~~~~~~~~~~~~~~
+We validate STM transactions for two purposes:
+* Ensure the trec (transaction log) is valid *after* execution. Either during
+  commit or after an exception has occured. Potentially locking the tvars in
+  the process. This is done by validate_and_acquire_ownership.
+* Terminate transactions early after their trec became invalid.
+  This is done by validate_trec_optimistic,
+
+Note that the second point is not merely a optimization. Consider transactions
+that are in an infinite loop as a result of seeing an inconsistent view of
+memory, e.g.
+
+      atomically $ do
+          [a,b] <- mapM readTVar [ta,tb]
+          -- a is never equal to b given a consistent view of memory.
+          when (a == b) loop
+
+We want to to always get a precise result for both checks. And indeed for the
+non-threaded runtime this is reasonably (see STM paper "Composable Memory Transactions").
+However for SMP things are more difficult.
+
+The easiest way to avoid false positives is to lock all relevant tvars during
+validation. And indeed that is what we still use for post-run validation.
+While this can lead to validation spuriously failing in edge cases when multiple
+threads perform validation in parallel the relevant transactions will simply be
+restarted and as long as the false-negative rate is reasonably low this is not
+problematic.
+
+However compared to post-run validation in-flight validation can happen multiple
+times per transaction. This means even a fairly low rate of spurious validation
+failures will result in a large performance hit. In the worst case preventing
+progress alltogether (See #24446).
+
+We don't want to reduce validation frequency too much to detect invalid
+transactions early. So we simply stick with the frequency "on return to scheduler"
+that's described in the stm paper.
+
+However we can improve the behaviour of in-flight validations by taking advantage
+of the fact that we can allow false positives for these.
+
+The biggest overhead we can reduce for in-flight validation is locking. We simply
+won't take any locks for in-flight validation. If the tvar is already locked we
+simply assume the value in our trec is still valid.
+
+This has the following effects:
+
+Benefits:
+* No lock contention between post-run and in-flight validations operating on the
+  same tvars. This reduces the false negative rate significantly for both.
+* Concurrent in-flight validations won't cause each other to fail spuriously
+  through lock contention.
+* No cas operations for in-flight validation reduces it's overhead significantly.
+
+Drawbacks:
+* We will sometimes fail to recognize invalid trecs as such by assuming locked
+  tvars contain valid values.
+
+Why can we simply not lock tvars for in-flight validations? Unlike with post-run
+validation if we miss part of an update which would invalidate the trec it will
+be either seen by a later validation (at the latest in the post-run validation
+which still locks). However there is one exception: Looping transactions.
+
+If a transaction loops it will *only* be validated optimistically. I think this
+is not an issue. The only way for in-flight validation to constantly
+result in false-positives is for the conflicting tvar(s) to get constantly locked
+for updates by post-run validations. Which seems impossibly unlikely over a long
+period of time. At at least not any more likely than some of the other similarly
+unlikely live-lock scenarious for the STM implementation.
+
+Alternatives:
+
+All of these primarily revolve around ways to ensure that we can recognize invalid
+looping transactions. However without proof this is a real problem implementing
+those seems not worthwhile.
+
+
+A1:
+Take locks for in-flight validation opportunistically to improve things.
+While this would solve lock contention/false positives caused
+by concurrent in-flight validations. It would still result in in-flight validation
+potentially triggering false-negatives during post-run validation by holding a
+lock a post-run validation is trying to take. Neither is it guaranteed to
+recognize a looping transaction as invalid, so this does not seem like an
+improvement to the lock-free inflight validation.
+
+A2:
+Perform occasional locking in-flight validation for long running transactions.
+This would solve the theoretical looping transaction recognition issue at the
+cost of some performance and complexity. This could done by adding a counter to
+the trec, counting the number of validations it has endured.
+
+A2.1:
+Like A2, but instead of counting the number of validations count the number of
+potentially false-positives by keeping track of how often we couldn't validate
+locked tvars. Could be done fine grained on a trec-entry bases or for the trec
+overall.
+
+A3:
+When encountering a locked tvar, validate the trec based on the value of the
+tvar before it was locked. This could be done by either adding another field
+to the tvar, or by looking for the expected value in the trec that holds the
+lock of the tvar. But neither option sounds great.
+
+
+*/
+
+// Check if a transaction is possibly invalid by this point.
+// Pessimistically - Currently we use this if an exception occured inside a transaction.
+//    To decide weither or not to abort by checking if the transaction was valid.
+// Optimistically - Currently we use this to eagerly abort invalid transactions from the scheduler.
+// See Note [STM Validation]
+StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec, StgBool optimistically) {
   StgTRecHeader *t;
 
-  TRACE("%p : stmValidateNestOfTransactions", trec);
+  TRACE("%p : stmValidateNestOfTransactions, %b", trec, optimistically);
   ASSERT(trec != NO_TREC);
   ASSERT((trec -> state == TREC_ACTIVE) ||
          (trec -> state == TREC_WAITING) ||
@@ -960,8 +1107,13 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   t = trec;
   StgBool result = true;
   while (t != NO_TREC) {
-    // TODO: I don't think there is a need to lock any tvars here, all even less so.
-    result &= validate_and_acquire_ownership(cap, t, true, false);
+    if(optimistically) {
+      result &= validate_trec_optimistic(cap, t);
+
+    } else {
+      // TODO: I don't think there is a need to lock all tvars here.
+      result &= validate_and_acquire_ownership(cap, t, true, false);
+    }
     t = t -> enclosing_trec;
   }
 
@@ -972,7 +1124,6 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   TRACE("%p : stmValidateNestOfTransactions()=%d", trec, result);
   return result;
 }
-
 /*......................................................................*/
 
 static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeader **in) {
