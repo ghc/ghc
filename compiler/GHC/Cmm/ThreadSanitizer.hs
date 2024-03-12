@@ -184,7 +184,7 @@ saveRestoreCallerRegs us platform =
     restore = blockFromList restore_nodes
 
 -- | Mirrors __tsan_memory_order
--- <https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface_atomic.h#L32>
+-- <https://github.com/llvm/llvm-project/blob/main/compiler-rt/include/sanitizer/tsan_interface_atomic.h#L34>
 memoryOrderToTsanMemoryOrder :: Env -> MemoryOrdering -> CmmExpr
 memoryOrderToTsanMemoryOrder env mord =
     mkIntExpr (platform env) n
@@ -294,4 +294,3 @@ tsanAtomicRMW env mord op w addr val dest =
            AMO_Or   -> "fetch_or"
            AMO_Xor  -> "fetch_xor"
     fn = fsLit $ "__tsan_atomic" ++ show (widthInBits w) ++ "_" ++ op'
-
