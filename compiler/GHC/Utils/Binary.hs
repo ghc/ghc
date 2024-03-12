@@ -71,7 +71,12 @@ module GHC.Utils.Binary
 
    -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
-   FSTable, initFSTable, getDictFastString, putDictFastString,
+   FSTable(..), initFSTable, getDictFastString, putDictFastString,
+
+   -- * TODO:
+   BinSymbolTable(..), withMyUserData,
+   CanCache(..), CacheTable(..), SomeCache(..),
+   CanCacheTable(..), findUserDataCache,
 
    -- * Newtype wrappers
    BinSpan(..), BinSrcSpan(..), BinLocated(..)
@@ -118,6 +123,8 @@ import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
+import Data.Typeable
+import Data.Type.Equality
 
 type BinArray = ForeignPtr Word8
 
@@ -1093,7 +1100,9 @@ data UserData =
         -- binding).
         ud_put_binding_name :: BinHandle -> Name -> IO (),
         -- ^ serialize a binding 'Name' (e.g. the name of an IfaceDecl)
-        ud_put_fs   :: BinHandle -> FastString -> IO ()
+        ud_put_fs   :: BinHandle -> FastString -> IO (),
+        -- ^
+        ud_my_user_data :: [SomeCache]
    }
 
 newReadState :: (BinHandle -> IO Name)   -- ^ how to deserialize 'Name's
@@ -1104,7 +1113,8 @@ newReadState get_name get_fs
                ud_get_fs   = get_fs,
                ud_put_nonbinding_name = undef "put_nonbinding_name",
                ud_put_binding_name    = undef "put_binding_name",
-               ud_put_fs   = undef "put_fs"
+               ud_put_fs   = undef "put_fs",
+               ud_my_user_data = undef "ud_my_user_data"
              }
 
 newWriteState :: (BinHandle -> Name -> IO ())
@@ -1118,8 +1128,51 @@ newWriteState put_nonbinding_name put_binding_name put_fs
                ud_get_fs   = undef "get_fs",
                ud_put_nonbinding_name = put_nonbinding_name,
                ud_put_binding_name    = put_binding_name,
-               ud_put_fs   = put_fs
+               ud_put_fs   = put_fs,
+               ud_my_user_data = undef "ud_my_user_data"
              }
+
+data BinSymbolTable = BinSymbolTable {
+        bin_symtab_next :: !FastMutInt, -- The next index to use
+        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
+                                -- indexed by Name
+  }
+
+data SomeCache = forall a . SomeCache (CanCache a, CanCacheTable a)
+
+data CanCache a where
+  CanCacheNames :: CanCache Name
+  CanCacheFastString :: CanCache FastString
+
+instance TestEquality CanCache where
+  testEquality CanCacheNames CanCacheNames = Just Refl
+  testEquality CanCacheFastString CanCacheFastString = Just Refl
+  testEquality _ _ = Nothing
+
+
+data CanCacheTable a where
+  CacheTableName :: CacheTable BinSymbolTable SymbolTable Name -> CanCacheTable Name
+  CacheTableFastString :: CacheTable FSTable Dictionary FastString -> CanCacheTable FastString
+
+data CacheTable t t' s = CacheTable
+  { putEntry :: BinHandle -> s -> IO ()
+  , getEntry :: BinHandle -> IO s
+  , getCache :: BinHandle -> IO t'
+  , putCache :: BinHandle -> IO Int
+  }
+
+withMyUserData :: [SomeCache] -> UserData
+withMyUserData caches = noUserData
+  { ud_my_user_data = caches
+  }
+
+findUserDataCache :: CanCache a -> BinHandle -> CanCacheTable a
+findUserDataCache query bh = go (ud_my_user_data $ getUserData bh)
+  where
+    go [] = panic "Failed to find cache"
+    go (SomeCache (x, y) : xs)
+      | Just Refl <- testEquality x query = y
+      | otherwise = go xs
 
 noUserData :: UserData
 noUserData = UserData
@@ -1128,6 +1181,7 @@ noUserData = UserData
   , ud_put_nonbinding_name = undef "put_nonbinding_name"
   , ud_put_binding_name    = undef "put_binding_name"
   , ud_put_fs              = undef "put_fs"
+  , ud_my_user_data = undef "ud_my_user_data"
   }
 
 undef :: String -> a
@@ -1260,12 +1314,12 @@ instance Binary ByteString where
 
 instance Binary FastString where
   put_ bh f =
-    case getUserData bh of
-        UserData { ud_put_fs = put_fs } -> put_fs bh f
+    case findUserDataCache CanCacheFastString bh of
+        CacheTableFastString tbl -> putEntry tbl bh f
 
   get bh =
-    case getUserData bh of
-        UserData { ud_get_fs = get_fs } -> get_fs bh
+    case findUserDataCache CanCacheFastString bh of
+        CacheTableFastString tbl -> getEntry tbl bh
 
 deriving instance Binary NonDetFastString
 deriving instance Binary LexicalFastString

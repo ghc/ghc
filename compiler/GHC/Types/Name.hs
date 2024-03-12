@@ -639,12 +639,12 @@ instance Data Name where
 -- distinction.
 instance Binary Name where
    put_ bh name =
-      case getUserData bh of
-        UserData{ ud_put_nonbinding_name = put_name } -> put_name bh name
+      case findUserDataCache CanCacheNames bh of
+        CacheTableName tbl -> putEntry tbl bh name
 
    get bh =
-      case getUserData bh of
-        UserData { ud_get_name = get_name } -> get_name bh
+      case findUserDataCache CanCacheNames bh of
+        CacheTableName tbl -> getEntry tbl bh
 
 {-
 ************************************************************************

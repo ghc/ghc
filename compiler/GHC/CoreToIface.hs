@@ -1,5 +1,5 @@
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
-
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dsuppress-all #-}
 -- | Functions for converting Core things to interface file things.
 module GHC.CoreToIface
     ( -- * Binders

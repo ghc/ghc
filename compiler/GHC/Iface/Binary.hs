@@ -54,6 +54,7 @@ import Data.Char
 import Data.Word
 import Data.IORef
 import Control.Monad
+import GHC.Data.FastString
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -168,7 +169,27 @@ getTables name_cache bh = do
     symtab <- Binary.forwardGet bh_fs (getSymbolTable bh_fs name_cache)
 
     -- It is only now that we know how to get a Name
-    return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
+    return $ setUserData bh $ newReadState (getSymtabName symtab)
+                                           (getDictFastString dict)
+
+getTables' :: NameCache -> BinHandle -> IO BinHandle
+getTables' name_cache bh = do
+    fsCache <- initFsCacheTable
+    nameCache <- initNameCacheTable (Just name_cache)
+
+    -- Read the dictionary
+    -- The next word in the file is a pointer to where the dictionary is
+    -- (probably at the end of the file)
+    dict <- Binary.forwardGet bh (getDictionary bh)
+
+    -- Initialise the user-data field of bh
+    let bh_fs = setUserData bh $ newReadState (error "getSymtabName")
+                                              (getDictFastString dict)
+
+    symtab <- Binary.forwardGet bh_fs (getSymbolTable bh_fs name_cache)
+
+    -- It is only now that we know how to get a Name
+    return $ setUserData bh $ newReadState (getSymtabName symtab)
                                            (getDictFastString dict)
 
 -- | Write an interface file
@@ -203,7 +224,7 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
-  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> put bh' payload)
+  (name_count, fs_count, _b) <- putWithTables' bh (\bh' -> put bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()
@@ -212,6 +233,51 @@ putWithUserData traceBinIface bh payload = do
                                       <+> text "Names")
        printer (text "writeBinIface:" <+> int fs_count
                                       <+> text "dict entries")
+
+initFsCacheTable :: IO (CacheTable FSTable Dictionary FastString)
+initFsCacheTable = do
+  dict_next_ref <- newFastMutInt 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict = FSTable
+        { fs_tab_next = dict_next_ref
+        , fs_tab_map  = dict_map_ref
+        }
+  let put_dict bh = do
+        fs_count <- readFastMutInt dict_next_ref
+        dict_map  <- readIORef dict_map_ref
+        putDictionary bh fs_count dict_map
+        pure fs_count
+
+  -- BinHandle with FastString writing support
+
+  return $ CacheTable
+    { putEntry = putDictFastString bin_dict
+    , getEntry = panic "test"
+    , putCache = put_dict
+    , getCache = panic "test"
+    }
+
+initNameCacheTable :: Maybe NameCache -> IO (CacheTable BinSymbolTable SymbolTable Name)
+initNameCacheTable mCache = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef emptyUFM
+  let bin_symtab = BinSymbolTable
+        { bin_symtab_next = symtab_next
+        , bin_symtab_map  = symtab_map
+        }
+
+  let put_symtab bh = do
+        name_count <- readFastMutInt symtab_next
+        symtab_map  <- readIORef symtab_map
+        putSymbolTable bh name_count symtab_map
+        pure name_count
+
+  return $ CacheTable
+    { putEntry = putName bin_symtab
+    , getEntry = \bh -> undefined
+    , putCache = put_symtab
+    , getCache = \bh -> maybe (panic "test") (\nameCache -> getSymbolTable bh nameCache) mCache
+    }
 
 -- | Write name/symbol tables
 --
@@ -235,7 +301,7 @@ putWithTables bh put_payload = do
                       , bin_symtab_map  = symtab_map
                       }
 
-    (bh_fs, bin_dict, put_dict) <- initFSTable bh
+    (bh_fs, _, put_dict) <- initFSTable bh
 
     (fs_count,(name_count,r)) <- forwardPut bh (const put_dict) $ do
 
@@ -252,8 +318,8 @@ putWithTables bh put_payload = do
         -- BinHandle with FastString and Name writing support
         let ud_fs = getUserData bh_fs
         let ud_name = ud_fs
-                        { ud_put_nonbinding_name = putName bin_dict bin_symtab
-                        , ud_put_binding_name    = putName bin_dict bin_symtab
+                        { ud_put_nonbinding_name = putName bin_symtab
+                        , ud_put_binding_name    = putName bin_symtab
                         }
         let bh_name = setUserData bh ud_name
 
@@ -261,7 +327,21 @@ putWithTables bh put_payload = do
 
     return (name_count, fs_count, r)
 
+putWithTables' :: BinHandle -> (BinHandle -> IO b) -> IO (Int,Int,b)
+putWithTables' bh' put_payload = do
+    fsCache <- initFsCacheTable
+    nameCache <- initNameCacheTable Nothing
 
+    let userData = withMyUserData
+          [ SomeCache (CanCacheFastString, CacheTableFastString fsCache)
+          , SomeCache (CanCacheNames, CacheTableName nameCache)
+          ]
+    let bh = setUserData bh' userData
+    (fs_count,(name_count,r)) <- forwardPut bh (const (putCache fsCache bh)) $ do
+      forwardPut bh (const (putCache nameCache bh)) $ do
+        put_payload bh
+
+    return (name_count, fs_count, r)
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
@@ -331,8 +411,8 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: FSTable -> BinSymbolTable -> BinHandle -> Name -> IO ()
-putName _dict BinSymbolTable{
+putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
@@ -356,10 +436,9 @@ putName _dict BinSymbolTable{
             put_ bh (fromIntegral off :: Word32)
 
 -- See Note [Symbol table representation of names]
-getSymtabName :: NameCache
-              -> Dictionary -> SymbolTable
+getSymtabName :: SymbolTable
               -> BinHandle -> IO Name
-getSymtabName _name_cache _dict symtab bh = do
+getSymtabName symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
@@ -376,10 +455,3 @@ getSymtabName _name_cache _dict symtab bh = do
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
-
-data BinSymbolTable = BinSymbolTable {
-        bin_symtab_next :: !FastMutInt, -- The next index to use
-        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
-                                -- indexed by Name
-  }
-
