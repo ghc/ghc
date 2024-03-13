@@ -82,7 +82,7 @@ mkIndexByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
              (elt_rep_ty e)
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
+  , desc = "Read " ++ elt_desc e ++ " from immutable array; offset in " ++ prettyOffset e ++ "."
   , opts = [OptionEffect CanFail]
   }
 
@@ -94,7 +94,7 @@ mkUnalignedIndexByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
              (elt_rep_ty e)
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Read " ++ elt_desc e ++ " from immutable array; offset in bytes."
   , opts = [OptionEffect CanFail]
   }
 
@@ -106,7 +106,7 @@ mkReadByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ readResTy e
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
+  , desc = "Read " ++ elt_desc e ++ " from mutable array; offset in " ++ prettyOffset e ++ "."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
@@ -118,7 +118,7 @@ mkUnalignedReadByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ readResTy e
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Read " ++ elt_desc e ++ " from mutable array; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
@@ -130,7 +130,7 @@ mkWriteByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ writeResTy e
   , cat = GenPrimOp
-  , desc = "Write " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
+  , desc = "Write " ++ elt_desc e ++ " to mutable array; offset in " ++ prettyOffset e ++ "."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
@@ -142,7 +142,7 @@ mkUnalignedWriteByteArrayOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ writeResTy e
   , cat = GenPrimOp
-  , desc = "Write " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Write " ++ elt_desc e ++ " to mutable array; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
@@ -166,7 +166,7 @@ mkIndexOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
              (elt_rep_ty e)
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
+  , desc = "Read " ++ elt_desc e ++ " from immutable address; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
   , opts = [OptionEffect CanFail]
   }
@@ -179,7 +179,7 @@ mkUnalignedIndexOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
              (elt_rep_ty e)
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Read " ++ elt_desc e ++ " from immutable address; offset in bytes."
   , opts = [OptionEffect CanFail]
   }
 
@@ -191,7 +191,7 @@ mkReadOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ readResTy e
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
+  , desc = "Read " ++ elt_desc e ++ " from mutable address; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
@@ -204,7 +204,7 @@ mkUnalignedReadOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ readResTy e
   , cat = GenPrimOp
-  , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Read " ++ elt_desc e ++ " from mutable address; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
@@ -216,7 +216,7 @@ mkWriteOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ writeResTy e
   , cat = GenPrimOp
-  , desc = "Write " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
+  , desc = "Write " ++ elt_desc e ++ " to mutable address; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
@@ -229,7 +229,7 @@ mkUnalignedWriteOffAddrOp e = PrimOpSpec
        $ TyF (strToTy "Int#")
        $ writeResTy e
   , cat = GenPrimOp
-  , desc = "Write " ++ elt_desc e ++ "; offset in bytes."
+  , desc = "Write " ++ elt_desc e ++ " to mutable address; offset in bytes."
   , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
