@@ -1006,7 +1006,7 @@ would mean that when we pretty-print it back, we don't know whether the user
 wrote '*' or 'Type', and lose the parse/ppr roundtrip property.
 
 As a workaround, we parse '*' as HsStarTy (if it stands for 'Data.Kind.Type')
-and then desugar it to 'Data.Kind.Type' in the typechecker (see tc_hs_type).
+and then desugar it to 'Data.Kind.Type' in the typechecker (see tcHsType).
 When '*' is a regular type operator (StarIsType is disabled), HsStarTy is not
 involved.
 

@@ -677,7 +677,7 @@ References:
 [2] 'rnSpliceExpr'
 [3] 'GHC.Tc.Gen.Splice.qAddModFinalizer'
 [4] 'GHC.Tc.Gen.Expr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
-[5] 'GHC.Tc.Gen.HsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
+[5] 'GHC.Tc.Gen.HsType.tcHsType' ('HsSpliceTy' ('HsSpliced' ...))
 [6] 'GHC.Tc.Gen.Pat.tc_pat' ('SplicePat' ('HsSpliced' ...))
 
 -}

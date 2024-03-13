@@ -1678,7 +1678,7 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
 -- is generated so that multiplicity can be inferred.
 tcMultAnn :: HsMultAnn GhcRn -> TcM Mult
 tcMultAnn (HsPct1Ann _) = return oneDataConTy
-tcMultAnn (HsMultAnn _ p) = tcCheckLHsType p (TheKind multiplicityTy)
+tcMultAnn (HsMultAnn _ p) = tcCheckLHsTypeInContext p (TheKind multiplicityTy)
 tcMultAnn (HsNoMultAnn _) = newFlexiTyVarTy multiplicityTy
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
