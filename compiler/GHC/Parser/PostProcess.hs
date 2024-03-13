@@ -1135,8 +1135,8 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 --     (((Eq a)))           -->  [Eq a]
 -- @
 checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
-checkContext orig_t@(L (EpAnn l _ _) _orig_t) =
-  check ([],[],emptyComments) orig_t
+checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
+  check ([],[],cs) orig_t
  where
   check :: ([EpaLocation],[EpaLocation],EpAnnComments)
         -> LHsType GhcPs -> P (LHsContext GhcPs)
