@@ -166,35 +166,6 @@ function purge_file() {
 
 function prepare_docs() {
     echo "THIS COMMAND IS DEPRECATED, THE DOCS FOLDER SHOULD BE PREPARED BY THE FETCH SCRIPT"
-    local tmp
-    rm -Rf docs
-    if [ -z "$GHC_TREE" ]; then
-        tmp="$(mktemp -d)"
-        tar -xf "ghc-$ver-src.tar.xz" -C "$tmp"
-        GHC_TREE="$tmp/ghc-$ver"
-    fi
-    mkdocs="$GHC_TREE/distrib/mkDocs/mkDocs"
-    if [ ! -e "$mkdocs" ]; then
-        echo "Couldn't find GHC mkDocs at $mkdocs."
-        echo "Perhaps you need to override GHC_TREE?"
-        rm -Rf "$tmp"
-        exit 1
-    fi
-    windows_bindist="$(ls ghc-$ver-x86_64-unknown-mingw32.tar.xz | head -n1)"
-    linux_bindist="$(ls ghc-$ver-x86_64-deb9-linux.tar.xz | head -n1)"
-    echo "Windows bindist: $windows_bindist"
-    echo "Linux bindist: $linux_bindist"
-    $ENTER_FHS_ENV $mkdocs $linux_bindist $windows_bindist
-    if [ -d "$tmp" ]; then rm -Rf "$tmp"; fi
-
-    mkdir -p docs/html
-    tar -Jxf "$linux_bindist"
-    cp -R "ghc-$ver/docs/users_guide/build-html/users_guide docs/html/users_guide"
-    #cp -R ghc-$ver/utils/haddock/doc/haddock docs/html/haddock
-    rm -R "ghc-$ver"
-
-    tar -Jxf docs/libraries.html.tar.xz -C docs/html
-    mv docs/index.html docs/html
 }
 
 function recompress() {
