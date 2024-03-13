@@ -43,6 +43,8 @@ module GHC.Tc.Utils.Unify (
   PuResult(..), failCheckWith, okCheckRefl, mapCheck,
   TyEqFlags(..), TyEqFamApp(..), AreUnifying(..), LevelCheck(..), FamAppBreaker,
   famAppArgFlags, simpleUnifyCheck, checkPromoteFreeVars,
+
+  fillInferResult,
   ) where
 
 import GHC.Prelude

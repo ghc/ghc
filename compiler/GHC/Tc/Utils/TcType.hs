@@ -27,7 +27,7 @@ module GHC.Tc.Utils.TcType (
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
   TcTyCon, MonoTcTyCon, PolyTcTyCon, TcTyConBinder, KnotTied,
 
-  ExpType(..), InferResult(..),
+  ExpType(..), ExpKind, InferResult(..),
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType,
   mkCheckExpType,
@@ -432,6 +432,9 @@ type ExpSigmaTypeFRR = ExpTypeFRR
   -- TODO: consider making this a newtype.
 
 type ExpRhoType      = ExpType
+
+-- | Like 'ExpType', but on kind level
+type ExpKind         = ExpType
 
 instance Outputable ExpType where
   ppr (Check ty) = text "Check" <> braces (ppr ty)

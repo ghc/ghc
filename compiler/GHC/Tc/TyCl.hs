@@ -1772,7 +1772,7 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = HsDataDefn { dd_
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     let res_kind = tyConResKind tycon
-    in discardResult $ tcCheckLHsType rhs (TheKind res_kind)
+    in discardResult $ tcCheckLHsTypeInContext rhs (TheKind res_kind)
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
@@ -1801,7 +1801,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 kcConArgTys :: NewOrData -> TcKind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
+  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
                                              tcMult mult)
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   }
@@ -1868,7 +1868,7 @@ kcConDecl new_or_data
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
-       ; _ <- tcCheckLHsType res_ty (TheKind con_res_kind)
+       ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
        ; kcConGADTArgs new_or_data con_res_kind args
        ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr con_res_kind)
        ; return () }
@@ -1895,7 +1895,7 @@ Otherwise we'd infer the bogus kind
 The type signature for MkT influences the kind of T simply by
 kind-checking the result type (T g b), which will force 'f' and 'g' to
 have the same kinds. This is the call to
-    tcCheckLHsType res_ty (TheKind con_res_kind)
+    tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
 Because this is the result type of an arrow, we know the kind must be
 of form (TYPE rr), and we get better error messages if we enforce that
 here (e.g. test gadt10).
@@ -3054,7 +3054,7 @@ tcTySynRhs roles_info tc_name hs_ty
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info tc_bndrs $
-                   tcCheckLHsType hs_ty (TheKind res_kind)
+                   tcCheckLHsTypeInContext hs_ty (TheKind res_kind)
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
          -- Example: (typecheck/should_fail/T17567)
@@ -3197,7 +3197,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
-            ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
+            ; tcCheckLHsTypeInContext hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
@@ -3349,7 +3349,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
-                     ; rhs_ty <- tcCheckLHsType hs_rhs_ty (TheKind rhs_kind)
+                     ; rhs_ty <- tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
@@ -3926,7 +3926,7 @@ tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatype
          -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg exp_kind (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
-        ; arg_ty <- tcCheckLHsType (getBangType bty) exp_kind
+        ; arg_ty <- tcCheckLHsTypeInContext (getBangType bty) exp_kind
         ; w' <- tcDataConMult w
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
