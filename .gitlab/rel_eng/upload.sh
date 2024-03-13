@@ -145,7 +145,7 @@ function purge_all() {
     curl -X PURGE http://downloads.haskell.org/~ghc/$dir
     curl -X PURGE http://downloads.haskell.org/~ghc/$dir/
     for i in *; do
-        purge_file $i
+        purge_file "$i"
     done
 }
 
@@ -158,9 +158,9 @@ function purge_file() {
     )
 
     for dir in ${dirs[@]}; do
-        curl -X PURGE http://downloads.haskell.org/$dir/$i
-        curl -X PURGE http://downloads.haskell.org/$dir/$i/
-        curl -X PURGE http://downloads.haskell.org/$dir/$i/docs/
+        curl -X PURGE http://downloads.haskell.org/$dir/$1
+        curl -X PURGE http://downloads.haskell.org/$dir/$1/
+        curl -X PURGE http://downloads.haskell.org/$dir/$1/docs/
     done
 }
 
@@ -213,7 +213,7 @@ function recompress() {
         needed+=( "$(basename $i .tar.xz).zip" )
     done
 
-    recompress-all -l ${needed[@]}
+    recompress-all -j10 ${needed[@]}
 }
 
 function upload_docs() {
