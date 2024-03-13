@@ -15,7 +15,7 @@ target="$2"
 common_part="$src"
 result=""
 
-while test "${target#$common_part}" = "${target}" ; do
+while test "${target#"$common_part"}" = "${target}" ; do
     #echo "common_part is now : \"$common_part\""
     #echo "result is now      : \"$result\""
     #echo "target#common_part : \"${target#$common_part}\""
@@ -39,7 +39,7 @@ fi
 
 # since we now have identified the common part,
 # compute the non-common part
-forward_part="${target#$common_part}"
+forward_part="${target#"$common_part"}"
 #echo "forward_part = \"$forward_part\""
 
 if test -n "$result" && test -n "$forward_part" ; then
