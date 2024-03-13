@@ -62,7 +62,7 @@ infix  6  :+
 -- it holds that @z == 'abs' z * 'signum' z@.
 --
 -- Note that `Complex`'s instances inherit the deficiencies from the type
--- parameter's. For example, @Complex Float@'s 'Ord' instance has similar
+-- parameter's. For example, @Complex Float@'s 'Eq' instance has similar
 -- problems to `Float`'s.
 --
 -- As can be seen in the examples, the 'Foldable'
