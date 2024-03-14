@@ -36,6 +36,7 @@ import os
 import yaml
 import gitlab
 from urllib.request import urlopen
+from urllib.parse import urlparse
 import hashlib
 import sys
 import json
@@ -156,13 +157,18 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
     eprint(f"Bindist URL: {url}")
     eprint(f"Download URL: {final_url}")
 
-    #Download and hash from the release pipeline, this must not change anyway during upload.
+    # Download and hash from the release pipeline, this must not change anyway during upload.
     h = download_and_hash(url)
 
     res = { "dlUri": final_url
           , "dlSubdir": artifact.subdir.format(version=version)
-          , "dlOutput": artifact.output_name.format(version=version)
           , "dlHash" : h }
+
+    # Only add dlOutput if it is inconsistent with the filename inferred from the URL
+    output = artifact.output_name.format(version=version)
+    if Path(urlparse(final_url).path).name != output:
+        res["dlOutput"] = output
+
     eprint(res)
     return res
 
