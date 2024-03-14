@@ -9,15 +9,15 @@ usage :
 
 %.gz : %.xz
 	echo "[xz->gz] $< to $@..."
-	xz -c $< | gzip -c > $@
+	xz -cd $< | gzip -c > $@
 
 %.bz2 : %.xz
 	echo "[xz->bz2] $< to $@..."
-	xz -c $< | bzip2 -c > $@
+	xz -cd $< | bzip2 -c > $@
 
 %.lz : %.xz
 	echo "[xz->lz] $< to $@..."
-	xz -c $< | lzip -c > $@
+	xz -cd $< | lzip -c > $@
 
 %.zip : %.tar.xz
 	echo "[tarxz->zip] $< to $@..."
