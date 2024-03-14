@@ -81,7 +81,7 @@ source_artifact = Artifact('source-tarball'
 test_artifact = Artifact('source-tarball'
                         , 'ghc-{version}-testsuite.tar.xz'
                         , 'ghc-{version}-testsuite.tar.xz'
-                        , 'ghc-{version}' )
+                        , 'ghc-{version}/testsuite' )
 
 def debian(arch, n):
     return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
