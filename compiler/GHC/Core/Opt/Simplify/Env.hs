@@ -17,7 +17,7 @@ module GHC.Core.Opt.Simplify.Env (
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePedanticBottoms, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
-        mkSimplEnv, extendIdSubst,
+        mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
@@ -549,6 +549,10 @@ extendCvSubst :: SimplEnv -> CoVar -> Coercion -> SimplEnv
 extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
   = assert (isCoVar var) $
     env {seCvSubst = extendVarEnv csubst var co}
+
+extendCvIdSubst :: SimplEnv -> Id -> OutExpr -> SimplEnv
+extendCvIdSubst env bndr (Coercion co) = extendCvSubst env bndr co
+extendCvIdSubst env bndr rhs           = extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet

@@ -1,0 +1,18 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 33, types: 60, coercions: 0, joins: 0/1}
+
+$wf
+  = \ @a xs ->
+      let {
+        t = reverse1 (reverse1 (reverse1 (reverse1 xs []) []) []) [] } in
+      case xs of {
+        [] -> (# t, True #);
+        : ds ds1 -> (# t, False #)
+      }
+
+f = \ @a xs -> case $wf xs of { (# ww, ww1 #) -> (ww, ww1) }
+
+
+

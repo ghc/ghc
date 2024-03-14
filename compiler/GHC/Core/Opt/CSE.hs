@@ -14,13 +14,15 @@ import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
-                        , isJoinId, idJoinPointHood, idUnfolding )
-import GHC.Core.Utils   ( mkAltExpr
-                        , exprIsTickedString
+                        , isJoinId, idJoinPointHood, idUnfolding
+                        , zapIdUnfolding, isDeadBinder )
+import GHC.Core.Utils   ( mkAltExpr, exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
+import GHC.Core.Utils   ( exprIsTrivial )
+import GHC.Core.Opt.OccurAnal( scrutBinderSwap_maybe )
 import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Types.Tickish
@@ -714,25 +716,33 @@ cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
 cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
-  = Case scrut1 bndr3 ty' $
-    combineAlts (map cse_alt alts)
+  | Just body <- caseElim scrut bndr alts
+  , -- See Note [Eliminating redundant cases]
+    let zapped_bndr = zapIdUnfolding bndr -- Wrinkle (ERC1)
+  = cseExpr env (Let (NonRec zapped_bndr scrut) body)
+
+  | otherwise
+  = Case scrut' bndr' ty' alts'
+
   where
     ty' = substTyUnchecked (csEnvSubst env) ty
-    (cse_done, scrut1) = try_for_cse env scrut
+    (cse_done, scrut') = try_for_cse env scrut
 
     bndr1 = zapIdOccInfo bndr
       -- Zapping the OccInfo is needed because the extendCSEnv
       -- in cse_alt may mean that a dead case binder
       -- becomes alive, and Lint rejects that
     (env1, bndr2)    = addBinder env bndr1
-    (alt_env, bndr3) = extendCSEnvWithBinding env1 bndr bndr2 scrut1 cse_done
+    (alt_env, bndr') = extendCSEnvWithBinding env1 bndr bndr2 scrut' cse_done
          -- extendCSEnvWithBinding: see Note [CSE for case expressions]
+
+    alts' = combineAlts (map cse_alt alts)
 
     con_target :: OutExpr
     con_target = lookupSubst alt_env bndr
 
     arg_tys :: [OutType]
-    arg_tys = tyConAppArgs (idType bndr3)
+    arg_tys = tyConAppArgs (idType bndr')
 
     -- See Note [CSE for case alternatives]
     cse_alt (Alt (DataAlt con) args rhs)
@@ -746,6 +756,45 @@ cseCase env scrut bndr ty alts
         = Alt con args' (tryForCSE env' rhs)
         where
           (env', args') = addBinders alt_env args
+
+caseElim :: InExpr -> InId -> [InAlt] -> Maybe InExpr
+-- Can we eliminate the case altogether?  If so return the body.
+--   Note [Eliminating redundant cases]
+caseElim scrut case_bndr alts
+  | [Alt _ bndrs rhs] <- alts
+  , Just (scrut_var, _) <- scrutBinderSwap_maybe scrut
+  , all isDeadBinder bndrs
+  , isEvaldSoon (scrut_var, case_bndr) rhs
+  = Just rhs
+
+  | otherwise
+  = Nothing
+
+isEvaldSoon :: (OutId, OutId) -> OutExpr -> Bool
+-- (isEvaldSoon (v1,v2) e) is True if either v1 or v2 is evaluated "soon" by e
+isEvaldSoon (v1,v2) expr
+  = go expr
+  where
+    hit :: Var -> Bool
+    hit v = v==v1 || v==v2
+
+    go (Var v)    = hit v
+    go (Let _ e)  = go e
+    go (Tick _ e) = go e
+    go (Cast e _) = go e
+
+    go (Case scrut cb _ alts)
+      = go scrut ||
+        (exprIsTrivial scrut &&
+         all go_alt alts &&
+         not (hit cb)    &&  -- Check for
+         all ok_alt alts)    --   shadowing
+         -- ok_alt only runs if things look good
+
+    go _ = False  -- Lit, App, Lam, Coercion, Type
+
+    go_alt (Alt _ _ rhs) = go rhs
+    ok_alt (Alt _ cbs _) = not (any hit cbs)
 
 combineAlts :: [OutAlt] -> [OutAlt]
 -- See Note [Combine case alternatives]
@@ -798,6 +847,64 @@ turning K2 into 'x' increases the number of live variables.  But
 * The next run of the simplifier will turn 'x' back into K2, so we won't
   permanently bloat the free-var count.
 
+Note [Eliminating redundant cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   case x of x' { DEFAULT ->
+   case y of y' { DEFAULT ->
+   let v = <thunk> in
+   case x' of { True -> e1; False -> e2 }
+   body }}}
+
+The initial `seq` of `x` is redundant.  But the Simplifier is generally
+careful not to drop that outer `case x` based on its demand-info: see Note
+[Case-to-let for strictly-used binders] in GHC.Core.Opt.Simplify.Iteration.
+
+Instead we peek at the body of the case, using `isEvaldSoon`, to see if `x` is
+evaluated "soon" in the code path that follows.  If so we transform the
+`case` to a `let`
+   let x' = x in
+   case y of y' ... etc...
+
+The notion of "soon" is a bit squishy, and is implemented by `isEvaldSoon`.
+We allow interchanging eval's (as in the `case x` vs `case y` above.  But
+what about
+   case x of x' { DEFAULT ->
+   case (f y) of y' { DEFAULT ->
+   case x' of { True -> e1; False -> e2 }
+If we drop the `seq` on `x` we fall vicitm of #21741.  There is nothing
+wrong /semantically/ with dropping the `seq`, but the case of #21741 it causes
+a big space leak.
+
+So the conditions in `isEvaldSoon` are quite narrow: the two evals are
+separated only by lets and other evals on /variables/.
+
+Wrinkle (ERC1):
+   x' will have an (OtherCon []) unfolding on it.  We want to zap that
+   unfolding before turning it into (let x' = x in ...).
+
+Wrinkle (ERC2):
+  You might wonder if case-merging in the Simplifer doesn't cover this.
+  See GHC.Core.Opt.Simplify.Utils.tryCaseMerge. and Note [Merge Nested Cases]
+  in that same module.  But no, it is defeated by the 'let v = <thunk>` in our
+  example above, and I didn't want to make it more complicated.
+
+  Mabye case-merging should be made simpler, or even moved outright here into CSE.
+
+Wrinkle (ERC3):
+  Why is this done in CSE?  Becuase the "peeking" is tiresome and potentially a bit
+  expensive (quadratic in deep nests) so we don't want too often.  CSE runs seldom,
+  it is a pretty simple pass, and it's easy to "drop in" this extra optimisation.
+  Also eliminating redundant cases is a bit like commoning up duplicated work.
+
+Wrinkle (ERC4):
+  You might wonder whether we want to do this "optimisation" /at all/. After all, as
+  Note [Case-to-let for strictly-used binders] point out, dropping the eval is
+  not a huge deal, because the inner eval should just be a multi-way jump (no
+  actual eval).  But droppping the eval removes clutter, and I found that not dropping
+  made some functions look a bit bigger, and hence they didn't get inlined.
+
+  This is small beer though: I don't think it's an /important/ transformation.
 
 Note [Combine case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

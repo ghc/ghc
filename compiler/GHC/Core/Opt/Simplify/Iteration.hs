@@ -412,9 +412,7 @@ simplAuxBind env bndr new_rhs
   -- have no NOLINE pragmas, nor RULEs
   | exprIsTrivial new_rhs  -- Short-cut for let x = y in ...
   = return ( emptyFloats env
-           , case new_rhs of
-                Coercion co -> extendCvSubst env bndr co
-                _           -> extendIdSubst env bndr (DoneEx new_rhs NotJoinPoint) )
+           , extendCvIdSubst env bndr new_rhs )  -- bndr can be a CoVar
 
   | otherwise
   = do  { -- ANF-ise the RHS

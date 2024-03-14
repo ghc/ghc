@@ -625,7 +625,7 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
-isDeadBinder :: Id -> Bool
+isDeadBinder :: Var -> Bool
 isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
                   | otherwise = False   -- TyVars count as not dead
 

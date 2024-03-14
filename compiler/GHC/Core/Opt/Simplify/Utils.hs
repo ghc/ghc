@@ -2394,6 +2394,9 @@ the outer case scrutinises the same variable as the outer case. This
 transformation is called Case Merging.  It avoids that the same
 variable is scrutinised multiple times.
 
+See also Note [Eliminating redundant cases] in GHC.Core.Opt.CSE, especially
+wrinkle (ERC2).
+
 Wrinkles
 
 (MC1) `tryCaseMerge` "looks though" an inner single-alternative case-on-variable.

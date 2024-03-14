@@ -413,3 +413,9 @@ test('T21839r',
 # perf doesn't regress further, so it is not marked as such.
 test('T18964', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O'])
 test('T23021', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O2'])
+
+# GC bytes copied goes up a lot if the space leak returns
+test('T21741', [collect_stats('copied_bytes', 2),
+                extra_run_opts('10000000'),
+                only_ways(['normal'])],
+      compile_and_run, ['-O'])
