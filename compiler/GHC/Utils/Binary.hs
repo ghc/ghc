@@ -4,6 +4,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+{-# LANGUAGE TypeFamilies #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -72,11 +73,14 @@ module GHC.Utils.Binary
    -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
    FSTable(..), initFSTable, getDictFastString, putDictFastString,
+   initGenericSymbolTable, putGenericSymbolTable, getGenericSymbolTable, putGenericSymTab, getGenericSymtab,
 
    -- * TODO:
    BinSymbolTable(..), withMyUserData,
-   CanCache(..), CacheTable(..), SomeCache(..),
-   CanCacheTable(..), findUserDataCache,
+   CachedBinary(..), mkWriter, mkReader, SomeCache, mkCache,
+   findUserDataCache,
+   GenericSymbolTable(..),
+   addDecoder,
 
    -- * Newtype wrappers
    BinSpan(..), BinSrcSpan(..), BinLocated(..)
@@ -124,7 +128,10 @@ import qualified Data.IntMap as IntMap
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
 import Data.Typeable
-import Data.Type.Equality
+import GHC.Utils.Misc
+import qualified Data.Map.Strict as Map
+import Data.Tuple (swap)
+import Unsafe.Coerce (unsafeCoerce)
 
 type BinArray = ForeignPtr Word8
 
@@ -187,6 +194,14 @@ getUserData bh = bh_usr bh
 setUserData :: BinHandle -> UserData -> BinHandle
 setUserData bh us = bh { bh_usr = us }
 
+addDecoder :: SomeCache -> BinHandle -> BinHandle
+addDecoder cache bh = bh
+  { bh_usr = (bh_usr bh)
+      { ud_my_user_data = cache : ud_my_user_data (bh_usr bh)
+      }
+
+  }
+
 -- | Get access to the underlying buffer.
 withBinBuffer :: BinHandle -> (ByteString -> IO a) -> IO a
 withBinBuffer (BinMem _ ix_r _ arr_r) action = do
@@ -218,9 +233,9 @@ castBin (BinPtr i) = BinPtr i
 -- | Do not rely on instance sizes for general types,
 -- we use variable length encoding for many of them.
 class Binary a where
-    put_   :: BinHandle -> a -> IO ()
-    put    :: BinHandle -> a -> IO (Bin a)
-    get    :: BinHandle -> IO a
+    put_   :: HasCallStack => BinHandle -> a -> IO ()
+    put    :: HasCallStack => BinHandle -> a -> IO (Bin a)
+    get    :: HasCallStack => BinHandle -> IO a
 
     -- define one of put_, put.  Use of put_ is recommended because it
     -- is more likely that tail-calls can kick in, and we rarely need the
@@ -270,14 +285,14 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
 
-readBinMem :: FilePath -> IO BinHandle
+readBinMem :: HasCallStack => FilePath -> IO BinHandle
 readBinMem filename = do
   withBinaryFile filename ReadMode $ \h -> do
     filesize' <- hFileSize h
     let filesize = fromIntegral filesize'
     readBinMem_ filesize h
 
-readBinMemN :: Int -> FilePath -> IO (Maybe BinHandle)
+readBinMemN :: HasCallStack => Int -> FilePath -> IO (Maybe BinHandle)
 readBinMemN size filename = do
   withBinaryFile filename ReadMode $ \h -> do
     filesize' <- hFileSize h
@@ -286,7 +301,7 @@ readBinMemN size filename = do
       then pure Nothing
       else Just <$> readBinMem_ size h
 
-readBinMem_ :: Int -> Handle -> IO BinHandle
+readBinMem_ :: HasCallStack => Int -> Handle -> IO BinHandle
 readBinMem_ filesize h = do
   arr <- mallocForeignPtrBytes filesize
   count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
@@ -335,6 +350,7 @@ foldGet n bh init_b f = go 0 init_b
 
 foldGet'
   :: Binary a
+  => HasCallStack
   => Word -- n elements
   -> BinHandle
   -> b -- initial accumulator
@@ -1024,7 +1040,7 @@ forwardGet bh get_A = do
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing
 
-lazyPut :: Binary a => BinHandle -> a -> IO ()
+lazyPut :: HasCallStack => Binary a => BinHandle -> a -> IO ()
 lazyPut bh a = do
     -- output the obj with a ptr to skip over it:
     pre_a <- tellBin bh
@@ -1034,7 +1050,7 @@ lazyPut bh a = do
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBin bh q        -- finally carry on writing at q
 
-lazyGet :: Binary a => BinHandle -> IO a
+lazyGet :: HasCallStack => Binary a => BinHandle -> IO a
 lazyGet bh = do
     p <- get bh -- a BinPtr
     p_a <- tellBin bh
@@ -1051,7 +1067,7 @@ lazyGet bh = do
 --
 -- This way we can check for the presence of a value without deserializing the
 -- value itself.
-lazyPutMaybe :: Binary a => BinHandle -> Maybe a -> IO ()
+lazyPutMaybe :: HasCallStack => Binary a => BinHandle -> Maybe a -> IO ()
 lazyPutMaybe bh Nothing  = putWord8 bh 0
 lazyPutMaybe bh (Just x) = do
   putWord8 bh 1
@@ -1090,31 +1106,23 @@ lazyGetMaybe bh = do
 --
 data UserData =
    UserData {
-        -- for *deserialising* only:
-        ud_get_name :: BinHandle -> IO Name,
-        ud_get_fs   :: BinHandle -> IO FastString,
-
-        -- for *serialising* only:
-        ud_put_nonbinding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a non-binding 'Name' (e.g. a reference to another
-        -- binding).
-        ud_put_binding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a binding 'Name' (e.g. the name of an IfaceDecl)
-        ud_put_fs   :: BinHandle -> FastString -> IO (),
-        -- ^
-        ud_my_user_data :: [SomeCache]
+      ud_my_user_data :: HasCallStack => [SomeCache]
    }
 
 newReadState :: (BinHandle -> IO Name)   -- ^ how to deserialize 'Name's
              -> (BinHandle -> IO FastString)
              -> UserData
 newReadState get_name get_fs
-  = UserData { ud_get_name = get_name,
-               ud_get_fs   = get_fs,
-               ud_put_nonbinding_name = undef "put_nonbinding_name",
-               ud_put_binding_name    = undef "put_binding_name",
-               ud_put_fs   = undef "put_fs",
-               ud_my_user_data = undef "ud_my_user_data"
+  = UserData { ud_my_user_data =
+                  [ SomeCache (typeRep (Proxy :: Proxy Name), emptyCachedBinary
+                    { getEntry = get_name
+                    }
+                    )
+                  , SomeCache (typeRep (Proxy :: Proxy FastString), emptyCachedBinary
+                    { getEntry = get_fs
+                    }
+                    )
+                  ]
              }
 
 newWriteState :: (BinHandle -> Name -> IO ())
@@ -1124,12 +1132,16 @@ newWriteState :: (BinHandle -> Name -> IO ())
               -> (BinHandle -> FastString -> IO ())
               -> UserData
 newWriteState put_nonbinding_name put_binding_name put_fs
-  = UserData { ud_get_name = undef "get_name",
-               ud_get_fs   = undef "get_fs",
-               ud_put_nonbinding_name = put_nonbinding_name,
-               ud_put_binding_name    = put_binding_name,
-               ud_put_fs   = put_fs,
-               ud_my_user_data = undef "ud_my_user_data"
+  = UserData { ud_my_user_data =
+                  [ SomeCache (typeRep (Proxy :: Proxy Name), emptyCachedBinary
+                    { putEntry = put_binding_name
+                    }
+                    )
+                  , SomeCache (typeRep (Proxy :: Proxy FastString), emptyCachedBinary
+                    { putEntry = put_fs
+                    }
+                    )
+                  ]
              }
 
 data BinSymbolTable = BinSymbolTable {
@@ -1138,53 +1150,110 @@ data BinSymbolTable = BinSymbolTable {
                                 -- indexed by Name
   }
 
-data SomeCache = forall a . SomeCache (CanCache a, CanCacheTable a)
-
-data CanCache a where
-  CanCacheNames :: CanCache Name
-  CanCacheFastString :: CanCache FastString
-
-instance TestEquality CanCache where
-  testEquality CanCacheNames CanCacheNames = Just Refl
-  testEquality CanCacheFastString CanCacheFastString = Just Refl
-  testEquality _ _ = Nothing
-
-
-data CanCacheTable a where
-  CacheTableName :: CacheTable BinSymbolTable SymbolTable Name -> CanCacheTable Name
-  CacheTableFastString :: CacheTable FSTable Dictionary FastString -> CanCacheTable FastString
-
-data CacheTable t t' s = CacheTable
-  { putEntry :: BinHandle -> s -> IO ()
-  , getEntry :: BinHandle -> IO s
-  , getCache :: BinHandle -> IO t'
-  , putCache :: BinHandle -> IO Int
+data GenericSymbolTable a = GenericSymbolTable
+  { gen_symtab_next :: !FastMutInt
+  , gen_symtab_map  :: !(IORef (Map.Map a Int))
   }
 
-withMyUserData :: [SomeCache] -> UserData
+initGenericSymbolTable :: IO (GenericSymbolTable a)
+initGenericSymbolTable = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef Map.empty
+  pure $ GenericSymbolTable
+        { gen_symtab_next = symtab_next
+        , gen_symtab_map  = symtab_map
+        }
+
+putGenericSymbolTable :: forall a. GenericSymbolTable a -> (BinHandle -> a -> IO ()) -> BinHandle -> IO Int
+putGenericSymbolTable gen_sym_tab serialiser bh = do
+  table_count <- readFastMutInt symtab_next
+  symtab_map  <- readIORef symtab_map
+  putGenericSymbolTable bh table_count symtab_map
+  pure table_count
+  where
+    symtab_map = gen_symtab_map gen_sym_tab
+    symtab_next = gen_symtab_next gen_sym_tab
+    putGenericSymbolTable :: HasCallStack => BinHandle -> Int -> Map.Map a Int -> IO ()
+    putGenericSymbolTable bh name_count symtab = do
+        put_ bh name_count
+        let genElements = elems (array (0,name_count-1) (fmap swap $ Map.toList symtab))
+        mapM_ (\n -> serialiser bh n) genElements
+
+getGenericSymbolTable :: forall a. (BinHandle -> IO a) -> BinHandle -> IO (SymbolTable a)
+getGenericSymbolTable deserialiser bh = do
+  sz <- get bh :: IO Int
+  mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
+  forM_ [0..(sz-1)] $ \i -> do
+    f <- deserialiser bh
+    writeArray mut_arr i f
+  unsafeFreeze mut_arr
+
+putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> BinHandle -> a -> IO ()
+putGenericSymTab GenericSymbolTable{
+               gen_symtab_map = symtab_map_ref,
+               gen_symtab_next = symtab_next }
+        bh val = do
+  symtab_map <- readIORef symtab_map_ref
+  case Map.lookup val symtab_map of
+    Just off -> put_ bh (fromIntegral off :: Word32)
+    Nothing -> do
+      off <- readFastMutInt symtab_next
+      writeFastMutInt symtab_next (off+1)
+      writeIORef symtab_map_ref
+          $! Map.insert val off symtab_map
+      put_ bh (fromIntegral off :: Word32)
+
+getGenericSymtab :: Binary a => SymbolTable a
+              -> BinHandle -> IO a
+getGenericSymtab symtab bh = do
+  i :: Word32 <- get bh
+  return $! symtab ! fromIntegral i
+
+data SomeCache = forall a . SomeCache (TypeRep, CachedBinary a)
+
+mkCache :: Typeable a => Proxy a -> CachedBinary a -> SomeCache
+mkCache p cb = SomeCache (typeRep p, cb)
+
+data CachedBinary s = CachedBinary
+  { putEntry :: HasCallStack => BinHandle -> s -> IO ()
+  , getEntry :: HasCallStack => BinHandle -> IO s
+  }
+
+mkWriter :: (BinHandle -> s -> IO ()) -> CachedBinary s
+mkWriter f = emptyCachedBinary
+  { putEntry = f
+  }
+
+mkReader :: (BinHandle -> IO s) -> CachedBinary s
+mkReader f = emptyCachedBinary
+  { getEntry = f
+  }
+
+emptyCachedBinary :: HasCallStack => CachedBinary s
+emptyCachedBinary = CachedBinary
+  { putEntry = undef "putEntry"
+  , getEntry = undef "getEntry"
+  }
+
+withMyUserData :: HasCallStack => [SomeCache] -> UserData
 withMyUserData caches = noUserData
   { ud_my_user_data = caches
   }
 
-findUserDataCache :: CanCache a -> BinHandle -> CanCacheTable a
+findUserDataCache :: (HasCallStack, Typeable a) => Proxy a -> BinHandle -> CachedBinary a
 findUserDataCache query bh = go (ud_my_user_data $ getUserData bh)
   where
-    go [] = panic "Failed to find cache"
+    go [] = panic $ "Failed to find cache for key " ++ show query
     go (SomeCache (x, y) : xs)
-      | Just Refl <- testEquality x query = y
+      | x == typeRep query = unsafeCoerce y
       | otherwise = go xs
 
-noUserData :: UserData
+noUserData :: HasCallStack => UserData
 noUserData = UserData
-  { ud_get_name            = undef "get_name"
-  , ud_get_fs              = undef "get_fs"
-  , ud_put_nonbinding_name = undef "put_nonbinding_name"
-  , ud_put_binding_name    = undef "put_binding_name"
-  , ud_put_fs              = undef "put_fs"
-  , ud_my_user_data = undef "ud_my_user_data"
+  { ud_my_user_data = []
   }
 
-undef :: String -> a
+undef :: HasCallStack => String -> a
 undef s = panic ("Binary.UserData: no " ++ s)
 
 ---------------------------------------------------------
@@ -1194,14 +1263,14 @@ undef s = panic ("Binary.UserData: no " ++ s)
 type Dictionary = Array Int FastString -- The dictionary
                                        -- Should be 0-indexed
 
-putDictionary :: BinHandle -> Int -> UniqFM FastString (Int,FastString) -> IO ()
+putDictionary ::HasCallStack => BinHandle -> Int -> UniqFM FastString (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
   put_ bh sz
   mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUFM dict)))
     -- It's OK to use nonDetEltsUFM here because the elements have indices
     -- that array uses to create order
 
-getDictionary :: BinHandle -> IO Dictionary
+getDictionary :: HasCallStack => BinHandle -> IO Dictionary
 getDictionary bh = do
   sz <- get bh :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int FastString)
@@ -1210,13 +1279,12 @@ getDictionary bh = do
     writeArray mut_arr i fs
   unsafeFreeze mut_arr
 
-getDictFastString :: Dictionary -> BinHandle -> IO FastString
+getDictFastString ::HasCallStack => Dictionary -> BinHandle -> IO FastString
 getDictFastString dict bh = do
     j <- get bh
     return $! (dict ! fromIntegral (j :: Word32))
 
-
-initFSTable :: BinHandle -> IO (BinHandle, FSTable, IO Int)
+initFSTable :: HasCallStack =>  BinHandle -> IO (BinHandle, FSTable, IO Int)
 initFSTable bh = do
   dict_next_ref <- newFastMutInt 0
   dict_map_ref <- newIORef emptyUFM
@@ -1232,15 +1300,20 @@ initFSTable bh = do
 
   -- BinHandle with FastString writing support
   let ud = getUserData bh
-  let ud_fs = ud { ud_put_fs = putDictFastString bin_dict }
+  -- TODO: this bad
+  let ud_fs = ud { ud_my_user_data =
+        SomeCache (typeRep (Proxy :: Proxy FastString), emptyCachedBinary
+          { putEntry = putDictFastString bin_dict
+          }) : ud_my_user_data ud
+        }
   let bh_fs = setUserData bh ud_fs
 
   return (bh_fs,bin_dict,put_dict)
 
-putDictFastString :: FSTable -> BinHandle -> FastString -> IO ()
+putDictFastString :: HasCallStack =>FSTable -> BinHandle -> FastString -> IO ()
 putDictFastString dict bh fs = allocateFastString dict fs >>= put_ bh
 
-allocateFastString :: FSTable -> FastString -> IO Word32
+allocateFastString ::HasCallStack =>FSTable -> FastString -> IO Word32
 allocateFastString FSTable { fs_tab_next = j_r
                            , fs_tab_map  = out_r
                            } f = do
@@ -1269,16 +1342,16 @@ data FSTable = FSTable { fs_tab_next :: !FastMutInt -- The next index to use
 -- On disk, the symbol table is an array of IfExtName, when
 -- reading it in we turn it into a SymbolTable.
 
-type SymbolTable = Array Int Name
+type SymbolTable a = Array Int a
 
 ---------------------------------------------------------
 -- Reading and writing FastStrings
 ---------------------------------------------------------
 
-putFS :: BinHandle -> FastString -> IO ()
+putFS :: HasCallStack =>BinHandle -> FastString -> IO ()
 putFS bh fs = putBS bh $ bytesFS fs
 
-getFS :: BinHandle -> IO FastString
+getFS :: HasCallStack =>BinHandle -> IO FastString
 getFS bh = do
   l  <- get bh :: IO Int
   getPrim bh l (\src -> pure $! mkFastStringBytes src l )
@@ -1314,12 +1387,12 @@ instance Binary ByteString where
 
 instance Binary FastString where
   put_ bh f =
-    case findUserDataCache CanCacheFastString bh of
-        CacheTableFastString tbl -> putEntry tbl bh f
+    case findUserDataCache (Proxy :: Proxy FastString) bh of
+      tbl -> putEntry tbl bh f
 
   get bh =
-    case findUserDataCache CanCacheFastString bh of
-        CacheTableFastString tbl -> getEntry tbl bh
+    case findUserDataCache (Proxy :: Proxy FastString) bh of
+      tbl -> getEntry tbl bh
 
 deriving instance Binary NonDetFastString
 deriving instance Binary LexicalFastString

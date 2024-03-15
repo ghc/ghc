@@ -639,12 +639,12 @@ instance Data Name where
 -- distinction.
 instance Binary Name where
    put_ bh name =
-      case findUserDataCache CanCacheNames bh of
-        CacheTableName tbl -> putEntry tbl bh name
+      case findUserDataCache Proxy bh of
+        tbl -> putEntry tbl bh name
 
    get bh =
-      case findUserDataCache CanCacheNames bh of
-        CacheTableName tbl -> getEntry tbl bh
+      case findUserDataCache Proxy bh of
+        tbl -> getEntry tbl bh
 
 {-
 ************************************************************************

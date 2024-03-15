@@ -99,6 +99,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc (dropWhileEndLE)
 import System.IO.Unsafe
 import qualified Control.Exception as Exception
+import GHC.Iface.Syntax
+import Data.Proxy
 
 ----------------------------------------------
 -- The JS backend supports 3 kinds of objects:
@@ -348,7 +350,8 @@ getObjectBody :: BinHandle -> ModuleName -> IO Object
 getObjectBody bh0 mod_name = do
   -- Read the string table
   dict <- forwardGet bh0 (getDictionary bh0)
-  let bh = setUserData bh0 $ noUserData { ud_get_fs = getDictFastString dict }
+  let bh = addDecoder (mkCache (Proxy @IfaceTyCon) (mkReader getIfaceTyCon)) $
+        setUserData bh0 $ newReadState (panic "No name allowed") (getDictFastString dict)
 
   block_info  <- get bh
   idx         <- forwardGet bh (get bh)

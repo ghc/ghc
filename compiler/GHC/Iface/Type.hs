@@ -33,6 +33,8 @@ module GHC.Iface.Type (
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
 
+        -- Binary utilities
+        putIfaceTyCon, getIfaceTyCon,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -92,6 +94,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import Data.Proxy
 
 {-
 ************************************************************************
@@ -244,7 +247,7 @@ instance Monoid IfaceAppArgs where
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
                              , ifaceTyConInfo :: IfaceTyConInfo }
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 -- | The various types of TyCons which have special, built-in syntax.
 data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
@@ -264,7 +267,7 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- that is actually being applied to two types
                       -- of the same kind.  This affects pretty-printing
                       -- only: see Note [Equality predicates in IfaceType]
-                    deriving (Eq)
+                    deriving (Eq, Ord)
 
 instance Outputable IfaceTyConSort where
   ppr IfaceNormalTyCon         = text "normal"
@@ -358,7 +361,7 @@ data IfaceTyConInfo   -- Used only to guide pretty-printing
                       -- should be printed as 'D to distinguish it from
                       -- an existing type constructor D.
                    , ifaceTyConSort       :: IfaceTyConSort }
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 -- | This smart constructor allows sharing of the two most common
 -- cases. See Note [Sharing IfaceTyConInfo]
@@ -1972,11 +1975,20 @@ instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
+   put_ bh tyCon = case findUserDataCache Proxy bh of
+    tbl -> putEntry tbl bh tyCon
 
-   get bh = do n <- get bh
-               i <- get bh
-               return (IfaceTyCon n i)
+   get bh = case findUserDataCache Proxy bh of
+    tbl -> getEntry tbl bh
+
+putIfaceTyCon :: HasCallStack => BinHandle -> IfaceTyCon -> IO ()
+putIfaceTyCon bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
+
+getIfaceTyCon :: HasCallStack => BinHandle -> IO IfaceTyCon
+getIfaceTyCon bh = do
+  n <- get bh
+  i <- get bh
+  return (IfaceTyCon n i)
 
 instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0
