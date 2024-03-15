@@ -33,6 +33,7 @@ module GHC.Linker.Types
    , LibrarySpec(..)
    , LoadedPkgInfo(..)
    , PkgsLoaded
+   , PkgsLoadedEnv(..)
    )
 where
 
@@ -57,6 +58,7 @@ import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
+import GHC.Utils.Logger (Logger)
 
 
 {- **********************************************************************
@@ -139,6 +141,12 @@ emptyClosureEnv = emptyNameEnv
 extendClosureEnv :: ClosureEnv -> [(Name,ForeignHValue)] -> ClosureEnv
 extendClosureEnv cl_env pairs
   = extendNameEnvList cl_env [ (n, (n,v)) | (n,v) <- pairs]
+
+data PkgsLoadedEnv =
+  PkgsLoadedEnv {
+    ple_pkgs_loaded :: !PkgsLoaded,
+    ple_logger :: !Logger
+  }
 
 type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
 

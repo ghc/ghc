@@ -218,6 +218,8 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                        `gopt_set` Opt_UseBytecodeRatherThanObjects
                                        -- By default enable the debugger by inserting breakpoints
                                        `gopt_set` Opt_InsertBreakpoints
+                                       -- Speed up symbol lookup
+                                       `gopt_set` Opt_CacheLoadedLibraryUnits
 
   logger1 <- getLogger
   let logger2 = setLogFlags logger1 (initLogFlags dflags2)

@@ -468,6 +468,7 @@ data GeneralFlag
    -- temporary flags
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
+   | Opt_CacheLoadedLibraryUnits
 
    -- keeping stuff
    | Opt_KeepHscppFiles

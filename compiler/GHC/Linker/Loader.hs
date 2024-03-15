@@ -588,7 +588,7 @@ loadExpr interp hsc_env span root_ul_bco = do
         -- Load the necessary packages and linkables
         let le = linker_env pls
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
-        resolved <- linkBCO interp (pkgs_loaded pls) le bco_ix root_ul_bco
+        resolved <- linkBCO interp (PkgsLoadedEnv (pkgs_loaded pls) (hsc_logger hsc_env)) le bco_ix root_ul_bco
         [root_hvref] <- createBCOs interp [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
         return (pls, fhv)
@@ -651,7 +651,7 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
                        , addr_env = plusNameEnv (addr_env le) bc_strs }
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 [cbc]
+          new_bindings <- linkSomeBCOs interp (PkgsLoadedEnv (pkgs_loaded pls) (hsc_logger hsc_env)) le2 [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
@@ -706,7 +706,7 @@ loadModuleLinkables interp hsc_env pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs interp pls1 bcos
+                pls2 <- dynLinkBCOs interp hsc_env pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -856,8 +856,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: Interp -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs interp pls bcos = do
+dynLinkBCOs :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO LoaderState
+dynLinkBCOs interp hsc_env pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -873,7 +873,7 @@ dynLinkBCOs interp pls bcos = do
             ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
             le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
-        names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
+        names_and_refs <- linkSomeBCOs interp (PkgsLoadedEnv (pkgs_loaded pls) (hsc_logger hsc_env)) le2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -888,7 +888,7 @@ dynLinkBCOs interp pls bcos = do
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
-             -> PkgsLoaded
+             -> PkgsLoadedEnv
              -> LinkerEnv
              -> [CompiledByteCode]
              -> IO [(Name,HValueRef)]
@@ -896,7 +896,7 @@ linkSomeBCOs :: Interp
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs interp pkgs_loaded le mods = foldr fun do_link mods []
+linkSomeBCOs interp pkgs_loaded_env le mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum = inner (bc_bcos : accum)
 
@@ -905,7 +905,7 @@ linkSomeBCOs interp pkgs_loaded le mods = foldr fun do_link mods []
     let flat = [ bco | bcos <- mods, bco <- bcos ]
         names = map unlinkedBCOName flat
         bco_ix = mkNameEnv (zip names [0..])
-    resolved <- sequence [ linkBCO interp pkgs_loaded le bco_ix bco | bco <- flat ]
+    resolved <- sequence [ linkBCO interp pkgs_loaded_env le bco_ix bco | bco <- flat ]
     hvrefs <- createBCOs interp resolved
     return (zip names hvrefs)
 
@@ -1072,10 +1072,17 @@ loadPackages' interp hsc_env new_pks pls = do
                                                    | dep_pkg <- deps
                                                    , Just loaded_pkg_info <- pure (lookupUDFM pkgs' dep_pkg)
                                                    ]
-             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls loaded_dlls trans_deps)) }
+                   cached | cacheDlls = loaded_dlls
+                          | otherwise = []
+             ; when (cacheDlls && not (null cached)) $
+               debugTraceMsg (hsc_logger hsc_env) 3 $
+               text "loadPackages': Updating cache for" <+> ppr (unitId pkg_cfg)
+             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls cached trans_deps)) }
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
+
+     cacheDlls = gopt Opt_CacheLoadedLibraryUnits (hsc_dflags hsc_env)
 
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])

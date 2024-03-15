@@ -46,6 +46,7 @@ import Language.Haskell.Syntax.Module.Name
 import Data.Array.Unboxed
 import Foreign.Ptr
 import GHC.Exts
+import GHC.Utils.Error (debugTraceMsg)
 
 {-
   Linking interpretables into something we can run
@@ -53,7 +54,7 @@ import GHC.Exts
 
 linkBCO
   :: Interp
-  -> PkgsLoaded
+  -> PkgsLoadedEnv
   -> LinkerEnv
   -> NameEnv Int
   -> UnlinkedBCO
@@ -68,7 +69,7 @@ linkBCO interp pkgs_loaded le bco_ix
               (listArray (0, fromIntegral (sizeSS lits0)-1) lits)
               (addListToSS emptySS ptrs))
 
-lookupLiteral :: Interp -> PkgsLoaded -> LinkerEnv -> BCONPtr -> IO Word
+lookupLiteral :: Interp -> PkgsLoadedEnv -> LinkerEnv -> BCONPtr -> IO Word
 lookupLiteral interp pkgs_loaded le ptr = case ptr of
   BCONPtrWord lit -> return lit
   BCONPtrLbl  sym -> do
@@ -92,7 +93,7 @@ lookupStaticPtr interp addr_of_label_string = do
     Nothing  -> linkFail "GHC.ByteCode.Linker: can't find label"
                   (unpackFS addr_of_label_string)
 
-lookupIE :: Interp -> PkgsLoaded -> ItblEnv -> Name -> IO (Ptr ())
+lookupIE :: Interp -> PkgsLoadedEnv -> ItblEnv -> Name -> IO (Ptr ())
 lookupIE interp pkgs_loaded ie con_nm =
   case lookupNameEnv ie con_nm of
     Just (_, ItblPtr a) -> return (fromRemotePtr (castRemotePtr a))
@@ -112,7 +113,7 @@ lookupIE interp pkgs_loaded ie con_nm =
                                        unpackFS sym_to_find2)
 
 -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
-lookupAddr :: Interp -> PkgsLoaded -> AddrEnv -> Name -> IO (Ptr ())
+lookupAddr :: Interp -> PkgsLoadedEnv -> AddrEnv -> Name -> IO (Ptr ())
 lookupAddr interp pkgs_loaded ae addr_nm = do
   case lookupNameEnv ae addr_nm of
     Just (_, AddrPtr ptr) -> return (fromRemotePtr ptr)
@@ -135,7 +136,7 @@ lookupPrimOp interp primop = do
 
 resolvePtr
   :: Interp
-  -> PkgsLoaded
+  -> PkgsLoadedEnv
   -> LinkerEnv
   -> NameEnv Int
   -> BCOPtr
@@ -166,8 +167,8 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
   BCOPtrBreakArray breakarray
     -> withForeignRef breakarray $ \ba -> return (ResolvedBCOPtrBreakArray ba)
 
-lookupHsSymbol :: Interp -> PkgsLoaded -> Name -> String -> IO (Maybe (Ptr ()))
-lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
+lookupHsSymbol :: Interp -> PkgsLoadedEnv -> Name -> String -> IO (Maybe (Ptr ()))
+lookupHsSymbol interp PkgsLoadedEnv {ple_pkgs_loaded = pkgs_loaded, ple_logger = logger} nm sym_suffix = do
   massertPpr (isExternalName nm) (ppr nm)
   let sym_to_find = nameToCLabel nm sym_suffix
       pkg_id = moduleUnitId $ nameModule nm
@@ -176,12 +177,20 @@ lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
       go (dll:dlls) = do
         mb_ptr <- lookupSymbolInDLL interp dll sym_to_find
         case mb_ptr of
-          Just ptr -> pure (Just ptr)
+          Just ptr -> do
+            log_resolution sym_to_find "hit"
+            pure (Just ptr)
           Nothing -> go dlls
-      go [] =
+      go [] = do
+        log_resolution sym_to_find "miss"
         lookupSymbol interp sym_to_find
 
   go loaded_dlls
+  where
+    log_resolution sym_to_find res =
+      debugTraceMsg logger 3 $
+        text "lookupHsSymbol: Cache" <+> text res <+> text "for" <+> ppr nm <+>
+        parens (ftext sym_to_find)
 
 linkFail :: String -> String -> IO a
 linkFail who what
