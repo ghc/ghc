@@ -1,0 +1,13 @@
+import Data.Time.Clock.System
+import System.IO
+import Data.Int
+start <- systemSeconds <$> getSystemTime
+writeFile "start-time" (show start)
+hPutStrLn stderr "--------------------- START"
+:load Main
+hPutStrLn stderr "--------------------- LOADED"
+main
+hPutStrLn stderr "--------------------- EXECUTED"
+end <- systemSeconds <$> getSystemTime
+start :: Int64 <- readIO =<< readFile "start-time"
+hPutStrLn stderr (show (end - start) ++ " seconds")

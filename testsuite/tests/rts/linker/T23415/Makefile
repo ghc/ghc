@@ -33,3 +33,11 @@ T23415a:
 		-v0 +RTS -Dl -RTS \
 		-fplugin=ReusePlugin \
 		-ghci-script Reuse.script
+
+.PHONY: T23415b
+T23415b:
+	./prepare-load.sh "$(TEST_HC)" " $(filter-out -rtsopts, $(TEST_HC_OPTS))" "$(GHC_PKG)" "$(dllext)" 30 100 1000
+
+.PHONY: T23415d
+T23415d: T23415b
+	"$(TEST_HC)" -package-db=db -fcache-loaded-library-units -v0 --interactive -ghci-script T23415.script

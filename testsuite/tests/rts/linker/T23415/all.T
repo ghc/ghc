@@ -1,7 +1,5 @@
 setTestOpts([
-  unless(arch('x86_64'), skip),
-  unless(opsys('linux'), skip),
-  unless(doing_ghci, skip),
+  # unless(doing_ghci, skip),
   unless(have_dynamic(),skip),
 ])
 
@@ -18,4 +16,21 @@ test('T23415a',
       req_rts_linker],
      makefile_test, ['T23415a'])
 
+test('T23415b',
+     [extra_files(['prepare-load.sh']),
+      pre_cmd('$MAKE T23415b'),
+      req_rts_linker,
+      # extra_hc_opts('-package-db=db -fno-cache-loaded-library-units -v3')],
+      extra_hc_opts('-package-db=db -fno-cache-loaded-library-units -v3')],
+     ghci_script, ['T23415b.script'])
 
+test('T23415c',
+     [extra_files(['prepare-load.sh']),
+      pre_cmd('$MAKE T23415b'),
+      req_rts_linker],
+     multimod_compile_and_run, ['Main', '-dynamic -package-db=db -O0'])
+
+test('T23415d',
+     [extra_files(['prepare-load.sh']),
+      req_rts_linker],
+     makefile_test, ['T23415d'])
