@@ -117,6 +117,7 @@ regUsageOfInstr platform instr = case instr of
   XORI dst src1 _          -> usage (regOp src1, regOp dst)
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
+  J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
   B_FAR _t                 -> usage ([], [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
@@ -248,6 +249,7 @@ patchRegsOfInstr instr env = case instr of
 
     -- 4. Branch Instructions --------------------------------------------------
     J t            -> J (patchTarget t)
+    J_TBL ids mbLbl t    -> J_TBL ids mbLbl (env t)
     B t            -> B (patchTarget t)
     B_FAR t            -> B_FAR t
     BL t rs ts     -> BL (patchTarget t) rs ts
@@ -296,6 +298,7 @@ isJumpishInstr :: Instr -> Bool
 isJumpishInstr instr = case instr of
   ANN _ i -> isJumpishInstr i
   J {} -> True
+  J_TBL {} -> True
   B {} -> True
   B_FAR {} -> True
   BL {} -> True
@@ -307,6 +310,7 @@ isJumpishInstr instr = case instr of
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = [id | Just id <- ids]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B_FAR t) = [t]
 jumpDestsOfInstr (BL t _ _) = [id | TBlock id <- [t]]
@@ -323,6 +327,7 @@ patchJumpInstr instr patchF =
   case instr of
     ANN d i -> ANN d (patchJumpInstr i patchF)
     J (TBlock bid) -> J (TBlock (patchF bid))
+    J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
     B (TBlock bid) -> B (TBlock (patchF bid))
     B_FAR bid -> B_FAR (patchF bid)
     BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
@@ -510,7 +515,8 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       insert_dealloc insn r = case insn of
         J _ -> dealloc ++ (insn : r)
-        ANN _ (J _) -> dealloc ++ (insn : r)
+        J_TBL {} -> dealloc ++ (insn : r)
+        ANN _ e -> insert_dealloc e r
         _other | jumpDestsOfInstr insn /= []
             -> patchJumpInstr insn retarget : r
         _other -> insn : r
@@ -659,6 +665,8 @@ data Instr
     -- Branching.
     -- TODO: Unused
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
+    -- | A `J` instruction with data for switch jump tables
+    | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
     -- | pseudo-op for far branch targets
     | B_FAR BlockId
@@ -721,6 +729,7 @@ instrCon i =
       LDRU{} -> "LDRU"
       CSET{} -> "CSET"
       J{} -> "J"
+      J_TBL{} -> "J_TBL"
       B{} -> "B"
       B_FAR{} -> "B_FAR"
       BL{} -> "BL"
