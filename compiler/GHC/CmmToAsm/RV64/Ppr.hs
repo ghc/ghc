@@ -531,6 +531,7 @@ pprInstr platform instr = case instr of
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t             -> pprInstr platform (B t)
+  J_TBL _ _ r     -> pprInstr platform (J (TReg r))
   -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
