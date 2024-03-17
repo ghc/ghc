@@ -6,3 +6,9 @@ instance
     Read b
   ) =>
   Read (a, b)
+
+class Foo (a :: Type {- Weird -})
+
+instance Eq Foo where
+  -- Weird
+  Foo == Foo = True
