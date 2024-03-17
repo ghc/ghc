@@ -943,11 +943,13 @@ checkTyVars pp_what equals_or_where tc tparms
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddEpAnn] -> [AddEpAnn] -> HsBndrVis GhcPs -> LHsType GhcPs
               -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
-    chkParens ops cps bvis (L l (HsParTy _ ty))
+    chkParens ops cps bvis (L l (HsParTy _ (L lt  ty)))
       = let
           (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
+          lcs = epAnnComments l
+          lt' = setCommentsEpAnn lt lcs
         in
-          chkParens (o:ops) (c:cps) bvis ty
+          chkParens (o:ops) (c:cps) bvis (L lt' ty)
     chkParens ops cps bvis ty = chk ops cps bvis ty
 
         -- Check that the name space is correct!
