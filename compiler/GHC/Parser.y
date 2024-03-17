@@ -1237,12 +1237,12 @@ topdecl_cs : topdecl {% commentsPA $1 }
 
 -----------------------------------------------------------------------------
 topdecl :: { LHsDecl GhcPs }
-        : cl_decl                               { sL1a $1 (TyClD noExtField (unLoc $1)) }
-        | ty_decl                               { sL1a $1 (TyClD noExtField (unLoc $1)) }
-        | standalone_kind_sig                   { sL1a $1 (KindSigD noExtField (unLoc $1)) }
-        | inst_decl                             { sL1a $1 (InstD noExtField (unLoc $1)) }
-        | stand_alone_deriving                  { sL1a $1 (DerivD noExtField (unLoc $1)) }
-        | role_annot                            { sL1a $1 (RoleAnnotD noExtField (unLoc $1)) }
+        : cl_decl                               { L (getLoc $1) (TyClD noExtField (unLoc $1)) }
+        | ty_decl                               { L (getLoc $1) (TyClD noExtField (unLoc $1)) }
+        | standalone_kind_sig                   { L (getLoc $1) (KindSigD noExtField (unLoc $1)) }
+        | inst_decl                             { L (getLoc $1) (InstD noExtField (unLoc $1)) }
+        | stand_alone_deriving                  { L (getLoc $1) (DerivD noExtField (unLoc $1)) }
+        | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
         | 'default' '(' comma_types0 ')'        {% amsA' (sLL $1 $>
                                                     (DefD noExtField (DefaultDecl [mj AnnDefault $1,mop $2,mcp $4] $3))) }
         | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((snd $ unLoc $2) (mj AnnForeign $1:(fst $ unLoc $2)))) }
