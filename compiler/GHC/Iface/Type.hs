@@ -95,6 +95,7 @@ import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
 import Data.Proxy
+import Control.Monad ((<$!>))
 
 {-
 ************************************************************************
@@ -246,7 +247,7 @@ instance Monoid IfaceAppArgs where
 -- We have to tag them in order to pretty print them
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
-                             , ifaceTyConInfo :: IfaceTyConInfo }
+                             , ifaceTyConInfo :: !IfaceTyConInfo }
     deriving (Eq, Ord)
 
 -- | The various types of TyCons which have special, built-in syntax.
@@ -2007,7 +2008,7 @@ instance Binary IfaceTyConSort where
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = mkIfaceTyConInfo <$> get bh <*> get bh
+   get bh = mkIfaceTyConInfo <$!> get bh <*> get bh
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
