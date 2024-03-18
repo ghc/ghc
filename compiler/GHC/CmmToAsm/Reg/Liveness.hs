@@ -468,7 +468,7 @@ slurpReloadCoalesce live
 
                 -- if we hit a jump, remember the current slotMap
                 | LiveInstr (Instr instr) _     <- li
-                , targets                       <- jumpDestsOfInstr instr
+                , targets                       <- jumpBlockDestsOfInstr instr
                 , not $ null targets
                 = do    mapM_   (accSlotMap slotMap) targets
                         return  (slotMap, Nothing)
@@ -760,7 +760,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
         sccs = stronglyConnCompG g2
 
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
-        getOutEdges instrs = concatMap jumpDestsOfInstr instrs
+        getOutEdges instrs = concatMap jumpBlockDestsOfInstr instrs
 
         -- This is truly ugly, but I don't see a good alternative.
         -- Digraph just has the wrong API.  We want to identify nodes
@@ -837,7 +837,7 @@ checkIsReverseDependent sccs'
 
         slurpJumpDestsOfBlock (BasicBlock _ instrs)
                 = unionManyUniqSets
-                $ map (mkUniqSet . jumpDestsOfInstr)
+                $ map (mkUniqSet . jumpBlockDestsOfInstr)
                         [ i | LiveInstr i _ <- instrs]
 
 
@@ -1047,7 +1047,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
 
             -- union in the live regs from all the jump destinations of this
             -- instruction.
-            targets      = jumpDestsOfInstr instr -- where we go from here
+            targets      = jumpBlockDestsOfInstr instr -- where we go from here
             not_a_branch = null targets
 
             targetLiveRegs target
