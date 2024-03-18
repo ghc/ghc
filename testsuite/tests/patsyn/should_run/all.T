@@ -17,3 +17,4 @@ test('T11224', normal, compile_and_run, ['-Wincomplete-patterns -Woverlapping-pa
 test('T13688', req_th, multimod_compile_and_run, ['T13688', '-v0'])
 test('T14228', normal, compile_and_run, [''])
 test('records-poly-update', normal, compile_and_run, [''])
+test('T24552', normal, compile_and_run, [''])

@@ -212,7 +212,7 @@ mk_failable_expr doFlav pat@(L loc _) expr fail_op =
 mk_fail_block :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
 mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
-      return $ HsLam noAnn LamSingle $ mkMatchGroup (doExpansionOrigin doFlav)     -- \
+      return $ HsLam noAnn LamCases $ mkMatchGroup (doExpansionOrigin doFlav)      -- \
                 (wrapGenSpan [ genHsCaseAltDoExp doFlav (mkVisPat pat) e           --  pat -> expr
                              , fail_alt_case dflags pat fail_op      --  _   -> fail "fail pattern"
                              ])
@@ -356,25 +356,42 @@ The `fail`-block wrapping is done by `GHC.Tc.Gen.Do.mk_failable_expr`.
   of do-notation is that if the pattern match fails, we fail in the monad, *not* just crash
   at runtime.
 
-* That call of `fail` will (rightly) automatically generate a `MonadFail` constraint. So if the
-  pattern is irrefuable, we don't want to generate that `fail` alternative, else we'll generate
-  a `MonadFail` constraint that isn't needed.
+* According to the language specification, when the pattern is irrefutable,
+  we should not add the `fail` alternative. This is important because
+  the occurrence of `fail` means that the typechecker will generate a `MonadFail` constraint,
+  and irrefutable patterns shouldn't need a fail alternative.
 
-* _Wrinkle 1_: For pattern synonyms, we always wrap it with a `fail`-block.
-  When the pattern is irrefutable, we do not add the fail block.
-  This is important because the occurrence of `fail` means that the typechecker
-  will generate a `MonadFail` constraint, and the language spec says that
-  we should not do that for irrefutable patterns.
+* _Wrinkel 1_: Note that pattern synonyms count as refutable during type checking,
+  (see `GHC.Tc.Gen.Pat.isIrrefutableHsPatRnTcM`). They will hence generate a
+  `MonadFail` constraint and they will always be wrapped in a `fail`able-block.
 
-  Note that pattern synonyms count as refutable (see `isIrrefutableHsPat`), and hence will generate
-  a `MonadFail` constraint, also, we would get a pattern match checker's redundant pattern warnings.
-  because after desugaring, it is marked as irrefutable!  To avoid such
-  spurious warnings and type checker errors, we filter out those patterns that appear
-  in a do expansion generated match in `HsToCore.Match.matchWrapper`. (see testcase Typeable1.hs)
+  Consider a patten synonym declaration (testcase T24552):
+
+             pattern MyJust :: a -> Maybe a
+             pattern MyJust x <- Just x where MyJust = Just
+
+  and a `do`-block with the following bind and return statement
+
+             do { MyJust x <- [MyNothing, MyJust ()]
+                ; return x }
+
+  The `do`-expansion will generate the expansion
+
+            (>>=) ([MyNothing, MyJust ()])
+                  (\case MyJust x -> return x                     -- (1)
+                         _        -> fail "failable pattern .. "  -- (2)
+                  )
+
+  This code (specifically the `match` spanning lines (1) and (2)) is a compiler generated code;
+  the associated `Origin` in tagged `Generated`
+  The alternative statements will thus be ignored by the pattern match check (c.f. `isMatchContextPmChecked`).
+  This ensures we do not generate spurious redundant-pattern-match warnings due to the line (2) above.
+  See Note [Generated code and pattern-match checking]
+  See Note [Long-distance information in matchWrapper]
 
 * _Wrinkle 2_: The call to `fail` will give rise to a `MonadFail` constraint. What `CtOrigin` do we
-  attach to that constraint?  It should be a good one, because it'll show up in error
-  messages when the `MonadFail` constraint can't be solved.  Ideally, it should identify the
+  attach to that constraint?  When the `MonadFail` constraint can't be solved, it'll show up in error
+  messages and it needs to be a good location.  Ideally, it should identify the
   pattern `p`.  Hence, we wrap the `fail` alternative expression with a `ExpandedPat`
   that tags the fail expression with the failable pattern. (See testcase MonadFailErrors.hs)
 
