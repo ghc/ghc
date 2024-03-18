@@ -921,10 +921,10 @@ pprIfaceTyConBinders suppress_sig = sep . map go
         ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 
 instance Binary IfaceBndr where
-    put_ bh (IfaceIdBndr aa) = do
+    putNoStack_ bh (IfaceIdBndr aa) = do
             putByte bh 0
             put_ bh aa
-    put_ bh (IfaceTvBndr ab) = do
+    putNoStack_ bh (IfaceTvBndr ab) = do
             putByte bh 1
             put_ bh ab
     get bh = do
@@ -936,9 +936,9 @@ instance Binary IfaceBndr where
                       return (IfaceTvBndr ab)
 
 instance Binary IfaceOneShot where
-    put_ bh IfaceNoOneShot =
+    putNoStack_ bh IfaceNoOneShot =
             putByte bh 0
-    put_ bh IfaceOneShot =
+    putNoStack_ bh IfaceOneShot =
             putByte bh 1
     get bh = do
             h <- getByte bh
@@ -1976,7 +1976,7 @@ instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh tyCon = case findUserDataCache Proxy bh of
+   putNoStack_ bh tyCon = case findUserDataCache Proxy bh of
     tbl -> putEntry tbl bh tyCon
 
    get bh = case findUserDataCache Proxy bh of
@@ -1992,10 +1992,10 @@ getIfaceTyCon bh = do
   return (IfaceTyCon n i)
 
 instance Binary IfaceTyConSort where
-   put_ bh IfaceNormalTyCon             = putByte bh 0
-   put_ bh (IfaceTupleTyCon arity sort) = putByte bh 1 >> put_ bh arity >> put_ bh sort
-   put_ bh (IfaceSumTyCon arity)        = putByte bh 2 >> put_ bh arity
-   put_ bh IfaceEqualityTyCon           = putByte bh 3
+   putNoStack_ bh IfaceNormalTyCon             = putByte bh 0
+   putNoStack_ bh (IfaceTupleTyCon arity sort) = putByte bh 1 >> put_ bh arity >> put_ bh sort
+   putNoStack_ bh (IfaceSumTyCon arity)        = putByte bh 2 >> put_ bh arity
+   putNoStack_ bh IfaceEqualityTyCon           = putByte bh 3
 
    get bh = do
        n <- getByte bh
@@ -2006,7 +2006,7 @@ instance Binary IfaceTyConSort where
          _ -> return IfaceEqualityTyCon
 
 instance Binary IfaceTyConInfo where
-   put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
+   putNoStack_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
    get bh = mkIfaceTyConInfo <$!> get bh <*> get bh
 
@@ -2014,9 +2014,9 @@ instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
 
 instance Binary IfaceTyLit where
-  put_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
-  put_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
-  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
+  putNoStack_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
+  putNoStack_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
+  putNoStack_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
 
   get bh =
     do tag <- getByte bh
@@ -2030,7 +2030,7 @@ instance Binary IfaceTyLit where
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
-  put_ bh tk =
+  putNoStack_ bh tk =
     case tk of
       IA_Arg t a ts -> putByte bh 0 >> put_ bh t >> put_ bh a >> put_ bh ts
       IA_Nil        -> putByte bh 1
@@ -2099,35 +2099,35 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    put_ _ (IfaceFreeTyVar tv)
+    putNoStack_ _ (IfaceFreeTyVar tv)
        = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
 
-    put_ bh (IfaceForAllTy aa ab) = do
+    putNoStack_ bh (IfaceForAllTy aa ab) = do
             putByte bh 0
             put_ bh aa
             put_ bh ab
-    put_ bh (IfaceTyVar ad) = do
+    putNoStack_ bh (IfaceTyVar ad) = do
             putByte bh 1
             put_ bh ad
-    put_ bh (IfaceAppTy ae af) = do
+    putNoStack_ bh (IfaceAppTy ae af) = do
             putByte bh 2
             put_ bh ae
             put_ bh af
-    put_ bh (IfaceFunTy af aw ag ah) = do
+    putNoStack_ bh (IfaceFunTy af aw ag ah) = do
             putByte bh 3
             put_ bh af
             put_ bh aw
             put_ bh ag
             put_ bh ah
-    put_ bh (IfaceTyConApp tc tys)
+    putNoStack_ bh (IfaceTyConApp tc tys)
       = do { putByte bh 5; put_ bh tc; put_ bh tys }
-    put_ bh (IfaceCastTy a b)
+    putNoStack_ bh (IfaceCastTy a b)
       = do { putByte bh 6; put_ bh a; put_ bh b }
-    put_ bh (IfaceCoercionTy a)
+    putNoStack_ bh (IfaceCoercionTy a)
       = do { putByte bh 7; put_ bh a }
-    put_ bh (IfaceTupleTy s i tys)
+    putNoStack_ bh (IfaceTupleTy s i tys)
       = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
-    put_ bh (IfaceLitTy n)
+    putNoStack_ bh (IfaceLitTy n)
       = do { putByte bh 9; put_ bh n }
 
     get bh = do
@@ -2159,9 +2159,9 @@ instance Binary IfaceType where
                        return (IfaceLitTy n)
 
 instance Binary IfaceMCoercion where
-  put_ bh IfaceMRefl =
+  putNoStack_ bh IfaceMRefl =
           putByte bh 1
-  put_ bh (IfaceMCo co) = do
+  putNoStack_ bh (IfaceMCo co) = do
           putByte bh 2
           put_ bh co
 
@@ -2174,82 +2174,82 @@ instance Binary IfaceMCoercion where
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
 instance Binary IfaceCoercion where
-  put_ bh (IfaceReflCo a) = do
+  putNoStack_ bh (IfaceReflCo a) = do
           putByte bh 1
           put_ bh a
-  put_ bh (IfaceGReflCo a b c) = do
+  putNoStack_ bh (IfaceGReflCo a b c) = do
           putByte bh 2
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceFunCo a w b c) = do
+  putNoStack_ bh (IfaceFunCo a w b c) = do
           putByte bh 3
           put_ bh a
           put_ bh w
           put_ bh b
           put_ bh c
-  put_ bh (IfaceTyConAppCo a b c) = do
+  putNoStack_ bh (IfaceTyConAppCo a b c) = do
           putByte bh 4
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceAppCo a b) = do
+  putNoStack_ bh (IfaceAppCo a b) = do
           putByte bh 5
           put_ bh a
           put_ bh b
-  put_ bh (IfaceForAllCo a visL visR b c) = do
+  putNoStack_ bh (IfaceForAllCo a visL visR b c) = do
           putByte bh 6
           put_ bh a
           put_ bh visL
           put_ bh visR
           put_ bh b
           put_ bh c
-  put_ bh (IfaceCoVarCo a) = do
+  putNoStack_ bh (IfaceCoVarCo a) = do
           putByte bh 7
           put_ bh a
-  put_ bh (IfaceAxiomInstCo a b c) = do
+  putNoStack_ bh (IfaceAxiomInstCo a b c) = do
           putByte bh 8
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceUnivCo a b c d) = do
+  putNoStack_ bh (IfaceUnivCo a b c d) = do
           putByte bh 9
           put_ bh a
           put_ bh b
           put_ bh c
           put_ bh d
-  put_ bh (IfaceSymCo a) = do
+  putNoStack_ bh (IfaceSymCo a) = do
           putByte bh 10
           put_ bh a
-  put_ bh (IfaceTransCo a b) = do
+  putNoStack_ bh (IfaceTransCo a b) = do
           putByte bh 11
           put_ bh a
           put_ bh b
-  put_ bh (IfaceSelCo a b) = do
+  putNoStack_ bh (IfaceSelCo a b) = do
           putByte bh 12
           put_ bh a
           put_ bh b
-  put_ bh (IfaceLRCo a b) = do
+  putNoStack_ bh (IfaceLRCo a b) = do
           putByte bh 13
           put_ bh a
           put_ bh b
-  put_ bh (IfaceInstCo a b) = do
+  putNoStack_ bh (IfaceInstCo a b) = do
           putByte bh 14
           put_ bh a
           put_ bh b
-  put_ bh (IfaceKindCo a) = do
+  putNoStack_ bh (IfaceKindCo a) = do
           putByte bh 15
           put_ bh a
-  put_ bh (IfaceSubCo a) = do
+  putNoStack_ bh (IfaceSubCo a) = do
           putByte bh 16
           put_ bh a
-  put_ bh (IfaceAxiomRuleCo a b) = do
+  putNoStack_ bh (IfaceAxiomRuleCo a b) = do
           putByte bh 17
           put_ bh a
           put_ bh b
-  put_ _ (IfaceFreeCoVar cv)
+  putNoStack_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
-  put_ _  (IfaceHoleCo cv)
+  putNoStack_ _  (IfaceHoleCo cv)
        = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
           -- See Note [Holes in IfaceCoercion]
 
@@ -2315,13 +2315,13 @@ instance Binary IfaceCoercion where
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
-  put_ bh (IfacePhantomProv a) = do
+  putNoStack_ bh (IfacePhantomProv a) = do
           putByte bh 1
           put_ bh a
-  put_ bh (IfaceProofIrrelProv a) = do
+  putNoStack_ bh (IfaceProofIrrelProv a) = do
           putByte bh 2
           put_ bh a
-  put_ bh (IfacePluginProv a) = do
+  putNoStack_ bh (IfacePluginProv a) = do
           putByte bh 3
           put_ bh a
 
@@ -2338,8 +2338,8 @@ instance Binary IfaceUnivCoProv where
 
 
 instance Binary (DefMethSpec IfaceType) where
-    put_ bh VanillaDM     = putByte bh 0
-    put_ bh (GenericDM t) = putByte bh 1 >> put_ bh t
+    putNoStack_ bh VanillaDM     = putByte bh 0
+    putNoStack_ bh (GenericDM t) = putByte bh 1 >> put_ bh t
     get bh = do
             h <- getByte bh
             case h of

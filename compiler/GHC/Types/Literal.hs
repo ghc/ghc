@@ -207,7 +207,7 @@ litNumBitSize platform nt = case nt of
   LitNumWord64  -> Just 64
 
 instance Binary LitNumType where
-   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
+   putNoStack_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
    get bh = do
       h <- getByte bh
       return (toEnum (fromIntegral h))
@@ -254,21 +254,21 @@ for more details.
 -}
 
 instance Binary Literal where
-    put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
-    put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
-    put_ bh (LitNullAddr)    = putByte bh 2
-    put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
-    put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
-    put_ bh (LitLabel aj mb fod)
+    putNoStack_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
+    putNoStack_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
+    putNoStack_ bh (LitNullAddr)    = putByte bh 2
+    putNoStack_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
+    putNoStack_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
+    putNoStack_ bh (LitLabel aj mb fod)
         = do putByte bh 5
              put_ bh aj
              put_ bh mb
              put_ bh fod
-    put_ bh (LitNumber nt i)
+    putNoStack_ bh (LitNumber nt i)
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ _ lit@(LitRubbish {}) = pprPanic "Binary LitRubbish" (ppr lit)
+    putNoStack_ _ lit@(LitRubbish {}) = pprPanic "Binary LitRubbish" (ppr lit)
      -- We use IfaceLitRubbish; see Note [Rubbish literals], item (6)
 
     get bh = do

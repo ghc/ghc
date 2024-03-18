@@ -979,11 +979,11 @@ instance Outputable FunSel where
   ppr SelRes  = text "res"
 
 instance Binary CoSel where
-   put_ bh (SelTyCon n r)   = do { putByte bh 0; put_ bh n; put_ bh r }
-   put_ bh SelForAll        = putByte bh 1
-   put_ bh (SelFun SelMult) = putByte bh 2
-   put_ bh (SelFun SelArg)  = putByte bh 3
-   put_ bh (SelFun SelRes)  = putByte bh 4
+   putNoStack_ bh (SelTyCon n r)   = do { putByte bh 0; put_ bh n; put_ bh r }
+   putNoStack_ bh SelForAll        = putByte bh 1
+   putNoStack_ bh (SelFun SelMult) = putByte bh 2
+   putNoStack_ bh (SelFun SelArg)  = putByte bh 3
+   putNoStack_ bh (SelFun SelRes)  = putByte bh 4
 
    get bh = do { h <- getByte bh
                ; case h of

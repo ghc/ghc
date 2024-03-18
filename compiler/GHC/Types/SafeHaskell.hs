@@ -82,5 +82,5 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_SafeInferred)  = text "safe-inferred"
 
 instance Binary IfaceTrustInfo where
-    put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
+    putNoStack_ bh iftrust = putByte bh $ trustInfoToNum iftrust
     get bh = getByte bh >>= (return . numToTrustInfo)

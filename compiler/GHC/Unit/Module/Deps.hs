@@ -171,7 +171,8 @@ dep_finsts_update deps f = do
 
 
 instance Binary Dependencies where
-    put_ bh deps = do put_ bh (dep_direct_mods deps)
+    putNoStack_ bh deps =
+                   do put_ bh (dep_direct_mods deps)
                       put_ bh (dep_direct_pkgs deps)
                       put_ bh (dep_plugin_pkgs deps)
                       put_ bh (dep_trusted_pkgs deps)
@@ -327,13 +328,13 @@ data Usage
         -- depend on their export lists
 
 instance Binary Usage where
-    put_ bh usg@UsagePackageModule{} = do
+    putNoStack_ bh usg@UsagePackageModule{} = do
         putByte bh 0
         put_ bh (usg_mod usg)
         put_ bh (usg_mod_hash usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageHomeModule{} = do
+    putNoStack_ bh usg@UsageHomeModule{} = do
         putByte bh 1
         put_ bh (usg_mod_name usg)
         put_ bh (usg_unit_id  usg)
@@ -342,18 +343,18 @@ instance Binary Usage where
         put_ bh (usg_entities usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageFile{} = do
+    putNoStack_ bh usg@UsageFile{} = do
         putByte bh 2
         put_ bh (usg_file_path usg)
         put_ bh (usg_file_hash usg)
         put_ bh (usg_file_label usg)
 
-    put_ bh usg@UsageMergedRequirement{} = do
+    putNoStack_ bh usg@UsageMergedRequirement{} = do
         putByte bh 3
         put_ bh (usg_mod      usg)
         put_ bh (usg_mod_hash usg)
 
-    put_ bh usg@UsageHomeModuleInterface{} = do
+    putNoStack_ bh usg@UsageHomeModuleInterface{} = do
         putByte bh 4
         put_ bh (usg_mod_name usg)
         put_ bh (usg_unit_id  usg)

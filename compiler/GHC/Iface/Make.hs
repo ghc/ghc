@@ -323,7 +323,7 @@ mkIface_ hsc_env
           mi_fixities    = fixities,
           mi_warns       = warns,
           mi_anns        = annotations,
-          mi_globals     = rdrs,
+          mi_globals     = Nothing,
           mi_used_th     = used_th,
           mi_decls       = decls,
           mi_extra_decls = extra_decls,

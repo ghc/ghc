@@ -41,9 +41,9 @@ instance B.Binary NamePattern where
       1 -> PWildcard <$> B.get bh
       2 -> pure PEnd
       _ -> panic "Binary(NamePattern): Invalid tag"
-  put_ bh (PChar x y) = B.put_ bh (0 :: Word8) >> B.put_ bh x >> B.put_ bh y
-  put_ bh (PWildcard x) = B.put_ bh (1 :: Word8) >> B.put_ bh x
-  put_ bh PEnd = B.put_ bh (2 :: Word8)
+  putNoStack_ bh (PChar x y) = B.put_ bh (0 :: Word8) >> B.put_ bh x >> B.put_ bh y
+  putNoStack_ bh (PWildcard x) = B.put_ bh (1 :: Word8) >> B.put_ bh x
+  putNoStack_ bh PEnd = B.put_ bh (2 :: Word8)
 
 occNameMatches :: NamePattern -> OccName -> Bool
 occNameMatches pat = go pat . occNameString
@@ -84,7 +84,7 @@ instance Outputable CallerCcFilter where
 
 instance B.Binary CallerCcFilter where
   get bh = CallerCcFilter <$> B.get bh <*> B.get bh
-  put_ bh (CallerCcFilter x y) = B.put_ bh x >> B.put_ bh y
+  putNoStack_ bh (CallerCcFilter x y) = B.put_ bh x >> B.put_ bh y
 
 parseCallerCcFilter :: String -> Either String CallerCcFilter
 parseCallerCcFilter inp =

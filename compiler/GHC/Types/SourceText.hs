@@ -116,8 +116,8 @@ instance NFData SourceText where
         NoSourceText -> ()
 
 instance Binary SourceText where
-  put_ bh NoSourceText = putByte bh 0
-  put_ bh (SourceText s) = do
+  putNoStack_ bh NoSourceText = putByte bh 0
+  putNoStack_ bh (SourceText s) = do
         putByte bh 1
         put_ bh s
 

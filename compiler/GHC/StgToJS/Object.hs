@@ -323,7 +323,7 @@ putObject bh mod_name deps os = do
     -- forward put the index
     forwardPut_ bh_fs (put_ bh_fs) $ do
       idx <- forM os $ \o -> do
-        p <- tellBin bh_fs
+        p <- tellBin @() bh_fs
         -- write units without their symbols
         putObjBlock bh_fs o
         -- return symbols and offset to store in the index
@@ -433,11 +433,11 @@ fromI32 = fromIntegral
 --------------------------------------------------------------------------------
 
 instance Binary IndexEntry where
-  put_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
+  putNoStack_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
   get bh = IndexEntry <$> get bh <*> get bh
 
 instance Binary BlockInfo where
-  put_ bh (BlockInfo m r e b) = do
+  putNoStack_ bh (BlockInfo m r e b) = do
       put_ bh m
       put_ bh (map toI32 $ IS.toList r)
       put_ bh (map (\(x,y) -> (x, toI32 y)) $ M.toList e)
@@ -448,35 +448,35 @@ instance Binary BlockInfo where
              <*> ((\xs -> listArray (0, length xs - 1) xs) <$> get bh)
 
 instance Binary BlockDeps where
-  put_ bh (BlockDeps bbd bfd) = put_ bh bbd >> put_ bh bfd
+  putNoStack_ bh (BlockDeps bbd bfd) = put_ bh bbd >> put_ bh bfd
   get bh = BlockDeps <$> get bh <*> get bh
 
 instance Binary ForeignJSRef where
-  put_ bh (ForeignJSRef span pat safety cconv arg_tys res_ty) =
+  putNoStack_ bh (ForeignJSRef span pat safety cconv arg_tys res_ty) =
     put_ bh span >> put_ bh pat >> putEnum bh safety >> putEnum bh cconv >> put_ bh arg_tys >> put_ bh res_ty
   get bh = ForeignJSRef <$> get bh <*> get bh <*> getEnum bh <*> getEnum bh <*> get bh <*> get bh
 
 instance Binary ExpFun where
-  put_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res
+  putNoStack_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res
   get bh                        = ExpFun <$> get bh <*> get bh <*> get bh
 
 instance Binary Sat.JStat where
-  put_ bh (Sat.DeclStat i e)       = putByte bh 1  >> put_ bh i >> put_ bh e
-  put_ bh (Sat.ReturnStat e)       = putByte bh 2  >> put_ bh e
-  put_ bh (Sat.IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
-  put_ bh (Sat.WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
-  put_ bh (Sat.ForStat is c s bd)  = putByte bh 5 >> put_ bh is  >> put_ bh c >> put_ bh s >> put_ bh bd
-  put_ bh (Sat.ForInStat b i e s)  = putByte bh 6  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
-  put_ bh (Sat.SwitchStat e ss s)  = putByte bh 7  >> put_ bh e  >> put_ bh ss >> put_ bh s
-  put_ bh (Sat.TryStat s1 i s2 s3) = putByte bh 8  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
-  put_ bh (Sat.BlockStat xs)       = putByte bh 9  >> put_ bh xs
-  put_ bh (Sat.ApplStat e es)      = putByte bh 10 >> put_ bh e  >> put_ bh es
-  put_ bh (Sat.UOpStat o e)        = putByte bh 11 >> put_ bh o  >> put_ bh e
-  put_ bh (Sat.AssignStat e1 op e2) = putByte bh 12 >> put_ bh e1 >> put_ bh op >> put_ bh e2
-  put_ bh (Sat.LabelStat l s)      = putByte bh 13 >> put_ bh l  >> put_ bh s
-  put_ bh (Sat.BreakStat ml)       = putByte bh 14 >> put_ bh ml
-  put_ bh (Sat.ContinueStat ml)    = putByte bh 15 >> put_ bh ml
-  put_ bh (Sat.FuncStat i is b)    = putByte bh 16 >> put_ bh i >> put_ bh is >> put_ bh b
+  putNoStack_ bh (Sat.DeclStat i e)       = putByte bh 1  >> put_ bh i >> put_ bh e
+  putNoStack_ bh (Sat.ReturnStat e)       = putByte bh 2  >> put_ bh e
+  putNoStack_ bh (Sat.IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
+  putNoStack_ bh (Sat.WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
+  putNoStack_ bh (Sat.ForStat is c s bd)  = putByte bh 5 >> put_ bh is  >> put_ bh c >> put_ bh s >> put_ bh bd
+  putNoStack_ bh (Sat.ForInStat b i e s)  = putByte bh 6  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
+  putNoStack_ bh (Sat.SwitchStat e ss s)  = putByte bh 7  >> put_ bh e  >> put_ bh ss >> put_ bh s
+  putNoStack_ bh (Sat.TryStat s1 i s2 s3) = putByte bh 8  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
+  putNoStack_ bh (Sat.BlockStat xs)       = putByte bh 9  >> put_ bh xs
+  putNoStack_ bh (Sat.ApplStat e es)      = putByte bh 10 >> put_ bh e  >> put_ bh es
+  putNoStack_ bh (Sat.UOpStat o e)        = putByte bh 11 >> put_ bh o  >> put_ bh e
+  putNoStack_ bh (Sat.AssignStat e1 op e2) = putByte bh 12 >> put_ bh e1 >> put_ bh op >> put_ bh e2
+  putNoStack_ bh (Sat.LabelStat l s)      = putByte bh 13 >> put_ bh l  >> put_ bh s
+  putNoStack_ bh (Sat.BreakStat ml)       = putByte bh 14 >> put_ bh ml
+  putNoStack_ bh (Sat.ContinueStat ml)    = putByte bh 15 >> put_ bh ml
+  putNoStack_ bh (Sat.FuncStat i is b)    = putByte bh 16 >> put_ bh i >> put_ bh is >> put_ bh b
   get bh = getByte bh >>= \case
     1  -> Sat.DeclStat     <$> get bh <*> get bh
     2  -> Sat.ReturnStat   <$> get bh
@@ -498,13 +498,13 @@ instance Binary Sat.JStat where
 
 
 instance Binary Sat.JExpr where
-  put_ bh (Sat.ValExpr v)          = putByte bh 1 >> put_ bh v
-  put_ bh (Sat.SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
-  put_ bh (Sat.IdxExpr e1 e2)      = putByte bh 3 >> put_ bh e1 >> put_ bh e2
-  put_ bh (Sat.InfixExpr o e1 e2)  = putByte bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
-  put_ bh (Sat.UOpExpr o e)        = putByte bh 5 >> put_ bh o  >> put_ bh e
-  put_ bh (Sat.IfExpr e1 e2 e3)    = putByte bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
-  put_ bh (Sat.ApplExpr e es)      = putByte bh 7 >> put_ bh e  >> put_ bh es
+  putNoStack_ bh (Sat.ValExpr v)          = putByte bh 1 >> put_ bh v
+  putNoStack_ bh (Sat.SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
+  putNoStack_ bh (Sat.IdxExpr e1 e2)      = putByte bh 3 >> put_ bh e1 >> put_ bh e2
+  putNoStack_ bh (Sat.InfixExpr o e1 e2)  = putByte bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
+  putNoStack_ bh (Sat.UOpExpr o e)        = putByte bh 5 >> put_ bh o  >> put_ bh e
+  putNoStack_ bh (Sat.IfExpr e1 e2 e3)    = putByte bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
+  putNoStack_ bh (Sat.ApplExpr e es)      = putByte bh 7 >> put_ bh e  >> put_ bh es
   get bh = getByte bh >>= \case
     1 -> Sat.ValExpr   <$> get bh
     2 -> Sat.SelExpr   <$> get bh <*> get bh
@@ -517,15 +517,15 @@ instance Binary Sat.JExpr where
 
 
 instance Binary Sat.JVal where
-  put_ bh (Sat.JVar i)      = putByte bh 1 >> put_ bh i
-  put_ bh (Sat.JList es)    = putByte bh 2 >> put_ bh es
-  put_ bh (Sat.JDouble d)   = putByte bh 3 >> put_ bh d
-  put_ bh (Sat.JInt i)      = putByte bh 4 >> put_ bh i
-  put_ bh (Sat.JStr xs)     = putByte bh 5 >> put_ bh xs
-  put_ bh (Sat.JRegEx xs)   = putByte bh 6 >> put_ bh xs
-  put_ bh (Sat.JBool b)     = putByte bh 7 >> put_ bh b
-  put_ bh (Sat.JHash m)     = putByte bh 8 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m)
-  put_ bh (Sat.JFunc is s)  = putByte bh 9 >> put_ bh is >> put_ bh s
+  putNoStack_ bh (Sat.JVar i)      = putByte bh 1 >> put_ bh i
+  putNoStack_ bh (Sat.JList es)    = putByte bh 2 >> put_ bh es
+  putNoStack_ bh (Sat.JDouble d)   = putByte bh 3 >> put_ bh d
+  putNoStack_ bh (Sat.JInt i)      = putByte bh 4 >> put_ bh i
+  putNoStack_ bh (Sat.JStr xs)     = putByte bh 5 >> put_ bh xs
+  putNoStack_ bh (Sat.JRegEx xs)   = putByte bh 6 >> put_ bh xs
+  putNoStack_ bh (Sat.JBool b)     = putByte bh 7 >> put_ bh b
+  putNoStack_ bh (Sat.JHash m)     = putByte bh 8 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m)
+  putNoStack_ bh (Sat.JFunc is s)  = putByte bh 9 >> put_ bh is >> put_ bh s
   get bh = getByte bh >>= \case
     1 -> Sat.JVar    <$> get bh
     2 -> Sat.JList   <$> get bh
@@ -539,47 +539,47 @@ instance Binary Sat.JVal where
     n -> error ("Binary get bh Sat.JVal: invalid tag: " ++ show n)
 
 instance Binary Ident where
-  put_ bh (identFS -> xs) = put_ bh xs
+  putNoStack_ bh (identFS -> xs) = put_ bh xs
   get  bh                = global <$> get bh
 
 instance Binary ClosureInfo where
-  put_ bh (ClosureInfo v regs name layo typ static) = do
+  putNoStack_ bh (ClosureInfo v regs name layo typ static) = do
     put_ bh v >> put_ bh regs >> put_ bh name >> put_ bh layo >> put_ bh typ >> put_ bh static
   get bh = ClosureInfo <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
 instance Binary JSFFIType where
-  put_ bh = putEnum bh
+  putNoStack_ bh = putEnum bh
   get bh = getEnum bh
 
 instance Binary JSRep where
-  put_ bh = putEnum bh
+  putNoStack_ bh = putEnum bh
   get bh = getEnum bh
 
 instance Binary CIRegs where
-  put_ bh CIRegsUnknown       = putByte bh 1
-  put_ bh (CIRegs skip types) = putByte bh 2 >> put_ bh skip >> put_ bh types
+  putNoStack_ bh CIRegsUnknown       = putByte bh 1
+  putNoStack_ bh (CIRegs skip types) = putByte bh 2 >> put_ bh skip >> put_ bh types
   get bh = getByte bh >>= \case
     1 -> pure CIRegsUnknown
     2 -> CIRegs <$> get bh <*> get bh
     n -> error ("Binary get bh CIRegs: invalid tag: " ++ show n)
 
 instance Binary Sat.Op where
-  put_ bh = putEnum bh
+  putNoStack_ bh = putEnum bh
   get bh = getEnum bh
 
 instance Binary Sat.UOp where
-  put_ bh = putEnum bh
+  putNoStack_ bh = putEnum bh
   get bh = getEnum bh
 
 instance Binary Sat.AOp where
-  put_ bh = putEnum bh
+  putNoStack_ bh = putEnum bh
   get bh = getEnum bh
 
 -- 16 bit sizes should be enough...
 instance Binary CILayout where
-  put_ bh CILayoutVariable           = putByte bh 1
-  put_ bh (CILayoutUnknown size)     = putByte bh 2 >> put_ bh size
-  put_ bh (CILayoutFixed size types) = putByte bh 3 >> put_ bh size >> put_ bh types
+  putNoStack_ bh CILayoutVariable           = putByte bh 1
+  putNoStack_ bh (CILayoutUnknown size)     = putByte bh 2 >> put_ bh size
+  putNoStack_ bh (CILayoutFixed size types) = putByte bh 3 >> put_ bh size >> put_ bh types
   get bh = getByte bh >>= \case
     1 -> pure CILayoutVariable
     2 -> CILayoutUnknown <$> get bh
@@ -587,18 +587,18 @@ instance Binary CILayout where
     n -> error ("Binary get bh CILayout: invalid tag: " ++ show n)
 
 instance Binary CIStatic where
-  put_ bh (CIStaticRefs refs) = putByte bh 1 >> put_ bh refs
+  putNoStack_ bh (CIStaticRefs refs) = putByte bh 1 >> put_ bh refs
   get bh = getByte bh >>= \case
     1 -> CIStaticRefs <$> get bh
     n -> error ("Binary get bh CIStatic: invalid tag: " ++ show n)
 
 instance Binary CIType where
-  put_ bh (CIFun arity regs) = putByte bh 1 >> put_ bh arity >> put_ bh regs
-  put_ bh CIThunk            = putByte bh 2
-  put_ bh (CICon conTag)     = putByte bh 3 >> put_ bh conTag
-  put_ bh CIPap              = putByte bh 4
-  put_ bh CIBlackhole        = putByte bh 5
-  put_ bh CIStackFrame       = putByte bh 6
+  putNoStack_ bh (CIFun arity regs) = putByte bh 1 >> put_ bh arity >> put_ bh regs
+  putNoStack_ bh CIThunk            = putByte bh 2
+  putNoStack_ bh (CICon conTag)     = putByte bh 3 >> put_ bh conTag
+  putNoStack_ bh CIPap              = putByte bh 4
+  putNoStack_ bh CIBlackhole        = putByte bh 5
+  putNoStack_ bh CIStackFrame       = putByte bh 6
   get bh = getByte bh >>= \case
     1 -> CIFun <$> get bh <*> get bh
     2 -> pure CIThunk
@@ -609,19 +609,19 @@ instance Binary CIType where
     n -> error ("Binary get bh CIType: invalid tag: " ++ show n)
 
 instance Binary ExportedFun where
-  put_ bh (ExportedFun modu symb) = put_ bh modu >> put_ bh symb
+  putNoStack_ bh (ExportedFun modu symb) = put_ bh modu >> put_ bh symb
   get bh = ExportedFun <$> get bh <*> get bh
 
 instance Binary StaticInfo where
-  put_ bh (StaticInfo ident val cc) = put_ bh ident >> put_ bh val >> put_ bh cc
+  putNoStack_ bh (StaticInfo ident val cc) = put_ bh ident >> put_ bh val >> put_ bh cc
   get bh = StaticInfo <$> get bh <*> get bh <*> get bh
 
 instance Binary StaticVal where
-  put_ bh (StaticFun f args)   = putByte bh 1 >> put_ bh f  >> put_ bh args
-  put_ bh (StaticThunk t)      = putByte bh 2 >> put_ bh t
-  put_ bh (StaticUnboxed u)    = putByte bh 3 >> put_ bh u
-  put_ bh (StaticData dc args) = putByte bh 4 >> put_ bh dc >> put_ bh args
-  put_ bh (StaticList xs t)    = putByte bh 5 >> put_ bh xs >> put_ bh t
+  putNoStack_ bh (StaticFun f args)   = putByte bh 1 >> put_ bh f  >> put_ bh args
+  putNoStack_ bh (StaticThunk t)      = putByte bh 2 >> put_ bh t
+  putNoStack_ bh (StaticUnboxed u)    = putByte bh 3 >> put_ bh u
+  putNoStack_ bh (StaticData dc args) = putByte bh 4 >> put_ bh dc >> put_ bh args
+  putNoStack_ bh (StaticList xs t)    = putByte bh 5 >> put_ bh xs >> put_ bh t
   get bh = getByte bh >>= \case
     1 -> StaticFun     <$> get bh <*> get bh
     2 -> StaticThunk   <$> get bh
@@ -631,11 +631,11 @@ instance Binary StaticVal where
     n -> error ("Binary get bh StaticVal: invalid tag " ++ show n)
 
 instance Binary StaticUnboxed where
-  put_ bh (StaticUnboxedBool b)           = putByte bh 1 >> put_ bh b
-  put_ bh (StaticUnboxedInt i)            = putByte bh 2 >> put_ bh i
-  put_ bh (StaticUnboxedDouble d)         = putByte bh 3 >> put_ bh d
-  put_ bh (StaticUnboxedString str)       = putByte bh 4 >> put_ bh str
-  put_ bh (StaticUnboxedStringOffset str) = putByte bh 5 >> put_ bh str
+  putNoStack_ bh (StaticUnboxedBool b)           = putByte bh 1 >> put_ bh b
+  putNoStack_ bh (StaticUnboxedInt i)            = putByte bh 2 >> put_ bh i
+  putNoStack_ bh (StaticUnboxedDouble d)         = putByte bh 3 >> put_ bh d
+  putNoStack_ bh (StaticUnboxedString str)       = putByte bh 4 >> put_ bh str
+  putNoStack_ bh (StaticUnboxedStringOffset str) = putByte bh 5 >> put_ bh str
   get bh = getByte bh >>= \case
     1 -> StaticUnboxedBool         <$> get bh
     2 -> StaticUnboxedInt          <$> get bh
@@ -645,9 +645,9 @@ instance Binary StaticUnboxed where
     n -> error ("Binary get bh StaticUnboxed: invalid tag " ++ show n)
 
 instance Binary StaticArg where
-  put_ bh (StaticObjArg i)      = putByte bh 1 >> put_ bh i
-  put_ bh (StaticLitArg p)      = putByte bh 2 >> put_ bh p
-  put_ bh (StaticConArg c args) = putByte bh 3 >> put_ bh c >> put_ bh args
+  putNoStack_ bh (StaticObjArg i)      = putByte bh 1 >> put_ bh i
+  putNoStack_ bh (StaticLitArg p)      = putByte bh 2 >> put_ bh p
+  putNoStack_ bh (StaticConArg c args) = putByte bh 3 >> put_ bh c >> put_ bh args
   get bh = getByte bh >>= \case
     1 -> StaticObjArg <$> get bh
     2 -> StaticLitArg <$> get bh
@@ -655,13 +655,13 @@ instance Binary StaticArg where
     n -> error ("Binary get bh StaticArg: invalid tag " ++ show n)
 
 instance Binary StaticLit where
-  put_ bh (BoolLit b)    = putByte bh 1 >> put_ bh b
-  put_ bh (IntLit i)     = putByte bh 2 >> put_ bh i
-  put_ bh NullLit        = putByte bh 3
-  put_ bh (DoubleLit d)  = putByte bh 4 >> put_ bh d
-  put_ bh (StringLit t)  = putByte bh 5 >> put_ bh t
-  put_ bh (BinLit b)     = putByte bh 6 >> put_ bh b
-  put_ bh (LabelLit b t) = putByte bh 7 >> put_ bh b >> put_ bh t
+  putNoStack_ bh (BoolLit b)    = putByte bh 1 >> put_ bh b
+  putNoStack_ bh (IntLit i)     = putByte bh 2 >> put_ bh i
+  putNoStack_ bh NullLit        = putByte bh 3
+  putNoStack_ bh (DoubleLit d)  = putByte bh 4 >> put_ bh d
+  putNoStack_ bh (StringLit t)  = putByte bh 5 >> put_ bh t
+  putNoStack_ bh (BinLit b)     = putByte bh 6 >> put_ bh b
+  putNoStack_ bh (LabelLit b t) = putByte bh 7 >> put_ bh b >> put_ bh t
   get bh = getByte bh >>= \case
     1 -> BoolLit   <$> get bh
     2 -> IntLit    <$> get bh
@@ -688,7 +688,7 @@ data JSOptions = JSOptions
 
 
 instance Binary JSOptions where
-  put_ bh (JSOptions a b c d) = do
+  putNoStack_ bh (JSOptions a b c d) = do
     put_ bh a
     put_ bh b
     put_ bh c

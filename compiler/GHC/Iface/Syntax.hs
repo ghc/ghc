@@ -461,20 +461,20 @@ instance Outputable IfaceLFInfo where
       text "LFUnknown" <+> ppr fun_flag
 
 instance Binary IfaceLFInfo where
-    put_ bh (IfLFReEntrant arity) = do
+    putNoStack_ bh (IfLFReEntrant arity) = do
         putByte bh 0
         put_ bh arity
-    put_ bh (IfLFThunk updatable mb_fun) = do
+    putNoStack_ bh (IfLFThunk updatable mb_fun) = do
         putByte bh 1
         put_ bh updatable
         put_ bh mb_fun
-    put_ bh (IfLFCon con_name) = do
+    putNoStack_ bh (IfLFCon con_name) = do
         putByte bh 2
         put_ bh con_name
-    put_ bh (IfLFUnknown fun_flag) = do
+    putNoStack_ bh (IfLFUnknown fun_flag) = do
         putByte bh 3
         put_ bh fun_flag
-    put_ bh IfLFUnlifted =
+    putNoStack_ bh IfLFUnlifted =
         putByte bh 4
     get bh = do
         tag <- getByte bh
@@ -1947,13 +1947,13 @@ details.
 -}
 
 instance Binary IfaceDecl where
-    put_ bh (IfaceId name ty details idinfo) = do
+    putNoStack_ bh (IfaceId name ty details idinfo) = do
         putByte bh 0
         putIfaceTopBndr bh name
         lazyPut bh (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
 
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    putNoStack_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -1965,7 +1965,7 @@ instance Binary IfaceDecl where
         put_ bh a8
         put_ bh a9
 
-    put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
+    putNoStack_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
         putByte bh 3
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -1973,7 +1973,7 @@ instance Binary IfaceDecl where
         put_ bh a4
         put_ bh a5
 
-    put_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
+    putNoStack_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
         putByte bh 4
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -1983,7 +1983,7 @@ instance Binary IfaceDecl where
         put_ bh a6
 
     -- NB: Written in a funny way to avoid an interface change
-    put_ bh (IfaceClass {
+    putNoStack_ bh (IfaceClass {
                 ifName    = a2,
                 ifRoles   = a3,
                 ifBinders = a4,
@@ -2004,14 +2004,14 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
 
-    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
+    putNoStack_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
 
-    put_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+    putNoStack_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putByte bh 7
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2025,7 +2025,7 @@ instance Binary IfaceDecl where
         put_ bh a10
         put_ bh a11
 
-    put_ bh (IfaceClass {
+    putNoStack_ bh (IfaceClass {
                 ifName    = a1,
                 ifRoles   = a2,
                 ifBinders = a3,
@@ -2117,7 +2117,7 @@ instance Binary IfaceDecl where
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 instance Binary IfaceBooleanFormula where
-    put_ bh = \case
+    putNoStack_ bh = \case
         IfVar a1    -> putByte bh 0 >> put_ bh a1
         IfAnd a1    -> putByte bh 1 >> put_ bh a1
         IfOr a1     -> putByte bh 2 >> put_ bh a1
@@ -2156,11 +2156,11 @@ represent a small proportion of all declarations.
 -}
 
 instance Binary IfaceFamTyConFlav where
-    put_ bh IfaceDataFamilyTyCon              = putByte bh 0
-    put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 1
-    put_ bh (IfaceClosedSynFamilyTyCon mb)    = putByte bh 2 >> put_ bh mb
-    put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 3
-    put_ _ IfaceBuiltInSynFamTyCon
+    putNoStack_ bh IfaceDataFamilyTyCon              = putByte bh 0
+    putNoStack_ bh IfaceOpenSynFamilyTyCon           = putByte bh 1
+    putNoStack_ bh (IfaceClosedSynFamilyTyCon mb)    = putByte bh 2 >> put_ bh mb
+    putNoStack_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 3
+    putNoStack_ _ IfaceBuiltInSynFamTyCon
         = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" Outputable.empty
 
     get bh = do { h <- getByte bh
@@ -2174,7 +2174,7 @@ instance Binary IfaceFamTyConFlav where
                                   (ppr (fromIntegral h :: Int)) }
 
 instance Binary IfaceClassOp where
-    put_ bh (IfaceClassOp n ty def) = do
+    putNoStack_ bh (IfaceClassOp n ty def) = do
         putIfaceTopBndr bh n
         put_ bh ty
         put_ bh def
@@ -2185,7 +2185,7 @@ instance Binary IfaceClassOp where
         return (IfaceClassOp n ty def)
 
 instance Binary IfaceAT where
-    put_ bh (IfaceAT dec defs) = do
+    putNoStack_ bh (IfaceAT dec defs) = do
         put_ bh dec
         put_ bh defs
     get bh = do
@@ -2194,7 +2194,7 @@ instance Binary IfaceAT where
         return (IfaceAT dec defs)
 
 instance Binary IfaceAxBranch where
-    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
+    putNoStack_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
@@ -2213,10 +2213,10 @@ instance Binary IfaceAxBranch where
         return (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceConDecls where
-    put_ bh IfAbstractTyCon  = putByte bh 0
-    put_ bh (IfDataTyCon False cs) = putByte bh 1 >> put_ bh cs
-    put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
-    put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
+    putNoStack_ bh IfAbstractTyCon  = putByte bh 0
+    putNoStack_ bh (IfDataTyCon False cs) = putByte bh 1 >> put_ bh cs
+    putNoStack_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
+    putNoStack_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
@@ -2227,7 +2227,7 @@ instance Binary IfaceConDecls where
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+    putNoStack_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -2256,10 +2256,10 @@ instance Binary IfaceConDecl where
         return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
 
 instance Binary IfaceBang where
-    put_ bh IfNoBang        = putByte bh 0
-    put_ bh IfStrict        = putByte bh 1
-    put_ bh IfUnpack        = putByte bh 2
-    put_ bh (IfUnpackCo co) = putByte bh 3 >> put_ bh co
+    putNoStack_ bh IfNoBang        = putByte bh 0
+    putNoStack_ bh IfStrict        = putByte bh 1
+    putNoStack_ bh IfUnpack        = putByte bh 2
+    putNoStack_ bh (IfUnpackCo co) = putByte bh 3 >> put_ bh co
 
     get bh = do
             h <- getByte bh
@@ -2270,7 +2270,7 @@ instance Binary IfaceBang where
               _ -> IfUnpackCo <$> get bh
 
 instance Binary IfaceSrcBang where
-    put_ bh (IfSrcBang a1 a2) =
+    putNoStack_ bh (IfSrcBang a1 a2) =
       do put_ bh a1
          put_ bh a2
 
@@ -2280,7 +2280,7 @@ instance Binary IfaceSrcBang where
          return (IfSrcBang a1 a2)
 
 instance Binary IfaceClsInst where
-    put_ bh (IfaceClsInst cls tys dfun flag orph warn) = do
+    putNoStack_ bh (IfaceClsInst cls tys dfun flag orph warn) = do
         put_ bh cls
         put_ bh tys
         put_ bh dfun
@@ -2297,7 +2297,7 @@ instance Binary IfaceClsInst where
         return (IfaceClsInst cls tys dfun flag orph warn)
 
 instance Binary IfaceFamInst where
-    put_ bh (IfaceFamInst fam tys name orph) = do
+    putNoStack_ bh (IfaceFamInst fam tys name orph) = do
         put_ bh fam
         put_ bh tys
         put_ bh name
@@ -2310,7 +2310,7 @@ instance Binary IfaceFamInst where
         return (IfaceFamInst fam tys name orph)
 
 instance Binary IfaceRule where
-    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
+    putNoStack_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
@@ -2331,7 +2331,7 @@ instance Binary IfaceRule where
         return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
 
 instance Binary IfaceWarnings where
-    put_ bh = \case
+    putNoStack_ bh = \case
         IfWarnAll txt  -> putByte bh 0 *> put_ bh txt
         IfWarnSome vs ds -> putByte bh 1 *> put_ bh vs *> put_ bh ds
     get bh = getByte bh >>= \case
@@ -2340,7 +2340,7 @@ instance Binary IfaceWarnings where
         _ -> fail "invalid tag(IfaceWarnings)"
 
 instance Binary IfaceWarningTxt where
-    put_ bh = \case
+    putNoStack_ bh = \case
         IfWarningTxt a1 a2 a3 -> putByte bh 0 *> put_ bh a1 *> put_ bh a2 *> put_ bh a3
         IfDeprecatedTxt a1 a2 -> putByte bh 1 *> put_ bh a1 *> put_ bh a2
     get bh = getByte bh >>= \case
@@ -2348,11 +2348,11 @@ instance Binary IfaceWarningTxt where
         _ -> pure IfDeprecatedTxt <*> get bh <*> get bh
 
 instance Binary IfaceStringLiteral where
-    put_ bh (IfStringLiteral a1 a2) = put_ bh a1 *> put_ bh a2
+    putNoStack_ bh (IfStringLiteral a1 a2) = put_ bh a1 *> put_ bh a2
     get bh = IfStringLiteral <$> get bh <*> get bh
 
 instance Binary IfaceAnnotation where
-    put_ bh (IfaceAnnotation a1 a2) = do
+    putNoStack_ bh (IfaceAnnotation a1 a2) = do
         put_ bh a1
         put_ bh a2
     get bh = do
@@ -2361,14 +2361,14 @@ instance Binary IfaceAnnotation where
         return (IfaceAnnotation a1 a2)
 
 instance Binary IfaceIdDetails where
-    put_ bh IfVanillaId           = putByte bh 0
-    put_ bh (IfRecSelId a b c d)  = do { putByte bh 1
+    putNoStack_ bh IfVanillaId           = putByte bh 0
+    putNoStack_ bh (IfRecSelId a b c d)  = do { putByte bh 1
                                        ; put_ bh a
                                        ; put_ bh b
                                        ; put_ bh c
                                        ; put_ bh d }
-    put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
-    put_ bh IfDFunId              = putByte bh 3
+    putNoStack_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
+    putNoStack_ bh IfDFunId              = putByte bh 3
     get bh = do
         h <- getByte bh
         case h of
@@ -2383,14 +2383,14 @@ instance Binary IfaceIdDetails where
             _ -> return IfDFunId
 
 instance Binary IfaceInfoItem where
-    put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
-    put_ bh (HsDmdSig ab)         = putByte bh 1 >> put_ bh ab
-    put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
-    put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
-    put_ bh HsNoCafRefs           = putByte bh 4
-    put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
-    put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
-    put_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
+    putNoStack_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
+    putNoStack_ bh (HsDmdSig ab)         = putByte bh 1 >> put_ bh ab
+    putNoStack_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
+    putNoStack_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
+    putNoStack_ bh HsNoCafRefs           = putByte bh 4
+    putNoStack_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
+    putNoStack_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
+    putNoStack_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
 
     get bh = do
         h <- getByte bh
@@ -2407,13 +2407,13 @@ instance Binary IfaceInfoItem where
             _ -> HsTagSig <$> get bh
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold s c g e) = do
+    putNoStack_ bh (IfCoreUnfold s c g e) = do
         putByte bh 0
         put_ bh s
         putUnfoldingCache bh c
         put_ bh g
         put_ bh e
-    put_ bh (IfDFunUnfold as bs) = do
+    putNoStack_ bh (IfDFunUnfold as bs) = do
         putByte bh 1
         put_ bh as
         put_ bh bs
@@ -2430,8 +2430,8 @@ instance Binary IfaceUnfolding where
                     return (IfDFunUnfold as bs)
 
 instance Binary IfGuidance where
-    put_ bh IfNoGuidance = putByte bh 0
-    put_ bh (IfWhen a b c ) = do
+    putNoStack_ bh IfNoGuidance = putByte bh 0
+    putNoStack_ bh (IfWhen a b c ) = do
         putByte bh 1
         put_ bh a
         put_ bh b
@@ -2466,7 +2466,7 @@ infixl 9 .<<|.
 x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
 
 instance Binary IfaceAlt where
-    put_ bh (IfaceAlt a b c) = do
+    putNoStack_ bh (IfaceAlt a b c) = do
         put_ bh a
         put_ bh b
         put_ bh c
@@ -2477,63 +2477,63 @@ instance Binary IfaceAlt where
         return (IfaceAlt a b c)
 
 instance Binary IfaceExpr where
-    put_ bh (IfaceLcl aa) = do
+    putNoStack_ bh (IfaceLcl aa) = do
         putByte bh 0
         put_ bh aa
-    put_ bh (IfaceType ab) = do
+    putNoStack_ bh (IfaceType ab) = do
         putByte bh 1
         put_ bh ab
-    put_ bh (IfaceCo ab) = do
+    putNoStack_ bh (IfaceCo ab) = do
         putByte bh 2
         put_ bh ab
-    put_ bh (IfaceTuple ac ad) = do
+    putNoStack_ bh (IfaceTuple ac ad) = do
         putByte bh 3
         put_ bh ac
         put_ bh ad
-    put_ bh (IfaceLam (ae, os) af) = do
+    putNoStack_ bh (IfaceLam (ae, os) af) = do
         putByte bh 4
         put_ bh ae
         put_ bh os
         put_ bh af
-    put_ bh (IfaceApp ag ah) = do
+    putNoStack_ bh (IfaceApp ag ah) = do
         putByte bh 5
         put_ bh ag
         put_ bh ah
-    put_ bh (IfaceCase ai aj ak) = do
+    putNoStack_ bh (IfaceCase ai aj ak) = do
         putByte bh 6
         put_ bh ai
         put_ bh aj
         put_ bh ak
-    put_ bh (IfaceLet al am) = do
+    putNoStack_ bh (IfaceLet al am) = do
         putByte bh 7
         put_ bh al
         put_ bh am
-    put_ bh (IfaceTick an ao) = do
+    putNoStack_ bh (IfaceTick an ao) = do
         putByte bh 8
         put_ bh an
         put_ bh ao
-    put_ bh (IfaceLit ap) = do
+    putNoStack_ bh (IfaceLit ap) = do
         putByte bh 9
         put_ bh ap
-    put_ bh (IfaceFCall as at) = do
+    putNoStack_ bh (IfaceFCall as at) = do
         putByte bh 10
         put_ bh as
         put_ bh at
-    put_ bh (IfaceExt aa) = do
+    putNoStack_ bh (IfaceExt aa) = do
         putByte bh 11
         put_ bh aa
-    put_ bh (IfaceCast ie ico) = do
+    putNoStack_ bh (IfaceCast ie ico) = do
         putByte bh 12
         put_ bh ie
         put_ bh ico
-    put_ bh (IfaceECase a b) = do
+    putNoStack_ bh (IfaceECase a b) = do
         putByte bh 13
         put_ bh a
         put_ bh b
-    put_ bh (IfaceLitRubbish TypeLike r) = do
+    putNoStack_ bh (IfaceLitRubbish TypeLike r) = do
         putByte bh 14
         put_ bh r
-    put_ bh (IfaceLitRubbish ConstraintLike r) = do
+    putNoStack_ bh (IfaceLitRubbish ConstraintLike r) = do
         putByte bh 15
         put_ bh r
     get bh = do
@@ -2585,16 +2585,16 @@ instance Binary IfaceExpr where
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
-    put_ bh (IfaceHpcTick m ix) = do
+    putNoStack_ bh (IfaceHpcTick m ix) = do
         putByte bh 0
         put_ bh m
         put_ bh ix
-    put_ bh (IfaceSCC cc tick push) = do
+    putNoStack_ bh (IfaceSCC cc tick push) = do
         putByte bh 1
         put_ bh cc
         put_ bh tick
         put_ bh push
-    put_ bh (IfaceSource src name) = do
+    putNoStack_ bh (IfaceSource src name) = do
         putByte bh 2
         put_ bh (srcSpanFile src)
         put_ bh (srcSpanStartLine src)
@@ -2602,7 +2602,7 @@ instance Binary IfaceTickish where
         put_ bh (srcSpanEndLine src)
         put_ bh (srcSpanEndCol src)
         put_ bh name
-    put_ bh (IfaceBreakpoint m ix fvs) = do
+    putNoStack_ bh (IfaceBreakpoint m ix fvs) = do
         putByte bh 3
         put_ bh m
         put_ bh ix
@@ -2634,9 +2634,9 @@ instance Binary IfaceTickish where
             _ -> panic ("get IfaceTickish " ++ show h)
 
 instance Binary IfaceConAlt where
-    put_ bh IfaceDefault      = putByte bh 0
-    put_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
-    put_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
+    putNoStack_ bh IfaceDefault      = putByte bh 0
+    putNoStack_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
+    putNoStack_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
     get bh = do
         h <- getByte bh
         case h of
@@ -2645,8 +2645,8 @@ instance Binary IfaceConAlt where
             _ -> liftM IfaceLitAlt  $ get bh
 
 instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
-    put_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
-    put_ bh (IfaceRec ac)       = putByte bh 1 >> put_ bh ac
+    putNoStack_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
+    putNoStack_ bh (IfaceRec ac)       = putByte bh 1 >> put_ bh ac
     get bh = do
         h <- getByte bh
         case h of
@@ -2654,7 +2654,7 @@ instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
             _ -> do { ac <- get bh; return (IfaceRec ac) }
 
 instance Binary IfaceLetBndr where
-    put_ bh (IfLetBndr a b c d) = do
+    putNoStack_ bh (IfLetBndr a b c d) = do
             put_ bh a
             put_ bh b
             put_ bh c
@@ -2666,13 +2666,13 @@ instance Binary IfaceLetBndr where
                 return (IfLetBndr a b c d)
 
 instance Binary IfaceTopBndrInfo where
-    put_ bh (IfLclTopBndr lcl ty info dets) = do
+    putNoStack_ bh (IfLclTopBndr lcl ty info dets) = do
             putByte bh 0
             put_ bh lcl
             put_ bh ty
             put_ bh info
             put_ bh dets
-    put_ bh (IfGblTopBndr gbl) = do
+    putNoStack_ bh (IfGblTopBndr gbl) = do
             putByte bh 1
             put_ bh gbl
     get bh = do
@@ -2683,8 +2683,8 @@ instance Binary IfaceTopBndrInfo where
         _ -> pprPanic "IfaceTopBndrInfo" (intWithCommas tag)
 
 instance Binary IfaceMaybeRhs where
-  put_ bh IfUseUnfoldingRhs = putByte bh 0
-  put_ bh (IfRhs e) = do
+  putNoStack_ bh IfUseUnfoldingRhs = putByte bh 0
+  putNoStack_ bh (IfRhs e) = do
     putByte bh 1
     put_ bh e
 
@@ -2696,8 +2696,8 @@ instance Binary IfaceMaybeRhs where
       _ -> pprPanic "IfaceMaybeRhs" (intWithCommas b)
 
 instance Binary IfaceTyConParent where
-    put_ bh IfNoParent = putByte bh 0
-    put_ bh (IfDataInstance ax pr ty) = do
+    putNoStack_ bh IfNoParent = putByte bh 0
+    putNoStack_ bh (IfDataInstance ax pr ty) = do
         putByte bh 1
         put_ bh ax
         put_ bh pr
@@ -2713,7 +2713,7 @@ instance Binary IfaceTyConParent where
                 return $ IfDataInstance ax pr ty
 
 instance Binary IfaceCompleteMatch where
-  put_ bh (IfaceCompleteMatch cs mtc) = put_ bh cs >> put_ bh mtc
+  putNoStack_ bh (IfaceCompleteMatch cs mtc) = put_ bh cs >> put_ bh mtc
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
 
 

@@ -2715,12 +2715,12 @@ instance Outputable TypeShape where
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
 
 instance Binary Card where
-  put_ bh C_00 = putByte bh 0
-  put_ bh C_01 = putByte bh 1
-  put_ bh C_0N = putByte bh 2
-  put_ bh C_11 = putByte bh 3
-  put_ bh C_1N = putByte bh 4
-  put_ bh C_10 = putByte bh 5
+  putNoStack_ bh C_00 = putByte bh 0
+  putNoStack_ bh C_01 = putByte bh 1
+  putNoStack_ bh C_0N = putByte bh 2
+  putNoStack_ bh C_11 = putByte bh 3
+  putNoStack_ bh C_1N = putByte bh 4
+  putNoStack_ bh C_10 = putByte bh 5
   get bh = do
     h <- getByte bh
     case h of
@@ -2733,7 +2733,7 @@ instance Binary Card where
       _ -> pprPanic "Binary:Card" (ppr (fromIntegral h :: Int))
 
 instance Binary Demand where
-  put_ bh (n :* sd) = put_ bh n *> case n of
+  putNoStack_ bh (n :* sd) = put_ bh n *> case n of
     C_00 -> return ()
     C_10 -> return ()
     _    -> put_ bh sd
@@ -2743,9 +2743,9 @@ instance Binary Demand where
     _    -> (n :*) <$> get bh
 
 instance Binary SubDemand where
-  put_ bh (Poly b sd) = putByte bh 0 *> put_ bh b *> put_ bh sd
-  put_ bh (Call n sd) = putByte bh 1 *> put_ bh n *> put_ bh sd
-  put_ bh (Prod b ds) = putByte bh 2 *> put_ bh b *> put_ bh ds
+  putNoStack_ bh (Poly b sd) = putByte bh 0 *> put_ bh b *> put_ bh sd
+  putNoStack_ bh (Call n sd) = putByte bh 1 *> put_ bh n *> put_ bh sd
+  putNoStack_ bh (Prod b ds) = putByte bh 2 *> put_ bh b *> put_ bh ds
   get bh = do
     h <- getByte bh
     case h of
@@ -2755,9 +2755,9 @@ instance Binary SubDemand where
       _ -> pprPanic "Binary:SubDemand" (ppr (fromIntegral h :: Int))
 
 instance Binary Divergence where
-  put_ bh Dunno    = putByte bh 0
-  put_ bh ExnOrDiv = putByte bh 1
-  put_ bh Diverges = putByte bh 2
+  putNoStack_ bh Dunno    = putByte bh 0
+  putNoStack_ bh ExnOrDiv = putByte bh 1
+  putNoStack_ bh Diverges = putByte bh 2
   get bh = do
     h <- getByte bh
     case h of
@@ -2768,13 +2768,13 @@ instance Binary Divergence where
 
 instance Binary DmdEnv where
   -- Ignore VarEnv when spitting out the DmdType
-  put_ bh (DE _ d) = put_ bh d
+  putNoStack_ bh (DE _ d) = put_ bh d
   get bh = DE emptyVarEnv <$> get bh
 
 instance Binary DmdType where
-  put_ bh (DmdType fv ds) = put_ bh fv *> put_ bh ds
+  putNoStack_ bh (DmdType fv ds) = put_ bh fv *> put_ bh ds
   get bh = DmdType <$> get bh <*> get bh
 
 instance Binary DmdSig where
-  put_ bh (DmdSig aa) = put_ bh aa
+  putNoStack_ bh (DmdSig aa) = put_ bh aa
   get bh = DmdSig <$> get bh

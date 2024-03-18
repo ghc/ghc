@@ -80,7 +80,7 @@ pprWithDocString doc sd = pprHsDocString doc $+$ sd
 
 
 instance Binary HsDocString where
-  put_ bh x = case x of
+  putNoStack_ bh x = case x of
     MultiLineDocString dec xs -> do
       putByte bh 0
       put_ bh dec
@@ -123,7 +123,7 @@ printDecorator (HsDocStringNamed n) = '$':n
 printDecorator (HsDocStringGroup n) = replicate n '*'
 
 instance Binary HsDocStringDecorator where
-  put_ bh x = case x of
+  putNoStack_ bh x = case x of
     HsDocStringNext -> putByte bh 0
     HsDocStringPrevious -> putByte bh 1
     HsDocStringNamed n -> putByte bh 2 >> put_ bh n
@@ -145,7 +145,7 @@ newtype HsDocStringChunk = HsDocStringChunk ByteString
   deriving newtype (NFData)
 
 instance Binary HsDocStringChunk where
-  put_ bh (HsDocStringChunk bs) = put_ bh bs
+  putNoStack_ bh (HsDocStringChunk bs) = put_ bh bs
   get bh = HsDocStringChunk <$> get bh
 
 instance Outputable HsDocStringChunk where

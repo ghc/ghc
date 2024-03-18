@@ -74,9 +74,9 @@ hscSourceToIsBoot HsBootFile = IsBoot
 hscSourceToIsBoot _ = NotBoot
 
 instance Binary HscSource where
-    put_ bh HsSrcFile = putByte bh 0
-    put_ bh HsBootFile = putByte bh 1
-    put_ bh HsigFile = putByte bh 2
+    putNoStack_ bh HsSrcFile = putByte bh 0
+    putNoStack_ bh HsBootFile = putByte bh 1
+    putNoStack_ bh HsigFile = putByte bh 2
     get bh = do
         h <- getByte bh
         case h of

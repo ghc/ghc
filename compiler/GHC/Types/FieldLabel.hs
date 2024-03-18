@@ -102,7 +102,7 @@ data DuplicateRecordFields
   deriving (Show, Eq, Typeable, Data)
 
 instance Binary DuplicateRecordFields where
-    put_ bh f = put_ bh (f == DuplicateRecordFields)
+    putNoStack_ bh f = put_ bh (f == DuplicateRecordFields)
     get bh = bool NoDuplicateRecordFields DuplicateRecordFields <$> get bh
 
 instance Outputable DuplicateRecordFields where
@@ -121,7 +121,7 @@ data FieldSelectors
   deriving (Show, Eq, Typeable, Data)
 
 instance Binary FieldSelectors where
-    put_ bh f = put_ bh (f == FieldSelectors)
+    putNoStack_ bh f = put_ bh (f == FieldSelectors)
     get bh = bool NoFieldSelectors FieldSelectors <$> get bh
 
 instance Outputable FieldSelectors where
@@ -137,7 +137,7 @@ instance NFData FieldSelectors where
 -- instance is not in scope.  And the instance cannot be added to Name.hs-boot
 -- because "GHC.Utils.Binary" itself depends on "GHC.Types.Name".
 instance Binary Name => Binary FieldLabel where
-    put_ bh (FieldLabel aa ab ac) = do
+    putNoStack_ bh (FieldLabel aa ab ac) = do
         put_ bh aa
         put_ bh ab
         case findUserDataCache Proxy bh of

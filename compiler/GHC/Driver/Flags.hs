@@ -51,7 +51,7 @@ instance Outputable Language where
     ppr = text . show
 
 instance Binary Language where
-  put_ bh = put_ bh . fromEnum
+  putNoStack_ bh = put_ bh . fromEnum
   get bh = toEnum <$> get bh
 
 instance NFData Language where

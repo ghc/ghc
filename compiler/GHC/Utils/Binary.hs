@@ -21,7 +21,7 @@
 
 module GHC.Utils.Binary
   ( {-type-}  Bin,
-    {-class-} Binary(..),
+    {-class-} Binary(..), put_, withCC,
     {-type-}  BinHandle,
     SymbolTable, Dictionary,
 
@@ -39,6 +39,7 @@ module GHC.Utils.Binary
    foldGet, foldGet',
 
    writeBinMem,
+   profileBinMem,
    readBinMem,
    readBinMemN,
 
@@ -132,6 +133,7 @@ import GHC.Utils.Misc
 import qualified Data.Map.Strict as Map
 import Data.Tuple (swap)
 import Unsafe.Coerce (unsafeCoerce)
+import qualified Data.Map.Strict as Map
 
 type BinArray = ForeignPtr Word8
 
@@ -150,7 +152,7 @@ instance NFData BinData where
   rnf (BinData sz _) = rnf sz
 
 instance Binary BinData where
-  put_ bh (BinData sz dat) = do
+  putNoStack_ bh (BinData sz dat) = do
     put_ bh sz
     putPrim bh sz $ \dest ->
       unsafeWithForeignPtr dat $ \orig ->
@@ -169,10 +171,11 @@ dataHandle (BinData size bin) = do
   ixr <- newFastMutInt 0
   szr <- newFastMutInt size
   binr <- newIORef bin
-  return (BinMem noUserData ixr szr binr)
+  bp <- initBinProf
+  return (BinMem noUserData ixr szr binr bp)
 
 handleData :: BinHandle -> IO BinData
-handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
+handleData (BinMem _ ixr _ binr _) = BinData <$> readFastMutInt ixr <*> readIORef binr
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -183,8 +186,19 @@ data BinHandle
      bh_usr :: UserData,         -- sigh, need parameterized modules :-)
      _off_r :: !FastMutInt,      -- the current offset
      _sz_r  :: !FastMutInt,      -- size of the array (cached)
-     _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
+     _arr_r :: !(IORef BinArray), -- the array (bounds: (0,size-1))
+     prof :: {-# UNPACK #-} !BinProf
     }
+
+data BinProf = BinProf { stack :: ![String], report :: IORef (Map.Map [String] Int) }
+
+initBinProf = BinProf <$> pure ["TOP"] <*> newIORef (Map.empty)
+
+addStack :: String -> BinProf -> BinProf
+addStack s (BinProf ss i) = (BinProf (s:ss) i)
+
+recordSample :: Int -> BinProf -> IO ()
+recordSample weight (BinProf ss i) = modifyIORef i (Map.insertWith (+) ss weight)
         -- XXX: should really store a "high water mark" for dumping out
         -- the binary data to a file.
 
@@ -204,7 +218,7 @@ addDecoder cache bh = bh
 
 -- | Get access to the underlying buffer.
 withBinBuffer :: BinHandle -> (ByteString -> IO a) -> IO a
-withBinBuffer (BinMem _ ix_r _ arr_r) action = do
+withBinBuffer (BinMem _ ix_r _ arr_r _) action = do
   arr <- readIORef arr_r
   ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
@@ -214,7 +228,8 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt len
-  return (BinMem noUserData ix_r sz_r arr_r)
+  bp  <- initBinProf
+  return (BinMem noUserData ix_r sz_r arr_r bp)
 
 ---------------------------------------------------------------
 -- Bin
@@ -232,16 +247,27 @@ castBin (BinPtr i) = BinPtr i
 
 -- | Do not rely on instance sizes for general types,
 -- we use variable length encoding for many of them.
-class Binary a where
-    put_   :: HasCallStack => BinHandle -> a -> IO ()
-    put    :: HasCallStack => BinHandle -> a -> IO (Bin a)
+class Typeable a => Binary a where
+    putNoStack_   :: HasCallStack => BinHandle -> a -> IO ()
+    putNoStack    :: HasCallStack => BinHandle -> a -> IO (Bin a)
     get    :: HasCallStack => BinHandle -> IO a
 
     -- define one of put_, put.  Use of put_ is recommended because it
     -- is more likely that tail-calls can kick in, and we rarely need the
     -- position return value.
-    put_ bh a = do _ <- put bh a; return ()
-    put bh a  = do p <- tellBin bh; put_ bh a; return p
+    putNoStack_ bh a = do _ <- putNoStack bh a; return ()
+    putNoStack bh a  = do p <- tellBin bh; put_ bh a; return p
+
+put_ :: forall a . (Binary a, Typeable a) => BinHandle -> a -> IO ()
+put_ bh = withCC (show (typeRep (Proxy @a))) bh putNoStack_
+
+withCC :: String -> BinHandle -> (BinHandle -> k) -> k
+withCC c bh k =
+  if c == head (stack (prof bh))
+    then
+      k bh
+    else
+      k (bh { prof = addStack c (prof bh) })
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
 putAt bh p x = do seekBin bh p; put_ bh x; return ()
@@ -257,13 +283,14 @@ openBinMem size
    arr_r <- newIORef arr
    ix_r <- newFastMutInt 0
    sz_r <- newFastMutInt size
-   return (BinMem noUserData ix_r sz_r arr_r)
+   bp <- initBinProf
+   return (BinMem noUserData ix_r sz_r arr_r bp)
 
 tellBin :: BinHandle -> IO (Bin a)
-tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
+tellBin (BinMem _ r _ _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
+seekBin h@(BinMem _ ix_r sz_r _ _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
@@ -271,19 +298,22 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
 
 -- | SeekBin but without calling expandBin
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
-seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
+seekBinNoExpand (BinMem _ ix_r sz_r _ _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
         then panic "seekBinNoExpand: seek out of range"
         else writeFastMutInt ix_r p
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
-writeBinMem (BinMem _ ix_r _ arr_r) fn = do
+writeBinMem (BinMem _ ix_r _ arr_r bp) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
   unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
+
+profileBinMem :: BinHandle -> IO (Map.Map [String] Int)
+profileBinMem (BinMem _ _ _ _ bp) = readIORef (report bp)
 
 readBinMem :: HasCallStack => FilePath -> IO BinHandle
 readBinMem filename = do
@@ -310,11 +340,12 @@ readBinMem_ filesize h = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize
-  return (BinMem noUserData ix_r sz_r arr_r)
+  bp <- initBinProf
+  return (BinMem noUserData ix_r sz_r arr_r bp)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ _ sz_r arr_r) !off = do
+expandBin (BinMem _ _ sz_r arr_r _) !off = do
    !sz <- readFastMutInt sz_r
    let !sz' = getSize sz
    arr <- readIORef arr_r
@@ -374,7 +405,7 @@ foldGet' n bh init_b f = go 0 init_b
 --   After the action has run advance the index to the buffer
 --   by size bytes.
 putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
-putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
+putPrim h@(BinMem _ ix_r sz_r arr_r bp) size f = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   when (ix + size > sz) $
@@ -382,6 +413,7 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
   arr <- readIORef arr_r
   unsafeWithForeignPtr arr $ \op -> f (op `plusPtr` ix)
   writeFastMutInt ix_r (ix + size)
+  recordSample size bp
 
 -- -- | Similar to putPrim but advances the index by the actual number of
 -- -- bytes written.
@@ -396,7 +428,7 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
 --   writeFastMutInt ix_r (ix + written)
 
 getPrim :: BinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
-getPrim (BinMem _ ix_r sz_r arr_r) size f = do
+getPrim (BinMem _ ix_r sz_r arr_r stack) size f = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   when (ix + size > sz) $
@@ -628,82 +660,82 @@ newtype FixedLengthEncoding a
   deriving (Eq,Ord,Show)
 
 instance Binary (FixedLengthEncoding Word8) where
-  put_ h (FixedLengthEncoding x) = putByte h x
+  putNoStack_ h (FixedLengthEncoding x) = putByte h x
   get h = FixedLengthEncoding <$> getByte h
 
 instance Binary (FixedLengthEncoding Word16) where
-  put_ h (FixedLengthEncoding x) = putWord16 h x
+  putNoStack_ h (FixedLengthEncoding x) = putWord16 h x
   get h = FixedLengthEncoding <$> getWord16 h
 
 instance Binary (FixedLengthEncoding Word32) where
-  put_ h (FixedLengthEncoding x) = putWord32 h x
+  putNoStack_ h (FixedLengthEncoding x) = putWord32 h x
   get h = FixedLengthEncoding <$> getWord32 h
 
 instance Binary (FixedLengthEncoding Word64) where
-  put_ h (FixedLengthEncoding x) = putWord64 h x
+  putNoStack_ h (FixedLengthEncoding x) = putWord64 h x
   get h = FixedLengthEncoding <$> getWord64 h
 
 -- -----------------------------------------------------------------------------
 -- Primitive Word writes
 
 instance Binary Word8 where
-  put_ bh !w = putWord8 bh w
+  putNoStack_ bh !w = putWord8 bh w
   get  = getWord8
 
 instance Binary Word16 where
-  put_ = putULEB128
+  putNoStack_ = putULEB128
   get  = getULEB128
 
 instance Binary Word32 where
-  put_ = putULEB128
+  putNoStack_ = putULEB128
   get  = getULEB128
 
 instance Binary Word64 where
-  put_ = putULEB128
+  putNoStack_ = putULEB128
   get = getULEB128
 
 -- -----------------------------------------------------------------------------
 -- Primitive Int writes
 
 instance Binary Int8 where
-  put_ h w = put_ h (fromIntegral w :: Word8)
+  putNoStack_ h w = put_ h (fromIntegral w :: Word8)
   get h    = do w <- get h; return $! (fromIntegral (w::Word8))
 
 instance Binary Int16 where
-  put_ = putSLEB128
+  putNoStack_ = putSLEB128
   get = getSLEB128
 
 instance Binary Int32 where
-  put_ = putSLEB128
+  putNoStack_ = putSLEB128
   get = getSLEB128
 
 instance Binary Int64 where
-  put_ h w = putSLEB128 h w
+  putNoStack_ h w = putSLEB128 h w
   get h    = getSLEB128 h
 
 -- -----------------------------------------------------------------------------
 -- Instances for standard types
 
 instance Binary () where
-    put_ _ () = return ()
+    putNoStack_ _ () = return ()
     get  _    = return ()
 
 instance Binary Bool where
-    put_ bh b = putByte bh (fromIntegral (fromEnum b))
+    putNoStack_ bh b = putByte bh (fromIntegral (fromEnum b))
     get  bh   = do x <- getWord8 bh; return $! (toEnum (fromIntegral x))
 
 instance Binary Char where
-    put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
+    putNoStack_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
 
 instance Binary Int where
-    put_ bh i = put_ bh (fromIntegral i :: Int64)
+    putNoStack_ bh i = put_ bh (fromIntegral i :: Int64)
     get  bh = do
         x <- get bh
         return $! (fromIntegral (x :: Int64))
 
 instance Binary a => Binary [a] where
-    put_ bh l = do
+    putNoStack_ bh l = do
         let len = length l
         put_ bh len
         mapM_ (put_ bh) l
@@ -717,15 +749,15 @@ instance Binary a => Binary [a] where
 -- | This instance doesn't rely on the determinism of the keys' 'Ord' instance,
 -- so it works e.g. for 'Name's too.
 instance (Binary a, Ord a) => Binary (Set a) where
-  put_ bh s = put_ bh (Set.toList s)
+  putNoStack_ bh s = put_ bh (Set.toList s)
   get bh = Set.fromList <$> get bh
 
 instance Binary a => Binary (NonEmpty a) where
-    put_ bh = put_ bh . NonEmpty.toList
+    putNoStack_ bh = put_ bh . NonEmpty.toList
     get bh = NonEmpty.fromList <$> get bh
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
-    put_ bh arr = do
+    putNoStack_ bh arr = do
         put_ bh $ bounds arr
         put_ bh $ elems arr
     get bh = do
@@ -734,20 +766,20 @@ instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
         return $ listArray bounds xs
 
 instance (Binary a, Binary b) => Binary (a,b) where
-    put_ bh (a,b) = do put_ bh a; put_ bh b
+    putNoStack_ bh (a,b) = do put_ bh a; put_ bh b
     get bh        = do a <- get bh
                        b <- get bh
                        return (a,b)
 
 instance (Binary a, Binary b, Binary c) => Binary (a,b,c) where
-    put_ bh (a,b,c) = do put_ bh a; put_ bh b; put_ bh c
+    putNoStack_ bh (a,b,c) = do put_ bh a; put_ bh b; put_ bh c
     get bh          = do a <- get bh
                          b <- get bh
                          c <- get bh
                          return (a,b,c)
 
 instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
-    put_ bh (a,b,c,d) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d
+    putNoStack_ bh (a,b,c,d) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d
     get bh            = do a <- get bh
                            b <- get bh
                            c <- get bh
@@ -755,7 +787,7 @@ instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
                            return (a,b,c,d)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, e) where
-    put_ bh (a,b,c,d, e) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e;
+    putNoStack_ bh (a,b,c,d, e) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e;
     get bh               = do a <- get bh
                               b <- get bh
                               c <- get bh
@@ -764,7 +796,7 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, 
                               return (a,b,c,d,e)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary (a,b,c,d, e, f) where
-    put_ bh (a,b,c,d, e, f) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f;
+    putNoStack_ bh (a,b,c,d, e, f) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f;
     get bh                  = do a <- get bh
                                  b <- get bh
                                  c <- get bh
@@ -774,7 +806,7 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary 
                                  return (a,b,c,d,e,f)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) => Binary (a,b,c,d,e,f,g) where
-    put_ bh (a,b,c,d,e,f,g) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f; put_ bh g
+    putNoStack_ bh (a,b,c,d,e,f,g) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f; put_ bh g
     get bh                  = do a <- get bh
                                  b <- get bh
                                  c <- get bh
@@ -785,16 +817,16 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) 
                                  return (a,b,c,d,e,f,g)
 
 instance Binary a => Binary (Maybe a) where
-    put_ bh Nothing  = putByte bh 0
-    put_ bh (Just a) = do putByte bh 1; put_ bh a
+    putNoStack_ bh Nothing  = putByte bh 0
+    putNoStack_ bh (Just a) = do putByte bh 1; put_ bh a
     get bh           = do h <- getWord8 bh
                           case h of
                             0 -> return Nothing
                             _ -> do x <- get bh; return (Just x)
 
 instance Binary a => Binary (Strict.Maybe a) where
-    put_ bh Strict.Nothing = putByte bh 0
-    put_ bh (Strict.Just a) = do putByte bh 1; put_ bh a
+    putNoStack_ bh Strict.Nothing = putByte bh 0
+    putNoStack_ bh (Strict.Just a) = do putByte bh 1; put_ bh a
     get bh =
       do h <- getWord8 bh
          case h of
@@ -802,33 +834,34 @@ instance Binary a => Binary (Strict.Maybe a) where
            _ -> do x <- get bh; return (Strict.Just x)
 
 instance (Binary a, Binary b) => Binary (Either a b) where
-    put_ bh (Left  a) = do putByte bh 0; put_ bh a
-    put_ bh (Right b) = do putByte bh 1; put_ bh b
+    putNoStack_ bh (Left  a) = do putByte bh 0; put_ bh a
+    putNoStack_ bh (Right b) = do putByte bh 1; put_ bh b
     get bh            = do h <- getWord8 bh
                            case h of
                              0 -> do a <- get bh ; return (Left a)
                              _ -> do b <- get bh ; return (Right b)
 
 instance Binary UTCTime where
-    put_ bh u = do put_ bh (utctDay u)
+    putNoStack_ bh u = do
+                   put_ bh (utctDay u)
                    put_ bh (utctDayTime u)
     get bh = do day <- get bh
                 dayTime <- get bh
                 return $ UTCTime { utctDay = day, utctDayTime = dayTime }
 
 instance Binary Day where
-    put_ bh d = put_ bh (toModifiedJulianDay d)
+    putNoStack_ bh d = put_ bh (toModifiedJulianDay d)
     get bh = do i <- get bh
                 return $ ModifiedJulianDay { toModifiedJulianDay = i }
 
 instance Binary DiffTime where
-    put_ bh dt = put_ bh (toRational dt)
+    putNoStack_ bh dt = put_ bh (toRational dt)
     get bh = do r <- get bh
                 return $ fromRational r
 
 instance Binary JoinPointHood where
-    put_ bh NotJoinPoint = putByte bh 0
-    put_ bh (JoinPoint ar) = do
+    putNoStack_ bh NotJoinPoint = putByte bh 0
+    putNoStack_ bh (JoinPoint ar) = do
         putByte bh 1
         put_ bh ar
     get bh = do
@@ -884,7 +917,7 @@ The instance is used for in Binary Integer and Binary Rational in GHC.Types.Lite
 -}
 
 instance Binary Integer where
-    put_ bh i
+    putNoStack_ bh i
       | i >= lo64 && i <= hi64 = do
           putWord8 bh 0
           put_ bh (fromIntegral i :: Int64)
@@ -925,8 +958,8 @@ roll   = foldl' unstep 0 . reverse
     -- See https://gitlab.haskell.org/ghc/ghc/issues/3379#note_104346 for
     -- discussion.
 
-    put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
-    put_ bh (J# s# a#) = do
+    putNoStack_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
+    putNoStack_ bh (J# s# a#) = do
         putByte bh 1
         put_ bh (I# s#)
         let sz# = sizeofByteArray# a#  -- in *bytes*
@@ -988,13 +1021,13 @@ indexByteArray a# n# = W8# (indexWord8Array# a# n#)
 
 -}
 instance (Binary a) => Binary (Ratio a) where
-    put_ bh (a :% b) = do put_ bh a; put_ bh b
+    putNoStack_ bh (a :% b) = do put_ bh a; put_ bh b
     get bh = do a <- get bh; b <- get bh; return (a :% b)
 
 -- Instance uses fixed-width encoding to allow inserting
 -- Bin placeholders in the stream.
-instance Binary (Bin a) where
-  put_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
+instance Typeable a => Binary (Bin (a :: *)) where
+  putNoStack_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
   get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
 
 
@@ -1006,14 +1039,14 @@ instance Binary (Bin a) where
 forwardPut :: BinHandle -> (b -> IO a) -> IO b -> IO (a,b)
 forwardPut bh put_A put_B = do
   -- write placeholder pointer to A
-  pre_a <- tellBin bh
-  put_ bh pre_a
+  pre_a <- tellBin @(Bin ()) bh
+  putNoStack_ bh pre_a
 
   -- write B
   r_b <- put_B
 
   -- update A's pointer
-  a <- tellBin bh
+  a <- tellBin @() bh
   putAt bh pre_a a
   seekBinNoExpand bh a
 
@@ -1028,9 +1061,9 @@ forwardPut_ bh put_A put_B = void $ forwardPut bh put_A put_B
 forwardGet :: BinHandle -> IO a -> IO a
 forwardGet bh get_A = do
     -- read forward reference
-    p <- get bh -- a BinPtr
+    p <- get @(Bin ()) bh -- a BinPtr
     -- store current position
-    p_a <- tellBin bh
+    p_a <- tellBin @() bh
     -- go read the forward value, then seek back
     seekBinNoExpand bh p
     r <- get_A
@@ -1043,16 +1076,16 @@ forwardGet bh get_A = do
 lazyPut :: HasCallStack => Binary a => BinHandle -> a -> IO ()
 lazyPut bh a = do
     -- output the obj with a ptr to skip over it:
-    pre_a <- tellBin bh
-    put_ bh pre_a       -- save a slot for the ptr
-    put_ bh a           -- dump the object
-    q <- tellBin bh     -- q = ptr to after object
+    pre_a <- tellBin @(Bin ()) bh
+    putNoStack_ bh pre_a       -- save a slot for the ptr
+    putNoStack_ bh a           -- dump the object
+    q <- tellBin @() bh     -- q = ptr to after object
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBin bh q        -- finally carry on writing at q
 
 lazyGet :: HasCallStack => Binary a => BinHandle -> IO a
 lazyGet bh = do
-    p <- get bh -- a BinPtr
+    p <- get @(Bin ()) bh -- a BinPtr
     p_a <- tellBin bh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh off_r variable in the child thread, for thread
@@ -1265,7 +1298,7 @@ type Dictionary = Array Int FastString -- The dictionary
 
 putDictionary ::HasCallStack => BinHandle -> Int -> UniqFM FastString (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
-  put_ bh sz
+  putNoStack_ bh sz
   mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUFM dict)))
     -- It's OK to use nonDetEltsUFM here because the elements have indices
     -- that array uses to create order
@@ -1372,7 +1405,7 @@ getByteString bh l =
 putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =
   BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
-    put_ bh l
+    putNoStack_ bh l
     putPrim bh l (\op -> copyBytes op (castPtr ptr) l)
 
 getBS :: BinHandle -> IO ByteString
@@ -1382,11 +1415,11 @@ getBS bh = do
     getPrim bh l (\src -> copyBytes dest src l)
 
 instance Binary ByteString where
-  put_ bh f = putBS bh f
+  putNoStack_ bh f = putBS bh f
   get bh = getBS bh
 
 instance Binary FastString where
-  put_ bh f =
+  putNoStack_ bh f =
     case findUserDataCache (Proxy :: Proxy FastString) bh of
       tbl -> putEntry tbl bh f
 
@@ -1398,11 +1431,11 @@ deriving instance Binary NonDetFastString
 deriving instance Binary LexicalFastString
 
 instance Binary Fingerprint where
-  put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
+  putNoStack_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
 
 instance Binary ModuleName where
-  put_ bh (ModuleName fs) = put_ bh fs
+  putNoStack_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
 -- instance Binary TupleSort where
@@ -1574,7 +1607,7 @@ instance Binary ModuleName where
 newtype BinLocated a = BinLocated { unBinLocated :: Located a }
 
 instance Binary a => Binary (BinLocated a) where
-    put_ bh (BinLocated (L l x)) = do
+    putNoStack_ bh (BinLocated (L l x)) = do
             put_ bh $ BinSrcSpan l
             put_ bh x
 
@@ -1587,7 +1620,7 @@ newtype BinSpan = BinSpan { unBinSpan :: RealSrcSpan }
 
 -- See Note [Source Location Wrappers]
 instance Binary BinSpan where
-  put_ bh (BinSpan ss) = do
+  putNoStack_ bh (BinSpan ss) = do
             put_ bh (srcSpanFile ss)
             put_ bh (srcSpanStartLine ss)
             put_ bh (srcSpanStartCol ss)
@@ -1604,7 +1637,7 @@ instance Binary BinSpan where
                                             (mkRealSrcLoc f el ec))
 
 instance Binary UnhelpfulSpanReason where
-  put_ bh r = case r of
+  putNoStack_ bh r = case r of
     UnhelpfulNoLocationInfo -> putByte bh 0
     UnhelpfulWiredIn        -> putByte bh 1
     UnhelpfulInteractive    -> putByte bh 2
@@ -1624,13 +1657,13 @@ newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
 
 -- See Note [Source Location Wrappers]
 instance Binary BinSrcSpan where
-  put_ bh (BinSrcSpan (RealSrcSpan ss _sb)) = do
+  putNoStack_ bh (BinSrcSpan (RealSrcSpan ss _sb)) = do
           putByte bh 0
           -- BufSpan doesn't ever get serialised because the positions depend
           -- on build location.
           put_ bh $ BinSpan ss
 
-  put_ bh (BinSrcSpan (UnhelpfulSpan s)) = do
+  putNoStack_ bh (BinSrcSpan (UnhelpfulSpan s)) = do
           putByte bh 1
           put_ bh s
 
@@ -1664,5 +1697,5 @@ source location as part of a larger structure.
 --------------------------------------------------------------------------------
 
 instance (Binary v) => Binary (IntMap v) where
-  put_ bh m = put_ bh (IntMap.toList m)
+  putNoStack_ bh m = put_ bh (IntMap.toList m)
   get bh = IntMap.fromList <$> get bh

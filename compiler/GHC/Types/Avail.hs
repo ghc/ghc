@@ -194,10 +194,10 @@ pprAvail (AvailTC n ns)
   = ppr n <> braces (pprWithCommas ppr ns)
 
 instance Binary AvailInfo where
-    put_ bh (Avail aa) = do
+    putNoStack_ bh (Avail aa) = do
             putByte bh 0
             put_ bh aa
-    put_ bh (AvailTC ab ac) = do
+    putNoStack_ bh (AvailTC ab ac) = do
             putByte bh 1
             put_ bh ab
             put_ bh ac

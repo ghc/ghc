@@ -150,7 +150,7 @@ instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitFS p `appendFS` moduleNameFS n)
 
 instance Binary a => Binary (GenModule a) where
-  put_ bh (Module p n) = put_ bh p >> put_ bh n
+  putNoStack_ bh (Module p n) = put_ bh p >> put_ bh n
   -- Module has strict fields, so use $! in order not to allocate a thunk
   get bh = do p <- get bh; n <- get bh; return $! Module p n
 
@@ -313,7 +313,7 @@ instance Ord (GenInstantiatedUnit unit) where
   u1 `compare` u2 = instUnitFS u1 `lexicalCompareFS` instUnitFS u2
 
 instance Binary InstantiatedUnit where
-  put_ bh indef = do
+  putNoStack_ bh indef = do
     put_ bh (instUnitInstanceOf indef)
     put_ bh (instUnitInsts indef)
   get bh = do
@@ -364,13 +364,13 @@ instance Show Unit where
 
 -- Performance: would prefer to have a NameCache like thing
 instance Binary Unit where
-  put_ bh (RealUnit def_uid) = do
+  putNoStack_ bh (RealUnit def_uid) = do
     putByte bh 0
     put_ bh def_uid
-  put_ bh (VirtUnit indef_uid) = do
+  putNoStack_ bh (VirtUnit indef_uid) = do
     putByte bh 1
     put_ bh indef_uid
-  put_ bh HoleUnit =
+  putNoStack_ bh HoleUnit =
     putByte bh 2
   get bh = do b <- getByte bh
               u <- case b of
@@ -520,7 +520,7 @@ newtype UnitId = UnitId
   deriving (Data)
 
 instance Binary UnitId where
-  put_ bh (UnitId fs) = put_ bh fs
+  putNoStack_ bh (UnitId fs) = put_ bh fs
   get bh = do fs <- get bh; return (UnitId fs)
 
 instance Eq UnitId where
@@ -696,7 +696,7 @@ the WiringMap, and that's why 'wiredInUnitIds' no longer includes
 -- 'DriverPhases.HscSource'. See Note [HscSource types].
 
 instance Binary IsBootInterface where
-  put_ bh ib = put_ bh $
+  putNoStack_ bh ib = put_ bh $
     case ib of
       NotBoot -> False
       IsBoot -> True
@@ -723,7 +723,7 @@ type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
 type ModuleWithIsBoot = GenWithIsBoot Module
 
 instance Binary a => Binary (GenWithIsBoot a) where
-  put_ bh (GWIB { gwib_mod, gwib_isBoot }) = do
+  putNoStack_ bh (GWIB { gwib_mod, gwib_isBoot }) = do
     put_ bh gwib_mod
     put_ bh gwib_isBoot
   get bh = do

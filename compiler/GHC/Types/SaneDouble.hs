@@ -32,7 +32,7 @@ instance Show SaneDouble where
 -- we need to preserve NaN and infinities, unfortunately the Binary instance for
 -- Double does not do this
 instance Binary SaneDouble where
-  put_ bh (SaneDouble d)
+  putNoStack_ bh (SaneDouble d)
     | isNaN d               = putByte bh 1
     | isInfinite d && d > 0 = putByte bh 2
     | isInfinite d && d < 0 = putByte bh 3

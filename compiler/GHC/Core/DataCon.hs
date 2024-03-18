@@ -1063,8 +1063,8 @@ instance Outputable StrictnessMark where
     ppr NotMarkedStrict = empty
 
 instance Binary StrictnessMark where
-    put_ bh NotMarkedStrict = putByte bh 0
-    put_ bh MarkedStrict    = putByte bh 1
+    putNoStack_ bh NotMarkedStrict = putByte bh 0
+    putNoStack_ bh MarkedStrict    = putByte bh 1
     get bh =
       do h <- getByte bh
          case h of
@@ -1073,9 +1073,9 @@ instance Binary StrictnessMark where
            _ -> panic "Invalid binary format"
 
 instance Binary SrcStrictness where
-    put_ bh SrcLazy     = putByte bh 0
-    put_ bh SrcStrict   = putByte bh 1
-    put_ bh NoSrcStrict = putByte bh 2
+    putNoStack_ bh SrcLazy     = putByte bh 0
+    putNoStack_ bh SrcStrict   = putByte bh 1
+    putNoStack_ bh NoSrcStrict = putByte bh 2
 
     get bh =
       do h <- getByte bh
@@ -1085,9 +1085,9 @@ instance Binary SrcStrictness where
            _ -> return NoSrcStrict
 
 instance Binary SrcUnpackedness where
-    put_ bh SrcNoUnpack = putByte bh 0
-    put_ bh SrcUnpack   = putByte bh 1
-    put_ bh NoSrcUnpack = putByte bh 2
+    putNoStack_ bh SrcNoUnpack = putByte bh 0
+    putNoStack_ bh SrcUnpack   = putByte bh 1
+    putNoStack_ bh NoSrcUnpack = putByte bh 2
 
     get bh =
       do h <- getByte bh

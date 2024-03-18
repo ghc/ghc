@@ -355,9 +355,9 @@ costCentreSrcSpan :: CostCentre -> SrcSpan
 costCentreSrcSpan = cc_loc
 
 instance Binary CCFlavour where
-    put_ bh CafCC =
+    putNoStack_ bh CafCC =
         putByte bh 0
-    put_ bh (IndexedCC flav i) = do
+    putNoStack_ bh (IndexedCC flav i) = do
         putByte bh 1
         let !flav_index = fromEnum flav
         put_ bh flav_index
@@ -370,12 +370,12 @@ instance Binary CCFlavour where
                 IndexedCC <$> (toEnum <$> get bh) <*> get bh
 
 instance Binary CostCentre where
-    put_ bh (NormalCC aa ab ac _ad) = do
+    putNoStack_ bh (NormalCC aa ab ac _ad) = do
             putByte bh 0
             put_ bh aa
             put_ bh ab
             put_ bh ac
-    put_ bh (AllCafsCC ae _af) = do
+    putNoStack_ bh (AllCafsCC ae _af) = do
             putByte bh 1
             put_ bh ae
     get bh = do

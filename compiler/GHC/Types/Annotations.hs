@@ -59,10 +59,10 @@ instance Outputable name => Outputable (AnnTarget name) where
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
 
 instance Binary name => Binary (AnnTarget name) where
-    put_ bh (NamedTarget a) = do
+    putNoStack_ bh (NamedTarget a) = do
         putByte bh 0
         put_ bh a
-    put_ bh (ModuleTarget a) = do
+    putNoStack_ bh (ModuleTarget a) = do
         putByte bh 1
         put_ bh a
     get bh = do
