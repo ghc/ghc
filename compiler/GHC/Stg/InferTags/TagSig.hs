@@ -44,10 +44,10 @@ instance Outputable TagInfo where
   ppr (TagTuple tis) = text "TagTuple" <> brackets (pprWithCommas ppr tis)
 
 instance Binary TagInfo where
-  put_ bh TagDunno  = putByte bh 1
-  put_ bh (TagTuple flds) = putByte bh 2 >> put_ bh flds
-  put_ bh TagProper = putByte bh 3
-  put_ bh TagTagged = putByte bh 4
+  putNoStack_ bh TagDunno  = putByte bh 1
+  putNoStack_ bh (TagTuple flds) = putByte bh 2 >> put_ bh flds
+  putNoStack_ bh TagProper = putByte bh 3
+  putNoStack_ bh TagTagged = putByte bh 4
 
   get bh = do tag <- getByte bh
               case tag of 1 -> return TagDunno
@@ -63,7 +63,7 @@ instance OutputableBndr (Id,TagSig) where
   pprPrefixOcc = ppr
 
 instance Binary TagSig where
-  put_ bh (TagSig sig) = put_ bh sig
+  putNoStack_ bh (TagSig sig) = put_ bh sig
   get bh = pure TagSig <*> get bh
 
 isTaggedSig :: TagSig -> Bool

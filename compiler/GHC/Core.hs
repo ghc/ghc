@@ -1105,8 +1105,8 @@ chooseOrphanAnchor local_names
     -- It's OK to use nonDetEltsUFM here, see comments above
 
 instance Binary IsOrphan where
-    put_ bh IsOrphan = putByte bh 0
-    put_ bh (NotOrphan n) = do
+    putNoStack_ bh IsOrphan = putByte bh 0
+    putNoStack_ bh (NotOrphan n) = do
         putByte bh 1
         put_ bh n
     get bh = do

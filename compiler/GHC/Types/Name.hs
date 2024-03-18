@@ -638,7 +638,7 @@ instance Data Name where
 -- serializing binding 'Name's. See 'UserData' for the rationale for this
 -- distinction.
 instance Binary Name where
-   put_ bh name =
+   putNoStack_ bh name =
       case findUserDataWriter Proxy bh of
         tbl -> putEntry tbl bh name
 

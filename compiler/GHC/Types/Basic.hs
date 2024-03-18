@@ -159,8 +159,8 @@ instance Outputable LeftOrRight where
   ppr CRight   = text "Right"
 
 instance Binary LeftOrRight where
-   put_ bh CLeft  = putByte bh 0
-   put_ bh CRight = putByte bh 1
+   putNoStack_ bh CLeft  = putByte bh 0
+   putNoStack_ bh CRight = putByte bh 1
 
    get bh = do { h <- getByte bh
                ; case h of
@@ -416,8 +416,8 @@ instance Outputable PromotionFlag where
   ppr IsPromoted  = text "IsPromoted"
 
 instance Binary PromotionFlag where
-   put_ bh NotPromoted = putByte bh 0
-   put_ bh IsPromoted  = putByte bh 1
+   putNoStack_ bh NotPromoted = putByte bh 0
+   putNoStack_ bh IsPromoted  = putByte bh 1
 
    get bh = do
        n <- getByte bh
@@ -442,8 +442,8 @@ instance Outputable FunctionOrData where
     ppr IsData     = text "(data)"
 
 instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
+    putNoStack_ bh IsFunction = putByte bh 0
+    putNoStack_ bh IsData     = putByte bh 1
     get bh = do
         h <- getByte bh
         case h of
@@ -503,7 +503,7 @@ instance Outputable Boxity where
   ppr Unboxed = text "Unboxed"
 
 instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
-  put_ bh = put_ bh . isBoxed
+  putNoStack_ bh = put_ bh . isBoxed
   get bh  = do
     b <- get bh
     pure $ if b then Boxed else Unboxed
@@ -525,8 +525,8 @@ instance Outputable CbvMark where
   ppr NotMarkedCbv = text "~"
 
 instance Binary CbvMark where
-    put_ bh NotMarkedCbv = putByte bh 0
-    put_ bh MarkedCbv    = putByte bh 1
+    putNoStack_ bh NotMarkedCbv = putByte bh 0
+    putNoStack_ bh MarkedCbv    = putByte bh 1
     get bh =
       do h <- getByte bh
          case h of
@@ -569,9 +569,9 @@ instance Outputable RecFlag where
   ppr NonRecursive = text "NonRecursive"
 
 instance Binary RecFlag where
-    put_ bh Recursive =
+    putNoStack_ bh Recursive =
             putByte bh 0
-    put_ bh NonRecursive =
+    putNoStack_ bh NonRecursive =
             putByte bh 1
     get bh = do
             h <- getByte bh
@@ -809,12 +809,12 @@ instance Outputable OverlapMode where
    ppr (NonCanonical _) = text "[noncanonical]"
 
 instance Binary OverlapMode where
-    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
-    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
-    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
-    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
-    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
-    put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
+    putNoStack_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+    putNoStack_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+    putNoStack_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+    putNoStack_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+    putNoStack_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+    putNoStack_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
     get bh = do
         h <- getByte bh
         case h of
@@ -828,8 +828,8 @@ instance Binary OverlapMode where
 
 
 instance Binary OverlapFlag where
-    put_ bh flag = do put_ bh (overlapMode flag)
-                      put_ bh (isSafeOverlap flag)
+    putNoStack_ bh flag = do put_ bh (overlapMode flag)
+                             put_ bh (isSafeOverlap flag)
     get bh = do
         h <- get bh
         b <- get bh
@@ -951,9 +951,9 @@ instance Outputable TupleSort where
       ConstraintTuple -> "ConstraintTuple"
 
 instance Binary TupleSort where
-    put_ bh BoxedTuple      = putByte bh 0
-    put_ bh UnboxedTuple    = putByte bh 1
-    put_ bh ConstraintTuple = putByte bh 2
+    putNoStack_ bh BoxedTuple      = putByte bh 0
+    putNoStack_ bh UnboxedTuple    = putByte bh 1
+    putNoStack_ bh ConstraintTuple = putByte bh 2
     get bh = do
       h <- getByte bh
       case h of
@@ -1762,17 +1762,17 @@ instance Outputable Activation where
    ppr FinalActive        = text "[final]"
 
 instance Binary Activation where
-    put_ bh NeverActive =
+    putNoStack_ bh NeverActive =
             putByte bh 0
-    put_ bh FinalActive =
+    putNoStack_ bh FinalActive =
             putByte bh 1
-    put_ bh AlwaysActive =
+    putNoStack_ bh AlwaysActive =
             putByte bh 2
-    put_ bh (ActiveBefore src aa) = do
+    putNoStack_ bh (ActiveBefore src aa) = do
             putByte bh 3
             put_ bh src
             put_ bh aa
-    put_ bh (ActiveAfter src ab) = do
+    putNoStack_ bh (ActiveAfter src ab) = do
             putByte bh 4
             put_ bh src
             put_ bh ab
@@ -1794,8 +1794,8 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = text "FUNLIKE"
 
 instance Binary RuleMatchInfo where
-    put_ bh FunLike = putByte bh 0
-    put_ bh ConLike = putByte bh 1
+    putNoStack_ bh FunLike = putByte bh 0
+    putNoStack_ bh ConLike = putByte bh 1
     get bh = do
             h <- getByte bh
             if h == 1 then return ConLike
@@ -1809,15 +1809,15 @@ instance Outputable InlineSpec where
     ppr NoUserInlinePrag       = empty
 
 instance Binary InlineSpec where
-    put_ bh NoUserInlinePrag = putByte bh 0
-    put_ bh (Inline s)       = do putByte bh 1
-                                  put_ bh s
-    put_ bh (Inlinable s)    = do putByte bh 2
-                                  put_ bh s
-    put_ bh (NoInline s)     = do putByte bh 3
-                                  put_ bh s
-    put_ bh (Opaque s)       = do putByte bh 4
-                                  put_ bh s
+    putNoStack_ bh NoUserInlinePrag = putByte bh 0
+    putNoStack_ bh (Inline s)       = do putByte bh 1
+                                         put_ bh s
+    putNoStack_ bh (Inlinable s)    = do putByte bh 2
+                                         put_ bh s
+    putNoStack_ bh (NoInline s)     = do putByte bh 3
+                                         put_ bh s
+    putNoStack_ bh (Opaque s)       = do putByte bh 4
+                                         put_ bh s
 
     get bh = do h <- getByte bh
                 case h of
@@ -1839,7 +1839,7 @@ instance Outputable InlinePragma where
   ppr = pprInline
 
 instance Binary InlinePragma where
-    put_ bh (InlinePragma s a b c d) = do
+    putNoStack_ bh (InlinePragma s a b c d) = do
             put_ bh s
             put_ bh a
             put_ bh b
@@ -1934,10 +1934,10 @@ isStableSource StableUserSrc   = True
 isStableSource VanillaSrc      = False
 
 instance Binary UnfoldingSource where
-    put_ bh CompulsorySrc   = putByte bh 0
-    put_ bh StableUserSrc   = putByte bh 1
-    put_ bh StableSystemSrc = putByte bh 2
-    put_ bh VanillaSrc      = putByte bh 3
+    putNoStack_ bh CompulsorySrc   = putByte bh 0
+    putNoStack_ bh StableUserSrc   = putByte bh 1
+    putNoStack_ bh StableSystemSrc = putByte bh 2
+    putNoStack_ bh VanillaSrc      = putByte bh 3
     get bh = do
         h <- getByte bh
         case h of
@@ -2071,7 +2071,7 @@ instance Outputable Levity where
   ppr Unlifted = text "Unlifted"
 
 instance Binary Levity where
-  put_ bh = \case
+  putNoStack_ bh = \case
     Lifted   -> putByte bh 0
     Unlifted -> putByte bh 1
   get bh = getByte bh >>= \case

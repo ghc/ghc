@@ -1422,26 +1422,26 @@ ppr_id_extras (IdExtras fix rules anns) = ppr fix $$ vcat (map ppr rules) $$ vca
 -- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
   get _bh = panic "no get for IfaceDeclExtras"
-  put_ bh (IfaceIdExtras extras) = do
+  putNoStack_ bh (IfaceIdExtras extras) = do
    putByte bh 1; put_ bh extras
-  put_ bh (IfaceDataExtras fix insts anns cons) = do
+  putNoStack_ bh (IfaceDataExtras fix insts anns cons) = do
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
-  put_ bh (IfaceClassExtras fix insts anns methods defms) = do
+  putNoStack_ bh (IfaceClassExtras fix insts anns methods defms) = do
    putByte bh 3
    put_ bh fix
    put_ bh insts
    put_ bh anns
    put_ bh methods
    put_ bh defms
-  put_ bh (IfaceSynonymExtras fix anns) = do
+  putNoStack_ bh (IfaceSynonymExtras fix anns) = do
    putByte bh 4; put_ bh fix; put_ bh anns
-  put_ bh (IfaceFamilyExtras fix finsts anns) = do
+  putNoStack_ bh (IfaceFamilyExtras fix finsts anns) = do
    putByte bh 5; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = putByte bh 6
+  putNoStack_ bh IfaceOtherDeclExtras = putByte bh 6
 
 instance Binary IfaceIdExtras where
   get _bh = panic "no get for IfaceIdExtras"
-  put_ bh (IdExtras fix rules anns)= do { put_ bh fix; put_ bh rules; put_ bh anns }
+  putNoStack_ bh (IdExtras fix rules anns)= do { put_ bh fix; put_ bh rules; put_ bh anns }
 
 declExtras :: (OccName -> Maybe Fixity)
            -> (OccName -> [AnnPayload])

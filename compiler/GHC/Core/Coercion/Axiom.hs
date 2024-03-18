@@ -534,9 +534,9 @@ instance Outputable Role where
   ppr = ftext . fsFromRole
 
 instance Binary Role where
-  put_ bh Nominal          = putByte bh 1
-  put_ bh Representational = putByte bh 2
-  put_ bh Phantom          = putByte bh 3
+  putNoStack_ bh Nominal          = putByte bh 1
+  putNoStack_ bh Representational = putByte bh 2
+  putNoStack_ bh Phantom          = putByte bh 3
 
   get bh = do tag <- getByte bh
               case tag of 1 -> return Nominal

@@ -14,6 +14,7 @@ module GHC.Data.EnumSet
 import GHC.Prelude
 import GHC.Utils.Binary
 import Control.DeepSeq
+import Data.Typeable
 
 import qualified Data.IntSet as IntSet
 
@@ -47,8 +48,8 @@ difference (EnumSet a) (EnumSet b) = EnumSet (IntSet.difference a b)
 --
 -- This is only efficient for values that are sufficiently small,
 -- for example in the lower hundreds.
-instance Binary (EnumSet a) where
-  put_ bh = put_ bh . enumSetToBitArray
+instance (Typeable k, Typeable a) => Binary (EnumSet (a :: k)) where
+  putNoStack_ bh = put_ bh . enumSetToBitArray
   get bh = bitArrayToEnumSet <$> get bh
 
 -- TODO: Using 'Natural' instead of 'Integer' should be slightly more efficient

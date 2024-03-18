@@ -34,7 +34,7 @@ instance Eq Fixity where -- Used to determine if two fixities conflict
   (Fixity _ p1 dir1) == (Fixity _ p2 dir2) = p1==p2 && dir1 == dir2
 
 instance Binary Fixity where
-    put_ bh (Fixity src aa ab) = do
+    putNoStack_ bh (Fixity src aa ab) = do
             put_ bh src
             put_ bh aa
             put_ bh ab
@@ -57,11 +57,11 @@ instance Outputable FixityDirection where
     ppr InfixN = text "infix"
 
 instance Binary FixityDirection where
-    put_ bh InfixL =
+    putNoStack_ bh InfixL =
             putByte bh 0
-    put_ bh InfixR =
+    putNoStack_ bh InfixR =
             putByte bh 1
-    put_ bh InfixN =
+    putNoStack_ bh InfixN =
             putByte bh 2
     get bh = do
             h <- getByte bh

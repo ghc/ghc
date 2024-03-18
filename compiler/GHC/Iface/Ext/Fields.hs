@@ -26,21 +26,21 @@ type FieldName = String
 newtype ExtensibleFields = ExtensibleFields { getExtensibleFields :: (Map FieldName BinData) }
 
 instance Binary ExtensibleFields where
-  put_ bh (ExtensibleFields fs) = do
+  putNoStack_ bh (ExtensibleFields fs) = do
     put_ bh (Map.size fs :: Int)
 
     -- Put the names of each field, and reserve a space
     -- for a payload pointer after each name:
     header_entries <- forM (Map.toList fs) $ \(name, dat) -> do
       put_ bh name
-      field_p_p <- tellBin bh
+      field_p_p <- tellBin @(Bin ()) bh
       put_ bh field_p_p
       return (field_p_p, dat)
 
     -- Now put the payloads and use the reserved space
     -- to point to the start of each payload:
     forM_ header_entries $ \(field_p_p, dat) -> do
-      field_p <- tellBin bh
+      field_p <- tellBin @() bh
       putAt bh field_p_p field_p
       seekBin bh field_p
       put_ bh dat
@@ -50,7 +50,7 @@ instance Binary ExtensibleFields where
 
     -- Get the names and field pointers:
     header_entries <- replicateM n $
-      (,) <$> get bh <*> get bh
+      (,) <$> get bh <*> get @(Bin ()) bh
 
     -- Seek to and get each field's payload:
     fields <- forM header_entries $ \(name, field_p) -> do

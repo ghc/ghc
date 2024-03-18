@@ -269,15 +269,15 @@ instance Outputable CType where
 -}
 
 instance Binary ForeignCall where
-    put_ bh (CCall aa) = put_ bh aa
+    putNoStack_ bh (CCall aa) = put_ bh aa
     get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
-    put_ bh PlaySafe =
+    putNoStack_ bh PlaySafe =
             putByte bh 0
-    put_ bh PlayInterruptible =
+    putNoStack_ bh PlayInterruptible =
             putByte bh 1
-    put_ bh PlayRisky =
+    putNoStack_ bh PlayRisky =
             putByte bh 2
     get bh = do
             h <- getByte bh
@@ -287,7 +287,7 @@ instance Binary Safety where
               _ -> return PlayRisky
 
 instance Binary CExportSpec where
-    put_ bh (CExportStatic ss aa ab) = do
+    putNoStack_ bh (CExportStatic ss aa ab) = do
             put_ bh ss
             put_ bh aa
             put_ bh ab
@@ -298,7 +298,7 @@ instance Binary CExportSpec where
           return (CExportStatic ss aa ab)
 
 instance Binary CCallSpec where
-    put_ bh (CCallSpec aa ab ac) = do
+    putNoStack_ bh (CCallSpec aa ab ac) = do
             put_ bh aa
             put_ bh ab
             put_ bh ac
@@ -309,13 +309,13 @@ instance Binary CCallSpec where
           return (CCallSpec aa ab ac)
 
 instance Binary CCallTarget where
-    put_ bh (StaticTarget ss aa ab ac) = do
+    putNoStack_ bh (StaticTarget ss aa ab ac) = do
             putByte bh 0
             put_ bh ss
             put_ bh aa
             put_ bh ab
             put_ bh ac
-    put_ bh DynamicTarget =
+    putNoStack_ bh DynamicTarget =
             putByte bh 1
     get bh = do
             h <- getByte bh
@@ -328,15 +328,15 @@ instance Binary CCallTarget where
               _ -> return DynamicTarget
 
 instance Binary CCallConv where
-    put_ bh CCallConv =
+    putNoStack_ bh CCallConv =
             putByte bh 0
-    put_ bh StdCallConv =
+    putNoStack_ bh StdCallConv =
             putByte bh 1
-    put_ bh PrimCallConv =
+    putNoStack_ bh PrimCallConv =
             putByte bh 2
-    put_ bh CApiConv =
+    putNoStack_ bh CApiConv =
             putByte bh 3
-    put_ bh JavaScriptCallConv =
+    putNoStack_ bh JavaScriptCallConv =
             putByte bh 4
     get bh = do
             h <- getByte bh
@@ -348,7 +348,8 @@ instance Binary CCallConv where
               _ -> return JavaScriptCallConv
 
 instance Binary CType where
-    put_ bh (CType s mh fs) = do put_ bh s
+    putNoStack_ bh (CType s mh fs) =
+                              do put_ bh s
                                  put_ bh mh
                                  put_ bh fs
     get bh = do s  <- get bh
@@ -357,7 +358,7 @@ instance Binary CType where
                 return (CType s mh fs)
 
 instance Binary Header where
-    put_ bh (Header s h) = put_ bh s >> put_ bh h
+    putNoStack_ bh (Header s h) = put_ bh s >> put_ bh h
     get bh = do s <- get bh
                 h <- get bh
                 return (Header s h)

@@ -54,6 +54,10 @@ import Data.Word
 import Data.IORef
 import Control.Monad
 import Data.Functor.Identity
+import qualified Data.Map as Map
+import System.IO
+import Data.List
+import System.FilePath
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -133,7 +137,7 @@ readBinIface
 readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
     (src_hash, bh) <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
 
-    extFields_p <- get bh
+    extFields_p <- get @(Bin ()) bh
 
     mod_iface <- getWithUserData name_cache bh
 
@@ -194,18 +198,28 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     put_  bh tag
     put_  bh (mi_src_hash mod_iface)
 
-    extFields_p_p <- tellBin bh
+    extFields_p_p <- tellBin @(Bin ()) bh
     put_ bh extFields_p_p
 
     putWithUserData traceBinIface bh mod_iface
 
-    extFields_p <- tellBin bh
+    extFields_p <- tellBin @() bh
     putAt bh extFields_p_p extFields_p
     seekBin bh extFields_p
     put_ bh (mi_ext_fields mod_iface)
 
     -- And send the result to the file
     writeBinMem bh hi_path
+    report <- profileBinMem bh
+    writeStackFormat (hi_path <.> "stats") report
+
+writeStackFormat :: FilePath -> Map.Map [String] Int -> IO ()
+writeStackFormat fp report = do
+  let elems = Map.assocs report
+      remove_bad = map (\c -> if c `elem` " ;" then '_' else c)
+  withFile fp WriteMode $ \h -> do
+    forM_ elems $ \(k, v) -> do
+      hPutStrLn h (intercalate ";" (map remove_bad (reverse k)) ++ " " ++ show v)
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.
@@ -213,7 +227,7 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
-  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> put bh' payload)
+  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> putNoStack bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()

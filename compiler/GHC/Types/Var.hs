@@ -512,8 +512,8 @@ instance Outputable ForAllTyFlag where
   ppr Inferred  = text "[infrd]"
 
 instance Binary Specificity where
-  put_ bh SpecifiedSpec = putByte bh 0
-  put_ bh InferredSpec  = putByte bh 1
+  putNoStack_ bh SpecifiedSpec = putByte bh 0
+  putNoStack_ bh InferredSpec  = putByte bh 1
 
   get bh = do
     h <- getByte bh
@@ -522,9 +522,9 @@ instance Binary Specificity where
       _ -> return InferredSpec
 
 instance Binary ForAllTyFlag where
-  put_ bh Required  = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Inferred  = putByte bh 2
+  putNoStack_ bh Required  = putByte bh 0
+  putNoStack_ bh Specified = putByte bh 1
+  putNoStack_ bh Inferred  = putByte bh 2
 
   get bh = do
     h <- getByte bh
@@ -565,10 +565,10 @@ instance Outputable FunTyFlag where
   ppr FTF_C_C  = text "[==>]"
 
 instance Binary FunTyFlag where
-  put_ bh FTF_T_T = putByte bh 0
-  put_ bh FTF_T_C = putByte bh 1
-  put_ bh FTF_C_T = putByte bh 2
-  put_ bh FTF_C_C = putByte bh 3
+  putNoStack_ bh FTF_T_T = putByte bh 0
+  putNoStack_ bh FTF_T_C = putByte bh 1
+  putNoStack_ bh FTF_C_T = putByte bh 2
+  putNoStack_ bh FTF_C_C = putByte bh 3
 
   get bh = do
     h <- getByte bh
@@ -808,7 +808,7 @@ instance Outputable tv => Outputable (VarBndr tv Specificity) where
   ppr = ppr . tyVarSpecToBinder
 
 instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
-  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
+  putNoStack_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
 
   get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
 

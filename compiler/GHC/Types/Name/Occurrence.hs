@@ -1289,15 +1289,15 @@ ppMainFn main_occ
 -}
 
 instance Binary NameSpace where
-    put_ bh VarName =
+    putNoStack_ bh VarName =
             putByte bh 0
-    put_ bh DataName =
+    putNoStack_ bh DataName =
             putByte bh 1
-    put_ bh TvName =
+    putNoStack_ bh TvName =
             putByte bh 2
-    put_ bh TcClsName =
+    putNoStack_ bh TcClsName =
             putByte bh 3
-    put_ bh (FldName parent) = do
+    putNoStack_ bh (FldName parent) = do
             putByte bh 4
             put_ bh parent
     get bh = do
@@ -1312,7 +1312,7 @@ instance Binary NameSpace where
                 return $ FldName { fldParent = parent }
 
 instance Binary OccName where
-    put_ bh (OccName aa ab) = do
+    putNoStack_ bh (OccName aa ab) = do
             put_ bh aa
             put_ bh ab
     get bh = do

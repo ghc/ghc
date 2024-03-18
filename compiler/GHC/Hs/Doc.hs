@@ -86,7 +86,7 @@ instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
   ppr (WithHsDocIdentifiers s _ids) = ppr s
 
 instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
-  put_ bh (WithHsDocIdentifiers s ids) = do
+  putNoStack_ bh (WithHsDocIdentifiers s ids) = do
     put_ bh s
     put_ bh $ BinLocated <$> ids
   get bh =
@@ -136,7 +136,7 @@ data DocStructureItem
       !Avails
 
 instance Binary DocStructureItem where
-  put_ bh = \case
+  putNoStack_ bh = \case
     DsiSectionHeading level doc -> do
       putByte bh 0
       put_ bh level
@@ -224,7 +224,7 @@ instance NFData Docs where
     `seq` ()
 
 instance Binary Docs where
-  put_ bh docs = do
+  putNoStack_ bh docs = do
     put_ bh (docs_mod_hdr docs)
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_exports docs)
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_decls docs)

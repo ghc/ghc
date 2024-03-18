@@ -711,8 +711,8 @@ instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
   ppr (Bndr v bi) = ppr bi <+> parens (pprBndr LetBind v)
 
 instance Binary TyConBndrVis where
-  put_ bh AnonTCB        = do { putByte bh 0 }
-  put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
+  putNoStack_ bh AnonTCB        = do { putByte bh 0 }
+  putNoStack_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
 
   get bh = do { h <- getByte bh
               ; case h of
@@ -1585,26 +1585,26 @@ instance Outputable PrimElemRep where
   ppr r = text (show r)
 
 instance Binary PrimRep where
-  put_ bh (BoxedRep ml)  = case ml of
+  putNoStack_ bh (BoxedRep ml)  = case ml of
     -- cheaper storage of the levity than using
     -- the Binary (Maybe Levity) instance
     Nothing       -> putByte bh 0
     Just Lifted   -> putByte bh 1
     Just Unlifted -> putByte bh 2
-  put_ bh Int8Rep        = putByte bh 3
-  put_ bh Int16Rep       = putByte bh 4
-  put_ bh Int32Rep       = putByte bh 5
-  put_ bh Int64Rep       = putByte bh 6
-  put_ bh IntRep         = putByte bh 7
-  put_ bh Word8Rep       = putByte bh 8
-  put_ bh Word16Rep      = putByte bh 9
-  put_ bh Word32Rep      = putByte bh 10
-  put_ bh Word64Rep      = putByte bh 11
-  put_ bh WordRep        = putByte bh 12
-  put_ bh AddrRep        = putByte bh 13
-  put_ bh FloatRep       = putByte bh 14
-  put_ bh DoubleRep      = putByte bh 15
-  put_ bh (VecRep n per) = putByte bh 16 *> put_ bh n *> put_ bh per
+  putNoStack_ bh Int8Rep        = putByte bh 3
+  putNoStack_ bh Int16Rep       = putByte bh 4
+  putNoStack_ bh Int32Rep       = putByte bh 5
+  putNoStack_ bh Int64Rep       = putByte bh 6
+  putNoStack_ bh IntRep         = putByte bh 7
+  putNoStack_ bh Word8Rep       = putByte bh 8
+  putNoStack_ bh Word16Rep      = putByte bh 9
+  putNoStack_ bh Word32Rep      = putByte bh 10
+  putNoStack_ bh Word64Rep      = putByte bh 11
+  putNoStack_ bh WordRep        = putByte bh 12
+  putNoStack_ bh AddrRep        = putByte bh 13
+  putNoStack_ bh FloatRep       = putByte bh 14
+  putNoStack_ bh DoubleRep      = putByte bh 15
+  putNoStack_ bh (VecRep n per) = putByte bh 16 *> put_ bh n *> put_ bh per
   get  bh = do
     h <- getByte bh
     case h of
@@ -1628,7 +1628,7 @@ instance Binary PrimRep where
       _  -> pprPanic "Binary:PrimRep" (int (fromIntegral h))
 
 instance Binary PrimElemRep where
-  put_ bh per = putByte bh (fromIntegral (fromEnum per))
+  putNoStack_ bh per = putByte bh (fromIntegral (fromEnum per))
   get  bh = toEnum . fromIntegral <$> getByte bh
 
 isGcPtrRep :: PrimRep -> Bool
@@ -2863,8 +2863,8 @@ instance Data.Data TyCon where
     dataTypeOf _ = mkNoRepType "TyCon"
 
 instance Binary Injectivity where
-    put_ bh NotInjective   = putByte bh 0
-    put_ bh (Injective xs) = putByte bh 1 >> put_ bh xs
+    putNoStack_ bh NotInjective   = putByte bh 0
+    putNoStack_ bh (Injective xs) = putByte bh 1 >> put_ bh xs
 
     get bh = do { h <- getByte bh
                 ; case h of

@@ -229,10 +229,10 @@ instance Outputable CprSig where
   ppr (CprSig ty) = ppr (ct_cpr ty)
 
 instance Binary Cpr where
-  put_ bh TopCpr         = putByte bh 0
-  put_ bh BotCpr         = putByte bh 1
-  put_ bh (FlatConCpr n) = putByte bh 2 *> put_ bh n
-  put_ bh (ConCpr n cs)  = putByte bh 3 *> put_ bh n *> put_ bh cs
+  putNoStack_ bh TopCpr         = putByte bh 0
+  putNoStack_ bh BotCpr         = putByte bh 1
+  putNoStack_ bh (FlatConCpr n) = putByte bh 2 *> put_ bh n
+  putNoStack_ bh (ConCpr n cs)  = putByte bh 3 *> put_ bh n *> put_ bh cs
   get  bh = do
     h <- getByte bh
     case h of
@@ -243,5 +243,5 @@ instance Binary Cpr where
       _ -> pprPanic "Binary Cpr: Invalid tag" (int (fromIntegral h))
 
 instance Binary CprType where
-  put_ bh (CprType arty cpr) = put_ bh arty *> put_ bh cpr
+  putNoStack_ bh (CprType arty cpr) = put_ bh arty *> put_ bh cpr
   get  bh                    = CprType <$> get bh <*> get bh

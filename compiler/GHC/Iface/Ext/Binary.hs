@@ -111,7 +111,7 @@ writeHieFile hie_file_path hiefile = do
   put_ bh hiefile
 
   -- write the symtab pointer at the front of the file
-  symtab_p <- tellBin bh
+  symtab_p <- tellBin @() bh
   putAt bh symtab_p_p symtab_p
   seekBin bh symtab_p
 
@@ -121,7 +121,7 @@ writeHieFile hie_file_path hiefile = do
   putSymbolTable bh symtab_next' symtab_map'
 
   -- write the dictionary pointer at the front of the file
-  dict_p <- tellBin bh
+  dict_p <- tellBin @() bh
   putAt bh dict_p_p dict_p
   seekBin bh dict_p
 
@@ -231,16 +231,16 @@ readHieFileContents bh0 name_cache = do
   get bh1
   where
     get_dictionary bin_handle = do
-      dict_p <- get bin_handle
-      data_p <- tellBin bin_handle
+      dict_p <- get @(Bin ()) bin_handle
+      data_p <- tellBin @() bin_handle
       seekBin bin_handle dict_p
       dict <- getDictionary bin_handle
       seekBin bin_handle data_p
       return dict
 
     get_symbol_table bh1 = do
-      symtab_p <- get bh1
-      data_p'  <- tellBin bh1
+      symtab_p <- get @(Bin ()) bh1
+      data_p'  <- tellBin @() bh1
       seekBin bh1 symtab_p
       symtab <- getSymbolTable bh1 name_cache
       seekBin bh1 data_p'

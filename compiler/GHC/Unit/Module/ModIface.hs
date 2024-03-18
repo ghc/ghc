@@ -355,7 +355,7 @@ renameFreeHoles fhs insts =
 
 -- See Note [Strictness in ModIface] about where we use lazyPut vs put
 instance Binary ModIface where
-   put_ bh (ModIface {
+   putNoStack_ bh (ModIface {
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
                  mi_hsc_src   = hsc_src,
