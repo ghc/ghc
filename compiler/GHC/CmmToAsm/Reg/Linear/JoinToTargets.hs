@@ -57,7 +57,7 @@ joinToTargets block_live id instr
         = return ([], instr)
 
         | otherwise
-        = joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
+        = joinToTargets' block_live [] id instr (jumpBlockDestsOfInstr instr)
 
 -----
 joinToTargets'
