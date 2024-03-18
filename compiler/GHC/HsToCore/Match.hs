@@ -29,7 +29,7 @@ import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Types.Basic ( Origin(..), requiresPMC, isDoExpansionGenerated )
+import GHC.Types.Basic ( Origin(..), requiresPMC )
 
 import GHC.Types.SourceText
     ( FractionalLit,
@@ -765,20 +765,11 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
+matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                            , mg_ext = MatchGroupTc arg_tys rhs_ty origin
                            })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
-        ; let matches
-                = if any (is_pat_syn_match origin) matches'
-                  then filter (non_gen_wc origin) matches'
-                       -- filter out the wild pattern fail alternatives
-                       -- which have a do expansion origin
-                       -- They generate spurious overlapping warnings
-                       -- Due to pattern synonyms treated as refutable patterns
-                       -- See Part 1's Wrinkle 1 in Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
-                  else matches'
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs arg_tys
                            (m:_) ->
@@ -797,6 +788,8 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
                 , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
         ; matches_nablas <-
             if isMatchContextPmChecked dflags origin ctxt
+               -- See Note [Expanding HsDo with XXExprGhcRn] Part 1. Wrinkle 1 for
+               -- pmc for pattern synonyms
 
             -- See Note [Long-distance information] in GHC.HsToCore.Pmc
             then addHsScrutTmCs (concat scrs) new_vars $
@@ -842,16 +835,6 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
       = expectJust "GRHSs non-empty"
       $ NEL.nonEmpty
       $ replicate (length (grhssGRHSs m)) ldi_nablas
-
-    is_pat_syn_match :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
-    is_pat_syn_match origin (L _ (Match _ _ [L _ (VisPat _ l_pat)] _)) | isDoExpansionGenerated origin
-                         = isPatSyn l_pat
-    is_pat_syn_match _ _ = False
-    -- generated match pattern that is not a wildcard
-    non_gen_wc :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
-    non_gen_wc origin (L _ (Match _ _ ([L _ (VisPat _ (L _ (WildPat _)))]) _))
-                   = not . isDoExpansionGenerated $ origin
-    non_gen_wc _ _ = True
 
 {- Note [Long-distance information in matchWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
