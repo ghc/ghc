@@ -777,6 +777,7 @@ dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
 dropJumps _    [] = []
 dropJumps info (BasicBlock lbl ins:todo)
     | Just ins <- nonEmpty ins --This can happen because of shortcutting
+    , [Just _dest] <- jumpDestsOfInstr (NE.last ins)
     , BasicBlock nextLbl _ : _ <- todo
     , canFallthroughTo (NE.last ins) nextLbl
     , not (mapMember nextLbl info)
@@ -875,7 +876,7 @@ mkNode edgeWeights block@(BasicBlock id instrs) =
               | length successors > 2 || edgeWeight info <= 0 -> []
               | otherwise -> [target]
           | Just instr <- lastMaybe instrs
-          , [one] <- jumpDestsOfInstr instr
+          , [one] <- jumpBlockDestsOfInstr instr
           = [one]
           | otherwise = []
 

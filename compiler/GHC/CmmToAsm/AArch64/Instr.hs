@@ -322,15 +322,20 @@ isJumpishInstr instr = case instr of
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-jumpDestsOfInstr :: Instr -> [BlockId]
+jumpDestsOfInstr :: Instr -> [Maybe BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
-jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
-jumpDestsOfInstr _ = []
+jumpDestsOfInstr i = case i of
+    (CBZ _ t) -> [ mkDest t ]
+    (CBNZ _ t) -> [ mkDest t ]
+    (J t) -> [ mkDest t ]
+    (B t) -> [ mkDest t ]
+    (BL t _ _) -> [ mkDest t ]
+    (BCOND _ t) -> [ mkDest t ]
+    _ -> []
+  where
+    mkDest (TBlock id) = Just id
+    mkDest TLabel{} = Nothing
+    mkDest TReg{} = Nothing
 
 canFallthroughTo :: Instr -> BlockId -> Bool
 canFallthroughTo (ANN _ i) bid = canFallthroughTo i bid

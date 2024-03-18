@@ -522,12 +522,15 @@ canFallthroughTo instr bid
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-jumpDestsOfInstr :: Instr -> [BlockId]
+jumpDestsOfInstr :: Instr -> [Maybe BlockId]
 jumpDestsOfInstr insn
   = case insn of
-        BCC _ id _       -> [id]
-        BCCFAR _ id _    -> [id]
-        BCTR targets _ _ -> [id | Just id <- targets]
+        BCC _ id _       -> [Just id]
+        BCCFAR _ id _    -> [Just id]
+        BCTR targets _ _ -> targets
+        BCTRL{}          -> [Nothing]
+        BL{}             -> [Nothing]
+        JMP{}            -> [Nothing]
         _                -> []
 
 
