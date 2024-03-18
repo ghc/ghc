@@ -3,6 +3,10 @@ test('T21336a',
      [ unless(opsys('linux') or opsys('freebsd'), skip)
      , js_broken(22261)
      , fragile(22022)
+     # More than fragile, the test is failing consistently on wasm. See #22022.
+     # It would be nice to see if the test is NOT fragile on the other
+     # architectures, but right now I don't know how to check.
+     , when(arch('wasm32'), skip)
      , extra_files(['FinalizerExceptionHandler.hs'])
      ],
      compile_and_run, [''])
