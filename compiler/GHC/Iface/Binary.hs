@@ -241,13 +241,13 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     report <- profileBinMem bh
     writeStackFormat (hi_path <.> "stats") report
 
-writeStackFormat :: FilePath -> Map.Map [String] Int -> IO ()
+writeStackFormat :: Show a => FilePath -> Map.Map [a] Int -> IO ()
 writeStackFormat fp report = do
   let elems = Map.assocs report
       remove_bad = map (\c -> if c `elem` " ;" then '_' else c)
   withFile fp WriteMode $ \h -> do
     forM_ elems $ \(k, v) -> do
-      hPutStrLn h (intercalate ";" (map remove_bad (reverse k)) ++ " " ++ show v)
+      hPutStrLn h (intercalate ";" (map (remove_bad . show) (reverse k)) ++ " " ++ show v)
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.

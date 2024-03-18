@@ -190,12 +190,18 @@ data BinHandle
      prof :: {-# UNPACK #-} !BinProf
     }
 
-data BinProf = BinProf { stack :: ![String], report :: IORef (Map.Map [String] Int) }
+data ProfKey = StringKey !String | TypeableKey !TypeRep deriving (Eq, Ord)
 
-initBinProf = BinProf <$> pure ["TOP"] <*> newIORef (Map.empty)
+instance Show ProfKey where
+  show (StringKey s) = s
+  show (TypeableKey tr) = show tr
 
-addStack :: String -> BinProf -> BinProf
-addStack s (BinProf ss i) = (BinProf (s:ss) i)
+data BinProf = BinProf { stack :: ![ProfKey], report :: IORef (Map.Map [ProfKey] Int) }
+
+initBinProf = BinProf <$> pure [StringKey "TOP"] <*> newIORef (Map.empty)
+
+addStack :: TypeRep -> BinProf -> BinProf
+addStack s (BinProf ss i) = (BinProf (TypeableKey s:ss) i)
 
 recordSample :: Int -> BinProf -> IO ()
 recordSample weight (BinProf ss i) = modifyIORef i (Map.insertWith (+) ss weight)
@@ -259,15 +265,15 @@ class Typeable a => Binary a where
     putNoStack bh a  = do p <- tellBin bh; put_ bh a; return p
 
 put_ :: forall a . (Binary a, Typeable a) => BinHandle -> a -> IO ()
-put_ bh = withCC (show (typeRep (Proxy @a))) bh putNoStack_
+put_ bh = putNoStack_  (withCC ((typeRep (Proxy @a))) bh)
 
-withCC :: String -> BinHandle -> (BinHandle -> k) -> k
-withCC c bh k =
-  if c == head (stack (prof bh))
+withCC :: TypeRep -> BinHandle -> BinHandle
+withCC c bh =
+  if TypeableKey c == head (stack (prof bh))
     then
-      k bh
+      bh
     else
-      k (bh { prof = addStack c (prof bh) })
+      (bh { prof = addStack c (prof bh) })
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
 putAt bh p x = do seekBin bh p; put_ bh x; return ()
@@ -312,7 +318,7 @@ writeBinMem (BinMem _ ix_r _ arr_r bp) fn = do
   unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
 
-profileBinMem :: BinHandle -> IO (Map.Map [String] Int)
+profileBinMem :: BinHandle -> IO (Map.Map [ProfKey] Int)
 profileBinMem (BinMem _ _ _ _ bp) = readIORef (report bp)
 
 readBinMem :: HasCallStack => FilePath -> IO BinHandle
