@@ -187,5 +187,16 @@ createAdjustor (int cconv,
         barf("createAdjustor: failed to allocate memory");
     }
 
+#if defined(riscv64_HOST_ARCH)
+    // Synchronize the memory and instruction cache to prevent illegal
+    // instruction exceptions. fence.i works per hart. I'm not sure what happens
+    // when the generated code is called on another hart. Probably, the fence on
+    // read/write is good enough for that. However, if there are illegal
+    // instruction exceptions, this is the place to look at (maybe, that the
+    // fence.i needs to be moved closely before the call.)
+    asm volatile ("fence rw, rw"  : : : "memory");
+    asm volatile ("fence.i" ::: "memory");
+#endif
+
     return (void*)code;
 }
