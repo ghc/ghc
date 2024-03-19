@@ -11,7 +11,7 @@ import GHC.Prelude
 import GHC.Core.Map.Type
 import GHC.Driver.DynFlags    ( DynFlags )
 import GHC.Driver.Ppr
-import GHC.Data.FastString   ( FastString, mkFastString )
+import GHC.Data.FastString   ( FastString, mkFastString , LexicalFastString(..))
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
@@ -156,15 +156,15 @@ getEvidenceTree refmap var = go emptyNameSet var
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
   where
-    go (HTyVarTy n) = IfaceTyVar $ occNameFS $ getOccName n
+    go (HTyVarTy n) = IfaceTyVar $ (LexicalFastString (occNameFS $ getOccName n))
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
-    go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
+    go (HForAllTy ((n,k),af) t) = let b = (LexicalFastString (occNameFS $ getOccName n), k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
     go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b
     go (HQualTy pred b) = IfaceFunTy invisArgTypeLike many_ty pred b
     go (HCastTy a) = a
-    go HCoercionTy = IfaceTyVar "<coercion type>"
+    go HCoercionTy = IfaceTyVar (LexicalFastString "<coercion type>")
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
 
     -- This isn't fully faithful - we can't produce the 'Inferred' case

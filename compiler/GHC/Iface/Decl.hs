@@ -147,7 +147,7 @@ tyConToIfaceDecl env tycon
   | Just fam_flav <- famTyConFlav_maybe tycon
   = ( tc_env1
     , IfaceFamily { ifName    = getName tycon,
-                    ifResVar  = if_res_var,
+                    ifResVar  = LexicalFastString <$> if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
                     ifResKind = if_res_kind,
@@ -256,7 +256,7 @@ tyConToIfaceDecl env tycon
 
           (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
           user_bndrs' = map (tidyUserForAllTyBinder con_env2) user_bndrs
-          to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
+          to_eq_spec (tv,ty) = ((tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
           -- By this point, we have tidied every universal and existential
           -- tyvar. Because of the dcUserForAllTyBinders invariant
@@ -288,7 +288,7 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = toIfaceBooleanFormula $ fmap getOccFS (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula $ fmap (LexicalFastString . getOccFS) (classMinimalDef clas)
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
@@ -334,7 +334,7 @@ tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
 tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
 tidyTyConBinders = mapAccumL tidyTyConBinder
 
-tidyTyVar :: TidyEnv -> TyVar -> FastString
+tidyTyVar :: TidyEnv -> TyVar -> LexicalFastString
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
 toIfaceBooleanFormula :: BooleanFormula IfLclName -> IfaceBooleanFormula

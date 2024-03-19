@@ -33,6 +33,8 @@ module GHC.Iface.Type (
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
 
+        -- Binary utilities
+        putIfaceType, getIfaceType,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -92,6 +94,9 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import Data.Proxy
+import Control.Monad ((<$!>))
+import Control.Arrow (first)
 
 {-
 ************************************************************************
@@ -101,7 +106,7 @@ import Control.DeepSeq
 ************************************************************************
 -}
 
-type IfLclName = FastString     -- A local name in iface syntax
+type IfLclName = LexicalFastString     -- A local name in iface syntax
 
 type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
                         -- (However Internal or System Names never should)
@@ -109,6 +114,8 @@ type IfExtName = Name   -- An External or WiredIn Name can appear in Iface synta
 data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
+  deriving (Eq, Ord)
+
 
 type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
@@ -177,6 +184,7 @@ data IfaceType
           -- In an experiment, removing IfaceTupleTy resulted in a 0.75% regression
           -- in interface file size (in GHC's boot libraries).
           -- See !3987.
+  deriving (Eq, Ord)
 
 type IfaceMult = IfaceType
 
@@ -185,9 +193,9 @@ type IfaceContext = [IfacePredType]
 
 data IfaceTyLit
   = IfaceNumTyLit Integer
-  | IfaceStrTyLit FastString
+  | IfaceStrTyLit LexicalFastString
   | IfaceCharTyLit Char
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
 type IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
@@ -229,6 +237,7 @@ data IfaceAppArgs
                         --    arguments in @{...}.
 
            IfaceAppArgs -- The rest of the arguments
+  deriving (Eq, Ord)
 
 instance Semi.Semigroup IfaceAppArgs where
   IA_Nil <> xs              = xs
@@ -390,7 +399,7 @@ adding no inline top-level constants for the two most common cases.
 
 data IfaceMCoercion
   = IfaceMRefl
-  | IfaceMCo IfaceCoercion
+  | IfaceMCo IfaceCoercion deriving (Eq, Ord)
 
 data IfaceCoercion
   = IfaceReflCo       IfaceType
@@ -415,11 +424,13 @@ data IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
+  deriving (Eq, Ord)
 
 data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
+  deriving (Eq, Ord)
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -591,11 +602,11 @@ type IfaceTySubst = FastStringEnv IfaceType -- Note [Substitution on IfaceType]
 
 mkIfaceTySubst :: [(IfLclName,IfaceType)] -> IfaceTySubst
 -- See Note [Substitution on IfaceType]
-mkIfaceTySubst eq_spec = mkFsEnv eq_spec
+mkIfaceTySubst eq_spec = mkFsEnv (map (first getLexicalFastString) eq_spec)
 
 inDomIfaceTySubst :: IfaceTySubst -> IfaceTvBndr -> Bool
 -- See Note [Substitution on IfaceType]
-inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst fs)
+inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst (getLexicalFastString fs))
 
 substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
 -- See Note [Substitution on IfaceType]
@@ -651,7 +662,7 @@ substIfaceAppArgs env args
 
 substIfaceTyVar :: IfaceTySubst -> IfLclName -> IfaceType
 substIfaceTyVar env tv
-  | Just ty <- lookupFsEnv env tv = ty
+  | Just ty <- lookupFsEnv env (getLexicalFastString tv) = ty
   | otherwise                     = IfaceTyVar tv
 
 
@@ -1160,7 +1171,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
      | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
-      = let subs' = extendFsEnv subs var substituted_ty
+      = let subs' = extendFsEnv subs (getLexicalFastString var) substituted_ty
             -- Record that we should replace it with LiftedRep/Lifted/Many,
             -- and recurse, discarding the forall
         in go subs' True ty
@@ -1168,7 +1179,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go subs rank1 (IfaceForAllTy bndr ty)
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
+    go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (getLexicalFastString tv) of
       Just s -> s
       Nothing -> ty
 
@@ -1596,7 +1607,7 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
                 Required (IA_Arg ty Required IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
-         $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
+         $ char '?' <> ftext (getLexicalFastString n) <> text "::" <> ppr_ty topPrec ty
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug
@@ -2099,38 +2110,46 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    putNoStack_ _ (IfaceFreeTyVar tv)
-       = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+   putNoStack_ bh tyCon = case findUserDataWriter Proxy bh of
+    tbl -> putEntry tbl bh tyCon
 
-    putNoStack_ bh (IfaceForAllTy aa ab) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-    putNoStack_ bh (IfaceTyVar ad) = do
-            putByte bh 1
-            put_ bh ad
-    putNoStack_ bh (IfaceAppTy ae af) = do
-            putByte bh 2
-            put_ bh ae
-            put_ bh af
-    putNoStack_ bh (IfaceFunTy af aw ag ah) = do
-            putByte bh 3
-            put_ bh af
-            put_ bh aw
-            put_ bh ag
-            put_ bh ah
-    putNoStack_ bh (IfaceTyConApp tc tys)
-      = do { putByte bh 5; put_ bh tc; put_ bh tys }
-    putNoStack_ bh (IfaceCastTy a b)
-      = do { putByte bh 6; put_ bh a; put_ bh b }
-    putNoStack_ bh (IfaceCoercionTy a)
-      = do { putByte bh 7; put_ bh a }
-    putNoStack_ bh (IfaceTupleTy s i tys)
-      = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
-    putNoStack_ bh (IfaceLitTy n)
-      = do { putByte bh 9; put_ bh n }
+   get bh = case findUserDataReader Proxy bh of
+    tbl -> getEntry tbl bh
 
-    get bh = do
+
+putIfaceType _ (IfaceFreeTyVar tv)
+   = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+
+putIfaceType bh (IfaceForAllTy aa ab) = do
+        putByte bh 0
+        put_ bh aa
+        put_ bh ab
+putIfaceType bh (IfaceTyVar ad) = do
+        putByte bh 1
+        put_ bh ad
+putIfaceType bh (IfaceAppTy ae af) = do
+        putByte bh 2
+        put_ bh ae
+        put_ bh af
+putIfaceType bh (IfaceFunTy af aw ag ah) = do
+        putByte bh 3
+        put_ bh af
+        put_ bh aw
+        put_ bh ag
+        put_ bh ah
+putIfaceType bh (IfaceTyConApp tc tys)
+  = do { putByte bh 5; put_ bh tc; put_ bh tys }
+putIfaceType bh (IfaceCastTy a b)
+  = do { putByte bh 6; put_ bh a; put_ bh b }
+putIfaceType bh (IfaceCoercionTy a)
+  = do { putByte bh 7; put_ bh a }
+putIfaceType bh (IfaceTupleTy s i tys)
+  = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
+putIfaceType bh (IfaceLitTy n)
+  = do { putByte bh 9; put_ bh n }
+
+getIfaceType :: HasCallStack => BinHandle -> IO IfaceType
+getIfaceType bh = do
             h <- getByte bh
             case h of
               0 -> do aa <- get bh

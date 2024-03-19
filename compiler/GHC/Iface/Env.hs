@@ -190,10 +190,10 @@ setNameModule (Just m) n =
 ************************************************************************
 -}
 
-tcIfaceLclId :: FastString -> IfL Id
+tcIfaceLclId :: LexicalFastString -> IfL Id
 tcIfaceLclId occ
   = do  { lcl <- getLclEnv
-        ; case lookupFsEnv (if_id_env lcl) occ of
+        ; case lookupFsEnv (if_id_env lcl) (getLexicalFastString occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM $
               vcat
@@ -209,10 +209,10 @@ extendIfaceIdEnv ids
     in env { if_id_env = id_env' }
 
 
-tcIfaceTyVar :: FastString -> IfL TyVar
+tcIfaceTyVar :: LexicalFastString -> IfL TyVar
 tcIfaceTyVar occ
   = do  { lcl <- getLclEnv
-        ; case lookupFsEnv (if_tv_env lcl) occ of
+        ; case lookupFsEnv (if_tv_env lcl) (getLexicalFastString occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
@@ -220,15 +220,15 @@ tcIfaceTyVar occ
 lookupIfaceTyVar :: IfaceTvBndr -> IfL (Maybe TyVar)
 lookupIfaceTyVar (occ, _)
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) (getLexicalFastString occ)) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
 lookupIfaceVar (IfaceIdBndr (_, occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_id_env lcl) occ) }
+        ; return (lookupFsEnv (if_id_env lcl) (getLexicalFastString occ)) }
 lookupIfaceVar (IfaceTvBndr (occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupFsEnv (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) (getLexicalFastString occ)) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars

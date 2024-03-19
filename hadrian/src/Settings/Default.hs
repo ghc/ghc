@@ -113,6 +113,8 @@ stage0Packages = do
              , transformers
              , unlit
              , hp2ps
+        , ghc_debug_convention
+        , ghc_debug_stub
              , if windowsHost then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
@@ -160,8 +162,6 @@ stage1Packages = do
         , unlit
         , xhtml
         , if winTarget then win32 else unix
-        , ghc_debug_convention
-        , ghc_debug_stub
         ]
       , when (not cross)
         [ haddock

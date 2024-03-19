@@ -64,6 +64,8 @@ module GHC.Utils.Binary
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
+   lazyGet',
+   lazyPut',
    lazyGetMaybe,
    lazyPutMaybe,
 
@@ -110,7 +112,7 @@ import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
-import GHC.Utils.Outputable( JoinPointHood(..) )
+import GHC.Utils.Outputable( JoinPointHood(..), Outputable(..))
 import GHC.Utils.Misc
 
 import Control.DeepSeq
@@ -146,6 +148,8 @@ import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Kind (Type)
+import Data.List (sortBy)
+import Data.Ord (comparing)
 
 type BinArray = ForeignPtr Word8
 
@@ -1105,24 +1109,33 @@ forwardGet bh get_A = do
 -- Lazy reading/writing
 
 lazyPut :: Binary a => BinHandle -> a -> IO ()
-lazyPut bh a = do
+lazyPut = lazyPut' putNoStack_
+
+lazyGet :: Binary a => BinHandle -> IO a
+lazyGet = lazyGet' Nothing get
+
+lazyPut' :: HasCallStack => (BinHandle -> a -> IO ()) -> BinHandle -> a -> IO ()
+lazyPut' f bh a = do
     -- output the obj with a ptr to skip over it:
     pre_a <- tellBin @(Bin ()) bh
     putNoStack_ bh pre_a       -- save a slot for the ptr
-    putNoStack_ bh a           -- dump the object
+    f bh a           -- dump the object
     q <- tellBin @() bh     -- q = ptr to after object
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBin bh q        -- finally carry on writing at q
 
-lazyGet :: Binary a => BinHandle -> IO a
-lazyGet bh = do
+lazyGet' :: HasCallStack => Maybe (IORef BinHandle) -> (BinHandle -> IO a) -> BinHandle -> IO a
+lazyGet' mbh f bh = do
     p <- get @(Bin ()) bh -- a BinPtr
     p_a <- tellBin bh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh off_r variable in the child thread, for thread
         -- safety.
+        inner_bh <- maybe (pure bh) readIORef mbh
         off_r <- newFastMutInt 0
-        getAt bh { _off_r = off_r } p_a
+        let bh' = inner_bh { _off_r = off_r }
+        seekBin bh' p_a
+        f bh'
     seekBin bh p -- skip over the object for now
     return a
 
@@ -1299,7 +1312,7 @@ data SomeWriterTable f = forall a . Typeable a =>
   SomeWriterTable (f (WriterTable, BinaryWriter a))
 
 data ReaderTable a = ReaderTable
-  { getTable :: BinHandle -> IO (SymbolTable a)
+  { getTable :: IORef BinHandle -> BinHandle -> IO (SymbolTable a)
   , mkReaderFromTable :: SymbolTable a -> BinaryReader a
   }
 
@@ -1330,26 +1343,34 @@ initGenericSymbolTable = do
 
 putGenericSymbolTable :: forall a. GenericSymbolTable a -> (BinHandle -> a -> IO ()) -> BinHandle -> IO Int
 putGenericSymbolTable gen_sym_tab serialiser bh = do
-  table_count <- readFastMutInt symtab_next
-  symtab_map  <- readIORef symtab_map
-  putGenericSymbolTable bh table_count symtab_map
-  pure table_count
+  putGenericSymbolTable bh
   where
     symtab_map = gen_symtab_map gen_sym_tab
     symtab_next = gen_symtab_next gen_sym_tab
-    putGenericSymbolTable :: BinHandle -> Int -> Map.Map a Int -> IO ()
-    putGenericSymbolTable bh name_count symtab = do
-        put_ bh name_count
-        let genElements = elems (array (0,name_count-1) (fmap swap $ Map.toList symtab))
-        mapM_ (\n -> serialiser bh n) genElements
+    putGenericSymbolTable :: HasCallStack => BinHandle -> IO Int
+    putGenericSymbolTable bh  = do
+      let loop bound = do
+            d <- readIORef symtab_map
+            table_count <- readFastMutInt symtab_next
+            let vs = sortBy (comparing fst) (map swap ([(a,b) | (a,b) <- Map.toList  d, b >= bound]))
+            case vs of
+              [] -> return table_count
+              todo -> do
+                print (map fst todo)
+                mapM_ (\n -> lazyPut' serialiser bh n) (map snd vs)
+                loop table_count
+      snd <$>
+        (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
+          loop 0)
 
-getGenericSymbolTable :: forall a. (BinHandle -> IO a) -> BinHandle -> IO (SymbolTable a)
-getGenericSymbolTable deserialiser bh = do
-  sz <- get bh :: IO Int
+getGenericSymbolTable :: forall a. (BinHandle -> IO a) -> IORef BinHandle -> BinHandle -> IO (SymbolTable a)
+getGenericSymbolTable deserialiser bhRef bh = do
+  sz <- forwardGet bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
   forM_ [0..(sz-1)] $ \i -> do
-    f <- deserialiser bh
+    f <- lazyGet' (Just bhRef) deserialiser bh
     writeArray mut_arr i f
+  pprTraceM "gotten" (ppr sz)
   unsafeFreeze mut_arr
 
 putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> BinHandle -> a -> IO ()
@@ -1384,7 +1405,7 @@ initFastStringReaderTable :: IO (ReaderTable FastString)
 initFastStringReaderTable = do
   return $
     ReaderTable
-      { getTable = getDictionary
+      { getTable = \_ -> getDictionary
       , mkReaderFromTable = \tbl -> mkReader (getDictFastString tbl)
       }
 
