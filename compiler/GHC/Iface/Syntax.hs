@@ -632,6 +632,7 @@ data IfaceExpr
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
+
 data IfaceTickish
   = IfaceHpcTick    Module Int               -- from HpcTick x
   | IfaceSCC        CostCentre Bool Bool     -- from ProfNote
@@ -1026,7 +1027,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
       pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
         pprBooleanFormula
-          (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
+          (\_ def -> cparen (isLexSym def) (ppr def)) 0 (fmap ifLclNameFS minDef) <+>
         text "#-}"
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
