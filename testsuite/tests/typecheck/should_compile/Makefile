@@ -122,3 +122,7 @@ InlinePatSyn_ExplicitBidiBuilder:
 InlinePatSyn_ExplicitBidiMatcher:
 	$(RM) -f InlinePatSyn_ExplicitBidiMatcher.o InlinePatSyn_ExplicitBidiMatcher.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_ExplicitBidiMatcher.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -vq 'Pattern'
+
+T24566:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T24566.hs -fno-code -dno-typeable-binds -ddump-if-trace 2>&1 | grep Integer || true
+         # Not expecting any mention of Integer in the interface loading trace

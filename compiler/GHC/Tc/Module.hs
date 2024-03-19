@@ -709,7 +709,7 @@ tcRnHsBootDecls boot_or_sig decls
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds, _th_bndrs)
-             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
+             <- tcTyClsInstDecls tycl_decls deriv_decls def_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
         -- Emit Typeable bindings
@@ -1612,7 +1612,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, th_bndrs,
          XValBindsLR (NValBinds deriv_binds deriv_sigs))
-            <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
+            <- tcTyClsInstDecls tycl_decls deriv_decls default_decls val_binds ;
 
         updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {
@@ -1621,11 +1621,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         traceTc "Tc4" empty ;
         (fi_ids, fi_decls, fi_gres) <- tcForeignImports foreign_decls ;
         tcExtendGlobalValEnv fi_ids     $ do {
-
-                -- Default declarations
-        traceTc "Tc4a" empty ;
-        default_tys <- tcDefaults default_decls ;
-        updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
 
                 -- Value declarations next.
                 -- It is important that we check the top-level value bindings
@@ -1686,13 +1681,14 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;
 
         return (tcg_env', tcl_env)
-    }}}}}}
+    }}}}}
 
 tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup GhcRn]
                  -> [LDerivDecl GhcRn]
+                 -> [LDefaultDecl GhcRn]
                  -> [(RecFlag, LHsBinds GhcRn)]
                  -> TcM (TcGblEnv,            -- The full inst env
                          [InstInfo GhcRn],    -- Source-code instance decls to
@@ -1702,16 +1698,24 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                           HsValBinds GhcRn)   -- Supporting bindings for derived
                                               -- instances
 
-tcTyClsInstDecls tycl_decls deriv_decls binds
+tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
    do { (tcg_env, inst_info, deriv_info, th_bndrs)
           <- tcTyAndClassDecls tycl_decls ;
+
       ; setGblEnv tcg_env $ do {
+
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
           -- process the deriving clauses, including data family deriving
           -- clauses discovered in @tcTyAndClassDecls@.
           --
+          -- But only after we've typechecked 'default' declarations.
+          -- See Note [Typechecking default declarations]
+          default_tys <- tcDefaults default_decls ;
+          updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
+
+
           -- Careful to quit now in case there were instance errors, so that
           -- the deriving errors don't pile up as well.
           ; failIfErrsM
@@ -1720,7 +1724,7 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
               ; pure ( tcg_env', inst_info' ++ inst_info, th_bndrs, val_binds )
-      }}}
+      }}}}
 
 {- *********************************************************************
 *                                                                      *
@@ -3141,3 +3145,43 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
     pluginUnsafe =
       singleMessage $
       mkPlainMsgEnvelope diag_opts noSrcSpan TcRnUnsafeDueToPlugin
+
+
+-- Note [Typechecking default declarations]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Typechecking default declarations requires careful placement:
+--
+-- 1. We must check them after types (tcTyAndClassDecls) because they can refer
+-- to them. E.g.
+--
+--    data T = MkT ...
+--    default(Int, T, Integer)
+--
+--    -- or even (tested by T11974b and T2245)
+--    default(Int, T, Integer)
+--    data T = MkT ...
+--
+-- 2. We must check them before typechecking deriving clauses (tcInstDeclsDeriv)
+-- otherwise we may lookup default default types (Integer, Double) while checking
+-- deriving clauses, ignoring the default declaration.
+--
+-- Before this careful placement (#24566), compiling the following example
+-- (T24566) with "-ddump-if-trace -ddump-tc-trace" showed a call to
+-- `applyDefaultingRules` with default types set to "(Integer,Double)":
+--
+--     module M where
+--
+--     import GHC.Classes
+--     default ()
+--
+--     data Foo a = Nothing | Just a
+--       deriving (Eq, Ord)
+--
+-- This was an issue while building modules like M in the ghc-internal package
+-- because they would spuriously fail to build if the module defining Integer
+-- (ghc-bignum:GHC.Num.Integer) wasn't compiled yet and its interface not to be
+-- found. The implicit dependency between M and GHC.Num.Integer isn't known to
+-- the build system.
+-- In addition, trying to explicitly avoid the implicit dependency with `default
+-- ()` didn't work, except if *standalone* deriving was used, which was an
+-- inconsistent behavior.
