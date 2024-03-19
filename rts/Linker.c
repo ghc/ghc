@@ -77,6 +77,10 @@
 #  include <mach-o/fat.h>
 #endif
 
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+#  include "linker/LoadNativeObjPosix.h"
+#endif
+
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
@@ -419,9 +423,6 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 static regex_t re_invalid;
 static regex_t re_realso;
-#if defined(THREADED_RTS)
-Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
-#endif
 #endif
 
 void initLinker (void)
@@ -455,9 +456,6 @@ initLinker_ (int retain_cafs)
 
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
-#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-    initMutex(&dl_mutex);
-#endif
 #endif
 
     symhash = allocStrHashTable();
@@ -520,9 +518,6 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
       regfree(&re_invalid);
       regfree(&re_realso);
-#if defined(THREADED_RTS)
-      closeMutex(&dl_mutex);
-#endif
    }
 #endif
    if (linker_init_done == 1) {
@@ -578,8 +573,8 @@ static void *
 internal_dlsym(const char *symbol) {
     void *v;
 
-    // We acquire dl_mutex as concurrent dl* calls may alter dlerror
-    ACQUIRE_LOCK(&dl_mutex);
+    // concurrent dl* calls may alter dlerror
+    ASSERT_LOCK_HELD(&linker_mutex);
 
     // clears dlerror
     dlerror();
@@ -587,7 +582,6 @@ internal_dlsym(const char *symbol) {
     // look in program first
     v = dlsym(dl_prog_handle, symbol);
     if (dlerror() == NULL) {
-        RELEASE_LOCK(&dl_mutex);
         IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in program\n", symbol));
         return v;
     }
@@ -597,12 +591,10 @@ internal_dlsym(const char *symbol) {
           v = dlsym(nc->dlopen_handle, symbol);
           if (dlerror() == NULL) {
             IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in shared object\n", symbol));
-            RELEASE_LOCK(&dl_mutex);
             return v;
           }
         }
     }
-    RELEASE_LOCK(&dl_mutex);
 
     IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in special cases\n", symbol));
 #   define SPECIAL_SYMBOL(sym) \
@@ -645,14 +637,13 @@ internal_dlsym(const char *symbol) {
 
 void *lookupSymbolInNativeObj(void *handle, const char *symbol_name)
 {
+    ASSERT_LOCK_HELD(&linker_mutex);
+
 #if defined(OBJFORMAT_MACHO)
     CHECK(symbol_name[0] == '_');
     symbol_name = symbol_name+1;
 #endif
-
-    ACQUIRE_LOCK(&dl_mutex); // dlsym alters dlerror
     void *result = dlsym(handle, symbol_name);
-    RELEASE_LOCK(&dl_mutex);
     return result;
 }
 #  endif
@@ -1101,9 +1092,10 @@ void freeObjectCode (ObjectCode *oc)
 
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
-        ACQUIRE_LOCK(&dl_mutex);
-        freeNativeCode_ELF(oc);
-        RELEASE_LOCK(&dl_mutex);
+        // ROMES:TODO: This previously acquired dl_mutex. Check that acquiring linker_mutex here is fine.
+        ACQUIRE_LOCK(&linker_mutex);
+        freeNativeCode_POSIX(oc);
+        RELEASE_LOCK(&linker_mutex);
 #else
         barf("freeObjectCode: This shouldn't happen");
 #endif
@@ -1868,73 +1860,20 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 
 #define UNUSED(x) (void)(x)
 
-#if defined(OBJFORMAT_ELF)
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
    IF_DEBUG(linker, debugBelch("loadNativeObj: path = '%s'\n", path));
    ACQUIRE_LOCK(&linker_mutex);
-   void *r = loadNativeObj_ELF(path, errmsg);
+   void *r = loadNativeObj_POSIX(path, errmsg);
 
-   if (r) {
-     RELEASE_LOCK(&linker_mutex);
-     return r;
+#if defined(OBJFORMAT_ELF)
+   if (!r) {
+       // Check if native object may be a linker script and try loading a native
+       // object from it
+       r = loadNativeObjFromLinkerScript_ELF(errmsg);
    }
-
-   // GHC #2615
-   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
-   // contain linker scripts rather than ELF-format object code. This
-   // code handles the situation by recognizing the real object code
-   // file name given in the linker script.
-   //
-   // If an "invalid ELF header" error occurs, it is assumed that the
-   // .so file contains a linker script instead of ELF object code.
-   // In this case, the code looks for the GROUP ( ... ) linker
-   // directive. If one is found, the first file name inside the
-   // parentheses is treated as the name of a dynamic library and the
-   // code attempts to dlopen that file. If this is also unsuccessful,
-   // an error message is returned.
-
-#define NMATCH 5
-   regmatch_t match[NMATCH];
-   FILE* fp;
-   size_t match_length;
-#define MAXLINE 1000
-   char line[MAXLINE];
-   int result;
-
-   // see if the error message is due to an invalid ELF header
-   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", *errmsg));
-   result = regexec(&re_invalid, *errmsg, (size_t) NMATCH, match, 0);
-   IF_DEBUG(linker, debugBelch("result = %i\n", result));
-   if (result == 0) {
-      // success -- try to read the named file as a linker script
-      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
-                                 MAXLINE-1);
-      strncpy(line, (*errmsg+(match[1].rm_so)),match_length);
-      line[match_length] = '\0'; // make sure string is null-terminated
-      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
-      if ((fp = __rts_fopen(line, "r")) == NULL) {
-         RELEASE_LOCK(&linker_mutex);
-         // return original error if open fails
-         return NULL;
-      }
-      // try to find a GROUP or INPUT ( ... ) command
-      while (fgets(line, MAXLINE, fp) != NULL) {
-         IF_DEBUG(linker, debugBelch("input line = %s", line));
-         if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
-            // success -- try to dlopen the first named file
-            IF_DEBUG(linker, debugBelch("match%s\n",""));
-            line[match[2].rm_eo] = '\0';
-            stgFree((void*)*errmsg); // Free old message before creating new one
-            r = loadNativeObj_ELF(line+match[2].rm_so, errmsg);
-            break;
-         }
-         // if control reaches here, no GROUP or INPUT ( ... ) directive
-         // was found and the original error message is returned to the
-         // caller
-      }
-      fclose(fp);
-   }
+#endif
 
    RELEASE_LOCK(&linker_mutex);
    return r;

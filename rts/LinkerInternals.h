@@ -412,10 +412,6 @@ extern Elf_Word shndx_table_uninit_label;
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
-
-#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-extern Mutex dl_mutex;
-#endif
 #endif /* THREADED_RTS */
 
 /* Type of an initializer */
