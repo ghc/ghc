@@ -21,7 +21,7 @@
 -- | Template Haskell splices
 module GHC.Tc.Gen.Splice(
      tcTypedSplice, tcTypedBracket, tcUntypedBracket,
-     runAnnotation,
+     runAnnotation, getUntypedSpliceBody,
 
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
@@ -639,13 +639,16 @@ Example:
 ************************************************************************
 -}
 
+-- None of these functions add constraints to the LIE
+
 tcTypedBracket    :: HsExpr GhcRn -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcUntypedBracket  :: HsExpr GhcRn -> HsQuote GhcRn -> [PendingRnSplice] -> ExpRhoType
                   -> TcM (HsExpr GhcTc)
-tcTypedSplice :: Name -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-        -- None of these functions add constraints to the LIE
+tcTypedSplice     :: Name -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
-runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
+getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
+runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
+
 {-
 ************************************************************************
 *                                                                      *
@@ -814,6 +817,16 @@ quotationCtxtDoc br_body
 *                                                                      *
 ************************************************************************
 -}
+
+-- getUntypedSpliceBody: the renamer has expanded the splice.
+-- Just run the finalizers that it produced, and return
+-- the renamed expression
+getUntypedSpliceBody (HsUntypedSpliceTop { utsplice_result_finalizers = mod_finalizers
+                                         , utsplice_result = rn_expr })
+  = do { addModFinalizersWithLclEnv mod_finalizers
+       ; return rn_expr }
+getUntypedSpliceBody (HsUntypedSpliceNested {})
+  = panic "tcTopUntypedSplice: invalid nested splice"
 
 tcTypedSplice splice_name expr res_ty
   = addErrCtxt (typedSpliceCtxtDoc splice_name expr) $

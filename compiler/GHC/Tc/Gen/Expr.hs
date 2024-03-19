@@ -30,7 +30,7 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
-  ( tcTypedSplice, tcTypedBracket, tcUntypedBracket )
+  ( tcTypedSplice, tcTypedBracket, tcUntypedBracket, getUntypedSpliceBody )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -168,6 +168,12 @@ tcPolyExprCheck expr res_ty
         = setSrcSpanA loc $
           do { e' <- tc_body e
              ; return (HsPar x (L loc e')) }
+
+      -- Look through any untyped splices (#24559)
+      -- c.f. Note [Looking through Template Haskell splices in splitHsApps]
+      tc_body (HsUntypedSplice splice_res _)
+        = do { body <- getUntypedSpliceBody splice_res
+             ; tc_body body }
 
       -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
       tc_body e@(HsLam x lam_variant matches)
@@ -673,11 +679,8 @@ tcExpr (HsUntypedSplice splice _)   res_ty
   -- for `HsUntypedSplice`; to see why, read Wrinkle (UTS1) in
   -- Note [Looking through Template Haskell splices in splitHsApps] in
   -- GHC.Tc.Gen.Head.
-  = case splice of
-      HsUntypedSpliceTop mod_finalizers expr
-        -> do { addModFinalizersWithLclEnv mod_finalizers
-              ; tcExpr expr res_ty }
-      HsUntypedSpliceNested {} -> panic "tcExpr: invalid nested splice"
+  = do { expr <- getUntypedSpliceBody splice
+       ; tcExpr expr res_ty }
 
 {-
 ************************************************************************
