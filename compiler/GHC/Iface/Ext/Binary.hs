@@ -33,6 +33,7 @@ import GHC.Types.Unique.FM
 import qualified Data.Array        as A
 import qualified Data.Array.IO     as A
 import qualified Data.Array.Unsafe as A
+import Data.Function              ( (&) )
 import Data.IORef
 import Data.ByteString            ( ByteString )
 import qualified Data.ByteString  as BS
@@ -43,6 +44,7 @@ import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
+import GHC.Iface.Syntax (getIfaceType, putIfaceType )
 
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
@@ -105,10 +107,13 @@ writeHieFile hie_file_path hiefile = do
                       hie_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = setWriterUserData bh0
-          $ newWriteState (putName hie_symtab)
-                          (putName hie_symtab)
-                          (putFastString hie_dict)
+  let bh = setWriterUserData bh0 $ mkWriterUserData
+        [ mkSomeBinaryWriter (mkWriter putIfaceType)
+        , mkSomeBinaryWriter (mkWriter $ putName hie_symtab)
+        , mkSomeBinaryWriter (simpleBindingNameWriter $ mkWriter $ putName hie_symtab)
+        , mkSomeBinaryWriter (mkWriter $ putFastString hie_dict)
+        ]
+
   put_ bh hiefile
 
   -- write the symtab pointer at the front of the file
@@ -219,13 +224,13 @@ readHieFileContents bh0 name_cache = do
   dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
   bh1 <- do
-      let bh1 = setReaderUserData bh0
-              $ newReadState (error "getSymtabName")
-                             (getDictFastString dict)
+      let bh1 = addReaderToUserData (mkReader $ getDictFastString dict) bh0
       symtab <- get_symbol_table bh1
-      let bh1' = setReaderUserData bh1
-               $ newReadState (getSymTabName symtab)
-                              (getDictFastString dict)
+      let bh1' = bh1
+                & addReaderToUserData (mkReader getIfaceType)
+                & addReaderToUserData (mkReader $ getSymTabName symtab)
+                & addReaderToUserData (simpleBindingNameReader $ mkReader $ getSymTabName symtab)
+                & addReaderToUserData (mkReader getIfaceType)
       return bh1'
 
   -- load the actual data

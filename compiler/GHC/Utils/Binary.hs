@@ -65,6 +65,8 @@ module GHC.Utils.Binary
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
+   lazyGet',
+   lazyPut',
    lazyGetMaybe,
    lazyPutMaybe,
 
@@ -87,10 +89,17 @@ module GHC.Utils.Binary
    initFastStringReaderTable, initFastStringWriterTable,
    putDictionary, getDictionary, putFS,
    FSTable(..), getDictFastString, putDictFastString,
+   -- * Generic deduplication table
+   GenericSymbolTable(..),
+   initGenericSymbolTable,
+   getGenericSymtab, putGenericSymTab,
+   getGenericSymbolTable, putGenericSymbolTable,
    -- * Newtype wrappers
    BinSpan(..), BinSrcSpan(..), BinLocated(..),
    -- * Newtypes for types that have canonically more than one valid encoding
    BindingName(..),
+   simpleBindingNameWriter,
+   simpleBindingNameReader,
   ) where
 
 import GHC.Prelude
@@ -103,11 +112,11 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
-import GHC.Utils.Misc (HasCallStack)
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
+import GHC.Utils.Misc ( HasCallStack )
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -127,7 +136,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set                 ( Set )
 import qualified Data.Set as Set
 import Data.Time
-import Data.List (unfoldr)
+import Data.List (sortOn, unfoldr)
 import Data.Typeable
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -230,22 +239,26 @@ setReaderUserData bh us = bh { rbm_userData = us }
 -- | Add 'SomeBinaryReader' as a known binary decoder.
 -- If a 'BinaryReader' for the associated type already exists in 'ReaderUserData',
 -- it is overwritten.
-addReaderToUserData :: SomeBinaryReader -> ReadBinHandle -> ReadBinHandle
-addReaderToUserData cache@(SomeBinaryReader typRep _) bh = bh
+addReaderToUserData :: Typeable a => BinaryReader a -> ReadBinHandle -> ReadBinHandle
+addReaderToUserData reader bh = bh
   { rbm_userData = (rbm_userData bh)
       { ud_reader_data = Map.insert typRep cache (ud_reader_data (rbm_userData bh))
       }
   }
+  where
+    cache@(SomeBinaryReader typRep _) = mkSomeBinaryReader reader
 
 -- | Add 'SomeBinaryWriter' as a known binary encoder.
 -- If a 'BinaryWriter' for the associated type already exists in 'WriterUserData',
 -- it is overwritten.
-addWriterToUserData :: SomeBinaryWriter -> WriteBinHandle -> WriteBinHandle
-addWriterToUserData cache@(SomeBinaryWriter typRep _) bh = bh
+addWriterToUserData :: Typeable a => BinaryWriter a -> WriteBinHandle -> WriteBinHandle
+addWriterToUserData writer bh = bh
   { wbm_userData = (wbm_userData bh)
       { ud_writer_data = Map.insert typRep cache (ud_writer_data (wbm_userData bh))
       }
   }
+  where
+    cache@(SomeBinaryWriter typRep _) = mkSomeBinaryWriter writer
 
 -- | Get access to the underlying buffer.
 withBinBuffer :: WriteBinHandle -> (ByteString -> IO a) -> IO a
@@ -1102,24 +1115,35 @@ forwardGet bh get_A = do
 -- Lazy reading/writing
 
 lazyPut :: Binary a => WriteBinHandle -> a -> IO ()
-lazyPut bh a = do
+lazyPut = lazyPut' put_
+
+lazyGet :: Binary a => ReadBinHandle -> IO a
+lazyGet = lazyGet' Nothing (\_ -> get)
+
+lazyPut' :: HasCallStack => (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
+lazyPut' f bh a = do
     -- output the obj with a ptr to skip over it:
     pre_a <- tellBinWriter bh
     put_ bh pre_a       -- save a slot for the ptr
-    put_ bh a           -- dump the object
+    f bh a           -- dump the object
     q <- tellBinWriter bh     -- q = ptr to after object
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBinWriter bh q        -- finally carry on writing at q
 
-lazyGet :: Binary a => ReadBinHandle -> IO a
-lazyGet bh = do
+lazyGet' :: HasCallStack => Maybe (IORef ReadBinHandle) -> (Bin () -> ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
+lazyGet' mbh f bh = do
     p <- get bh -- a BinPtr
     p_a <- tellBinReader bh
+    -- Do this before to avoid retaining reference to old BH inside the unsafeInterleaveIO.
+    let !get_inner_bh = maybe (pure bh) readIORef mbh
     a <- unsafeInterleaveIO $ do
-        -- NB: Use a fresh off_r variable in the child thread, for thread
+        -- NB: Use a fresh rbm_off_r variable in the child thread, for thread
         -- safety.
+        inner_bh <- get_inner_bh
         off_r <- newFastMutInt 0
-        getAt bh { rbm_off_r = off_r } p_a
+        let bh' = inner_bh { rbm_off_r = off_r }
+        seekBinReader bh' p_a
+        f p bh'
     seekBinReader bh p -- skip over the object for now
     return a
 
@@ -1172,6 +1196,12 @@ lazyGetMaybe bh = do
 -- See Note [Binary UserData]
 newtype BindingName = BindingName { getBindingName :: Name }
   deriving ( Eq )
+
+simpleBindingNameWriter :: BinaryWriter Name -> BinaryWriter BindingName
+simpleBindingNameWriter = coerce
+
+simpleBindingNameReader :: BinaryReader Name -> BinaryReader BindingName
+simpleBindingNameReader = coerce
 
 -- | Existential for 'BinaryWriter' with a type witness.
 data SomeBinaryWriter = forall a . SomeBinaryWriter TypeRep (BinaryWriter a)
@@ -1312,6 +1342,80 @@ data ReaderTable a = ReaderTable
 data WriterTable = WriterTable
   { putTable :: WriteBinHandle -> IO Int
   }
+
+-- ----------------------------------------------------------------------------
+-- Common data structures for constructing and maintaining lookup tables for
+-- binary serialisation and deserialisation.
+-- ----------------------------------------------------------------------------
+
+data GenericSymbolTable a = GenericSymbolTable
+  { gen_symtab_next :: !FastMutInt
+  -- ^ The next index to use
+  , gen_symtab_map  :: !(IORef (Map.Map a Int))
+  -- ^ Given a symbol, find the symbol
+  }
+
+initGenericSymbolTable :: IO (GenericSymbolTable a)
+initGenericSymbolTable = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef Map.empty
+  pure $ GenericSymbolTable
+        { gen_symtab_next = symtab_next
+        , gen_symtab_map  = symtab_map
+        }
+
+putGenericSymbolTable :: forall a. GenericSymbolTable a -> (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> IO Int
+putGenericSymbolTable gen_sym_tab serialiser bh = do
+  putGenericSymbolTable bh
+  where
+    symtab_map = gen_symtab_map gen_sym_tab
+    symtab_next = gen_symtab_next gen_sym_tab
+    putGenericSymbolTable :: HasCallStack => WriteBinHandle -> IO Int
+    putGenericSymbolTable bh  = do
+      let loop bound = do
+            d <- readIORef symtab_map
+            table_count <- readFastMutInt symtab_next
+            let vs = sortOn fst [(b, a) | (a,b) <- Map.toList  d, b >= bound]
+            case vs of
+              [] -> return table_count
+              todo -> do
+                mapM_ (\n -> serialiser bh n) (map snd todo)
+                loop table_count
+      snd <$>
+        (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
+          loop 0)
+
+getGenericSymbolTable :: forall a. (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
+getGenericSymbolTable deserialiser bh = do
+  sz <- forwardGet bh (get bh) :: IO Int
+  mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
+  -- Using lazyPut/lazyGet is quite space inefficient as each usage will allocate a large closure
+  -- (6 arguments-ish).
+  forM_ [0..(sz-1)] $ \i -> do
+    f <- lazyGet' Nothing (\_ -> deserialiser) bh
+    -- f <- deserialiser bh
+    writeArray mut_arr i f
+  unsafeFreeze mut_arr
+
+putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> WriteBinHandle -> a -> IO ()
+putGenericSymTab GenericSymbolTable{
+               gen_symtab_map = symtab_map_ref,
+               gen_symtab_next = symtab_next }
+        bh val = do
+  symtab_map <- readIORef symtab_map_ref
+  case Map.lookup val symtab_map of
+    Just off -> put_ bh (fromIntegral off :: Word32)
+    Nothing -> do
+      off <- readFastMutInt symtab_next
+      writeFastMutInt symtab_next (off+1)
+      writeIORef symtab_map_ref
+          $! Map.insert val off symtab_map
+      put_ bh (fromIntegral off :: Word32)
+
+getGenericSymtab :: Binary a => SymbolTable a -> ReadBinHandle -> IO a
+getGenericSymtab symtab bh = do
+  i :: Word32 <- get bh
+  return $! symtab ! fromIntegral i
 
 ---------------------------------------------------------
 -- The Dictionary
