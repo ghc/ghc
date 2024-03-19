@@ -36,8 +36,10 @@ computeFingerprint put_nonbinding_name a = do
     put_ bh a
     fingerprintBinMem bh
   where
-    set_user_data bh = addDecoder (mkCache (Proxy @IfaceTyCon) $ mkWriter putIfaceTyCon)
-      $ setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
+    set_user_data bh =
+      addDecoder (mkCache (Proxy @IfaceType) $ mkWriter putIfaceType) $
+      -- addDecoder (mkCache (Proxy @IfaceTyCon) $ mkWriter putIfaceTyCon) $
+        setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
 
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.

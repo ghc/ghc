@@ -43,7 +43,7 @@ import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
-import GHC.Iface.Syntax (putIfaceTyCon, IfaceTyCon, getIfaceTyCon)
+import GHC.Iface.Syntax (putIfaceTyCon, IfaceTyCon, getIfaceTyCon, getIfaceType, IfaceType, putIfaceType )
 import Data.Proxy
 
 data HieSymbolTable = HieSymbolTable
@@ -107,7 +107,8 @@ writeHieFile hie_file_path hiefile = do
                       hie_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = addDecoder (mkCache (Proxy @IfaceTyCon) (mkWriter putIfaceTyCon)) $
+  let bh = -- addDecoder (mkCache (Proxy @IfaceTyCon) (mkWriter putIfaceTyCon)) $
+           addDecoder (mkCache (Proxy @IfaceType) (mkWriter putIfaceType)) $
            setUserData bh0 $ newWriteState (putName hie_symtab)
                                            (putName hie_symtab)
                                            (putFastString hie_dict)
@@ -224,7 +225,8 @@ readHieFileContents bh0 name_cache = do
       let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
                                                (getDictFastString dict)
       symtab <- get_symbol_table bh1
-      let bh1' = addDecoder (mkCache (Proxy @IfaceTyCon) (mkReader getIfaceTyCon))
+      let bh1' = -- addDecoder (mkCache (Proxy @IfaceTyCon) (mkReader getIfaceTyCon))
+                 addDecoder (mkCache (Proxy @IfaceType) (mkReader getIfaceType))
                $ setUserData bh1
                $ newReadState (getSymTabName symtab)
                               (getDictFastString dict)
