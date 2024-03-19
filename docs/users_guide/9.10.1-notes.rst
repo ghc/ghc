@@ -2,6 +2,10 @@
 
 Version 9.10.1
 ==============
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.10>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
 
 Language
 ~~~~~~~~
