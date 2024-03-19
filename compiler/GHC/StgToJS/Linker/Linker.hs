@@ -738,7 +738,7 @@ writeExterns out = writeFile (out </> "all.js.externs")
 
 -- | Get all block dependencies for a given set of roots
 --
--- Returns the update block info map and the blocks.
+-- Returns the updated block info map and the blocks.
 getDeps :: Map Module LocatedBlockInfo     -- ^ Block info per module
         -> (Module -> IO LocatedBlockInfo) -- ^ Used to load block info if missing
         -> Set ExportedFun                 -- ^ start here
@@ -754,7 +754,7 @@ getDeps init_infos load_info root_funs root_blocks = traverse_funs init_infos S.
     --  1. We use the BlockInfos to find the block corresponding to every
     --  exported root functions.
     --
-    --  2. We had these blocks to the set of root_blocks if they aren't already
+    --  2. We add these blocks to the set of root_blocks if they aren't already
     --  added to the result.
     --
     --  3. Then we traverse the root_blocks to find their dependencies and we
