@@ -72,6 +72,7 @@ GHC.Data.List.SetOps
 GHC.Data.Maybe
 GHC.Data.OrdList
 GHC.Data.Pair
+GHC.Data.SmallArray
 GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
