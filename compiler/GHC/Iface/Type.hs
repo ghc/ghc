@@ -708,6 +708,12 @@ ifaceVisAppArgsLength = go 0
       | isVisibleForAllTyFlag argf = go (n+1) rest
       | otherwise             = go n rest
 
+ifaceAppArgsLength :: IfaceAppArgs -> Int
+ifaceAppArgsLength = go 0
+  where
+    go !n IA_Nil = n
+    go !n (IA_Arg _ _ ts) = go (n + 1) ts
+
 {-
 Note [Suppressing invisible arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2040,21 +2046,27 @@ instance Binary IfaceTyLit where
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
-  putNoStack_ bh tk =
-    case tk of
-      IA_Arg t a ts -> putByte bh 0 >> put_ bh t >> put_ bh a >> put_ bh ts
-      IA_Nil        -> putByte bh 1
+  putNoStack_ bh tk = do
+    -- Int is variable length encoded so only
+    -- one byte for small lists.
+    put_ bh (ifaceAppArgsLength tk)
+    go tk
+    where
+      go IA_Nil = pure ()
+      go (IA_Arg a b t) = do
+        put_ bh a
+        put_ bh b
+        go t
 
-  get bh =
-    do c <- getByte bh
-       case c of
-         0 -> do
-           t  <- get bh
-           a  <- get bh
-           ts <- get bh
-           return $! IA_Arg t a ts
-         1 -> return IA_Nil
-         _ -> panic ("get IfaceAppArgs " ++ show c)
+  get bh = do
+    n <- get bh :: IO Int
+    go n
+    where
+      go 0 = return IA_Nil
+      go c = do
+        a <- get bh
+        b <- get bh
+        IA_Arg a b <$> go (c - 1)
 
 -------------------
 
