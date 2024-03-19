@@ -30,6 +30,7 @@ module GHC.Tc.Gen.Head
        , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
+import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
 
 import GHC.Prelude
 import GHC.Hs
@@ -310,15 +311,11 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) ctxt args
-      = case splice_res of
-          HsUntypedSpliceTop mod_finalizers fun
-            -> do addModFinalizersWithLclEnv mod_finalizers
-                  go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args)
-          HsUntypedSpliceNested {} -> panic "splitHsApps: invalid nested splice"
+      = do { fun <- getUntypedSpliceBody splice_res
+           ; go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args) }
       where
         ctxt' :: AppCtxt
-        ctxt' =
-          case splice of
+        ctxt' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
 
@@ -840,7 +837,7 @@ handling splices and quasiquotes has already been performed by the renamer by
 the time we get to `splitHsApps`.
 
 Wrinkle (UTS1):
-  `tcExpr` has a separate case for `HsUntypedSplice`s that do not occur at the
+  `tcExpr` has a separate case for `HsUntypedSplice`s that do /not/ occur at the
   head of an application. This is important to handle programs like this one:
 
     foo :: (forall a. a -> a) -> b -> b

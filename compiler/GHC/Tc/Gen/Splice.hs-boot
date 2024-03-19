@@ -10,7 +10,7 @@ import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
 
-import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers )
+import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult )
 import qualified Language.Haskell.TH as TH
 
 tcTypedSplice :: Name
@@ -30,7 +30,8 @@ tcUntypedBracket :: HsExpr GhcRn
 
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 
-runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
+runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
+getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
 
 tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 
