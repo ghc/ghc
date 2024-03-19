@@ -2814,19 +2814,19 @@ characters into single bytes.
 
 {-# INLINE adjustChar #-}
 adjustChar :: Char -> Word8
-adjustChar c = fromIntegral $ ord adj_c
-  where non_graphic     = '\x00'
-        upper           = '\x01'
-        lower           = '\x02'
-        digit           = '\x03'
-        symbol          = '\x04'
-        space           = '\x05'
-        other_graphic   = '\x06'
-        uniidchar       = '\x07'
+adjustChar c = adj_c
+  where non_graphic     = 0x00
+        upper           = 0x01
+        lower           = 0x02
+        digit           = 0x03
+        symbol          = 0x04
+        space           = 0x05
+        other_graphic   = 0x06
+        uniidchar       = 0x07
 
         adj_c
           | c <= '\x07' = non_graphic
-          | c <= '\x7f' = c
+          | c <= '\x7f' = fromIntegral (ord c)
           -- Alex doesn't handle Unicode, so when Unicode
           -- character is encountered we output these values
           -- with the actual character value hidden in the state.
@@ -2866,15 +2866,18 @@ adjustChar c = fromIntegral $ ord adj_c
 --
 -- See Note [Unicode in Alex] and #13986.
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ buf) = chr (fromIntegral (adjustChar pc))
+alexInputPrevChar (AI _ buf) = unsafeChr (fromIntegral (adjustChar pc))
   where pc = prevChar buf '\n'
+
+unsafeChr :: Int -> Char
+unsafeChr (I# c) = C# (chr# c)
 
 -- backwards compatibility for Alex 2.x
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
 alexGetChar inp = case alexGetByte inp of
                     Nothing    -> Nothing
                     Just (b,i) -> c `seq` Just (c,i)
-                       where c = chr $ fromIntegral b
+                       where c = unsafeChr $ fromIntegral b
 
 -- See Note [Unicode in Alex]
 alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
