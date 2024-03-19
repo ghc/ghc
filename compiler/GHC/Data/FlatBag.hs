@@ -1,3 +1,4 @@
+{-# LANGUAGE UnboxedTuples #-}
 module GHC.Data.FlatBag
   ( FlatBag
   , emptyFlatBag
@@ -16,7 +17,7 @@ import GHC.Data.SizedSeq (SizedSeq, ssElts, sizeSS)
 
 import Control.DeepSeq
 
-import Data.Array
+import GHC.Data.SmallArray
 
 -- | Store elements in a flattened representation.
 --
@@ -39,20 +40,19 @@ data FlatBag a
   = EmptyFlatBag
   | UnitFlatBag !a
   | TupleFlatBag !a !a
-  | FlatBag {-# UNPACK #-} !(Array Word a)
-  deriving (Show)
+  | FlatBag {-# UNPACK #-} !(SmallArray a)
 
 instance Functor FlatBag where
   fmap _ EmptyFlatBag = EmptyFlatBag
   fmap f (UnitFlatBag a) = UnitFlatBag $ f a
   fmap f (TupleFlatBag a b) = TupleFlatBag (f a) (f b)
-  fmap f (FlatBag e) = FlatBag $ fmap f e
+  fmap f (FlatBag e) = FlatBag $ mapSmallArray f e
 
 instance Foldable FlatBag where
   foldMap _ EmptyFlatBag = mempty
   foldMap f (UnitFlatBag a) = f a
   foldMap f (TupleFlatBag a b) = f a `mappend` f b
-  foldMap f (FlatBag e) = foldMap f e
+  foldMap f (FlatBag arr) = foldMapSmallArray f arr
 
   length = fromIntegral . sizeFlatBag
 
@@ -60,13 +60,13 @@ instance Traversable FlatBag where
   traverse _ EmptyFlatBag = pure EmptyFlatBag
   traverse f (UnitFlatBag a) = UnitFlatBag <$> f a
   traverse f (TupleFlatBag a b) = TupleFlatBag <$> f a <*> f b
-  traverse f (FlatBag e) = FlatBag <$> traverse f e
+  traverse f fl@(FlatBag arr) = fromList (fromIntegral $ sizeofSmallArray arr) <$> traverse f (elemsFlatBag fl)
 
 instance NFData a => NFData (FlatBag a) where
   rnf EmptyFlatBag = ()
   rnf (UnitFlatBag a) = rnf a
   rnf (TupleFlatBag a b) = rnf a `seq` rnf b
-  rnf (FlatBag e) = rnf e
+  rnf (FlatBag arr) = rnfSmallArray arr
 
 -- | Create an empty 'FlatBag'.
 --
@@ -83,14 +83,15 @@ sizeFlatBag :: FlatBag a -> Word
 sizeFlatBag EmptyFlatBag = 0
 sizeFlatBag UnitFlatBag{} = 1
 sizeFlatBag TupleFlatBag{} = 2
-sizeFlatBag (FlatBag e) = fromIntegral (length e)
+sizeFlatBag (FlatBag arr) = fromIntegral $ sizeofSmallArray arr
 
 -- | Get all elements that are stored in the 'FlatBag'.
 elemsFlatBag :: FlatBag a -> [a]
 elemsFlatBag EmptyFlatBag = []
 elemsFlatBag (UnitFlatBag a) = [a]
 elemsFlatBag (TupleFlatBag a b) = [a, b]
-elemsFlatBag (FlatBag e) = elems e
+elemsFlatBag (FlatBag arr) =
+  [indexSmallArray arr i | i <- [0 .. sizeofSmallArray arr - 1]]
 
 -- | Combine two 'FlatBag's.
 --
@@ -100,6 +101,7 @@ elemsFlatBag (FlatBag e) = elems e
 mappendFlatBag :: FlatBag a -> FlatBag a -> FlatBag a
 mappendFlatBag EmptyFlatBag b = b
 mappendFlatBag a EmptyFlatBag = a
+mappendFlatBag (UnitFlatBag a) (UnitFlatBag b) = TupleFlatBag a b
 mappendFlatBag a b =
   fromList (sizeFlatBag a + sizeFlatBag b)
            (elemsFlatBag a ++ elemsFlatBag b)
@@ -107,7 +109,7 @@ mappendFlatBag a b =
 -- | Store the list in a flattened memory representation, avoiding the memory overhead
 -- of a linked list.
 --
--- The size 'n' needs to be at least the length of the list.
+-- The size 'n' needs to be smaller or equal to the length of the list.
 -- If it is smaller than the length of the list, overflowing elements are
 -- discarded. It is undefined behaviour to set 'n' to be bigger than the
 -- length of the list.
@@ -117,7 +119,8 @@ fromList n elts =
     [] -> EmptyFlatBag
     [a] -> UnitFlatBag a
     [a, b] -> TupleFlatBag a b
-    xs -> FlatBag (listArray (0, n - 1) xs)
+    xs ->
+      FlatBag (listToArray (fromIntegral n) fst snd (zip [0..] xs))
 
 -- | Convert a 'SizedSeq' into its flattened representation.
 -- A 'FlatBag a' is more memory efficient than '[a]', if no further modification
