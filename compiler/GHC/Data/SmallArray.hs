@@ -11,13 +11,18 @@ module GHC.Data.SmallArray
   , freezeSmallArray
   , unsafeFreezeSmallArray
   , indexSmallArray
+  , sizeofSmallArray
   , listToArray
+  , mapSmallArray
+  , foldMapSmallArray
+  , rnfSmallArray
   )
 where
 
 import GHC.Exts
 import GHC.Prelude
 import GHC.ST
+import Control.DeepSeq
 
 data SmallArray a = SmallArray (SmallArray# a)
 
@@ -64,6 +69,14 @@ unsafeFreezeSmallArray (SmallMutableArray ma) s =
   case unsafeFreezeSmallArray# ma s of
     (# s', a #) -> (# s', SmallArray a #)
 
+-- | Get the size of a 'SmallArray'
+sizeofSmallArray
+  :: SmallArray a
+  -> Int
+{-# INLINE sizeofSmallArray #-}
+sizeofSmallArray (SmallArray sa#) =
+  case sizeofSmallArray# sa# of
+    s -> I# s
 
 -- | Index a small-array (no bounds checking!)
 indexSmallArray
@@ -71,9 +84,51 @@ indexSmallArray
   -> Int          -- ^ index
   -> a
 {-# INLINE indexSmallArray #-}
-indexSmallArray (SmallArray sa#) (I# i) = case indexSmallArray# sa# i of
-  (# v #) -> v
+indexSmallArray (SmallArray sa#) (I# i) =
+  case indexSmallArray# sa# i of
+    (# v #) -> v
 
+-- | Map a function over the elements of a 'SmallArray'
+--
+mapSmallArray :: (a -> b) -> SmallArray a -> SmallArray b
+{-# INLINE mapSmallArray #-}
+mapSmallArray f sa = runST $ ST $ \s ->
+  let
+    n = sizeofSmallArray sa
+    go !i saMut# state#
+      | i < n =
+        let
+          a = indexSmallArray sa i
+          newState# = writeSmallArray saMut# i (f a) state#
+        in
+          go (i + 1) saMut# newState#
+      | otherwise = state#
+  in
+  case newSmallArray n (error "SmallArray: internal error, uninitialised elements") s of
+    (# s', mutArr #) ->
+      case go 0 mutArr s' of
+        s'' -> unsafeFreezeSmallArray mutArr s''
+
+-- | Fold the values of a 'SmallArray' into a 'Monoid m' of choice
+foldMapSmallArray :: Monoid m => (a -> m) -> SmallArray a -> m
+{-# INLINE foldMapSmallArray #-}
+foldMapSmallArray f sa = go 0
+  where
+    n = sizeofSmallArray sa
+    go i
+      | i < n = f (indexSmallArray sa i) `mappend` go (i + 1)
+      | otherwise = mempty
+
+-- | Force the elements of the given 'SmallArray'
+--
+rnfSmallArray :: NFData a => SmallArray a -> ()
+{-# INLINE rnfSmallArray #-}
+rnfSmallArray sa = go 0
+  where
+    n = sizeofSmallArray sa
+    go !i
+      | i < n = rnf (indexSmallArray sa i) `seq` go (i + 1)
+      | otherwise = ()
 
 -- | Convert a list into an array.
 listToArray :: Int -> (e -> Int) -> (e -> a) -> [e] -> SmallArray a
