@@ -812,11 +812,12 @@ newConcreteTyVar reason fs kind
 newPatTyVar :: Name -> Kind -> TcM TcTyVar
 newPatTyVar name kind
   = do { details <- newMetaDetails TauTv
-       ; uniq <- newUnique
-       ; let name' = name `setNameUnique` uniq
-             tyvar = mkTcTyVar name' kind details
+       ; let tyvar = mkTcTyVar name kind details
          -- Don't use cloneMetaTyVar;
          -- same reasoning as in newTyVarTyVar
+         --
+         -- Do not allocate new unique
+         -- See Note [TcTypeM and Type Patterns] in GHC.Tc.Gen.HsType.Monad
        ; traceTc "newPatTyVar" (ppr tyvar)
        ; return tyvar }
 

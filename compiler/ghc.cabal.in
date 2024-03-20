@@ -774,6 +774,7 @@ Library
         GHC.Tc.Gen.Foreign
         GHC.Tc.Gen.Head
         GHC.Tc.Gen.HsType
+        GHC.Tc.Gen.HsType.Monad
         GHC.Tc.Gen.Match
         GHC.Tc.Gen.Pat
         GHC.Tc.Gen.Rule

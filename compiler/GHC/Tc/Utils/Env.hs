@@ -37,7 +37,8 @@ module GHC.Tc.Utils.Env(
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
 
-        tcLookup, tcLookupLocated, tcLookupLocalIds,
+        tcNotInScopeErr,
+        tcLookup, tcLookup_maybe, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
         tcLookupTcTyCon,
         tcLookupLcl_maybe,
@@ -137,6 +138,7 @@ import Data.List          ( intercalate )
 import Control.Monad
 import GHC.Iface.Errors.Types
 import GHC.Types.Error
+import Data.Functor.Identity
 
 {- *********************************************************************
 *                                                                      *
@@ -229,24 +231,31 @@ tcLookupGlobal :: Name -> TcM TyThing
 -- The Name is almost always an ExternalName, but not always
 -- In GHCi, we may make command-line bindings (ghci> let x = True)
 -- that bind a GlobalId, but with an InternalName
-tcLookupGlobal name
+tcLookupGlobal
+  = fmap runIdentity . tc_lookup_global (fmap Identity . notFound )
+
+tcLookupGlobal_maybe :: Name -> TcM (Maybe TyThing)
+tcLookupGlobal_maybe = tc_lookup_global notFound_maybe
+
+tc_lookup_global :: Monad m => (Name -> TcM (m TyThing)) -> Name -> TcM (m TyThing)
+tc_lookup_global not_found name
   = do  {    -- Try local envt
           env <- getGblEnv
         ; case lookupNameEnv (tcg_type_env env) name of {
-                Just thing -> return thing ;
+                Just thing -> return (pure thing) ;
                 Nothing    ->
 
                 -- Should it have been in the local envt?
                 -- (NB: use semantic mod here, since names never use
                 -- identity module, see Note [Identity versus semantic module].)
           if nameIsLocalOrFrom (tcg_semantic_mod env) name
-          then notFound name  -- Internal names can happen in GHCi
+          then not_found name  -- Internal names can happen in GHCi
           else
 
            -- Try home package table and external package table
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
-            Succeeded thing -> return thing
+            Succeeded thing -> return (pure thing)
             Failed msg      -> failWithTc (TcRnInterfaceError msg)
         }}}
 
@@ -458,6 +467,13 @@ tcLookup name = do
     case lookupNameEnv local_env name of
         Just thing -> return thing
         Nothing    -> AGlobal <$> tcLookupGlobal name
+
+tcLookup_maybe :: Name -> TcM (Maybe TcTyThing)
+tcLookup_maybe name = do
+    local_env <- getLclTypeEnv
+    case lookupNameEnv local_env name of
+        Just thing -> return (Just thing)
+        Nothing    -> fmap AGlobal <$> tcLookupGlobal_maybe name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name
@@ -1077,7 +1093,25 @@ pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
 notFound :: Name -> TcM TyThing
-notFound name
+notFound name = do
+  m_res <- notFound_maybe name
+  case m_res of
+    Just x -> pure x
+    Nothing -> tcNotInScopeErr name
+
+tcNotInScopeErr :: Name -> TcM a
+tcNotInScopeErr name = do
+  lcl_env <- getLclEnv
+  failWithTc $
+    mkTcRnNotInScope (getRdrName name) (NotInScopeTc (getLclEnvTypeEnv lcl_env))
+      -- Take care: printing the whole gbl env can
+      -- cause an infinite loop, in the case where we
+      -- are in the middle of a recursive TyCon/Class group;
+      -- so let's just not print it!  Getting a loop here is
+      -- very unhelpful, because it hides one compiler bug with another
+
+notFound_maybe :: Name -> TcM (Maybe TyThing)
+notFound_maybe name
   = do { lcl_env <- getLclEnv
        ; let stage = getLclEnvThStage lcl_env
        ; case stage of   -- See Note [Out of scope might be a staging error]
@@ -1086,26 +1120,7 @@ notFound name
                                             -- don't report it again (#11941)
              | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
 
-           _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
-               -- This code path is only reachable with RequiredTypeArguments enabled
-               -- via the following chain of calls:
-               --   `notFound`       called from
-               --   `tcLookupGlobal` called from
-               --   `tcLookup`       called from
-               --   `tcTyVar`
-               -- It means the user tried to use a term variable at the type level, e.g.
-               --   let { a = 42; f :: a -> a; ... } in ...
-               -- If you are seeing this error for any other reason, it is a bug in GHC.
-               -- See Note [Demotion of unqualified variables] (W1) in GHC.Rename.Env
-               failWithTc $ TcRnUnpromotableThing name TermVariablePE
-
-             | otherwise -> failWithTc $
-                mkTcRnNotInScope (getRdrName name) (NotInScopeTc (getLclEnvTypeEnv lcl_env))
-                       -- Take care: printing the whole gbl env can
-                       -- cause an infinite loop, in the case where we
-                       -- are in the middle of a recursive TyCon/Class group;
-                       -- so let's just not print it!  Getting a loop here is
-                       -- very unhelpful, because it hides one compiler bug with another
+           _ -> pure Nothing
        }
 
 wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
