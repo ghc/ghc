@@ -516,7 +516,9 @@ demoteOccTvName (OccName space name) = do
 -- See Note [Promotion] in GHC.Rename.Env.
 promoteOccName :: OccName -> Maybe OccName
 promoteOccName (OccName space name) = do
-  space' <- promoteNameSpace space
+  promoted_space <- promoteNameSpace space
+  let tyop   = isTvNameSpace promoted_space && isLexVarSym name
+      space' = if tyop then tcClsName else promoted_space   -- special case for type operators (#24570)
   return $ OccName space' name
 
 {- | Other names in the compiler add additional information to an OccName.
