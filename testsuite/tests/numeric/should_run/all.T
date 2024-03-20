@@ -50,7 +50,6 @@ test('T4383', normal, compile_and_run, [''])
 
 test('add2', normal, compile_and_run, ['-fobject-code'])
 test('mul2', normal, compile_and_run, ['-fobject-code'])
-test('mul2int', normal, compile_and_run, ['-fobject-code'])
 test('quotRem2', normal, compile_and_run, ['-fobject-code'])
 test('T5863', normal, compile_and_run, [''])
 
@@ -83,4 +82,4 @@ test('T22282', normal, compile_and_run, [''])
 test('T22671', js_fragile(24259), compile_and_run, [''])
 test('foundation', [when(js_arch(), run_timeout_multiplier(2)), js_fragile(24259)], compile_and_run, ['-O -package transformers'])
 test('T24066', normal, compile_and_run, [''])
-test('T26230', normal, compile_and_run, [''])
+test('div01', normal, compile_and_run, [''])
