@@ -219,9 +219,11 @@ instance Show ProfKey where
 data BinProf = BinProf { stack :: ![ProfKey], report :: IORef (Map.Map [ProfKey] Int) }
 
 addStack :: TypeRep -> BinProf -> BinProf
+addStack _ bp = bp
 addStack s (BinProf ss i) = (BinProf (TypeableKey s:ss) i)
 
 recordSample :: Int -> BinProf -> IO ()
+recordSample _ _ = return ()
 recordSample weight (BinProf ss i) = modifyIORef i (Map.insertWith (+) ss weight)
         -- XXX: should really store a "high water mark" for dumping out
         -- the binary data to a file.
@@ -1356,7 +1358,6 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
             case vs of
               [] -> return table_count
               todo -> do
-                print (map fst todo)
                 mapM_ (\n -> lazyPut' serialiser bh n) (map snd vs)
                 loop table_count
       snd <$>
@@ -1370,7 +1371,7 @@ getGenericSymbolTable deserialiser bhRef bh = do
   forM_ [0..(sz-1)] $ \i -> do
     f <- lazyGet' (Just bhRef) deserialiser bh
     writeArray mut_arr i f
-  pprTraceM "gotten" (ppr sz)
+--  pprTraceM "gotten" (ppr sz)
   unsafeFreeze mut_arr
 
 putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> BinHandle -> a -> IO ()
@@ -1392,7 +1393,7 @@ getGenericSymtab :: Binary a => SymbolTable a
               -> BinHandle -> IO a
 getGenericSymtab symtab bh = do
   i :: Word32 <- get bh
-  pprTraceM "getting" (ppr (bounds symtab, i))
+--  pprTraceM "getting" (ppr (bounds symtab, i))
   return $! symtab ! fromIntegral i
 
 ---------------------------------------------------------
