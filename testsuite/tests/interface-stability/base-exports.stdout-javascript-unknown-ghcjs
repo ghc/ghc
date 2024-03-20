@@ -12146,10 +12146,12 @@ module GHC.RTS.Flags where
   data GiveGCStats = NoGCStats | CollectGCStats | OneLineGCStats | SummaryGCStats | VerboseGCStats
   type HpcFlags :: *
   data HpcFlags = HpcFlags {writeTixFile :: GHC.Types.Bool}
+  type IoManagerFlag :: *
+  data IoManagerFlag = IoManagerFlagAuto | IoManagerFlagSelect | IoManagerFlagMIO | IoManagerFlagWinIO | IoManagerFlagWin32Legacy
   type IoSubSystem :: *
   data IoSubSystem = IoPOSIX | IoNative
   type MiscFlags :: *
-  data MiscFlags = MiscFlags {tickInterval :: RtsTime, installSignalHandlers :: GHC.Types.Bool, installSEHHandlers :: GHC.Types.Bool, generateCrashDumpFile :: GHC.Types.Bool, generateStackTrace :: GHC.Types.Bool, machineReadable :: GHC.Types.Bool, disableDelayedOsMemoryReturn :: GHC.Types.Bool, internalCounters :: GHC.Types.Bool, linkerAlwaysPic :: GHC.Types.Bool, linkerMemBase :: GHC.Types.Word, ioManager :: IoSubSystem, numIoWorkerThreads :: GHC.Internal.Word.Word32}
+  data MiscFlags = MiscFlags {tickInterval :: RtsTime, installSignalHandlers :: GHC.Types.Bool, installSEHHandlers :: GHC.Types.Bool, generateCrashDumpFile :: GHC.Types.Bool, generateStackTrace :: GHC.Types.Bool, machineReadable :: GHC.Types.Bool, disableDelayedOsMemoryReturn :: GHC.Types.Bool, internalCounters :: GHC.Types.Bool, linkerAlwaysPic :: GHC.Types.Bool, linkerMemBase :: GHC.Types.Word, ioManager :: IoManagerFlag, numIoWorkerThreads :: GHC.Internal.Word.Word32}
   type ParFlags :: *
   data ParFlags = ParFlags {nCapabilities :: GHC.Internal.Word.Word32, migrate :: GHC.Types.Bool, maxLocalSparks :: GHC.Internal.Word.Word32, parGcEnabled :: GHC.Types.Bool, parGcGen :: GHC.Internal.Word.Word32, parGcLoadBalancingEnabled :: GHC.Types.Bool, parGcLoadBalancingGen :: GHC.Internal.Word.Word32, parGcNoSyncWithIdle :: GHC.Internal.Word.Word32, parGcThreads :: GHC.Internal.Word.Word32, setAffinity :: GHC.Types.Bool}
   type ProfFlags :: *
@@ -12184,7 +12186,6 @@ module GHC.RTS.Flags where
   getDebugFlags :: GHC.Types.IO DebugFlags
   getGCFlags :: GHC.Types.IO GCFlags
   getHpcFlags :: GHC.Types.IO HpcFlags
-  getIoManagerFlag :: GHC.Types.IO IoSubSystem
   getMiscFlags :: GHC.Types.IO MiscFlags
   getParFlags :: GHC.Types.IO ParFlags
   getProfFlags :: GHC.Types.IO ProfFlags
@@ -14721,7 +14722,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined 
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.AllocationLimitExceeded -- Defined in ‘GHC.Internal.IO.Exception’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.ArrayException -- Defined in ‘GHC.Internal.IO.Exception’
@@ -14827,7 +14828,6 @@ instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.C.Types.CUL
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.GHCi.GHCiSandboxIO GHC.Types.IO -- Defined in ‘GHC.Internal.GHCi’
 instance GHC.Internal.GHCi.GHCiSandboxIO GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance forall (n :: GHC.Types.Symbol) (f :: GHC.Internal.Generics.FixityI) (r :: GHC.Types.Bool). (GHC.Internal.TypeLits.KnownSymbol n, GHC.Internal.Generics.SingI f, GHC.Internal.Generics.SingI r) => GHC.Internal.Generics.Constructor (GHC.Internal.Generics.MetaCons n f r) -- Defined in ‘GHC.Internal.Generics’
@@ -15532,6 +15532,10 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.NewlineMode -- Defi
 instance [safe] GHC.Internal.Show.Show ghc-internal-0.1.0.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-0.1.0.0:GHC.Internal.IO.Handle.Lock.Common’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.HandlePosn -- Defined in ‘GHC.Internal.IO.Handle’
 instance GHC.Internal.Show.Show GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
+instance GHC.Internal.Show.Show GHC.Internal.IOPort.IOPortException -- Defined in ‘GHC.Internal.IOPort’
+instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
+instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
+instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -15541,17 +15545,13 @@ instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.HpcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.MiscFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ParFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ProfFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.RTSFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.IOPort.IOPortException -- Defined in ‘GHC.Internal.IOPort’
-instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
-instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
-instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Show.Show GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
@@ -15738,7 +15738,7 @@ instance GHC.Classes.Eq GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GH
 instance GHC.Classes.Eq GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Classes.Eq GHC.Internal.IO.Handle.HandlePosn -- Defined in ‘GHC.Internal.IO.Handle’
 instance GHC.Classes.Eq GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
-instance GHC.Classes.Eq GHC.Internal.RTS.Flags.IoSubSystem -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance forall i e. GHC.Classes.Eq (GHC.Internal.IOArray.IOArray i e) -- Defined in ‘GHC.Internal.IOArray’
 instance forall a. GHC.Classes.Eq (GHC.Internal.IOPort.IOPort a) -- Defined in ‘GHC.Internal.IOPort’
 instance GHC.Classes.Eq GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
@@ -15746,6 +15746,7 @@ instance GHC.Classes.Eq GHC.Num.Integer.Integer -- Defined in ‘GHC.Num.Integer
 instance GHC.Classes.Eq GHC.Internal.JS.Foreign.Callback.OnBlocked -- Defined in ‘GHC.Internal.JS.Foreign.Callback’
 instance GHC.Classes.Eq GHC.Num.BigNat.BigNat -- Defined in ‘GHC.Num.BigNat’
 instance GHC.Classes.Eq GHC.Num.Natural.Natural -- Defined in ‘GHC.Num.Natural’
+instance GHC.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance forall a. GHC.Classes.Eq (GHC.Internal.StableName.StableName a) -- Defined in ‘GHC.Internal.StableName’
 instance GHC.Classes.Eq GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
