@@ -95,7 +95,7 @@ module GHC.Tc.Utils.TcType (
   -- Re-exported from GHC.Core.TyCo.Compare
   -- mainly just for back-compat reasons
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
-  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, mayLookIdentical,
   tcEqTyConApps, eqForAllVis, eqVarBndrs,
 
   ---------------------------------
@@ -888,7 +888,8 @@ tcTyFamInsts = map (\(_,b,c) -> (b,c)) . tcTyFamInstsAndVis
 -- to @C@, whereas @F Bool@ is paired with 'False' since it appears an a
 -- /visible/ argument to @C@.
 --
--- See also @Note [Kind arguments in error messages]@ in "GHC.Tc.Errors".
+-- See also Note [Showing invisible bits of types in error messages]
+-- in "GHC.Tc.Errors.Ppr".
 tcTyFamInstsAndVis :: Type -> [(Bool, TyCon, [Type])]
 tcTyFamInstsAndVis = tcTyFamInstsAndVisX False
 

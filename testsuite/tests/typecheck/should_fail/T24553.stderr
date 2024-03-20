@@ -1,0 +1,6 @@
+
+T24553.hs:8:12: error: [GHC-83865]
+    • Expected kind ‘forall (r :: RuntimeRep). * -> TYPE r -> *’,
+        but ‘Foo’ has kind ‘* -> forall (r :: RuntimeRep). TYPE r -> *’
+    • In the type ‘Foo :: forall r. * -> TYPE r -> *’
+      In the type declaration for ‘Bar’
