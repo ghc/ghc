@@ -1553,27 +1553,27 @@ emitPrimOp cfg primop =
   DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
 
   IntQuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_S_QuotRem  (wordWidth platform))
     else Right (genericIntQuotRemOp (wordWidth platform))
 
   Int8QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_S_QuotRem W8)
     else Right (genericIntQuotRemOp W8)
 
   Int16QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_S_QuotRem W16)
     else Right (genericIntQuotRemOp W16)
 
   Int32QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_S_QuotRem W32)
     else Right (genericIntQuotRemOp W32)
 
   WordQuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_U_QuotRem  (wordWidth platform))
     else Right (genericWordQuotRemOp (wordWidth platform))
 
@@ -1583,17 +1583,17 @@ emitPrimOp cfg primop =
     else Right (genericWordQuotRem2Op platform)
 
   Word8QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_U_QuotRem W8)
     else Right (genericWordQuotRemOp W8)
 
   Word16QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_U_QuotRem W16)
     else Right (genericWordQuotRemOp W16)
 
   Word32QuotRemOp -> \args -> opCallishHandledLater args $
-    if allowQuotRem && not (quotRemCanBeOptimized args)
+    if allowQuotRem
     then Left (MO_U_QuotRem W32)
     else Right (genericWordQuotRemOp W32)
 
@@ -1827,23 +1827,6 @@ emitPrimOp cfg primop =
     pure $ map (CmmReg . CmmLocal) regs
 
   alwaysExternal = \_ -> PrimopCmmEmit_External
-  -- Note [QuotRem optimization]
-  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  -- `quot` and `rem` with constant divisor can be implemented with fast bit-ops
-  -- (shift, .&.).
-  --
-  -- Currently we only support optimization (performed in GHC.Cmm.Opt) when the
-  -- constant is a power of 2. #9041 tracks the implementation of the general
-  -- optimization.
-  --
-  -- `quotRem` can be optimized in the same way. However as it returns two values,
-  -- it is implemented as a "callish" primop which is harder to match and
-  -- to transform later on. For simplicity, the current implementation detects cases
-  -- that can be optimized (see `quotRemCanBeOptimized`) and converts STG quotRem
-  -- primop into two CMM quot and rem primops.
-  quotRemCanBeOptimized = \case
-    [_, CmmLit (CmmInt n _) ] -> isJust (exactLog2 n)
-    _                         -> False
 
   allowQuotRem  = stgToCmmAllowQuotRemInstr         cfg
   allowQuotRem2 = stgToCmmAllowQuotRem2             cfg

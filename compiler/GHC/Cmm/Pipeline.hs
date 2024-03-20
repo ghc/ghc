@@ -128,8 +128,11 @@ cpsTop logger platform cfg proc =
 
       ----------- Sink and inline assignments  --------------------------------
       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-           condPass (cmmOptSink cfg) (cmmSink platform) g
-                    Opt_D_dump_cmm_sink "Sink assignments"
+           if cmmOptSink cfg
+              then runUniqSM $ cmmSink cfg g
+              else return g
+      dump Opt_D_dump_cmm_sink "Sink assignments" g
+
 
       ------------- CAF analysis ----------------------------------------------
       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
