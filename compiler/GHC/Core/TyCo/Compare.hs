@@ -12,8 +12,9 @@ module GHC.Core.TyCo.Compare (
     nonDetCmpTypesX, nonDetCmpTc,
     eqVarBndrs,
 
-    pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+    pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
     tcEqTyConApps,
+    mayLookIdentical,
 
    -- * Visiblity comparision
    eqForAllVis, cmpForAllVis
@@ -22,7 +23,8 @@ module GHC.Core.TyCo.Compare (
 
 import GHC.Prelude
 
-import GHC.Core.Type( typeKind, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe )
+import GHC.Core.Type( typeKind, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
+                    , isLevityTy, isRuntimeRepTy, isMultiplicityTy )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -129,52 +131,119 @@ Cabal.
 See #19226.
 -}
 
+mayLookIdentical :: Type -> Type -> Bool
+-- | Returns True if the /visible/ part of the types
+-- might look equal, even if they are really unequal (in the invisible bits)
+--
+-- This function is very similar to tc_eq_type but it is much more
+-- heuristic.  Notably, it is always safe to return True, even with types
+-- that might (in truth) be unequal  -- this affects error messages only
+-- (Originally there were one function with an extra flag, but the result
+--  was hard to understand.)
+mayLookIdentical orig_ty1 orig_ty2
+  = go orig_env orig_ty1 orig_ty2
+  where
+    orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
+
+    go :: RnEnv2 -> Type -> Type -> Bool
+    -- See Note [Comparing nullary type synonyms]
+    go _  (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
+
+    go env t1 t2 | Just t1' <- coreView t1 = go env t1' t2
+    go env t1 t2 | Just t2' <- coreView t2 = go env t1 t2'
+
+    go env (TyVarTy tv1)   (TyVarTy tv2)   = rnOccL env tv1 == rnOccR env tv2
+    go _   (LitTy lit1)    (LitTy lit2)    = lit1 == lit2
+    go env (CastTy t1 _)   t2              = go env t1 t2
+    go env t1              (CastTy t2 _)   = go env t1 t2
+    go _   (CoercionTy {}) (CoercionTy {}) = True
+
+    go env (ForAllTy (Bndr tv1 vis1) ty1)
+           (ForAllTy (Bndr tv2 vis2) ty2)
+      =  vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
+      && go (rnBndr2 env tv1 tv2) ty1 ty2
+         -- Visible stuff only: ignore kinds of binders
+
+    -- If we have (forall (r::RunTimeRep). ty1  ~   blah) then respond
+    -- with True.  Reason: the type pretty-printer defaults RuntimeRep
+    -- foralls (see Ghc.Iface.Type.hideNonStandardTypes).  That can make,
+    -- say (forall r. TYPE r -> Type) into (Type -> Type), so it looks the
+    -- same as a very different type (#24553).  By responding True, we
+    -- tell GHC (see calls of mayLookIdentical) to display without defaulting.
+    -- See Note [Showing invisible bits of types in error messages]
+    -- in GHC.Tc.Errors.Ppr
+    go _ (ForAllTy b _) _ | isDefaultableBndr b = True
+    go _ _ (ForAllTy b _) | isDefaultableBndr b = True
+
+    go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
+      = go env arg1 arg2 && go env res1 res2 && go env w1 w2
+        -- Visible stuff only: ignore agg kinds
+
+      -- See Note [Equality on AppTys] in GHC.Core.Type
+    go env (AppTy s1 t1) ty2
+      | Just (s2, t2) <- tcSplitAppTyNoView_maybe ty2
+      = go env s1 s2 && go env t1 t2
+    go env ty1 (AppTy s2 t2)
+      | Just (s1, t1) <- tcSplitAppTyNoView_maybe ty1
+      = go env s1 s2 && go env t1 t2
+
+    go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
+      = tc1 == tc2 && gos env (tyConBinders tc1) ts1 ts2
+
+    go _ _ _ = False
+
+    gos :: RnEnv2 -> [TyConBinder] -> [Type] -> [Type] -> Bool
+    gos _   _         []       []      = True
+    gos env bs (t1:ts1) (t2:ts2)
+      | (invisible, bs') <- case bs of
+                               []     -> (False,                    [])
+                               (b:bs) -> (isInvisibleTyConBinder b, bs)
+      = (invisible || go env t1 t2) && gos env bs' ts1 ts2
+
+    gos _ _ _ _ = False
+
+
 -- | Type equality comparing both visible and invisible arguments and expanding
 -- type synonyms.
 tcEqTypeNoSyns :: Type -> Type -> Bool
-tcEqTypeNoSyns ta tb = tc_eq_type False False ta tb
-
--- | Like 'tcEqType', but returns True if the /visible/ part of the types
--- are equal, even if they are really unequal (in the invisible bits)
-tcEqTypeVis :: Type -> Type -> Bool
-tcEqTypeVis ty1 ty2 = tc_eq_type False True ty1 ty2
+tcEqTypeNoSyns ta tb = tc_eq_type False ta tb
 
 -- | Like 'pickyEqTypeVis', but returns a Bool for convenience
 pickyEqType :: Type -> Type -> Bool
 -- Check when two types _look_ the same, _including_ synonyms.
 -- So (pickyEqType String [Char]) returns False
 -- This ignores kinds and coercions, because this is used only for printing.
-pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
+pickyEqType ty1 ty2 = tc_eq_type True ty1 ty2
 
 -- | Real worker for 'tcEqType'. No kind check!
 tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
-           -> Bool          -- ^ True <=> compare visible args only
            -> Type -> Type
            -> Bool
 -- Flags False, False is the usual setting for tc_eq_type
 -- See Note [Computing equality on types] in Type
-tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
+{-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
+tc_eq_type keep_syns orig_ty1 orig_ty2
   = go orig_env orig_ty1 orig_ty2
   where
+    orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
+
     go :: RnEnv2 -> Type -> Type -> Bool
-    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type.
-    go _   (TyConApp tc1 []) (TyConApp tc2 [])
-      | tc1 == tc2
-      = True
+    -- See Note [Comparing nullary type synonyms]
+    go _ (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
 
     go env t1 t2 | not keep_syns, Just t1' <- coreView t1 = go env t1' t2
     go env t1 t2 | not keep_syns, Just t2' <- coreView t2 = go env t1 t2'
 
-    go env (TyVarTy tv1) (TyVarTy tv2)
-      = rnOccL env tv1 == rnOccR env tv2
-
-    go _   (LitTy lit1) (LitTy lit2)
-      = lit1 == lit2
+    go env (TyVarTy tv1)   (TyVarTy tv2)   = rnOccL env tv1 == rnOccR env tv2
+    go _   (LitTy lit1)    (LitTy lit2)    = lit1 == lit2
+    go env (CastTy t1 _)   t2              = go env t1 t2
+    go env t1              (CastTy t2 _)   = go env t1 t2
+    go _   (CoercionTy {}) (CoercionTy {}) = True
 
     go env (ForAllTy (Bndr tv1 vis1) ty1)
            (ForAllTy (Bndr tv2 vis2) ty2)
       =  vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
-      && (vis_only || go env (varType tv1) (varType tv2))
+      && go env (varType tv1) (varType tv2)
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
     -- Make sure we handle all FunTy cases since falling through to the
@@ -183,11 +252,9 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     -- See Note [Equality on FunTys] in GHC.Core.TyCo.Rep: we must check
     -- kinds here
     go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
-      = kinds_eq && go env arg1 arg2 && go env res1 res2 && go env w1 w2
-      where
-        kinds_eq | vis_only  = True
-                 | otherwise = go env (typeKind arg1) (typeKind arg2) &&
-                               go env (typeKind res1) (typeKind res2)
+      = go env (typeKind arg1) (typeKind arg2) &&
+        go env (typeKind res1) (typeKind res2) &&
+        go env arg1 arg2 && go env res1 res2 && go env w1 w2
 
       -- See Note [Equality on AppTys] in GHC.Core.Type
     go env (AppTy s1 t1)        ty2
@@ -198,32 +265,24 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
       = go env s1 s2 && go env t1 t2
 
     go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
-      = tc1 == tc2 && gos env (tc_vis tc1) ts1 ts2
-
-    go env (CastTy t1 _)   t2              = go env t1 t2
-    go env t1              (CastTy t2 _)   = go env t1 t2
-    go _   (CoercionTy {}) (CoercionTy {}) = True
+      = tc1 == tc2 && gos env ts1 ts2
 
     go _ _ _ = False
 
-    gos _   _         []       []      = True
-    gos env (ig:igs) (t1:ts1) (t2:ts2) = (ig || go env t1 t2)
-                                      && gos env igs ts1 ts2
-    gos _ _ _ _ = False
+    gos _   []       []       = True
+    gos env (t1:ts1) (t2:ts2) = go env t1 t2 && gos env ts1 ts2
+    gos _ _ _                 = False
 
-    tc_vis :: TyCon -> [Bool]  -- True for the fields we should ignore
-    tc_vis tc | vis_only  = inviss ++ repeat False    -- Ignore invisibles
-              | otherwise = repeat False              -- Ignore nothing
-       -- The repeat False is necessary because tycons
-       -- can legitimately be oversaturated
-      where
-        bndrs = tyConBinders tc
-        inviss  = map isInvisibleTyConBinder bndrs
 
-    orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
-
-{-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
-
+isDefaultableBndr :: ForAllTyBinder -> Bool
+-- This function should line up with the defaulting done
+--   by GHC.Iface.Type.defaultIfaceTyVarsOfKind
+-- See Note [Showing invisible bits of types in error messages]
+--   in GHC.Tc.Errors.Ppr
+isDefaultableBndr (Bndr tv vis)
+  = isInvisibleForAllTyFlag vis && is_defaultable (tyVarKind tv)
+  where
+    is_defaultable ki = isLevityTy ki || isRuntimeRepTy ki  || isMultiplicityTy ki
 
 -- | Do these denote the same level of visibility? 'Required'
 -- arguments are visible, others are not. So this function
@@ -543,7 +602,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between
     -- the two types and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
-    -- See Note [Comparing nullary type synonyms].
+    -- See Note [Comparing nullary type synonyms]
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
       = TEQ
