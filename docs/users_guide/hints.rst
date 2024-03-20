@@ -273,22 +273,6 @@ Use ``foreign import`` (a GHC extension) to plug into fast libraries:
 
     :ref:`ffi` describes the foreign function interface.
 
-Don't use ``Float``\s:
-    If you're using ``Complex``, definitely use ``Complex Double``
-    rather than ``Complex Float`` (the former is specialised heavily,
-    but the latter isn't).
-
-    ``Floats`` (probably 32-bits) are almost always a bad idea, anyway,
-    unless you Really Know What You Are Doing. Use ``Double``\s.
-    There's rarely a speed disadvantage—modern machines will use the
-    same floating-point unit for both. With ``Double``\s, you are much
-    less likely to hang yourself with numerical errors.
-
-    One time when ``Float`` might be a good idea is if you have a *lot*
-    of them, say a giant array of ``Float``\s. They take up half the
-    space in the heap compared to ``Doubles``. However, this isn't true
-    on a 64-bit machine.
-
 Use unboxed arrays (``UArray``)
     GHC supports arrays of unboxed elements, for several basic
     arithmetic element types including ``Int`` and ``Char``: see the
