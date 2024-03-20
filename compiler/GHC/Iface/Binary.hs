@@ -215,10 +215,9 @@ getTables' name_cache bh = do
 
 --        bh_name2 = addDecoder (mkCache (Proxy :: Proxy IfaceTyCon) ifaceDecoder) bh_name
 
-    pprTraceM "getTables" empty
     ifaceSymTab2 <- Binary.forwardGet bh_name (getTable ifaceTypeCache bhRef bh_name)
     let ifaceDecoder2 = mkReader $ getGenericSymtab ifaceSymTab2
-    let bh_type = addDecoder (mkCache (Proxy :: Proxy IfaceType) (pprTrace "forced" (text "f") ifaceDecoder2)) bh_name
+    let bh_type = addDecoder (mkCache (Proxy :: Proxy IfaceType) ifaceDecoder2) bh_name
     writeIORef bhRef bh_type
     return bh_type
 
