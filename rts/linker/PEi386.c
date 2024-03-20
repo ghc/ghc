@@ -1865,6 +1865,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           if (result != NULL || dllInstance == 0) {
               errorBelch("Could not load `%s'. Reason: %s\n",
                          (char*)dllName, result);
+              stgFree((void*)result);
               return false;
           }
 
