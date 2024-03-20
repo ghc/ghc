@@ -24,6 +24,8 @@ data CmmConfig = CmmConfig
   , cmmExternalDynamicRefs :: !Bool    -- ^ Generate code to link against dynamic libraries
   , cmmDoCmmSwitchPlans    :: !Bool    -- ^ Should the Cmm pass replace Stg switch statements
   , cmmSplitProcPoints     :: !Bool    -- ^ Should Cmm split proc points or not
+  , cmmAllowMul2           :: !Bool    -- ^ Does this platform support mul2
+  , cmmOptConstDivision    :: !Bool    -- ^ Should we optimize constant divisors
   }
 
 -- | retrieve the target Cmm platform

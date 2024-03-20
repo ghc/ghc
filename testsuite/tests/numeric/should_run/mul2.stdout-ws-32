@@ -13,3 +13,21 @@ Doing 4265016088 * 4213832810
 High: 4184447398
 Low: 549951472
 Result: 17972064726792247280
+-----
+Doing 5 * 6
+Needs high: False
+High: 0
+Low: 30
+Result: 30
+-----
+Doing -29951208 * 49
+Needs high: False
+High: -1
+Low: -1467609192
+Result: -1467609192
+-----
+Doing -29951208 * -81134486
+Needs high: True
+High: 565796
+Low: 549951472
+Result: 2430075866159088
