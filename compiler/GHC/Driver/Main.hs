@@ -160,7 +160,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface , pprModIface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -168,6 +168,8 @@ import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
 import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
+import GHC.Iface.Binary
+import GHC.Utils.Binary
 
 import GHC.Core
 import GHC.Core.Lint.Interactive ( interactiveInScope )
@@ -239,7 +241,7 @@ import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
-import GHC.Types.Name.Cache ( initNameCache )
+import GHC.Types.Name.Cache ( initNameCache, NameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
@@ -964,12 +966,25 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
+shareIface :: NameCache -> ModIface -> IO ModIface
+shareIface nc mi = do
+  bh <- openBinMem (1024 * 1024)
+  -- Todo, not quite right (See ext fields etc)
+  start <- tellBin @() bh
+  putWithUserData QuietBinIFace bh mi
+  seekBin bh start
+  res <- getWithUserData nc bh
+  let resiface = res { mi_src_hash = mi_src_hash mi }
+  forceModIface  resiface
+  return resiface
+
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
-initModDetails :: HscEnv -> ModIface -> IO ModDetails
-initModDetails hsc_env iface =
-  fixIO $ \details' -> do
+initModDetails :: HscEnv -> ModIface -> IO (ModIface, ModDetails)
+initModDetails hsc_env raw_iface = do
+  iface <- shareIface (hsc_NC hsc_env) raw_iface
+  d <- fixIO $ \details' -> do
     let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
                                 (HomeModInfo iface details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
@@ -978,6 +993,7 @@ initModDetails hsc_env iface =
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
+  return (iface, d)
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
@@ -989,16 +1005,16 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
         types_var <- newIORef (md_types details)
         let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
         let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
         -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
         -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
         -- reports a bug.
-        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
         LoadedBCOs <$> (unsafeInterleaveIO $ do
+                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
+                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
