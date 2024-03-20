@@ -228,7 +228,7 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
     andEq TEQX e = hasCast e
     andEq TEQ  e = e
 
-    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type
+    -- See Note [Comparing nullary type synonyms] in GHC.Core.TyCo.Compare
     go (D _ (TyConApp tc1 [])) (D _ (TyConApp tc2 []))
       | tc1 == tc2
       = TEQ

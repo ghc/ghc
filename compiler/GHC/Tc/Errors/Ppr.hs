@@ -54,8 +54,8 @@ import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
-import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
-                          pprSourceTyCon, pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
+import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
+                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -536,7 +536,7 @@ instance Diagnostic TcRnMessage where
                                 , text "cannot be inferred from the right-hand side." ]
                      in (injectivityErrorHerald $$ body $$ text "In the type family equation:", show_kinds)
 
-         in mkSimpleDecorated $ pprWithExplicitKindsWhen show_kinds $
+         in mkSimpleDecorated $ pprWithInvisibleBitsWhen show_kinds $
               hang herald
                 2 (vcat (map (pprCoAxBranchUser fam_tc) (eqn1 : rest_eqns)))
     TcRnBangOnUnliftedType ty
@@ -1182,7 +1182,7 @@ instance Diagnostic TcRnMessage where
                 ppr con <+> dcolon <+> ppr (dataConDisplayType True con))
               IsGADT ->
                 (text "A newtype must not be a GADT",
-                ppr con <+> dcolon <+> pprWithExplicitKindsWhen sneaky_eq_spec
+                ppr con <+> dcolon <+> pprWithInvisibleBitsWhen sneaky_eq_spec
                                        (ppr $ dataConDisplayType show_linear_types con))
               HasConstructorContext ->
                 (text "A newtype constructor must not have a context in its type",
@@ -1432,7 +1432,7 @@ instance Diagnostic TcRnMessage where
             , text "Perhaps enable PolyKinds or add a kind signature" ])
     TcRnUninferrableTyVar tidied_tvs context ->
       mkSimpleDecorated $
-      pprWithExplicitKindsWhen True $
+      pprWithInvisibleBitsWhen True $
       vcat [ text "Uninferrable type variable"
               <> plural tidied_tvs
               <+> pprWithCommas pprTyVar tidied_tvs
@@ -1440,7 +1440,7 @@ instance Diagnostic TcRnMessage where
             , pprUninferrableTyVarCtx context ]
     TcRnSkolemEscape escapees tv orig_ty ->
       mkSimpleDecorated $
-      pprWithExplicitKindsWhen True $
+      pprWithInvisibleBitsWhen True $
       vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees
                 , quotes $ pprTyVars escapees
                 , text "would escape" <+> itsOrTheir escapees <+> text "scope"
@@ -1884,7 +1884,7 @@ instance Diagnostic TcRnMessage where
 
     TcRnInvalidDefaultedTyVar wanteds proposal bad_tvs ->
       mkSimpleDecorated $
-      pprWithExplicitKindsWhen True $
+      pprWithInvisibleBitsWhen True $
       vcat [ text "Invalid defaulting proposal."
            , hang (text "The following type variable" <> plural (NE.toList bad_tvs) <+> text "cannot be defaulted, as" <+> why <> colon)
                 2 (pprQuotedList (NE.toList bad_tvs))
@@ -4153,17 +4153,18 @@ pprMismatchMsg _
               | otherwise       = text "kind" <+> quotes (ppr exp)
 
 pprMismatchMsg ctxt
-  (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
-                  , teq_mismatch_item     = item
+  (TypeEqMismatch { teq_mismatch_item     = item
                   , teq_mismatch_ty1      = ty1   -- These types are the actual types
                   , teq_mismatch_ty2      = ty2   --   that don't match; may be swapped
                   , teq_mismatch_expected = exp   -- These are the context of
                   , teq_mismatch_actual   = act   --   the mis-match
                   , teq_mismatch_what     = mb_thing
                   , teq_mb_same_occ       = mb_same_occ })
-  = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
-  $$ maybe empty pprSameOccInfo mb_same_occ
+  = addArising ct_loc $
+    pprWithInvisibleBitsWhen ppr_invis_bits msg
+    $$ maybe empty pprSameOccInfo mb_same_occ
   where
+
     msg | Just (torc, rep) <- sORTKind_maybe exp
         = msg_for_exp_sort torc rep
 
@@ -4226,6 +4227,7 @@ pprMismatchMsg ctxt
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
     level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
+    ppr_invis_bits = shouldPprWithInvisibleBits ty1 ty2 orig
 
     num_args_msg = case level of
       KindLevel
@@ -4317,6 +4319,60 @@ pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
         _        -> pprTheta wanteds
 
 
+-- | Whether to print explicit kinds (with @-fprint-explicit-kinds@)
+-- in an 'SDoc' when a type mismatch occurs to due invisible parts of the types.
+-- See Note [Showing invisible bits of types in error messages]
+--
+-- This function first checks to see if the 'CtOrigin' argument is a
+-- 'TypeEqOrigin'. If so, it first checks whether the equality is a visible
+-- equality; if it's not, definitely print the kinds. Even if the equality is
+-- a visible equality, check the expected/actual types to see if the types
+-- have equal visible components. If the 'CtOrigin' is
+-- not a 'TypeEqOrigin', fall back on the actual mismatched types themselves.
+shouldPprWithInvisibleBits :: Type -> Type -> CtOrigin -> Bool
+shouldPprWithInvisibleBits _ty1 _ty2 (TypeEqOrigin { uo_actual = act
+                                                   , uo_expected = exp
+                                                   , uo_visible = vis })
+  | not vis   = True                  -- See tests T15870, T16204c
+  | otherwise = mayLookIdentical act exp   -- See tests T9171, T9144.
+shouldPprWithInvisibleBits ty1 ty2 _ct
+  = mayLookIdentical ty1 ty2
+
+{- Note [Showing invisible bits of types in error messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It can be terribly confusing to get an error message like (#9171)
+
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+
+The reason may be that the kinds don't match up.  Typically you'll get
+more useful information, but not when it's as a result of ambiguity.
+
+To mitigate this, when we find a type or kind mis-match:
+
+* See if normally-visible parts of the type would make the two types
+  look different.  This check is made by
+  `GHC.Core.TyCo.Compare.mayLookIdentical`
+
+* If not, display the types with their normally-visible parts made visible,
+  by setting flags in the `SDocContext":
+  Specifically:
+    - Display kind arguments: sdocPrintExplicitKinds
+    - Don't default away runtime-reps: sdocPrintExplicitRuntimeReps,
+           which controls `GHC.Iface.Type.hideNonStandardTypes`
+  (NB: foralls are always printed by pprType, it turns out.)
+
+As a result the above error message would instead be displayed as:
+
+    Couldn't match expected type
+                  ‘GetParam @* @k2 @* Base (GetParam @* @* @k2 Base Int)’
+                with actual type
+                  ‘GetParam @* @k20 @* Base (GetParam @* @* @k20 Base Int)’
+
+Which makes it clearer that the culprit is the mismatch between `k2` and `k20`.
+
+Another example of what goes wrong without this: #24553.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -6040,7 +6096,7 @@ pprIllegalInstance = \case
   IllegalFamilyInstance reason ->
     pprIllegalFamilyInstance reason
   IllegalFamilyApplicationInInstance inst_ty invis_arg tf_tc tf_args ->
-    pprWithExplicitKindsWhen invis_arg $
+    pprWithInvisibleBitsWhen invis_arg $
       hang (text "Illegal type synonym family application"
               <+> quotes (ppr tf_ty) <+> text "in instance" <> colon)
          2 (ppr inst_ty)
@@ -6123,7 +6179,7 @@ pprNotCovered clas
   , not_covered_invis_vis_tvs = undetermined_tvs
   , not_covered_liberal       = which_cc_failed
   } =
-  pprWithExplicitKindsWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
+  pprWithInvisibleBitsWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
     vcat [ sep [ text "The"
                   <+> ppWhen liberal (text "liberal")
                   <+> text "coverage condition fails in class"
@@ -6385,7 +6441,7 @@ pprInvalidAssocInstance = \case
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr cls <+> hsep (map ppr (classTyVars cls)))]
   AssocTyVarsDontMatch vis fam_tc exp_tys act_tys ->
-    pprWithExplicitKindsWhen (isInvisibleForAllTyFlag vis) $
+    pprWithInvisibleBitsWhen (isInvisibleForAllTyFlag vis) $
     vcat [ text "Type indexes must match class instance head"
          , text "Expected:" <+> pp exp_tys
          , text "  Actual:" <+> pp act_tys ]
@@ -6409,7 +6465,7 @@ pprInvalidAssocDefault = \case
             let (pat_tv, pat_vis) = NE.head dups
             in (pat_vis,
                 text "Illegal duplicate variable" <+> quotes (ppr pat_tv) <+> text "in:")
-    in pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
+    in pprWithInvisibleBitsWhen (isInvisibleForAllTyFlag pat_vis) $
          hang main_msg
             2 (vcat [ppr_eqn, suggestion])
     where

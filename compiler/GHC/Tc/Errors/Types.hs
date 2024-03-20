@@ -5525,8 +5525,7 @@ data MismatchMsg
   --
   -- Test cases: T1470, tcfail212.
   | TypeEqMismatch
-      { teq_mismatch_ppr_explicit_kinds :: Bool
-      , teq_mismatch_item     :: ErrorItem
+      { teq_mismatch_item     :: ErrorItem
       , teq_mismatch_ty1      :: Type
       , teq_mismatch_ty2      :: Type
       , teq_mismatch_expected :: Type -- ^ The overall expected type

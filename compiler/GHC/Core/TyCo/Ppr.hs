@@ -14,7 +14,7 @@ module GHC.Core.TyCo.Ppr
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        pprDataCons, pprWithExplicitKindsWhen,
+        pprDataCons, pprWithInvisibleBitsWhen,
         pprWithTYPE, pprSourceTyCon,
 
 
@@ -330,13 +330,14 @@ pprTypeApp tc tys
     -- TODO: toIfaceTcArgs seems rather wasteful here
 
 ------------------
--- | Display all kind information (with @-fprint-explicit-kinds@) when the
--- provided 'Bool' argument is 'True'.
--- See @Note [Kind arguments in error messages]@ in "GHC.Tc.Errors".
-pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
-pprWithExplicitKindsWhen b
+-- | Display all foralls, runtime-reps, and kind information
+-- when provided 'Bool' argument is 'True'.  See GHC.Tc.Errors.Ppr
+-- Note [Showing invisible bits of types in error messages]
+pprWithInvisibleBitsWhen :: Bool -> SDoc -> SDoc
+pprWithInvisibleBitsWhen b
   = updSDocContext $ \ctx ->
-      if b then ctx { sdocPrintExplicitKinds = True }
+      if b then ctx { sdocPrintExplicitKinds   = True
+                    , sdocPrintExplicitRuntimeReps = True }
            else ctx
 
 -- | This variant preserves any use of TYPE in a type, effectively

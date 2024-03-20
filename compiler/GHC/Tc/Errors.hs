@@ -2094,10 +2094,9 @@ mkMismatchMsg item ty1 ty2 =
   case orig of
     TypeEqOrigin { uo_actual, uo_expected, uo_thing = mb_thing } ->
       (TypeEqMismatch
-        { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
-        , teq_mismatch_item = item
-        , teq_mismatch_ty1  = ty1
-        , teq_mismatch_ty2  = ty2
+        { teq_mismatch_item     = item
+        , teq_mismatch_ty1      = ty1
+        , teq_mismatch_ty2      = ty2
         , teq_mismatch_actual   = uo_actual
         , teq_mismatch_expected = uo_expected
         , teq_mismatch_what     = mb_thing
@@ -2121,25 +2120,6 @@ mkMismatchMsg item ty1 ty2 =
   where
     orig = errorItemOrigin item
     mb_same_occ = sameOccExtras ty2 ty1
-    ppr_explicit_kinds = shouldPprWithExplicitKinds ty1 ty2 orig
-
--- | Whether to print explicit kinds (with @-fprint-explicit-kinds@)
--- in an 'SDoc' when a type mismatch occurs to due invisible kind arguments.
---
--- This function first checks to see if the 'CtOrigin' argument is a
--- 'TypeEqOrigin'. If so, it first checks whether the equality is a visible
--- equality; if it's not, definitely print the kinds. Even if the equality is
--- a visible equality, check the expected/actual types to see if the types
--- have equal visible components. If the 'CtOrigin' is
--- not a 'TypeEqOrigin', fall back on the actual mismatched types themselves.
-shouldPprWithExplicitKinds :: Type -> Type -> CtOrigin -> Bool
-shouldPprWithExplicitKinds _ty1 _ty2 (TypeEqOrigin { uo_actual = act
-                                                   , uo_expected = exp
-                                                   , uo_visible = vis })
-  | not vis   = True                  -- See tests T15870, T16204c
-  | otherwise = tcEqTypeVis act exp   -- See tests T9171, T9144.
-shouldPprWithExplicitKinds ty1 ty2 _ct
-  = tcEqTypeVis ty1 ty2
 
 {- Note [Insoluble mis-match]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2401,29 +2381,6 @@ results in
       Perhaps you meant ‘getAlt’ (imported from Data.Monoid)
       Perhaps you want to add ‘getAll’ to the import list
       in the import of ‘Data.Monoid’
--}
-
-{-
-Note [Kind arguments in error messages]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It can be terribly confusing to get an error message like (#9171)
-
-    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
-                with actual type ‘GetParam Base (GetParam Base Int)’
-
-The reason may be that the kinds don't match up.  Typically you'll get
-more useful information, but not when it's as a result of ambiguity.
-
-To mitigate this, GHC attempts to enable the -fprint-explicit-kinds flag
-whenever any error message arises due to a kind mismatch. This means that
-the above error message would instead be displayed as:
-
-    Couldn't match expected type
-                  ‘GetParam @* @k2 @* Base (GetParam @* @* @k2 Base Int)’
-                with actual type
-                  ‘GetParam @* @k20 @* Base (GetParam @* @* @k20 Base Int)’
-
-Which makes it clearer that the culprit is the mismatch between `k2` and `k20`.
 -}
 
 -----------------------

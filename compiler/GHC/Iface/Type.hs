@@ -1132,7 +1132,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
        -> IfaceType
     go subs True (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
      | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
-                                -- or we get the mess in #13963
+                                     -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs var substituted_ty
             -- Record that we should replace it with LiftedRep/Lifted/Many,
