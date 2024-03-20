@@ -26,9 +26,21 @@ initCmmConfig dflags = CmmConfig
   , cmmSplitProcPoints     = not (backendSupportsUnsplitProcPoints (backend dflags))
                              || not (platformTablesNextToCode platform)
                              || usingInconsistentPicReg
+  , cmmAllowMul2           = (ncg && x86ish) || llvm
+  , cmmOptConstDivision    = not llvm
   }
   where platform                = targetPlatform dflags
         usingInconsistentPicReg =
           case (platformArch platform, platformOS platform, positionIndependent dflags)
           of   (ArchX86, OSDarwin, pic) -> pic
                _                        -> False
+        -- Copied from StgToCmm
+        (ncg, llvm) = case backendPrimitiveImplementation (backend dflags) of
+                          GenericPrimitives -> (False, False)
+                          NcgPrimitives -> (True, False)
+                          LlvmPrimitives -> (False, True)
+                          JSPrimitives -> (False, False)
+        x86ish  = case platformArch platform of
+                    ArchX86    -> True
+                    ArchX86_64 -> True
+                    _          -> False
