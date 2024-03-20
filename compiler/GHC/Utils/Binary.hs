@@ -1267,6 +1267,7 @@ getGenericSymtab :: Binary a => SymbolTable a
               -> BinHandle -> IO a
 getGenericSymtab symtab bh = do
   i :: Word32 <- get bh
+  pprTraceM "getting" (ppr (bounds symtab, i))
   return $! symtab ! fromIntegral i
 
 data SomeCache = forall a . SomeCache (TypeRep, CachedBinary a)

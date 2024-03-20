@@ -4,7 +4,7 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
-{-# OPTIONS_GHC -O0 -ddump-simpl -ddump-to-file #-}
+{-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
