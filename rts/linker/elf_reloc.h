@@ -10,5 +10,5 @@
 bool
 relocateObjectCode(ObjectCode * oc);
 
-
+void flushInstructionCache();
 #endif /* OBJETFORMAT_ELF */
