@@ -588,5 +588,25 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
   return EXIT_SUCCESS;
 }
 
+void flushInstructionCacheRISCV64(ObjectCode *oc) {
+  // Synchronize the memory and instruction cache to prevent illegal
+  // instruction exceptions. On Linux the parameters of
+  // __builtin___clear_cache are currently unused. Add them anyways for future
+  // compatibility. (I.e. the parameters couldn't be checked during
+  // development.)
+
+  /* The main object code */
+  void *codeBegin = oc->image + oc->misalignment;
+  __builtin___clear_cache(codeBegin, codeBegin + oc->fileSize);
+
+  /* Jump Islands */
+  __builtin___clear_cache((void *)oc->symbol_extras,
+                          (void *)oc->symbol_extras +
+                              sizeof(SymbolExtra) * oc->n_symbol_extras);
+
+  // Memory barrier to ensure nothing circumvents the fence.i / cache flushes.
+  SEQ_CST_FENCE();
+}
+
 #endif /* OBJECTFORMAT_ELF */
 #endif /* riscv64_HOST_ARCH */

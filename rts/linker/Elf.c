@@ -2012,6 +2012,8 @@ ocResolve_ELF ( ObjectCode* oc )
 
 #if defined(powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
+#elseif defined(riscv64_HOST_ARCH)
+    flushInstructionCache();
 #endif
 
     return ocMprotect_Elf(oc);

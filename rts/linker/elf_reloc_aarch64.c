@@ -339,5 +339,10 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
     return EXIT_SUCCESS;
 }
 
+void flushInstructionCacheAarch64() {
+  // Looks like we don't need this on Aarch64.
+  /* no-op */
+}
+
 #endif /* OBJECTFORMAT_ELF */
 #endif /* aarch64_HOST_ARCH */

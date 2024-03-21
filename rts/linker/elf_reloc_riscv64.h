@@ -7,4 +7,5 @@
 bool
 relocateObjectCodeRISCV64(ObjectCode * oc);
 
+void flushInstructionCacheRISCV64();
 #endif /* OBJETFORMAT_ELF */

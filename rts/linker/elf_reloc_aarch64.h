@@ -7,4 +7,5 @@
 bool
 relocateObjectCodeAarch64(ObjectCode * oc);
 
+void flushInstructionCacheAarch64();
 #endif /* OBJETFORMAT_ELF */
