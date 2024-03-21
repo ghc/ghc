@@ -534,6 +534,9 @@ pat_to_type_pat (SigPat _ pat sig_ty)
 pat_to_type_pat (ParPat _ pat)
   = do { HsTP x t <- pat_to_type_pat (unLoc pat)
        ; return (HsTP x (noLocA (HsParTy noAnn t))) }
+pat_to_type_pat (SplicePat (HsUntypedSpliceTop mod_finalizers pat) splice) = do
+      { HsTP x t <- pat_to_type_pat pat
+      ; return (HsTP x (noLocA (HsSpliceTy (HsUntypedSpliceTop mod_finalizers t) splice))) }
 pat_to_type_pat pat =
   -- There are other cases to handle (ConPat, ListPat, TuplePat, etc), but these
   -- would always be rejected by the unification in `tcHsTyPat`, so it's fine to
