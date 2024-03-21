@@ -11,6 +11,11 @@ bool
 relocateObjectCode(ObjectCode * oc) {
     return ADD_SUFFIX(relocateObjectCode)(oc);
 }
+
+
+void flushInstructionCache(){
+   return ADD_SUFFIX(flushInstructionCache)();
+}
 #endif
 
 #endif

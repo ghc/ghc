@@ -12,6 +12,7 @@
 #include "Adjustor.h"
 
 #include "rts/ghc_ffi.h"
+#include <stdint.h>
 #include <string.h>
 
 // Note that ffi_alloc_prep_closure is a non-standard libffi closure
@@ -189,14 +190,18 @@ createAdjustor (int cconv,
 
 #if defined(riscv64_HOST_ARCH)
     // Synchronize the memory and instruction cache to prevent illegal
-    // instruction exceptions. fence.i works per hart. I'm not sure what happens
-    // when the generated code is called on another hart. Probably, the fence on
-    // read/write is good enough for that. However, if there are illegal
-    // instruction exceptions, this is the place to look at (maybe, that the
-    // fence.i needs to be moved closely before the call.)
-    asm volatile ("fence rw, rw"  : : : "memory");
-    asm volatile ("fence.i" ::: "memory");
+    // instruction exceptions.
+
+    // We expect two instructions for address loading, one for the jump.
+    int instrCount = 3;
+    // On Linux the parameters of __builtin___clear_cache are currently unused.
+    // Add them anyways for future compatibility. (I.e. the parameters couldn't
+    // be checked during development.)
+    __builtin___clear_cache((void *)code,
+                            (void *)code + instrCount * sizeof(uint64_t));
+    // Memory barrier to ensure nothing circumvents the fence.i / cache flush.
+    SEQ_CST_FENCE();
 #endif
 
-    return (void*)code;
+    return (void *)code;
 }
