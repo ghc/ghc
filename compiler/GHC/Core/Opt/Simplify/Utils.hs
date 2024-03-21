@@ -85,6 +85,8 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import GHC.Types.Name.Env
+import Data.Graph
 
 {- *********************************************************************
 *                                                                      *
@@ -2108,6 +2110,27 @@ new binding is abstracted.  Several points worth noting
       which showed that it's harder to do polymorphic specialisation well
       if there are dictionaries abstracted over unnecessary type variables.
       See Note [Weird special case for SpecDict] in GHC.Core.Opt.Specialise
+
+(AB5) We do dependency analysis on recursive groups prior to determining
+      which variables to abstract over.
+      This is useful, because ANFisation in prepareBinding may float out
+      values out of a complex recursive binding, e.g.,
+          letrec { xs = g @a "blah"# ((:) 1 []) xs } in ...
+        ==> { prepareBinding }
+          letrec { foo = "blah"#
+                   bar = [42]
+                   xs = g @a foo bar xs } in
+          ...
+      and we don't want to abstract foo and bar over @a.
+
+      (Why is it OK to float the unlifted `foo` there?
+      See Note [Core top-level string literals] in GHC.Core;
+      it is controlled by GHC.Core.Opt.Simplify.Env.unitLetFloat.)
+
+      It is also necessary to do dependency analysis, because
+      otherwise (in #24551) we might get `foo = \@_ -> "missing"#` at the
+      top-level, and that triggers a CoreLint error because `foo` is *not*
+      manifestly a literal string.
 -}
 
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
@@ -2115,15 +2138,27 @@ abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
 abstractFloats uf_opts top_lvl main_tvs floats body
   = assert (notNull body_floats) $
     assert (isNilOL (sfJoinFloats floats)) $
-    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
+    do  { let sccs = concatMap to_sccs body_floats
+        ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     body_floats = letFloatBinds (sfLetFloats floats)
     empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
 
-    abstract :: GHC.Core.Subst.Subst -> OutBind -> SimplM (GHC.Core.Subst.Subst, OutBind)
-    abstract subst (NonRec id rhs)
+    -- See wrinkle (AB5) in Note [Which type variables to abstract over]
+    -- for why we need to re-do dependency analysis
+    to_sccs :: OutBind -> [SCC (Id, CoreExpr, VarSet)]
+    to_sccs (NonRec id e) = [AcyclicSCC (id, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
+    to_sccs (Rec prs)     = sccs
+      where
+        (ids,rhss) = unzip prs
+        sccs = depAnal (\(id,_rhs,_fvs) -> [getName id])
+                       (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
+                       (zip3 ids rhss (map exprFreeVars rhss))
+
+    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
                  !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
@@ -2134,7 +2169,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')
 
-    abstract subst (Rec prs)
+    abstract subst (CyclicSCC trpls)
       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
            ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
@@ -2142,15 +2177,15 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
            ; return (subst', Rec poly_pairs) }
       where
-        (ids,rhss) = unzip prs
-
+        (ids,rhss,_fvss) = unzip3 trpls
 
         -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = choose_tvs (mapUnionVarSet get_bind_fvs prs)
+        tvs_here = choose_tvs (mapUnionVarSet get_bind_fvs trpls)
 
         -- See wrinkle (AB4) in Note [Which type variables to abstract over]
-        get_bind_fvs (id,rhs) = tyCoVarsOfType (idType id) `unionVarSet` get_rec_rhs_tvs rhs
-        get_rec_rhs_tvs rhs   = nonDetStrictFoldVarSet get_tvs emptyVarSet (exprFreeVars rhs)
+        get_bind_fvs (id,_rhs,rhs_fvs) = tyCoVarsOfType (idType id) `unionVarSet` get_rec_rhs_tvs rhs_fvs
+        get_rec_rhs_tvs rhs_fvs        = nonDetStrictFoldVarSet get_tvs emptyVarSet rhs_fvs
+                                  -- nonDet is safe because of wrinkle (AB3)
 
         get_tvs :: Var -> VarSet -> VarSet
         get_tvs var free_tvs
