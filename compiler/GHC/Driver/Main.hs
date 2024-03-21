@@ -966,25 +966,13 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
-shareIface :: NameCache -> ModIface -> IO ModIface
-shareIface nc mi = do
-  bh <- openBinMem (1024 * 1024)
-  -- Todo, not quite right (See ext fields etc)
-  start <- tellBin @() bh
-  putWithUserData QuietBinIFace bh mi
-  seekBin bh start
-  res <- getWithUserData nc bh
-  let resiface = res { mi_src_hash = mi_src_hash mi }
-  forceModIface  resiface
-  return resiface
 
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
-initModDetails :: HscEnv -> ModIface -> IO (ModIface, ModDetails)
-initModDetails hsc_env raw_iface = do
-  iface <- shareIface (hsc_NC hsc_env) raw_iface
-  d <- fixIO $ \details' -> do
+initModDetails :: HscEnv -> ModIface -> IO ModDetails
+initModDetails hsc_env iface = do
+  fixIO $ \details' -> do
     let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
                                 (HomeModInfo iface details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
@@ -993,7 +981,6 @@ initModDetails hsc_env raw_iface = do
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
-  return (iface, d)
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
