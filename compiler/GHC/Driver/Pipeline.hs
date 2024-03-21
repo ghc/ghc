@@ -244,9 +244,9 @@ compileOne' mHscMessage
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, upd_summary, status)
    (iface, linkable) <- runPipeline (hsc_hooks plugin_hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
-   (shared_iface, details) <- initModDetails plugin_hsc_env iface
-   linkable' <- traverse (initWholeCoreBindings plugin_hsc_env shared_iface details) (homeMod_bytecode linkable)
-   return $! HomeModInfo shared_iface details (linkable { homeMod_bytecode = linkable' })
+   details <- initModDetails plugin_hsc_env iface
+   linkable' <- traverse (initWholeCoreBindings plugin_hsc_env iface details) (homeMod_bytecode linkable)
+   return $! HomeModInfo iface details (linkable { homeMod_bytecode = linkable' })
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
