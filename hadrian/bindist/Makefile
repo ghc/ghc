@@ -19,13 +19,6 @@ default:
 # TODO : find if a better function exists
 eq=$(and $(findstring $(1),$(2)),$(findstring $(2),$(1)))
 
-# the following is the work around suggested by @carter in #17418 during install
-# time.  This should help us with code signing issues by removing extended
-# attributes from all files.
-ifeq "$(Darwin_Host)" "YES"
-XATTR ?= /usr/bin/xattr
-endif
-
 # patchpackageconf
 #
 # Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'
@@ -156,10 +149,6 @@ install_bin_libdir:
 			$(INSTALL_PROGRAM) "$$i" "$(DESTDIR)$(ActualBinsDir)"; \
 		fi; \
 	done
-	# Work around #17418 on Darwin
-	if [ -e "${XATTR}" ]; then \
-		"${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; \
-	fi
 
 .PHONY: install_bin_direct
 install_bin_direct:
@@ -194,10 +183,6 @@ install_lib: lib/settings
 		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ;; \
 		esac; \
 	done; \
-	# Work around #17418 on Darwin
-	if [ -e "${XATTR}" ]; then \
-		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \
-	fi
 
 .PHONY: install_docs
 install_docs:

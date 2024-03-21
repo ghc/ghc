@@ -105,6 +105,29 @@ if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
   FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/mingw/], [\$\$topdir/../mingw/])
 fi
 
+
+if test "$HostOS" = "darwin"; then
+    # On darwin, we need to clean the extended attributes of the
+    # ghc-toolchain binary and its dynamic library before we can execute it in the bindist
+    # (this is a workaround for #24554, for the lack of proper notarisation #17418)
+
+    # The following is the work around suggested by @carter in #17418 during
+    # install time. This should help us with code signing issues by removing
+    # extended attributes from all files.
+    XATTR=${XATTR:-/usr/bin/xattr}
+
+    if [ -e "${XATTR}" ]; then
+
+        # Instead of cleaning the attributes of the ghc-toolchain binary only,
+        # we clean them from all files in the bin/ and lib/ directories, as it additionally future
+        # proofs running executables from the bindist besides ghc-toolchain at configure time, and
+        # we can avoid figuring out the path to the ghc-toolchain dynlib specifically.
+        /usr/bin/xattr -rc bin/
+        /usr/bin/xattr -rc lib/
+
+    fi
+fi
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
