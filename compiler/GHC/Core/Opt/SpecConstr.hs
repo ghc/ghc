@@ -952,7 +952,9 @@ data Value = ConVal            -- Constructor application
 
 instance Outputable Value where
    ppr LambdaVal            = text "<Lambda>"
-   ppr (ConVal wf con args) = ppr con <> braces pp_wf <+> interpp'SP args
+   ppr (ConVal wf con args)
+     | null args = ppr con
+     | otherwise = parens (ppr con <> braces pp_wf <+> interpp'SP args)
      where
        pp_wf | wf        = text "wf"
              | otherwise = text "not-wf"
@@ -2509,17 +2511,17 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
 callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = getSubstInScope (sc_subst env)
 
-        ; arg_tripples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
+        ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
           -- Drop boring patterns from the end
           -- See Note [SpecConstr call patterns]
-        ; let arg_tripples' | isJoinId fn = arg_tripples
-                            | otherwise   = dropWhileEnd is_boring arg_tripples
-              is_boring (interesting, _,_) = not interesting
-              (interesting_s, pats, cbv_ids) = unzip3 arg_tripples'
-              interesting           = or interesting_s
+        ; let arg_triples' | isJoinId fn     = arg_triples
+                           | otherwise       = dropWhileEnd is_boring arg_triples
+              is_boring (interesting, _,_)   = not interesting
+              (interesting_s, pats, cbv_ids) = unzip3 arg_triples'
+              interesting                    = or interesting_s
 
         ; let pat_fvs = exprsFreeVarsList pats
                 -- To get determinism we need the list of free variables in
