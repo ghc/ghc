@@ -17,12 +17,13 @@ module GHC.Core.Opt.Simplify.Env (
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePedanticBottoms, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
-        mkSimplEnv, extendIdSubst,
+        mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules, enterRecGroupRHSs,
+        reSimplifying,
 
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr,
@@ -154,6 +155,17 @@ following table:
     | Set by user                | SimplMode    | TopEnvConfig    |
     | Computed on initialization | SimplEnv     | SimplTopEnv     |
 
+Note [Inline depth]
+~~~~~~~~~~~~~~~~~~~
+When we inline an /already-simplified/ unfolding, we
+* Zap the substitution environment; the inlined thing is an OutExpr
+* Bump the seInlineDepth in the SimplEnv
+Both these tasks are done in zapSubstEnv.
+
+The seInlineDepth tells us how deep in inlining we are.  Currently,
+seInlineDepth is used for just one purpose: when we encounter a
+coercion we don't apply optCoercion to it if seInlineDepth>0.
+Reason: it has already been optimised once, no point in doing so again.
 -}
 
 data SimplEnv
@@ -183,7 +195,11 @@ data SimplEnv
         -- They are all OutVars, and all bound in this module
       , seInScope   :: !InScopeSet       -- OutVars only
 
-      , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
+      , seCaseDepth   :: !Int  -- Depth of multi-branch case alternatives
+
+      , seInlineDepth :: !Int  -- 0 initially, 1 when we inline an already-simplified
+                               -- unfolding, and simplify again; and so on
+                               -- See Note [Inline depth]
     }
 
 seArityOpts :: SimplEnv -> ArityOpts
@@ -491,14 +507,15 @@ points we're substituting. -}
 
 mkSimplEnv :: SimplMode -> (FamInstEnv, FamInstEnv) -> SimplEnv
 mkSimplEnv mode fam_envs
-  = SimplEnv { seMode      = mode
-             , seFamEnvs   = fam_envs
-             , seInScope   = init_in_scope
-             , seTvSubst   = emptyVarEnv
-             , seCvSubst   = emptyVarEnv
-             , seIdSubst   = emptyVarEnv
-             , seRecIds    = emptyUnVarSet
-             , seCaseDepth = 0 }
+  = SimplEnv { seMode        = mode
+             , seFamEnvs     = fam_envs
+             , seInScope     = init_in_scope
+             , seTvSubst     = emptyVarEnv
+             , seCvSubst     = emptyVarEnv
+             , seIdSubst     = emptyVarEnv
+             , seRecIds      = emptyUnVarSet
+             , seCaseDepth   = 0
+             , seInlineDepth = 0 }
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
@@ -534,6 +551,9 @@ updMode upd env
 bumpCaseDepth :: SimplEnv -> SimplEnv
 bumpCaseDepth env = env { seCaseDepth = seCaseDepth env + 1 }
 
+reSimplifying :: SimplEnv -> Bool
+reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
+
 ---------------------
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
@@ -549,6 +569,10 @@ extendCvSubst :: SimplEnv -> CoVar -> Coercion -> SimplEnv
 extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
   = assert (isCoVar var) $
     env {seCvSubst = extendVarEnv csubst var co}
+
+extendCvIdSubst :: SimplEnv -> Id -> OutExpr -> SimplEnv
+extendCvIdSubst env bndr (Coercion co) = extendCvSubst env bndr co
+extendCvIdSubst env bndr rhs           = extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet
@@ -619,7 +643,12 @@ setInScopeFromE.
 
 ---------------------
 zapSubstEnv :: SimplEnv -> SimplEnv
-zapSubstEnv env = env {seTvSubst = emptyVarEnv, seCvSubst = emptyVarEnv, seIdSubst = emptyVarEnv}
+-- See Note [Inline depth]
+-- We call zapSubstEnv precisely when we are about to
+-- simplify an already-simplified term
+zapSubstEnv env@(SimplEnv { seInlineDepth = n })
+  = env { seTvSubst = emptyVarEnv, seCvSubst = emptyVarEnv, seIdSubst = emptyVarEnv
+        , seInlineDepth = n+1 }
 
 setSubstEnv :: SimplEnv -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> SimplEnv
 setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }

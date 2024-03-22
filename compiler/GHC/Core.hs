@@ -1556,7 +1556,6 @@ isEvaldUnfolding _                                    = False
 -- | @True@ if the unfolding is a constructor application, the application
 -- of a CONLIKE function or 'OtherCon'
 isConLikeUnfolding :: Unfolding -> Bool
-isConLikeUnfolding (OtherCon _)                         = True
 isConLikeUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_conlike cache
 isConLikeUnfolding _                                    = False
 

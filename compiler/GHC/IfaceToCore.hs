@@ -1782,7 +1782,7 @@ tcUnfolding toplvl name _ info (IfCoreUnfold src cache if_guidance if_expr)
         ; expr <- tcUnfoldingRhs (isCompulsorySource src) toplvl name if_expr
         ; let guidance = case if_guidance of
                  IfWhen arity unsat_ok boring_ok -> UnfWhen arity unsat_ok boring_ok
-                 IfNoGuidance -> calcUnfoldingGuidance uf_opts is_top_bottoming expr
+                 IfNoGuidance -> calcUnfoldingGuidance uf_opts is_top_bottoming False expr
           -- See Note [Tying the 'CoreUnfolding' knot]
         ; return $ mkCoreUnfolding src True expr (Just cache) guidance }
   where

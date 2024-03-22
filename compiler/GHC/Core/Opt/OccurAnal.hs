@@ -55,7 +55,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
-import GHC.Types.Demand ( argOneShots, argsOneShots )
+import GHC.Types.Demand ( argOneShots, argsOneShots, isDeadEndSig )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -2579,7 +2579,12 @@ occAnalArgs :: OccEnv -> CoreExpr -> [CoreExpr]
 occAnalArgs !env fun args !one_shots
   = go emptyDetails fun args one_shots
   where
-    env_args = setNonTailCtxt OccVanilla env
+    env_args = setNonTailCtxt encl env
+
+    -- Make bottoming functions interesting
+    -- See Note [Bottoming function calls]
+    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
+         | otherwise                               = OccVanilla
 
     go uds fun [] _ = WUD uds fun
     go uds fun (arg:args) one_shots
@@ -2597,6 +2602,22 @@ occAnalArgs !env fun args !one_shots
 {-
 Applications are dealt with specially because we want
 the "build hack" to work.
+
+Note [Bottoming function calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   let x = (a,b) in
+   case p of
+      A -> ...(error x)..
+      B -> ...(ertor x)...
+
+postInlineUnconditionally may duplicate x's binding, but sometimes it
+does so only if the use site IsInteresting.  Pushing allocation into error
+branches is good, so we try to make bottoming calls look interesting, by
+setting occ_encl = OccScrut for such calls.
+
+The slightly-artificial test T21128 is a good example.  It's probably
+not a huge deal.
 
 Note [Arguments of let-bound constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

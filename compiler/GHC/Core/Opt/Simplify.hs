@@ -17,7 +17,8 @@ import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
 import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules )
-import GHC.Core.Opt.Simplify.Utils ( activeRule, activeUnfolding )
+import GHC.Core.Opt.Simplify.Utils  ( activeRule )
+import GHC.Core.Opt.Simplify.Inline ( activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats ( simplCountN )

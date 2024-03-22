@@ -31,27 +31,30 @@ module GHC.Core.Unfold (
         updateVeryAggressive, updateCaseScaling,
         updateCaseThreshold, updateReportPrefix,
 
-        inlineBoringOk, calcUnfoldingGuidance
+        inlineBoringOk, calcUnfoldingGuidance,
+        uncondInlineJoin
     ) where
 
 import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Types.Id
 import GHC.Core.DataCon
+import GHC.Core.Type
+
+import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
 import GHC.Types.RepType ( isZeroBitTy )
 import GHC.Types.Basic  ( Arity, RecFlag )
-import GHC.Core.Type
+import GHC.Types.ForeignCall
+import GHC.Types.Tickish
+
+import GHC.Builtin.PrimOps
 import GHC.Builtin.Names
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Types.ForeignCall
-import GHC.Types.Tickish
 
 import qualified Data.ByteString as BS
 
@@ -242,16 +245,17 @@ inlineBoringOk e
 calcUnfoldingGuidance
         :: UnfoldingOpts
         -> Bool          -- Definitely a top-level, bottoming binding
+        -> Bool          -- True <=> join point
         -> CoreExpr      -- Expression to look at
         -> UnfoldingGuidance
-calcUnfoldingGuidance opts is_top_bottoming (Tick t expr)
+calcUnfoldingGuidance opts is_top_bottoming is_join (Tick t expr)
   | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
-  = calcUnfoldingGuidance opts is_top_bottoming expr
-calcUnfoldingGuidance opts is_top_bottoming expr
+  = calcUnfoldingGuidance opts is_top_bottoming is_join expr
+calcUnfoldingGuidance opts is_top_bottoming is_join expr
   = case sizeExpr opts bOMB_OUT_SIZE val_bndrs body of
       TooBig -> UnfNever
       SizeIs size cased_bndrs scrut_discount
-        | uncondInline expr n_val_bndrs size
+        | uncondInline is_join expr bndrs n_val_bndrs body size
         -> UnfWhen { ug_unsat_ok = unSaturatedOk
                    , ug_boring_ok =  boringCxtOk
                    , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
@@ -419,13 +423,29 @@ sharing the wrapper closure.
 The solution: don’t ignore coercion arguments after all.
 -}
 
-uncondInline :: CoreExpr -> Arity -> Int -> Bool
+uncondInline :: Bool -> CoreExpr -> [Var] -> Arity -> CoreExpr -> Int -> Bool
 -- Inline unconditionally if there no size increase
 -- Size of call is arity (+1 for the function)
 -- See Note [INLINE for small functions]
-uncondInline rhs arity size
+uncondInline is_join rhs bndrs arity body size
+  | is_join   = uncondInlineJoin bndrs body
   | arity > 0 = size <= 10 * (arity + 1) -- See Note [INLINE for small functions] (1)
   | otherwise = exprIsTrivial rhs        -- See Note [INLINE for small functions] (4)
+
+uncondInlineJoin :: [Var] -> CoreExpr -> Bool
+-- See Note [Duplicating join points] point (DJ3) in GHC.Core.Opt.Simplify.Iteration
+uncondInlineJoin _bndrs body
+  | exprIsTrivial body
+  = True   -- Nullary constructors, literals
+
+  | (Var v, args) <- collectArgs body
+  , all exprIsTrivial args
+  , isJoinId v   -- Indirection to another join point; always inline
+  = True
+
+  | otherwise
+  = False
+
 
 sizeExpr :: UnfoldingOpts
          -> Int             -- Bomb out if it gets bigger than this
@@ -677,7 +697,10 @@ jumpSize
  :: Int  -- ^ number of value args
  -> Int  -- ^ number of value args that are void
  -> Int
-jumpSize n_val_args voids = 2 * (1 + n_val_args - voids)
+jumpSize _n_val_args _voids = 0   -- Jumps are small, and we don't want penalise them
+
+  -- Old version:
+  -- 2 * (1 + n_val_args - voids)
   -- A jump is 20% the size of a function call. Making jumps free reopens
   -- bug #6048, but making them any more expensive loses a 21% improvement in
   -- spectral/puzzle. TODO Perhaps adjusting the default threshold would be a

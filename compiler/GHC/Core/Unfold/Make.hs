@@ -57,6 +57,7 @@ mkFinalUnfolding' opts src strict_sig expr
   = mkUnfolding opts src
                 True {- Top level -}
                 (isDeadEndSig strict_sig)
+                False {- Not a join point -}
                 expr
 
 -- | Same as 'mkCompulsoryUnfolding' but simplifies the unfolding first
@@ -79,7 +80,7 @@ mkCompulsoryUnfolding expr
 
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
-  = mkUnfolding opts VanillaSrc False False rhs Nothing
+  = mkUnfolding opts VanillaSrc False False False rhs Nothing
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -117,7 +118,7 @@ mkWorkerUnfolding opts work_fn
   = mkCoreUnfolding src top_lvl new_tmpl Nothing guidance
   where
     new_tmpl = simpleOptExpr opts (work_fn tmpl)
-    guidance = calcUnfoldingGuidance (so_uf_opts opts) False new_tmpl
+    guidance = calcUnfoldingGuidance (so_uf_opts opts) False False new_tmpl
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
@@ -156,7 +157,7 @@ mkInlineUnfoldingWithArity opts src arity expr
 
 mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts src expr
-  = mkUnfolding (so_uf_opts opts) src False False expr' Nothing
+  = mkUnfolding (so_uf_opts opts) src False False False expr' Nothing
   where
     expr' = simpleOptExpr opts expr
 
@@ -319,16 +320,17 @@ mkUnfolding :: UnfoldingOpts
             -> Bool       -- Is top-level
             -> Bool       -- Definitely a bottoming binding
                           -- (only relevant for top-level bindings)
+            -> Bool       -- True <=> join point
             -> CoreExpr
             -> Maybe UnfoldingCache
             -> Unfolding
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
-mkUnfolding opts src top_lvl is_bottoming expr cache
+mkUnfolding opts src top_lvl is_bottoming is_join expr cache
   = mkCoreUnfolding src top_lvl expr cache guidance
   where
     is_top_bottoming = top_lvl && is_bottoming
-    guidance         = calcUnfoldingGuidance opts is_top_bottoming expr
+    guidance         = calcUnfoldingGuidance opts is_top_bottoming is_join expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
