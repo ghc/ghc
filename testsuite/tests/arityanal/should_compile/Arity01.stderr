@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 65, types: 41, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 71, types: 43, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F1.f2 :: Integer
@@ -8,14 +8,18 @@ F1.f2 :: Integer
 F1.f2 = GHC.Num.Integer.IS 1#
 
 Rec {
--- RHS size: {terms: 18, types: 4, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 24, types: 6, coercions: 0, joins: 0/0}
 F1.f1_h1 [Occ=LoopBreaker] :: Integer -> Integer -> Integer -> Integer
-[GblId, Arity=3, Str=<SL><SL><SL>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<1L><1L><SL>, Unf=OtherCon []]
 F1.f1_h1
-  = \ (n :: Integer) (x :: Integer) (eta :: Integer) ->
-      case GHC.Num.Integer.integerLt x n of {
-        False -> eta;
-        True -> F1.f1_h1 n (GHC.Num.Integer.integerAdd x F1.f2) (GHC.Num.Integer.integerAdd x eta)
+  = \ (n :: Integer) (x :: Integer) (eta [OS=OneShot] :: Integer) ->
+      case x of x1 { __DEFAULT ->
+      case n of y1 { __DEFAULT ->
+      case GHC.Num.Integer.integerLt# x1 y1 of {
+        __DEFAULT -> eta;
+        1# -> F1.f1_h1 y1 (GHC.Num.Integer.integerAdd x1 F1.f2) (GHC.Num.Integer.integerAdd x1 eta)
+      }
+      }
       }
 end Rec }
 

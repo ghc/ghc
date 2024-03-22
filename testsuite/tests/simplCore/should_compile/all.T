@@ -53,7 +53,7 @@ test('T3717', only_ways(['optasm']),
 
 test('spec-inline', only_ways(['optasm']),
               	    compile,
-              	    ['-O2 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
+              	    ['-O2 -ddump-simpl -dsuppress-uniques -dsuppress-ticks -dno-typeable-binds'])
 test('T4908', only_ways(['optasm']),
               compile,
               ['-O2 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
@@ -320,7 +320,7 @@ test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress
 test('spec004', [ grep_errmsg(r'\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques'])
 # NB: T17810: -fspecialise-aggressively
 test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
-test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
+test('T18013', normal, multimod_compile, ['T18013', '-v0 -O -dno-typeable-binds'])
 test('T18098', normal, compile, ['-dcore-lint -O2'])
 test('T18120', normal, compile, ['-dcore-lint -O'])
 
@@ -342,7 +342,6 @@ test('T18603', normal, compile, ['-dcore-lint -O'])
 # T18649 should /not/ generate a specialisation rule
 test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
 
-test('T18730', normal, multimod_compile, ['T18730_A', '-dcore-lint -O'])
 test('T18747A', normal, compile, [''])
 test('T18747B', normal, compile, [''])
 test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])

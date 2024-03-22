@@ -18,7 +18,7 @@ f :: Integer -> Integer -> Integer
  Str=<SL><1L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [0 0] 156 0}]
+         Guidance=IF_ARGS [0 0] 140 0}]
 f = \ (x :: Integer) (y :: Integer) ->
       joinrec {
         go [InlPrag=INLINE (sat-args=1), Occ=LoopBreaker, Dmd=SC(S,L)]

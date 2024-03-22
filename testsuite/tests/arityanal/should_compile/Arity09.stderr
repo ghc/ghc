@@ -18,14 +18,14 @@ F9.f91_f [Occ=LoopBreaker] :: Integer -> Integer
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 F9.f91_f
   = \ (n :: Integer) ->
-      case n of wild {
-        GHC.Num.Integer.IS x1 ->
-          case GHC.Prim.<=# x1 100# of {
-            __DEFAULT -> GHC.Num.Integer.integerSub wild F9.f1;
-            1# -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd wild lvl))
+      case n of x1 {
+        GHC.Num.Integer.IS x ->
+          case GHC.Prim.<=# x 100# of {
+            __DEFAULT -> GHC.Num.Integer.integerSub x1 F9.f1;
+            1# -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd x1 lvl))
           };
-        GHC.Num.Integer.IP x1 -> GHC.Num.Integer.integerSub wild F9.f1;
-        GHC.Num.Integer.IN x1 -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd wild lvl))
+        GHC.Num.Integer.IP x -> GHC.Num.Integer.integerSub x1 F9.f1;
+        GHC.Num.Integer.IN x -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd x1 lvl))
       }
 end Rec }
 
