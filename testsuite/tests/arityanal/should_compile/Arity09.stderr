@@ -1,11 +1,16 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 38, types: 11, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 28, types: 8, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Integer
 [GblId, Unf=OtherCon []]
-lvl = GHC.Num.Integer.IS 11#
+lvl = GHC.Num.Integer.IS 100#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl1 :: Integer
+[GblId, Unf=OtherCon []]
+lvl1 = GHC.Num.Integer.IS 11#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F9.f1 :: Integer
@@ -13,19 +18,14 @@ F9.f1 :: Integer
 F9.f1 = GHC.Num.Integer.IS 10#
 
 Rec {
--- RHS size: {terms: 28, types: 6, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 15, types: 2, coercions: 0, joins: 0/0}
 F9.f91_f [Occ=LoopBreaker] :: Integer -> Integer
-[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<SL>, Unf=OtherCon []]
 F9.f91_f
   = \ (n :: Integer) ->
-      case n of wild {
-        GHC.Num.Integer.IS x1 ->
-          case GHC.Prim.<=# x1 100# of {
-            __DEFAULT -> GHC.Num.Integer.integerSub wild F9.f1;
-            1# -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd wild lvl))
-          };
-        GHC.Num.Integer.IP x1 -> GHC.Num.Integer.integerSub wild F9.f1;
-        GHC.Num.Integer.IN x1 -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd wild lvl))
+      case GHC.Num.Integer.integerLe n lvl of {
+        False -> GHC.Num.Integer.integerSub n F9.f1;
+        True -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd n lvl1))
       }
 end Rec }
 

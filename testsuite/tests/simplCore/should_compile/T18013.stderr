@@ -17,6 +17,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -25,6 +27,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
@@ -38,6 +42,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op first (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
@@ -48,6 +54,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -56,12 +64,16 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op . (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -70,6 +82,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op id (BUILTIN)
@@ -83,6 +97,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op ||| (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op $p1Applicative (BUILTIN)
@@ -90,6 +106,8 @@ Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -98,6 +116,8 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -107,31 +127,11 @@ Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @(_, ()) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @(_, ()) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @(_, ()) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 52, types: 95, coercions: 17, joins: 0/1}
+  = {terms: 38, types: 90, coercions: 17, joins: 0/1}
 
 -- RHS size: {terms: 37, types: 78, coercions: 17, joins: 0/1}
 mapMaybeRule [InlPrag=[2]]
@@ -220,47 +220,6 @@ mapMaybeRule
                             -> (# GHC.Prim.State# GHC.Prim.RealWorld, Result s (Maybe b) #))
                            ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
       }
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18013.$trModule4 :: GHC.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T18013.$trModule4 = "main"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18013.$trModule3 :: GHC.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T18013.$trModule3 = GHC.Types.TrNameS T18013.$trModule4
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18013.$trModule2 :: GHC.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T18013.$trModule2 = "T18013"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18013.$trModule1 :: GHC.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
-
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T18013.$trModule :: GHC.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T18013.$trModule
-  = GHC.Types.Module T18013.$trModule3 T18013.$trModule1
 
 
 

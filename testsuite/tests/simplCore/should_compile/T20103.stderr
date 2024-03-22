@@ -6,7 +6,7 @@ T20103.hs:7:24: warning: [GHC-63394] [-Wx-partial (in -Wextended-warnings)]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 139, types: 89, coercions: 22, joins: 0/0}
+  = {terms: 136, types: 88, coercions: 25, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Int
@@ -117,7 +117,7 @@ lvl16
                  :: CallStack ~R# (?callStack::CallStack)))
 
 Rec {
--- RHS size: {terms: 47, types: 42, coercions: 18, joins: 0/0}
+-- RHS size: {terms: 44, types: 41, coercions: 21, joins: 0/0}
 T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!])], Arity=2, Str=<1L><1L>, Unf=OtherCon []]
@@ -150,8 +150,11 @@ T20103.$wfoo
           { __DEFAULT ->
           case getCallStack wild1 of {
             [] ->
-              case wild1 of wild2 {
-                __DEFAULT -> case lvl16 wild2 of {};
+              case $dIP
+                   `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
+                           :: (?callStack::CallStack) ~R# CallStack)
+              of wild1 {
+                __DEFAULT -> case lvl16 wild1 of {};
                 GHC.Stack.Types.FreezeCallStack ds1 ->
                   case GHC.List.head1
                          @([Char], SrcLoc)

@@ -15,7 +15,7 @@ T21081.fst': <1!P(1L,A)>
 T21081.g: <ML>
 T21081.h: <MP(ML,ML)><1!P(1L)>
 T21081.h2: <L><S!P(SL)>
-T21081.i: <1L><1L><MP(ML,ML)>
+T21081.i: <1L><1L><LP(ML,ML)>
 T21081.j: <S!P(1L,1L)>
 T21081.myfoldl: <LC(S,C(1,L))><1L><1L>
 T21081.snd': <1!P(A,1L)>
@@ -61,7 +61,7 @@ T21081.fst': <1!P(1L,A)>
 T21081.g: <ML>
 T21081.h: <MP(ML,ML)><1!P(1L)>
 T21081.h2: <L><1!P(SL)>
-T21081.i: <1L><1L><MP(ML,ML)>
+T21081.i: <1L><1L><LP(ML,ML)>
 T21081.j: <1!P(1L,1L)>
 T21081.myfoldl: <LC(S,C(1,L))><1L><1L>
 T21081.snd': <1!P(A,1L)>

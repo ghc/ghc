@@ -17,16 +17,16 @@ integerConstantFolding:
 	! grep -q '\<100[0-9][0-9][0-9]\>' folding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' folding.simpl; }
 	$(call CHECK,\<200007\>,plusInteger)
 	$(call CHECK,\<683234160\>,timesInteger)
-	$(call CHECK,-991\>,minusIntegerN)
+	$(call CHECK,991\>,minusIntegerN)  # itos negates -991 so we see just 991
 	$(call CHECK,\<989\>,minusIntegerP)
-	$(call CHECK,-200011\>,negateInteger)
+	$(call CHECK,200011\>,negateInteger) # Ditto negation
 	$(call CHECK,\<200019\>,absInteger)
 	$(call CHECK,\<50024\>,gcdInteger)
 	$(call CHECK,\<1001100300\>,lcmInteger)
 	$(call CHECK,\<532\>,andInteger)
 	$(call CHECK,\<239575\>,orInteger)
 	$(call CHECK,\<239041\>,xorInteger)
-	$(call CHECK,-200059\>,complementInteger)
+	$(call CHECK,200059\>,complementInteger)  # Ditto negation
 	$(call CHECK,\<813\>,quotRemInteger)
 	$(call CHECK,\<60\>,quotRemInteger)
 	$(call CHECK,\<219\>,divModInteger)
