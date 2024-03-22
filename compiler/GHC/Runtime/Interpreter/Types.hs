@@ -51,6 +51,9 @@ data Interp = Interp
 
   , interpLoader   :: !Loader
       -- ^ Interpreter loader
+
+  , interpLookupSymbolCache :: !(MVar (UniqFM FastString (Ptr ())))
+      -- ^ LookupSymbol cache
   }
 
 data InterpInstance
@@ -107,9 +110,6 @@ data ExtInterpInstance c = ExtInterpInstance
       -- ^ Values that need to be freed before the next command is sent.
       -- Finalizers for ForeignRefs can append values to this list
       -- asynchronously.
-
-  , instLookupSymbolCache :: !(MVar (UniqFM FastString (Ptr ())))
-      -- ^ LookupSymbol cache
 
   , instExtra             :: !c
       -- ^ Instance specific extra fields
