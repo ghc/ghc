@@ -184,11 +184,12 @@ getCoreToDo dflags hpt_rule_base extra_vars
       runWhen static_ptrs $ CoreDoPasses
         [ simpl_gently -- Float Out can't handle type lets (sometimes created
                        -- by simpleOptPgm via mkParallelBindings)
-        , CoreDoFloatOutwards FloatOutSwitches
+        , CoreDoFloatOutwards $ FloatOutSwitches
           { floatOutLambdas   = Just 0
           , floatOutConstants = True
           , floatOutOverSatApps = False
           , floatToTopLevelOnly = True
+          , floatJoinsToTop = False
           }
         ]
 
@@ -214,13 +215,13 @@ getCoreToDo dflags hpt_rule_base extra_vars
         runWhen do_specialise CoreDoSpecialising,
 
         if full_laziness then
-           CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = Just 0,
-                                 floatOutConstants = True,
-                                 floatOutOverSatApps = False,
-                                 floatToTopLevelOnly = False }
-                -- Was: gentleFloatOutSwitches
-                --
+           CoreDoFloatOutwards $ FloatOutSwitches
+                { floatOutLambdas     = Just 0
+                , floatOutConstants   = True
+                , floatOutOverSatApps = False
+                , floatToTopLevelOnly = False
+                , floatJoinsToTop     = False  -- Initially, don't float join points at all
+                }
                 -- I have no idea why, but not floating constants to
                 -- top level is very bad in some cases.
                 --
@@ -276,17 +277,19 @@ getCoreToDo dflags hpt_rule_base extra_vars
         runWhen exitification CoreDoExitify,
             -- See Note [Placement of the exitification pass]
 
-        runWhen full_laziness $
-           CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas     = floatLamArgs dflags,
-                                 floatOutConstants   = True,
-                                 floatOutOverSatApps = True,
-                                 floatToTopLevelOnly = False },
-                -- nofib/spectral/hartel/wang doubles in speed if you
-                -- do full laziness late in the day.  It only happens
-                -- after fusion and other stuff, so the early pass doesn't
-                -- catch it.  For the record, the redex is
-                --        f_el22 (f_el21 r_midblock)
+        -- nofib/spectral/hartel/wang doubles in speed if you
+        -- do full laziness late in the day.  It only happens
+        -- after fusion and other stuff, so the early pass doesn't
+        -- catch it.  For the record, the redex is
+        --        f_el22 (f_el21 r_midblock)
+        runWhen full_laziness $ CoreDoFloatOutwards $ FloatOutSwitches
+               { floatOutLambdas     = floatLamArgs dflags
+               , floatOutConstants   = True
+               , floatOutOverSatApps = True
+               , floatToTopLevelOnly = False
+               , floatJoinsToTop     = True },
+                -- floatJoinsToTop: floating joins to the top makes a huge difference to
+                -- spectral/minimax; see XXX
 
 
         runWhen cse CoreCSE,

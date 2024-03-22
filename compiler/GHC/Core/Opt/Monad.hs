@@ -73,23 +73,27 @@ import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 
-data FloatOutSwitches = FloatOutSwitches {
-  floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
-                                   -- doing so will abstract over n or fewer
-                                   -- value variables
-                                   -- Nothing <=> float all lambdas to top level,
-                                   --             regardless of how many free variables
-                                   -- Just 0 is the vanilla case: float a lambda
-                                   --    iff it has no free vars
+data FloatOutSwitches = FloatOutSwitches
+  { floatOutLambdas   :: Maybe Int  -- ^ Just n <=> float lambdas to top level, if
+                                    -- doing so will abstract over n or fewer
+                                    -- value variables
+                                    -- Nothing <=> float all lambdas to top level,
+                                    --             regardless of how many free variables
+                                    -- Just 0 is the vanilla case: float a lambda
+                                    --    iff it has no free vars
 
-  floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
-                                   --            even if they do not escape a lambda
-  floatOutOverSatApps :: Bool,
-                             -- ^ True <=> float out over-saturated applications
-                             --            based on arity information.
-                             -- See Note [Floating over-saturated applications]
-                             -- in GHC.Core.Opt.SetLevels
-  floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
+  , floatOutConstants :: Bool       -- ^ True <=> float constants to top level,
+                                    --            even if they do not escape a lambda
+
+  , floatOutOverSatApps :: Bool     -- ^ True <=> float out over-saturated applications
+                                    --            based on arity information.
+                                    -- See Note [Floating over-saturated applications]
+                                    -- in GHC.Core.Opt.SetLevels
+  , floatToTopLevelOnly :: Bool     -- ^ Allow floating to the top level only.
+
+  , floatJoinsToTop :: Bool         -- ^ Float join points to top level if possible
+                                    -- See Note [Floating join point bindings]
+                                    --     in GHC.Core.Opt.SetLevels
   }
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
@@ -100,6 +104,7 @@ pprFloatOutSwitches sw
      sep $ punctuate comma $
      [ text "Lam ="    <+> ppr (floatOutLambdas sw)
      , text "Consts =" <+> ppr (floatOutConstants sw)
+     , text "JoinsToTop =" <+> ppr (floatJoinsToTop sw)
      , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
 
 {-
