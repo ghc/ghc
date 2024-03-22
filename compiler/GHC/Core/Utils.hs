@@ -16,7 +16,7 @@ module GHC.Core.Utils (
 
         -- * Taking expressions apart
         findDefault, addDefault, findAlt, isDefaultAlt,
-        mergeAlts, trimConArgs,
+        mergeAlts, mergeCaseAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
         scaleAltsBy,
 
@@ -71,6 +71,7 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Ppr
+import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
@@ -96,6 +97,7 @@ import GHC.Types.Basic( Arity )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Demand
+import GHC.Types.RepType (isZeroBitTy)
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -111,8 +113,8 @@ import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
+import Control.Monad       ( guard )
 import qualified Data.Set as Set
-import GHC.Types.RepType (isZeroBitTy)
 
 {-
 ************************************************************************
@@ -643,6 +645,76 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
+mergeCaseAlts :: Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
+-- See Note [Merge Nested Cases]
+mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
+  | Just (joins, inner_alts) <- go deflt_rhs
+  = Just (joins, mergeAlts outer_alts inner_alts)
+                -- NB: mergeAlts gives priority to the left
+                --      case x of
+                --        A -> e1
+                --        DEFAULT -> case x of
+                --                      A -> e2
+                --                      B -> e3
+                -- When we merge, we must ensure that e1 takes
+                -- precedence over e2 as the value for A!
+  where
+    go :: CoreExpr -> Maybe ([CoreBind], [CoreAlt])
+
+    -- Whizzo: we can merge!
+    go (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
+       | inner_scrut_var == outer_bndr
+       , not (inner_bndr == outer_bndr)   -- Avoid shadowing
+       , let wrap_let rhs' = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
+                -- inner_bndr is never dead!  It's the scrutinee!
+                -- The let is OK even for unboxed binders
+                -- See Note [Merge Nested Cases] wrinkle (MC2)
+             do_one (Alt con bndrs rhs)
+               | any (== outer_bndr) bndrs = Nothing
+               | otherwise                 = Just (Alt con bndrs (wrap_let rhs))
+       = do { alts' <- mapM do_one inner_alts
+            ; return ([], alts') }
+
+    -- Deal with tagToEnum# See Note [Merge Nested Cases] wrinkle (MC3)
+    go (App (App (Var f) (Type type_arg)) (Var v))
+      | v == outer_bndr
+      , Just TagToEnumOp <- isPrimOpId_maybe f
+      , Just tc  <- tyConAppTyCon_maybe type_arg
+      , Just (dc1:dcs) <- tyConDataCons_maybe tc   -- At least one data constructor
+      , dcs `lengthAtMost` 3  -- Arbitrary
+      = return ( [], mk_alts dc1 dcs)
+      where
+        mk_lit dc = mkLitIntUnchecked $ toInteger $ dataConTagZ dc
+        mk_rhs dc = Var (dataConWorkId dc)
+        mk_alts dc1 dcs =  Alt DEFAULT              [] (mk_rhs dc1)
+                        : [Alt (LitAlt (mk_lit dc)) [] (mk_rhs dc) | dc <- dcs]
+
+    -- Float out let/join bindings
+    -- See Note [Merge Nested Cases] wrinkle (MC4)
+    go (Let bind body)
+      | null outer_alts || isJoinBind bind
+      = do { (joins, alts) <- go body
+
+             -- Check for capture; but only if we could otherwise do a merge
+           ; let capture = outer_bndr `elem` bindersOf bind
+                           || outer_bndr `elemVarSet` bindFreeVars bind
+           ; guard (not capture)
+
+           ; return (bind:joins, alts ) }
+      | otherwise
+      = Nothing
+
+    -- We don't want ticks to get in the way; just push them inwards.
+    -- (This happens when you add SourceTicks e.g. GHC.Num.Integer.integerLt#)
+    go (Tick t body)
+      = do { (joins, alts) <- go body
+           ; return (joins, [Alt con bs (Tick t rhs) | Alt con bs rhs <- alts]) }
+
+    go _ = Nothing
+
+mergeCaseAlts _ _ = Nothing
+
+---------------------------------
 mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
 -- ^ Merge alternatives preserving order; alternatives in
 -- the first argument shadow ones in the second
@@ -757,7 +829,165 @@ refineDefaultAlt us mult tycon tys imposs_deflt_cons all_alts
   | otherwise      -- The common case
   = (False, all_alts)
 
-{- Note [Refine DEFAULT case alternatives]
+{- Note [Merge Nested Cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+       case e of b {             ==>   case e of b {
+         p1 -> rhs1                      p1 -> rhs1
+         ...                             ...
+         pm -> rhsm                      pm -> rhsm
+         _  -> case b of b' {            pn -> let b'=b in rhsn
+                     pn -> rhsn          ...
+                     ...                 po -> let b'=b in rhso
+                     po -> rhso          _  -> let b'=b in rhsd
+                     _  -> rhsd
+       }
+
+which merges two cases in one case when -- the default alternative of
+the outer case scrutinises the same variable as the outer case. This
+transformation is called Case Merging.  It avoids that the same
+variable is scrutinised multiple times.
+
+Wrinkles
+
+(MC1) Historical note. I tried making `mergeCaseAlts` "looks though" an inner
+     single-alternative case-on-variable. For example
+       case x of {
+          ...outer-alts...
+          DEFAULT -> case y of (a,b) ->
+                     case x of { A -> rhs1; B -> rhs2 }
+    ===>
+       case x of
+         ...outer-alts...
+         a -> case y of (a,b) -> rhs1
+         B -> case y of (a,b) -> rhs2
+
+    This duplicates the `case y` but it removes the case x; so it is a win
+    in terms of execution time (combining the cases on x) at the cost of
+    perhaps duplicating the `case y`.  A case in point is integerEq, which
+    is defined thus
+        integerEq :: Integer -> Integer -> Bool
+        integerEq !x !y = isTrue# (integerEq# x y)
+    which becomes
+        integerEq
+          = \ (x :: Integer) (y_aAL :: Integer) ->
+              case x of x1 { __DEFAULT ->
+              case y of y1 { __DEFAULT ->
+              case x1 of {
+                IS x2 -> case y1 of {
+                           __DEFAULT -> GHC.Types.False;
+                           IS y2     -> tagToEnum# @Bool (==# x2 y2) };
+                IP x2 -> ...
+                IN x2 -> ...
+    We want to merge the outer `case x` with the inner `case x1`.
+
+    But (a) this is all a bit dubious: see #24251, and
+        (b) it is hard to combine with (MC4)
+    So I'm not doing this any more.  If we want to do it, we'll handle it
+    separately: #24251.
+
+    End of historical note
+
+(MC2) The auxiliary bindings b'=b are annoying, because they force another
+      simplifier pass, but there seems no easy way to avoid them.  See
+      Note [Which transformations are innocuous] in GHC.Core.Opt.Stats.
+
+(MC3) Consider
+         case f x of (r::Int#) -> tagToEnum# r :: Bool
+      `mergeCaseAlts` as a special case to treat this as if it was
+         case f x of r ->
+           case r of { 0# -> False; 1# -> True }
+      which can be merged to
+         case f x of { 0# -> False; 1# -> True }
+
+      To see why this is important, return to
+         case f x of (r::Int#) -> tagToEnum# r :: Bool
+      and supppose `f` inlines to a case expression.  Then then we get
+         let $j r = tagToEnum# r
+         case .. of { .. jump $j 0#; ...jump $j 1# ... }
+      Now if the entire expression is consumed by another case-expression,
+      that outer case will only see (tagToEnum# r) which it can't do much
+      with.  Whereas the result of the above case-merge generates much better
+      code: no branching on Int#
+
+(MC4) Consider
+          case f x of r ->
+            join $j y = <rhs> in
+            case r of { ...alts ... }
+      This is pretty common, and it a pity for it to defeat the case-merge
+      transformation; and it makes the optimiser fragile to inlining decisions
+      for join points.
+
+      So `mergeCaseAlts` floats out any join points. It doesn't float out
+      non-join-points unless the /outer/ case has just one alternative; doing
+      so would risk more allocation
+
+(MC5) See Note [Cascading case merge]
+
+See also Note [Example of case-merging and caseRules] in GHC.Core.Opt.Simplify.Utils
+
+
+Note [Cascading case merge]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case merging should cascade in one sweep, because the Simplifier tries it /after/
+simplifying (and hence case-merging) the inner case.  For example
+
+      case e of a {
+        DEFAULT -> case a of b
+                      DEFAULT -> case b of c {
+                                     DEFAULT -> e
+                                     A -> ea
+                      B -> eb
+        C -> ec
+==> {simplify inner case}
+      case e of a {
+        DEFAULT -> case a of b
+                      DEFAULT -> let c = b in e
+                      A -> let c = b in ea
+                      B -> eb
+        C -> ec
+==> {case-merge on outer case}
+      case e of a {
+        DEFAULT -> let b = a in let c = b in e
+        A -> let b = a in let c = b in ea
+        B -> let b = a in eb
+        C -> ec
+
+
+However here's a tricky case that we still don't catch, and I don't
+see how to catch it in one pass:
+
+  case x of c1 { I# a1 ->
+  case a1 of c2 ->
+    0 -> ...
+    DEFAULT -> case x of c3 { I# a2 ->
+               case a2 of ...
+
+After occurrence analysis (and its binder-swap) we get this
+
+  case x of c1 { I# a1 ->
+  let x = c1 in         -- Binder-swap addition
+  case a1 of c2 ->
+    0 -> ...
+    DEFAULT -> case x of c3 { I# a2 ->
+               case a2 of ...
+
+When we simplify the inner case x, we'll see that
+x=c1=I# a1.  So we'll bind a2 to a1, and get
+
+  case x of c1 { I# a1 ->
+  case a1 of c2 ->
+    0 -> ...
+    DEFAULT -> case a1 of ...
+
+This is correct, but we can't do a case merge in this sweep
+because c2 /= a1.  Reason: the binding c1=I# a1 went inwards
+without getting changed to c1=I# c2.
+
+I don't think this is worth fixing, even if I knew how. It'll
+all come out in the next pass anyway.
+
+
+Note [Refine DEFAULT case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 refineDefaultAlt replaces the DEFAULT alt with a constructor if there
 is one possible value it could be.

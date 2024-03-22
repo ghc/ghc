@@ -106,9 +106,11 @@ data GenTickish pass =
     -- the user.
     ProfNote {
       profNoteCC    :: CostCentre, -- ^ the cost centre
+
       profNoteCount :: !Bool,      -- ^ bump the entry count?
       profNoteScope :: !Bool       -- ^ scopes over the enclosed expression
                                    -- (i.e. not just a tick)
+      -- Invariant: the False/False case never happens
     }
 
   -- | A "tick" used by HPC to track the execution of each

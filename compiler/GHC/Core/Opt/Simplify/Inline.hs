@@ -10,7 +10,7 @@ This module contains inlining logic used by the simplifier.
 module GHC.Core.Opt.Simplify.Inline (
         -- * Cheap and cheerful inlining checks.
         couldBeSmallEnoughToInline,
-        smallEnoughToInline,
+        smallEnoughToInline, activeUnfolding,
 
         -- * The smart inlining decisions are made by callSiteInline
         callSiteInline, CallCtxt(..),
@@ -20,10 +20,16 @@ import GHC.Prelude
 
 import GHC.Driver.Flags
 
+import GHC.Core.Opt.Simplify.Env
+
 import GHC.Core
 import GHC.Core.Unfold
+import GHC.Core.FVs( exprFreeIds )
+
 import GHC.Types.Id
-import GHC.Types.Basic  ( Arity, RecFlag(..) )
+import GHC.Types.Var.Env( InScopeSet, lookupInScope )
+import GHC.Types.Var.Set
+import GHC.Types.Basic  ( Arity, RecFlag(..), isActive )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -86,16 +92,14 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 -}
 
-callSiteInline :: Logger
-               -> UnfoldingOpts
-               -> Int                   -- Case depth
+callSiteInline :: SimplEnv
+               -> Logger
                -> Id                    -- The Id
-               -> Bool                  -- True <=> unfolding is active
                -> Bool                  -- True if there are no arguments at all (incl type args)
                -> [ArgSummary]          -- One for each value arg; True if it is interesting
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any
-callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_infos cont_info
+callSiteInline env logger id lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -103,14 +107,30 @@ callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_inf
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_cache = unf_cache
                       , uf_guidance = guidance }
-          | active_unfolding -> tryUnfolding logger opts case_depth id lone_variable
+          | active_unf -> tryUnfolding env logger id lone_variable
                                     arg_infos cont_info unf_template
                                     unf_cache guidance
-          | otherwise -> traceInline logger opts id "Inactive unfolding:" (ppr id) Nothing
+          | otherwise -> traceInline logger uf_opts id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
+  where
+    uf_opts    = seUnfoldingOpts env
+    active_unf = activeUnfolding (seMode env) id
+
+activeUnfolding :: SimplMode -> Id -> Bool
+activeUnfolding mode id
+  | isCompulsoryUnfolding (realIdUnfolding id)
+  = True   -- Even sm_inline can't override compulsory unfoldings
+  | otherwise
+  = isActive (sm_phase mode) (idInlineActivation id)
+  && sm_inline mode
+      -- `or` isStableUnfolding (realIdUnfolding id)
+      -- Inline things when
+      --  (a) they are active
+      --  (b) sm_inline says so, except that for stable unfoldings
+      --                         (ie pragmas) we inline anyway
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a
@@ -132,8 +152,9 @@ traceInline logger opts inline_id str doc result
 
 {- Note [Avoid inlining into deeply nested cases]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Also called "exponential inlining".
 
-Consider a function f like this:
+Consider a function f like this: (#18730)
 
   f arg1 arg2 =
     case ...
@@ -144,46 +165,44 @@ This function is small. So should be safe to inline.
 However sometimes this doesn't quite work out like that.
 Consider this code:
 
-f1 arg1 arg2 ... = ...
-    case _foo of
-      alt1 -> ... f2 arg1 ...
-      alt2 -> ... f2 arg2 ...
+    f1 arg1 arg2 ... = ...
+        case _foo of
+          alt1 -> ... f2 arg1 ...
+          alt2 -> ... f2 arg2 ...
 
-f2 arg1 arg2 ... = ...
-    case _foo of
-      alt1 -> ... f3 arg1 ...
-      alt2 -> ... f3 arg2 ...
+    f2 arg1 arg2 ... = ...
+        case _foo of
+          alt1 -> ... f3 arg1 ...
+          alt2 -> ... f3 arg2 ...
 
-f3 arg1 arg2 ... = ...
+    f3 arg1 arg2 ... = ...
 
-... repeats up to n times. And then f1 is
-applied to some arguments:
+    ... repeats up to n times. And then f1 is
+    applied to some arguments:
 
-foo = ... f1 <interestingArgs> ...
+    foo = ... f1 <interestingArgs> ...
 
-Initially f2..fn are not interesting to inline so we don't.
-However we see that f1 is applied to interesting args.
-So it's an obvious choice to inline those:
+Initially f2..fn are not interesting to inline so we don't.  However we see
+that f1 is applied to interesting args.  So it's an obvious choice to inline
+those:
 
-foo =
-    ...
-      case _foo of
-        alt1 -> ... f2 <interestingArg> ...
-        alt2 -> ... f2 <interestingArg> ...
+    foo = ...
+          case _foo of
+            alt1 -> ... f2 <interestingArg> ...
+            alt2 -> ... f2 <interestingArg> ...
 
-As a result we go and inline f2 both mentions of f2 in turn are now applied to interesting
-arguments and f2 is small:
+As a result we go and inline f2 both mentions of f2 in turn are now applied to
+interesting arguments and f2 is small:
 
-foo =
-    ...
-      case _foo of
-        alt1 -> ... case _foo of
-            alt1 -> ... f3 <interestingArg> ...
-            alt2 -> ... f3 <interestingArg> ...
+    foo = ...
+          case _foo of
+            alt1 -> ... case _foo of
+                alt1 -> ... f3 <interestingArg> ...
+                alt2 -> ... f3 <interestingArg> ...
 
-        alt2 -> ... case _foo of
-            alt1 -> ... f3 <interestingArg> ...
-            alt2 -> ... f3 <interestingArg> ...
+            alt2 -> ... case _foo of
+                alt1 -> ... f3 <interestingArg> ...
+                alt2 -> ... f3 <interestingArg> ...
 
 The same thing happens for each binding up to f_n, duplicating the amount of inlining
 done in each step. Until at some point we are either done or run out of simplifier
@@ -200,19 +219,73 @@ The heuristic can be tuned in two ways:
 
 * We can ignore the first n levels of case nestings for inlining decisions using
   -funfolding-case-threshold.
-* The penalty grows linear with the depth. It's computed as size*(depth-threshold)/scaling.
+
+* The penalty grows linear with the depth. It's computed as
+     size*(depth-threshold)/scaling.
   Scaling can be set with -funfolding-case-scaling.
+
+Reflections and wrinkles
+
+* See also Note [Do not add unfoldings to join points at birth] in
+  GHC.Core.Opt.Simplify.Iteration
+
+* The total case depth is really the wrong thing; it will inhibit inlining of a
+  local function, just because there is some giant case nest further out.  What we
+  want is the /difference/ in case-depth between the binding site and the call site.
+  That could be done quite easily by adding the case-depth to the Unfolding of the
+  function.
+
+* What matters more than /depth/ is total /width/; that is how many alternatives
+  are in the tree.  We could perhaps multiply depth by width at each case expression.
+
+* There might be a case nest with many alternatives, but the function is called in
+  only a handful of them.  So maybe we should ignore case-depth, and instead penalise
+  funtions that are called many times -- after all, inlining them bloats code.
+
+  But in the scenario above, we are simplifying an inlined fuction, without doing a
+  global occurrence analysis each time.  So if we based the penalty on multiple
+  occurences, we should /also/ add a penalty when simplifying an already-simplified
+  expression.  We do track this (seInlineDepth) but currently we barely use it.
+
+  An advantage of using occurrences+inline depth is that it'll work when no
+  case expressions are involved.  See #15488.
+
+* Test T18730 did not involve join points.  But join points are very prone to
+  the same kind of thing.  For exampe in #13253, and several related tickets,
+  we got an exponential blowup in code size from a program that looks like
+  this.
+
+  let j1a x = case f y     of { True -> p;   False -> q }
+      j1b x = case f y     of { True -> q;   False -> p }
+      j2a x = case f (y+1) of { True -> j1a x; False -> j1b x}
+      j2b x = case f (y+1) of { True -> j1b x; False -> j1a x}
+      ...
+  in case f (y+10) of { True -> j10a 7; False -> j10b 8 }
+
+  The first danger is this: in Simplifier iteration 1 postInlineUnconditionally
+  inlines the last functions, j10a and j10b (they are both small).  Now we have
+  two calls to j9a and two to j9b.  In the next Simplifer iteration,
+  postInlineUnconditionally inlines all four of these calls, leaving four calls
+  to j8a and j8b. Etc.
+
+  Happily, this probably /won't/ happen because the Simplifier works top down, so it'll
+  inline j1a/j1b into j2a/j2b, which will make the latter bigger; so the process
+  will stop.  But we still need to stop the inline cascade described at the head
+  of this Note.
 
 Some guidance on setting these defaults:
 
 * A low threshold (<= 2) is needed to prevent exponential cases from spiraling out of
   control. We picked 2 for no particular reason.
+
 * Scaling the penalty by any more than 30 means the reproducer from
   T18730 won't compile even with reasonably small values of n. Instead
   it will run out of runs/ticks. This means to positively affect the reproducer
   a scaling <= 30 is required.
+
 * A scaling of >= 15 still causes a few very large regressions on some nofib benchmarks.
   (+80% for gc/fulsom, +90% for real/ben-raytrace, +20% for spectral/fibheaps)
+
 * A scaling of >= 25 showed no regressions on nofib. However it showed a number of
   (small) regression for compiler perf benchmarks.
 
@@ -221,15 +294,15 @@ This gives us minimal compiler perf regressions. No nofib runtime regressions an
 will still avoid this pattern sometimes. This is a "safe" default, where we err on
 the side of compiler blowup instead of risking runtime regressions.
 
-For cases where the default falls short the flag can be changed to allow more/less inlining as
-needed on a per-module basis.
+For cases where the default falls short the flag can be changed to allow
+more/less inlining as needed on a per-module basis.
 
 -}
 
-tryUnfolding :: Logger -> UnfoldingOpts -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
+tryUnfolding :: SimplEnv -> Logger -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> UnfoldingCache -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding logger opts !case_depth id lone_variable arg_infos
+tryUnfolding env logger id lone_variable arg_infos
              cont_info unf_template unf_cache guidance
  = case guidance of
      UnfNever -> traceInline logger opts id str (text "UnfNever") Nothing
@@ -241,31 +314,53 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
         | otherwise
         -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
         where
-          some_benefit = calc_some_benefit uf_arity
+          some_benefit = calc_some_benefit uf_arity True
           enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-        | unfoldingVeryAggressive opts
-        -> traceInline logger opts id str (mk_doc some_benefit extra_doc True) (Just unf_template)
-        | is_wf && some_benefit && small_enough
-        -> traceInline logger opts id str (mk_doc some_benefit extra_doc True) (Just unf_template)
-        | otherwise
-        -> traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
+        | isJoinId id, small_enough         -> inline_join_point
+        | unfoldingVeryAggressive opts      -> yes
+        | is_wf, some_benefit, small_enough -> yes
+        | otherwise                         -> no
         where
-          some_benefit = calc_some_benefit (length arg_discounts)
-          -- See Note [Avoid inlining into deeply nested cases]
-          depth_treshold = unfoldingCaseThreshold opts
-          depth_scaling = unfoldingCaseScaling opts
-          depth_penalty | case_depth <= depth_treshold = 0
-                        | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
+          yes = traceInline logger opts id str (mk_doc some_benefit extra_doc True)  (Just unf_template)
+          no  = traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
+
+          some_benefit = calc_some_benefit (length arg_discounts) False
+
+          -- depth_penalty: see Note [Avoid inlining into deeply nested cases]
+          depth_threshold = unfoldingCaseThreshold opts
+          depth_scaling   = unfoldingCaseScaling opts
+          depth_penalty | case_depth <= depth_threshold = 0
+                        | otherwise = (size * (case_depth - depth_threshold)) `div` depth_scaling
+
           adjusted_size = size + depth_penalty - discount
           small_enough = adjusted_size <= unfoldingUseThreshold opts
           discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
-          extra_doc = vcat [ text "case depth =" <+> int case_depth
+          extra_doc = vcat [ ppWhen (isJoinId id) $
+                             text "join" <+> fsep [ ppr (v, hasCoreUnfolding (idUnfolding v)
+                                                        , fmap (isEvaldUnfolding . idUnfolding) (lookupInScope in_scope v)
+                                                        , is_more_evald in_scope v)
+                                                  | v <- vselems (exprFreeIds unf_template) ]
                            , text "depth based penalty =" <+> int depth_penalty
-                           , text "discounted size =" <+> int adjusted_size ]
+                           , text "adjusted size =" <+> int adjusted_size ]
+
+          inline_join_point  -- See Note [Inlining join points]
+            | or (zipWith scrut_arg arg_discounts arg_infos) = yes
+            | anyVarSet (is_more_evald in_scope) $
+              exprFreeIds unf_template                       = yes
+            | otherwise                                      = no
+          -- scrut_arg is True if the function body has a discount and the arg is a value
+          scrut_arg disc ValueArg = disc > 0
+          scrut_arg _    _        = False
+
   where
+    opts         = seUnfoldingOpts env
+    case_depth   = seCaseDepth env
+    inline_depth = seInlineDepth env
+    in_scope     = seInScope env
+
     -- Unpack the UnfoldingCache lazily because it may not be needed, and all
     -- its fields are strict; so evaluating unf_cache at all forces all the
     -- isWorkFree etc computations to take place.  That risks wasting effort for
@@ -280,6 +375,8 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
              , text "is exp:" <+> ppr is_exp
              , text "is work-free:" <+> ppr is_wf
              , text "guidance" <+> ppr guidance
+             , text "case depth =" <+> int case_depth
+             , text "inline depth =" <+> int inline_depth
              , extra_doc
              , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
 
@@ -292,9 +389,9 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
            -- arguments (ie n_val_args >= arity). But there must
            -- be *something* interesting about some argument, or the
            -- result context, to make it worth inlining
-    calc_some_benefit :: Arity -> Bool   -- The Arity is the number of args
+    calc_some_benefit :: Arity -> Bool -> Bool   -- The Arity is the number of args
                                          -- expected by the unfolding
-    calc_some_benefit uf_arity
+    calc_some_benefit uf_arity is_inline
        | not saturated = interesting_args       -- Under-saturated
                                         -- Note [Unsaturated applications]
        | otherwise = interesting_args   -- Saturated or over-saturated
@@ -316,10 +413,22 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
               ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [RHS of lets]
               DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
-              RhsCtxt NonRecursive
+              RhsCtxt NonRecursive | is_inline
                           -> uf_arity > 0  -- See Note [RHS of lets]
               _other      -> False         -- See Note [Nested functions]
 
+
+vselems :: VarSet -> [Var]
+vselems s = nonDetStrictFoldVarSet (\v vs -> v : vs) [] s
+
+is_more_evald :: InScopeSet -> Id -> Bool
+-- See Note [Inlining join points]
+is_more_evald in_scope v
+  | Just v1 <- lookupInScope in_scope v
+  , idUnfolding v1 `isBetterUnfoldingThan` idUnfolding v
+  = True
+  | otherwise
+  = False
 
 {- Note [RHS of lets]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -338,6 +447,94 @@ So, in `interesting_call` in `tryUnfolding`, we treat the RHS of a
 /non-recursive/ let as not-totally-boring.  A /recursive/ let isn't
 going be inlined so there is much less point.  Hence the (only reason
 for the) RecFlag in RhsCtxt
+
+We inline only if `f` has an `UnfWhen` guidance.  I found that being more eager
+led to fruitless inlining.  See Note [Seq is boring] wrinkle (SB1) in
+GHC.Core.Opt.Simplify.Utils.
+
+Note [Inlining join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we /do not/ want to inline join points /even if they are small/.
+See Note [Duplicating join points] in GHC.Core.Opt.Simplify.Iteration.
+
+But, assuming it is small, there are various times when we /do/ want to
+inline a (non-recursive) join point.  Namely, if either of these hold:
+
+(1) A /scrutinised/ argument (non-zero discount) has a /ValueArg/ info.
+    Inlining will give some benefit.
+
+(2) A free variable of the RHS is
+    * Is /not/ evaluated at the join point defn site
+    * Is evaluated at the join point call site.
+    This is the is_more_evald predicate.
+
+(1) is fairly obvious but (2) is less so. Here is the code for `integerGT`
+without (2):
+
+  integerGt = \ (x :: Integer) (y :: Integer) ->
+     join fail _ = case x of {
+       IS x1 -> case y of {
+           IS y1 -> case <# x1 y1  of
+                      _DEFAULT -> case ==# x1 y1 of
+                                    DEFAULT -> True;
+                                    1#      -> False
+                      1# -> False
+           IP ds1 -> False
+           IN ds1 -> True
+
+       IP x1 -> case y of {
+                 _DEFAULT -> True;
+                 IP y1    -> case bigNatCompare x1 y1 of
+                               _DEFAULT -> False;
+                               GT -> True
+       IN x1 -> case y of {
+                  _DEFAULT -> False;
+                  IN y1    -> case bigNatCompare y1 x1 of
+                                _DEFAULT -> False;
+                                GT -> True
+     in case x of {
+       _DEFAULT -> jump fail GHC.Prim.(##);
+       IS x1    -> case y of {
+                     _DEFAULT -> jump fail GHC.Prim.(##);
+                     IS y1 -> tagToEnum# @Bool (># x1 y1)
+
+If we inline `fail` we get /much/ better code.  The only clue is that
+`x` and `y` (a) are not evaluated at the definition site, and (b) are
+evaluated at the call site.  This predicate is `isBetterUnfoldingThan`.
+
+You might think that the variable should also be /scrutinised/ in the
+join-point RHS, but here are two reasons for not taking that into
+account.
+
+First, we see code somewhat like this in imaginary/wheel-sieve1:
+    let x = <small thunk> in
+    join $j = (x,y) in
+    case z of
+      A -> case x of
+             P -> $j
+             Q -> blah
+      B -> (x,x)
+      C -> True
+Here `x` can't be duplicated into the branches becuase it is used
+in both the join point and the A branch.  But if we inline $j we get
+    let x = <small thunk> in
+    case z of
+      A -> case x of x'
+             P -> (x', y)
+             Q -> blah
+      B -> x
+      C -> True
+and now we /can/ duplicate x into the branches, at which point:
+  * it is used strictly in the A branch (evaluated, but no thunk)
+  * it is used lazily in the B branch (still a thunk)
+  * it is not used at all in the C branch (no thunk)
+
+Second, spectral/treejoin gets a big win from SpecConstr due
+to evaluated-ness. Something like this:
+    join $j x = ...(foo fv)...
+    in case fv of I# x ->
+       ...  jump $j True ...
+If we inline $j, SpecConstr sees a call (foo (I# x)) and specialises.
 
 Note [Unsaturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

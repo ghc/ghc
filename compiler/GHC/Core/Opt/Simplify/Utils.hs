@@ -13,7 +13,7 @@ module GHC.Core.Opt.Simplify.Utils (
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
-        activeUnfolding, activeRule,
+        activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRules,
 
@@ -48,7 +48,7 @@ import qualified GHC.Prelude as Partial (head)
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Simplify.Inline
+import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
@@ -74,7 +74,6 @@ import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
-import GHC.Data.Maybe ( orElse )
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
@@ -804,45 +803,87 @@ Suppose
           True  -> Just x
           False -> Just (x-1)
 
-Now consider these cases:
+Now consider these variants of
+   case (f x) of ...
 
-1. case f x of b{-dead-} { DEFAULT -> blah[no b] }
-     Inlining (f x) will allow us to avoid ever allocating (Just x),
-     since the case binder `b` is dead.  We will end up with a
+1. [Dead case binder]: inline f
+      case f x of b{-dead-} { DEFAULT -> blah[no b] }
+   Inlining (f x) will allow us to avoid ever allocating (Just x),
+   since the case binder `b` is dead.  We will end up with a
      join point for blah, thus
          join j = blah in
          case v of { True -> j; False -> j }
-     which will turn into (case v of DEFAULT -> blah
-     All good
+   which will turn into (case v of DEFAULT -> blah)
+   All good
 
-2. case f x of b { DEFAULT -> blah[b] }
-     Inlining (f x) will still mean we allocate (Just x). We'd get:
-         join j b = blah[b]
-         case v of { True -> j (Just x); False -> j (Just (x-1)) }
-     No new optimisations are revealed. Nothing is gained.
-     (This is the situation in T22317.)
-
-2a. case g x of b { (x{-dead-}, x{-dead-}) -> blah[b, no x, no y] }
-      Instead of DEFAULT we have a single constructor alternative
-      with all dead binders.  This is just a variant of (2); no
-      gain from inlining (f x)
-
-3. case f x of b { Just y -> blah[y,b] }
-     Inlining (f x) will mean we still allocate (Just x),
-     but we also get to bind `y` without fetching it out of the Just, thus
+2. [Live case binder, live alt binders]: inline f
+       case f x of b { Just y -> blah[y,b] }
+   Inlining (f x) will mean we still allocate (Just x),
+   but we also get to bind `y` without fetching it out of the Just, thus
          join j y b = blah[y,b]
          case v of { True -> j x (Just x)
                    ; False -> let y = x-1 in j y (Just y) }
    Inlining (f x) has a small benefit, perhaps.
    (To T14955 it makes a surprisingly large difference of ~30% to inline here.)
 
+3. [Live case binder, dead alt binders]: maybe don't inline f
+      case f x of b { DEFAULT -> blah[b] }
+   Inlining (f x) will still mean we allocate (Just x). We'd get:
+         join j b = blah[b]
+         case v of { True -> j (Just x); False -> j (Just (x-1)) }
+   No new optimisations are revealed. Nothing is gained.
+   (This is the situation in T22317.)
 
-Conclusion: if the case expression
-  * Has a non-dead case-binder
-  * Has one alternative
+   A variant is when we have a data constructor with dead binders:
+       case g x of b { (x{-dead-}, x{-dead-}) -> blah[b, no x, no y] }
+   Instead of DEFAULT we have a single constructor alternative
+   with all dead binders.  Again, no gain from inlining (f x)
+
+4. [Live case binder, dead alt binders]: small f
+   Suppose f is CPR'd, so it looks like
+       f x = case $wf x of (# a #) -> Just a
+   Then even in case (3) we want to inline:
+      case f x of b { DEFAULT -> blah[b] }
+   -->
+      case $wf x of (# a #) ->
+      let b = Just a in blah[b]
+   This is very good; we now know a lot about `b` (instead of nothing)
+   and `blah` might benefit.  Similarly if `f` has a join point
+      f x = join $j y = Just y in ...
+   Again the case (f x) is now consuming a constructor (Just y).
+
+   This is very like the situation described in Note [RHS of lets]
+   in GHC.Core.Opt.Simplify.Inline; (case e of b -> blah) is just
+   like a strict `let`.
+
+Conclusion: in interestingCallCtxt, a case-expression (i.e. Select continuation)
+usually gives a CaseCtxt (cases 1,2); but when (cases 3,4):
+  * It has a non-dead case-binder
+  * It has one alternative
   * All the binders in the alternative are dead
-then the `case` is just a strict let-binding, and the scrutinee is
-BoringCtxt (don't inline).  Otherwise CaseCtxt.
+then the `case` is just a strict let-binding, so use RhsCtxt NonRecursive.
+This RhsCtxt gives a small incentive for small functions to inline.
+That incentive is what is needed in case (4).
+
+Wrinkle (SB1).  The 'small incentive' is implemented by `calc_some_benefit` in
+GHC.Core.Opt.Simplify.Inline.tryUnfolding.  We restrict the incentive just to
+funtions that have unfolding guidance of `UnfWhen`, which particularly includes
+wrappers created by CPR, exactly case (4) above.  Without this limitation I
+got too much fruitless inlining, which led to regressions (#22317 is an example).
+
+A good example of a function where this 'small incentive' is important is
+GHC.Num.Integer where we ended up with calls like this:
+     case (integerSignum a b) of r -> ...
+but were failing to inline integerSignum, even though it always returns
+a single constructor, so it is very helpful to inline it. There is also an
+issue of confluence-of-the-simplifier.  Suppose we have
+    f x = case x of r -> ...
+and the Simplifier sees
+    f (integerSigNum a b)
+Because `f` scrutines `x`, the unfolding guidance for f gives a discount
+for `x`; and that discount makes interestingCallContext for the context
+`f <>` return DiscArgCtxt, which again gives that incentive.  We don't want
+the incentive to disappear when we inline `f`!
 -}
 
 lazyArgContext :: ArgInfo -> CallCtxt
@@ -877,7 +918,7 @@ interestingCallContext env cont
       | not (seCaseCase env)         = BoringCtxt -- See Note [No case of case is boring]
       | [Alt _ bs _] <- alts
       , all isDeadBinder bs
-      , not (isDeadBinder case_bndr) = BoringCtxt -- See Note [Seq is boring]
+      , not (isDeadBinder case_bndr) = RhsCtxt NonRecursive -- See Note [Seq is boring]
       | otherwise                    = CaseCtxt
 
 
@@ -892,7 +933,7 @@ interestingCallContext env cont
     interesting (Stop _ cci _)               = cci
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
-    interesting (CastIt _ k)                 = interesting k
+    interesting (CastIt { sc_cont = k })     = interesting k
         -- If this call is the arg of a strict function, the context
         -- is a bit interesting.  If we inline here, we may get useful
         -- evaluation information to avoid repeated evals: e.g.
@@ -932,7 +973,7 @@ contHasRules cont
   where
     go (ApplyToVal { sc_cont = cont }) = go cont
     go (ApplyToTy  { sc_cont = cont }) = go cont
-    go (CastIt _ cont)                 = go cont
+    go (CastIt { sc_cont = cont })     = go cont
     go (StrictArg { sc_fun = fun })    = ai_encl fun
     go (Stop _ RuleArgCtxt _)          = True
     go (TickIt _ c)                    = go c
@@ -1003,17 +1044,41 @@ interestingArg env e = go env 0 e
                                  env' = env `addNewInScopeIds` bindersOf b
 
     go_var n v
-       | isConLikeId v     = ValueArg   -- Experimenting with 'conlike' rather that
-                                        --    data constructors here
-       | idArity v > n     = ValueArg   -- Catches (eg) primops with arity but no unfolding
-       | n > 0             = NonTrivArg -- Saturated or unknown call
-       | conlike_unfolding = ValueArg   -- n==0; look for an interesting unfolding
-                                        -- See Note [Conlike is interesting]
-       | otherwise         = TrivArg    -- n==0, no useful unfolding
-       where
-         conlike_unfolding = isConLikeUnfolding (idUnfolding v)
+       | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
+                                    --    data constructors here
+                                    -- DFuns are con-like; see Note [Conlike is interesting]
+       | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
+       | n > 0         = NonTrivArg -- Saturated or unknown call
+       | otherwise  -- n==0, no value arguments; look for an interesting unfolding
+       = case idUnfolding v of
+           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
+           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
+              -- See Note [OtherCon and interestingArg]
+           DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
+           CoreUnfolding{ uf_cache = cache }
+             | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
+             | uf_is_value cache   -> NonTrivArg  -- Things like partial applications
+             | otherwise           -> TrivArg
+           BootUnfolding           -> TrivArg
+           NoUnfolding             -> TrivArg
 
-{-
+{- Note [OtherCon and interestingArg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+interstingArg returns
+   (a) NonTrivArg for an arg with an OtherCon [] unfolding
+   (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
+
+Reason for (a): I found (in the GHC.Num.Integer library) that I was
+inlining a pretty big function when all we knew was that its arguments
+were evaluated, nothing more.  That in turn make the enclosing function
+too big to inline elsewhere.
+
+Reason for (b): we want to inline integerCompare here
+  integerLt# :: Integer -> Integer -> Bool#
+  integerLt# (IS x) (IS y)                  = x <# y
+  integerLt# x y | LT <- integerCompare x y = 1#
+  integerLt# _ _                            = 0#
+
 ************************************************************************
 *                                                                      *
                   SimplMode
@@ -1233,19 +1298,6 @@ if the wrapper is sure to be called, the strictness analyser will
 mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
 continuation.
 -}
-
-activeUnfolding :: SimplMode -> Id -> Bool
-activeUnfolding mode id
-  | isCompulsoryUnfolding (realIdUnfolding id)
-  = True   -- Even sm_inline can't override compulsory unfoldings
-  | otherwise
-  = isActive (sm_phase mode) (idInlineActivation id)
-  && sm_inline mode
-      -- `or` isStableUnfolding (realIdUnfolding id)
-      -- Inline things when
-      --  (a) they are active
-      --  (b) sm_inline says so, except that for stable unfoldings
-      --                         (ie pragmas) we inline anyway
 
 getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
@@ -1537,15 +1589,14 @@ rules] for details.
 
 postInlineUnconditionally
     :: SimplEnv -> BindContext
-    -> OutId            -- The binder (*not* a CoVar), including its unfolding
-    -> OccInfo          -- From the InId
+    -> InId -> OutId    -- The binder (*not* a CoVar), including its unfolding
     -> OutExpr
     -> Bool
 -- Precondition: rhs satisfies the let-can-float invariant
 -- See Note [Core let-can-float invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-postInlineUnconditionally env bind_cxt bndr occ_info rhs
+postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
@@ -1553,39 +1604,32 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
   | isTopLevel (bindContextLevel bind_cxt)
                                 = False -- Note [Top level and postInlineUnconditionally]
   | exprIsTrivial rhs           = True
-  | BC_Join {} <- bind_cxt              -- See point (1) of Note [Duplicating join points]
-  , not (phase == FinalPhase)   = False -- in Simplify.hs
+  | BC_Join {} <- bind_cxt      = False -- See point (1) of Note [Duplicating join points]
+                                        --     in GHC.Core.Opt.Simplify.Iteration
   | otherwise
   = case occ_info of
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
         -- See Note [Inline small things to avoid creating a thunk]
 
-        -> n_br < 100  -- See Note [Suppress exponential blowup]
+        | n_br >= 100 -> False  -- See #23627
 
-           && smallEnoughToInline uf_opts unfolding     -- Small enough to dup
-                        -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
-                        --
-                        -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
-                        -- Reason: doing so risks exponential behaviour.  We simplify a big
-                        --         expression, inline it, and simplify it again.  But if the
-                        --         very same thing happens in the big expression, we get
-                        --         exponential cost!
-                        -- PRINCIPLE: when we've already simplified an expression once,
-                        -- make sure that we only inline it if it's reasonably small.
+        | n_br == 1, NotInsideLam <- in_lam  -- One syntactic occurrence
+        -> True                              -- See Note [Post-inline for single-use things]
 
-           && (in_lam == NotInsideLam ||
-                        -- Outside a lambda, we want to be reasonably aggressive
-                        -- about inlining into multiple branches of case
-                        -- e.g. let x = <non-value>
-                        --      in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... }
-                        -- Inlining can be a big win if C3 is the hot-spot, even if
-                        -- the uses in C1, C2 are not 'interesting'
-                        -- An example that gets worse if you add int_cxt here is 'clausify'
+--        | is_unlifted                        -- Unlifted binding, hence ok-for-spec
+--        -> True                              -- hence cheap to inline probably just a primop
+--                                             -- Not a big deal either way
+-- No, this is wrong.  {v = p +# q; x = K v}.
+-- Don't inline v; it'll just get floated out again. Stupid.
 
-                (isCheapUnfolding unfolding && int_cxt == IsInteresting))
-                        -- isCheap => acceptable work duplication; in_lam may be true
-                        -- int_cxt to prevent us inlining inside a lambda without some
-                        -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+        | is_demanded
+        -> False                            -- No allocation (it'll be a case expression in the end)
+                                            -- so inlining duplicates code but nothing more
+
+        | otherwise
+        -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
+              -- Multiple syntactic occurences; but lazy, and small enough to dup
+              -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
@@ -1594,23 +1638,29 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
 
       _ -> False
 
--- Here's an example that we don't handle well:
---      let f = if b then Left (\x.BIG) else Right (\y.BIG)
---      in \y. ....case f of {...} ....
--- Here f is used just once, and duplicating the case work is fine (exprIsCheap).
--- But
---  - We can't preInlineUnconditionally because that would invalidate
---    the occ info for b.
---  - We can't postInlineUnconditionally because the RHS is big, and
---    that risks exponential behaviour
---  - We can't call-site inline, because the rhs is big
--- Alas!
-
   where
-    unfolding = idUnfolding bndr
-    uf_opts   = seUnfoldingOpts env
-    phase     = sePhase env
-    active    = isActive phase (idInlineActivation bndr)
+    work_ok NotInsideLam _              = True
+    work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
+    work_ok IsInsideLam  NotInteresting = False
+      -- NotInsideLam: outside a lambda, we want to be reasonably aggressive
+      -- about inlining into multiple branches of case
+      -- e.g. let x = <non-value>
+      --      in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... }
+      -- Inlining can be a big win if C3 is the hot-spot, even if
+      -- the uses in C1, C2 are not 'interesting'
+      -- An example that gets worse if you add int_cxt here is 'clausify'
+
+      -- InsideLam: check for acceptable work duplication, using isCheapUnfoldign
+      -- int_cxt to prevent us inlining inside a lambda without some
+      -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+
+--    is_unlifted = isUnliftedType (idType bndr)
+    is_demanded = isStrUsedDmd (idDemandInfo bndr)
+    occ_info    = idOccInfo old_bndr
+    unfolding   = idUnfolding bndr
+    uf_opts     = seUnfoldingOpts env
+    phase       = sePhase env
+    active      = isActive phase (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
 {- Note [Inline small things to avoid creating a thunk]
@@ -1631,37 +1681,51 @@ in allocation if you miss this out.  And bits of GHC itself start
 to allocate more.  An egregious example is test perf/compiler/T14697,
 where GHC.Driver.CmdLine.$wprocessArgs allocated hugely more.
 
-Note [Suppress exponential blowup]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In #13253, and several related tickets, we got an exponential blowup
-in code size from postInlineUnconditionally.  The trouble comes when
-we have
-  let j1a = case f y     of { True -> p;   False -> q }
-      j1b = case f y     of { True -> q;   False -> p }
-      j2a = case f (y+1) of { True -> j1a; False -> j1b }
-      j2b = case f (y+1) of { True -> j1b; False -> j1a }
-      ...
-  in case f (y+10) of { True -> j10a; False -> j10b }
+Note [Post-inline for single-use things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
 
-when there are many branches. In pass 1, postInlineUnconditionally
-inlines j10a and j10b (they are both small).  Now we have two calls
-to j9a and two to j9b.  In pass 2, postInlineUnconditionally inlines
-all four of these calls, leaving four calls to j8a and j8b. Etc.
-Yikes!  This is exponential!
+   let x = rhs in ...x...
 
-A possible plan: stop doing postInlineUnconditionally
-for some fixed, smallish number of branches, say 4. But that turned
-out to be bad: see Note [Inline small things to avoid creating a thunk].
-And, as it happened, the problem with #13253 was solved in a
-different way (Note [Duplicating StrictArg] in Simplify).
+and `x` is used exactly once, and not inside a lambda, then we will usually
+preInlineUnconditinally. But we can still get this situation in
+postInlineUnconditionally:
 
-So I just set an arbitrary, high limit of 100, to stop any
-totally exponential behaviour.
+  case K rhs of K x -> ...x....
 
-This still leaves the nasty possibility that /ordinary/ inlining (not
-postInlineUnconditionally) might inline these join points, each of
-which is individually quiet small.  I'm still not sure what to do
-about this (e.g. see #15488).
+Here we'll use `simplAuxBind` to bind `x` to (the already-simplified) `rhs`;
+and `x` is used exactly once.  It's beneficial to inline right away; otherwise
+we risk creating
+
+   let x = rhs in ...x...
+
+which will take another iteration of the Simplifier to eliminate.  We do this in
+two places
+
+1. In the full `postInlineUnconditionally` look for the special case
+   of "one occurrence, not under a lambda", and inline unconditionally then.
+
+   This is a bit risky: see Note [Avoiding simplifying repeatedly] in
+   Simplify.Iteration.  But in practice it seems to be a small win.
+
+2. `simplAuxBind` does a kind of poor-man's `postInlineUnconditionally`.  It
+   does not need to account for many of the cases (e.g. top level) that the
+   full `postInlineUnconditionally` does.  Moreover, we don't have an
+   OutId, which `postInlineUnconditionally` needs.  I got a slight improvement
+   in compiler performance when I added this test.
+
+Here's an example that we don't currently handle well:
+     let f = if b then Left (\x.BIG) else Right (\y.BIG)
+     in \y. ....case f of {...} ....
+Here f is used just once, and duplicating the case work is fine (exprIsCheap).
+But
+ - We can't preInlineUnconditionally because that would invalidate
+   the occ info for b.
+ - We can't postInlineUnconditionally because the RHS is big, and
+   that risks exponential behaviour
+ - We can't call-site inline, because the rhs is big
+Alas!
+
 
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2239,7 +2303,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
       = (poly_id `setIdUnfolding` unf, poly_rhs)
       where
         poly_rhs = mkLams tvs_here rhs
-        unf = mkUnfolding uf_opts VanillaSrc is_top_lvl False poly_rhs Nothing
+        unf = mkUnfolding uf_opts VanillaSrc is_top_lvl False False poly_rhs Nothing
 
         -- We want the unfolding.  Consider
         --      let
@@ -2370,6 +2434,24 @@ prepareAlts scrut case_bndr alts
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
 
+{- Note [Merging nested cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The basic case-merge stuff is described in Note [Merge Nested Cases] in GHC.Core.Utils
+
+We do it here in `prepareAlts` (on InAlts) rather than after (on OutAlts) for two reasons:
+
+* It "belongs" here with `filterAlts`, `refineDefaultAlt` and `combineIdenticalAlts`.
+
+* In test perf/compiler/T22428 I found that I was getting extra Simplifer iterations:
+    1. Create a join point
+    2. That join point gets inlined at all call sites, so it is now dead.
+    3. Case-merge happened, but left behind some trivial bindings (see `mergeCaseAlts`)
+    4. Get rid of the trivial bindings
+  The first two seem reasonable.  It's imaginable that we could do better on
+  (3), by making case-merge join-point-aware, but it's not trivial.  But the
+  fourth is just stupid.  Rather than always do an extra iteration, it's better
+  to do the transformation on the input-end of teh Simplifier.
+-}
 
 {-
 ************************************************************************
@@ -2380,65 +2462,8 @@ prepareAlts scrut case_bndr alts
 
 mkCase tries these things
 
-* Note [Merge Nested Cases]
 * Note [Eliminate Identity Case]
 * Note [Scrutinee Constant Folding]
-
-Note [Merge Nested Cases]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-       case e of b {             ==>   case e of b {
-         p1 -> rhs1                      p1 -> rhs1
-         ...                             ...
-         pm -> rhsm                      pm -> rhsm
-         _  -> case b of b' {            pn -> let b'=b in rhsn
-                     pn -> rhsn          ...
-                     ...                 po -> let b'=b in rhso
-                     po -> rhso          _  -> let b'=b in rhsd
-                     _  -> rhsd
-       }
-
-which merges two cases in one case when -- the default alternative of
-the outer case scrutinises the same variable as the outer case. This
-transformation is called Case Merging.  It avoids that the same
-variable is scrutinised multiple times.
-
-Wrinkles
-
-(MC1) `tryCaseMerge` "looks though" an inner single-alternative case-on-variable.
-     For example
-       case x of {
-          ...outer-alts...
-          DEFAULT -> case y of (a,b) ->
-                     case x of { A -> rhs1; B -> rhs2 }
-    ===>
-       case x of
-         ...outer-alts...
-         a -> case y of (a,b) -> rhs1
-         B -> case y of (a,b) -> rhs2
-
-    This duplicates the `case y` but it removes the case x; so it is a win
-    in terms of execution time (combining the cases on x) at the cost of
-    perhaps duplicating the `case y`.  A case in point is integerEq, which
-    is defined thus
-        integerEq :: Integer -> Integer -> Bool
-        integerEq !x !y = isTrue# (integerEq# x y)
-    which becomes
-        integerEq
-          = \ (x :: Integer) (y_aAL :: Integer) ->
-              case x of x1 { __DEFAULT ->
-              case y of y1 { __DEFAULT ->
-              case x1 of {
-                IS x2 -> case y1 of {
-                           __DEFAULT -> GHC.Types.False;
-                           IS y2     -> tagToEnum# @Bool (==# x2 y2) };
-                IP x2 -> ...
-                IN x2 -> ...
-    We want to merge the outer `case x` with the inner `case x1`.
-
-    This story is not fully robust; it will be defeated by a let-binding,
-    whih we don't want to duplicate.   But accounting for single-alternative
-    case-on-variable is easy to do, and seems useful in common cases so
-    `tryMergeCase` does it.
 
 Note [Eliminate Identity Case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2531,7 +2556,6 @@ Wrinkle 4:
   see Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold
 
 
-
 Note [Example of case-merging and caseRules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The case-transformation rules are quite powerful. Here's a
@@ -2617,14 +2641,18 @@ mkCase, mkCase1, mkCase2, mkCase3
 
 --------------------------------------------------
 --      1. Merge Nested Cases
+--         See Note [Merge Nested Cases]
+--             Note [Example of case-merging and caseRules]
+--             Note [Cascading case merge]
 --------------------------------------------------
 
 mkCase mode scrut outer_bndr alts_ty alts
   | sm_case_merge mode
-  , Just alts' <- tryMergeCase outer_bndr alts
+  , Just (joins, alts') <- mergeCaseAlts outer_bndr alts
   = do  { tick (CaseMerge outer_bndr)
-        ; mkCase1 mode scrut outer_bndr alts_ty alts' }
-        -- Warning: don't call mkCase recursively!
+        ; case_expr <- mkCase1 mode scrut outer_bndr alts_ty alts'
+        ; return (mkLets joins case_expr) }
+        -- mkCase1: don't call mkCase recursively!
         -- Firstly, there's no point, because inner alts have already had
         -- mkCase applied to them, so they won't have a case in their default
         -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
@@ -2632,59 +2660,9 @@ mkCase mode scrut outer_bndr alts_ty alts
   | otherwise
   = mkCase1 mode scrut outer_bndr alts_ty alts
 
-tryMergeCase :: OutId -> [OutAlt] -> Maybe [OutAlt]
--- See Note [Merge Nested Cases]
-tryMergeCase outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
-  = case go 5 (\e -> e) emptyVarSet deflt_rhs of
-       Nothing         -> Nothing
-       Just inner_alts -> Just (mergeAlts outer_alts inner_alts)
-                -- NB: mergeAlts gives priority to the left
-                --      case x of
-                --        A -> e1
-                --        DEFAULT -> case x of
-                --                      A -> e2
-                --                      B -> e3
-                -- When we merge, we must ensure that e1 takes
-                -- precedence over e2 as the value for A!
-  where
-    go :: Int -> (OutExpr -> OutExpr) -> VarSet -> OutExpr -> Maybe [OutAlt]
-    -- In the call (go wrap free_bndrs rhs), the `wrap` function has free `free_bndrs`;
-    -- so do not push `wrap` under any binders that would shadow `free_bndrs`
-    --
-    -- The 'n' is just a depth-bound to avoid pathalogical quadratic behaviour with
-    --   case x1 of DEFAULT -> case x2 of DEFAULT -> case x3 of DEFAULT -> ...
-    -- when for each `case` we'll look down the whole chain to see if there is
-    -- another `case` on that same variable.  Also all of these (case xi) evals
-    -- get duplicated in each branch of the outer case, so 'n' controls how much
-    -- duplication we are prepared to put up with.
-    go 0 _ _ _ = Nothing
-
-    go n wrap free_bndrs (Tick t rhs)
-       = go n (wrap . Tick t) free_bndrs rhs
-    go _ wrap free_bndrs (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
-       | inner_scrut_var == outer_bndr
-       , let wrap_let rhs' | isDeadBinder inner_bndr = rhs'
-                           | otherwise = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
-                              -- The let is OK even for unboxed binders,
-             free_bndrs' = extendVarSet free_bndrs outer_bndr
-       = Just [ assert (not (any (`elemVarSet` free_bndrs') bndrs)) $
-                Alt con bndrs (wrap (wrap_let rhs))
-              | Alt con bndrs rhs <- inner_alts ]
-    go n wrap free_bndrs (Case (Var inner_scrut) inner_bndr ty inner_alts)
-       | [Alt con bndrs rhs] <- inner_alts -- Wrinkle (MC1)
-       , let wrap_case rhs' = Case (Var inner_scrut) inner_bndr ty $
-                              tryMergeCase inner_bndr alts `orElse` alts
-                where
-                  alts = [Alt con bndrs rhs']
-        = assert (not (outer_bndr `elem` (inner_bndr : bndrs))) $
-         go (n-1) (wrap . wrap_case) (free_bndrs `extendVarSet` inner_scrut) rhs
-
-    go _ _ _ _ = Nothing
-
-tryMergeCase _ _ = Nothing
-
 --------------------------------------------------
 --      2. Eliminate Identity Case
+--         See Note [Eliminate Identity Case]
 --------------------------------------------------
 
 mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
@@ -2728,8 +2706,10 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
 
 mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
 
+
 --------------------------------------------------
 --      2. Scrutinee Constant Folding
+--         See Note [Scrutinee Constant Folding]
 --------------------------------------------------
 
 mkCase2 mode scrut bndr alts_ty alts
@@ -2848,64 +2828,4 @@ Note [Dead binders]
 Note that dead-ness is maintained by the simplifier, so that it is
 accurate after simplification as well as before.
 
-
-Note [Cascading case merge]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case merging should cascade in one sweep, because it
-happens bottom-up
-
-      case e of a {
-        DEFAULT -> case a of b
-                      DEFAULT -> case b of c {
-                                     DEFAULT -> e
-                                     A -> ea
-                      B -> eb
-        C -> ec
-==>
-      case e of a {
-        DEFAULT -> case a of b
-                      DEFAULT -> let c = b in e
-                      A -> let c = b in ea
-                      B -> eb
-        C -> ec
-==>
-      case e of a {
-        DEFAULT -> let b = a in let c = b in e
-        A -> let b = a in let c = b in ea
-        B -> let b = a in eb
-        C -> ec
-
-
-However here's a tricky case that we still don't catch, and I don't
-see how to catch it in one pass:
-
-  case x of c1 { I# a1 ->
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case x of c3 { I# a2 ->
-               case a2 of ...
-
-After occurrence analysis (and its binder-swap) we get this
-
-  case x of c1 { I# a1 ->
-  let x = c1 in         -- Binder-swap addition
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case x of c3 { I# a2 ->
-               case a2 of ...
-
-When we simplify the inner case x, we'll see that
-x=c1=I# a1.  So we'll bind a2 to a1, and get
-
-  case x of c1 { I# a1 ->
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case a1 of ...
-
-This is correct, but we can't do a case merge in this sweep
-because c2 /= a1.  Reason: the binding c1=I# a1 went inwards
-without getting changed to c1=I# c2.
-
-I don't think this is worth fixing, even if I knew how. It'll
-all come out in the next pass anyway.
 -}
