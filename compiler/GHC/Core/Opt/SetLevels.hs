@@ -76,7 +76,7 @@
 module GHC.Core.Opt.SetLevels (
         setLevels,
 
-        Level(..), LevelType(..), tOP_LEVEL, isJoinCeilLvl, asJoinCeilLvl,
+        Level(..), tOP_LEVEL,
         LevelledBind, LevelledExpr, LevelledBndr,
         FloatSpec(..), floatSpecLevel,
 
@@ -144,8 +144,6 @@ data Level = Level Int  -- Level number of enclosing lambdas
                    Int  -- Number of big-lambda and/or case expressions and/or
                         -- context boundaries between
                         -- here and the nearest enclosing lambda
-                   LevelType -- Binder or join ceiling?
-data LevelType = BndrLvl | JoinCeilLvl deriving (Eq)
 
 data FloatSpec
   = FloatMe Level       -- Float to just inside the binding
@@ -184,7 +182,6 @@ If you can float to level @Level 0 0@ worth doing so because then your
 allocation becomes static instead of dynamic.  We always start with
 context @Level 0 0@.
 
-
 Note [FloatOut inside INLINE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @InlineCtxt@ very similar to @Level 0 0@, but is used for one purpose:
@@ -211,25 +208,6 @@ One particular case is that of workers: we don't want to float the
 call to the worker outside the wrapper, otherwise the worker might get
 inlined into the floated expression, and an importing module won't see
 the worker at all.
-
-Note [Join ceiling]
-~~~~~~~~~~~~~~~~~~~
-Join points can't float very far; too far, and they can't remain join points
-So, suppose we have:
-
-  f x = (joinrec j y = ... x ... in jump j x) + 1
-
-One may be tempted to float j out to the top of f's RHS, but then the jump
-would not be a tail call. Thus we keep track of a level called the *join
-ceiling* past which join points are not allowed to float.
-
-The troublesome thing is that, unlike most levels to which something might
-float, there is not necessarily an identifier to which the join ceiling is
-attached. Fortunately, if something is to be floated to a join ceiling, it must
-be dropped at the *nearest* join ceiling. Thus each level is marked as to
-whether it is a join ceiling, so that FloatOut can tell which binders are being
-floated to the nearest join ceiling and which to a particular binder (or set of
-binders).
 -}
 
 instance Outputable FloatSpec where
@@ -237,44 +215,37 @@ instance Outputable FloatSpec where
   ppr (StayPut l) = ppr l
 
 tOP_LEVEL :: Level
-tOP_LEVEL   = Level 0 0 BndrLvl
+tOP_LEVEL   = Level 0 0
 
 incMajorLvl :: Level -> Level
-incMajorLvl (Level major _ _) = Level (major + 1) 0 BndrLvl
+incMajorLvl (Level major _) = Level (major + 1) 0
 
 incMinorLvl :: Level -> Level
-incMinorLvl (Level major minor _) = Level major (minor+1) BndrLvl
-
-asJoinCeilLvl :: Level -> Level
-asJoinCeilLvl (Level major minor _) = Level major minor JoinCeilLvl
+incMinorLvl (Level major minor) = Level major (minor+1)
 
 maxLvl :: Level -> Level -> Level
-maxLvl l1@(Level maj1 min1 _) l2@(Level maj2 min2 _)
+maxLvl l1@(Level maj1 min1) l2@(Level maj2 min2)
   | (maj1 > maj2) || (maj1 == maj2 && min1 > min2) = l1
   | otherwise                                      = l2
 
 ltLvl :: Level -> Level -> Bool
-ltLvl (Level maj1 min1 _) (Level maj2 min2 _)
+ltLvl (Level maj1 min1) (Level maj2 min2)
   = (maj1 < maj2) || (maj1 == maj2 && min1 < min2)
 
 ltMajLvl :: Level -> Level -> Bool
     -- Tells if one level belongs to a difft *lambda* level to another
-ltMajLvl (Level maj1 _ _) (Level maj2 _ _) = maj1 < maj2
+ltMajLvl (Level maj1 _) (Level maj2 _) = maj1 < maj2
 
 isTopLvl :: Level -> Bool
-isTopLvl (Level 0 0 _) = True
-isTopLvl _             = False
-
-isJoinCeilLvl :: Level -> Bool
-isJoinCeilLvl (Level _ _ t) = t == JoinCeilLvl
+isTopLvl (Level 0 0) = True
+isTopLvl _           = False
 
 instance Outputable Level where
-  ppr (Level maj min typ)
-    = hcat [ char '<', int maj, char ',', int min, char '>'
-           , ppWhen (typ == JoinCeilLvl) (char 'C') ]
+  ppr (Level maj min)
+    = hcat [ char '<', int maj, char ',', int min, char '>' ]
 
 instance Eq Level where
-  (Level maj1 min1 _) == (Level maj2 min2 _) = maj1 == maj2 && min1 == min2
+  (Level maj1 min1) == (Level maj2 min2) = maj1 == maj2 && min1 == min2
 
 {-
 ************************************************************************
@@ -416,7 +387,7 @@ lvlNonTailExpr :: LevelEnv             -- Context
                -> CoreExprWithFVs      -- Input expression
                -> LvlM LevelledExpr    -- Result expression
 lvlNonTailExpr env expr
-  = lvlExpr (placeJoinCeiling env) expr
+  = lvlExpr env expr
 
 -------------------------------------------
 lvlApp :: LevelEnv
@@ -613,7 +584,7 @@ lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
               -> CoreExprWithFVs      -- input expression
               -> LvlM LevelledExpr    -- Result expression
 lvlNonTailMFE env strict_ctxt ann_expr
-  = lvlMFE (placeJoinCeiling env) strict_ctxt ann_expr
+  = lvlMFE env strict_ctxt ann_expr
 
 lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
         -> Bool                 -- True <=> strict context [body of case or let]
@@ -708,7 +679,7 @@ lvlMFE env strict_ctxt ann_expr
                            -- esp Bottoming floats (2)
     expr_ok_for_spec = exprOkForSpeculation expr
     abs_vars = abstractVars dest_lvl env fvs
-    dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam False
+    dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam
                -- NB: is_bot_lam not is_bot; see (3) in
                --     Note [Bottoming floats]
 
@@ -848,22 +819,75 @@ ToDo: find a way to fix the bad asymptotic complexity.
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Mostly we only float a join point if it can /stay/ a join point.  But
-there is one exception: if it can go to the top level (#13286).
+Mostly we don't float join points at all -- we want them to /stay/ join points.
+This decision is made in `wantToFloat`.
+
+But there is one exception: if it can go to the top level (#13286).
 Consider
   f x = joinrec j y n = <...j y' n'...>
         in jump j x 0
-
 Here we may just as well produce
   j y n = <....j y' n'...>
   f x = j x 0
-
 and now there is a chance that 'f' will be inlined at its call sites.
 It shouldn't make a lot of difference, but these tests
   perf/should_run/MethSharing
   simplCore/should_compile/spec-inline
 and one nofib program, all improve if you do float to top, because
-of the resulting inlining of f.  So ok, let's do it.
+of the resulting inlining of f.
+
+Another reason for floating join points to the top. spectral/minimax has:
+    prog input = join $j y = <expensive> in
+                 case (input == "doesnt happen") of
+                   True  -> $j (testBoard + testBoard)
+                   False -> $j testBoard
+Now, iff we float $j to the top, we can /also/ float ($j (tb+tb)) and ($j tb).
+Result: asymptotic improvement in perf, if `prof` is called many times.
+
+However there are also bad consequences of floating join points to the top:
+
+* If a continuation consumes (let $j x = Just x in case y of {...})
+  we may get much less duplication of the continuation if we don't
+  float $j to the top, because the contination goes into $j's RHS
+
+* See #21392 for an example of how demand analysis can get worse if you
+  float a join point to the top level.
+
+Compromise (determined experimentally):
+
+* Always float /recursive/ join points to the top.
+
+* For /non-recursive/ join points, float them to the top in the second
+  invocation of FloatOut, near the end of the pipeline.  This is controlled by
+  the FloatOutSwitch floatJoinsToTop.
+
+Missed opportunity
+------------------
+There is another benfit of floating local join points.  Stream fusion
+has been known to produce nested loops like this:
+
+  joinrec j1 x1 =
+    joinrec j2 x2 =
+      joinrec j3 x3 = ... jump j1 (x3 + 1) ... jump j2 (x3 + 1) ...
+      in jump j3 x2
+    in jump j2 x1
+  in jump j1 x
+
+(Assume x1 and x2 do *not* occur free in j3.)
+
+Here j1 and j2 are wholly superfluous---each of them merely forwards its
+argument to j3. Since j3 only refers to x3, we can float j2 and j3 to make
+everything one big mutual recursion:
+
+  joinrec j1 x1 = jump j2 x1
+          j2 x2 = jump j3 x2
+          j3 x3 = ... jump j1 (x3 + 1) ... jump j2 (x3 + 1) ...
+  in jump j1 x
+
+Now the simplifier will happily inline the trivial j1 and j2, leaving only j3.
+Without floating, we're stuck with three loops instead of one.
+
+Currently we don't do this -- a missed opportunity.
 
 Note [Free join points]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1145,16 +1169,10 @@ lvlBind :: LevelEnv
         -> LvlM (LevelledBind, LevelEnv)
 
 lvlBind env (AnnNonRec bndr rhs)
-  | isTyVar bndr    -- Don't do anything for TyVar binders
-                    --   (simplifier gets rid of them pronto)
-  || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
-                    -- so we will ignore this case for now
-  || not (profitableFloat env dest_lvl)
-  || (isTopLvl dest_lvl && not (exprIsTopLevelBindable deann_rhs bndr_ty))
-          -- We can't float an unlifted binding to top level (except
-          -- literal strings), so we don't float it at all.  It's a
-          -- bit brutal, but unlifted bindings aren't expensive either
-
+  |  isTyVar bndr  -- Don't float TyVar binders (simplifier gets rid of them pronto)
+  || isCoVar bndr  -- Don't float CoVars: difficult to fix up CoVar occurrences
+                   --                     (see extendPolyLvlEnv)
+  || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
@@ -1165,7 +1183,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
          rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
-                             is_bot_lam mb_join_arity rhs
+                             is_bot_lam NotJoinPoint rhs
        ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1173,7 +1191,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
          rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
-                             is_bot_lam mb_join_arity rhs
+                             is_bot_lam NotJoinPoint rhs
        ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1184,7 +1202,7 @@ lvlBind env (AnnNonRec bndr rhs)
     rhs_fvs    = freeVarsOf rhs
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
-    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam is_join
+    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam
 
     deann_rhs  = deAnnotate rhs
     mb_bot_str = exprBotStrictness_maybe deann_rhs
@@ -1192,21 +1210,14 @@ lvlBind env (AnnNonRec bndr rhs)
         -- is_bot_lam: looks like (\xy. bot), maybe zero lams
         -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
 
-    n_extra    = count isId abs_vars
+    is_top_bindable = exprIsTopLevelBindable deann_rhs bndr_ty
+    n_extra       = count isId abs_vars
     mb_join_arity = idJoinPointHood bndr
     is_join       = isJoinPoint mb_join_arity
 
 lvlBind env (AnnRec pairs)
-  |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
-         -- Only floating to the top level is allowed.
-  || not (profitableFloat env dest_lvl)
-  || (isTopLvl dest_lvl && any (mightBeUnliftedType . idType) bndrs)
-       -- This mightBeUnliftedType stuff is the same test as in the non-rec case
-       -- You might wonder whether we can have a recursive binding for
-       -- an unlifted value -- but we can if it's a /join binding/ (#16978)
-       -- (Ultimately I think we should not use GHC.Core.Opt.SetLevels to
-       -- float join bindings at all, but that's another story.)
-  =    -- No float
+  |  not (wantToFloat env Recursive dest_lvl is_join is_top_bindable)
+  = -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
              lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (idJoinPointHood b) r
@@ -1242,7 +1253,7 @@ lvlBind env (AnnRec pairs)
         (lam_bndrs, rhs_body)   = collectAnnBndrs rhs
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
         (body_env2, lam_bndrs2) = lvlLamBndrs body_env1 rhs_lvl lam_bndrs1
-    new_rhs_body <- lvlRhs body_env2 Recursive is_bot (get_join bndr) rhs_body
+    new_rhs_body <- lvlRhs body_env2 Recursive is_bot NotJoinPoint rhs_body
     (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
                  , mkLams abs_vars_w_lvls $
@@ -1268,13 +1279,9 @@ lvlBind env (AnnRec pairs)
                       -- function in a Rec, and we don't much care what
                       -- happens to it.  False is simple!
 
-    do_rhs env (bndr,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive
-                                        is_bot (get_join bndr)
-                                        rhs
-
-    get_join bndr | need_zap  = NotJoinPoint
-                  | otherwise = idJoinPointHood bndr
-    need_zap = dest_lvl `ltLvl` joinCeilingLevel env
+    do_rhs env (_,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive
+                                     is_bot NotJoinPoint
+                                     rhs
 
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
@@ -1285,8 +1292,40 @@ lvlBind env (AnnRec pairs)
                 bndrs
 
     ty_fvs   = foldr (unionVarSet . tyCoVarsOfType . idType) emptyVarSet bndrs
-    dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot is_join
+    dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot
     abs_vars = abstractVars dest_lvl env bind_fvs
+
+    is_top_bindable = not (any (mightBeUnliftedType . idType) bndrs)
+       -- This mightBeUnliftedType stuff is the same test as in the non-rec case
+       -- You might wonder whether we can have a recursive binding for
+       -- an unlifted value -- but we can if it's a /join binding/ (#16978)
+
+wantToFloat :: LevelEnv
+            -> RecFlag
+            -> Level    -- This is how far it could float
+            -> Bool     -- Join point
+            -> Bool     -- True <=> top-level-bindadable
+            -> Bool     -- True <=> Yes! Float me
+
+wantToFloat env is_rec dest_lvl is_join is_top_bindable
+  | not (profitableFloat env dest_lvl)
+  = False
+
+  | floatTopLvlOnly env && not (isTopLvl dest_lvl)
+  = False
+
+  | isTopLvl dest_lvl, not is_top_bindable
+  = False    -- We can't float an unlifted binding to top level (except
+             -- literal strings), so we don't float it at all.  It's a
+             -- bit brutal, but unlifted bindings aren't expensive either
+
+  | is_join  -- Join points either stay put, or float to top
+             -- See Note [Floating join point bindings]
+  = isTopLvl dest_lvl && (isRec is_rec || floatJoinsToTop (le_switches env))
+
+  | otherwise
+  = True     -- Yes!  Float me
+
 
 profitableFloat :: LevelEnv -> Level -> Bool
 profitableFloat env dest_lvl
@@ -1329,8 +1368,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
     (body_env, bndrs') | JoinPoint {} <- mb_join_arity
                       = lvlJoinBndrs env1 dest_lvl rec all_bndrs
                       | otherwise
-                      = case lvlLamBndrs env1 dest_lvl all_bndrs of
-                          (env2, bndrs') -> (placeJoinCeiling env2, bndrs')
+                      = lvlLamBndrs env1 dest_lvl all_bndrs
         -- The important thing here is that we call lvlLamBndrs on
         -- all these binders at once (abs_vars and bndrs), so they
         -- all get the same major level.  Otherwise we create stupid
@@ -1441,7 +1479,6 @@ lvlBndrs :: LevelEnv -> Level -> [CoreBndr] -> (LevelEnv, [LevelledBndr])
 -- all or none.  We never separate binders.
 lvlBndrs env@(LE { le_lvl_env = lvl_env }) new_lvl bndrs
   = ( env { le_ctxt_lvl = new_lvl
-          , le_join_ceil = new_lvl
           , le_lvl_env  = addLvls new_lvl lvl_env bndrs }
     , map (stayPut new_lvl) bndrs)
 
@@ -1456,19 +1493,11 @@ destLevel :: LevelEnv
                         -- (a subset of the previous argument)
           -> Bool   -- True <=> is function
           -> Bool   -- True <=> looks like \x1..xn.bottom (n>=0)
-          -> Bool   -- True <=> is a join point
           -> Level
--- INVARIANT: if is_join=True then result >= join_ceiling
-destLevel env fvs fvs_ty is_function is_bot is_join
+destLevel env fvs fvs_ty is_function is_bot
   | isTopLvl max_fv_id_level  -- Float even joins if they get to top level
                               -- See Note [Floating join point bindings]
   = tOP_LEVEL
-
-  | is_join  -- Never float a join point past the join ceiling
-             -- See Note [Join points] in GHC.Core.Opt.FloatOut
-  = if max_fv_id_level `ltLvl` join_ceiling
-    then join_ceiling
-    else max_fv_id_level
 
   | is_bot              -- Send bottoming bindings to the top
   = as_far_as_poss      -- regardless; see Note [Bottoming floats]
@@ -1483,7 +1512,6 @@ destLevel env fvs fvs_ty is_function is_bot is_join
 
   | otherwise = max_fv_id_level
   where
-    join_ceiling    = joinCeilingLevel env
     max_fv_id_level = maxFvLevel isId env fvs -- Max over Ids only; the
                                               -- tyvars will be abstracted
 
@@ -1554,8 +1582,6 @@ data LevelEnv
   = LE { le_switches :: FloatOutSwitches
        , le_ctxt_lvl :: Level           -- The current level
        , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
-       , le_join_ceil:: Level           -- Highest level to which joins float
-                                        -- Invariant: always >= le_ctxt_lvl
 
        -- See Note [le_subst and le_env]
        , le_subst    :: Subst           -- Domain is pre-cloned TyVars and Ids
@@ -1600,7 +1626,6 @@ initialEnv :: FloatOutSwitches -> CoreProgram -> LevelEnv
 initialEnv float_lams binds
   = LE { le_switches  = float_lams
        , le_ctxt_lvl  = tOP_LEVEL
-       , le_join_ceil = panic "initialEnv"
        , le_lvl_env   = emptyVarEnv
        , le_subst     = mkEmptySubst in_scope_toplvl
        , le_env       = emptyVarEnv }
@@ -1648,13 +1673,6 @@ extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
 
--- See Note [Join ceiling]
-placeJoinCeiling :: LevelEnv -> LevelEnv
-placeJoinCeiling le@(LE { le_ctxt_lvl = lvl })
-  = le { le_ctxt_lvl = lvl', le_join_ceil = lvl' }
-  where
-    lvl' = asJoinCeilLvl (incMinorLvl lvl)
-
 maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
 maxFvLevel max_me env var_set
   = nonDetStrictFoldDVarSet (maxIn max_me env) tOP_LEVEL var_set
@@ -1682,11 +1700,6 @@ lookupVar :: LevelEnv -> Id -> LevelledExpr
 lookupVar le v = case lookupVarEnv (le_env le) v of
                     Just (_, expr) -> expr
                     _              -> Var v
-
--- Level to which join points are allowed to float (boundary of current tail
--- context). See Note [Join ceiling]
-joinCeilingLevel :: LevelEnv -> Level
-joinCeilingLevel = le_join_ceil
 
 abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- Find the variables in fvs, free vars of the target expression,
@@ -1790,9 +1803,8 @@ cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env
                new_lvl vs
   = do { (subst', vs') <- cloneBndrs subst vs
              -- N.B. We are not moving the body of the case, merely its case
-             -- binders.  Consequently we should *not* set le_ctxt_lvl and
-             -- le_join_ceil.  See Note [Setting levels when floating
-             -- single-alternative cases].
+             -- binders.  Consequently we should *not* set le_ctxt_lvl.
+             -- See Note [Setting levels when floating single-alternative cases].
        ; let env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
                         , le_env       = foldl' add_id id_env (vs `zip` vs') }
