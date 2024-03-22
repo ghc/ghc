@@ -394,6 +394,7 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.BreakInfo
 import GHC.Types.PkgQual
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -673,6 +674,7 @@ setTopSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setTopSessionDynFlags dflags = do
   hsc_env <- getSession
   logger  <- getLogger
+  lookup_cache  <- liftIO $ newMVar emptyUFM
 
   -- Interpreter
   interp <- if
@@ -702,7 +704,7 @@ setTopSessionDynFlags dflags = do
             }
          s <- liftIO $ newMVar InterpPending
          loader <- liftIO Loader.uninitializedLoader
-         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader))
+         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache))
 
     -- JavaScript interpreter
     | ArchJavaScript <- platformArch (targetPlatform dflags)
@@ -720,7 +722,7 @@ setTopSessionDynFlags dflags = do
               , jsInterpFinderOpts  = initFinderOpts dflags
               , jsInterpFinderCache = hsc_FC hsc_env
               }
-         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader))
+         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
 
     -- Internal interpreter
     | otherwise
@@ -728,7 +730,7 @@ setTopSessionDynFlags dflags = do
 #if defined(HAVE_INTERNAL_INTERPRETER)
      do
       loader <- liftIO Loader.uninitializedLoader
-      return (Just (Interp InternalInterp loader))
+      return (Just (Interp InternalInterp loader lookup_cache))
 #else
       return Nothing
 #endif
