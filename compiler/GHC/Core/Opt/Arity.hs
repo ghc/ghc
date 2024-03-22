@@ -54,7 +54,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy )
+import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy, isCallStackTy )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -1420,6 +1420,16 @@ do so through CallStacks.  #20103 is a case in point, where we got
 We really want to eta-expand this!  #20103 is quite convincing!
 We do this regardless of -fdicts-cheap; it's not really a dictionary.
 
+We also want to check both for (IP blah CallStack) and for CallStack itself.
+We might have either
+   d :: IP blah CallStack    -- Or HasCallStack
+   d = (cs-expr :: CallStack) |> (nt-ax :: CallStack ~ IP blah CallStack)
+or just
+   cs :: CallStack
+   cs = cs-expr
+
+Test T20103 is an example of the latter.
+
 Note [Eta expanding through dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the experimental -fdicts-cheap flag is on, we eta-expand through
@@ -1519,7 +1529,7 @@ myExprIsCheap (AE { am_opts = opts, am_sigs = sigs }) e mb_ty
     cheap_dict = case mb_ty of
                      Nothing -> False
                      Just ty -> (ao_dicts_cheap opts && isDictTy ty)
-                                || isCallStackPredTy ty
+                                || isCallStackPredTy ty || isCallStackTy ty
         -- See Note [Eta expanding through dictionaries]
         -- See Note [Eta expanding through CallStacks]
 
