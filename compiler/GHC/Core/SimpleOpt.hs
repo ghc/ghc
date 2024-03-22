@@ -510,6 +510,12 @@ do_beta_by_substitution bndr rhs
   = exprIsTrivial rhs                   -- Can duplicate
     || safe_to_inline (idOccInfo bndr)  -- Occurs at most once
 
+do_case_elim :: CoreExpr -> Id -> [Id] -> Bool
+do_case_elim scrut case_bndr alt_bndrs
+  =  exprIsHNF scrut
+  && safe_to_inline (idOccInfo case_bndr)
+  && all isDeadBinder alt_bndrs
+
 -------------------
 simple_out_bind :: TopLevelFlag
                 -> SimpleOptEnv
@@ -764,6 +770,7 @@ add_info env old_bndr top_level new_rhs new_bndr
    unfolding_from_rhs = mkUnfolding uf_opts VanillaSrc
                                     (isTopLevel top_level)
                                     False -- may be bottom or not
+                                    False -- Not a join point
                                     new_rhs Nothing
 
 wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
@@ -1295,13 +1302,17 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
          in go subst' (float:floats) expr cont
 
     go subst floats (Case scrut b _ [Alt con vars expr]) cont
+       | do_case_elim scrut' b vars  -- See Note [Case elim in exprIsConApp_maybe]
+       = go (extend subst b scrut') floats expr cont
+       | otherwise
        = let
-          scrut'           = subst_expr subst scrut
           (subst', b')     = subst_bndr subst b
           (subst'', vars') = subst_bndrs subst' vars
           float            = FloatCase scrut' b' con vars'
          in
            go subst'' (float:floats) expr cont
+       where
+          scrut'           = subst_expr subst scrut
 
     go (Right sub) floats (Var v) cont
        = go (Left (getSubstInScope sub))
@@ -1422,6 +1433,27 @@ dealWithStringLiteral fun str mco =
       in pushCoDataCon consDataCon [Type charTy, char_expr, rest] mco
 
 {-
+Note [Case elim in exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   data K a = MkK !a
+
+   $WMkK x = case x of y -> K y   -- Wrapper for MkK
+
+   ...case $WMkK v of K w -> <rhs>
+
+We call `exprIsConApp_maybe` on ($WMkK v); we inline the wrapper
+and beta-reduce, so we get to
+   exprIsConApp_maybe (case v of y -> K y)
+
+So we may float the case, and end up with
+   case v of y -> <rhs>[y/w]
+
+But if `v` is already evaluated, the next run of the Simplifier will
+eliminate the case, and we may then make more progress with <rhs>.
+Better to do it in one iteration.  Hence the `do_case_elim`
+check in `exprIsConApp_maybe`.
+
 Note [Unfolding DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~
 DFuns look like
