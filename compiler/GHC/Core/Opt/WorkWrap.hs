@@ -768,11 +768,19 @@ splitFun ww_opts fn_id rhs
                        return [(fn_id, rhs)]
 
             Just stuff
-              | let opt_wwd_rhs = simpleOptExpr (wo_simple_opts ww_opts) rhs
-                  -- We need to stabilise the WW'd (and optimised) RHS below
+              | let opt_wwd_rhs = mkLams arg_vars $
+                                  simpleOptExpr (wo_simple_opts ww_opts) body
+                  -- Run the simple optimiser on the WW'd body, to get rid of
+                  -- junk. Keep all the original `arg_vars` binders though: this
+                  -- might be a join point, and we don't want to lose the
+                  -- one-shot annotations.  At least I think that's the reason
+                  -- (honestly, I have forgottne), but doing it this way
+                  -- certainly does no harm and is slightly more efficient.
+
               , Just stable_unf <- certainlyWillInline uf_opts fn_info opt_wwd_rhs
                 -- We could make a w/w split, but in fact the RHS is small
                 -- See Note [Don't w/w inline small non-loop-breaker things]
+
               , let id_w_unf = fn_id `setIdUnfolding` stable_unf
                 -- See Note [Inline pragma for certainlyWillInline]
               ->  return [ (id_w_unf, rhs) ]
