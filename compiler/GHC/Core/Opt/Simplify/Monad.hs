@@ -219,7 +219,6 @@ newJoinId bndrs body_ty
              join_arity = length bndrs
              details    = JoinId join_arity Nothing
              id_info    = vanillaIdInfo `setArityInfo` arity
---                                        `setOccInfo` strongLoopBreaker
 
        ; return (mkLocalVar details name ManyTy join_id_ty id_info) }
 
