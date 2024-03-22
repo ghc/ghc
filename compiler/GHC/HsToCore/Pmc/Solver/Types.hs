@@ -325,6 +325,11 @@ lookupVarInfoNT ts x = case lookupVarInfo ts x of
     go _                = Nothing
 
 trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
+{-# INLINE trvVarInfo #-}
+-- This function is called a lot and we want to specilise it, not only
+-- for the type class, but also for its 'f' function argument.
+-- Before the INLINE pragma it sometimes inlined and sometimes didn't,
+-- depending delicately on GHC's optimisations.  Better to use a pragma.
 trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
   = set_vi <$> f (lookupVarInfo ts x)
   where
