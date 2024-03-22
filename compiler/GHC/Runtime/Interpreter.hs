@@ -458,7 +458,11 @@ lookupSymbolInDLL interp dll str = withSymbolCache interp str $
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
 #endif
-    ExternalInterp _ -> panic "lookupSymbolInDLL: not implemented for external interpreter" -- FIXME
+    ExternalInterp ext -> case ext of
+      ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
+        uninterruptibleMask_ $
+          sendMessage inst (LookupSymbolInDLL dll (unpackFS str))
+      ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
 lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
 lookupClosure interp str =

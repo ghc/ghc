@@ -134,7 +134,7 @@ extern void iconv();
    - Indexing (e.g. ocVerifyImage and ocGetNames)
    - Initialization (e.g. ocResolve)
    - RunInit (e.g. ocRunInit)
-   - Lookup (e.g. lookupSymbol)
+   - Lookup (e.g. lookupSymbol/lookupSymbolInDLL)
 
    This is to enable lazy loading of symbols. Eager loading is problematic
    as it means that all symbols must be available, even those which we will
