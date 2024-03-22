@@ -206,6 +206,15 @@ test('CoOpt_Singletons',
 
 #########
 
+# Moved from simplCore/should_compile
+test('T18730',
+      [ only_ways(['optasm'])
+      , collect_compiler_stats('bytes allocated',1)
+      , extra_files(['T18730_A.hs'])
+      ],
+      multimod_compile,
+      ['T18730', '-v0 -O'])
+
 # LargeRecord is subject to Note [Sensitivity to unique increment] in T12545.hs
 # observed spread was 2.2%
 test ('LargeRecord',
@@ -540,6 +549,11 @@ test ('T15164',
       compile,
       ['-v0 -O'])
 test('T15630',
+      [collect_compiler_stats()
+      ],
+      compile,
+      ['-O2'])
+test('T15630a',
       [collect_compiler_stats()
       ],
       compile,

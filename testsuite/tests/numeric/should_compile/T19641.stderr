@@ -14,8 +14,8 @@ integer_to_int
   = \ eta ->
       case eta of {
         IS ipv -> Just (I# ipv);
-        IP x2 -> Nothing;
-        IN ds -> Nothing
+        IP x -> Nothing;
+        IN ds2 -> Nothing
       }
 
 

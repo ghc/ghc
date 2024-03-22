@@ -1,8 +1,8 @@
 
 ==================== Final STG: ====================
-$WNil = CCS_DONT_CARE Nil! [];
+$WNil = Nil! [];
 
-$WCons = \r [conrep conrep] Cons [conrep conrep];
+$WCons = \r [conrep conrep1] Cons [conrep conrep1];
 
 unSucc1 = \r [ds] ds;
 
@@ -11,7 +11,7 @@ unSucc = \r [eta] unSucc1 eta;
 Rec {
 ifoldl' =
     \r [f z ds]
-        case ds of {
+        case ds of wild {
           Nil -> z;
           Cons ipv2 ipv3 ->
               case z of z1 {
@@ -25,7 +25,7 @@ Nil = \r [void] Nil [];
 
 Cons = \r [void eta eta] Cons [eta eta];
 
-Z = CCS_DONT_CARE Z! [];
+Z = Z! [];
 
 S = \r [eta] S [eta];
 

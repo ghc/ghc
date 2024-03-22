@@ -23,14 +23,14 @@ F2.f2_g [Occ=LoopBreaker] :: Integer -> Integer -> Integer
 [GblId, Arity=2, Str=<1L><SL>, Unf=OtherCon []]
 F2.f2_g
   = \ (x :: Integer) (y :: Integer) ->
-      case x of wild {
-        GHC.Num.Integer.IS x1 ->
-          case GHC.Prim.># x1 0# of {
+      case x of x1 {
+        GHC.Num.Integer.IS x2 ->
+          case GHC.Prim.># x2 0# of {
             __DEFAULT -> y;
-            1# -> F2.f2_g (GHC.Num.Integer.integerSub wild lvl) (GHC.Num.Integer.integerAdd wild y)
+            1# -> F2.f2_g (GHC.Num.Integer.integerSub x1 lvl) (GHC.Num.Integer.integerAdd x1 y)
           };
-        GHC.Num.Integer.IP x1 -> F2.f2_g (GHC.Num.Integer.integerSub wild lvl) (GHC.Num.Integer.integerAdd wild y);
-        GHC.Num.Integer.IN x1 -> y
+        GHC.Num.Integer.IP x2 -> F2.f2_g (GHC.Num.Integer.integerSub x1 lvl) (GHC.Num.Integer.integerAdd x1 y);
+        GHC.Num.Integer.IN x2 -> y
       }
 end Rec }
 

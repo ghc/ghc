@@ -6,9 +6,9 @@ data T = T (Maybe Bool) (Maybe Bool) (Maybe Bool) (Maybe Bool)
 
 
 m :: Maybe a -> Maybe a -> Maybe a
+-- Don't make this INLINE; if you do, ,it's not unreasonable to inline it
 m (Just v1) Nothing = Just v1
 m _         mb      = mb
-{-# INLINE m #-}
 
 f :: T -> T -> T
 f (T a1 b1 c1 d1) (T a2 b2 c2 d2)
