@@ -3140,6 +3140,10 @@ commonly used commands.
 
     The :ghci-cmd:`:uses` command requires :ghci-cmd:`:set +c` to be set.
 
+.. ghci-cmd:: :version
+
+    Display the current GHC version.
+
 .. ghci-cmd:: :where
 
    Show the current evaluation stack while stopped at a breakpoint.

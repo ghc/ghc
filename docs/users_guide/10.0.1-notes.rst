@@ -1,0 +1,36 @@
+.. _release-10-0-1:
+
+Version 10.0.1
+==============
+
+Language
+~~~~~~~~
+
+Compiler
+~~~~~~~~
+
+GHCi
+~~~~
+
+- Added the :ghci-cmd:`:version` command. This displays the current GHC version.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
