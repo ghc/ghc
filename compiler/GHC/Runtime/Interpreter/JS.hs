@@ -41,7 +41,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Error (logInfo)
 import GHC.Utils.Outputable (text)
 import GHC.Data.FastString
-import GHC.Types.Unique.FM
 
 import Control.Concurrent
 import Control.Monad
@@ -178,11 +177,9 @@ spawnJSInterp cfg = do
         }
 
   pending_frees <- newMVar []
-  lookup_cache  <- newMVar emptyUFM
   let inst = ExtInterpInstance
         { instProcess           = proc
         , instPendingFrees      = pending_frees
-        , instLookupSymbolCache = lookup_cache
         , instExtra             = extra
         }
 
