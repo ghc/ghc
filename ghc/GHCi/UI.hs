@@ -193,9 +193,11 @@ defaultGhciSettings =
         fullHelpText      = defFullHelpText
     }
 
+versionString :: String
+versionString = "GHCi, version " ++ cProjectVersion
+
 ghciWelcomeMsg :: String
-ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
-                 ": https://www.haskell.org/ghc/  :? for help"
+ghciWelcomeMsg = versionString ++ ": https://www.haskell.org/ghc/  :? for help"
 
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [
@@ -253,6 +255,7 @@ ghciCommands = map mkCmd [
   ("unadd",     keepGoingPaths unAddModule,     completeFilename),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
+  ("version",   keepGoing showVersion',         noCompletion),
   ("where",     keepGoing whereCmd,             noCompletion),
   ("instances", keepGoing' instancesCmd,        completeExpression)
   ] ++ map mkCmdHidden [ -- hidden commands
@@ -366,6 +369,7 @@ defFullHelpText =
   "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
   "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+  "   :version                    display the current GHC version\n" ++
   "   ::<cmd>                     run the builtin command\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "   :shell <command>            run shell via sh -c <command>\n" ++
@@ -3625,6 +3629,9 @@ unsetOptions str
 
              no_flags <- mapM no_flag minus_opts
              when (not (null no_flags)) $ newDynFlags False no_flags
+
+showVersion' :: GhciMonad m => String -> m ()
+showVersion' _ = liftIO (putStrLn versionString)
 
 isMinus :: String -> Bool
 isMinus ('-':_) = True
