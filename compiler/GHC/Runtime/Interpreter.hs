@@ -152,22 +152,22 @@ The main pieces are:
   - implementation of Template Haskell (GHCi.TH)
   - a few other things needed to run interpreted code
 
-- top-level iserv directory, containing the codefor the external
-  server.  This is a fairly simple wrapper, most of the functionality
+- top-level iserv directory, containing the code for the external
+  server. This is a fairly simple wrapper, most of the functionality
   is provided by modules in libraries/ghci.
 
 - This module which provides the interface to the server used
   by the rest of GHC.
 
-GHC works with and without -fexternal-interpreter.  With the flag, all
-interpreted code is run by the iserv binary.  Without the flag,
+GHC works with and without -fexternal-interpreter. With the flag, all
+interpreted code is run by the iserv binary. Without the flag,
 interpreted code is run in the same process as GHC.
 
 Things that do not work with -fexternal-interpreter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 dynCompileExpr cannot work, because we have no way to run code of an
-unknown type in the remote process.  This API fails with an error
+unknown type in the remote process. This API fails with an error
 message if it is used with -fexternal-interpreter.
 
 Other Notes on Remote GHCi
@@ -441,52 +441,71 @@ initObjLinker :: Interp -> IO ()
 initObjLinker interp = interpCmd interp InitLinker
 
 lookupSymbol :: Interp -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbol interp str = case interpInstance interp of
+lookupSymbol interp str = withSymbolCache interp str $
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #endif
-
-  ExternalInterp ext -> case ext of
-    ExtIServ i -> withIServ i $ \inst -> do
-      -- Profiling of GHCi showed a lot of time and allocation spent
-      -- making cross-process LookupSymbol calls, so I added a GHC-side
-      -- cache which sped things up quite a lot.  We have to be careful
-      -- to purge this cache when unloading code though.
-      cache <- readMVar (instLookupSymbolCache inst)
-      case lookupUFM cache str of
-        Just p -> return (Just p)
-        Nothing -> do
-          m <- uninterruptibleMask_ $
-                   sendMessage inst (LookupSymbol (unpackFS str))
-          case m of
-            Nothing -> return Nothing
-            Just r -> do
-              let p        = fromRemotePtr r
-                  cache'   = addToUFM cache str p
-              modifyMVar_ (instLookupSymbolCache inst) (const (pure cache'))
-              return (Just p)
-
-    ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
+    ExternalInterp ext -> case ext of
+      ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
+        uninterruptibleMask_ $
+          sendMessage inst (LookupSymbol (unpackFS str))
+      ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbolInDLL interp dll str = case interpInstance interp of
+lookupSymbolInDLL interp dll str = withSymbolCache interp str $
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
 #endif
-  ExternalInterp _ -> panic "lookupSymbolInDLL: not implemented for external interpreter" -- FIXME
+    ExternalInterp ext -> case ext of
+      ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
+        uninterruptibleMask_ $
+          sendMessage inst (LookupSymbolInDLL dll (unpackFS str))
+      ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
 lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
 lookupClosure interp str =
   interpCmd interp (LookupClosure str)
 
+-- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
+-- which maps symbols to the address where they are loaded.
+-- When there's a cache hit we simply return the cached address, when there is
+-- a miss we run the action which determines the symbol's address and populate
+-- the cache with the answer.
+withSymbolCache :: Interp
+                -> FastString
+                -- ^ The symbol we are looking up in the cache
+                -> IO (Maybe (Ptr ()))
+                -- ^ An action which determines the address of the symbol we
+                -- are looking up in the cache, which is run if there is a
+                -- cache miss. The result will be cached.
+                -> IO (Maybe (Ptr ()))
+withSymbolCache interp str determine_addr = do
+
+  -- Profiling of GHCi showed a lot of time and allocation spent
+  -- making cross-process LookupSymbol calls, so I added a GHC-side
+  -- cache which sped things up quite a lot. We have to be careful
+  -- to purge this cache when unloading code though.
+  --
+  -- The analysis in #23415 further showed this cache should also benefit the
+  -- internal interpreter's loading times, and needn't be used by the external
+  -- interpreter only.
+  cache <- readMVar (interpLookupSymbolCache interp)
+  case lookupUFM cache str of
+    Just p -> return (Just p)
+    Nothing -> do
+
+      maddr <- determine_addr
+      case maddr of
+        Nothing -> return Nothing
+        Just p -> do
+          let upd_cache cache' = addToUFM cache' str p
+          modifyMVar_ (interpLookupSymbolCache interp) (pure . upd_cache)
+          return (Just p)
+
 purgeLookupSymbolCache :: Interp -> IO ()
-purgeLookupSymbolCache interp = case interpInstance interp of
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp -> pure ()
-#endif
-  ExternalInterp ext -> withExtInterpMaybe ext $ \case
-    Nothing   -> pure () -- interpreter stopped, nothing to do
-    Just inst -> modifyMVar_ (instLookupSymbolCache inst) (const (pure emptyUFM))
+purgeLookupSymbolCache interp = modifyMVar_ (interpLookupSymbolCache interp) (const (pure emptyUFM))
 
 -- | loadDLL loads a dynamic library using the OS's native linker
 -- (i.e. dlopen() on Unix, LoadLibrary() on Windows).  It takes either
@@ -552,11 +571,9 @@ spawnIServ conf = do
                   }
 
   pending_frees <- newMVar []
-  lookup_cache  <- newMVar emptyUFM
   let inst = ExtInterpInstance
         { instProcess           = process
         , instPendingFrees      = pending_frees
-        , instLookupSymbolCache = lookup_cache
         , instExtra             = ()
         }
   pure inst
