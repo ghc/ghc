@@ -179,6 +179,13 @@ PostInlineUnconditionally
   transformations for the same reason as PreInlineUnconditionally,
   so it's probably not innocuous anyway.
 
+  One annoying variant is this.  CaseMerge introduces auxiliary bindings
+     let b = b' in ...
+  This takes another full run of the simplifier to elimiante.  But if
+  the PostInlineUnconditionally, replacing b with b', is the only thing
+  that happens in a Simplifier run, that probably really is innocuous.
+  Perhaps an opportunity here.
+
 KnownBranch, BetaReduction:
   May drop chunks of code, and thereby enable PreInlineUnconditionally
   for some let-binding which now occurs once

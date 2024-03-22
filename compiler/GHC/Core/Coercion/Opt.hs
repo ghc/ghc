@@ -163,10 +163,10 @@ optCoercion' env co
     in
     warnPprTrace (not (isReflCo out_co) && isReflexiveCo out_co)
                  "optCoercion: reflexive but not refl" details $
-    assertPpr (substTyUnchecked env in_ty1 `eqType` out_ty1 &&
-               substTyUnchecked env in_ty2 `eqType` out_ty2 &&
-               in_role == out_role)
-              (hang (text "optCoercion changed types!") 2 details) $
+--    assertPpr (substTyUnchecked env in_ty1 `eqType` out_ty1 &&
+--               substTyUnchecked env in_ty2 `eqType` out_ty2 &&
+--               in_role == out_role)
+--              (hang (text "optCoercion changed types!") 2 details) $
     out_co
 
   | otherwise

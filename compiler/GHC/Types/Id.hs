@@ -72,7 +72,7 @@ module GHC.Types.Id (
         isFCallId, isFCallId_maybe,
         isDataConWorkId, isDataConWorkId_maybe,
         isDataConWrapId, isDataConWrapId_maybe,
-        isDataConId_maybe,
+        isDataConId, isDataConId_maybe,
         idDataCon,
         isConLikeId, isWorkerLikeId, isDeadEndId, idIsFrom,
         hasNoBinding,
@@ -539,6 +539,12 @@ isDataConId_maybe id = case Var.idDetails id of
                          DataConWorkId con -> Just con
                          DataConWrapId con -> Just con
                          _                 -> Nothing
+
+isDataConId :: Id -> Bool
+isDataConId id = case Var.idDetails id of
+                         DataConWorkId {} -> True
+                         DataConWrapId {} -> True
+                         _                 -> False
 
 -- | An Id for which we might require all callers to pass strict arguments properly tagged + evaluated.
 --
