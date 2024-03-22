@@ -164,9 +164,12 @@ data SimplCont
 
 
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
-        OutCoercion             -- The coercion simplified
+      { sc_co   :: OutCoercion  -- The coercion simplified
                                 -- Invariant: never an identity coercion
-        SimplCont
+      , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
+                                --      See Note [Avoid re-simplifying coercions]
+                                --      in GHC.Core.Opt.Simplify.Iteration
+      , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
@@ -275,8 +278,10 @@ instance Outputable SimplCont where
     = text "Stop" <> brackets (sep $ punctuate comma pps) <+> ppr ty
     where
       pps = [ppr interesting] ++ [ppr eval_sd | eval_sd /= topSubDmd]
-  ppr (CastIt co cont  )    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
-  ppr (TickIt t cont)       = (text "TickIt" <+> ppr t) $$ ppr cont
+  ppr (CastIt { sc_co = co, sc_cont = cont })
+    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
+  ppr (TickIt t cont)
+    = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
   ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
@@ -287,9 +292,9 @@ instance Outputable SimplCont where
     = (text "StrictBind" <+> ppr b) $$ ppr cont
   ppr (StrictArg { sc_fun = ai, sc_cont = cont })
     = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
+  ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_cont = cont })
     = (text "Select" <+> ppr dup <+> ppr bndr) $$
-       whenPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
+      whenPprDebug (nest 2 $ ppr alts) $$ ppr cont
 
 
 {- Note [The hole type in ApplyToTy]
@@ -353,6 +358,7 @@ data ArgSpec
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
 
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
+                                      -- Coercion is optimised
 
 instance Outputable ArgInfo where
   ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds })
@@ -415,7 +421,8 @@ pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
   = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
                  -- The SubstEnv will be ignored since sc_dup=Simplified
                , sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg _ (CastBy c) cont = CastIt c cont
+pushSimplifiedArg _ (CastBy c) cont
+  = CastIt { sc_co = c, sc_cont = cont, sc_opt = True }
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
@@ -472,7 +479,7 @@ mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
 -------------------
 contIsRhs :: SimplCont -> Maybe RecFlag
 contIsRhs (Stop _ (RhsCtxt is_rec) _) = Just is_rec
-contIsRhs (CastIt _ k)                = contIsRhs k   -- For f = e |> co, treat e as Rhs context
+contIsRhs (CastIt { sc_cont = k })    = contIsRhs k   -- For f = e |> co, treat e as Rhs context
 contIsRhs _                           = Nothing
 
 -------------------
@@ -486,7 +493,7 @@ contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
 contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
 contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
 contIsDupable (StrictArg { sc_dup = OkToDup })  = True -- ...ditto...
-contIsDupable (CastIt _ k)                      = contIsDupable k
+contIsDupable (CastIt { sc_cont = k })          = contIsDupable k
 contIsDupable _                                 = False
 
 -------------------
@@ -495,13 +502,13 @@ contIsTrivial (Stop {})                                         = True
 contIsTrivial (ApplyToTy { sc_cont = k })                       = contIsTrivial k
 -- This one doesn't look right.  A value application is not trivial
 -- contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
-contIsTrivial (CastIt _ k)                                      = contIsTrivial k
+contIsTrivial (CastIt { sc_cont = k })                          = contIsTrivial k
 contIsTrivial _                                                 = False
 
 -------------------
 contResultType :: SimplCont -> OutType
 contResultType (Stop ty _ _)                = ty
-contResultType (CastIt _ k)                 = contResultType k
+contResultType (CastIt { sc_cont = k })     = contResultType k
 contResultType (StrictBind { sc_cont = k }) = contResultType k
 contResultType (StrictArg { sc_cont = k })  = contResultType k
 contResultType (Select { sc_cont = k })     = contResultType k
@@ -512,7 +519,7 @@ contResultType (TickIt _ k)                 = contResultType k
 contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
-contHoleType (CastIt co _)                    = coercionLKind co
+contHoleType (CastIt { sc_co = co })          = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
@@ -532,7 +539,8 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 -- case-of-case transformation.
 contHoleScaling :: SimplCont -> Mult
 contHoleScaling (Stop _ _ _) = OneTy
-contHoleScaling (CastIt _ k) = contHoleScaling k
+contHoleScaling (CastIt { sc_cont = k })
+  = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
   = idMult id `mkMultMul` contHoleScaling k
 contHoleScaling (Select { sc_bndr = id, sc_cont = k })
@@ -551,14 +559,14 @@ countArgs :: SimplCont -> Int
 -- and other values; skipping over casts.
 countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
 countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
-countArgs (CastIt _ cont)                 = countArgs cont
+countArgs (CastIt     { sc_cont = cont }) = countArgs cont
 countArgs _                               = 0
 
 countValArgs :: SimplCont -> Int
 -- Count value arguments only
 countValArgs (ApplyToTy  { sc_cont = cont }) = countValArgs cont
 countValArgs (ApplyToVal { sc_cont = cont }) = 1 + countValArgs cont
-countValArgs (CastIt _ cont)                 = countValArgs cont
+countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
@@ -578,7 +586,7 @@ contArgs cont
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
                                         = go (is_interesting arg se : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
-    go args (CastIt _ k)                = go args k
+    go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
 
     is_interesting arg se = interestingArg se arg
@@ -597,10 +605,10 @@ contArgs cont
 -- about what to do then and no call sites so far seem to care.
 contEvalContext :: SimplCont -> SubDemand
 contEvalContext k = case k of
-  (Stop _ _ sd)              -> sd
-  (TickIt _ k)               -> contEvalContext k
-  (CastIt _ k)               -> contEvalContext k
-  ApplyToTy{sc_cont=k}       -> contEvalContext k
+  Stop _ _ sd              -> sd
+  TickIt _ k               -> contEvalContext k
+  CastIt   { sc_cont = k } -> contEvalContext k
+  ApplyToTy{ sc_cont = k } -> contEvalContext k
     --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
     -- Not 100% sure that's correct, . Here's an example:
     --   f (e x) and f :: <SC(S,C(1,L))>
