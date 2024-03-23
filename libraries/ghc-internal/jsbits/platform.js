@@ -76,7 +76,7 @@ if(typeof process !== 'undefined' && (typeof h$TH !== 'undefined' || (typeof req
       }
     }
     var h$processConstants = h$getProcessConstants();
-} else if(typeof Java !== 'undefined') {
+} else if(typeof Java !== 'undefined' && typeof java !== 'undefined') {
     h$isJvm_ = true;
     this.console = {
       log: function(s) {
