@@ -983,7 +983,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   | mb_join@(JoinPoint {}) <- idJoinPointHood bndr
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
-        !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env ire mb_join bndr rhs
+        !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
         rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
                                            -- Note [Occurrence analysis for join points]
 
@@ -1009,7 +1009,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
         -- => join arity O of Note [Join arity prediction based on joinRhsArity]
         (tagged_bndr, mb_join) = tagNonRecBinder lvl occ bndr
 
-        !(rhs_uds_s, final_bndr, rhs') = occAnalNonRecRhs env ire mb_join tagged_bndr rhs
+        !(rhs_uds_s, final_bndr, rhs') = occAnalNonRecRhs env lvl ire mb_join tagged_bndr rhs
     in WUD (foldr andUDs body_uds rhs_uds_s)      -- Note `andUDs`
            (combine [NonRec final_bndr rhs'] body)
 
@@ -1024,10 +1024,10 @@ occAnalNonRecBody env bndr thing_inside
     in WUD inner_uds (occ, res)
 
 -----------------
-occAnalNonRecRhs :: OccEnv -> ImpRuleEdges -> JoinPointHood
-                 -> Id -> CoreExpr
+occAnalNonRecRhs :: OccEnv -> TopLevelFlag -> ImpRuleEdges
+                -> JoinPointHood -> Id -> CoreExpr
                  -> ([UsageDetails], Id, CoreExpr)
-occAnalNonRecRhs !env imp_rule_edges mb_join bndr rhs
+occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
   | null rules, null imp_rule_infos
   =  -- Fast path for common case of no rules. This is only worth
      -- 0.1% perf on average, but it's also only a line or two of code
@@ -1046,7 +1046,7 @@ occAnalNonRecRhs !env imp_rule_edges mb_join bndr rhs
     -- j will never be scrutinised.
     env1 | is_join_point = setTailCtxt env
          | otherwise     = setNonTailCtxt rhs_ctxt env  -- Zap occ_join_points
-    rhs_ctxt = mkNonRecRhsCtxt bndr unf
+    rhs_ctxt = mkNonRecRhsCtxt lvl bndr unf
 
     -- See Note [Sources of one-shot information]
     rhs_env = addOneShotsFromDmd bndr env1
@@ -1092,9 +1092,9 @@ occAnalNonRecRhs !env imp_rule_edges mb_join bndr rhs
                    [ l `andUDs` adjustTailArity mb_join r
                    | (_,l,r) <- rules_w_uds ]
 
-mkNonRecRhsCtxt :: Id -> Unfolding -> OccEncl
+mkNonRecRhsCtxt :: TopLevelFlag -> Id -> Unfolding -> OccEncl
 -- Precondition: Id is not a join point
-mkNonRecRhsCtxt bndr unf
+mkNonRecRhsCtxt lvl bndr unf
   | certainly_inline = OccVanilla -- See Note [Cascading inlines]
   | otherwise        = OccRhs
   where
@@ -1103,11 +1103,12 @@ mkNonRecRhsCtxt bndr unf
         -- has set the OccInfo for this binder before calling occAnalNonRecRhs
         case idOccInfo bndr of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
-            -> active && not_stable
+            -> active && not stable_unf && not top_bottoming
           _ -> False
 
     active     = isAlwaysActive (idInlineActivation bndr)
-    not_stable = not (isStableUnfolding unf)
+    stable_unf = isStableUnfolding unf
+    top_bottoming = isTopLevel lvl && isDeadEndId bndr
 
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
@@ -2410,7 +2411,7 @@ float ==>
 
 This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally
-for the various clauses.
+for the various clauses.  See #24582 for an example of the two getting out of sync.
 
 
 ************************************************************************
