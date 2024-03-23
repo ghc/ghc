@@ -753,7 +753,7 @@ prepareRhs env top_lvl occ rhs0
   | is_expandable = anfise rhs0
   | otherwise     = return (emptyLetFloats, rhs0)
   where
-    -- We can' use exprIsExpandable because the WHOLE POINT is that
+    -- We can't use exprIsExpandable because the WHOLE POINT is that
     -- we want to treat (K <big>) as expandable, because we are just
     -- about "anfise" the <big> expression.  exprIsExpandable would
     -- just say no!
