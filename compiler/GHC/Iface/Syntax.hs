@@ -2483,6 +2483,10 @@ instance Binary IfaceAlt where
         return (IfaceAlt a b c)
 
 instance Binary IfaceExpr where
+
+    putNoStack_ bh (IfaceSerialisedExpr f) = do
+      deserialised <- getIfaceExpr =<< thawBinHandle f
+      putNoStack_ bh deserialised
     putNoStack_ bh (IfaceLcl aa) = do
         putByte bh 0
         put_ bh aa
@@ -2543,7 +2547,15 @@ instance Binary IfaceExpr where
         putByte bh 15
         put_ bh r
 
-    get bh = getIfaceExpr bh --IfaceSerialisedExpr <$> freezeBinHandle bh
+    get bh = do
+      start <- tellBin @() bh
+      _ <- getIfaceExpr bh
+      end <- tellBin @() bh
+      seekBinNoExpand bh start
+      frozen <- IfaceSerialisedExpr <$> freezeBinHandle end bh
+      seekBinNoExpand bh end
+      return frozen
+
 
 
 getIfaceExpr bh = do
