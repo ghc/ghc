@@ -46,18 +46,36 @@ function h$isGHCJSi() {
 }
 
 // load all required node.js modules
-if(typeof process !== 'undefined' && (typeof h$TH !== 'undefined' || (typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports))) {
+if(typeof global !== 'undefined' && typeof process !== 'undefined' && (typeof h$TH !== 'undefined' || (typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports))) {
     h$isNode_ = true;
-    // we have to use these names for the closure compiler externs to work
-    var fs            = require('fs');
-    var path          = require('path');
-    var os            = require('os');
-    var child_process = require('child_process');
-    var h$fs          = fs;
-    var h$path        = path;
-    var h$os          = os;
-    var h$child       = child_process;
+    // we have to put fs var into closure to prevent name clashes with emscripten compiler code injections
+    // we use additional suffix to have more guarantees over possible clashes
+    // we should use amd/commonjs module wrappers to avoid such ugly things
+    global.h$nodeOS_modules_qvsKGchAmE = (function() {
+      var fs = require('fs');
+      var path = require('path');
+      var os = require('os');
+      var child_process = require('child_process');
+      return {
+        'fs' : fs,
+        'path': path,
+        'os': os,
+        'child_process': child_process
+      };
+    })();
+    // we dictionary-like access strictly prevents
+    // google closure compiler names mangling
+    var h$fs          = global.h$nodeOS_modules_qvsKGchAmE['fs'];
+    var h$path        = global.h$nodeOS_modules_qvsKGchAmE['path'];
+    var h$os          = global.h$nodeOS_modules_qvsKGchAmE['os'];
+    var h$child       = global.h$nodeOS_modules_qvsKGchAmE['child_process'];
+
+    // we forcibly delete temporary lexical environment variable
+    // to prevent any clashes
+    delete global.h$nodeOS_modules_qvsKGchAmE;
+
     var h$process     = process;
+
     function h$getProcessConstants() {
       // this is a non-public API, but we need these values for things like file access modes
       var cs = process['binding']('constants');
