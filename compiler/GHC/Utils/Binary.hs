@@ -31,7 +31,7 @@ module GHC.Utils.Binary
    openBinMem,
 --   closeBin,
 
-   seekBin,
+   seekBin, seekBinNoExpand,
    tellBin,
    castBin,
    withBinBuffer,
@@ -200,10 +200,10 @@ handleData (BinMem _ _ _ ixr binr _) = BinData <$> readFastMutInt ixr <*> readIO
 -- -- Frozen BinHandle
 
 data FullBinData = FullBinData WriterUserData ReaderUserData
-      Int -- start offset
-      Int -- end offset
-      Int -- total buffer size
-      BinArray
+      {-# UNPACK #-} !Int -- start offset
+      {-# UNPACK #-} !Int -- end offset
+      {-# UNPACK #-} !Int -- total buffer size
+      {-# UNPACK #-} !BinArray
 
 -- Equality and Ord assume that two distinct buffers are different, even if they compare the same things.
 instance Eq FullBinData where
