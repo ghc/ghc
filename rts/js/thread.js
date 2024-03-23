@@ -179,6 +179,32 @@ function h$threadStatus(t) {
   RETURN_UBX_TUP3(t.status, 0, 1);
 }
 
+// Required by Google Closure Compiler static code analysis
+var h$fds = {};
+
+// Copied from GHCJS because it is required by Google Closure Compiler
+// static code analysis
+function h$fdReady(fd, write, msecs, isSock) {
+  var f = h$fds[fd];
+  if(write) {
+    if(f.writeReady) {
+      return 1;
+    } else if(msecs === 0) {
+      return 0;
+    } else {
+      throw "h$fdReady: blocking not implemented";
+    }
+  } else {
+    if(f.readReady) {
+      return 1;
+    } else if(msecs === 0) {
+      return 0;
+    } else {
+      throw "h$fdReady: blocking not implemented";
+    }
+  }
+}
+
 function h$waitRead(fd) {
   h$fds[fd].waitRead.push(h$currentThread);
   h$currentThread.interruptible = true;
@@ -798,7 +824,7 @@ function h$runThreadSliceCatch(c) {
     h$currentThread is the thread to run
     h$stack         is the stack of this thread
     h$sp            is the stack pointer
-  
+
     any global variables needed to pass arguments have been set
     the caller has to update the thread state object
  */
@@ -898,7 +924,7 @@ function h$run(a) {
 
 /** @constructor */
 function h$WouldBlock() {
-  
+
 }
 
 h$WouldBlock.prototype.toString = function() {
@@ -968,7 +994,7 @@ function h$runSyncReturn(a, cont) {
 /*
    run a Haskell IO action synchronously, ignoring the result
    or any exception in the Haskell code
-     
+
      - a:    the IO action
      - cont: continue async if blocked
 
