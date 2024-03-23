@@ -2852,6 +2852,7 @@ instance NFData IfaceUnfolding where
 
 instance NFData IfaceExpr where
   rnf = \case
+    IfaceSerialisedExpr bd -> bd `seq` ()
     IfaceLcl nm -> rnf nm
     IfaceExt nm -> rnf nm
     IfaceType ty -> rnf ty
