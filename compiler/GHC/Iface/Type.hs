@@ -97,6 +97,7 @@ import Control.DeepSeq
 import Data.Proxy
 import Control.Monad ((<$!>))
 import Control.Arrow (first)
+import Data.ByteString (ByteString)
 
 {-
 ************************************************************************
@@ -160,7 +161,8 @@ type IfaceKind     = IfaceType
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
 -- before being printed. See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
 data IfaceType
-  = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
+  = IfaceSerialisedType FullBinData
+  | IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceAppArgs
@@ -2004,7 +2006,7 @@ putIfaceTyCon bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
 getIfaceTyCon :: HasCallStack => BinHandle -> IO IfaceTyCon
 getIfaceTyCon bh = do
   n <- get bh
-  i <- get bh
+  !i <- get bh
   return (IfaceTyCon n i)
 
 instance Binary IfaceTyConSort where
@@ -2127,6 +2129,8 @@ instance Binary IfaceType where
    get bh = case findUserDataCache Proxy bh of
     tbl -> getEntry tbl bh
 
+
+putIfaceType bh (IfaceSerialisedType fb) = panic "bh"
 
 putIfaceType _ (IfaceFreeTyVar tv)
    = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
@@ -2378,6 +2382,7 @@ instance Binary (DefMethSpec IfaceType) where
 
 instance NFData IfaceType where
   rnf = \case
+    IfaceSerialisedType bh -> bh `seq` ()
     IfaceFreeTyVar f1 -> f1 `seq` ()
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1

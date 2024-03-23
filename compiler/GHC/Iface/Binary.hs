@@ -338,14 +338,15 @@ initReadIfaceTyConTable :: HasCallStack => IO (ReadIfaceTable (SymbolTable Iface
 initReadIfaceTyConTable = do
   pure $
     ReadIfaceTable
-      { getTable = getGenericSymbolTable getIfaceTyCon
+      { getTable = getGenericSymbolTable (\_ -> getIfaceTyCon)
       }
 
 initReadIfaceTypeTable :: HasCallStack => IO (ReadIfaceTable (SymbolTable IfaceType))
 initReadIfaceTypeTable = do
   pure $
     ReadIfaceTable
-      { getTable = getGenericSymbolTable getIfaceType
+      { getTable = getGenericSymbolTable (\optr bh -> IfaceSerialisedType <$> freezeBinHandle optr bh)
+
       }
 
 

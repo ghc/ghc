@@ -37,6 +37,8 @@ module GHC.Iface.Syntax (
         fromIfaceWarnings,
         fromIfaceWarningTxt,
 
+        getIfaceExpr,
+
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
         freeNamesIfConDecls,
@@ -131,7 +133,9 @@ putIfaceTopBndr bh name =
 
 
 data IfaceDecl
-  = IfaceId { ifName      :: IfaceTopBndr,
+  = IfaceSerialisedDecl { ifName :: IfaceTopBndr
+                        , ifSerialisedDecl :: FullBinData }
+  | IfaceId { ifName      :: IfaceTopBndr,
               ifType      :: IfaceType,
               ifIdDetails :: IfaceIdDetails,
               ifIdInfo    :: IfaceIdInfo
@@ -615,7 +619,8 @@ fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
 -}
 
 data IfaceExpr
-  = IfaceLcl    IfLclName
+  = IfaceSerialisedExpr FullBinData
+  | IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
@@ -2537,7 +2542,11 @@ instance Binary IfaceExpr where
     putNoStack_ bh (IfaceLitRubbish ConstraintLike r) = do
         putByte bh 15
         put_ bh r
-    get bh = do
+
+    get bh = getIfaceExpr bh --IfaceSerialisedExpr <$> freezeBinHandle bh
+
+
+getIfaceExpr bh = do
         h <- getByte bh
         case h of
             0 -> do aa <- get bh

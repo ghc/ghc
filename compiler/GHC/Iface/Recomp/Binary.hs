@@ -16,6 +16,7 @@ import GHC.Types.Name
 import GHC.Utils.Panic.Plain
 import GHC.Iface.Type
 import Data.Proxy
+import GHC.Utils.Outputable
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
@@ -33,7 +34,9 @@ computeFingerprint :: (Binary a)
                    -> IO Fingerprint
 computeFingerprint put_nonbinding_name a = do
     bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
+    pprTraceM "comput" (text "abc")
     put_ bh a
+    pprTraceM "comput" (text "cde")
     fingerprintBinMem bh
   where
     set_user_data bh =
