@@ -76,7 +76,7 @@ var h$retainCAFs = false;
 // var h$CAFs = [];
 // var h$CAFsReset = [];
 
-// 
+//
 var h$extensibleRetentionRoots     = [];
 var h$extensibleRetentionCallbacks = [];
 
@@ -206,7 +206,7 @@ function h$gc(t) {
 	h$markThread(nt);
 	h$resetThread(nt);
     }
-    
+
     // some blocked threads are always considered reachable, mark them
     //   - delayed threads
     //   - threads blocked on async FFI
@@ -531,6 +531,7 @@ function h$follow(obj, sp) {
                     extensibleMatched = true;
 #endif
                     if(x !== true) {
+                      var j;
                       for(j=x.length-1;j>=0;j--) {
 		          ADDW(x[j]);
 		      }

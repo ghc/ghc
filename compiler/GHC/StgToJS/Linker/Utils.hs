@@ -140,7 +140,7 @@ genCommonCppDefs profiling = mconcat
 
   -- Put Addr# in ByteArray# or at Addr# (same thing)
   , "#define PUT_ADDR(a,o,va,vo) if (!(a).arr) (a).arr = []; (a).arr[o] = va; (a).dv.setInt32(o,vo,true);\n"
-  , "#define GET_ADDR(a,o,ra,ro) var ra = (((a).arr && (a).arr[o]) ? (a).arr[o] : null_); var ro = (a).dv.getInt32(o,true);\n"
+  , "#define GET_ADDR(a,o,ra,ro) var ra = (((a).arr && (a).arr[o]) ? (a).arr[o] : null); var ro = (a).dv.getInt32(o,true);\n"
 
   -- Data.Maybe.Maybe
   , "#define HS_NOTHING h$ghczminternalZCGHCziInternalziMaybeziNothing\n"
