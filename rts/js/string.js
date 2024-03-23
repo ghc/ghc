@@ -479,9 +479,9 @@ function h$decodeUtf16z(v,start) {
 
 function h$decodeUtf16l(v, byteLen, start) {
   // perhaps we can apply it with an Uint16Array view, but that might give us endianness problems
-  var a = [];
+  var arr = [];
   for(var i=0;i<byteLen;i+=2) {
-    a[i>>1] = v.dv.getUint16(i+start,true);
+    arr[i>>1] = v.dv.getUint16(i+start,true);
   }
   return h$charCodeArrayToString(arr);
 }
@@ -590,7 +590,7 @@ function h$charCodeArrayToString(arr) {
 }
 
 function h$hs_iconv_open(to,to_off,from,from_off) {
-  h$errno = h$EINVAL; // no encodings supported
+  h$setErrno("EINVAL"); // no encodings supported
   return -1;
 //  var fromStr = decodeUtf8(from, from_off);
 //  var toStr = decodeUtf8(to, to_off);

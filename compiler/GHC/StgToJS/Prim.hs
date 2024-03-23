@@ -940,7 +940,7 @@ genPrim prof bound ty op = case op of
 ------------------------------- Delay/Wait Ops ---------------------------------
 
   DelayOp     -> \[] [t]  -> pure $ PRPrimCall $ returnS (app "h$delayThread" [t])
-  WaitReadOp  -> \[] [fd] -> pure $ PRPrimCall $ returnS (app "h$waidRead" [fd])
+  WaitReadOp  -> \[] [fd] -> pure $ PRPrimCall $ returnS (app "h$waitRead" [fd])
   WaitWriteOp -> \[] [fd] -> pure $ PRPrimCall $ returnS (app "h$waitWrite" [fd])
 
 ------------------------------- Concurrency Primitives -------------------------

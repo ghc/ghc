@@ -1546,7 +1546,8 @@ function h$initHeapBufferLen(buf_d, buf_o, len) {
 // Allocate and copy a JS buffer on the heap
 function h$initHeapBuffer(str_d, str_o) {
   if(str_d === null) return null;
-  return ptr = h$initHeapBufferLen(str_d, str_o, str_d.len);
+  var ptr = h$initHeapBufferLen(str_d, str_o, str_d.len);
+  return ptr;
 }
 
 
