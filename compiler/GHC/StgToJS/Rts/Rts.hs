@@ -670,6 +670,10 @@ rts_gen s = do
                                        , r1 |= x
                                        , returnS (stack .! sp)
                                        ])
+             , closure (ClosureInfo (global "h$reportHeapOverflow") (CIRegs 0 [PtrV]) "h$reportHeapOverflow" (CILayoutFixed 0 []) CIStackFrame mempty)
+                  (return $ (appS "throw" [jString "h$reportHeapOverflow: Heap Overflow!"]))
+             , closure (ClosureInfo (global "h$reportStackOverflow") (CIRegs 0 [PtrV]) "h$reportStackOverflow" (CILayoutFixed 0 []) CIStackFrame mempty)
+                  (return $ (appS "throw" [jString "h$reportStackOverflow: Stack Overflow!"]))
              -- Top-level statements to generate only in profiling mode
              , fmap (profStat s) $ (closure (ClosureInfo (global "h$setCcs_e") (CIRegs 0 [PtrV]) "set cost centre stack" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
                            (return $
