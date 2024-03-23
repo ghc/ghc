@@ -1144,15 +1144,17 @@ lazyGet' :: HasCallStack => Maybe (IORef BinHandle) -> (Bin () -> BinHandle -> I
 lazyGet' mbh f bh = do
     p <- get @(Bin ()) bh -- a BinPtr
     p_a <- tellBin bh
+    -- Do this before to avoid retaining reference to old BH inside the unsafeInterleaveIO.
+    let !get_inner_bh = maybe (pure bh) readIORef mbh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh off_r variable in the child thread, for thread
         -- safety.
-        inner_bh <- maybe (pure bh) readIORef mbh
+        inner_bh <- get_inner_bh
         off_r <- newFastMutInt 0
         let bh' = inner_bh { _off_r = off_r }
-        seekBin bh' p_a
+        seekBinNoExpand bh' p_a
         f p bh'
-    seekBin bh p -- skip over the object for now
+    seekBinNoExpand bh p -- skip over the object for now
     return a
 
 -- | Serialize the constructor strictly but lazily serialize a value inside a
@@ -1282,6 +1284,8 @@ getGenericSymbolTable :: forall a. (Bin () -> BinHandle -> IO a) -> IORef BinHan
 getGenericSymbolTable deserialiser bhRef bh = do
   sz <- forwardGet bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
+  -- Using lazyPut/lazyGet is quite space inefficient as each usage will allocate a large closure
+  -- (6 arguments-ish).
   forM_ [0..(sz-1)] $ \i -> do
     f <- lazyGet' (Just bhRef) deserialiser bh
     writeArray mut_arr i f
