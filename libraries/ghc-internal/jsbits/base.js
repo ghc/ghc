@@ -912,7 +912,7 @@ if(h$isNode()) {
     }
 } else if(h$isJsCore()) {
     h$base_readStdin = function(fd, fdo, buf, buf_offset, n, c) {
-	c(0);
+        c(0);
     }
     var h$base_stdoutLeftover = { f: print, val: null };
     var h$base_stderrLeftover = { f: debug, val: null };

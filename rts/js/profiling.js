@@ -1,6 +1,6 @@
 //#OPTIONS: CPP
 
-// Used definitions: GHCJS_TRACE_PROF and GHCJS_ASSERT_PROF
+// Used definitions: PROFILING and GHCJS_ASSERT_PROF
 
 #ifdef GHCJS_ASSERT_PROF
 function assert(condition, message) {
@@ -13,7 +13,7 @@ function assert(condition, message) {
 #define ASSERT(args...)
 #endif
 
-#ifdef GHCJS_TRACE_PROF
+#ifdef PROFILING
 #define TRACE(args...) { h$log(args); }
 #else
 #define TRACE(args...)
@@ -140,7 +140,7 @@ var h$CAF           = new h$CCS(h$CCS_MAIN, h$CAF_cc);
 // Cost-centre entries, SCC
 //
 
-#ifdef GHCJS_TRACE_PROF
+#ifdef PROFILING
 function h$ccsString(ccs) {
   var labels = [];
   do {
@@ -151,6 +151,7 @@ function h$ccsString(ccs) {
 }
 #endif
 
+#ifdef PROFILING
 function h$pushRestoreCCS() {
     TRACE("push restoreccs:" + h$ccsString(h$currentThread.ccs))
     if(h$stack[h$sp] !== h$setCcs_e) {
@@ -159,6 +160,7 @@ function h$pushRestoreCCS() {
         h$stack[h$sp]   = h$setCcs_e;
     }
 }
+#endif
 
 function h$restoreCCS(ccs) {
     TRACE("restoreccs from:", h$ccsString(h$currentThread.ccs))
@@ -299,7 +301,7 @@ function h$buildCCPtr(o) {
   // last used offset is 12, so we need to allocate 20 bytes
   ASSERT(o !== null)
   var cc = h$newByteArray(20);
-#ifdef GHCJS_TRACE_PROF
+#ifdef PROFILING
   cc.myTag = "cc pointer";
 #endif
   PUT_ADDR(cc, h$ccLabel_offset,  h$encodeUtf8(o.label),  0);
@@ -312,7 +314,7 @@ function h$buildCCSPtr(o) {
   ASSERT(o !== null)
   // last used offset is 8, allocate 16 bytes
   var ccs = h$newByteArray(16);
-#ifdef GHCJS_TRACE_PROF
+#ifdef PROFILING
   ccs.myTag = "ccs pointer";
 #endif
   ccs.arr = [];
