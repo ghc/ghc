@@ -175,7 +175,8 @@ type IfaceKind     = IfaceType
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
 -- before being printed. See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
 data IfaceType
-  = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
+  = IfaceSerialisedType !FullBinData
+  | IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceAppArgs
@@ -2230,6 +2231,10 @@ getIfaceTypeShared bh = do
     else seekBinReader bh start >> getIfaceType bh
 
 putIfaceType :: WriteBinHandle -> IfaceType -> IO ()
+putIfaceType bh (IfaceSerialisedType fb) = do
+  ity <- getIfaceType =<< thawBinHandle fb
+  putIfaceType bh ity
+
 putIfaceType _ (IfaceFreeTyVar tv)
    = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
 
@@ -2287,8 +2292,9 @@ getIfaceType bh = do
 
               8 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
-              _  -> do n <- get bh
+              9  -> do n <- get bh
                        return (IfaceLitTy n)
+              n  -> panic $ "getIfaceType: " ++ show n
 
 instance Binary IfLclName where
   put_ bh = put_ bh . ifLclNameFS
@@ -2487,6 +2493,7 @@ instance Binary (DefMethSpec IfaceType) where
 
 instance NFData IfaceType where
   rnf = \case
+    IfaceSerialisedType bh -> bh `seq` ()
     IfaceFreeTyVar f1 -> f1 `seq` ()
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1

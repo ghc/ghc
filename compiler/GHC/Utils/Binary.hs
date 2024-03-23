@@ -19,7 +19,7 @@
 --     http://www.cs.york.ac.uk/fp/nhc98/
 
 module GHC.Utils.Binary
-  ( {-type-}  Bin, RelBin(..), getRelBin,
+  ( {-type-}  Bin, RelBin(..), getRelBin, makeAbsoluteBin,
     {-class-} Binary(..),
     {-type-}  ReadBinHandle, WriteBinHandle,
     SymbolTable, Dictionary,
@@ -39,6 +39,7 @@ module GHC.Utils.Binary
    withBinBuffer,
    freezeWriteHandle,
    thawReadHandle,
+   shrinkBinBuffer,
 
    foldGet, foldGet',
 
@@ -246,18 +247,6 @@ thawBinHandle (FullBinData user_data ix _end sz ba) = do
   ixr <- newFastMutInt ix
   return $ ReadBinMem user_data ixr sz ba
 
--- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
--- This performs a copy of the underlying buffer.
--- The buffer may be truncated if the offset is not at the end of the written
--- output.
---
--- UserData is also discarded during the copy
--- You should just use this when translating a Put handle into a Get handle.
-shrinkBinBuffer :: WriteBinHandle -> IO ReadBinHandle
-shrinkBinBuffer bh = withBinBuffer bh $ \bs -> do
-  unsafeUnpackBinBuffer (copy bs)
-
-
 ---------------------------------------------------------------
 -- BinHandle
 ---------------------------------------------------------------
@@ -276,6 +265,8 @@ data WriteBinHandle
      wbm_sz_r     :: !FastMutInt,      -- ^ size of the array (cached)
      wbm_arr_r    :: !(IORef BinArray) -- ^ the array (bounds: (0,size-1))
     }
+        -- XXX: should really store a "high water mark" for dumping out
+        -- the binary data to a file.
 
 -- | A read-only handle that can be used to deserialise binary data from a buffer.
 --
@@ -343,6 +334,17 @@ unsafeUnpackBinBuffer :: ByteString -> IO ReadBinHandle
 unsafeUnpackBinBuffer (BS.BS arr len) = do
   ix_r <- newFastMutInt 0
   return (ReadBinMem noReaderUserData ix_r len arr)
+
+-- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
+-- This performs a copy of the underlying buffer.
+-- The buffer may be truncated if the offset is not at the end of the written
+-- output.
+--
+-- UserData is also discarded during the copy
+-- You should just use this when translating a Put handle into a Get handle.
+shrinkBinBuffer :: WriteBinHandle -> IO ReadBinHandle
+shrinkBinBuffer bh = withBinBuffer bh $ \bs -> do
+  unsafeUnpackBinBuffer (copy bs)
 
 ---------------------------------------------------------------
 -- Bin
@@ -1277,7 +1279,7 @@ forwardGetRel bh get_A = do
     -- store current position
     p_a <- tellBinReader bh
     -- go read the forward value, then seek back
-    seekBinReader bh $ makeAbsoluteBin p
+    seekBinReaderRel bh p
     r <- get_A
     seekBinReader bh p_a
     pure r
@@ -1615,7 +1617,7 @@ getGenericSymbolTable deserialiser bh = do
   sz <- forwardGetRel bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
   forM_ [0..(sz-1)] $ \i -> do
-    f <- deserialiser bh
+    !f <- deserialiser bh
     writeArray mut_arr i f
   unsafeFreeze mut_arr
 

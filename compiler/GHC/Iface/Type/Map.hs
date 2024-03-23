@@ -11,6 +11,7 @@ import Control.Monad ((>=>))
 import GHC.Types.Unique.DFM
 import Data.Functor.Product
 import GHC.Types.Var (VarBndr(..))
+import GHC.Utils.Binary
 
 
 newtype IfaceTypeMap a = IfaceTypeMap (IfaceTypeMapG a)
@@ -42,7 +43,8 @@ data IfaceTypeMapX a
         , ifm_forall_ty :: IfaceForAllBndrMap (IfaceTypeMapG a)
         , ifm_cast_ty :: IfaceTypeMapG (IfaceCoercionMap a)
         , ifm_coercion_ty :: IfaceCoercionMap a
-        , ifm_tuple_ty :: TupleSortMap (PromotionFlagMap (IfaceAppArgsMap a))  }
+        , ifm_tuple_ty :: TupleSortMap (PromotionFlagMap (IfaceAppArgsMap a))
+        , ifm_serialised_ty :: ForeignBinDataMap (OffsetBinDataMap a) }
 
 type IfaceLiteralMap = Map.Map IfaceTyLit
 type FunTyFlagMap = Map.Map FunTyFlag
@@ -51,6 +53,8 @@ type ForAllTyFlagMap = Map.Map ForAllTyFlag
 type IfaceCoercionMap = Map.Map IfaceCoercion
 type TupleSortMap = Map.Map TupleSort
 type PromotionFlagMap = Map.Map PromotionFlag
+type ForeignBinDataMap = Map.Map BinArray
+type OffsetBinDataMap = Map.Map Int
 type IfaceForAllBndrMap = Compose IfaceBndrMap ForAllTyFlagMap
 
 type IfaceIdBndrMap = Compose IfaceTypeMapG (Compose (UniqDFM IfLclName) IfaceTypeMapG)
@@ -72,7 +76,9 @@ emptyE = IFM { ifm_lit = emptyTM
              , ifm_forall_ty = emptyTM
              , ifm_cast_ty = emptyTM
              , ifm_coercion_ty = emptyTM
-             , ifm_tuple_ty = emptyTM }
+             , ifm_tuple_ty = emptyTM
+             , ifm_serialised_ty = emptyTM
+             }
 
 instance Functor IfaceTypeMapX where
   fmap f  IFM { ifm_lit = ilit
@@ -83,7 +89,8 @@ instance Functor IfaceTypeMapX where
           , ifm_forall_ty = ifal
           , ifm_cast_ty = icast
           , ifm_coercion_ty = ico
-          , ifm_tuple_ty = itup }
+          , ifm_tuple_ty = itup
+          , ifm_serialised_ty = iser }
 
     = IFM { ifm_lit = fmap f ilit
           , ifm_var = fmap f ivar
@@ -93,7 +100,9 @@ instance Functor IfaceTypeMapX where
           , ifm_forall_ty = fmap (fmap f) ifal
           , ifm_cast_ty = fmap (fmap f) icast
           , ifm_coercion_ty = fmap f ico
-          , ifm_tuple_ty = fmap (fmap (fmap f)) itup }
+          , ifm_tuple_ty = fmap (fmap (fmap f)) itup
+          , ifm_serialised_ty = fmap (fmap f) iser
+          }
 
 instance TrieMap IfaceTypeMapX where
   type Key IfaceTypeMapX = IfaceType
@@ -116,7 +125,8 @@ ftE f  IFM { ifm_lit = ilit
           , ifm_forall_ty = ifal
           , ifm_cast_ty = icast
           , ifm_coercion_ty = ico
-          , ifm_tuple_ty = itup }
+          , ifm_tuple_ty = itup
+          , ifm_serialised_ty = iser  }
 
     = IFM { ifm_lit = filterTM f ilit
           , ifm_var = filterTM f ivar
@@ -126,7 +136,9 @@ ftE f  IFM { ifm_lit = ilit
           , ifm_forall_ty = fmap (filterTM f) ifal
           , ifm_cast_ty = fmap (filterTM f) icast
           , ifm_coercion_ty = filterTM f ico
-          , ifm_tuple_ty = fmap (fmap (filterTM f)) itup }
+          , ifm_tuple_ty = fmap (fmap (filterTM f)) itup
+          , ifm_serialised_ty = fmap (filterTM f) iser
+          }
 
 {-# INLINE fdE #-}
 fdE :: (a -> b -> b) -> IfaceTypeMapX a -> b -> b
@@ -138,7 +150,8 @@ fdE f  IFM { ifm_lit = ilit
           , ifm_forall_ty = ifal
           , ifm_cast_ty = icast
           , ifm_coercion_ty = ico
-          , ifm_tuple_ty = itup }
+          , ifm_tuple_ty = itup
+          , ifm_serialised_ty= iser }
   = foldTM f ilit . foldTM f ivar . foldTM (foldTM f) iapp
   . foldTM (foldTM (foldTM (foldTM f))) ift
   . foldTM (foldTM f) itc
@@ -146,6 +159,7 @@ fdE f  IFM { ifm_lit = ilit
   . foldTM (foldTM f) icast
   . foldTM f ico
   . foldTM (foldTM (foldTM f)) itup
+  . foldTM (foldTM f) iser
 
 bndrToKey :: IfaceBndr -> Either (IfaceType, (IfLclName, IfaceType)) IfaceTvBndr
 bndrToKey (IfaceIdBndr (a,b,c)) = Left (a, (b,c))
@@ -155,6 +169,7 @@ bndrToKey (IfaceTvBndr k) = Right k
 lkE :: IfaceType -> IfaceTypeMapX a -> Maybe a
 lkE it ifm = go it ifm
   where
+    go (IfaceSerialisedType binData) = ifm_serialised_ty >.> lookupTM (fbd_buffer binData) >=> lookupTM (fbd_off_s binData)
     go (IfaceFreeTyVar {}) = error "ftv"
     go (IfaceTyVar var) = ifm_var >.> lookupTM var
     go (IfaceLitTy l) = ifm_lit >.> lookupTM l
@@ -168,6 +183,7 @@ lkE it ifm = go it ifm
 
 {-# INLINE xtE #-}
 xtE :: IfaceType -> XT a -> IfaceTypeMapX a -> IfaceTypeMapX a
+xtE (IfaceSerialisedType binData) f m = m { ifm_serialised_ty = ifm_serialised_ty m |> alterTM (fbd_buffer binData) |>> alterTM (fbd_off_s binData) f }
 xtE (IfaceFreeTyVar {}) _ _ = error "ftv"
 xtE (IfaceTyVar var) f m = m { ifm_var = ifm_var m |> alterTM var f }
 xtE (IfaceLitTy l) f m = m { ifm_lit = ifm_lit m |> alterTM l f }

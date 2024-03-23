@@ -172,10 +172,8 @@ shareIface _ NormalCompression mi = do
   pure mi
 shareIface nc compressionLevel  mi = do
   bh <- openBinMem (1024 * 1024)
-  start <- tellBinWriter bh
   putIfaceWithExtFields QuietBinIFace compressionLevel bh mi
   rbh <- shrinkBinBuffer bh
-  seekBinReader rbh start
   res <- getIfaceWithExtFields nc rbh
   let resiface = res { mi_src_hash = mi_src_hash mi }
   forceModIface  resiface
@@ -271,6 +269,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    mod_details
 
           mkFullIface hsc_env partial_iface Nothing Nothing
+
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv

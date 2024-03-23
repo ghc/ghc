@@ -43,7 +43,6 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Data.FastMutInt
-import GHC.Data.FastString (FastString)
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
@@ -59,12 +58,17 @@ import Data.Array.IO
 import Data.Array.Unsafe
 import Data.Char
 import Data.IORef
+import Control.Monad
+import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
+import System.IO.Unsafe
 import Data.Map.Strict (Map)
 import Data.Word
 import System.IO.Unsafe
 import Data.Typeable (Typeable)
 import qualified GHC.Data.Strict as Strict
 
+import GHC.Data.FastString
+import GHC.Iface.Type
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -509,11 +513,18 @@ Here, a visualisation of the table structure we currently have (ignoring 'Extens
 -- The symbol table
 --
 
+readFromSymTab :: ReaderUserData -> ReadBinHandle -> IO FullBinData
+readFromSymTab ud bh = do
+    p <- getRelBin bh -- a BinPtr
+    frozen_bh <- freezeBinHandle (makeAbsoluteBin p) (setReaderUserData bh ud)
+    seekBinReaderRel bh p -- skip over the object for now
+    return frozen_bh
+
 initReadIfaceTypeTable :: ReaderUserData -> IO (ReaderTable IfaceType)
 initReadIfaceTypeTable ud = do
   pure $
     ReaderTable
-      { getTable = getGenericSymbolTable (\bh -> lazyGet' getIfaceType (setReaderUserData bh ud))
+      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$!> readFromSymTab ud bh)
       , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
       }
 
@@ -581,7 +592,6 @@ initNameWriterTable = do
         }
     , mkWriter $ putName bin_symtab
     )
-
 
 putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
 putSymbolTable bh name_count symtab = do

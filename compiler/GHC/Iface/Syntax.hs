@@ -37,6 +37,8 @@ module GHC.Iface.Syntax (
         fromIfaceWarnings,
         fromIfaceWarningTxt,
 
+        getIfaceExpr,
+
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
         freeNamesIfConDecls,
@@ -615,7 +617,8 @@ fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
 -}
 
 data IfaceExpr
-  = IfaceLcl    IfLclName
+  = IfaceSerialisedExpr !FullBinData
+  | IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
@@ -2478,6 +2481,9 @@ instance Binary IfaceAlt where
         return (IfaceAlt a b c)
 
 instance Binary IfaceExpr where
+    put_ bh (IfaceSerialisedExpr f) = do
+      deserialised <- getIfaceExpr =<< thawBinHandle f
+      put_ bh deserialised
     put_ bh (IfaceLcl aa) = do
         putByte bh 0
         put_ bh aa
@@ -2537,7 +2543,20 @@ instance Binary IfaceExpr where
     put_ bh (IfaceLitRubbish ConstraintLike r) = do
         putByte bh 15
         put_ bh r
+
     get bh = do
+      start <- tellBinReader @() bh
+      _ <- getIfaceExpr bh
+      end <- tellBinReader @() bh
+      seekBinReader bh start
+      frozen <- IfaceSerialisedExpr <$> freezeBinHandle end bh
+      seekBinReader bh end
+      return frozen
+
+
+
+getIfaceExpr :: ReadBinHandle -> IO IfaceExpr
+getIfaceExpr bh = do
         h <- getByte bh
         case h of
             0 -> do aa <- get bh
@@ -2831,6 +2850,7 @@ instance NFData IfaceUnfolding where
 
 instance NFData IfaceExpr where
   rnf = \case
+    IfaceSerialisedExpr bd -> bd `seq` ()
     IfaceLcl nm -> rnf nm
     IfaceExt nm -> rnf nm
     IfaceType ty -> rnf ty
