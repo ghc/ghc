@@ -96,7 +96,9 @@ module GHC.Utils.Binary
    GenericSymbolTable(..),
 
    -- * Newtype wrappers
-   BinSpan(..), BinSrcSpan(..), BinLocated(..)
+   BinSpan(..), BinSrcSpan(..), BinLocated(..),
+
+   FullBinData, freezeBinHandle, thawBinHandle, putFullBinData,
   ) where
 
 import GHC.Prelude
@@ -193,6 +195,43 @@ dataHandle (BinData size bin) = do
 handleData :: BinHandle -> IO BinData
 handleData (BinMem _ _ _ ixr binr _) = BinData <$> readFastMutInt ixr <*> readIORef binr
 
+---
+-- FullBinData
+-- -- Frozen BinHandle
+
+data FullBinData = FullBinData WriterUserData ReaderUserData
+      Int -- start offset
+      Int -- end offset
+      Int -- total buffer size
+      BinArray
+
+-- Equality and Ord assume that two distinct buffers are different, even if they compare the same things.
+instance Eq FullBinData where
+  (FullBinData w r b c d e) == (FullBinData w1 r1 b1 c1 d1 e1) = b == b1 && c == c1 && d == d1 && e == e1
+
+instance Ord FullBinData where
+  compare (FullBinData _ _ b c d e) (FullBinData _ _ b1 c1 d1 e1) =
+    compare b b1 `mappend` compare c c1 `mappend` compare d d1 `mappend` compare e e1
+
+putFullBinData bh (FullBinData _ _ o1 o2 _sz ba) = do
+  let sz = o2 - o1
+  putPrim bh sz $ \dest ->
+    unsafeWithForeignPtr (ba `plusForeignPtr` o1) $ \orig ->
+    copyBytes dest orig sz
+
+freezeBinHandle :: Bin () -> BinHandle -> IO FullBinData
+freezeBinHandle (BinPtr len) (BinMem w r ixr sz binr _) =
+  FullBinData r w <$> readFastMutInt ixr <*> pure len  <*> readFastMutInt sz <*> readIORef binr
+
+thawBinHandle :: FullBinData -> IO BinHandle
+thawBinHandle (FullBinData w r ix _end sz ba) = do
+  ixr <- newFastMutInt ix
+  szr <- newFastMutInt sz
+  binr <- newIORef ba
+  bp <- initBinProf
+  return $ BinMem r w ixr szr binr bp
+
+
 ---------------------------------------------------------------
 -- BinHandle
 ---------------------------------------------------------------
@@ -275,6 +314,7 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
 
 newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
+
 
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
@@ -1114,7 +1154,7 @@ lazyPut :: Binary a => BinHandle -> a -> IO ()
 lazyPut = lazyPut' putNoStack_
 
 lazyGet :: Binary a => BinHandle -> IO a
-lazyGet = lazyGet' Nothing get
+lazyGet = lazyGet' Nothing (\_ -> get)
 
 lazyPut' :: HasCallStack => (BinHandle -> a -> IO ()) -> BinHandle -> a -> IO ()
 lazyPut' f bh a = do
@@ -1126,7 +1166,7 @@ lazyPut' f bh a = do
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBin bh q        -- finally carry on writing at q
 
-lazyGet' :: HasCallStack => Maybe (IORef BinHandle) -> (BinHandle -> IO a) -> BinHandle -> IO a
+lazyGet' :: HasCallStack => Maybe (IORef BinHandle) -> (Bin () -> BinHandle -> IO a) -> BinHandle -> IO a
 lazyGet' mbh f bh = do
     p <- get @(Bin ()) bh -- a BinPtr
     p_a <- tellBin bh
@@ -1137,7 +1177,7 @@ lazyGet' mbh f bh = do
         off_r <- newFastMutInt 0
         let bh' = inner_bh { _off_r = off_r }
         seekBin bh' p_a
-        f bh'
+        f p bh'
     seekBin bh p -- skip over the object for now
     return a
 
@@ -1364,7 +1404,7 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
         (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
           loop 0)
 
-getGenericSymbolTable :: forall a. (BinHandle -> IO a) -> IORef BinHandle -> BinHandle -> IO (SymbolTable a)
+getGenericSymbolTable :: forall a. (Bin () -> BinHandle -> IO a) -> IORef BinHandle -> BinHandle -> IO (SymbolTable a)
 getGenericSymbolTable deserialiser bhRef bh = do
   sz <- forwardGet bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)

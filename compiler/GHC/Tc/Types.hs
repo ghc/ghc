@@ -342,7 +342,7 @@ data IfLclEnv
         -- Whether or not the IfaceDecl came from a boot
         -- file or not; we'll use this to choose between
         -- NoUnfolding and BootUnfolding
-        if_boot :: IsBootInterface,
+        if_boot :: !IsBootInterface,
 
         -- The field is used only for error reporting
         -- if (say) there's a Lint error in it

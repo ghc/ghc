@@ -171,6 +171,7 @@ import GHC.TopHandler ( topHandler )
 
 import GHCi.Leak
 import qualified GHC.Unit.Module.Graph as GHC
+import GHC.Profiling.Eras
 
 -----------------------------------------------------------------------------
 
@@ -2159,6 +2160,7 @@ reloadModuleDefer = wrapDeferTypeErrors . reloadModule
 -- sessions.
 doLoadAndCollectInfo :: GhciMonad m => LoadType -> LoadHowMuch -> m SuccessFlag
 doLoadAndCollectInfo load_type howmuch = do
+  liftIO $ incrementUserEra 1
   doCollectInfo <- isOptionSet CollectInfo
 
   doLoad load_type howmuch >>= \case

@@ -131,6 +131,7 @@ import Data.Foldable
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
+import GHC.Utils.Binary
 
 {-
 This module takes
@@ -1384,6 +1385,12 @@ loop. See #19744.
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
+    go (IfaceSerialisedType bs)  = do
+      pprTraceM "thawing" (text @SDoc "abc")
+      deserialised <- liftIO (getIfaceType =<< thawBinHandle bs)
+      go deserialised
+
+
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
@@ -1502,6 +1509,10 @@ tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
 -}
 
 tcIfaceExpr :: IfaceExpr -> IfL CoreExpr
+tcIfaceExpr (IfaceSerialisedExpr fbh) = do
+  pprTraceM "thawing" (text @SDoc "e")
+  deserialised <- liftIO (getIfaceExpr =<< thawBinHandle fbh)
+  tcIfaceExpr deserialised
 tcIfaceExpr (IfaceType ty)
   = Type <$> tcIfaceType ty
 

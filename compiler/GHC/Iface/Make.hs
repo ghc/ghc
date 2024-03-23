@@ -256,6 +256,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
 
           mkFullIface hsc_env partial_iface Nothing Nothing
 
+
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings GhcRn -> HpcInfo

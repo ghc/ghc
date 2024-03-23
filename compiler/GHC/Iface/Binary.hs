@@ -360,7 +360,7 @@ initReadIfaceTypeTable :: IO (ReaderTable IfaceType)
 initReadIfaceTypeTable = do
   pure $
     ReaderTable
-      { getTable = getGenericSymbolTable getIfaceType
+      { getTable = getGenericSymbolTable (\_ -> getIfaceType)
       , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
       }
 
