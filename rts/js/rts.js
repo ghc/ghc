@@ -441,9 +441,7 @@ function h$throw(e, async) {
       if(async) { // async exceptions always propagate
         h$currentThread.transaction = null;
       } else if(!h$stmValidateTransaction()) { // restart transaction if invalid, don't propagate exception
-      h$sp++;
-      h$stack[h$sp] = h$checkInvariants_e;
-      return h$stmStartTransaction(h$stack[h$sp-1]);
+        return h$stmStartTransaction(h$stack[h$sp]);
     }
   }
   if(f === h$catchStm_e && !async) break; // catchSTM only catches sync
@@ -723,3 +721,24 @@ function h$keepAlive(x, f) {
   h$r1 = f;
   return h$ap_1_0_fast();
 }
+
+// It is required by Google Closure Compiler to be at least defined if
+// somewhere it is used
+var h$libdwLookupLocation, h$libdwPoolRelease, h$libdwPoolTake,
+  h$libdwGetBacktrace, h$backtraceFree
+h$libdwLookupLocation
+  = h$libdwPoolRelease
+  = h$libdwPoolTake
+  = h$libdwGetBacktrace
+  = h$backtraceFree
+  = function() {
+    throw new Error('Libdw: Not Implemented Yet')
+  }
+
+// It is required by Google Closure Compiler to be at least defined if
+// somewhere it is used
+var h$lookupIPE
+h$lookupIPE
+  = function () {
+    throw new Error('IPE: Not Implemented Yet')
+  }

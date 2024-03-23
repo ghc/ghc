@@ -1077,3 +1077,12 @@ function h$mkdir(path, path_offset, mode) {
   }
   return 0;
 }
+
+// It is required by Google Closure Compiler to be at least defined if
+// somewhere it is used
+var h$stg_cloneMyStackzh, h$stg_decodeStackzh
+h$stg_cloneMyStackzh
+  = h$stg_decodeStackzh
+  = function () {
+    throw new Error('Stack Cloning Decoding: Not Implemented Yet')
+  }
