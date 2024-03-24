@@ -827,29 +827,43 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
   = putSrcSpanDs loc $
     dsHsWrapper spec_app $ \core_app ->
-    finishSpecPrag mb_poly_rhs spec_bndrs (core_app (Var poly_id)) spec_inl
+    finishSpecPrag mb_poly_rhs spec_bndrs
+                   (core_app (Var poly_id))
+                   (\_ poly_rhs -> core_app poly_rhs)
+                   spec_inl
 
 
-dsSpec mb_poly_rhs (L loc (SpecPragE lhs_bndrs lhs_e
-                                     spec_inl))
-  | RuleBndrs { rb_tmvs = tm_bndrs } <- bndrs
+dsSpec mb_poly_rhs (L loc (SpecPragE { spe_bndrs     = bndrs
+                                     , spe_lhs_binds = lhs_binds
+                                     , spe_call      = the_call
+                                     , spe_rhs_binds = rhs_binds
+                                     , spe_inl       = inl }))
   = putSrcSpanDs loc $
-    do { core_spec_e <- dsLExpr spec_e
-       ; let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- tm_bndrs]
+    do { core_call <- dsTcEvBinds lhs_binds $ \ ds_binds ->
+                      do { ds_call <- dsLExpr the_call
+                         ; return (mkLets ds_binds ds_call) }
 
-       ; finishSpecPrag mb_poly_rhs bndrs' core_spec_e spec_inl }
+       ; mk_spec_call <- dsTcEvBinds rhs_binds $ \ ds_binds ->
+                         do { ds_call <- dsLExpr the_call
+                            ; return $ \ poly_id poly_rhs ->
+                                  mkLetNonRec poly_id poly_rhs $
+                                  mkLets ds_binds ds_call }
+
+       ; finishSpecPrag mb_poly_rhs bndrs core_call mk_spec_call inl }
 
 finishSpecPrag :: Maybe CoreExpr  -- See the first param of dsSpec
                -> [Var]           -- LHS binders
                -> CoreExpr        -- LHS pattern
+               -> (Id -> CoreExpr -> CoreExpr)  -- Make spec RHS given function body
                -> InlinePragma
                -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-finishSpecPrag mb_poly_rhs rule_bndrs rule_lhs
-               spec_bndrs spec_bindsno
+finishSpecPrag mb_poly_rhs spec_bndrs
+               rule_lhs
+               mk_spec_rhs
                spec_inl
   = do { dflags <- getDynFlags
        ; case decomposeRuleLhs dflags spec_bndrs rule_lhs (mkVarSet spec_bndrs) of {
-           Left msg    -> do { diagnosticDs msg; return Nothing } ;
+           Left msg -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, poly_id, rule_lhs_args) ->
 
     do { this_mod <- getModule
@@ -865,7 +879,7 @@ finishSpecPrag mb_poly_rhs rule_bndrs rule_lhs
 
              simpl_opts = initSimpleOpts dflags
              fn_unf     = realIdUnfolding poly_id
-             spec_unf   = specUnfolding simpl_opts rule_bndrs mk_app rule_lhs_args fn_unf
+             spec_unf   = specUnfolding simpl_opts spec_bndrs mk_app rule_lhs_args fn_unf
              spec_id    = mkLocalId spec_name ManyTy spec_ty
                             -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
@@ -877,7 +891,7 @@ finishSpecPrag mb_poly_rhs rule_bndrs rule_lhs
 
              mk_app e = mkApps e rule_lhs_args
              spec_rhs = mkLams spec_bndrs $
-                        mkApps poly_rhs rule_lhs_args
+                        mk_spec_rhs poly_id poly_rhs
 
        ; dsWarnOrphanRule rule
 
@@ -1053,13 +1067,13 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
 
                 -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
                 -- and extra dict binders: Note [Free dictionaries on rule LHS]
-                extra_bndrs = scopedSort extra_tvs {- ++ extra_dicts -}
+                extra_bndrs = scopedSort extra_tvs ++ extra_dicts
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
--- ToDo: I think this is not needed any more
---                extra_dicts =
---                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
---                  | d <- extra_vars, isDictId d ]
+-- ToDo: extra_dicts is needed. E.g. the SPECIALISE rules for `ap` in GHC.Base
+                extra_dicts =
+                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
+                  | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v
                   | v <- exprsFreeVarsList args

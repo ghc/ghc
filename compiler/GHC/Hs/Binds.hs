@@ -805,7 +805,11 @@ data TcSpecPrag
       -- ^ The Id to be specialised, a wrapper that specialises the
       -- polymorphic function, and inlining spec for the specialised function
 
-   | SpecPragE (RuleBndrs GhcTc) (LHsExpr GhcTc) InlinePragma
+   | SpecPragE { spe_bndrs     :: [Var]
+               , spe_lhs_binds :: TcEvBinds
+               , spe_call      :: LHsExpr GhcTc
+               , spe_rhs_binds :: TcEvBinds
+               , spe_inl       :: InlinePragma }
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -948,7 +952,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
-  ppr (SpecPragE bndrs spec_e inl)
+  ppr (SpecPragE { spe_bndrs = bndrs, spe_call = spec_e, spe_inl = inl })
     = text (extractSpecPragName $ inl_src inl)
        <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
 

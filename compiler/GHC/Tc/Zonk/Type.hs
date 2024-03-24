@@ -855,10 +855,16 @@ zonkLTcSpecPrags ps
       = do { co_fn' <- don'tBind $ zonkCoFn co_fn
            ; id' <- zonkIdOcc id
            ; return (L loc (SpecPrag id' co_fn' inl)) }
-    zonk_prag (L loc (SpecPragE bndrs spec_e inl))
-      = zonkRuleBndrs bndrs $ \ bndrs' ->
+    zonk_prag (L loc (SpecPragE { spe_bndrs = bndrs, spe_lhs_binds = lhs_binds
+                                , spe_call = spec_e, spe_rhs_binds = rhs_binds
+                                , spe_inl = inl }))
+      = runZonkBndrT (zonkCoreBndrsX bndrs)    $ \bndrs' ->
+        runZonkBndrT (zonkTcEvBinds lhs_binds) $ \lhs_binds' ->
+        runZonkBndrT (zonkTcEvBinds rhs_binds) $ \rhs_binds' ->
         do { spec_e' <- zonkLExpr spec_e
-           ; return (L loc (SpecPragE bndrs' spec_e' inl)) }
+           ; return (L loc (SpecPragE { spe_bndrs = bndrs', spe_lhs_binds = lhs_binds'
+                                      , spe_call = spec_e', spe_rhs_binds = rhs_binds'
+                                      , spe_inl = inl })) }
 
 {-
 ************************************************************************
