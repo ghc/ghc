@@ -48,7 +48,6 @@ import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Evidence( HsWrapper, TcEvBinds(..), (<.>) )
 import GHC.Tc.Types.Constraint
 
 import GHC.Tc.Zonk.TcType
@@ -825,14 +824,15 @@ Example:
 
 We want to generate:
 
-  RULE forall @a d1 d2 d3 x xs.
-     f @Int @p @p (d1::Eq p) (d2::Eq p) (d3::Ord Int) y y True
-        = $sf @p d1 y
-  $sf @p (dx::Eq p) (y::p)
-     = let d1 = dx
-           d2 = dx
-           d3 = $fOrdInt
-       in <f-rhs> @p @p @Int (d1::Eq p) (d2::Eq p) (d3::OrdInt) y y True
+  RULE forall @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p).
+     f @Int @p @p d1 d2 d3 x y y True
+        = $sf @p d1 d2 d3 x y
+  $sf @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p)
+     = let d1a = $fEqint
+           d2a = d2
+           d3a = d3
+       in let f = <f-rhs>
+       in f @p @p @Int (d1a::Eq p) (d2a::Eq p) (d3a::OrdInt) y y True
 
 Note that
 
@@ -840,11 +840,10 @@ Note that
   they are the same (Eq p) dictionary. Reason: we don't want to force
   them to be visibly equal at the call site.
 
-* Simpilarly in the RULE we quantify over (d3::Ord Int), again so as
-  not to force the caller to be passing the constant $fOrdInt from
-  `instance Ord Int`
-
-* But we pass only `d1` to `$sf`, and reconstitute `d2` and `d3` there.
+* The specialised function $sf takes all three dictionaries as
+  arguments; but the constraint solver does not use d1 (short-cut
+  solved).  We rely on the Simplifier to drop the dead arguments.
+  It isn't strictly necessary to pass d2 either, but it does no harm.
 
 -}
 
@@ -860,53 +859,43 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
                        ; return (id_bndrs, spec_e', rho) } }
 
        -- Solve unfication constraints
-       ; _ <- setTcLevel tc_lvl $ runTcS $ solveWanteds wanted
+       ; cloned_wanted <- cloneWC wanted  -- See Note [Simplify cloned constraints]
+       ; _ <- setTcLevel tc_lvl $ runTcS $ solveWanteds cloned_wanted
 
        -- Apply the unifications
+       -- c.f. Note [The SimplifyRule Plan] step 2
+       ; wanted   <- liftZonkM $ zonkWC wanted
        ; seed_tys <- liftZonkM (mapM zonkTcType (rho : map idType id_bndrs))
 
        -- Quantify
        ; let (quant_cts, residual_wanted) = getRuleQuantCts wanted
              quant_preds = ctsPreds quant_cts
-             quant_wc    = mkSimpleWC quant_cts
        ; dvs <- candidateQTyVarsOfTypes (quant_preds ++ seed_tys)
        ; let grown_tcvs = growThetaTyVars quant_preds (tyCoVarsOfTypes seed_tys)
-       ;     weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
+             weeded_dvs = weedOutCandidates (`dVarSetIntersectVarSet` grown_tcvs) dvs
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
 
        -- Left hand side of the RULE
        ; rule_evs <- mk_quant_evs quant_cts
        ; (implic1, lhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
                                                      qtkvs rule_evs residual_wanted
-       ; let lhs_expr = mkHsDictLet lhs_binds spec_e'
 
-       -- Right hand side of the RULE
-       ; (spec_cts, _) <- setTcLevel tc_lvl $ runTcS $
-                          solveWanteds quant_wc
-
-       -- No need to zonk; any unifications have happened already
-       ; let min_spec_cts :: [Ct]
-             min_spec_cts = mkMinimalBySCs ctPred $
-                            bagToList             $
-                            approximateWC True spec_cts
-
-       -- rhs_binds uses spec_evs to build rule_evs
-       ; spec_evs < mapM (newEvVar . ctPred) min_spec_cts
+       -- rhs_binds uses rule_evs to build `wanted` (NB not just `residual_wanted`)
        ; (implic2, rhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
-                                                     qtkvs spec_evs quant_wc
+                                                     qtkvs rule_evs wanted
 
        ; emitImplications (implic1 `unionBags` implic2)
 
+       ; let all_bndrs = qtkvs ++ rule_evs ++ id_bndrs
        ; traceTc "tcSpecPrag:SpecSigE" $
-         vcat [ text "bndrs:" <+> ppr bndrs'
-              , text "full_e:" <+> ppr full_e'
+         vcat [ text "all_bndrs:" <+> ppr all_bndrs
+              , text "spec_e:" <+> ppr spec_e'
               , text "inl:" <+> ppr inl ]
-       ; return [SpecPragE { spe_bndrs      = qtkvs ++ rule_evs ++ id_bndrs
-                           , spe_lhs        = lhs_expr
-                           , spe_rhs        = map ctEvTerm min_spec_cst
-                           , spe_spec_bndrs = qtkvs ++ spec_evs ++ id_bndrs
-                           , spe_spec_binds = rhs_binds
-                           , spe_inl = inl }] }
+       ; return [SpecPragE { spe_bndrs     = all_bndrs
+                           , spe_lhs_binds = lhs_binds
+                           , spe_call      = spec_e'
+                           , spe_rhs_binds = rhs_binds
+                           , spe_inl       = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 
