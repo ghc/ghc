@@ -2870,7 +2870,7 @@ alexInputPrevChar (AI _ buf) = unsafeChr (fromIntegral (adjustChar pc))
   where pc = prevChar buf '\n'
 
 unsafeChr :: Int -> Char
-unsafeChr (I# c) = C# (chr# c)
+unsafeChr (I# c) = GHC.Exts.C# (GHC.Exts.chr# c)
 
 -- backwards compatibility for Alex 2.x
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
