@@ -1555,6 +1555,7 @@ Getting information about the RTS
         ,("Compiler unregisterised", "NO")
         ,("Tables next to code", "YES")
         ,("Flag -with-rtsopts", "")
+        ,("I/O manager default", "select")
         ]
 
     The information is formatted such that it can be read as a of type
@@ -1608,3 +1609,8 @@ Getting information about the RTS
 
     ``Flag -with-rtsopts``
         The value of the GHC flag :ghc-flag:`-with-rtsopts=⟨opts⟩` at compile/link time.
+
+    ``I/O manager default``
+        The name of the I/O manager subsystem that will be used by default
+        for this program. This can be overridden with the
+        :rts-flag:`--io-manager=(name)` RTS flag.

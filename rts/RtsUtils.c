@@ -14,6 +14,7 @@
 #include "Ticky.h"
 #include "Schedule.h"
 #include "RtsFlags.h"
+#include "IOManager.h"
 
 #include <time.h>
 
@@ -385,6 +386,8 @@ void printRtsInfo(const RtsConfig rts_config) {
     mkRtsInfoPair("Tables next to code",     TablesNextToCode);
     mkRtsInfoPair("Flag -with-rtsopts",      /* See #15261 */
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
+    selectIOManager(); /* resolve the io-manager, accounting for flags  */
+    mkRtsInfoPair("I/O manager default",     showIOManager());
     printf(" ]\n");
 }
 
