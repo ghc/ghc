@@ -58,7 +58,8 @@ import qualified Data.Map as Map
 import System.IO
 import Data.List
 import System.FilePath
-import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
+import GHC.Iface.Type (IfaceType (..), putIfaceType)
+import System.IO.Unsafe
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -163,6 +164,9 @@ getWithUserData name_cache bh = do
 -- Reading names has the side effect of adding them into the given NameCache.
 getTables :: NameCache -> BinHandle -> IO BinHandle
 getTables name_cache bh = do
+    bhRef <- newIORef (error "used too soon")
+    -- It is important this is passed to 'getTable'
+    ud <- unsafeInterleaveIO (readIORef bhRef)
     let
       -- The order of these entries matters!
       --
@@ -171,21 +175,20 @@ getTables name_cache bh = do
       tables =
         [ SomeReaderTable initFastStringReaderTable
         , SomeReaderTable (initReadNameCachedBinary name_cache)
-        , SomeReaderTable initReadIfaceTypeTable
+        , SomeReaderTable (initReadIfaceTypeTable ud)
         ]
 
     tables <- traverse (\(SomeReaderTable tblM) -> tblM >>= pure . SomeReaderTable . pure) tables
 
-    bhRef <- newIORef (error "used too soon")
     final_bh <- foldM (\bh (SomeReaderTable (tbl' :: Identity (ReaderTable a))) -> do
       let tbl = runIdentity tbl'
-      res <- Binary.forwardGet bh (getTable tbl bhRef bh)
+      res <- Binary.forwardGet bh (getTable tbl bh)
       let newDecoder = mkReaderFromTable tbl res
       pure $ addReaderToUserData (mkSomeBinaryReader newDecoder) bh
       ) bh tables
 
 
-    writeIORef bhRef final_bh
+    writeIORef bhRef (getReaderUserData final_bh)
     pure final_bh
 
 -- | Write an interface file.
@@ -356,20 +359,27 @@ Here, a visualisation of the table structure we currently have:
 -- The symbol table
 --
 
-initReadIfaceTypeTable :: IO (ReaderTable IfaceType)
-initReadIfaceTypeTable = do
+initReadIfaceTypeTable :: ReaderUserData -> IO (ReaderTable IfaceType)
+initReadIfaceTypeTable ud = do
   pure $
     ReaderTable
-      { getTable = getGenericSymbolTable (\_ -> getIfaceType)
+      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$> readFromSymTab ud bh)
       , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
       }
+
+readFromSymTab :: ReaderUserData -> BinHandle -> IO FullBinData
+readFromSymTab ud bh = do
+    p <- get @(Bin ()) bh -- a BinPtr
+    frozen_bh <- freezeBinHandle p (setReaderUserData bh ud)
+    seekBinNoExpand bh p -- skip over the object for now
+    return frozen_bh
 
 initWriteIfaceType :: IO (WriterTable, BinaryWriter IfaceType)
 initWriteIfaceType = do
   sym_tab <- initGenericSymbolTable
   pure
     ( WriterTable
-        { putTable = putGenericSymbolTable sym_tab putIfaceType
+        { putTable = putGenericSymbolTable sym_tab (lazyPut' putIfaceType)
         }
     , mkWriter $ putGenericSymTab sym_tab
     )
@@ -379,7 +389,7 @@ initReadNameCachedBinary :: NameCache -> IO (ReaderTable Name)
 initReadNameCachedBinary cache = do
   return $
     ReaderTable
-      { getTable = \_ bh -> getSymbolTable bh cache
+      { getTable = \bh -> getSymbolTable bh cache
       , mkReaderFromTable = \tbl -> mkReader (getSymtabName tbl)
       }
 

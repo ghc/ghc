@@ -1356,7 +1356,7 @@ data SomeWriterTable f = forall a . Typeable a =>
   SomeWriterTable (f (WriterTable, BinaryWriter a))
 
 data ReaderTable a = ReaderTable
-  { getTable :: IORef BinHandle -> BinHandle -> IO (SymbolTable a)
+  { getTable :: BinHandle -> IO (SymbolTable a)
   , mkReaderFromTable :: SymbolTable a -> BinaryReader a
   }
 
@@ -1400,20 +1400,21 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
             case vs of
               [] -> return table_count
               todo -> do
-                mapM_ (\n -> lazyPut' serialiser bh n) (map snd vs)
+                mapM_ (\n -> serialiser bh n) (map snd vs)
                 loop table_count
       snd <$>
         (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
           loop 0)
 
-getGenericSymbolTable :: forall a. (Bin () -> BinHandle -> IO a) -> IORef BinHandle -> BinHandle -> IO (SymbolTable a)
-getGenericSymbolTable deserialiser bhRef bh = do
+getGenericSymbolTable :: forall a. (BinHandle -> IO a) -> BinHandle -> IO (SymbolTable a)
+getGenericSymbolTable deserialiser bh = do
   sz <- forwardGet bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
   -- Using lazyPut/lazyGet is quite space inefficient as each usage will allocate a large closure
   -- (6 arguments-ish).
   forM_ [0..(sz-1)] $ \i -> do
-    f <- lazyGet' (Just bhRef) deserialiser bh
+--    f <- lazyGet' (Just bhRef) deserialiser bh
+    f <- deserialiser bh
     writeArray mut_arr i f
 --  pprTraceM "gotten" (ppr sz)
   unsafeFreeze mut_arr
@@ -1451,7 +1452,7 @@ initFastStringReaderTable :: IO (ReaderTable FastString)
 initFastStringReaderTable = do
   return $
     ReaderTable
-      { getTable = \_ -> getDictionary
+      { getTable = getDictionary
       , mkReaderFromTable = \tbl -> mkReader (getDictFastString tbl)
       }
 
