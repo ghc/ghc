@@ -79,7 +79,9 @@ type SubMap = Map Name [Name]
 type DeclMap = Map Name DeclMapEntry
 type InstMap = Map RealSrcSpan Name
 type FixMap = Map Name Fixity
-type DocPaths = (FilePath, Maybe FilePath) -- paths to HTML and sources
+data DocPaths      = DocPaths { docPathsHtml :: FilePath  -- ^ path to HTML Haddocks
+                              , docPathsSources :: Maybe FilePath -- ^ path to hyperlinked sources
+                              }
 type WarningMap = Map Name (Doc Name)
 
 -----------------------------------------------------------------------------

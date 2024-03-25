@@ -564,16 +564,19 @@ readIfaceArgs flags = [parseIfaceOption s | Flag_ReadInterface s <- flags]
               let src' = case src of
                     "" -> Nothing
                     _  -> Just (src ++ "/%M.html")
+                  docPaths = DocPaths { docPathsHtml = fpath
+                                      , docPathsSources = src'
+                                      }
                in case break (== ',') rest' of
                     (visibility, ',' : file)
                       | visibility == "hidden" ->
-                          ((fpath, src'), Hidden, file)
+                          (docPaths, Hidden, file)
                       | otherwise ->
-                          ((fpath, src'), Visible, file)
+                          (docPaths, Visible, file)
                     (file, _) ->
-                      ((fpath, src'), Visible, file)
-            (file, _) -> ((fpath, Nothing), Visible, file)
-        (file, _) -> (("", Nothing), Visible, file)
+                      (docPaths, Visible, file)
+            (file, _) -> (DocPaths fpath Nothing, Visible, file)
+        (file, _) -> (DocPaths "" Nothing, Visible, file)
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.
 optLast :: [a] -> Maybe a

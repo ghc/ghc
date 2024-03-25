@@ -208,7 +208,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     -- If any --show-interface was used, show the given interfaces
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       name_cache <- freshNameCache
-      mIfaceFile <- readInterfaceFiles name_cache [(("", Nothing), Visible, path)] noChecks
+      mIfaceFile <- readInterfaceFiles name_cache [(DocPaths "" Nothing, Visible, path)] noChecks
       forM_ mIfaceFile $ \(_,_,_, ifaceFile) -> do
         putMsg logger $ renderJson (jsonInterfaceFile ifaceFile)
 
@@ -300,7 +300,7 @@ renderStep :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOpti
 renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs (map (\(docPath, _ifaceFilePath, _showModules, ifaceFile) ->
                           ( case baseUrl flags of
-                              Nothing  -> fst docPath
+                              Nothing  -> docPathsHtml docPath
                               Just url -> url </> packageName (ifUnitId ifaceFile)
                           , ifaceFile)) pkgs)
   let
@@ -310,7 +310,7 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
           -> (ifaceFilePath, mkPackageInterfaces showModules ifaceFile))
         pkgs
     extSrcMap = Map.fromList $ do
-      ((_, Just path), _, _, ifile) <- pkgs
+      (DocPaths {docPathsSources=Just path}, _, _, ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
   render logger dflags unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
