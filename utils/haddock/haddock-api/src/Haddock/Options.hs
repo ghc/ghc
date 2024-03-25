@@ -563,7 +563,7 @@ readIfaceArgs flags = [parseIfaceOption s | Flag_ReadInterface s <- flags]
             (src, ',' : rest') ->
               let src' = case src of
                     "" -> Nothing
-                    _ -> Just src
+                    _  -> Just (src ++ "/%M.html")
                in case break (== ',') rest' of
                     (visibility, ',' : file)
                       | visibility == "hidden" ->
