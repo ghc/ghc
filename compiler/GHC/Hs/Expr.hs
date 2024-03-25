@@ -476,7 +476,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 -- | The different source constructs that we use to instantiate the "original" field
 --   in an `XXExprGhcRn original expansion`
 data HsThingRn = OrigExpr (HsExpr GhcRn)
-               | OrigStmt (ExprLStmt GhcRn)
+               | OrigStmt (ExprLStmt GhcRn) HsDoFlavour
                | OrigPat  (LPat GhcRn)
 
 isHsThingRnExpr, isHsThingRnStmt, isHsThingRnPat :: HsThingRn -> Bool
@@ -522,9 +522,10 @@ mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn (OrigExpr oExpr) eExpr)
 --   expanded expression
 mkExpandedStmt
   :: ExprLStmt GhcRn      -- ^ source statement
+  -> HsDoFlavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt eExpr = XExpr (ExpandedThingRn (OrigStmt oStmt) eExpr)
+mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn (OrigStmt oStmt flav) eExpr)
 
 mkExpandedPatRn
   :: LPat   GhcRn      -- ^ source pattern
@@ -538,17 +539,19 @@ mkExpandedPatRn oPat eExpr = XExpr (ExpandedThingRn (OrigPat oPat) eExpr)
 mkExpandedStmtAt
   :: SrcSpanAnnA          -- ^ Location for the expansion expression
   -> ExprLStmt GhcRn      -- ^ source statement
+  -> HsDoFlavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt loc oStmt eExpr = L loc $ mkExpandedStmt oStmt eExpr
+mkExpandedStmtAt loc oStmt flav eExpr = L loc $ mkExpandedStmt oStmt flav eExpr
 
 -- | Wrap the expanded version of the expression with a pop.
 mkExpandedStmtPopAt
   :: SrcSpanAnnA          -- ^ Location for the expansion statement
   -> ExprLStmt GhcRn      -- ^ source statement
+  -> HsDoFlavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmtPopAt loc oStmt eExpr = mkPopErrCtxtExprAt loc $ mkExpandedStmtAt loc oStmt eExpr
+mkExpandedStmtPopAt loc oStmt flav eExpr = mkPopErrCtxtExprAt loc $ mkExpandedStmtAt loc oStmt flav eExpr
 
 
 data XXExprGhcTc
@@ -593,9 +596,10 @@ mkExpandedExprTc oExpr eExpr = XExpr (ExpandedThingTc (OrigExpr oExpr) eExpr)
 --   expanded typechecked expression.
 mkExpandedStmtTc
   :: ExprLStmt GhcRn        -- ^ source do statement
+  -> HsDoFlavour
   -> HsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmtTc oStmt eExpr = XExpr (ExpandedThingTc (OrigStmt oStmt) eExpr)
+mkExpandedStmtTc oStmt flav eExpr = XExpr (ExpandedThingTc (OrigStmt oStmt flav) eExpr)
 
 {- *********************************************************************
 *                                                                      *
@@ -836,7 +840,7 @@ instance Outputable HsThingRn where
   ppr thing
     = case thing of
         OrigExpr x -> ppr_builder "<OrigExpr>:" x
-        OrigStmt x -> ppr_builder "<OrigStmt>:" x
+        OrigStmt x _ -> ppr_builder "<OrigStmt>:" x
         OrigPat x  -> ppr_builder "<OrigPat>:" x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 

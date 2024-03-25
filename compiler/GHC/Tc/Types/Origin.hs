@@ -751,7 +751,7 @@ exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
 exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
-                                               | OrigStmt _ <- thing = DoOrigin
+                                               | OrigStmt _ _ <- thing = DoOrigin
                                                | OrigPat p  <- thing = DoPatOrigin p
 exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
 

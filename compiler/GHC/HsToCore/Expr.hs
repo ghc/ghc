@@ -315,7 +315,7 @@ dsExpr (HsOverLit _ lit)
 dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
+        | OrigStmt (L loc _) _ <- o
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
       WrapExpr {}                    -> dsHsWrapped e

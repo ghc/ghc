@@ -806,18 +806,18 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
              | XExpr{} <- arg, in_generated_code
              -> thing_inside -- AppDo case for <*>'s second argument, the ctxt will be set by addHeadCtxt
 
-           VAExpansion (OrigStmt (L _ stmt@(BindStmt {}))) _ loc
+           VAExpansion (OrigStmt (L _ stmt@(BindStmt {})) flav) _ loc
              | isGeneratedSrcSpan (locA arg_loc) -- This arg is the second argument to generated (>>=)
              -> setSrcSpan loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
              | otherwise                        -- This arg is the first argument to generated (>>=)
              -> setSrcSpanA arg_loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
-           VAExpansion (OrigStmt (L loc stmt)) _ _
+           VAExpansion (OrigStmt (L loc stmt) flav) _ _
              -> setSrcSpanA loc $
-                  addStmtCtxt stmt $
+                  addStmtCtxt stmt flav $
                   thing_inside
 
            _ -> setSrcSpanA arg_loc $

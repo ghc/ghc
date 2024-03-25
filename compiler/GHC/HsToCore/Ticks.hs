@@ -611,7 +611,7 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     _        -> Nothing
 
 addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o@(OrigStmt (L pos LastStmt{})) e
+addTickHsExpanded o@(OrigStmt (L pos LastStmt{}) _) e
   -- LastStmt always gets a tick for breakpoint and hpc coverage
   = do d <- getDensity
        case d of

@@ -325,7 +325,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
       = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
                (EWrap (EExpand o) : args)
 
-      | OrigStmt (L _ stmt) <- o                -- so that we set `(>>)` as generated
+      | OrigStmt (L _ stmt) _ <- o                -- so that we set `(>>)` as generated
       , BodyStmt{} <- stmt                      -- and get the right unused bind warnings
       = go e (VAExpansion o generatedSrcSpan generatedSrcSpan)
                                                 -- See Part 3. in Note [Expanding HsDo with XXExprGhcRn]
@@ -896,10 +896,10 @@ tcInferAppHead_maybe fun
       _                         -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
-addHeadCtxt (VAExpansion (OrigStmt (L loc stmt)) _ _) thing_inside =
+addHeadCtxt (VAExpansion (OrigStmt (L loc stmt) flav) _ _) thing_inside =
   do traceTc "addHeadCtxt stmt" (ppr stmt)
      setSrcSpanA loc $
-       addStmtCtxt stmt
+       addStmtCtxt stmt flav $
          thing_inside
 addHeadCtxt fun_ctxt thing_inside
   | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
@@ -1628,9 +1628,9 @@ mis-match in the number of value arguments.
 *                                                                      *
 ********************************************************************* -}
 
-addStmtCtxt :: ExprStmt GhcRn -> TcRn a -> TcRn a
-addStmtCtxt stmt thing_inside
-  = do let err_doc = pprStmtInCtxt (HsDoStmt (DoExpr Nothing)) stmt
+addStmtCtxt :: ExprStmt GhcRn -> HsDoFlavour -> TcRn a -> TcRn a
+addStmtCtxt stmt flav thing_inside
+  = do let err_doc = pprStmtInCtxt (HsDoStmt flav) stmt
        addErrCtxt err_doc thing_inside
   where
     pprStmtInCtxt :: HsStmtContextRn -> StmtLR GhcRn GhcRn (LHsExpr GhcRn) -> SDoc
@@ -1643,7 +1643,7 @@ addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsUnboundVar {} -> thing_inside
-      XExpr (ExpandedThingRn (OrigStmt stmt) _) -> addStmtCtxt (unLoc stmt) thing_inside
+      XExpr (ExpandedThingRn (OrigStmt stmt flav) _) -> addStmtCtxt (unLoc stmt) flav thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
    -- The HsUnboundVar special case addresses situations like
    --    f x = _
