@@ -17,8 +17,6 @@ import GHC.Cmm.BlockId
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
 
-import Data.Maybe (catMaybes)
-
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
 --
@@ -75,16 +73,8 @@ class Instruction instr where
 
         -- | Give the possible destinations of this jump instruction.
         --      Must be defined for all jumpish instructions.
-        --      Returns Nothing for non BlockId destinations.
         jumpDestsOfInstr
-                :: instr -> [Maybe BlockId]
-
-        -- | Give the possible block destinations of this jump instruction.
-        --      Must be defined for all jumpish instructions.
-        jumpBlockDestsOfInstr
                 :: instr -> [BlockId]
-
-        jumpBlockDestsOfInstr = catMaybes . jumpDestsOfInstr
 
 
         -- | Change the destination of this jump instruction.

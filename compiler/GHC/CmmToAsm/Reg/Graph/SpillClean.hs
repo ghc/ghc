@@ -207,7 +207,7 @@ cleanForward platform blockId assoc acc (li : instrs)
 
         -- Remember the association over a jump.
         | LiveInstr instr _     <- li
-        , targets               <- jumpBlockDestsOfInstr instr
+        , targets               <- jumpDestsOfInstr instr
         , not $ null targets
         = do    mapM_ (accJumpValid assoc) targets
                 cleanForward platform blockId assoc (li : acc) instrs
@@ -386,7 +386,7 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
         --       it always does, but if those reloads are cleaned the slot
         --       liveness map doesn't get updated.
         | LiveInstr instr _     <- li
-        , targets               <- jumpBlockDestsOfInstr instr
+        , targets               <- jumpDestsOfInstr instr
         = do
                 let slotsReloadedByTargets
                         = IntSet.unions
