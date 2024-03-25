@@ -897,15 +897,18 @@ tcInferAppHead_maybe fun
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
 addHeadCtxt (VAExpansion (OrigStmt (L loc stmt)) _ _) thing_inside =
-  do setSrcSpanA loc $
+  do traceTc "addHeadCtxt stmt" (ppr stmt)
+     setSrcSpanA loc $
        addStmtCtxt stmt
          thing_inside
 addHeadCtxt fun_ctxt thing_inside
   | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
-  = thing_inside                  -- => context is already set
+  = do traceTc "addHeadCtxt notGood" empty
+       thing_inside                  -- => context is already set
   | otherwise
   = setSrcSpan fun_loc $
-    do case fun_ctxt of
+    do traceTc "addHeadCtxt fun_loc" (ppr fun_loc)
+       case fun_ctxt of
          VAExpansion (OrigExpr orig) _ _ -> addExprCtxt orig thing_inside
          _                               -> thing_inside
   where
@@ -1640,6 +1643,7 @@ addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsUnboundVar {} -> thing_inside
+      XExpr (ExpandedThingRn (OrigStmt stmt) _) -> addStmtCtxt (unLoc stmt) thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
    -- The HsUnboundVar special case addresses situations like
    --    f x = _

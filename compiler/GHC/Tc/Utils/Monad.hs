@@ -1230,7 +1230,7 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 -- do any tidying.
 addErrCtxt :: SDoc -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addErrCtxt msg thing_inside = dbgErrCtxt (addErrCtxtM (\env -> return (env, msg)) thing_inside)
+addErrCtxt msg thing_inside = dbgErrCtxt msg (addErrCtxtM (\env -> return (env, msg)) thing_inside)
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
@@ -1255,11 +1255,11 @@ pushCtxt :: ErrCtxt -> TcM a -> TcM a
 {-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
 pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 
-dbgErrCtxt :: TcM a -> TcM a
-dbgErrCtxt thing_inside =
+dbgErrCtxt :: SDoc -> TcM a -> TcM a
+dbgErrCtxt msg thing_inside =
   do errCtxt <- getErrCtxt
      info <- mkErrInfo emptyTidyEnv errCtxt
-     traceTc "--Debug Error Context--" (ppr info)
+     traceTc "--Debug Error Context--" (vcat [ppr msg, text "----", ppr info, text "----"])
      thing_inside
 
 updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
@@ -1270,7 +1270,7 @@ updCtxt ctxt env
   | otherwise = addLclEnvErrCtxt ctxt env
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt thing_inside = dbgErrCtxt $ updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
+popErrCtxt thing_inside = dbgErrCtxt (text "PopErrCtxt") $ updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
                                        thing_inside
            where
              pop []       = []

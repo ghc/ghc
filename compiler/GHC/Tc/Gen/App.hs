@@ -797,10 +797,14 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
        ; case ctxt of
-           VACall fun arg_no _ | not in_generated_code
+           VACall fun arg_no _
+             | not in_generated_code
              -> do setSrcSpanA arg_loc                    $
                      addErrCtxt (funAppCtxt fun arg arg_no) $
                      thing_inside
+
+             | XExpr{} <- arg, in_generated_code
+             -> thing_inside -- AppDo case for <*>'s second argument, the ctxt will be set by addHeadCtxt
 
            VAExpansion (OrigStmt (L _ stmt@(BindStmt {}))) _ loc
              | isGeneratedSrcSpan (locA arg_loc) -- This arg is the second argument to generated (>>=)
@@ -817,8 +821,8 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
                   thing_inside
 
            _ -> setSrcSpanA arg_loc $
-                  addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
-                  thing_inside }
+                     addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
+                     thing_inside }
 
 {- *********************************************************************
 *                                                                      *

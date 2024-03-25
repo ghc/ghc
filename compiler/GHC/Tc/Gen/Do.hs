@@ -87,7 +87,10 @@ expand_do_stmts _ [stmt@(L loc (LastStmt _ (L body_loc body) _ ret_expr))]
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
    = do traceTc "expand_do_stmts last" (ppr ret_expr)
-        return $ mkExpandedStmtPopAt loc stmt body
+        appDo <- xoptM LangExt.ApplicativeDo
+        if appDo
+          then return $ mkExpandedStmtAt loc stmt body
+          else return $ mkExpandedStmtPopAt loc stmt body
 
    | SyntaxExprRn ret <- ret_expr
    --
@@ -220,14 +223,14 @@ expand_do_stmts doFlavour ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
     do_arg :: ApplicativeArg GhcRn -> TcM ((LPat GhcRn, FailOperator GhcRn), LHsExpr GhcRn)
     do_arg (ApplicativeArgOne
             { xarg_app_arg_one = mb_fail_op
-            , app_arg_pattern = pat@(L loc _)
-            , arg_expr        = rhs
+            , app_arg_pattern = pat
+            , arg_expr        = (L rhs_loc rhs)
             }) =
-      return ((pat, mb_fail_op), mkExpandedStmtAt loc (L loc (BindStmt xbsn pat rhs)) (unLoc rhs))
+      return ((pat, mb_fail_op), mkExpandedStmtAt rhs_loc (L rhs_loc (BindStmt xbsn pat (L rhs_loc rhs))) rhs)
     do_arg (ApplicativeArgMany _ stmts ret pat ctxt) =
       do { expr <- expand_do_stmts ctxt $ stmts ++ [wrapGenSpan $ mkLastStmt (wrapGenSpan ret)]
          ; return ((pat, Nothing)
-                  , {- wrapGenSpan $ mkExpandedExpr (HsDo noExtField ctxt (wrapGenSpan stmts)) (unLoc expr)-} expr) }
+                  , expr) }
 
     match_args :: (LPat GhcRn, FailOperator GhcRn) -> HsExpr GhcRn -> TcM (HsExpr GhcRn)
     match_args (pat, fail_op) body = unLoc <$> mk_failable_expr doFlavour pat (wrapGenSpan body) fail_op
