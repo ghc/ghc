@@ -62,6 +62,7 @@ import qualified Data.Map as Map
 import System.IO
 import Data.List
 import System.FilePath
+import System.IO.Unsafe
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -180,7 +181,7 @@ getWithUserData name_cache bh = do
 --                                            (getDictFastString dict)
 
 data ReadIfaceTable out = ReadIfaceTable
-  { getTable :: HasCallStack => IORef BinHandle -> BinHandle -> IO out
+  { getTable :: HasCallStack => BinHandle -> IO out
   }
 
 data WriteIfaceTable = WriteIfaceTable
@@ -189,21 +190,22 @@ data WriteIfaceTable = WriteIfaceTable
 
 getTables' :: HasCallStack => NameCache -> BinHandle -> IO BinHandle
 getTables' name_cache bh = do
+    bhRef <- newIORef (error "used too soon")
+    ud <- unsafeInterleaveIO (readIORef bhRef)
     fsCache <- initReadFsCachedBinary
     nameCache <- initReadNameCachedBinary name_cache
 --    ifaceCache <- initReadIfaceTyConTable
-    ifaceTypeCache <- initReadIfaceTypeTable
-    bhRef <- newIORef (error "used too soon")
+    ifaceTypeCache <- initReadIfaceTypeTable ud
 
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
-    dict <- Binary.forwardGet bh (getTable fsCache bhRef bh)
+    dict <- Binary.forwardGet bh (getTable fsCache bh)
     let
         fsDecoder = mkReader $ getDictFastString dict
         bh_fs = addDecoder (mkCache (Proxy @FastString) fsDecoder) bh
 
-    symtab <- Binary.forwardGet bh_fs (getTable nameCache bhRef bh_fs)
+    symtab <- Binary.forwardGet bh_fs (getTable nameCache bh_fs)
 
     let nameCache' = mkReader $ getSymtabName symtab
 
@@ -215,10 +217,10 @@ getTables' name_cache bh = do
 
 --        bh_name2 = addDecoder (mkCache (Proxy :: Proxy IfaceTyCon) ifaceDecoder) bh_name
 
-    ifaceSymTab2 <- Binary.forwardGet bh_name (getTable ifaceTypeCache bhRef bh_name)
+    ifaceSymTab2 <- Binary.forwardGet bh_name (getTable ifaceTypeCache bh_name)
     let ifaceDecoder2 = mkReader $ getGenericSymtab ifaceSymTab2
     let bh_type = addDecoder (mkCache (Proxy :: Proxy IfaceType) ifaceDecoder2) bh_name
-    writeIORef bhRef bh_type
+    writeIORef bhRef (getUserData bh_type)
     return bh_type
 
 
@@ -279,7 +281,7 @@ initReadFsCachedBinary :: (HasCallStack) => IO (ReadIfaceTable (SymbolTable Fast
 initReadFsCachedBinary = do
   return $
     ReadIfaceTable
-      { getTable = \_ -> getDictionary
+      { getTable = getDictionary
       }
 
 initWriteFsTable :: (HasCallStack) => IO (WriteIfaceTable, CachedBinary FastString)
@@ -308,7 +310,7 @@ initReadNameCachedBinary :: (HasCallStack) => NameCache -> IO (ReadIfaceTable (S
 initReadNameCachedBinary cache = do
   return $
     ReadIfaceTable
-      { getTable = \_ bh -> getSymbolTable bh cache
+      { getTable = \bh -> getSymbolTable bh cache
       }
 
 initWriteNameTable :: (HasCallStack) => IO (WriteIfaceTable, CachedBinary Name)
@@ -338,14 +340,21 @@ initReadIfaceTyConTable :: HasCallStack => IO (ReadIfaceTable (SymbolTable Iface
 initReadIfaceTyConTable = do
   pure $
     ReadIfaceTable
-      { getTable = getGenericSymbolTable (\_ -> getIfaceTyCon)
+      { getTable = getGenericSymbolTable getIfaceTyCon
       }
 
-initReadIfaceTypeTable :: HasCallStack => IO (ReadIfaceTable (SymbolTable IfaceType))
-initReadIfaceTypeTable = do
+readFromSymTab :: UserData -> BinHandle -> IO FullBinData
+readFromSymTab ud bh = do
+    p <- get @(Bin ()) bh -- a BinPtr
+    frozen_bh <- freezeBinHandle p (setUserData bh ud)
+    seekBinNoExpand bh p -- skip over the object for now
+    return frozen_bh
+
+initReadIfaceTypeTable :: HasCallStack => UserData -> IO (ReadIfaceTable (SymbolTable IfaceType))
+initReadIfaceTypeTable ud = do
   pure $
     ReadIfaceTable
-      { getTable = getGenericSymbolTable (\optr bh -> IfaceSerialisedType <$> freezeBinHandle optr bh)
+      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$> readFromSymTab ud bh)
 
       }
 
@@ -365,7 +374,7 @@ initWriteIfaceType = do
   sym_tab <- initGenericSymbolTable
   pure
     ( WriteIfaceTable
-        { putTable = putGenericSymbolTable sym_tab putIfaceType
+        { putTable = putGenericSymbolTable sym_tab (lazyPut' putIfaceType)
         }
     , mkWriter $ putGenericSymTab sym_tab
     )
