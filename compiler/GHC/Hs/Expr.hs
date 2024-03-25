@@ -477,7 +477,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 --   in an `XXExprGhcRn original expansion`
 data HsThingRn = OrigExpr (HsExpr GhcRn)
                | OrigStmt (ExprLStmt GhcRn) HsDoFlavour
-               | OrigPat  (LPat GhcRn)
+               | OrigPat  (LPat GhcRn) (Maybe (HsDoFlavour, ExprLStmt GhcRn))
 
 isHsThingRnExpr, isHsThingRnStmt, isHsThingRnPat :: HsThingRn -> Bool
 isHsThingRnExpr (OrigExpr{}) = True
@@ -529,9 +529,10 @@ mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn (OrigStmt oStmt flav) e
 
 mkExpandedPatRn
   :: LPat   GhcRn      -- ^ source pattern
+  -> Maybe (HsDoFlavour, ExprLStmt GhcRn) -- ^ pattern statement origin
   -> HsExpr GhcRn      -- ^ expanded expression
   -> HsExpr GhcRn      -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedPatRn oPat eExpr = XExpr (ExpandedThingRn (OrigPat oPat) eExpr)
+mkExpandedPatRn oPat stmt eExpr = XExpr (ExpandedThingRn (OrigPat oPat stmt) eExpr)
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original do stmt and
@@ -841,7 +842,7 @@ instance Outputable HsThingRn where
     = case thing of
         OrigExpr x -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _ -> ppr_builder "<OrigStmt>:" x
-        OrigPat x  -> ppr_builder "<OrigPat>:" x
+        OrigPat  x _ -> ppr_builder "<OrigPat>:" x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where

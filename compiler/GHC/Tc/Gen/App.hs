@@ -538,7 +538,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     fun_orig
       | VAExpansion (OrigStmt{}) _ _ <- fun_ctxt
       = DoOrigin
-      | VAExpansion (OrigPat pat) _ _ <- fun_ctxt
+      | VAExpansion (OrigPat pat _) _ _ <- fun_ctxt
       = DoPatOrigin pat
       | VAExpansion (OrigExpr e) _ _ <- fun_ctxt
       = exprCtOrigin e

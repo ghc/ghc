@@ -332,7 +332,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
                (EWrap (EExpand o) : args)       -- in `GHC.Tc.Gen.Do`
 
 
-      | OrigPat (L loc _) <- o                              -- so that we set the compiler generated fail context
+      | OrigPat (L loc _) _ <- o                            -- so that we set the compiler generated fail context
       = go e (VAExpansion o (locA loc) (locA loc))          -- to be originating from a failable pattern
                                                             -- See Part 1. Wrinkle 2. of
                (EWrap (EExpand o) : args)                   -- Note [Expanding HsDo with XXExprGhcRn]
@@ -903,13 +903,13 @@ addHeadCtxt (VAExpansion (OrigStmt (L loc stmt) flav) _ _) thing_inside =
          thing_inside
 addHeadCtxt fun_ctxt thing_inside
   | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
-  = do traceTc "addHeadCtxt notGood" empty
-       thing_inside                  -- => context is already set
+  = thing_inside                  -- => context is already set
   | otherwise
   = setSrcSpan fun_loc $
-    do traceTc "addHeadCtxt fun_loc" (ppr fun_loc)
+    do traceTc "addHeadCtxt fun_loc" (ppr fun_ctxt)
        case fun_ctxt of
          VAExpansion (OrigExpr orig) _ _ -> addExprCtxt orig thing_inside
+         VAExpansion (OrigPat _ (Just (flav, stmt))) _ _ -> addStmtCtxt (unLoc stmt) flav $ thing_inside
          _                               -> thing_inside
   where
     fun_loc = appCtxtLoc fun_ctxt
