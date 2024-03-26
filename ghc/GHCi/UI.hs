@@ -557,7 +557,8 @@ interactiveUI config srcs maybe_exprs = do
            -- Set to True because Prelude is implicitly imported.
            impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclImplicit=True}}
    hsc_env <- GHC.getSession
-   let in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
+   let !in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
+        -- We force this to make sure we don't retain the hsc_env when reloading
    empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
