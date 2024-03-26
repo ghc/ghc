@@ -354,7 +354,7 @@ initReadIfaceTypeTable :: HasCallStack => UserData -> IO (ReadIfaceTable (Symbol
 initReadIfaceTypeTable ud = do
   pure $
     ReadIfaceTable
-      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$> readFromSymTab ud bh)
+      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$!> readFromSymTab ud bh)
 
       }
 

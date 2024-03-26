@@ -1288,7 +1288,7 @@ getGenericSymbolTable deserialiser bh = do
   -- (6 arguments-ish).
   forM_ [0..(sz-1)] $ \i -> do
 --    f <- lazyGet' (Just bhRef) deserialiser bh
-    f <- deserialiser bh
+    !f <- deserialiser bh
     writeArray mut_arr i f
 --  pprTraceM "gotten" (ppr sz)
   unsafeFreeze mut_arr

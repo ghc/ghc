@@ -619,7 +619,7 @@ fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
 -}
 
 data IfaceExpr
-  = IfaceSerialisedExpr FullBinData
+  = IfaceSerialisedExpr !FullBinData
   | IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
