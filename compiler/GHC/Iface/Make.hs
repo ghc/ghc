@@ -96,6 +96,8 @@ import Data.List ( sortBy )
 import Data.Ord
 import Data.IORef
 
+import qualified Data.ByteString as BS
+
 
 {-
 ************************************************************************
@@ -157,10 +159,11 @@ shareIface :: NameCache -> ModIface -> IO ModIface
 shareIface nc mi = do
   bh <- openBinMem (1024 * 1024)
   -- Todo, not quite right (See ext fields etc)
-  start <- tellBin @() bh
   putWithUserData QuietBinIFace bh mi
-  seekBin bh start
-  res <- getWithUserData nc bh
+  -- Copy out just the part of the buffer which is used, otherwise each interface
+  -- retains a 1mb bytearray
+  bh' <- withBinBuffer bh (\bs -> unsafeUnpackBinBuffer (BS.copy bs))
+  res <- getWithUserData nc bh'
   let resiface = res { mi_src_hash = mi_src_hash mi }
   forceModIface  resiface
   return resiface
