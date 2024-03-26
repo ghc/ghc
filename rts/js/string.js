@@ -723,7 +723,10 @@ function h$appendToHsStringA(str, appendTo, cc) {
 function h$appendToHsStringA(str, appendTo) {
 #endif
   var i = str.length - 1;
-  var r = appendTo;
+  // we need to make an updatable thunk here
+  // if we embed the given closure in a CONS cell.
+  // (#24495)
+  var r = i == 0 ? appendTo : MK_UPD_THUNK(appendTo);
   while(i>=0) {
     r = MK_CONS_CC(str.charCodeAt(i), r, cc);
     --i;

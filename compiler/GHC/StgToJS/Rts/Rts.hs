@@ -448,6 +448,19 @@ rts_gen s = do
                                                 , r4 |= d4
                                                 , returnS (app "h$ap_3_3_fast" [])
                                                 ])
+             , closure (ClosureInfo (TxtI "h$upd_thunk_e") (CIRegs 0 [PtrV]) "updatable thunk" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+               (jVar $ \t -> return $
+                   mconcat [t |= closureField1 r1
+                           , adjSp' 2
+                           , stack .! (sp - 1) |= r1
+                           , stack .! sp       |= var "h$upd_frame"
+                           , closureEntry  r1 |= var "h$blackhole"
+                           , closureField1 r1 |= var "h$currentThread"
+                           , closureField2 r1 |= null_
+                           , r1 |= t
+                           , returnS (app "h$ap_0_0_fast" [])
+                           ]
+                  )
              -- select first field
              , closure (ClosureInfo (global "h$select1_e") (CIRegs 0 [PtrV]) "select1" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                   (jVar \t -> return $

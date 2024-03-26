@@ -191,6 +191,9 @@ genCommonCppDefs profiling = mconcat
   -- resumable thunks
   , "#define MAKE_RESUMABLE(closure,stack) { (closure).f = h$resume_e; (closure).d1 = (stack), (closure).d2 = null; }\n"
 
+  -- making a thunk
+  , "#define MK_UPD_THUNK(closure) h$c1(h$upd_thunk_e,(closure))\n"
+
   -- general deconstruction
   , "#define IS_THUNK(x) ((x).f.t === CLOSURE_TYPE_THUNK)\n"
   , "#define CONSTR_TAG(x) ((x).f.a)\n"
