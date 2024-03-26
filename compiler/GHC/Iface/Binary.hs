@@ -19,6 +19,8 @@ module GHC.Iface.Binary (
         TraceBinIFace(..),
         getWithUserData,
         putWithUserData,
+        putWithTables,
+        getTables,
 
         -- * Internal serialisation functions
         getSymbolTable,
@@ -235,7 +237,7 @@ writeStackFormat fp report = do
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
-  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> putNoStack bh' payload)
+  (name_count, fs_count, type_count, _b) <- putWithTables bh (\bh' -> putNoStack bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()
@@ -244,6 +246,8 @@ putWithUserData traceBinIface bh payload = do
                                       <+> text "Names")
        printer (text "writeBinIface:" <+> int fs_count
                                       <+> text "dict entries")
+       printer (text "writeBinIface:" <+> int type_count
+                                      <+> text "iface type entries")
 
 -- | Write name/symbol tables
 --
@@ -257,7 +261,7 @@ putWithUserData traceBinIface bh payload = do
 --
 -- It returns (number of names, number of FastStrings, payload write result)
 --
-putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int, Int, b)
+putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int, Int, Int, b)
 putWithTables bh' put_payload = do
   let
     -- The order of these entries matters!
@@ -278,11 +282,11 @@ putWithTables bh' put_payload = do
             tables
 
   let bh = setWriterUserData bh' writerUserData
-  (fs_count : name_count : _, r) <-
+  (fs_count : name_count : ifacetype_count : _, r) <-
     putAllTables bh (fmap (\(SomeWriterTable tbl) -> fst $ runIdentity tbl) tables) $ do
       put_payload bh
 
-  return (name_count, fs_count, r)
+  return (name_count, fs_count, ifacetype_count, r)
  where
   putAllTables _ [] act = do
     a <- act

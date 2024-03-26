@@ -92,6 +92,10 @@ import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
 import Data.Array as Array
+import GHC.Utils.Binary
+import Data.IORef
+import System.IO.Unsafe
+import GHC.Iface.Binary
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -2190,6 +2194,7 @@ data BcM_State
                                          -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
         , breakInfo   :: IntMap CgBreakInfo
+        , breakInfoBuffer :: (BinHandle, UserData) -- ^ A buffer which enables CgBreakInfo to be shared.
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
@@ -2202,8 +2207,32 @@ ioToBc io = BcM $ \st -> do
 runBc :: HscEnv -> Module -> Maybe ModBreaks
       -> BcM r
       -> IO (BcM_State, r)
-runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty)
+runBc hsc_env this_mod modBreaks (BcM m) =  do
+  bh <- openBinMem 1024
+  start <- tellBin @() bh
+  user_data <- newIORef (error "used too soon")
+  read_ud <- unsafeInterleaveIO (readIORef user_data)
+  (fs, n, t, r) <- putWithTables' bh
+    (\bh' -> m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty (bh', read_ud)))
+  seekBinNoExpand bh start
+  bh_with_user <- getTables' (hsc_NC hsc_env) bh
+  writeIORef user_data (getUserData bh_with_user)
+  return r
+
+{-
+shareIface :: NameCache -> ModIface -> IO ModIface
+shareIface nc mi = do
+  bh <- openBinMem (1024 * 1024)
+  -- Todo, not quite right (See ext fields etc)
+  putWithUserData QuietBinIFace bh mi
+  -- Copy out just the part of the buffer which is used, otherwise each interface
+  -- retains a 1mb bytearray
+  bh' <- withBinBuffer bh (\bs -> unsafeUnpackBinBuffer (BS.copy bs))
+  res <- getWithUserData nc bh'
+  let resiface = res { mi_src_hash = mi_src_hash mi }
+  forceModIface  resiface
+  return resiface
+  -}
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2260,8 +2289,13 @@ getLabelsBc n
                  in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
 newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
-newBreakInfo ix info = BcM $ \st ->
-  return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
+newBreakInfo ix info = BcM $ \st -> do
+  let (bh, read_ud) = breakInfoBuffer st
+  start <- tellBin @() bh
+  lazyPut bh info
+  seekBinNoExpand bh start
+  shared_info <- lazyGet (setUserData bh read_ud)
+  return (st{breakInfo = IntMap.insert ix shared_info (breakInfo st)}, ())
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)
