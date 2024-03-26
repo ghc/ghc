@@ -746,6 +746,10 @@ instance Binary Word64 where
   putNoStack_ = putULEB128
   get = getULEB128
 
+instance Binary Word where
+  putNoStack_ = putULEB128
+  get = getULEB128
+
 -- -----------------------------------------------------------------------------
 -- Primitive Int writes
 
