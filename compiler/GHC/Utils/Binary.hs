@@ -249,15 +249,18 @@ tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 seekBin :: BinHandle -> Bin a -> IO ()
 seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
-  if (p >= sz)
+  if (p > sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
--- | SeekBin but without calling expandBin
+-- | 'seekBinNoExpand' moves the index pointer to the location pointed to
+-- by 'Bin a'.
+-- This operation may 'panic', if the pointer location is out of bounds of the
+-- buffer of 'BinHandle'.
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
 seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
-  if (p >= sz)
+  if (p > sz)
         then panic "seekBinNoExpand: seek out of range"
         else writeFastMutInt ix_r p
 
