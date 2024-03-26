@@ -27,4 +27,5 @@ import GHC.Internal.IO.Encoding.Iconv
 #else
     ( ) where
 
+import Prelude () -- for build ordering (#23942)
 #endif
