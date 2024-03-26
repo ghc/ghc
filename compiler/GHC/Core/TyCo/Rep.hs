@@ -1826,6 +1826,38 @@ Here deep_fvs and deep_tcf are mutually recursive, unlike fvs and tcf.
 But, amazingly, we get good code here too. GHC is careful not to mark
 TyCoFolder data constructor for deep_tcf as a loop breaker, so the
 record selections still cancel.  And eta expansion still happens too.
+
+Note [Use explicit recursion in foldTyCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foldTyCo you'll see things like:
+    go_tys _   []     = mempty
+    go_tys env (t:ts) = go_ty env t `mappend` go_tys env ts
+where we use /explicit recursion/.  You might wonder about using foldr instead:
+    go_tys env = foldl (\t acc -> go_ty env t `mappend` acc) mempty
+Or maybe or foldl', or foldr.
+
+But don't do that for two reasons (see #24591)
+
+* We sometimes instantiate `a` to (Endo VarSet). Remembering
+     newtype Endo a = Endo (a->a)
+  after inlining `foldTyCo` bodily, the explicit recursion looks like
+    go_tys _   []     = \acc -> acc
+    go_tys env (t:ts) = \acc -> go_ty env t (go_tys env ts acc)
+  The strictness analyser has no problem spotting that this function is
+  strict in `acc`, provided `go_ty` is.
+
+  But in the foldl form that is /much/ less obvious, and the strictness
+  analyser fails utterly.  Result: lots and lots of thunks get built.  In
+  !12037, Mikolaj found that GHC allocated allocated /six times/ as much heap
+  on test perf/compiler/T9198 as a result of this single problem!
+
+* Second, while I think that using `foldr` would be fine (simple experiments in
+  #24591 suggest as much), it builds a local loop (with env free) and I'm not 100%
+  confident it'll be lambda lifted in the end. It seems more direct just to write
+  the code we want.
+
+  On the other hand in `go_cvs` we might hope that the `foldr` will fuse with the
+  `dVarSetElems` so I have used `foldr`.
 -}
 
 data TyCoFolder env a
@@ -1864,12 +1896,11 @@ foldTyCo (TyCoFolder { tcf_view       = view
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
         in go_ty env (varType tv) `mappend` go_ty env' inner
 
-    -- Explicit recursion because using foldr builds a local
-    -- loop (with env free) and I'm not confident it'll be
-    -- lambda lifted in the end
+    -- See Note [Use explicit recursion in foldTyCo]
     go_tys _   []     = mempty
     go_tys env (t:ts) = go_ty env t `mappend` go_tys env ts
 
+    -- See Note [Use explicit recursion in foldTyCo]
     go_cos _   []     = mempty
     go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
 
@@ -1905,7 +1936,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _ cvs)  = go_cvs env cvs
 
-    go_cvs env cvs = foldl' (\ !acc cv -> acc `mappend` covar env cv) mempty (dVarSetElems cvs)
+    -- See Note [Use explicit recursion in foldTyCo]
+    go_cvs env cvs = foldr (add_one env) mempty (dVarSetElems cvs)
+    add_one env cv acc = covar env cv `mappend` acc
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
