@@ -52,6 +52,7 @@ import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
 import Language.Haskell.Syntax.Module.Name (ModuleName)
 import GHC.Base (ByteArray#)
+import GHC.Utils.Binary
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -229,6 +230,11 @@ data CgBreakInfo
    , cgb_vars   :: ![Maybe (IfaceIdBndr, Word)]
    , cgb_resty  :: !IfaceType
    }
+
+instance Binary CgBreakInfo where
+  putNoStack_ bh (CgBreakInfo tv vs rty) =
+    put_ bh tv >> put_ bh vs >> put_ bh rty
+  get bh = CgBreakInfo <$> get bh <*> get bh <*> get bh
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
 seqCgBreakInfo :: CgBreakInfo -> ()

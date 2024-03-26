@@ -19,6 +19,8 @@ module GHC.Iface.Binary (
         TraceBinIFace(..),
         getWithUserData,
         putWithUserData,
+        putWithTables',
+        getTables',
 
         -- * Internal serialisation functions
         getSymbolTable,
@@ -267,7 +269,7 @@ writeStackFormat fp report = do
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: HasCallStack => Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
-  (name_count, fs_count, _b) <- putWithTables' bh (\bh' -> putNoStack bh' payload)
+  (name_count, fs_count, type_count, _b) <- putWithTables' bh (\bh' -> putNoStack bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()
@@ -426,7 +428,7 @@ initWriteIfaceType = do
 
 --     return (name_count, fs_count, r)
 
-putWithTables' :: HasCallStack => BinHandle -> (BinHandle -> IO b) -> IO (Int,Int,b)
+putWithTables' :: HasCallStack => BinHandle -> (BinHandle -> IO b) -> IO (Int,Int, Int, b)
 putWithTables' bh' put_payload = do
     (fsTbl, fsWriter) <- initWriteFsTable
     (nameTbl, nameWriter) <- initWriteNameTable
@@ -441,14 +443,14 @@ putWithTables' bh' put_payload = do
           ]
 
     let bh = setUserData bh' userData
-    (fs_count,(name_count,(_, r))) <-
+    (fs_count,(name_count,(type_count, r))) <-
       forwardPut bh (const (putTable fsTbl bh)) $ do
         forwardPut bh (const (putTable nameTbl bh)) $ do
  --         forwardPut bh (const (putTable ifaceTyConTbl bh)) $ do
             forwardPut bh (const (putTable ifaceTypeTbl bh)) $ do
               put_payload bh
 
-    return (name_count, fs_count, r)
+    return (name_count, fs_count, type_count, r)
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
