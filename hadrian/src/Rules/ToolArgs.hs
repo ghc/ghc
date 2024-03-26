@@ -158,7 +158,6 @@ toolTargets = [ binary
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
               , ghcBoot
-              , ghcBootTh
               , ghcPlatform
               , ghcToolchain
               , ghcToolchainBin
@@ -172,7 +171,6 @@ toolTargets = [ binary
               , mtl
               , parsec
               , time
-              , templateHaskell
               , text
               , transformers
               , semaphoreCompat

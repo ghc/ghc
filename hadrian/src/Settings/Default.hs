@@ -93,7 +93,6 @@ stage0Packages = do
              , ghc
              , runGhc
              , ghcBoot
-             , ghcBootTh
              , ghcPlatform
              , ghcHeap
              , ghcToolchain
@@ -108,7 +107,6 @@ stage0Packages = do
              , parsec
              , semaphoreCompat
              , time
-             , templateHaskell
              , text
              , transformers
              , unlit
@@ -143,6 +141,7 @@ stage1Packages = do
         , deepseq
         , exceptions
         , ghc
+        , ghcBootTh
         , ghcBignum
         , ghcCompact
         , ghcExperimental
@@ -156,6 +155,7 @@ stage1Packages = do
         , pretty
         , rts
         , semaphoreCompat
+        , templateHaskell
         , stm
         , unlit
         , xhtml

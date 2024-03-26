@@ -3,6 +3,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP #-}
 
 -- This module is full of orphans, unfortunately
 module GHCi.TH.Binary () where
@@ -27,17 +28,23 @@ instance Binary TH.Info
 instance Binary TH.Type
 instance Binary TH.TyLit
 instance Binary TH.Specificity
+#if MIN_VERSION_template_haskell(2,21,0)
 instance Binary TH.BndrVis
+#endif
 instance Binary flag => Binary (TH.TyVarBndr flag)
 instance Binary TH.Role
 instance Binary TH.Lit
 instance Binary TH.Range
 instance Binary TH.Stmt
 instance Binary TH.Pat
+#if MIN_VERSION_template_haskell(2,22,0)
 instance Binary TH.ArgPat
+#endif
 instance Binary TH.Exp
 instance Binary TH.Dec
+#if MIN_VERSION_template_haskell(2,22,0)
 instance Binary TH.NamespaceSpecifier
+#endif
 instance Binary TH.Overlap
 instance Binary TH.DerivClause
 instance Binary TH.DerivStrategy

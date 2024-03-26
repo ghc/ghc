@@ -83,8 +83,9 @@ library
         deepseq          >= 1.4 && < 1.6,
         filepath         >= 1.4 && < 1.6,
         ghc-boot         == @ProjectVersionMunged@,
+        ghc-boot-th      >= 9.6 && <= @ProjectVersionMunged@,
         ghc-heap         == @ProjectVersionMunged@,
-        template-haskell == 2.22.*,
+        template-haskell >= 2.20 && < 2.23,
         transformers     >= 0.5 && < 0.7
 
     if !os(windows)

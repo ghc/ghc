@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE CPP                    #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -160,6 +161,14 @@ type MetaM a = ReaderT MetaWrappers DsM a
 
 getPlatform :: MetaM Platform
 getPlatform = targetPlatform <$> getDynFlags
+
+#if MIN_VERSION_template_haskell(2,21,0)
+type BndrVis = TH.BndrVis
+type THArgPat = TH.ArgPat
+#else
+type THArgPat = TH.Pat
+type BndrVis = ()
+#endif
 
 -----------------------------------------------------------------------------
 dsBracket :: HsBracketTc -> DsM CoreExpr
@@ -513,7 +522,7 @@ repKiSigD (L loc kisig) =
 
 -------------------------
 repDataDefn :: Core TH.Name
-            -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
+            -> Either (Core [(M (TH.TyVarBndr BndrVis))])
                         -- the repTyClD case
                       (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
                         -- the repDataFamInstD case
@@ -536,7 +545,7 @@ repDataDefn tc opts
                                          derivs1 }
        }
 
-repSynDecl :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+repSynDecl :: Core TH.Name -> Core [(M (TH.TyVarBndr BndrVis))]
            -> LHsType GhcRn
            -> MetaM (Core (M TH.Dec))
 repSynDecl tc bndrs ty
@@ -789,8 +798,13 @@ rep_fix_d loc (FixitySig ns_spec names (Fixity _ prec dir))
                         InfixN -> infixNWithSpecDName
        ; let do_one name
               = do { MkC name' <- lookupLOcc name
+#if MIN_VERSION_template_haskell(2,22,0)
                    ; MkC ns_spec' <- repNamespaceSpecifier ns_spec
                    ; dec <- rep2 rep_fn [prec', ns_spec', name']
+#else
+                   ; void $ return ns_spec -- to avoid CPP incurred unused variable warning
+                   ; dec <- rep2 rep_fn [prec', name']
+#endif
                    ; return (loc,dec) }
        ; mapM do_one names }
 
@@ -1195,16 +1209,20 @@ rep_flag :: Specificity -> MetaM (Core TH.Specificity)
 rep_flag SpecifiedSpec = rep2_nw specifiedSpecName []
 rep_flag InferredSpec  = rep2_nw inferredSpecName []
 
-instance RepTV (HsBndrVis GhcRn) TH.BndrVis where
+instance RepTV (HsBndrVis GhcRn) BndrVis where
     tyVarBndrName = tyVarBndrVisTyConName
     repPlainTV  (MkC nm) vis          = do { (MkC vis') <- rep_bndr_vis vis
                                            ; rep2 plainBndrTVName  [nm, vis'] }
     repKindedTV (MkC nm) vis (MkC ki) = do { (MkC vis') <- rep_bndr_vis vis
                                            ; rep2 kindedBndrTVName [nm, vis', ki] }
 
-rep_bndr_vis :: HsBndrVis GhcRn -> MetaM (Core TH.BndrVis)
+rep_bndr_vis :: HsBndrVis GhcRn -> MetaM (Core BndrVis)
+#if MIN_VERSION_template_haskell(2,21,0)
 rep_bndr_vis (HsBndrRequired _)  = rep2_nw bndrReqName []
 rep_bndr_vis (HsBndrInvisible _) = rep2_nw bndrInvisName []
+#else
+rep_bndr_vis _  = rep2_nw bndrReqName []
+#endif
 
 addHsOuterFamEqnTyVarBinds ::
      HsOuterFamEqnTyVarBndrs GhcRn
@@ -1311,7 +1329,7 @@ addHsTyVarBinds fresh_or_reuse exp_tvs thing_inside
 
 addQTyVarBinds :: FreshOrReuse
                -> LHsQTyVars GhcRn -- the binders to be added
-               -> (Core [(M (TH.TyVarBndr TH.BndrVis))] -> MetaM (Core (M a))) -- action in the ext env
+               -> (Core [(M (TH.TyVarBndr BndrVis))] -> MetaM (Core (M a))) -- action in the ext env
                -> MetaM (Core (M a))
 addQTyVarBinds fresh_or_reuse qtvs thing_inside =
   let HsQTvs { hsq_ext      = imp_tvs
@@ -2101,10 +2119,10 @@ repLP :: LPat GhcRn -> MetaM (Core (M TH.Pat))
 repLP p = repP (unLoc p)
 
 -- Process a list of arg patterns
-repLMPs :: [LArgPat GhcRn] -> MetaM (Core ([M TH.ArgPat]))
+repLMPs :: [LArgPat GhcRn] -> MetaM (Core ([M THArgPat]))
 repLMPs ps = repListM argPatTyConName repLMP ps
 
-repLMP :: LArgPat GhcRn -> MetaM (Core (M TH.ArgPat))
+repLMP :: LArgPat GhcRn -> MetaM (Core (M THArgPat))
 repLMP (L _ (VisPat _ p))     = do {p' <- repLP p; repAPvis p'}
 repLMP (L _ (InvisPat _ t)) = do {t' <- repLTy (hstp_body t); repAPinvis t'}
 
@@ -2417,10 +2435,10 @@ repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 repPtype :: Core (M TH.Type) -> MetaM (Core (M TH.Pat))
 repPtype (MkC t) = rep2 typePName [t]
 
-repAPvis :: Core (M TH.Pat) -> MetaM (Core (M TH.ArgPat))
+repAPvis :: Core (M TH.Pat) -> MetaM (Core (M THArgPat))
 repAPvis (MkC t) = rep2 visAPName [t]
 
-repAPinvis :: Core (M TH.Type) -> MetaM (Core (M TH.ArgPat))
+repAPinvis :: Core (M TH.Type) -> MetaM (Core (M THArgPat))
 repAPinvis (MkC t) = rep2 invisAPName [t]
 
 --------------- Expressions -----------------
@@ -2446,7 +2464,7 @@ repApp (MkC x) (MkC y) = rep2 appEName [x,y]
 repAppType :: Core (M TH.Exp) -> Core (M TH.Type) -> MetaM (Core (M TH.Exp))
 repAppType (MkC x) (MkC y) = rep2 appTypeEName [x,y]
 
-repLam :: Core [(M TH.ArgPat)] -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
+repLam :: Core [(M THArgPat)] -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
 repLam (MkC ps) (MkC e) = rep2 lamArgEName [ps, e]
 
 repLamCase :: Core [(M TH.Match)] -> MetaM (Core (M TH.Exp))
@@ -2583,7 +2601,7 @@ repFromThenTo (MkC x) (MkC y) (MkC z) = rep2 fromThenToEName [x,y,z]
 repMatch :: Core (M TH.Pat) -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Match))
 repMatch (MkC p) (MkC bod) (MkC ds) = rep2 matchName [p, bod, ds]
 
-repClause :: Core [(M TH.ArgPat)] -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Clause))
+repClause :: Core [(M THArgPat)] -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Clause))
 repClause (MkC ps) (MkC bod) (MkC ds) = rep2 clauseArgName [ps, bod, ds]
 
 -------------- Dec -----------------------------
@@ -2596,7 +2614,7 @@ repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 repData :: Bool -- ^ @True@ for a @type data@ declaration.
                 -- See Note [Type data declarations] in GHC.Rename.Module
         -> Core (M TH.Cxt) -> Core TH.Name
-        -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
+        -> Either (Core [(M (TH.TyVarBndr BndrVis))])
                   (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
         -> Core (Maybe (M TH.Kind)) -> Core [(M TH.Con)] -> Core [M TH.DerivClause]
         -> MetaM (Core (M TH.Dec))
@@ -2608,7 +2626,7 @@ repData _ (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
   = rep2 dataInstDName [cxt, mb_bndrs, ty, ksig, cons, derivs]
 
 repNewtype :: Core (M TH.Cxt) -> Core TH.Name
-           -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
+           -> Either (Core [(M (TH.TyVarBndr BndrVis))])
                      (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
            -> Core (Maybe (M TH.Kind)) -> Core (M TH.Con) -> Core [M TH.DerivClause]
            -> MetaM (Core (M TH.Dec))
@@ -2619,7 +2637,7 @@ repNewtype (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC con)
            (MkC derivs)
   = rep2 newtypeInstDName [cxt, mb_bndrs, ty, ksig, con, derivs]
 
-repTySyn :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+repTySyn :: Core TH.Name -> Core [(M (TH.TyVarBndr BndrVis))]
          -> Core (M TH.Type) -> MetaM (Core (M TH.Dec))
 repTySyn (MkC nm) (MkC tvs) (MkC rhs)
   = rep2 tySynDName [nm, tvs, rhs]
@@ -2677,14 +2695,15 @@ repOverlap mb =
   nothing = coreNothing overlapTyConName
   just    = coreJust overlapTyConName
 
-
+#if MIN_VERSION_template_haskell(2,22,0)
 repNamespaceSpecifier :: NamespaceSpecifier -> MetaM (Core (TH.NamespaceSpecifier))
 repNamespaceSpecifier ns_spec = case ns_spec of
   NoNamespaceSpecifier{} -> dataCon noNamespaceSpecifierDataConName
   TypeNamespaceSpecifier{} -> dataCon typeNamespaceSpecifierDataConName
   DataNamespaceSpecifier{} -> dataCon dataNamespaceSpecifierDataConName
+#endif
 
-repClass :: Core (M TH.Cxt) -> Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+repClass :: Core (M TH.Cxt) -> Core TH.Name -> Core [(M (TH.TyVarBndr BndrVis))]
          -> Core [TH.FunDep] -> Core [(M TH.Dec)]
          -> MetaM (Core (M TH.Dec))
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
@@ -2739,13 +2758,13 @@ repTySynInst :: Core (M TH.TySynEqn) -> MetaM (Core (M TH.Dec))
 repTySynInst (MkC eqn)
     = rep2 tySynInstDName [eqn]
 
-repDataFamilyD :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+repDataFamilyD :: Core TH.Name -> Core [(M (TH.TyVarBndr BndrVis))]
                -> Core (Maybe (M TH.Kind)) -> MetaM (Core (M TH.Dec))
 repDataFamilyD (MkC nm) (MkC tvs) (MkC kind)
     = rep2 dataFamilyDName [nm, tvs, kind]
 
 repOpenFamilyD :: Core TH.Name
-               -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+               -> Core [(M (TH.TyVarBndr BndrVis))]
                -> Core (M TH.FamilyResultSig)
                -> Core (Maybe TH.InjectivityAnn)
                -> MetaM (Core (M TH.Dec))
@@ -2753,7 +2772,7 @@ repOpenFamilyD (MkC nm) (MkC tvs) (MkC result) (MkC inj)
     = rep2 openTypeFamilyDName [nm, tvs, result, inj]
 
 repClosedFamilyD :: Core TH.Name
-                 -> Core [(M (TH.TyVarBndr TH.BndrVis))]
+                 -> Core [(M (TH.TyVarBndr BndrVis))]
                  -> Core (M TH.FamilyResultSig)
                  -> Core (Maybe TH.InjectivityAnn)
                  -> Core [(M TH.TySynEqn)]

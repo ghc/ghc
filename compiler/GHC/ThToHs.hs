@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -164,6 +165,10 @@ wrapLA (CvtM m) = CvtM $ \origin loc -> case m origin loc of
   Left err -> Left err
   Right (loc', v) -> Right (loc', L (noAnnSrcSpan loc) v)
 
+#if !MIN_VERSION_template_haskell(2,21,0)
+type BndrVis = ()
+#endif
+
 {-
 Note [Source locations within TH splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,19 +248,31 @@ cvtDec (TH.KiSigD nm ki)
         ; let sig' = StandaloneKindSig noAnn nm' ki'
         ; returnJustLA $ Hs.KindSigD noExtField sig' }
 
-cvtDec (TH.InfixD fx th_ns_spec nm)
+cvtDec (TH.InfixD fx
+#if MIN_VERSION_template_haskell(2,22,0)
+        th_ns_spec
+#endif
+        nm)
   -- Fixity signatures are allowed for variables, constructors, and types
   -- the renamer automatically looks for types during renaming, even when
   -- the RdrName says it's a variable or a constructor. So, just assume
   -- it's a variable or constructor and proceed.
   = do { nm' <- vcNameN nm
        ; returnJustLA (Hs.SigD noExtField (FixSig noAnn
-                                      (FixitySig ns_spec [nm'] (cvtFixity fx)))) }
+                                      (FixitySig
+#if MIN_VERSION_template_haskell(2,22,0)
+                                       ns_spec
+#else
+                                       Hs.NoNamespaceSpecifier
+#endif
+                                       [nm'] (cvtFixity fx)))) }
   where
+#if MIN_VERSION_template_haskell(2,22,0)
     ns_spec = case th_ns_spec of
       TH.NoNamespaceSpecifier -> Hs.NoNamespaceSpecifier
       TH.TypeNamespaceSpecifier -> Hs.TypeNamespaceSpecifier noAnn
       TH.DataNamespaceSpecifier -> Hs.DataNamespaceSpecifier noAnn
+#endif
 
 cvtDec (TH.DefaultD tys)
   = do  { tys' <- traverse cvtType tys
@@ -469,7 +486,7 @@ cvtDec (TH.ImplicitParamBindD _ _)
   = failWith InvalidImplicitParamBinding
 
 -- Convert a @data@ declaration.
-cvtDataDec :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
+cvtDataDec :: TH.Cxt -> TH.Name -> [TH.TyVarBndr BndrVis]
     -> Maybe TH.Kind -> [TH.Con] -> [TH.DerivClause]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtDataDec = cvtGenDataDec False
@@ -477,14 +494,14 @@ cvtDataDec = cvtGenDataDec False
 -- Convert a @type data@ declaration.
 -- These have neither contexts nor derived clauses.
 -- See Note [Type data declarations] in GHC.Rename.Module.
-cvtTypeDataDec :: TH.Name -> [TH.TyVarBndr TH.BndrVis] -> Maybe TH.Kind -> [TH.Con]
+cvtTypeDataDec :: TH.Name -> [TH.TyVarBndr BndrVis] -> Maybe TH.Kind -> [TH.Con]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtTypeDataDec tc tvs ksig constrs
   = cvtGenDataDec True [] tc tvs ksig constrs []
 
 -- Convert a @data@ or @type data@ declaration (flagged by the Bool arg).
 -- See Note [Type data declarations] in GHC.Rename.Module.
-cvtGenDataDec :: Bool -> TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
+cvtGenDataDec :: Bool -> TH.Cxt -> TH.Name -> [TH.TyVarBndr BndrVis]
     -> Maybe TH.Kind -> [TH.Con] -> [TH.DerivClause]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
@@ -538,6 +555,20 @@ cvtDataDefnCons type_data ksig constrs
                   c:_ -> c
         ; mapM (cvtConstr first_datacon_name con_name) constrs }
 
+#if !MIN_VERSION_template_haskell(2,21,0)
+get_cons_names :: TH.Con -> [TH.Name]
+get_cons_names (TH.NormalC n _)     = [n]
+get_cons_names (TH.RecC n _)        = [n]
+get_cons_names (TH.InfixC _ n _)    = [n]
+get_cons_names (TH.ForallC _ _ con) = get_cons_names con
+-- GadtC can have multiple names, e.g
+-- > data Bar a where
+-- >   MkBar1, MkBar2 :: a -> Bar a
+-- Will have one GadtC with [MkBar1, MkBar2] as names
+get_cons_names (TH.GadtC ns _ _)    = ns
+get_cons_names (TH.RecGadtC ns _ _) = ns
+#endif
+
 ----------------
 cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
 cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
@@ -590,7 +621,7 @@ cvt_ci_decs declDescr decs
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
-cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr BndrVis]
              -> CvtM ( LHsContext GhcPs
                      , LocatedN RdrName
                      , LHsQTyVars GhcPs)
@@ -954,12 +985,14 @@ cvtPragmaD (CompleteP cls mty)
        ; mty'  <- traverse tconNameN mty
        ; returnJustLA $ Hs.SigD noExtField
                    $ CompleteMatchSig (noAnn, NoSourceText) cls' mty' }
+#if MIN_VERSION_template_haskell(2,22,0)
 cvtPragmaD (SCCP nm str) = do
   nm' <- vcNameN nm
   str' <- traverse (\s ->
     returnLA $ StringLiteral NoSourceText (mkFastString s) Nothing) str
   returnJustLA $ Hs.SigD noExtField
     $ SCCFunSig (noAnn, SourceText $ fsLit "{-# SCC") nm' str'
+#endif
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive
@@ -1165,12 +1198,17 @@ cvtl e = wrapLA (cvt e)
                                          (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
                                          (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
+
+#if MIN_VERSION_template_haskell(2,21,0)
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
                               ; return $ HsTypedSplice [] e' }
     cvt (TypedBracketE e) = do { e' <- cvtl e
                                ; return $ HsTypedBracket noAnn e' }
+#endif
+#if MIN_VERSION_template_haskell(2,22,0)
     cvt (TypeE t) = do { t' <- cvtType t
                        ; return $ HsEmbTy noAnn (mkHsWildCardBndrs t') }
+#endif
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
@@ -1416,6 +1454,7 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""
 
+#if MIN_VERSION_template_haskell(2,22,0)
 cvtArgPats :: [TH.ArgPat] -> CvtM [Hs.LArgPat GhcPs]
 cvtArgPats pats = mapM cvtArgPat pats
 
@@ -1427,6 +1466,18 @@ cvtap (VisAP pat) = do { pat' <- cvtPat pat
                        ; pure (VisPat noExtField pat')}
 cvtap (InvisAP t) = do { t' <- cvtType t
                        ; pure (InvisPat noAnn (mkHsTyPat noAnn t'))}
+#else
+cvtArgPats :: [TH.Pat] -> CvtM [Hs.LArgPat GhcPs]
+cvtArgPats pats = mapM cvtArgPat pats
+
+cvtArgPat :: TH.Pat -> CvtM (Hs.LArgPat GhcPs)
+cvtArgPat pat = wrapLA (cvtap pat)
+
+cvtap :: TH.Pat -> CvtM (Hs.ArgPat GhcPs)
+cvtap pat = do { pat' <- cvtPat pat
+               ; pure (VisPat noExtField pat')}
+#endif
+
 
 cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
 cvtPats pats = mapM cvtPat pats
@@ -1498,8 +1549,10 @@ cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
                             ; return $ SigPat noAnn p' (mkHsPatSigType noAnn t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
+#if MIN_VERSION_template_haskell(2,22,0)
 cvtp (TypeP t)         = do { t' <- cvtType t
                             ; return $ EmbTyPat noAnn (mkHsTyPat noAnn t') }
+#endif
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)
@@ -1533,7 +1586,7 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --      Types and type variables
 
-class CvtFlag flag flag' | flag -> flag' where
+class CvtFlag flag flag' where
   cvtFlag :: flag -> flag'
 
 instance CvtFlag () () where
@@ -1543,9 +1596,14 @@ instance CvtFlag TH.Specificity Hs.Specificity where
   cvtFlag TH.SpecifiedSpec = Hs.SpecifiedSpec
   cvtFlag TH.InferredSpec  = Hs.InferredSpec
 
+#if MIN_VERSION_template_haskell(2,21,0)
 instance CvtFlag TH.BndrVis (HsBndrVis GhcPs) where
   cvtFlag TH.BndrReq   = HsBndrRequired noExtField
   cvtFlag TH.BndrInvis = HsBndrInvisible noAnn
+#else
+instance CvtFlag () (HsBndrVis GhcPs) where
+  cvtFlag () = HsBndrRequired noExtField
+#endif
 
 cvtTvs :: CvtFlag flag flag' => [TH.TyVarBndr flag] -> CvtM [LHsTyVarBndr flag' GhcPs]
 cvtTvs tvs = mapM cvt_tv tvs
@@ -2212,7 +2270,9 @@ mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
 mk_ghc_ns TH.DataName      = OccName.dataName
 mk_ghc_ns TH.TcClsName     = OccName.tcClsName
 mk_ghc_ns TH.VarName       = OccName.varName
+#if MIN_VERSION_template_haskell(2,22,0)
 mk_ghc_ns (TH.FldName con) = OccName.fieldName (fsLit con)
+#endif
 
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)

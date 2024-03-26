@@ -45,7 +45,7 @@ import qualified Data.IntMap as IntMap
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List.NonEmpty (NonEmpty(..))
-import GHC.LanguageExtensions.Type
+import GHC.LanguageExtensions
 import qualified GHC.Utils.Outputable as O
 import GHC.Hs.Extension
 import GHC.Types.Unique.Map

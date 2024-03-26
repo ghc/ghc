@@ -35,7 +35,10 @@ extra_dependencies =
 
   where
     th_internal = (templateHaskell, "Language.Haskell.TH.Lib.Internal")
-    dep (p1, m1) (p2, m2) s = do
+    dep (p1, m1) (p2, m2) s =
+      -- We use the boot compiler's `template-haskell` library when building stage0,
+      -- so we don't need to register dependencies.
+      if isStage0 s then pure [] else do
         let context = Context s p1 (error "extra_dependencies: way not set") (error "extra_dependencies: iplace not set")
         ways <- interpretInContext context getLibraryWays
         mapM (\way -> (,) <$> path s way p1 m1 <*> path s way p2 m2) (S.toList ways)

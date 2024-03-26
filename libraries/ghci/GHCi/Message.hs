@@ -32,7 +32,9 @@ import GHCi.TH.Binary () -- For Binary instances
 import GHCi.BreakArray
 import GHCi.ResolvedBCO
 
-import GHC.LanguageExtensions
+-- Import the ghc-boot-th version of the extension list because when building
+-- stage1, we want to use the list bundled with `template-haskell`.
+import GHC.LanguageExtensions.Type
 import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
@@ -57,6 +59,9 @@ import qualified Language.Haskell.TH.Syntax as TH
 import System.Exit
 import System.IO
 import System.IO.Error
+
+-- orphan instance
+instance Binary Extension
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server

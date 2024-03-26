@@ -157,6 +157,7 @@ import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+import GHC.LanguageExtensions
 
 
 
@@ -1514,10 +1515,10 @@ instance TH.Quasi TcM where
       th_state_var <- fmap tcg_th_state getGblEnv
       updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
 
-  qIsExtEnabled = xoptM
+  qIsExtEnabled = xoptM . migrateExt
 
   qExtsEnabled =
-    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
+    map unmigrateExt . EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
   qPutDoc doc_loc s = do
     th_doc_var <- tcg_th_docs <$> getGblEnv
@@ -2002,7 +2003,9 @@ getThing th_name
     ppr_ns (TH.Name _ (TH.NameG TH.DataName     _pkg _mod)) = text "data"
     ppr_ns (TH.Name _ (TH.NameG TH.TcClsName    _pkg _mod)) = text "tc"
     ppr_ns (TH.Name _ (TH.NameG TH.VarName      _pkg _mod)) = text "var"
+#if MIN_VERSION_template_haskell(2,21,0)
     ppr_ns (TH.Name _ (TH.NameG (TH.FldName {}) _pkg _mod)) = text "fld"
+#endif
     ppr_ns _ = panic "reify/ppr_ns"
 
 reify :: TH.Name -> TcM TH.Info
@@ -2674,6 +2677,14 @@ reifyCxt   = mapM reifyType
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
+#if MIN_VERSION_template_haskell(2,21,0)
+type BndrVis = TH.BndrVis
+#else
+type BndrVis = ()
+deriving instance Foldable TH.TyVarBndr
+deriving instance Traversable TH.TyVarBndr
+#endif
+
 class ReifyFlag flag flag' | flag -> flag' where
     reifyFlag :: flag -> flag'
 
@@ -2684,15 +2695,19 @@ instance ReifyFlag Specificity TH.Specificity where
     reifyFlag SpecifiedSpec = TH.SpecifiedSpec
     reifyFlag InferredSpec  = TH.InferredSpec
 
-instance ReifyFlag TyConBndrVis (Maybe TH.BndrVis) where
+instance ReifyFlag TyConBndrVis (Maybe BndrVis) where
+#if MIN_VERSION_template_haskell(2,21,0)
     reifyFlag AnonTCB              = Just TH.BndrReq
     reifyFlag (NamedTCB Required)  = Just TH.BndrReq
     reifyFlag (NamedTCB (Invisible _)) =
       Nothing -- See Note [Reifying invisible type variable binders] and #22828.
+#else
+   reifyFlag _ = Just ()
+#endif
 
 -- Currently does not return invisible type variable binders (@k-binders).
 -- See Note [Reifying invisible type variable binders] and #22828.
-reifyTyConBinders :: TyCon -> TcM [TH.TyVarBndr TH.BndrVis]
+reifyTyConBinders :: TyCon -> TcM [TH.TyVarBndr BndrVis]
 reifyTyConBinders tc = fmap (mapMaybe get_bndr) (reifyTyVarBndrs (tyConBinders tc))
   where
     get_bndr :: TH.TyVarBndr (Maybe flag) -> Maybe (TH.TyVarBndr flag)
@@ -2801,8 +2816,10 @@ reifyName thing
     mk_varg | OccName.isDataOcc occ = TH.mkNameG_d
             | OccName.isVarOcc  occ = TH.mkNameG_v
             | OccName.isTcOcc   occ = TH.mkNameG_tc
+#if MIN_VERSION_template_haskell(2,21,0)
             | Just con_fs <- OccName.fieldOcc_maybe occ
             = \ pkg mod occ -> TH.mkNameG_fld pkg mod (unpackFS con_fs) occ
+#endif
             | otherwise             = pprPanic "reifyName" (ppr name)
 
 reifyFieldLabel :: FieldLabel -> TH.Name
