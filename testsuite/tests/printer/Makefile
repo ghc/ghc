@@ -821,3 +821,8 @@ AnnotationNoListTuplePuns:
 Test24533:
 	$(CHECK_PPR)   $(LIBDIR) Test24533.hs
 	$(CHECK_EXACT) $(LIBDIR) Test24533.hs
+
+.PHONY: PprLetIn
+PprLetIn:
+	$(CHECK_PPR)   $(LIBDIR) PprLetIn.hs
+	$(CHECK_EXACT) $(LIBDIR) PprLetIn.hs

@@ -1438,10 +1438,10 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
                                              h' <- addTrailingSemiA h (gl $2)
                                              return (sLL $1 $> ($3 : h' : t)) }
         | ty_fam_inst_eqns ';'        {% case unLoc $1 of
-                                           [] -> return (sLL $1 $> (unLoc $1))
+                                           [] -> return (sLZ $1 $> (unLoc $1))
                                            (h:t) -> do
                                              h' <- addTrailingSemiA h (gl $2)
-                                             return (sLL $1 $>  (h':t)) }
+                                             return (sLZ $1 $>  (h':t)) }
         | ty_fam_inst_eqn             { sLL $1 $> [$1] }
         | {- empty -}                 { noLoc [] }
 
@@ -1719,12 +1719,12 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                  return (sLL $1 $> (fst $ unLoc $1
                                                                 , snocOL hs t' `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ( (fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLZ $1 $> ( (fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
                                                   t' <- addTrailingSemiA t (gl $2)
-                                                  return (sLL $1 $> (fst $ unLoc $1
+                                                  return (sLZ $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t')) }
           | decl_cls                    { sL1 $1 ([], unitOL $1) }
           | {- empty -}                 { noLoc ([],nilOL) }
@@ -1765,12 +1765,12 @@ decls_inst :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
                                                   return (sLL $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t' `appOL` unLoc $3)) }
            | decls_inst ';'             {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLZ $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
                                                   t' <- addTrailingSemiA t (gl $2)
-                                                  return (sLL $1 $> (fst $ unLoc $1
+                                                  return (sLZ $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t')) }
            | decl_inst                  { sL1 $1 ([],unLoc $1) }
            | {- empty -}                { noLoc ([],nilOL) }
@@ -1806,12 +1806,12 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
                                       return (rest `seq` this `seq` these `seq`
                                                  (sLL $1 $> (fst $ unLoc $1, these))) }
         | decls ';'          {% if isNilOL (snd $ unLoc $1)
-                                  then return (sLL $1 $> (((fst $ unLoc $1) ++ (msemiA $2)
+                                  then return (sLZ $1 $> (((fst $ unLoc $1) ++ (msemiA $2)
                                                           ,snd $ unLoc $1)))
                                   else case (snd $ unLoc $1) of
                                     SnocOL hs t -> do
                                        t' <- addTrailingSemiA t (gl $2)
-                                       return (sLL $1 $> (fst $ unLoc $1
+                                       return (sLZ $1 $> (fst $ unLoc $1
                                                       , snocOL hs t')) }
         | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
@@ -3334,11 +3334,11 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
                                               return (sLL $1 $> (fst $ unLoc $1,$3 : h' : t)) }
         | alts1(PATS) ';'           {  $1 >>= \ $1 ->
                                          case snd $ unLoc $1 of
-                                           [] -> return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                           [] -> return (sLZ $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                            ,[]))
                                            (h:t) -> do
                                              h' <- addTrailingSemiA h (gl $2)
-                                             return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
+                                             return (sLZ $1 $> (fst $ unLoc $1, h' : t)) }
         | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 $1 ([],[$1]) }
 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
@@ -3442,7 +3442,7 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (
 
         | stmts ';'     {  $1 >>= \ $1 ->
                            case (snd $ unLoc $1) of
-                             [] -> return (sLL $1 $> ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2),snd $ unLoc $1))
+                             [] -> return (sLZ $1 $> ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2),snd $ unLoc $1))
                              (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
                                ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
@@ -3552,7 +3552,7 @@ dbinds  :: { Located [LIPBind GhcPs] } -- reversed
         | dbinds ';'  {% case unLoc $1 of
                            (h:t) -> do
                              h' <- addTrailingSemiA h (gl $2)
-                             return (sLL $1 $> (h':t)) }
+                             return (sLZ $1 $> (h':t)) }
         | dbind                        { let this = $1 in this `seq` (sL1 $1 [this]) }
 --      | {- empty -}                  { [] }
 
@@ -4194,6 +4194,12 @@ sLLl !x !y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 sLLAsl :: (HasLoc a) => [a] -> Located b -> c -> Located c
 sLLAsl [] = sL1
 sLLAsl (!x:_) = sLL x
+
+{-# INLINE sLZ #-}
+sLZ :: (HasLoc a, HasLoc b) => a -> b -> c -> Located c
+sLZ !x !y = if isZeroWidthSpan (getHasLoc y)
+                 then sL (getHasLoc x)
+                 else sL (comb2 x y)
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
