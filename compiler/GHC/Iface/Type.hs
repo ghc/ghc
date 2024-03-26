@@ -161,7 +161,7 @@ type IfaceKind     = IfaceType
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
 -- before being printed. See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
 data IfaceType
-  = IfaceSerialisedType FullBinData
+  = IfaceSerialisedType !FullBinData
   | IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit

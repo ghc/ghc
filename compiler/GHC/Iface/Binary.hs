@@ -363,7 +363,7 @@ initReadIfaceTypeTable :: ReaderUserData -> IO (ReaderTable IfaceType)
 initReadIfaceTypeTable ud = do
   pure $
     ReaderTable
-      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$> readFromSymTab ud bh)
+      { getTable = getGenericSymbolTable (\bh -> IfaceSerialisedType <$!> readFromSymTab ud bh)
       , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
       }
 
