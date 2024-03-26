@@ -4,6 +4,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -693,11 +695,11 @@ envVarNull var = "$" ++ var ++ " == null"
 
 
 validateRuleString :: ValidateRule -> String
-validateRuleString FullCI = or_all ([ labelString "full-ci"
-                                    , labelString "marge_bot_batch_merge_job"
-                                    , branchStringExact "master"
-                                    , branchStringLike "ghc-[0-9]+\\.[0-9]+"
-                                    ])
+validateRuleString FullCI = or_all [ labelString "full-ci"
+                                   , labelString "marge_bot_batch_merge_job"
+                                   , branchStringExact "master"
+                                   , branchStringLike "ghc-[0-9]+\\.[0-9]+"
+                                   ]
 validateRuleString FastCI = true
 
 validateRuleString LLVMBackend  = labelString "LLVM backend"
@@ -1028,7 +1030,7 @@ flattenNamedJob (NamedJob n i) = (n, i)
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
+jobs = Map.fromList $ concatMap flattenJobGroup job_groups
 
 debian_x86 :: [JobGroup Job]
 debian_x86 =
