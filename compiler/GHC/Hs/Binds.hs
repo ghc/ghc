@@ -804,11 +804,19 @@ data TcSpecPrag
       -- ^ The Id to be specialised, a wrapper that specialises the
       -- polymorphic function, and inlining spec for the specialised function
 
-   | SpecPragE { spe_bndrs     :: [Var]
-               , spe_lhs_binds :: TcEvBinds
-               , spe_call      :: LHsExpr GhcTc
-               , spe_rhs_binds :: TcEvBinds
-               , spe_inl       :: InlinePragma }
+   | SpecPragE { spe_tv_bndrs     :: [TyVar]
+               , spe_id_bndrs     :: [Id]
+
+               , spe_lhs_ev_bndrs :: [EvVar]
+               , spe_lhs_binds    :: TcEvBinds  -- Closes spe_call using variables in
+                                                -- tv_bndrs, lhs_ev_bndrs, id_bndrs
+
+               , spe_rhs_ev_bndrs :: [EvVar]
+               , spe_rhs_binds    :: TcEvBinds  -- Closes spe_call using variables in
+                                                -- tv_bndrs, rhs_ev_bndrs, id_bndrs
+
+               , spe_call         :: LHsExpr GhcTc
+               , spe_inl          :: InlinePragma }
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -956,9 +964,10 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
-  ppr (SpecPragE { spe_bndrs = bndrs, spe_call = spec_e, spe_inl = inl })
+  ppr (SpecPragE { spe_tv_bndrs = tv_bndrs, spe_id_bndrs = id_bndrs
+                 , spe_call = spec_e, spe_inl = inl })
     = text (extractSpecPragName $ inl_src inl)
-       <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
+       <+> hang (ppr (tv_bndrs ++ id_bndrs) 2 (pprLExpr spec_e)
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc

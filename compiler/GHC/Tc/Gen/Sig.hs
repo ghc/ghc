@@ -876,13 +876,15 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
 
        -- Left hand side of the RULE
-       ; rule_evs <- mk_quant_evs quant_cts
+       ; lhs_evs <- mk_quant_evs quant_cts
        ; (implic1, lhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
-                                                     qtkvs rule_evs residual_wanted
+                                                     qtkvs lhs_evs residual_wanted
 
-       -- rhs_binds uses rule_evs to build `wanted` (NB not just `residual_wanted`)
+       -- rhs_binds uses rhs_evs to build `wanted` (NB not just `residual_wanted`)
+       ; let rhs_preds = mkMinimalBySCs id quant_preds
+       ; rhs_evs <- mapM newEvVar rhs_preds
        ; (implic2, rhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
-                                                     qtkvs rule_evs wanted
+                                                     qtkvs rhs_evs wanted
 
        ; emitImplications (implic1 `unionBags` implic2)
 
@@ -891,11 +893,15 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
          vcat [ text "all_bndrs:" <+> ppr all_bndrs
               , text "spec_e:" <+> ppr spec_e'
               , text "inl:" <+> ppr inl ]
-       ; return [SpecPragE { spe_bndrs     = all_bndrs
-                           , spe_lhs_binds = lhs_binds
-                           , spe_call      = spec_e'
-                           , spe_rhs_binds = rhs_binds
-                           , spe_inl       = inl }] }
+       ; return [SpecPragE { spe_tv_bndrs     = qtkvs
+                           , spe_id_bndrs     = id_bndrs
+                           , spe_lhs_ev_bndrs = rule_evs
+                           , spe_lhs_binds    = lhs_binds
+                           , spe_rhs_ev_bndrs = rhs_evs
+                           , spe_rhs_binds    = rhs_binds
+
+                           , spe_call = spec_e'
+                           , spe_inl  = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 
