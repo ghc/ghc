@@ -344,7 +344,7 @@ tellBin (BinMem _ r _ _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 seekBin :: BinHandle -> Bin a -> IO ()
 seekBin h@(BinMem _ ix_r sz_r _ _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
-  if (p >= sz)
+  if (p > sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
@@ -352,7 +352,7 @@ seekBin h@(BinMem _ ix_r sz_r _ _) (BinPtr !p) = do
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
 seekBinNoExpand (BinMem _ ix_r sz_r _ _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
-  if (p >= sz)
+  if (p > sz)
         then panic "seekBinNoExpand: seek out of range"
         else writeFastMutInt ix_r p
 
