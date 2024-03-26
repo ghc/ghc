@@ -74,7 +74,6 @@ import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
-import GHC.Data.Maybe ( orElse )
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
@@ -2403,24 +2402,28 @@ OutId.  Test simplCore/should_compile/simpl013 apparently shows this
 up, although I'm not sure exactly how..
 -}
 
-prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: SimplMode -> OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 --
 -- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
-prepareAlts scrut case_bndr alts
+prepareAlts mode scrut case_bndr alts
   | Just (tc, tys) <- splitTyConApp_maybe (idType case_bndr)
   = do { us <- getUniquesM
-       ; let (idcs1, alts1) = filterAlts tc tys imposs_cons alts
-             (yes2,  alts2) = refineDefaultAlt us (idMult case_bndr) tc tys idcs1 alts1
+       ; let (yes1,  alts1) | sm_case_merge mode = mergeCaseAlts case_bndr alts
+                            | otherwise          = (False, alts)
+               -- See Note [Merging nested cases]
+             (idcs2, alts2) = filterAlts tc tys imposs_cons alts1
+             (yes3,  alts3) = refineDefaultAlt us (idMult case_bndr) tc tys idcs2 alts2
                -- The multiplicity on case_bndr's is the multiplicity of the
                -- case expression The newly introduced patterns in
                -- refineDefaultAlt must be scaled by this multiplicity
-             (yes3, idcs3, alts3) = combineIdenticalAlts idcs1 alts2
+             (yes4, idcs4, alts4) = combineIdenticalAlts idcs2 alts3
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
-       ; when yes2 $ tick (FillInCaseDefault case_bndr)
-       ; when yes3 $ tick (AltMerge case_bndr)
-       ; return (idcs3, alts3) }
+       ; when yes1 $ tick (CaseMerge case_bndr)
+       ; when yes3 $ tick (FillInCaseDefault case_bndr)
+       ; when yes4 $ tick (AltMerge case_bndr)
+       ; return (idcs4, alts4) }
 
   | otherwise  -- Not a data type, so nothing interesting happens
   = return ([], alts)
@@ -2429,6 +2432,24 @@ prepareAlts scrut case_bndr alts
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
 
+{- Note [Merging nested cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The basic case-merge stuff is described in Note [Merge Nested Cases] in GHC.Core.Utils
+
+We do it here in `prepareAlts` (on InAlts) rather than after (on OutAlts) for two reasons:
+
+* It "belongs" here with `filterAlts`, `refineDefaultAlt` and `combineIdenticalAlts`.
+
+* In test perf/compiler/T22428 I found that I was getting extra Simplifer iterations:
+    1. Create a join point
+    2. That join point gets inlined at all call sites, so it is now dead.
+    3. Case-merge happened, but left behind some trivial bindings (see `mergeCaseAlts`)
+    4. Get rid of the trivial bindings
+  The first two seem reasonable.  It's imaginable that we could do better on
+  (3), by making case-merge join-point-aware, but it's not trivial.  But the
+  fourth is just stupid.  Rather than always do an extra iteration, it's better
+  to do the transformation on the input-end of teh Simplifier.
+-}
 
 {-
 ************************************************************************
@@ -2439,73 +2460,8 @@ prepareAlts scrut case_bndr alts
 
 mkCase tries these things
 
-* Note [Merge Nested Cases]
 * Note [Eliminate Identity Case]
 * Note [Scrutinee Constant Folding]
-
-Note [Merge Nested Cases]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-       case e of b {             ==>   case e of b {
-         p1 -> rhs1                      p1 -> rhs1
-         ...                             ...
-         pm -> rhsm                      pm -> rhsm
-         _  -> case b of b' {            pn -> let b'=b in rhsn
-                     pn -> rhsn          ...
-                     ...                 po -> let b'=b in rhso
-                     po -> rhso          _  -> let b'=b in rhsd
-                     _  -> rhsd
-       }
-
-which merges two cases in one case when -- the default alternative of
-the outer case scrutinises the same variable as the outer case. This
-transformation is called Case Merging.  It avoids that the same
-variable is scrutinised multiple times.
-
-Wrinkles
-
-(MC1) `tryMergeCase` "looks though" an inner single-alternative case-on-variable.
-     For example
-       case x of {
-          ...outer-alts...
-          DEFAULT -> case y of (a,b) ->
-                     case x of { A -> rhs1; B -> rhs2 }
-    ===>
-       case x of
-         ...outer-alts...
-         a -> case y of (a,b) -> rhs1
-         B -> case y of (a,b) -> rhs2
-
-    This duplicates the `case y` but it removes the case x; so it is a win
-    in terms of execution time (combining the cases on x) at the cost of
-    perhaps duplicating the `case y`.  A case in point is integerEq, which
-    is defined thus
-        integerEq :: Integer -> Integer -> Bool
-        integerEq !x !y = isTrue# (integerEq# x y)
-    which becomes
-        integerEq
-          = \ (x :: Integer) (y_aAL :: Integer) ->
-              case x of x1 { __DEFAULT ->
-              case y of y1 { __DEFAULT ->
-              case x1 of {
-                IS x2 -> case y1 of {
-                           __DEFAULT -> GHC.Types.False;
-                           IS y2     -> tagToEnum# @Bool (==# x2 y2) };
-                IP x2 -> ...
-                IN x2 -> ...
-    We want to merge the outer `case x` with the inner `case x1`.
-
-    This story is not fully robust; it will be defeated by a let-binding,
-    whih we don't want to duplicate.   But accounting for single-alternative
-    case-on-variable is easy to do, and seems useful in common cases so
-    `tryMergeCase` does it.
-
-(MC2) The auxiliary bindings b'=b are annoying, because they force another
-      simplifier pass, but there seems no easy way to avoid them.  See
-      Note [Which transformations are innocuous] in GHC.Core.Opt.Stats.
-
-See also
-* Note [Example of case-merging and caseRules]
-* Note [Cascading case merge]
 
 Note [Eliminate Identity Case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2675,7 +2631,7 @@ and now we can do case-merge again, getting the desired
 
 -}
 
-mkCase, mkCase1, mkCase2, mkCase3
+mkCase, mkCase2, mkCase3
    :: SimplMode
    -> OutExpr -> OutId
    -> OutType -> [OutAlt]               -- Alternatives in standard (increasing) order
@@ -2688,76 +2644,12 @@ mkCase, mkCase1, mkCase2, mkCase3
 --             Note [Cascading case merge]
 --------------------------------------------------
 
-mkCase mode scrut outer_bndr alts_ty alts
-  | sm_case_merge mode
-  , Just alts' <- tryMergeCase outer_bndr alts
-  = do  { tick (CaseMerge outer_bndr)
-        ; mkCase1 mode scrut outer_bndr alts_ty alts' }
-        -- Warning: don't call mkCase recursively!
-        -- Firstly, there's no point, because inner alts have already had
-        -- mkCase applied to them, so they won't have a case in their default
-        -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
-        -- in munge_rhs may put a case into the DEFAULT branch!
-  | otherwise
-  = mkCase1 mode scrut outer_bndr alts_ty alts
-
-tryMergeCase :: OutId -> [OutAlt] -> Maybe [OutAlt]
--- See Note [Merge Nested Cases]
-tryMergeCase outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
-  = case go 5 (\e -> e) emptyVarSet deflt_rhs of
-       Nothing         -> Nothing
-       Just inner_alts -> Just (mergeAlts outer_alts inner_alts)
-                -- NB: mergeAlts gives priority to the left
-                --      case x of
-                --        A -> e1
-                --        DEFAULT -> case x of
-                --                      A -> e2
-                --                      B -> e3
-                -- When we merge, we must ensure that e1 takes
-                -- precedence over e2 as the value for A!
-  where
-    go :: Int -> (OutExpr -> OutExpr) -> VarSet -> OutExpr -> Maybe [OutAlt]
-    -- In the call (go wrap free_bndrs rhs), the `wrap` function has free `free_bndrs`;
-    -- so do not push `wrap` under any binders that would shadow `free_bndrs`
-    --
-    -- The 'n' is just a depth-bound to avoid pathalogical quadratic behaviour with
-    --   case x1 of DEFAULT -> case x2 of DEFAULT -> case x3 of DEFAULT -> ...
-    -- when for each `case` we'll look down the whole chain to see if there is
-    -- another `case` on that same variable.  Also all of these (case xi) evals
-    -- get duplicated in each branch of the outer case, so 'n' controls how much
-    -- duplication we are prepared to put up with.
-    go 0 _ _ _ = Nothing
-
-    go n wrap free_bndrs (Tick t rhs)
-       = go n (wrap . Tick t) free_bndrs rhs
-    go _ wrap free_bndrs (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
-       | inner_scrut_var == outer_bndr
-       , let wrap_let rhs' | isDeadBinder inner_bndr = rhs'
-                           | otherwise = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
-                              -- The let is OK even for unboxed binders,
-             free_bndrs' = extendVarSet free_bndrs outer_bndr
-       = Just [ assert (not (any (`elemVarSet` free_bndrs') bndrs)) $
-                Alt con bndrs (wrap (wrap_let rhs))
-              | Alt con bndrs rhs <- inner_alts ]
-    go n wrap free_bndrs (Case (Var inner_scrut) inner_bndr ty inner_alts)
-       | [Alt con bndrs rhs] <- inner_alts -- Wrinkle (MC1)
-       , let wrap_case rhs' = Case (Var inner_scrut) inner_bndr ty $
-                              tryMergeCase inner_bndr alts `orElse` alts
-                where
-                  alts = [Alt con bndrs rhs']
-        = assert (not (outer_bndr `elem` (inner_bndr : bndrs))) $
-         go (n-1) (wrap . wrap_case) (free_bndrs `extendVarSet` inner_scrut) rhs
-
-    go _ _ _ _ = Nothing
-
-tryMergeCase _ _ = Nothing
-
 --------------------------------------------------
 --      2. Eliminate Identity Case
 --         See Note [Eliminate Identity Case]
 --------------------------------------------------
 
-mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
+mkCase _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
@@ -2796,7 +2688,7 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
-mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
+mkCase mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
 
 --------------------------------------------------
 --      2. Scrutinee Constant Folding
@@ -2919,64 +2811,4 @@ Note [Dead binders]
 Note that dead-ness is maintained by the simplifier, so that it is
 accurate after simplification as well as before.
 
-
-Note [Cascading case merge]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case merging should cascade in one sweep, because it
-happens bottom-up
-
-      case e of a {
-        DEFAULT -> case a of b
-                      DEFAULT -> case b of c {
-                                     DEFAULT -> e
-                                     A -> ea
-                      B -> eb
-        C -> ec
-==>
-      case e of a {
-        DEFAULT -> case a of b
-                      DEFAULT -> let c = b in e
-                      A -> let c = b in ea
-                      B -> eb
-        C -> ec
-==>
-      case e of a {
-        DEFAULT -> let b = a in let c = b in e
-        A -> let b = a in let c = b in ea
-        B -> let b = a in eb
-        C -> ec
-
-
-However here's a tricky case that we still don't catch, and I don't
-see how to catch it in one pass:
-
-  case x of c1 { I# a1 ->
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case x of c3 { I# a2 ->
-               case a2 of ...
-
-After occurrence analysis (and its binder-swap) we get this
-
-  case x of c1 { I# a1 ->
-  let x = c1 in         -- Binder-swap addition
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case x of c3 { I# a2 ->
-               case a2 of ...
-
-When we simplify the inner case x, we'll see that
-x=c1=I# a1.  So we'll bind a2 to a1, and get
-
-  case x of c1 { I# a1 ->
-  case a1 of c2 ->
-    0 -> ...
-    DEFAULT -> case a1 of ...
-
-This is correct, but we can't do a case merge in this sweep
-because c2 /= a1.  Reason: the binding c1=I# a1 went inwards
-without getting changed to c1=I# c2.
-
-I don't think this is worth fixing, even if I knew how. It'll
-all come out in the next pass anyway.
 -}
