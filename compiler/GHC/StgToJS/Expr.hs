@@ -57,11 +57,13 @@ import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
+import GHC.Types.Literal
 
 import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
 import GHC.Builtin.PrimOps
+import GHC.Builtin.Names
 
 import GHC.Core
 import GHC.Core.TyCon
@@ -70,6 +72,7 @@ import GHC.Core.Opt.Arity (isOneShotBndr)
 import GHC.Core.Type hiding (typeSize)
 
 import GHC.Utils.Misc
+import GHC.Utils.Encoding
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
@@ -556,7 +559,37 @@ genCase :: HasDebugCallStack
         -> LiveVars
         -> G (JStat, ExprResult)
 genCase ctx bnd e at alts l
-  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = do
+  -- For:      unpackCStringAppend# "some string"# str
+  -- Generate: h$appendToHsStringA(str, "some string")
+  --
+  -- The latter has a faster decoding loop.
+  --
+  -- Since #23270 and 7e0c8b3bab30, literals strings aren't STG atoms and we
+  -- need to match the following instead:
+  --
+  --    case "some string"# of b {
+  --      DEFAULT -> unpackCStringAppend# b str
+  --    }
+  --
+  -- Wrinkle: it doesn't kick in when literals are floated out to the top level.
+  --
+  | StgLit (LitString bs) <- e
+  , [GenStgAlt DEFAULT _ rhs] <- alts
+  , StgApp i args <- rhs
+  , getUnique i == unpackCStringAppendIdKey
+  , [StgVarArg b',x] <- args
+  , bnd == b'
+  , d <- utf8DecodeByteString bs
+  , [top] <- concatMap typex_expr (ctxTarget ctx)
+  = do
+      prof <- csProf <$> getSettings
+      let profArg = if prof then [jCafCCS] else []
+      a <- genArg x
+      return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
+             , ExprInline Nothing
+             )
+
+  | snd $ isInlineExpr (ctxEvaluatedIds ctx) e = do
       bndi <- identsForId bnd
       let ctx' = ctxSetTop bnd
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))

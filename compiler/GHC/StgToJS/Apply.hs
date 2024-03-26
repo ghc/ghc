@@ -44,7 +44,6 @@ import GHC.StgToJS.Rts.Types
 import GHC.StgToJS.Stack
 import GHC.StgToJS.Ids
 
-import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
@@ -58,7 +57,6 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Type hiding (typeSize)
 
-import GHC.Utils.Encoding
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
@@ -97,22 +95,6 @@ genApp
   -> [StgArg]
   -> G (JStat, ExprResult)
 genApp ctx i args
-
-    -- Case: unpackCStringAppend# "some string"# str
-    --
-    -- Generates h$appendToHsStringA(str, "some string"), which has a faster
-    -- decoding loop.
-    | [StgLitArg (LitString bs), x] <- args
-    , [top] <- concatMap typex_expr (ctxTarget ctx)
-    , getUnique i == unpackCStringAppendIdKey
-    , d <- utf8DecodeByteString bs
-    = do
-        prof <- csProf <$> getSettings
-        let profArg = if prof then [jCafCCS] else []
-        a <- genArg x
-        return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
-               , ExprInline Nothing
-               )
 
     -- let-no-escape
     | Just n <- ctxLneBindingStackSize ctx i
