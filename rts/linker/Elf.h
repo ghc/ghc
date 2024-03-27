@@ -14,7 +14,6 @@ int ocResolve_ELF        ( ObjectCode* oc );
 int ocRunInit_ELF        ( ObjectCode* oc );
 int ocRunFini_ELF        ( ObjectCode* oc );
 int ocAllocateExtras_ELF ( ObjectCode *oc );
-void freeNativeCode_ELF  ( ObjectCode *nc );
-void *loadNativeObj_ELF  ( pathchar *path, char **errmsg );
+void *loadNativeObjFromLinkerScript_ELF( char **errmsg );
 
 #include "EndPrivate.h"

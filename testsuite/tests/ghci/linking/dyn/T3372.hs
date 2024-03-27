@@ -1,3 +1,6 @@
+-- Note: This test exercises running concurrent GHCi sessions, but
+-- although this test is expected to pass, running concurrent GHCi
+-- sessions is currently broken in other ways; see #24345.
 {-# LANGUAGE MagicHash #-}
 
 module Main where
