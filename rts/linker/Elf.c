@@ -2146,6 +2146,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
 
+
    /* Loading the same object multiple times will lead to chaos
     * as we will have two ObjectCodes but one underlying dlopen
     * handle. Fail if this happens.
@@ -2158,9 +2159,34 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, false, NULL, 0);
 
    foreignExportsLoadingObject(nc);
-   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
+
+   // When dlopen() loads a profiled dynamic library, it calls the
+   // ctors which will call registerCcsList() to append the defined
+   // CostCentreStacks to CCS_LIST. This execution path starting from
+   // addDLL() was only protected by dl_mutex previously. However,
+   // another thread may be doing other things with the RTS linker
+   // that transitively calls refreshProfilingCCSs() which also
+   // accesses CCS_LIST, and those execution paths are protected by
+   // linker_mutex. So there's a risk of data race that may lead to
+   // segfaults (#24423), and we need to ensure the ctors are also
+   // protected by ccs_mutex.
+#if defined(PROFILING)
+   ACQUIRE_LOCK(&ccs_mutex);
+#endif
+
+   // We want to use RTLD_NOW rather than RTLD_LAZY because in the case that
+   // DLINFO is available we want to learn eagerly about all symbols, however,
+   // there is no ldinfo on macos in which case we prefer using RTLD_LAZY.
+   // ROMES:TODO: ^
+   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
    nc->dlopen_handle = hdl;
+
+#if defined(PROFILING)
+   RELEASE_LOCK(&ccs_mutex);
+#endif
+
    foreignExportsFinishedLoadingObject();
+
    if (hdl == NULL) {
      /* dlopen failed; save the message in errmsg */
      copyErrmsg(errmsg, dlerror());

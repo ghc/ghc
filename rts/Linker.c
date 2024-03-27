@@ -556,85 +556,17 @@ exitLinker( void ) {
 
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 
-/* Suppose in ghci we load a temporary SO for a module containing
-       f = 1
-   and then modify the module, recompile, and load another temporary
-   SO with
-       f = 2
-   Then as we don't unload the first SO, dlsym will find the
-       f = 1
-   symbol whereas we want the
-       f = 2
-   symbol. We therefore need to keep our own SO handle list, and
-   try SOs in the right order. */
-
-typedef
-   struct _OpenedSO {
-      struct _OpenedSO* next;
-      void *handle;
-   }
-   OpenedSO;
-
-/* A list thereof. */
-static OpenedSO* openedSOs = NULL;
-
-static void *
-internal_dlopen(const char *dll_name, const char **errmsg_ptr)
+static const char *
+internal_dlopen(const char *dll_name)
 {
-   OpenedSO* o_so;
-   void *hdl;
-
-   // omitted: RTLD_NOW
-   // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
-   IF_DEBUG(linker,
-      debugBelch("internal_dlopen: dll_name = '%s'\n", dll_name));
-
-   //-------------- Begin critical section ------------------
-   // This critical section is necessary because dlerror() is not
-   // required to be reentrant (see POSIX -- IEEE Std 1003.1-2008)
-   // Also, the error message returned must be copied to preserve it
-   // (see POSIX also)
-
-   ACQUIRE_LOCK(&dl_mutex);
-
-   // When dlopen() loads a profiled dynamic library, it calls the
-   // ctors which will call registerCcsList() to append the defined
-   // CostCentreStacks to CCS_LIST. This execution path starting from
-   // addDLL() was only protected by dl_mutex previously. However,
-   // another thread may be doing other things with the RTS linker
-   // that transitively calls refreshProfilingCCSs() which also
-   // accesses CCS_LIST, and those execution paths are protected by
-   // linker_mutex. So there's a risk of data race that may lead to
-   // segfaults (#24423), and we need to ensure the ctors are also
-   // protected by ccs_mutex.
-#if defined(PROFILING)
-   ACQUIRE_LOCK(&ccs_mutex);
-#endif
-
-   hdl = dlopen(dll_name, RTLD_LAZY|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
-
-#if defined(PROFILING)
-   RELEASE_LOCK(&ccs_mutex);
-#endif
-
-   if (hdl == NULL) {
-      /* dlopen failed; return a ptr to the error msg. */
-      char *errmsg = dlerror();
-      if (errmsg == NULL) errmsg = "addDLL: unknown error";
-      char *errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
-      strcpy(errmsg_copy, errmsg);
-      *errmsg_ptr = errmsg_copy;
-   } else {
-      o_so = stgMallocBytes(sizeof(OpenedSO), "addDLL");
-      o_so->handle = hdl;
-      o_so->next   = openedSOs;
-      openedSOs    = o_so;
-   }
-
-   RELEASE_LOCK(&dl_mutex);
-   //--------------- End critical section -------------------
-
-   return hdl;
+  char *errmsg;
+  void *loaded_dll = loadNativeObj(dll_name, &errmsg);
+  if (loaded_dll) {
+    return NULL;
+  } else {
+    ASSERT(errmsg != NULL);
+    return errmsg;
+  }
 }
 
 /*
@@ -657,7 +589,6 @@ internal_dlopen(const char *dll_name, const char **errmsg_ptr)
 
 static void *
 internal_dlsym(const char *symbol) {
-    OpenedSO* o_so;
     void *v;
 
     // We acquire dl_mutex as concurrent dl* calls may alter dlerror
@@ -674,12 +605,14 @@ internal_dlsym(const char *symbol) {
         return v;
     }
 
-    for (o_so = openedSOs; o_so != NULL; o_so = o_so->next) {
-        v = dlsym(o_so->handle, symbol);
-        if (dlerror() == NULL) {
+    for (ObjectCode *nc = loaded_objects; nc; nc = nc->next_loaded_object) {
+        if (nc->type == DYNAMIC_OBJECT) {
+          v = dlsym(nc->dlopen_handle, symbol);
+          if (dlerror() == NULL) {
             IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in shared object\n", symbol));
             RELEASE_LOCK(&dl_mutex);
             return v;
+          }
         }
     }
     RELEASE_LOCK(&dl_mutex);
