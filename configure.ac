@@ -307,13 +307,12 @@ else
     AC_PATH_TOOL([AR],[ar])
     AC_PATH_TOOL([RANLIB],[ranlib])
     AC_PATH_TOOL([OBJDUMP],[objdump])
-    AC_PATH_TOOL([WindresCmd],[windres])
-    AC_PATH_TOOL([Genlib],[genlib])
 
     if test "$HostOS" = "mingw32"; then
         AC_CHECK_TARGET_TOOL([WindresCmd],[windres])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
+        AC_PATH_TOOL([Genlib],[genlib])
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
         fi

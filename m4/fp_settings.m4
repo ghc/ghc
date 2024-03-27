@@ -69,7 +69,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsMergeObjectsFlags="$MergeObjsArgs"
 
     if test -z "$WindresCmd"; then
-        SettingsWindresCommand="/bin/false"
+        SettingsWindresCommand=""
     else
         SettingsWindresCommand="$WindresCmd"
     fi
