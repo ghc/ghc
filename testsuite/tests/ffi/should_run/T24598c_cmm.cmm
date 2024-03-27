@@ -1,0 +1,11 @@
+#include "Cmm.h"
+
+section "data" {
+  test_str: bits8[] "hello";
+}
+
+hello() {
+    ccall puts(test_str);
+    return ();
+}
+

@@ -84,7 +84,6 @@ import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
   ( lift )
 import Data.Maybe (isJust)
-import GHC.Types.RepType (tyConPrimRep)
 import GHC.Builtin.Types (unitTyCon)
 
 -- Defines a binding
@@ -737,7 +736,6 @@ marshalablePrimTyCon tc = isPrimTyCon tc && not (isLiftedTypeKind (tyConResKind 
 marshalableTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 marshalableTyCon dflags tc
   | marshalablePrimTyCon tc
-  , not (null (tyConPrimRep tc)) -- Note [Marshalling void]
   = validIfUnliftedFFITypes dflags
   | otherwise
   = boxedMarshalableTyCon tc
@@ -772,7 +770,6 @@ legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledRe
 -- types and also unboxed tuple and sum result types.
 legalFIPrimResultTyCon dflags tc
   | marshalablePrimTyCon tc
-  , not (null (tyConPrimRep tc))   -- Note [Marshalling void]
   = validIfUnliftedFFITypes dflags
 
   | isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc
@@ -786,13 +783,3 @@ validIfUnliftedFFITypes dflags
   | xopt LangExt.UnliftedFFITypes dflags =  IsValid
   | otherwise = NotValid UnliftedFFITypesNeeded
 
-{-
-Note [Marshalling void]
-~~~~~~~~~~~~~~~~~~~~~~~
-We don't treat State# (whose PrimRep is VoidRep) as marshalable.
-In turn that means you can't write
-        foreign import foo :: Int -> State# RealWorld
-
-Reason: the back end falls over with panic "primRepHint:VoidRep";
-        and there is no compelling reason to permit it
--}
