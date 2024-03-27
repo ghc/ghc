@@ -621,6 +621,7 @@ loadExpr interp hsc_env span root_ul_bco = do
   where
      free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
 
+     -- TODO(24600): We should be using a Set-like datatype, as this may contain lots of duplicates.
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names,
                      isExternalName n,      -- Names from other modules
@@ -686,6 +687,7 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
     free_names = uniqDSetToList $
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
 
+    -- TODO(24600): We should be using a Set-like datatype, as this may contain lots of duplicates.
     needed_mods :: [Module]
     needed_mods = [ nameModule n | n <- free_names,
                     isExternalName n,       -- Names from other modules
