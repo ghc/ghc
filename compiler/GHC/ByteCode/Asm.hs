@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP             #-}
 {-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -226,12 +227,49 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
 
   return ul_bco
 
+
+bitmap_0_0, bitmap_1_0, bitmap_2_0, bitmap_3_0, bitmap_4_0, bitmap_5_0, bitmap_6_0, bitmap_7_0, bitmap_8_0 :: UArray Int Word64
+
+bitmap_0_0 = Array.listArray (0,0) [0]
+bitmap_1_0 = Array.listArray (0,1) [ 1, 0 ]
+bitmap_2_0 = Array.listArray (0,1) [ 2, 0 ]
+bitmap_3_0 = Array.listArray (0,1) [ 3, 0 ]
+bitmap_4_0 = Array.listArray (0,1) [ 4, 0 ]
+bitmap_5_0 = Array.listArray (0,1) [ 5, 0 ]
+bitmap_6_0 = Array.listArray (0,1) [ 6, 0 ]
+bitmap_7_0 = Array.listArray (0,1) [ 7, 0 ]
+bitmap_8_0 = Array.listArray (0,1) [ 8, 0 ]
+
+{-# NOINLINE bitmap_0_0 #-}
+{-# NOINLINE bitmap_1_0 #-}
+{-# NOINLINE bitmap_2_0 #-}
+{-# NOINLINE bitmap_3_0 #-}
+{-# NOINLINE bitmap_4_0 #-}
+{-# NOINLINE bitmap_5_0 #-}
+{-# NOINLINE bitmap_6_0 #-}
+{-# NOINLINE bitmap_7_0 #-}
+{-# NOINLINE bitmap_8_0 #-}
+
+
 mkBitmapArray :: Word -> [StgWord] -> UArray Int Word64
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.
+mkBitmapArray 0 [] = bitmap_0_0
+mkBitmapArray 1 [fromStgWord -> 0] = bitmap_1_0
+mkBitmapArray 2 [fromStgWord -> 0] = bitmap_2_0
+mkBitmapArray 3 [fromStgWord -> 0] = bitmap_3_0
+mkBitmapArray 4 [fromStgWord -> 0] = bitmap_4_0
+mkBitmapArray 5 [fromStgWord -> 0] = bitmap_5_0
+mkBitmapArray 6 [fromStgWord -> 0] = bitmap_6_0
+mkBitmapArray 7 [fromStgWord -> 0] = bitmap_7_0
+mkBitmapArray 8 [fromStgWord -> 0] = bitmap_8_0
 mkBitmapArray bsize bitmap
-  = Array.listArray (0, length bitmap) $
+  = reallyMkBitmapArray bsize bitmap
+
+reallyMkBitmapArray :: Word -> [StgWord] -> UArray Int Word64
+reallyMkBitmapArray bsize bitmap =
+  Array.listArray (0, length bitmap) $
       fromIntegral bsize : map (fromInteger . fromStgWord) bitmap
 
 -- instrs nonptrs ptrs
