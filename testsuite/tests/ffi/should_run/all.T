@@ -268,3 +268,7 @@ test('T24314',
       # libffi-wasm doesn't support more than 4 args yet
       when(arch('wasm32'), skip)],
      compile_and_run, ['T24314_c.c'])
+
+test('T24598', req_cmm, compile_and_run, ['T24598_cmm.cmm'])
+test('T24598b', req_cmm, compile_and_run, ['T24598b_cmm.cmm'])
+test('T24598c', req_cmm, compile_and_run, ['T24598c_cmm.cmm'])
