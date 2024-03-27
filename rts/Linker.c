@@ -77,9 +77,15 @@
 #  include <mach-o/fat.h>
 #endif
 
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+#  include "linker/LoadNativeObjPosix.h"
+#endif
+
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
+
+#define UNUSED(x) (void)(x)
 
 /*
  * Note [iconv and FreeBSD]
@@ -130,7 +136,7 @@ extern void iconv();
    - Indexing (e.g. ocVerifyImage and ocGetNames)
    - Initialization (e.g. ocResolve)
    - RunInit (e.g. ocRunInit)
-   - Lookup (e.g. lookupSymbol)
+   - Lookup (e.g. lookupSymbol/lookupSymbolInNativeObj)
 
    This is to enable lazy loading of symbols. Eager loading is problematic
    as it means that all symbols must be available, even those which we will
@@ -417,11 +423,8 @@ static int linker_init_done = 0 ;
 
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 static void *dl_prog_handle;
-static regex_t re_invalid;
-static regex_t re_realso;
-#if defined(THREADED_RTS)
-Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
-#endif
+regex_t re_invalid;
+regex_t re_realso;
 #endif
 
 void initLinker (void)
@@ -455,9 +458,6 @@ initLinker_ (int retain_cafs)
 
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
-#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-    initMutex(&dl_mutex);
-#endif
 #endif
 
     symhash = allocStrHashTable();
@@ -520,9 +520,6 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
       regfree(&re_invalid);
       regfree(&re_realso);
-#if defined(THREADED_RTS)
-      closeMutex(&dl_mutex);
-#endif
    }
 #endif
    if (linker_init_done == 1) {
@@ -556,87 +553,6 @@ exitLinker( void ) {
 
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 
-/* Suppose in ghci we load a temporary SO for a module containing
-       f = 1
-   and then modify the module, recompile, and load another temporary
-   SO with
-       f = 2
-   Then as we don't unload the first SO, dlsym will find the
-       f = 1
-   symbol whereas we want the
-       f = 2
-   symbol. We therefore need to keep our own SO handle list, and
-   try SOs in the right order. */
-
-typedef
-   struct _OpenedSO {
-      struct _OpenedSO* next;
-      void *handle;
-   }
-   OpenedSO;
-
-/* A list thereof. */
-static OpenedSO* openedSOs = NULL;
-
-static void *
-internal_dlopen(const char *dll_name, const char **errmsg_ptr)
-{
-   OpenedSO* o_so;
-   void *hdl;
-
-   // omitted: RTLD_NOW
-   // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
-   IF_DEBUG(linker,
-      debugBelch("internal_dlopen: dll_name = '%s'\n", dll_name));
-
-   //-------------- Begin critical section ------------------
-   // This critical section is necessary because dlerror() is not
-   // required to be reentrant (see POSIX -- IEEE Std 1003.1-2008)
-   // Also, the error message returned must be copied to preserve it
-   // (see POSIX also)
-
-   ACQUIRE_LOCK(&dl_mutex);
-
-   // When dlopen() loads a profiled dynamic library, it calls the
-   // ctors which will call registerCcsList() to append the defined
-   // CostCentreStacks to CCS_LIST. This execution path starting from
-   // addDLL() was only protected by dl_mutex previously. However,
-   // another thread may be doing other things with the RTS linker
-   // that transitively calls refreshProfilingCCSs() which also
-   // accesses CCS_LIST, and those execution paths are protected by
-   // linker_mutex. So there's a risk of data race that may lead to
-   // segfaults (#24423), and we need to ensure the ctors are also
-   // protected by ccs_mutex.
-#if defined(PROFILING)
-   ACQUIRE_LOCK(&ccs_mutex);
-#endif
-
-   hdl = dlopen(dll_name, RTLD_LAZY|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
-
-#if defined(PROFILING)
-   RELEASE_LOCK(&ccs_mutex);
-#endif
-
-   if (hdl == NULL) {
-      /* dlopen failed; return a ptr to the error msg. */
-      char *errmsg = dlerror();
-      if (errmsg == NULL) errmsg = "addDLL: unknown error";
-      char *errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
-      strcpy(errmsg_copy, errmsg);
-      *errmsg_ptr = errmsg_copy;
-   } else {
-      o_so = stgMallocBytes(sizeof(OpenedSO), "addDLL");
-      o_so->handle = hdl;
-      o_so->next   = openedSOs;
-      openedSOs    = o_so;
-   }
-
-   RELEASE_LOCK(&dl_mutex);
-   //--------------- End critical section -------------------
-
-   return hdl;
-}
-
 /*
   Note [RTLD_LOCAL]
   ~~~~~~~~~~~~~~~~~
@@ -657,11 +573,10 @@ internal_dlopen(const char *dll_name, const char **errmsg_ptr)
 
 static void *
 internal_dlsym(const char *symbol) {
-    OpenedSO* o_so;
     void *v;
 
-    // We acquire dl_mutex as concurrent dl* calls may alter dlerror
-    ACQUIRE_LOCK(&dl_mutex);
+    // concurrent dl* calls may alter dlerror
+    ASSERT_LOCK_HELD(&linker_mutex);
 
     // clears dlerror
     dlerror();
@@ -669,20 +584,19 @@ internal_dlsym(const char *symbol) {
     // look in program first
     v = dlsym(dl_prog_handle, symbol);
     if (dlerror() == NULL) {
-        RELEASE_LOCK(&dl_mutex);
         IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in program\n", symbol));
         return v;
     }
 
-    for (o_so = openedSOs; o_so != NULL; o_so = o_so->next) {
-        v = dlsym(o_so->handle, symbol);
-        if (dlerror() == NULL) {
+    for (ObjectCode *nc = loaded_objects; nc; nc = nc->next_loaded_object) {
+        if (nc->type == DYNAMIC_OBJECT) {
+          v = dlsym(nc->dlopen_handle, symbol);
+          if (dlerror() == NULL) {
             IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in shared object\n", symbol));
-            RELEASE_LOCK(&dl_mutex);
             return v;
+          }
         }
     }
-    RELEASE_LOCK(&dl_mutex);
 
     IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in special cases\n", symbol));
 #   define SPECIAL_SYMBOL(sym) \
@@ -722,98 +636,42 @@ internal_dlsym(const char *symbol) {
     // we failed to find the symbol
     return NULL;
 }
+#  endif
 
-void *lookupSymbolInDLL(void *handle, const char *symbol_name)
+void *lookupSymbolInNativeObj(void *handle, const char *symbol_name)
 {
+    ACQUIRE_LOCK(&linker_mutex);
+
 #if defined(OBJFORMAT_MACHO)
+    // The Mach-O standard says ccall symbols representing a function are prefixed with _
+    // https://math-atlas.sourceforge.net/devel/assembly/MachORuntime.pdf
     CHECK(symbol_name[0] == '_');
     symbol_name = symbol_name+1;
 #endif
-
-    ACQUIRE_LOCK(&dl_mutex); // dlsym alters dlerror
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     void *result = dlsym(handle, symbol_name);
-    RELEASE_LOCK(&dl_mutex);
+#elif defined(OBJFORMAT_PEi386)
+    void *result = lookupSymbolInDLL_PEi386(symbol_name, handle, NULL, NULL);
+#else
+    void* result;
+    UNUSED(handle);
+    UNUSED(symbol_name);
+    barf("lookupSymbolInNativeObj: Unsupported platform");
+#endif
+
+    RELEASE_LOCK(&linker_mutex);
     return result;
 }
-#  endif
 
-void *addDLL(pathchar* dll_name, const char **errmsg_ptr)
+const char *addDLL(pathchar* dll_name)
 {
-#  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-   /* ------------------- ELF DLL loader ------------------- */
-
-#define NMATCH 5
-   regmatch_t match[NMATCH];
-   void *handle;
-   const char *errmsg;
-   FILE* fp;
-   size_t match_length;
-#define MAXLINE 1000
-   char line[MAXLINE];
-   int result;
-
-   IF_DEBUG(linker, debugBelch("addDLL: dll_name = '%s'\n", dll_name));
-   handle = internal_dlopen(dll_name, &errmsg);
-
-   if (handle != NULL) {
-      return handle;
+   char *errmsg;
+   if (loadNativeObj(dll_name, &errmsg)) {
+     return NULL;
+   } else {
+     ASSERT(errmsg != NULL);
+     return errmsg;
    }
-
-   // GHC #2615
-   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
-   // contain linker scripts rather than ELF-format object code. This
-   // code handles the situation by recognizing the real object code
-   // file name given in the linker script.
-   //
-   // If an "invalid ELF header" error occurs, it is assumed that the
-   // .so file contains a linker script instead of ELF object code.
-   // In this case, the code looks for the GROUP ( ... ) linker
-   // directive. If one is found, the first file name inside the
-   // parentheses is treated as the name of a dynamic library and the
-   // code attempts to dlopen that file. If this is also unsuccessful,
-   // an error message is returned.
-
-   // see if the error message is due to an invalid ELF header
-   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", errmsg));
-   result = regexec(&re_invalid, errmsg, (size_t) NMATCH, match, 0);
-   IF_DEBUG(linker, debugBelch("result = %i\n", result));
-   if (result == 0) {
-      // success -- try to read the named file as a linker script
-      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
-                                 MAXLINE-1);
-      strncpy(line, (errmsg+(match[1].rm_so)),match_length);
-      line[match_length] = '\0'; // make sure string is null-terminated
-      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
-      if ((fp = __rts_fopen(line, "r")) == NULL) {
-         *errmsg_ptr = errmsg; // return original error if open fails
-         return NULL;
-      }
-      // try to find a GROUP or INPUT ( ... ) command
-      while (fgets(line, MAXLINE, fp) != NULL) {
-         IF_DEBUG(linker, debugBelch("input line = %s", line));
-         if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
-            // success -- try to dlopen the first named file
-            IF_DEBUG(linker, debugBelch("match%s\n",""));
-            line[match[2].rm_eo] = '\0';
-            stgFree((void*)errmsg); // Free old message before creating new one
-            handle = internal_dlopen(line+match[2].rm_so, errmsg_ptr);
-            break;
-         }
-         // if control reaches here, no GROUP or INPUT ( ... ) directive
-         // was found and the original error message is returned to the
-         // caller
-      }
-      fclose(fp);
-   }
-   return handle;
-
-#  elif defined(OBJFORMAT_PEi386)
-   // FIXME
-   return addDLL_PEi386(dll_name, NULL);
-
-#  else
-   barf("addDLL: not implemented on this platform");
-#  endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -1246,10 +1104,10 @@ void freeObjectCode (ObjectCode *oc)
     }
 
     if (oc->type == DYNAMIC_OBJECT) {
-#if defined(OBJFORMAT_ELF)
-        ACQUIRE_LOCK(&dl_mutex);
-        freeNativeCode_ELF(oc);
-        RELEASE_LOCK(&dl_mutex);
+#if defined(OBJFORMAT_ELF) || defined(darwin_HOST_OS)
+        ACQUIRE_LOCK(&linker_mutex);
+        freeNativeCode_POSIX(oc);
+        RELEASE_LOCK(&linker_mutex);
 #else
         barf("freeObjectCode: This shouldn't happen");
 #endif
@@ -1911,12 +1769,20 @@ HsInt purgeObj (pathchar *path)
     return r;
 }
 
+ObjectCode *lookupObjectByPath(pathchar *path) {
+  for (ObjectCode *o = objects; o; o = o->next) {
+     if (0 == pathcmp(o->fileName, path)) {
+         return o;
+     }
+  }
+  return NULL;
+}
+
 OStatus getObjectLoadStatus_ (pathchar *path)
 {
-    for (ObjectCode *o = objects; o; o = o->next) {
-       if (0 == pathcmp(o->fileName, path)) {
-           return o->status;
-       }
+    ObjectCode *oc = lookupObjectByPath(path);
+    if (oc) {
+      return oc->status;
     }
     return OBJECT_NOT_LOADED;
 }
@@ -2001,27 +1867,35 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                        size, kind ));
 }
 
-#define UNUSED(x) (void)(x)
-
-#if defined(OBJFORMAT_ELF)
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
+   IF_DEBUG(linker, debugBelch("loadNativeObj: path = '%" PATH_FMT "'\n", path));
    ACQUIRE_LOCK(&linker_mutex);
-   void *r = loadNativeObj_ELF(path, errmsg);
+
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+   void *r = loadNativeObj_POSIX(path, errmsg);
+#elif defined(OBJFORMAT_PEi386)
+   void *r = NULL;
+   *errmsg = (char*)addDLL_PEi386(path, (HINSTANCE*)&r);
+#else
+   void *r;
+   UNUSED(errmsg);
+   barf("loadNativeObj: not implemented on this platform");
+#endif
+
+#if defined(OBJFORMAT_ELF)
+   if (!r) {
+       // Check if native object may be a linker script and try loading a native
+       // object from it
+       r = loadNativeObjFromLinkerScript_ELF(errmsg);
+   }
+#endif
+
    RELEASE_LOCK(&linker_mutex);
    return r;
 }
-#else
-void * STG_NORETURN
-loadNativeObj (pathchar *path, char **errmsg)
-{
-   UNUSED(path);
-   UNUSED(errmsg);
-   barf("loadNativeObj: not implemented on this platform");
-}
-#endif
 
-HsInt unloadNativeObj (void *handle)
+static HsInt unloadNativeObj_(void *handle)
 {
     bool unloadedAnyObj = false;
 
@@ -2054,9 +1928,16 @@ HsInt unloadNativeObj (void *handle)
     if (unloadedAnyObj) {
         return 1;
     } else {
-        errorBelch("unloadObjNativeObj_ELF: can't find `%p' to unload", handle);
+        errorBelch("unloadObjNativeObj_: can't find `%p' to unload", handle);
         return 0;
     }
+}
+
+HsInt unloadNativeObj(void *handle) {
+  ACQUIRE_LOCK(&linker_mutex);
+  HsInt r = unloadNativeObj_(handle);
+  RELEASE_LOCK(&linker_mutex);
+  return r;
 }
 
 /* -----------------------------------------------------------------------------
