@@ -957,7 +957,7 @@ tc_iface_decl_fingerprint :: Bool                    -- Don't load pragmas into 
 tc_iface_decl_fingerprint ignore_prags (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
-          let main_name = ifName decl
+          let !main_name = ifName decl
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
