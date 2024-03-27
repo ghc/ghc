@@ -30,8 +30,8 @@ import GHC.Data.Bag
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 import GHC.Utils.Error
-import GHC.Driver.Errors.Types
-import GHC.Driver.Errors.Ppr () -- instance Diagnostic DriverMessage
+import {-# SOURCE #-} GHC.Driver.Errors.Types (DriverMessage, driverUnknownMessage)
+import {-# SOURCE #-} GHC.Driver.Errors.Ppr () -- instance Diagnostic DriverMessage
 import GHC.Utils.Outputable (text)
 
 import Data.Function
@@ -146,7 +146,7 @@ addErr :: Monad m => String -> EwM m ()
 addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` Err (L loc e), ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn msg = addFlagWarn $ DriverUnknownMessage $ mkSimpleUnknownDiagnostic $
+addWarn msg = addFlagWarn $ driverUnknownMessage $ mkSimpleUnknownDiagnostic $
   mkPlainDiagnostic WarningWithoutFlag noHints $ text msg
 
 addFlagWarn :: Monad m => DriverMessage -> EwM m ()

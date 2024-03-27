@@ -13,6 +13,7 @@ module GHC.Driver.Errors.Types (
   , WarnMsg
   -- * Constructors
   , ghcUnknownMessage
+  , driverUnknownMessage
   -- * Utility functions
   , hoistTcRnMessage
   , hoistDsMessage
@@ -112,6 +113,9 @@ data GhcMessageOpts = GhcMessageOpts { psMessageOpts :: DiagnosticOpts PsMessage
 -- comment for the 'GhcUnknownMessage' type constructor)
 ghcUnknownMessage :: (DiagnosticOpts a ~ NoDiagnosticOpts, Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage . mkSimpleUnknownDiagnostic
+
+driverUnknownMessage :: UnknownDiagnostic (DiagnosticOpts DriverMessage) -> DriverMessage
+driverUnknownMessage = DriverUnknownMessage
 
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
 -- the result of 'IO (Messages TcRnMessage, a)'.
