@@ -1313,7 +1313,7 @@ ty_decl :: { LTyClDecl GhcPs }
 
           -- data/newtype family
         | 'data' 'family' type opt_datafam_kind_sig
-                {% mkFamDecl (comb3 $1 $2 $4) DataFamily TopLevel $3
+                {% mkFamDecl (comb4 $1 $2 $3 $4) DataFamily TopLevel $3
                                    (snd $ unLoc $4) Nothing
                           (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
