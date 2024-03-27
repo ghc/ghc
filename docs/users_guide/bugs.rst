@@ -697,6 +697,9 @@ Bugs in GHC
 - ``-Wincomplete-record-updates`` does not warn about record updates for records with
   partial record fields since GHC 9.6.1. See :ghc-ticket:`23520` for more details.
 
+- ``-fasm-shortcutting`` may result in unsound optimisations and result in incorrect
+  runtime results. See :ghc-ticket:`24507` for more details.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)

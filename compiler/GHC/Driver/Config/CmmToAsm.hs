@@ -66,7 +66,8 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgDwarfSourceNotes    = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 2 -- We produce GHC-specific source-note DIEs only with -g3
    , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
    , ncgCmmStaticPred       = gopt Opt_CmmStaticPred dflags
-   , ncgEnableShortcutting  = gopt Opt_AsmShortcutting dflags
+                              -- Disabled due to https://gitlab.haskell.org/ghc/ghc/-/issues/24507
+   , ncgEnableShortcutting  = False -- gopt Opt_AsmShortcutting dflags
    , ncgComputeUnwinding    = debugLevel dflags > 0
    , ncgEnableDeadCodeElimination = not (gopt Opt_InfoTableMap dflags)
                                      -- Disable when -finfo-table-map is on (#20428)

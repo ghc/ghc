@@ -3363,7 +3363,8 @@ fFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec "asm-shortcutting"                 Opt_AsmShortcutting,
+  depFlagSpec "asm-shortcutting"              Opt_AsmShortcutting
+    "this flag is disabled on this ghc version due to unsoundness concerns (https://gitlab.haskell.org/ghc/ghc/-/issues/24507)",
   flagGhciSpec "break-on-error"               Opt_BreakOnError,
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
@@ -4002,7 +4003,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
-    , ([2],     Opt_AsmShortcutting)
+    -- Disabled due to #24507
+    -- , ([2],     Opt_AsmShortcutting)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
