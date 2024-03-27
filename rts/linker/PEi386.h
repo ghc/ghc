@@ -60,6 +60,7 @@ bool ocRunFini_PEi386     ( ObjectCode *oc );
 bool ocGetNames_PEi386    ( ObjectCode* oc );
 bool ocVerifyImage_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type);
+SymbolAddr *lookupSymbolInDLL_PEi386 (const SymbolName* lbl, HINSTANCE instance, pathchar* dll_name, ObjectCode *dependent);
 
 /* See Note [mingw-w64 name decoration scheme] */
 /* We use myindex to calculate array addresses, rather than

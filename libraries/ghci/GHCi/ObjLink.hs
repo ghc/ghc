@@ -74,7 +74,7 @@ lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
 lookupSymbolInDLL dll str_in = do
    let str = prefixUnderscore str_in
    withCAString str $ \c_str -> do
-     addr <- c_lookupSymbolInDLL dll c_str
+     addr <- c_lookupSymbolInNativeObj dll c_str
      if addr == nullPtr
        then return Nothing
        else return (Just addr)
@@ -99,8 +99,6 @@ prefixUnderscore
 -- searches the standard locations for the appropriate library.
 --
 loadDLL :: String -> IO (Either String (Ptr LoadedDLL))
--- Nothing      => success
--- Just err_msg => failure
 loadDLL str0 = do
   let
      -- On Windows, addDLL takes a filename without an extension, because
@@ -112,7 +110,7 @@ loadDLL str0 = do
   --
   (maybe_handle, maybe_errmsg) <- withFilePath (normalise str) $ \dll ->
     alloca $ \errmsg_ptr -> (,)
-      <$> c_addDLL dll errmsg_ptr
+      <$> c_loadNativeObj dll errmsg_ptr
       <*> peek errmsg_ptr
 
   if maybe_handle == nullPtr
@@ -176,8 +174,8 @@ resolveObjs = do
 -- Foreign declarations to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
 
-foreign import ccall unsafe "addDLL"                  c_addDLL                  :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
-foreign import ccall unsafe "lookupSymbolInDLL"       c_lookupSymbolInDLL       :: Ptr LoadedDLL -> CString -> IO (Ptr a)
+foreign import ccall unsafe "loadNativeObj"           c_loadNativeObj           :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
+foreign import ccall unsafe "lookupSymbolInNativeObj" c_lookupSymbolInNativeObj :: Ptr LoadedDLL -> CString -> IO (Ptr a)
 foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
 foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int
