@@ -2,4 +2,5 @@
 tcfail127.hs:3:8: error: [GHC-91510]
     • Illegal qualified type: Num a => a -> a
     • In the type signature: foo :: IO (Num a => a -> a)
-    Suggested fix: Perhaps you intended to use ImpredicativeTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension

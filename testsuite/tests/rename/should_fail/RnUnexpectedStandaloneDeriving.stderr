@@ -1,4 +1,5 @@
 
 RnUnexpectedStandaloneDeriving.hs:7:1: error: [GHC-95159]
     Illegal standalone deriving declaration
-    Suggested fix: Perhaps you intended to use StandaloneDeriving
+    Suggested fix:
+      Perhaps you intended to use the ‘StandaloneDeriving’ extension

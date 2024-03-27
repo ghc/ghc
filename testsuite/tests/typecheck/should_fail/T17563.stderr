@@ -3,4 +3,5 @@ T17563.hs:8:9: error: [GHC-80003]
     • Non type-variable argument in the constraint: Num (T a x)
     • In the quantified constraint ‘forall x. Num (T a x)’
       In the type signature: blah :: (forall x. Num (T a x)) => T a b
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension

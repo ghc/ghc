@@ -2,4 +2,5 @@
 tcfail209.hs:4:1: error: [GHC-75844]
     • Illegal constraint synonym of kind: ‘* -> Constraint’
     • In the type synonym declaration for ‘Showish’
-    Suggested fix: Perhaps you intended to use ConstraintKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘ConstraintKinds’ extension

@@ -5,4 +5,5 @@ T10461.hs:6:1: error: [GHC-10964]
         UnliftedFFITypes is required to marshal unlifted types
     • When checking declaration:
         foreign import prim safe cheneycopy :: Any -> Word#
-    Suggested fix: Perhaps you intended to use UnliftedFFITypes
+    Suggested fix:
+      Perhaps you intended to use the ‘UnliftedFFITypes’ extension

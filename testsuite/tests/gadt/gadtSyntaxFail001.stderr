@@ -5,4 +5,4 @@ gadtSyntaxFail001.hs:9:5: error: [GHC-25709]
     • In the definition of data constructor ‘C2’
       In the data type declaration for ‘Foo’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ‘ExistentialQuantification’ or ‘GADTs’

@@ -2,4 +2,5 @@
 T17162.hs:7:21: error: [GHC-79767]
     Illegal bang-pattern
     !enc
-    Suggested fix: Perhaps you intended to use BangPatterns
+    Suggested fix:
+      Perhaps you intended to use the ‘BangPatterns’ extension

@@ -2,4 +2,5 @@
 NoPatternSynonyms.hs:3:1: error: [GHC-94426]
     Invalid type signature:
     A type signature should be of form <variables> :: <type>.
-    Suggested fix: Perhaps you intended to use PatternSynonyms
+    Suggested fix:
+      Perhaps you intended to use the ‘PatternSynonyms’ extension

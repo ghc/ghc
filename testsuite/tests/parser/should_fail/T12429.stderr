@@ -1,4 +1,5 @@
 
 T12429.hs:2:29: error: [GHC-58481]
     parse error on input ‘Y’
-    Suggested fix: Perhaps you intended to use PatternSynonyms
+    Suggested fix:
+      Perhaps you intended to use the ‘PatternSynonyms’ extension

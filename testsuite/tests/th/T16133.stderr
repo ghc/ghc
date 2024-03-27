@@ -1,8 +1,10 @@
 
 T16133.hs:11:2: error: [GHC-23482]
     Illegal visible type application: @Int
-    Suggested fix: Perhaps you intended to use TypeApplications
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeApplications’ extension
 
 T16133.hs:11:2: error: [GHC-23482]
     Illegal visible kind application: @Type
-    Suggested fix: Perhaps you intended to use TypeApplications
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeApplications’ extension

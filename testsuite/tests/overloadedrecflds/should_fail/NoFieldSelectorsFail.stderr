@@ -18,7 +18,8 @@ NoFieldSelectorsFail.hs:12:15: error: [GHC-56428]
       • record field ‘foo’ of ‘Bar’,
         imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
         (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
-    Suggested fix: Perhaps you intended to use DisambiguateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)
 
 NoFieldSelectorsFail.hs:14:15: error: [GHC-56428]
     Ambiguous record field ‘foo’.
@@ -29,7 +30,8 @@ NoFieldSelectorsFail.hs:14:15: error: [GHC-56428]
       • record field ‘foo’ of ‘Bar’,
         imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
         (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
-    Suggested fix: Perhaps you intended to use DisambiguateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)
 
 NoFieldSelectorsFail.hs:16:15: error: [GHC-56428]
     Ambiguous record field ‘bar’.
@@ -40,4 +42,5 @@ NoFieldSelectorsFail.hs:16:15: error: [GHC-56428]
       • variable ‘bar’,
         imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
         (and originally defined at NoFieldSelectorsFailA.hs:8:1-3)
-    Suggested fix: Perhaps you intended to use DisambiguateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)

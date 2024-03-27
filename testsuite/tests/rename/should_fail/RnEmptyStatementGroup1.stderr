@@ -4,7 +4,8 @@ RnEmptyStatementGroup1.hs:6:13: error: [GHC-92693]
 
 RnEmptyStatementGroup1.hs:8:7: error: [GHC-82311]
     Empty 'do' block
-    Suggested fix: Perhaps you intended to use NondecreasingIndentation
+    Suggested fix:
+      Perhaps you intended to use the ‘NondecreasingIndentation’ extension
 
 RnEmptyStatementGroup1.hs:10:20: error: [GHC-19442]
     Empty 'do' block in an arrow command

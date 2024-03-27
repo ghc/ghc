@@ -6,4 +6,5 @@ T15473.hs:11:3: error: [GHC-22979]
                                                   xs t ts is y z’
     • In the equations for closed type family ‘LetInterleave’
       In the type family declaration for ‘LetInterleave’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

@@ -4,29 +4,34 @@ T22141d.hs:10:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
       Future versions of GHC will turn this warning into an error.
     • In the expansion of type synonym ‘T’
       In a standalone kind signature for ‘D’: Proxy T -> Type
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
 T22141d.hs:10:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • An occurrence of ‘'[]’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
     • In a standalone kind signature for ‘D’: Proxy T -> Type
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
 T22141d.hs:10:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • An occurrence of ‘'[GHC.Types.LiftedRep]’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
     • In a standalone kind signature for ‘D’: Proxy T -> Type
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
 T22141d.hs:10:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • An occurrence of ‘[GHC.Types.LiftedRep,
                          GHC.Types.LiftedRep]’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
     • In a standalone kind signature for ‘D’: Proxy T -> Type
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
 T22141d.hs:10:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • An occurrence of ‘Proxy T’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
     • In a standalone kind signature for ‘D’: Proxy T -> Type
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)

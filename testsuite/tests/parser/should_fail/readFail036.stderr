@@ -1,5 +1,6 @@
 
 readFail036.hs:6:16: error: [GHC-49378]
-    Illegal kind signature ‘Type’
-    In the data type declaration for ‘Foo’
-    Suggested fix: Perhaps you intended to use KindSignatures
+    • Illegal kind signature ‘Type’
+    • In the data type declaration for ‘Foo’
+    Suggested fix:
+      Perhaps you intended to use the ‘KindSignatures’ extension (implied by ‘TypeFamilies’ and ‘PolyKinds’)

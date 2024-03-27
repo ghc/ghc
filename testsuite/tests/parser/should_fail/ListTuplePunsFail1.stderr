@@ -1,8 +1,9 @@
+
 ListTuplePunsFail1.hs:5:10: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -10,7 +11,7 @@ ListTuplePunsFail1.hs:7:10: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -18,7 +19,7 @@ ListTuplePunsFail1.hs:9:10: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -26,7 +27,7 @@ ListTuplePunsFail1.hs:11:11: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -34,7 +35,7 @@ ListTuplePunsFail1.hs:13:11: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -42,7 +43,7 @@ ListTuplePunsFail1.hs:15:11: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
@@ -50,30 +51,30 @@ ListTuplePunsFail1.hs:17:11: error: [GHC-52943]
     Disambiguating data constructors of tuples and lists is disabled.
     Remove the quote to use the data constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
-ListTuplePunsFail1.hs:19:12: [GHC-52943]
+ListTuplePunsFail1.hs:19:12: error: [GHC-52943]
     Unboxed tuple data constructors are not supported in types.
     Use ‘Tuple<n># a b c ...’ to refer to the type constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
-ListTuplePunsFail1.hs:21:13: [GHC-52943]
+ListTuplePunsFail1.hs:21:13: error: [GHC-52943]
     Unboxed sum data constructors are not supported in types.
     Use ‘Sum<n># a b c ...’ to refer to the type constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns
 
-ListTuplePunsFail1.hs:23:13: [GHC-52943]
+ListTuplePunsFail1.hs:23:13: error: [GHC-52943]
     Unboxed sum data constructors are not supported in types.
     Use ‘Sum<n># a b c ...’ to refer to the type constructor.
     Suggested fix:
-      Perhaps you intended to use ListTuplePuns
+      Perhaps you intended to use the ‘ListTuplePuns’ extension
       You may enable this language extension in GHCi with:
         :set -XListTuplePuns

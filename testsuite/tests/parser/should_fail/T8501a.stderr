@@ -2,5 +2,5 @@
 T8501a.hs:5:3: error: [GHC-07626]
     Parse error in pattern: rec
     Suggested fixes:
-      • Perhaps you intended to use RecursiveDo
+      • Perhaps you intended to use the ‘RecursiveDo’ extension
       • Possibly caused by a missing 'do'?

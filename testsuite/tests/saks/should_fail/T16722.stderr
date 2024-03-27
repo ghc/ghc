@@ -1,5 +1,6 @@
 
 T16722.hs:8:11: error: [GHC-12875]
-    Unexpected kind variable ‘k’
-    In the standalone kind signature for D
-    Suggested fix: Perhaps you intended to use PolyKinds
+    • Unexpected kind variable ‘k’
+    • In the standalone kind signature for D
+    Suggested fix:
+      Perhaps you intended to use the ‘PolyKinds’ extension

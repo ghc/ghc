@@ -1,8 +1,10 @@
 
-NondecreasingIndentationFail.hs:7:28: [GHC-82311]
+NondecreasingIndentationFail.hs:7:28: error: [GHC-82311]
     Empty 'do' block
-    Suggested fix: Perhaps you intended to use NondecreasingIndentation
+    Suggested fix:
+      Perhaps you intended to use the ‘NondecreasingIndentation’ extension
 
-NondecreasingIndentationFail.hs:9:28: [GHC-82311]
+NondecreasingIndentationFail.hs:9:28: error: [GHC-82311]
     Empty 'do' block
-    Suggested fix: Perhaps you intended to use NondecreasingIndentation
+    Suggested fix:
+      Perhaps you intended to use the ‘NondecreasingIndentation’ extension

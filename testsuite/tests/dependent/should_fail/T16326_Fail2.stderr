@@ -5,4 +5,5 @@ T16326_Fail2.hs:6:37: error: [GHC-51580]
     • In the type signature: blah :: forall a -> a -> IO ()
       When checking declaration:
         foreign import ccall safe "blah" blah :: forall a -> a -> IO ()
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

@@ -6,7 +6,7 @@ T5462No1.hs:25:42: error: [GHC-82023]
         ‘GFunctor’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘F’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension
 
 T5462No1.hs:27:23: error: [GHC-00158]
@@ -18,4 +18,5 @@ T5462No1.hs:28:23: error: [GHC-00158]
     • Can't make a derived instance of ‘C2 H’:
         ‘C2’ is not a stock derivable class (Eq, Show, etc.)
     • In the data declaration for ‘H’
-    Suggested fix: Perhaps you intended to use DeriveAnyClass
+    Suggested fix:
+      Perhaps you intended to use the ‘DeriveAnyClass’ extension

@@ -6,4 +6,5 @@ T15859.hs:9:19: error: [GHC-51580]
       In the expression: (undefined :: forall k -> k -> Type) @Int
       In an equation for ‘a’:
           a = (undefined :: forall k -> k -> Type) @Int
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

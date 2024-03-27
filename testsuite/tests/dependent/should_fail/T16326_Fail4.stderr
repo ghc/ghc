@@ -8,4 +8,5 @@ T16326_Fail4.hs:6:30: error: [GHC-51580]
         ‘((<>) :: forall a -> Maybe a -> Maybe a -> Maybe a)’
       In the expression:
         zipWith ((<>) :: forall a -> Maybe a -> Maybe a -> Maybe a) xs ys
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

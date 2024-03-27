@@ -3,4 +3,5 @@ T8165_fail2.hs:9:12: error: [GHC-22979]
     • The type-family application ‘T Loop’
         is no smaller than the LHS of the family instance ‘T Loop’
     • In the instance declaration for ‘C Loop’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

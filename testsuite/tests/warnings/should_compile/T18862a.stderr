@@ -2,4 +2,5 @@
 T18862a.hs:5:9: warning: [GHC-58520] [-Wtype-equality-requires-operators (in -Wdefault)]
     The use of ‘~’ without TypeOperators
     will become an error in a future GHC release.
-    Suggested fix: Perhaps you intended to use TypeOperators
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeOperators’ extension

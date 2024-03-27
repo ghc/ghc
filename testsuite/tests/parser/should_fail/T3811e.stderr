@@ -1,4 +1,5 @@
 
 T3811e.hs:6:6: error: [GHC-87429]
     Illegal datatype context: (Show a, Read a) =>
-    Suggested fix: Perhaps you intended to use DatatypeContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘DatatypeContexts’ extension

@@ -6,4 +6,5 @@ T16512b.hs:6:3: error: [GHC-05175]
         G [a] = [G a] -- Defined at T16512b.hs:6:3
     • In the equations for closed type family ‘G’
       In the type family declaration for ‘G’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

@@ -4,11 +4,13 @@ T9415.hs:3:1: error: [GHC-29210]
         one of whose superclasses is ‘D’
         one of whose superclasses is ‘C’
     • In the class declaration for ‘C’
-    Suggested fix: Perhaps you intended to use UndecidableSuperClasses
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableSuperClasses’ extension
 
 T9415.hs:5:1: error: [GHC-29210]
     • Superclass cycle for ‘D’
         one of whose superclasses is ‘C’
         one of whose superclasses is ‘D’
     • In the class declaration for ‘D’
-    Suggested fix: Perhaps you intended to use UndecidableSuperClasses
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableSuperClasses’ extension

@@ -1,1 +1,1 @@
-{"version":"1.0","ghcVersion":"ghc-9.9.20230817","span":{"file":"json.hs","start":{"line":9,"column":11},"end":{"line":9,"column":21}},"severity":"Error","code":48010,"message":["Empty list of alternatives in case expression"],"hints":["Perhaps you intended to use EmptyCase"]}
+{"version":"1.0","ghcVersion":"ghc-9.11.20240329","span":{"file":"json.hs","start":{"line":9,"column":11},"end":{"line":9,"column":21}},"severity":"Error","code":48010,"message":["Empty list of alternatives in case expression"],"hints":["Perhaps you intended to use the `EmptyCase' extension"]}

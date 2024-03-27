@@ -3,4 +3,5 @@ T16059d.hs:5:1: error: [GHC-19590]
     • Illegal unboxed tuple type as function argument: (# #)
     • In the expansion of type synonym ‘Bar’
       In the type synonym declaration for ‘Bar'’
-    Suggested fix: Perhaps you intended to use UnboxedTuples
+    Suggested fix:
+      Perhaps you intended to use the ‘UnboxedTuples’ extension

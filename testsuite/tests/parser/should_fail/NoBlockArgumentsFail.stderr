@@ -4,4 +4,4 @@ NoBlockArgumentsFail.hs:6:17: error: [GHC-52095]
         do return ()
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension

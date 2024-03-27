@@ -1,4 +1,5 @@
 
 RecordDotSyntaxFail2.hs:10:10: error: [GHC-82135]
     Illegal overloaded record update
-    Suggested fix: Perhaps you intended to use OverloadedRecordUpdate
+    Suggested fix:
+      Perhaps you intended to use the ‘OverloadedRecordUpdate’ extension

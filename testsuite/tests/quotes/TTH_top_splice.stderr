@@ -2,4 +2,5 @@
 TTH_top_splice.hs:6:7: error: [GHC-26759]
     • Unexpected top-level splice.
     • In the typed splice: $$([|| 1 ||])
-    Suggested fix: Perhaps you intended to use TemplateHaskell
+    Suggested fix:
+      Perhaps you intended to use the ‘TemplateHaskell’ extension

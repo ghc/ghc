@@ -1,5 +1,6 @@
 
-T8773.hs:5:1: [GHC-18273]
-    Roles other than ‘nominal’ for class parameters can lead to incoherence.
-    while checking a role annotation for ‘C2’
-    Suggested fix: Perhaps you intended to use IncoherentInstances
+T8773.hs:5:1: error: [GHC-18273]
+    • Roles other than ‘nominal’ for class parameters can lead to incoherence.
+    • while checking a role annotation for ‘C2’
+    Suggested fix:
+      Perhaps you intended to use the ‘IncoherentInstances’ extension

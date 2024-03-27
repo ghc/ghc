@@ -1,7 +1,8 @@
 
 T12811.hs:5:15: error: [GHC-62547]
     Illegal operator ‘.’ in type ‘foral a . a’
-    Suggested fix: Perhaps you intended to use TypeOperators
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeOperators’ extension
 
 T12811.hs:5:15: error: [GHC-76037]
     Not in scope: type constructor or class ‘.’

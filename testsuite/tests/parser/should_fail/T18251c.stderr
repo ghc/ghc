@@ -1,4 +1,5 @@
 
 T18251c.hs:4:5: error: [GHC-23482]
     Illegal visible type application: @Int
-    Suggested fix: Perhaps you intended to use TypeApplications
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeApplications’ extension

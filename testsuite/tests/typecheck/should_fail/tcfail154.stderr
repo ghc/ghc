@@ -3,4 +3,5 @@ tcfail154.hs:13:10: error: [GHC-22979]
     • The constraint ‘C a a’
         is no smaller than the instance head ‘Eq (T a)’
     • In the instance declaration for ‘Eq (T a)’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

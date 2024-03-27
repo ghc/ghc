@@ -3,4 +3,5 @@ T6022.hs:4:1: error: [GHC-80003]
     • Non type-variable argument in the constraint: Eq ([a] -> a)
     • When checking the inferred type
         f :: forall {a}. Eq ([a] -> a) => ([a] -> a) -> Bool
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension

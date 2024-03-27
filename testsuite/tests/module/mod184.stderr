@@ -3,4 +3,4 @@ mod184.hs:6:8: warning: [GHC-07924] [-Wprepositive-qualified-module]
     Found ‘qualified’ in prepositive position
     Suggested fixes:
       • Place ‘qualified’ after the module name.
-      • Perhaps you intended to use ImportQualifiedPost
+      • Perhaps you intended to use the ‘ImportQualifiedPost’ extension

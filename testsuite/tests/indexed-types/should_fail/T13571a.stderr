@@ -2,4 +2,5 @@
 T13571a.hs:7:1: error: [GHC-44012]
     • Illegal result type variable (r :: Type) for ‘G’
     • In the type family declaration for ‘G’
-    Suggested fix: Perhaps you intended to use TypeFamilyDependencies
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeFamilyDependencies’ extension

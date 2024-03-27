@@ -4,4 +4,4 @@ NoBlockArgumentsFail3.hs:7:22: error: [GHC-06074]
         \case Just 3 -> print x
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension

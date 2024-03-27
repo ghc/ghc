@@ -2,6 +2,6 @@
 prog011.hx:14:22: error: [GHC-82311]
     Empty 'do' block
     Suggested fix:
-      Perhaps you intended to use NondecreasingIndentation
+      Perhaps you intended to use the ‘NondecreasingIndentation’ extension
       You may enable this language extension in GHCi with:
         :set -XNondecreasingIndentation

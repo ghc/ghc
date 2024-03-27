@@ -1,4 +1,5 @@
 
 LinearNoExtU.hs:4:14: error: [GHC-31574]
     Illegal use of linear functions
-    Suggested fix: Perhaps you intended to use LinearTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension

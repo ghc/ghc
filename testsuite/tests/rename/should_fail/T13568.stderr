@@ -2,5 +2,5 @@
 T13568.hs:7:8: error: [GHC-76037]
     Not in scope: type constructor or class ‘A’
     Suggested fix:
-      Perhaps you intended to use DataKinds
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
       to refer to the data constructor of that name?

@@ -12,4 +12,5 @@ Template.hs:9:29: warning: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcomp
 Template.hs:12:6: warning: [GHC-69797] [-Wdeprecated-type-abstractions (in -Wcompat)]
     Type applications in constructor patterns will require
     the TypeAbstractions extension starting from GHC 9.14.
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension

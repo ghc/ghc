@@ -4,4 +4,5 @@ T12083b.hs:7:5: error: [GHC-91510]
     • When checking the class method:
         test :: forall a r. Class a => a -> (Eq a => r) -> r
       In the class declaration for ‘Class’
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)

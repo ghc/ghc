@@ -1,4 +1,5 @@
 
 export-syntax.hs:1:12: error: [GHC-89515]
     Illegal export form
-    Suggested fix: Perhaps you intended to use PatternSynonyms
+    Suggested fix:
+      Perhaps you intended to use the ‘PatternSynonyms’ extension

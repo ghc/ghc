@@ -4,4 +4,5 @@ tcfail139.hs:7:10: error: [GHC-93557]
         All instance types must be of the form (T t1 ... tn)
         where T is not a synonym.
     • In the instance declaration for ‘Bounded Foo’
-    Suggested fix: Perhaps you intended to use TypeSynonymInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeSynonymInstances’ extension (implied by ‘FlexibleInstances’)

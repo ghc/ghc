@@ -3,4 +3,4 @@ T8501c.hs:4:7: error: [GHC-88464]
     Variable not in scope: mdo :: (String -> IO ()) -> String -> IO ()
     Suggested fixes:
       • Perhaps use ‘mod’ (imported from Prelude)
-      • Perhaps you intended to use RecursiveDo
+      • Perhaps you intended to use the ‘RecursiveDo’ extension

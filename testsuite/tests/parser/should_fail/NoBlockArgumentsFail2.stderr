@@ -4,4 +4,4 @@ NoBlockArgumentsFail2.hs:6:22: error: [GHC-06074]
         \ x -> print x
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension

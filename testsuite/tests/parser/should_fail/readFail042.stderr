@@ -1,8 +1,10 @@
 
-readFail042.hs:9:9: [GHC-42026] error:
+readFail042.hs:9:9: error: [GHC-42026]
     Unexpected transform statement in a list comprehension
-    Suggested fix: Perhaps you intended to use TransformListComp
+    Suggested fix:
+      Perhaps you intended to use the ‘TransformListComp’ extension
 
-readFail042.hs:9:9: [GHC-42026] error:
+readFail042.hs:9:9: error: [GHC-42026]
     Unexpected transform statement in a list comprehension
-    Suggested fix: Perhaps you intended to use TransformListComp
+    Suggested fix:
+      Perhaps you intended to use the ‘TransformListComp’ extension

@@ -4,7 +4,8 @@ drvfail015.hs:11:19: error: [GHC-93557]
         All instance types must be of the form (T t1 ... tn)
         where T is not a synonym.
     • In the stand-alone deriving instance for ‘Eq T’
-    Suggested fix: Perhaps you intended to use TypeSynonymInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeSynonymInstances’ extension (implied by ‘FlexibleInstances’)
 
 drvfail015.hs:14:1: error: [GHC-54540]
     • Can't make a derived instance of ‘Eq Handle’:

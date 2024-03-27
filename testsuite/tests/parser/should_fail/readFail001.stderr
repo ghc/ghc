@@ -5,13 +5,13 @@ readFail001.hs:25:11: error: [GHC-44432]
 readFail001.hs:38:32: error: [GHC-76037]
     Not in scope: type constructor or class ‘Leaf’
     Suggested fix:
-      Perhaps you intended to use DataKinds
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
       to refer to the data constructor of that name?
 
 readFail001.hs:38:41: error: [GHC-76037]
     Not in scope: type constructor or class ‘Leaf’
     Suggested fix:
-      Perhaps you intended to use DataKinds
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
       to refer to the data constructor of that name?
 
 readFail001.hs:107:30: error: [GHC-76037]

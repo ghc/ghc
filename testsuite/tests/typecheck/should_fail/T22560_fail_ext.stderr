@@ -1,8 +1,10 @@
 
 T22560_fail_ext.hs:7:1: error: [GHC-58589]
     Illegal invisible type variable binder: @(j :: Type)
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T22560_fail_ext.hs:7:1: error: [GHC-58589]
     Illegal invisible type variable binder: @k
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension

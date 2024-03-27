@@ -2,6 +2,6 @@
 <interactive>:1:1: error: [GHC-91510]
     Illegal polymorphic type: forall a. a -> a
     Suggested fix:
-      Perhaps you intended to use ImpredicativeTypes
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension
       You may enable this language extension in GHCi with:
         :set -XImpredicativeTypes

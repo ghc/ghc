@@ -14,7 +14,8 @@ overloadedrecfldsfail10.hs:6:20: error: [GHC-97219]
          imported from ‘OverloadedRecFldsFail10_C’ at overloadedrecfldsfail10.hs:9:1-32
          (and originally defined in ‘OverloadedRecFldsFail10_A’
             at OverloadedRecFldsFail10_A.hs:5:32-34)
-    Suggested fix: Perhaps you intended to use DuplicateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DuplicateRecordFields’ extension
 
 overloadedrecfldsfail10.hs:6:20: error: [GHC-97219]
     Duplicate record field ‘foo’ in export list:
@@ -27,4 +28,5 @@ overloadedrecfldsfail10.hs:6:20: error: [GHC-97219]
          imported from ‘OverloadedRecFldsFail10_C’ at overloadedrecfldsfail10.hs:9:1-32
          (and originally defined in ‘OverloadedRecFldsFail10_A’
             at OverloadedRecFldsFail10_A.hs:5:32-34)
-    Suggested fix: Perhaps you intended to use DuplicateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DuplicateRecordFields’ extension

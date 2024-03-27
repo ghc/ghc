@@ -1,4 +1,5 @@
 
-T18888.hs:4:9: [GHC-68567]
-    Illegal type: ‘001’ 
-    Suggested fix: Perhaps you intended to use DataKinds
+T18888.hs:4:9: error: [GHC-68567]
+    Illegal type: ‘001’
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)

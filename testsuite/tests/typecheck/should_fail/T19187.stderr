@@ -2,4 +2,5 @@
 T19187.hs:8:10: error: [GHC-80003]
     • Non type-variable argument in the constraint: Eq Int
     • In the instance declaration for ‘Eq T’
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension

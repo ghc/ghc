@@ -6791,7 +6791,7 @@ thErrorHints = \case
 thSyntaxErrorHints :: THSyntaxError -> [GhcHint]
 thSyntaxErrorHints = \case
   IllegalTHQuotes{}
-    -> [suggestAnyExtension [LangExt.TemplateHaskell, LangExt.TemplateHaskellQuotes]]
+    -> [suggestExtension LangExt.TemplateHaskellQuotes]
   BadImplicitSplice {}
     -> noHints -- NB: don't suggest TemplateHaskell
                -- see comments on BadImplicitSplice in pprTHSyntaxError

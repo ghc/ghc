@@ -1,8 +1,10 @@
 
 qdofail002.hs:8:11: error: [GHC-40280]
     Illegal qualified ‘P.do’ block
-    Suggested fix: Perhaps you intended to use QualifiedDo
+    Suggested fix:
+      Perhaps you intended to use the ‘QualifiedDo’ extension
 
 qdofail002.hs:11:13: error: [GHC-40280]
     Illegal qualified ‘P.mdo’ block
-    Suggested fix: Perhaps you intended to use QualifiedDo
+    Suggested fix:
+      Perhaps you intended to use the ‘QualifiedDo’ extension

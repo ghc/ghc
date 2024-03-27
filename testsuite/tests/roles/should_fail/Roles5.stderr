@@ -1,19 +1,22 @@
 
-Roles5.hs:7:1: [GHC-17779]
-    Illegal role annotation for T
-    while checking a role annotation for ‘T’
-    Suggested fix: Perhaps you intended to use RoleAnnotations
+Roles5.hs:7:1: error: [GHC-17779]
+    • Illegal role annotation for T
+    • while checking a role annotation for ‘T’
+    Suggested fix:
+      Perhaps you intended to use the ‘RoleAnnotations’ extension
 
-Roles5.hs:8:1: [GHC-18273]
-     Roles other than ‘nominal’ for class parameters can lead to incoherence.
-     while checking a role annotation for ‘C’
-    Suggested fix: Perhaps you intended to use IncoherentInstances
+Roles5.hs:8:1: error: [GHC-18273]
+    • Roles other than ‘nominal’ for class parameters can lead to incoherence.
+    • while checking a role annotation for ‘C’
+    Suggested fix:
+      Perhaps you intended to use the ‘IncoherentInstances’ extension
 
-Roles5.hs:8:1: [GHC-17779]
-    Illegal role annotation for C
-    while checking a role annotation for ‘C’
-    Suggested fix: Perhaps you intended to use RoleAnnotations
+Roles5.hs:8:1: error: [GHC-17779]
+    • Illegal role annotation for C
+    • while checking a role annotation for ‘C’
+    Suggested fix:
+      Perhaps you intended to use the ‘RoleAnnotations’ extension
 
-Roles5.hs:9:1: [GHC-77192]
+Roles5.hs:9:1: error: [GHC-77192]
     Illegal role annotation for S;
     they are allowed only for datatypes and classes.

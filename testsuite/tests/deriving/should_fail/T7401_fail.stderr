@@ -4,5 +4,5 @@ T7401_fail.hs:4:17: error: [GHC-64560]
         ‘D’ must have at least one data constructor
     • In the data declaration for ‘D’
     Suggested fix:
-      Use EmptyDataDeriving
+      Use the ‘EmptyDataDeriving’ extension
       to enable deriving for empty data types

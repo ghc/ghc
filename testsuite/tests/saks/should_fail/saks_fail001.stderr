@@ -1,4 +1,5 @@
 
 saks_fail001.hs:8:1: error: [GHC-45906]
     Illegal standalone kind signature
-    Suggested fix: Perhaps you intended to use StandaloneKindSignatures
+    Suggested fix:
+      Perhaps you intended to use the ‘StandaloneKindSignatures’ extension (implied by ‘UnliftedDatatypes’)

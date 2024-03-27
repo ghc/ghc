@@ -3,4 +3,5 @@ T15316.hs:20:13: error: [GHC-22979]
     • The constraint ‘c’ is no smaller than the instance head ‘c’
     • In the quantified constraint ‘c => c’
       In the type signature: subsume' :: Proxy c -> ((c => c) => r) -> r
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

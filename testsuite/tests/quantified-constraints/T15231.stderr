@@ -4,4 +4,5 @@ T15231.hs:15:10: error: [GHC-22979]
         in the constraint ‘c’ than in the instance head ‘Z a’
     • In the quantified constraint ‘c => Z a’
       In the instance declaration for ‘Z (ECC c a)’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

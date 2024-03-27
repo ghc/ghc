@@ -1,6 +1,8 @@
-LazyFieldsDisabled.hs:3:10: [GHC-81601]
-     Lazy field annotations (~) are disabled
+
+LazyFieldsDisabled.hs:3:10: error: [GHC-81601]
+    • Lazy field annotations (~) are disabled
         on the first argument of ‘A’
-     In the definition of data constructor ‘A’
+    • In the definition of data constructor ‘A’
       In the data type declaration for ‘A’
-    Suggested fix: Perhaps you intended to use StrictData
+    Suggested fix:
+      Perhaps you intended to use the ‘StrictData’ extension (implied by ‘Strict’)

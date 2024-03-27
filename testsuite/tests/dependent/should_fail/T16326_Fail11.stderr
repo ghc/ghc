@@ -4,4 +4,5 @@ T16326_Fail11.hs:9:11: error: [GHC-51580]
         forall x -> x
     • When checking the class method: m :: forall a b. C a => b -> a
       In the class declaration for ‘C’
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

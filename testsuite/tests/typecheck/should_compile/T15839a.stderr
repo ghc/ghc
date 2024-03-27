@@ -4,5 +4,5 @@ T15839a.hs:6:30: warning: [GHC-20042] [-Wderiving-defaults (in -Wdefault)]
       Defaulting to the DeriveAnyClass strategy for instantiating C
     • In the newtype declaration for ‘T’
     Suggested fix:
-      Use DerivingStrategies
+      Use the ‘DerivingStrategies’ extension (implied by ‘DerivingVia’)
       to pick a different strategy
