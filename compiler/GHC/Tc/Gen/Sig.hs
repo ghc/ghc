@@ -881,21 +881,22 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
                                                      qtkvs lhs_evs residual_wanted
 
        -- rhs_binds uses rhs_evs to build `wanted` (NB not just `residual_wanted`)
-       ; let rhs_preds = mkMinimalBySCs id quant_preds
-       ; rhs_evs <- mapM newEvVar rhs_preds
+       ; let quant_wanted = emptyWC { wc_simple = quant_cts }
+       ; rhs_evs <- mapM newEvVar quant_preds
        ; (implic2, rhs_binds) <- buildImplicationFor tc_lvl skol_info_anon
-                                                     qtkvs rhs_evs wanted
+                                                     qtkvs rhs_evs quant_wanted
 
        ; emitImplications (implic1 `unionBags` implic2)
 
-       ; let all_bndrs = qtkvs ++ rule_evs ++ id_bndrs
        ; traceTc "tcSpecPrag:SpecSigE" $
-         vcat [ text "all_bndrs:" <+> ppr all_bndrs
+         vcat [ text "tv/id bndrs:" <+> ppr qtkvs <+> ppr id_bndrs
+              , text "lhs_evs:" <+> ppr lhs_evs
+              , text "rhs_evs:" <+> ppr rhs_evs
               , text "spec_e:" <+> ppr spec_e'
               , text "inl:" <+> ppr inl ]
        ; return [SpecPragE { spe_tv_bndrs     = qtkvs
                            , spe_id_bndrs     = id_bndrs
-                           , spe_lhs_ev_bndrs = rule_evs
+                           , spe_lhs_ev_bndrs = lhs_evs
                            , spe_lhs_binds    = lhs_binds
                            , spe_rhs_ev_bndrs = rhs_evs
                            , spe_rhs_binds    = rhs_binds
