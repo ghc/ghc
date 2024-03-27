@@ -508,6 +508,7 @@ extern char **environ;
       SymI_HasDataProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(addDLL)                                             \
+      SymI_HasProto(loadNativeObj)                                      \
       SymI_HasProto(addLibrarySearchPath)                               \
       SymI_HasProto(removeLibrarySearchPath)                            \
       SymI_HasProto(findSystemLibrary)                                  \
@@ -618,7 +619,7 @@ extern char **environ;
       SymI_HasProto(purgeObj)                                           \
       SymI_HasProto(insertSymbol)                                       \
       SymI_HasProto(lookupSymbol)                                       \
-      SymI_HasProto(lookupSymbolInDLL)                                  \
+      SymI_HasProto(lookupSymbolInNativeObj)                            \
       SymI_HasDataProto(stg_makeStablePtrzh)                                \
       SymI_HasDataProto(stg_mkApUpd0zh)                                     \
       SymI_HasDataProto(stg_labelThreadzh)                                  \

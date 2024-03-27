@@ -27,11 +27,15 @@
 #include "sm/OSMem.h"
 #include "linker/util.h"
 #include "linker/elf_util.h"
+#include "linker/LoadNativeObjPosix.h"
 
+#include <fs_rts.h>
 #include <link.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <regex.h>    // regex is already used by dlopen() so this is OK
+                      // to use here without requiring an additional lib
 #if defined(HAVE_DLFCN_H)
 #include <dlfcn.h>
 #endif
@@ -2072,159 +2076,6 @@ int ocRunFini_ELF( ObjectCode *oc )
 }
 
 /*
- * Shared object loading
- */
-
-#if defined(HAVE_DLINFO)
-struct piterate_cb_info {
-  ObjectCode *nc;
-  void *l_addr;   /* base virtual address of the loaded code */
-};
-
-static int loadNativeObjCb_(struct dl_phdr_info *info,
-    size_t _size STG_UNUSED, void *data) {
-  struct piterate_cb_info *s = (struct piterate_cb_info *) data;
-
-  // This logic mimicks _dl_addr_inside_object from glibc
-  // For reference:
-  // int
-  // internal_function
-  // _dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
-  // {
-  //   int n = l->l_phnum;
-  //   const ElfW(Addr) reladdr = addr - l->l_addr;
-  //
-  //   while (--n >= 0)
-  //     if (l->l_phdr[n].p_type == PT_LOAD
-  //         && reladdr - l->l_phdr[n].p_vaddr >= 0
-  //         && reladdr - l->l_phdr[n].p_vaddr < l->l_phdr[n].p_memsz)
-  //       return 1;
-  //   return 0;
-  // }
-
-  if ((void*) info->dlpi_addr == s->l_addr) {
-    int n = info->dlpi_phnum;
-    while (--n >= 0) {
-      if (info->dlpi_phdr[n].p_type == PT_LOAD) {
-        NativeCodeRange* ncr =
-          stgMallocBytes(sizeof(NativeCodeRange), "loadNativeObjCb_");
-        ncr->start = (void*) ((char*) s->l_addr + info->dlpi_phdr[n].p_vaddr);
-        ncr->end = (void*) ((char*) ncr->start + info->dlpi_phdr[n].p_memsz);
-
-        ncr->next = s->nc->nc_ranges;
-        s->nc->nc_ranges = ncr;
-      }
-    }
-  }
-  return 0;
-}
-#endif /* defined(HAVE_DLINFO) */
-
-static void copyErrmsg(char** errmsg_dest, char* errmsg) {
-  if (errmsg == NULL) errmsg = "loadNativeObj_ELF: unknown error";
-  *errmsg_dest = stgMallocBytes(strlen(errmsg)+1, "loadNativeObj_ELF");
-  strcpy(*errmsg_dest, errmsg);
-}
-
-// need dl_mutex
-void freeNativeCode_ELF (ObjectCode *nc) {
-  dlclose(nc->dlopen_handle);
-
-  NativeCodeRange *ncr = nc->nc_ranges;
-  while (ncr) {
-    NativeCodeRange* last_ncr = ncr;
-    ncr = ncr->next;
-    stgFree(last_ncr);
-  }
-}
-
-void * loadNativeObj_ELF (pathchar *path, char **errmsg)
-{
-   ObjectCode* nc;
-   void *hdl, *retval;
-
-   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
-
-   retval = NULL;
-   ACQUIRE_LOCK(&dl_mutex);
-
-   /* Loading the same object multiple times will lead to chaos
-    * as we will have two ObjectCodes but one underlying dlopen
-    * handle. Fail if this happens.
-    */
-   if (getObjectLoadStatus_(path) != OBJECT_NOT_LOADED) {
-     copyErrmsg(errmsg, "loadNativeObj_ELF: Already loaded");
-     goto dlopen_fail;
-   }
-
-   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, false, NULL, 0);
-
-   foreignExportsLoadingObject(nc);
-   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
-   nc->dlopen_handle = hdl;
-   foreignExportsFinishedLoadingObject();
-   if (hdl == NULL) {
-     /* dlopen failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlopen_fail;
-   }
-
-#if defined(HAVE_DLINFO)
-   struct link_map *map;
-   if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
-     /* dlinfo failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlinfo_fail;
-   }
-
-   hdl = NULL; // pass handle ownership to nc
-
-   struct piterate_cb_info piterate_info = {
-     .nc = nc,
-     .l_addr = (void *) map->l_addr
-   };
-   dl_iterate_phdr(loadNativeObjCb_, &piterate_info);
-   if (!nc->nc_ranges) {
-     copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
-     goto dl_iterate_phdr_fail;
-   }
-   nc->unloadable = true;
-#else
-   nc->nc_ranges = NULL;
-   nc->unloadable = false;
-#endif /* defined (HAVE_DLINFO) */
-
-   insertOCSectionIndices(nc);
-
-   nc->next_loaded_object = loaded_objects;
-   loaded_objects = nc;
-
-   retval = nc->dlopen_handle;
-
-#if defined(PROFILING)
-  // collect any new cost centres that were defined in the loaded object.
-  refreshProfilingCCSs();
-#endif
-
-   goto success;
-
-dl_iterate_phdr_fail:
-   // already have dl_mutex
-   freeNativeCode_ELF(nc);
-dlinfo_fail:
-   if (hdl) dlclose(hdl);
-dlopen_fail:
-success:
-
-   RELEASE_LOCK(&dl_mutex);
-
-   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF result=%p\n", retval));
-
-   return retval;
-}
-
-
-/*
  * PowerPC & X86_64 ELF specifics
  */
 
@@ -2272,5 +2123,81 @@ int ocAllocateExtras_ELF( ObjectCode *oc )
 }
 
 #endif /* NEED_SYMBOL_EXTRAS */
+
+extern regex_t re_invalid;
+extern regex_t re_realso;
+
+// Try interpreting an object which couldn't be loaded as a linker script and
+// load the first object in the linker GROUP ( ... ) directive (see comment below).
+//
+// Receives the non-NULL error message outputted from an attempt to load an
+// object (eg `loadNativeObj_POSIX` ).
+//
+// Returns the handle to the loaded object first mentioned in the linker script.
+// If this process fails at any point, the function returns NULL and outputs a
+// new error message.
+void * loadNativeObjFromLinkerScript_ELF(char **errmsg)
+{
+   // GHC #2615
+   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
+   // contain linker scripts rather than ELF-format object code. This
+   // code handles the situation by recognizing the real object code
+   // file name given in the linker script.
+   //
+   // If an "invalid ELF header" error occurs, it is assumed that the
+   // .so file contains a linker script instead of ELF object code.
+   // In this case, the code looks for the GROUP ( ... ) linker
+   // directive. If one is found, the first file name inside the
+   // parentheses is treated as the name of a dynamic library and the
+   // code attempts to dlopen that file. If this is also unsuccessful,
+   // an error message is returned.
+
+#define NMATCH 5
+   regmatch_t match[NMATCH];
+   FILE* fp;
+   size_t match_length;
+#define MAXLINE 1000
+   char line[MAXLINE];
+   int result;
+   void* r = NULL;
+
+   ASSERT_LOCK_HELD(&linker_mutex);
+
+   // see if the error message is due to an invalid ELF header
+   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", *errmsg));
+   result = regexec(&re_invalid, *errmsg, (size_t) NMATCH, match, 0);
+   IF_DEBUG(linker, debugBelch("result = %i\n", result));
+   if (result == 0) {
+      // success -- try to read the named file as a linker script
+      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
+                                 MAXLINE-1);
+      strncpy(line, (*errmsg+(match[1].rm_so)),match_length);
+      line[match_length] = '\0'; // make sure string is null-terminated
+      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
+      if ((fp = __rts_fopen(line, "r")) == NULL) {
+         // return original error if open fails
+         return NULL;
+      }
+      // try to find a GROUP or INPUT ( ... ) command
+      while (fgets(line, MAXLINE, fp) != NULL) {
+         IF_DEBUG(linker, debugBelch("input line = %s", line));
+         if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
+            // success -- try to dlopen the first named file
+            IF_DEBUG(linker, debugBelch("match%s\n",""));
+            line[match[2].rm_eo] = '\0';
+            stgFree((void*)*errmsg); // Free old message before creating new one
+            r = loadNativeObj_POSIX(line+match[2].rm_so, errmsg);
+            break;
+         }
+         // if control reaches here, no GROUP or INPUT ( ... ) directive
+         // was found and the original error message is returned to the
+         // caller
+      }
+      fclose(fp);
+   }
+
+   return r;
+}
+
 
 #endif /* elf */
