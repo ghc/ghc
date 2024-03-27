@@ -304,9 +304,18 @@ and updates to multiple buckets with low synchronization overhead.
 See Note [Updating the FastString table] on how it's updated.
 -}
 data FastStringTable = FastStringTable
-  {-# UNPACK #-} !FastMutInt -- the unique ID counter shared with all buckets
-  {-# UNPACK #-} !FastMutInt -- number of computed z-encodings for all buckets
-  (Array# (IORef FastStringTableSegment)) -- concurrent segments
+  {-# UNPACK #-} !FastMutInt
+  -- ^ The unique ID counter shared with all buckets
+  --
+  -- We unpack the 'FastMutInt' counter as it is always consumed strictly.
+  {-# NOUNPACK #-} !FastMutInt
+  -- ^ Number of computed z-encodings for all buckets.
+  --
+  -- We mark this as 'NOUNPACK' as this 'FastMutInt' is retained by a thunk
+  -- in 'mkFastStringWith' and needs to be boxed any way.
+  -- If this is unpacked, then we box this single 'FastMutInt' once for each
+  -- allocated FastString.
+  (Array# (IORef FastStringTableSegment)) -- ^  concurrent segments
 
 data FastStringTableSegment = FastStringTableSegment
   {-# UNPACK #-} !(MVar ())  -- the lock for write in each segment
