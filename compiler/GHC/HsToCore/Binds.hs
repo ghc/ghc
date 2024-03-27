@@ -827,42 +827,49 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
   = putSrcSpanDs loc $
     dsHsWrapper spec_app $ \core_app ->
-    finishSpecPrag mb_poly_rhs spec_bndrs
-                   (core_app (Var poly_id))
-                   (\_ poly_rhs -> core_app poly_rhs)
+    finishSpecPrag mb_poly_rhs
+                   spec_bndrs (core_app (Var poly_id))
+                   spec_bndrs (\_ poly_rhs -> core_app poly_rhs)
                    spec_inl
 
 
-dsSpec mb_poly_rhs (L loc (SpecPragE { spe_bndrs     = bndrs
+dsSpec mb_poly_rhs (L loc (SpecPragE { spe_tv_bndrs  = tv_bndrs
+                                     , spe_id_bndrs  = id_bndrs
+                                     , spe_lhs_ev_bndrs = lhs_evs
                                      , spe_lhs_binds = lhs_binds
                                      , spe_call      = the_call
+                                     , spe_rhs_ev_bndrs = rhs_evs
                                      , spe_rhs_binds = rhs_binds
                                      , spe_inl       = inl }))
   = putSrcSpanDs loc $
-    do { core_call <- dsTcEvBinds lhs_binds $ \ ds_binds ->
-                      do { ds_call <- dsLExpr the_call
-                         ; return (mkLets ds_binds ds_call) }
+    dsTcEvBinds lhs_binds $ \ ds_lhs_binds ->
+    dsTcEvBinds rhs_binds $ \ ds_rhs_binds ->
+    do { ds_call <- dsLExpr the_call
+       ; let core_call = mkLets ds_lhs_binds ds_call
 
-       ; mk_spec_call <- dsTcEvBinds rhs_binds $ \ ds_binds ->
-                         do { ds_call <- dsLExpr the_call
+       ; mk_spec_call <- do { ds_call <- dsLExpr the_call
                             ; return $ \ poly_id poly_rhs ->
-                                  mkLetNonRec poly_id poly_rhs $
-                                  mkLets ds_binds ds_call }
+                                  mkLetNonRec (localiseId poly_id) poly_rhs $
+                                  mkLets ds_lhs_binds          $
+                                  mkLets ds_rhs_binds ds_call }
 
-       ; finishSpecPrag mb_poly_rhs bndrs core_call mk_spec_call inl }
+       ; finishSpecPrag mb_poly_rhs
+                        (tv_bndrs ++ lhs_evs ++ id_bndrs) core_call
+                        (tv_bndrs ++ rhs_evs ++ id_bndrs) mk_spec_call
+                        inl }
 
 finishSpecPrag :: Maybe CoreExpr  -- See the first param of dsSpec
                -> [Var]           -- LHS binders
                -> CoreExpr        -- LHS pattern
-               -> (Id -> CoreExpr -> CoreExpr)  -- Make spec RHS given function body
+               -> [Var] -> (Id -> CoreExpr -> CoreExpr)  -- Make spec RHS given function body
                -> InlinePragma
                -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-finishSpecPrag mb_poly_rhs spec_bndrs
-               rule_lhs
-               mk_spec_rhs
+finishSpecPrag mb_poly_rhs
+               lhs_bndrs rule_lhs
+               spec_bndrs mk_spec_rhs
                spec_inl
   = do { dflags <- getDynFlags
-       ; case decomposeRuleLhs dflags spec_bndrs rule_lhs (mkVarSet spec_bndrs) of {
+       ; case decomposeRuleLhs dflags lhs_bndrs rule_lhs (mkVarSet lhs_bndrs) of {
            Left msg -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, poly_id, rule_lhs_args) ->
 
@@ -871,7 +878,6 @@ finishSpecPrag mb_poly_rhs spec_bndrs
        ; let poly_name  = idName poly_id
              spec_occ   = mkSpecOcc (getOccName poly_name)
              spec_name  = mkInternalName uniq spec_occ (getSrcSpan poly_name)
-             spec_ty    = mkLamTypes spec_bndrs (exprType rule_lhs)
              poly_rhs   = specFunBody poly_id mb_poly_rhs
              id_inl     = idInlinePragma poly_id
              inl_prag   = specFunInlinePrag mb_poly_rhs poly_id id_inl spec_inl
@@ -880,6 +886,7 @@ finishSpecPrag mb_poly_rhs spec_bndrs
              simpl_opts = initSimpleOpts dflags
              fn_unf     = realIdUnfolding poly_id
              spec_unf   = specUnfolding simpl_opts spec_bndrs mk_app rule_lhs_args fn_unf
+             mk_app e   = mkApps e rule_lhs_args
              spec_id    = mkLocalId spec_name ManyTy spec_ty
                             -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
@@ -887,9 +894,9 @@ finishSpecPrag mb_poly_rhs spec_bndrs
 
              rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
-                               (mkVarApps (Var spec_id) spec_bndrs)
+                               (mkVarApps (Var spec_id) lhs_bndrs)
 
-             mk_app e = mkApps e rule_lhs_args
+             spec_ty  = mkLamTypes spec_bndrs (exprType rule_lhs)
              spec_rhs = mkLams spec_bndrs $
                         mk_spec_rhs poly_id poly_rhs
 

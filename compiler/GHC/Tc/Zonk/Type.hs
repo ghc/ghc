@@ -855,15 +855,22 @@ zonkLTcSpecPrags ps
       = do { co_fn' <- don'tBind $ zonkCoFn co_fn
            ; id' <- zonkIdOcc id
            ; return (L loc (SpecPrag id' co_fn' inl)) }
-    zonk_prag (L loc (SpecPragE { spe_bndrs = bndrs, spe_lhs_binds = lhs_binds
-                                , spe_call = spec_e, spe_rhs_binds = rhs_binds
+    zonk_prag (L loc (SpecPragE { spe_tv_bndrs = tv_bndrs, spe_id_bndrs = id_bndrs
+                                , spe_lhs_ev_bndrs = lhs_evs, spe_rhs_ev_bndrs = rhs_evs
+                                , spe_lhs_binds = lhs_binds, spe_rhs_binds = rhs_binds
+                                , spe_call = spec_e
                                 , spe_inl = inl }))
-      = runZonkBndrT (zonkCoreBndrsX bndrs)    $ \bndrs' ->
-        runZonkBndrT (zonkTcEvBinds lhs_binds) $ \lhs_binds' ->
-        runZonkBndrT (zonkTcEvBinds rhs_binds) $ \rhs_binds' ->
+      = runZonkBndrT (zonkCoreBndrsX tv_bndrs)     $ \tv_bndrs' ->
+        runZonkBndrT (zonkCoreBndrsX id_bndrs)     $ \id_bndrs' ->
+        runZonkBndrT (zonkCoreBndrsX lhs_evs)      $ \lhs_evs' ->
+        runZonkBndrT (zonkTcEvBinds lhs_binds)     $ \lhs_binds' ->
+        runZonkBndrT (zonkCoreBndrsX rhs_evs)      $ \rhs_evs' ->
+        runZonkBndrT (zonkTcEvBinds rhs_binds)     $ \rhs_binds' ->
         do { spec_e' <- zonkLExpr spec_e
-           ; return (L loc (SpecPragE { spe_bndrs = bndrs', spe_lhs_binds = lhs_binds'
-                                      , spe_call = spec_e', spe_rhs_binds = rhs_binds'
+           ; return (L loc (SpecPragE { spe_tv_bndrs = tv_bndrs', spe_id_bndrs = id_bndrs'
+                                      , spe_lhs_ev_bndrs = lhs_evs', spe_rhs_ev_bndrs = rhs_evs'
+                                      , spe_lhs_binds = lhs_binds', spe_rhs_binds = rhs_binds'
+                                      , spe_call = spec_e'
                                       , spe_inl = inl })) }
 
 {-

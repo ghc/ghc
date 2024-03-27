@@ -963,7 +963,7 @@ instance Outputable TcSpecPrag where
   ppr (SpecPragE { spe_tv_bndrs = tv_bndrs, spe_id_bndrs = id_bndrs
                  , spe_call = spec_e, spe_inl = inl })
     = text (extractSpecPragName $ inl_src inl)
-       <+> hang (ppr (tv_bndrs ++ id_bndrs) 2 (pprLExpr spec_e)
+       <+> hang (ppr (tv_bndrs ++ id_bndrs)) 2 (pprLExpr spec_e)
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc
