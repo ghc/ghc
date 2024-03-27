@@ -10,4 +10,5 @@ SafeLang12_B.hs:3:14: warning: [GHC-98887]
 
 SafeLang12.hs:1:1: error: [GHC-26759]
     Unexpected top-level splice.
-    Suggested fix: Perhaps you intended to use TemplateHaskell
+    Suggested fix:
+      Perhaps you intended to use the ‘TemplateHaskell’ extension

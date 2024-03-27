@@ -4,4 +4,4 @@ NoBlockArgumentsFailArrowCmds.hs:7:27: error: [GHC-12178]
         \ () -> () >- returnA
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension

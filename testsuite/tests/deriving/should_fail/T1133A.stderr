@@ -5,5 +5,5 @@ T1133A.hs:7:28: error: [GHC-30750]
         (an enumeration consists of one or more nullary, non-GADT constructors)
     • In the newtype declaration for ‘X’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension

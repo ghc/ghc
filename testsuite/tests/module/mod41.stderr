@@ -5,4 +5,5 @@ mod41.hs:4:18: error: [GHC-48406]
         where a1 ... an are *distinct type variables*,
         and each type variable appears at most once in the instance head.
     • In the instance declaration for ‘Eq (Either a a)’
-    Suggested fix: Perhaps you intended to use FlexibleInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleInstances’ extension

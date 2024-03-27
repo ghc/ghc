@@ -2,4 +2,5 @@
 TH_Roles1.hs:7:2: error: [GHC-17779]
     • Illegal role annotation for T
     • while checking a role annotation for ‘T’
-    Suggested fix: Perhaps you intended to use RoleAnnotations
+    Suggested fix:
+      Perhaps you intended to use the ‘RoleAnnotations’ extension

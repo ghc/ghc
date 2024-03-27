@@ -1,4 +1,5 @@
 
 readFailTraditionalRecords1.hs:6:16: error: [GHC-65719]
     Illegal record syntax: {i :: Int}
-    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
+    Suggested fix:
+      Perhaps you intended to use the ‘TraditionalRecordSyntax’ extension

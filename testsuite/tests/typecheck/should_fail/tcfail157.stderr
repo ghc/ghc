@@ -4,4 +4,5 @@ tcfail157.hs:27:10: error: [GHC-22979]
         in the constraint ‘E m a b’
         than in the instance head ‘Foo m (a -> ())’
     • In the instance declaration for ‘Foo m (a -> ())’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

@@ -4,4 +4,5 @@ T16059e.hs:15:6: error: [GHC-91510]
     • In the expansion of type synonym ‘Foo’
       In the expansion of type synonym ‘Const’
       In the type signature: g :: Const Foo Foo -> Int
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)

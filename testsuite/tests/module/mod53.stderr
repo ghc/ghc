@@ -3,4 +3,5 @@ mod53.hs:4:22: error: [GHC-00158]
     • Can't make a derived instance of ‘C T’:
         ‘C’ is not a stock derivable class (Eq, Show, etc.)
     • In the data declaration for ‘T’
-    Suggested fix: Perhaps you intended to use DeriveAnyClass
+    Suggested fix:
+      Perhaps you intended to use the ‘DeriveAnyClass’ extension

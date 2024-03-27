@@ -2,8 +2,10 @@
 T3095.hs:8:12: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use the ‘ExplicitForAll’ extension (implied by ‘RankNTypes’,
+                                                     ‘QuantifiedConstraints’, ‘ScopedTypeVariables’,
+                                                     ‘LiberalTypeSynonyms’ and ‘ExistentialQuantification’)
+      to enable syntax: forall <tvs>. <type>
 
 T3095.hs:8:12: error: [GHC-77878]
     Unexpected type ‘forall x. x :: Type’

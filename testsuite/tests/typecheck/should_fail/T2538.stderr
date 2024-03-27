@@ -2,14 +2,17 @@
 T2538.hs:7:6: error: [GHC-91510]
     • Illegal qualified type: Eq a => a -> a
     • In the type signature: f :: (Eq a => a -> a) -> Int
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)
 
 T2538.hs:10:6: error: [GHC-91510]
     • Illegal qualified type: Eq a => a -> a
     • In the type signature: g :: [Eq a => a -> a] -> Int
-    Suggested fix: Perhaps you intended to use ImpredicativeTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension
 
 T2538.hs:13:6: error: [GHC-91510]
     • Illegal qualified type: Eq a => a -> a
     • In the type signature: h :: Ix (Eq a => a -> a) => Int
-    Suggested fix: Perhaps you intended to use ImpredicativeTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension

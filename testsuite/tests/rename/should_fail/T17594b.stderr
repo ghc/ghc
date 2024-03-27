@@ -1,84 +1,105 @@
 
 T17594b.hs:7:5: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:10:5: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:14:5: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:5: error: [GHC-78249]
     Illegal invisible type pattern: t1
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:9: error: [GHC-78249]
     Illegal invisible type pattern: t2
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:13: error: [GHC-78249]
     Illegal invisible type pattern: t3
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:26: error: [GHC-78249]
     Illegal invisible type pattern: t4
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:30: error: [GHC-78249]
     Illegal invisible type pattern: t5
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:17:34: error: [GHC-78249]
     Illegal invisible type pattern: t6
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:20:10: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:22:19: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:25:9: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:5: error: [GHC-78249]
     Illegal invisible type pattern: t1
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:9: error: [GHC-78249]
     Illegal invisible type pattern: t2
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:31: error: [GHC-78249]
     Illegal invisible type pattern: t3
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:57: error: [GHC-78249]
     Illegal invisible type pattern: t4
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:61: error: [GHC-78249]
     Illegal invisible type pattern: t5
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:28:70: error: [GHC-78249]
     Illegal invisible type pattern: t6
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:31:10: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:34:10: error: [GHC-78249]
     Illegal invisible type pattern: t
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
 
 T17594b.hs:37:6: error: [GHC-78249]
     Illegal invisible type pattern: ($(TH.varT (TH.mkName "t")))
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension

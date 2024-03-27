@@ -2,4 +2,5 @@
 tcfail214.hs:9:10: error: [GHC-22979]
     • Illegal use of type family ‘F’ in the constraint ‘F a’
     • In the instance declaration for ‘C [a]’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

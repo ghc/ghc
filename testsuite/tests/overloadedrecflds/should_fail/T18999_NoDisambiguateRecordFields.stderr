@@ -16,4 +16,5 @@ T18999_NoDisambiguateRecordFields.hs:8:11: error: [GHC-56428]
       • variable ‘not’,
         imported from ‘Prelude’ at T18999_NoDisambiguateRecordFields.hs:2:8-40
         (and originally defined in ‘GHC.Classes’)
-    Suggested fix: Perhaps you intended to use DisambiguateRecordFields
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)

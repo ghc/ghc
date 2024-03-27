@@ -2,5 +2,5 @@
 T8542.hs:9:5: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
     Literal 128 is out of the Int8 range -128..127
     Suggested fix:
-      Perhaps you intended to use NegativeLiterals
+      Perhaps you intended to use the ‘NegativeLiterals’ extension
       If you are trying to write a large negative literal

@@ -3,10 +3,12 @@ T12512.hs:10:1: error: [GHC-00158]
     • Can't make a derived instance of ‘Wat1 (# a, b #)’:
         ‘Wat1’ is not a stock derivable class (Eq, Show, etc.)
     • In the stand-alone deriving instance for ‘Wat1 (# a, b #)’
-    Suggested fix: Perhaps you intended to use DeriveAnyClass
+    Suggested fix:
+      Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
 T12512.hs:13:1: error: [GHC-00158]
     • Can't make a derived instance of ‘Wat2 (# a | b #)’:
         ‘Wat2’ is not a stock derivable class (Eq, Show, etc.)
     • In the stand-alone deriving instance for ‘Wat2 (# a | b #)’
-    Suggested fix: Perhaps you intended to use DeriveAnyClass
+    Suggested fix:
+      Perhaps you intended to use the ‘DeriveAnyClass’ extension

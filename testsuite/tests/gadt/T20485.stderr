@@ -2,14 +2,14 @@
 T20485.hs:7:3: warning: [GHC-58008] [-Wgadt-mono-local-binds (in -Wdefault)]
     Pattern matching on GADTs without MonoLocalBinds is fragile.
     Suggested fix:
-      Enable any of the following extensions: GADTs, TypeFamilies
+      Enable any of the following extensions: ‘GADTs’ or ‘TypeFamilies’ (implied by ‘TypeFamilyDependencies’)
 
 T20485.hs:9:19: warning: [GHC-58008] [-Wgadt-mono-local-binds (in -Wdefault)]
     Pattern matching on GADTs without MonoLocalBinds is fragile.
     Suggested fix:
-      Enable any of the following extensions: GADTs, TypeFamilies
+      Enable any of the following extensions: ‘GADTs’ or ‘TypeFamilies’ (implied by ‘TypeFamilyDependencies’)
 
 T20485.hs:12:3: warning: [GHC-58008] [-Wgadt-mono-local-binds (in -Wdefault)]
     Pattern matching on GADTs without MonoLocalBinds is fragile.
     Suggested fix:
-      Enable any of the following extensions: GADTs, TypeFamilies
+      Enable any of the following extensions: ‘GADTs’ or ‘TypeFamilies’ (implied by ‘TypeFamilyDependencies’)

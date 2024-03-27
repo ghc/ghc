@@ -2,19 +2,23 @@
 T11663.hs:6:12: error: [GHC-74097]
     Illegal type signature: ‘Int’
       Type signatures are only allowed in patterns with ScopedTypeVariables
-    Suggested fix: Perhaps you intended to use ScopedTypeVariables
+    Suggested fix:
+      Perhaps you intended to use the ‘ScopedTypeVariables’ extension
 
 T11663.hs:7:9: error: [GHC-74097]
     Illegal type signature: ‘Int’
       Type signatures are only allowed in patterns with ScopedTypeVariables
-    Suggested fix: Perhaps you intended to use ScopedTypeVariables
+    Suggested fix:
+      Perhaps you intended to use the ‘ScopedTypeVariables’ extension
 
 T11663.hs:8:22: error: [GHC-74097]
     Illegal type signature: ‘Int’
       Type signatures are only allowed in patterns with ScopedTypeVariables
-    Suggested fix: Perhaps you intended to use ScopedTypeVariables
+    Suggested fix:
+      Perhaps you intended to use the ‘ScopedTypeVariables’ extension
 
 T11663.hs:9:32: error: [GHC-74097]
     Illegal type signature: ‘Int’
       Type signatures are only allowed in patterns with ScopedTypeVariables
-    Suggested fix: Perhaps you intended to use ScopedTypeVariables
+    Suggested fix:
+      Perhaps you intended to use the ‘ScopedTypeVariables’ extension

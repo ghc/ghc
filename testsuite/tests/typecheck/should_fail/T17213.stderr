@@ -3,4 +3,5 @@ T17213.hs:6:1: error: [GHC-91510]
     • Illegal polymorphic type: forall a. a -> a
     • When checking the inferred type
         g :: (forall a. a -> a) -> Int
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)

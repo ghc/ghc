@@ -5,7 +5,8 @@ tcfail044.hs:6:20: error: [GHC-48406]
         where a1 ... an are *distinct type variables*,
         and each type variable appears at most once in the instance head.
     • In the instance declaration for ‘Eq (a -> a)’
-    Suggested fix: Perhaps you intended to use FlexibleInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleInstances’ extension
 
 tcfail044.hs:9:21: error: [GHC-48406]
     • Illegal instance declaration for ‘Num (a -> a)’:
@@ -13,4 +14,5 @@ tcfail044.hs:9:21: error: [GHC-48406]
         where a1 ... an are *distinct type variables*,
         and each type variable appears at most once in the instance head.
     • In the instance declaration for ‘Num (a -> a)’
-    Suggested fix: Perhaps you intended to use FlexibleInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleInstances’ extension

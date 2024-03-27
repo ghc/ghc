@@ -2,4 +2,5 @@
 T16326_Fail3.hs:6:1: error: [GHC-51580]
     Illegal visible, dependent quantification in the type of a term:
       forall a -> [a]
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

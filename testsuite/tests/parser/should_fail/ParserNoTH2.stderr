@@ -6,4 +6,5 @@ ParserNoTH2.hs:1:5: warning: [GHC-47082] [-Woperator-whitespace-ext-conflict (in
 
 ParserNoTH2.hs:1:5: error: [GHC-58481]
     parse error on input ‘$$’
-    Suggested fix: Perhaps you intended to use TemplateHaskell
+    Suggested fix:
+      Perhaps you intended to use the ‘TemplateHaskell’ extension

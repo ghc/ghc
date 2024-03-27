@@ -1,4 +1,5 @@
 
 T8501b.hs:5:9: error: [GHC-58481]
     parse error on input ‘<-’
-    Suggested fix: Perhaps you intended to use RecursiveDo
+    Suggested fix:
+      Perhaps you intended to use the ‘RecursiveDo’ extension

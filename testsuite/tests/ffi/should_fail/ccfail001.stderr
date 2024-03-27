@@ -1,8 +1,9 @@
-
 ccfail001.hs:10:1: error: [GHC-10964]
     • Unacceptable result type in foreign declaration:
         ‘State# RealWorld’ cannot be marshalled in a foreign call
         UnliftedFFITypes is required to marshal unlifted types
     • When checking declaration:
         foreign import ccall safe foo :: Int -> State# RealWorld
-    Suggested fix: Perhaps you intended to use UnliftedFFITypes
+    Suggested fix:
+      Perhaps you intended to use the ‘UnliftedFFITypes’ extension
+

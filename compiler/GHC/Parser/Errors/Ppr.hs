@@ -7,6 +7,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
 
@@ -699,10 +700,8 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordDotInvalid{}             -> noHints
     PsErrIllegalPatSynExport                      -> [suggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
-    PsErrExplicitForall is_unicode                ->
-      let info = text "or a similar language extension to enable explicit-forall syntax:" <+>
-                 forallSym is_unicode <+> text "<tvs>. <type>"
-      in [ suggestExtensionWithInfo info LangExt.RankNTypes ]
+    PsErrExplicitForall is_unicode                -> [useExtensionInOrderTo info LangExt.ExplicitForAll]
+      where info = "to enable syntax:" <+> forallSym is_unicode <+> angleBrackets "tvs" <> dot <+> angleBrackets "type"
     PsErrIllegalQualifiedDo{}                     -> [suggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
@@ -757,9 +756,7 @@ instance Diagnostic PsMessage where
     PsErrIfInFunAppExpr{}                         -> suggestParensAndBlockArgs
     PsErrProcInFunAppExpr{}                       -> suggestParensAndBlockArgs
     PsErrMalformedTyOrClDecl{}                    -> noHints
-    PsErrIllegalWhereInDataDecl                   ->
-      [ suggestExtensionWithInfo (text "or a similar language extension to enable syntax: data T where")
-                                 LangExt.GADTs ]
+    PsErrIllegalWhereInDataDecl                   -> [useExtensionInOrderTo "to enable syntax: data T where" LangExt.GADTSyntax]
     PsErrIllegalDataTypeContext{}                 -> [suggestExtension LangExt.DatatypeContexts]
     PsErrPrimStringInvalidChar                    -> noHints
     PsErrSuffixAT                                 -> noHints

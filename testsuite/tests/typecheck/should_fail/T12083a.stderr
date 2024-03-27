@@ -2,7 +2,8 @@
 T12083a.hs:6:1: error: [GHC-91510]
     • Illegal qualified type: Num a => a
     • In the type synonym declaration for ‘Constrd’
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)
 
 T12083a.hs:10:26: error: [GHC-25709]
     • Data constructor ‘ExistentiallyLost’ has existential type variables, a context, or a specialised result type
@@ -10,4 +11,4 @@ T12083a.hs:10:26: error: [GHC-25709]
     • In the definition of data constructor ‘ExistentiallyLost’
       In the data type declaration for ‘ExistentiallyLost’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ‘ExistentialQuantification’ or ‘GADTs’

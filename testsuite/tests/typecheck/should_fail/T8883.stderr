@@ -5,4 +5,5 @@ T8883.hs:21:1: error: [GHC-80003]
         fold :: forall {a} {b}.
                 (Functor (PF a), Regular a) =>
                 (PF a b -> b) -> a -> b
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension

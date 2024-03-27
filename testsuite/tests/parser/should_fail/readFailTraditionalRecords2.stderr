@@ -1,4 +1,5 @@
 
 readFailTraditionalRecords2.hs:6:4: error: [GHC-65719]
     Illegal record syntax: Foo {i = j}
-    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
+    Suggested fix:
+      Perhaps you intended to use the ‘TraditionalRecordSyntax’ extension

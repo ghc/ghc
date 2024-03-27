@@ -5,7 +5,8 @@ T15552a.hs:26:9: error: [GHC-22979]
                                                            (FirstEntryOfVal v kvs)’
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension
 
 T15552a.hs:26:9: error: [GHC-22979]
     • Illegal nested use of type family ‘FirstEntryOfVal’
@@ -13,7 +14,8 @@ T15552a.hs:26:9: error: [GHC-22979]
                                                            (FirstEntryOfVal v kvs)’
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension
 
 T15552a.hs:26:9: error: [GHC-22979]
     • Illegal nested use of type family ‘FirstEntryOfVal’
@@ -21,4 +23,5 @@ T15552a.hs:26:9: error: [GHC-22979]
                                                            (FirstEntryOfVal v kvs)’
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

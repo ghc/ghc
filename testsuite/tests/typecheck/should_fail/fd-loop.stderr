@@ -3,4 +3,5 @@ fd-loop.hs:12:10: error: [GHC-22979]
     • The constraint ‘C a b’
         is no smaller than the instance head ‘Eq (T a)’
     • In the instance declaration for ‘Eq (T a)’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

@@ -3,4 +3,5 @@ mod45.hs:6:11: error: [GHC-06202]
     • Illegal type signature in instance declaration:
         (==) :: T -> T -> Bool
     • In the instance declaration for ‘Eq T’
-    Suggested fix: Perhaps you intended to use InstanceSigs
+    Suggested fix:
+      Perhaps you intended to use the ‘InstanceSigs’ extension

@@ -4,5 +4,5 @@ T9600.hs:4:39: error: [GHC-82023]
         ‘Applicative’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘Foo’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension

@@ -4,4 +4,5 @@ mod39.hs:4:17: error: [GHC-25079]
         constrains only the class type variables
     • When checking the class method: f :: forall a. (C a, Eq a) => a
       In the class declaration for ‘C’
-    Suggested fix: Perhaps you intended to use ConstrainedClassMethods
+    Suggested fix:
+      Perhaps you intended to use the ‘ConstrainedClassMethods’ extension (implied by ‘MultiParamTypeClasses’)

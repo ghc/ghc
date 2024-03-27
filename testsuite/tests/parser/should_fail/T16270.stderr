@@ -9,67 +9,78 @@ T16270.hs:8:1: warning: [GHC-94817] [-Wtabs (in -Wdefault)]
 T16270.hs:8:12: error: [GHC-75254]
     Unexpected semi-colons in conditional:
         if c then False; else True
-    Suggested fix: Perhaps you intended to use DoAndIfThenElse
+    Suggested fix:
+      Perhaps you intended to use the ‘DoAndIfThenElse’ extension
 
 T16270.hs:13:8: error: [GHC-52095]
     Unexpected do block in function application:
         do 1
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension
 
 T16270.hs:14:8: error: [GHC-06074]
     Unexpected lambda expression in function application:
         \ x -> x
     Suggested fixes:
       • Use parentheses.
-      • Perhaps you intended to use BlockArguments
+      • Perhaps you intended to use the ‘BlockArguments’ extension
 
 T16270.hs:18:22: error: [GHC-65719]
     Illegal record syntax: {fst :: a, snd :: b}
-    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
+    Suggested fix:
+      Perhaps you intended to use the ‘TraditionalRecordSyntax’ extension
 
 T16270.hs:19:5: error: [GHC-65719]
     Illegal record syntax: p {fst = 1, snd = True}
-    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
+    Suggested fix:
+      Perhaps you intended to use the ‘TraditionalRecordSyntax’ extension
 
 T16270.hs:21:6: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
-      Perhaps you intended to use RankNTypes
-      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
+      Use the ‘ExplicitForAll’ extension (implied by ‘RankNTypes’,
+                                                     ‘QuantifiedConstraints’, ‘ScopedTypeVariables’,
+                                                     ‘LiberalTypeSynonyms’ and ‘ExistentialQuantification’)
+      to enable syntax: forall <tvs>. <type>
 
 T16270.hs:22:8: error: [GHC-75254]
     Unexpected semi-colons in conditional:
         if True; then (); else ()
-    Suggested fix: Perhaps you intended to use DoAndIfThenElse
+    Suggested fix:
+      Perhaps you intended to use the ‘DoAndIfThenElse’ extension
 
 T16270.hs:24:10: error: [GHC-36952]
     Illegal keyword 'where' in data declaration
     Suggested fix:
-      Perhaps you intended to use GADTs
-      or a similar language extension to enable syntax: data T where
+      Use the ‘GADTSyntax’ extension (implied by ‘GADTs’)
+      to enable syntax: data T where
 
 T16270.hs:26:12: error: [GHC-79767]
     Illegal bang-pattern
     !i
-    Suggested fix: Perhaps you intended to use BangPatterns
+    Suggested fix:
+      Perhaps you intended to use the ‘BangPatterns’ extension
 
 T16270.hs:28:9: error: [GHC-28985]
     Illegal multi-way if-expression
-    Suggested fix: Perhaps you intended to use MultiWayIf
+    Suggested fix:
+      Perhaps you intended to use the ‘MultiWayIf’ extension
 
 T16270.hs:30:9: error: [GHC-28985]
     Illegal multi-way if-expression
-    Suggested fix: Perhaps you intended to use MultiWayIf
+    Suggested fix:
+      Perhaps you intended to use the ‘MultiWayIf’ extension
 
 T16270.hs:33:6: error: [GHC-51179]
     Illegal \case
-    Suggested fix: Perhaps you intended to use LambdaCase
+    Suggested fix:
+      Perhaps you intended to use the ‘LambdaCase’ extension
 
 T16270.hs:36:5: error: [GHC-62330]
     Illegal underscores in integer literals
-    Suggested fix: Perhaps you intended to use NumericUnderscores
+    Suggested fix:
+      Perhaps you intended to use the ‘NumericUnderscores’ extension
 
 T16270.hs:38:5: error: [GHC-43080]
     primitive string literal must contain only characters <= '\xFF'

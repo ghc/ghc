@@ -4,6 +4,6 @@
     • When checking the inferred type
         foo :: forall {r} {a}. HasField "name" r a => r -> a
     Suggested fix:
-      Perhaps you intended to use FlexibleContexts
+      Perhaps you intended to use the ‘FlexibleContexts’ extension
       You may enable this language extension in GHCi with:
         :set -XFlexibleContexts

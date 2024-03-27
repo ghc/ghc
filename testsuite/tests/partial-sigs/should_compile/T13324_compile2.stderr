@@ -3,5 +3,5 @@ T13324_compile2.hs:7:19: warning: [GHC-60661] [-Wpartial-type-signatures (in -Wd
     • Found type wildcard ‘_’ standing for ‘Show a’
     • In the instance declaration for ‘Show (Option a)’
     Suggested fix:
-      Perhaps you intended to use PartialTypeSignatures
+      Perhaps you intended to use the ‘PartialTypeSignatures’ extension
       to use the inferred type

@@ -1302,10 +1302,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --   Static Argument Transformation needs investigation. See #9374
     ]
 
-type TurnOnFlag = Bool   -- True  <=> we are turning the flag on
-                         -- False <=> we are turning the flag off
-turnOn  :: TurnOnFlag; turnOn  = True
-turnOff :: TurnOnFlag; turnOff = False
 
 default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =

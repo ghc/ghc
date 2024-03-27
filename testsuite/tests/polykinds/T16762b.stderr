@@ -1,5 +1,5 @@
 
 T16762b.hs:8:11: error: [GHC-64861]
     Illegal kind: forall k. Type
-    Suggested fix: Perhaps you intended to use PolyKinds
-
+    Suggested fix:
+      Perhaps you intended to use the ‘PolyKinds’ extension

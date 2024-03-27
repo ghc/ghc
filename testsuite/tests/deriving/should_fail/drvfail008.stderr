@@ -4,5 +4,5 @@ drvfail008.hs:11:43: error: [GHC-82023]
         ‘Monad’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘M’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension

@@ -1,4 +1,5 @@
 
 RnPatternSynonymFail.hs:6:2: error: [GHC-41507]
     Illegal pattern synonym declaration
-    Suggested fix: Perhaps you intended to use PatternSynonyms
+    Suggested fix:
+      Perhaps you intended to use the ‘PatternSynonyms’ extension

@@ -3,7 +3,7 @@ T23686A.hs:4:1: error: [GHC-39191]
     • Illegal family declaration for ‘GMap’
     • In the data family declaration for ‘GMap’
     Suggested fix:
-      Perhaps you intended to use TypeFamilies
+      Perhaps you intended to use the ‘TypeFamilies’ extension (implied by ‘TypeFamilyDependencies’)
       You may enable this language extension in GHCi with:
         :set -XTypeFamilies
 
@@ -12,7 +12,6 @@ T23686B.hs:5:5: error: [GHC-62558]
     • In the Template Haskell quotation
         [| \ left right x -> left (right x) |]
     Suggested fix:
-      Enable any of the following extensions: TemplateHaskell, TemplateHaskellQuotes
-      You may enable these language extensions in GHCi with:
-        :set -XTemplateHaskell
+      Perhaps you intended to use the ‘TemplateHaskellQuotes’ extension (implied by ‘TemplateHaskell’)
+      You may enable this language extension in GHCi with:
         :set -XTemplateHaskellQuotes

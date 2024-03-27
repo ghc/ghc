@@ -3,22 +3,26 @@ T24396c.hs:7:13: error: [GHC-14995]
     Illegal use of the ‘data’ keyword:
       data f "warning on data level"
     in a WARNING pragma
-    Suggested fix: Perhaps you intended to use ExplicitNamespaces
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
 
 T24396c.hs:11:13: error: [GHC-14995]
     Illegal use of the ‘type’ keyword:
       type F "warning on type level"
     in a WARNING pragma
-    Suggested fix: Perhaps you intended to use ExplicitNamespaces
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
 
 T24396c.hs:16:16: error: [GHC-14995]
     Illegal use of the ‘data’ keyword:
       data g "deprecation on data level"
     in a DEPRECATED pragma
-    Suggested fix: Perhaps you intended to use ExplicitNamespaces
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
 
 T24396c.hs:20:16: error: [GHC-14995]
     Illegal use of the ‘type’ keyword:
       type G "deprecation on type level"
     in a DEPRECATED pragma
-    Suggested fix: Perhaps you intended to use ExplicitNamespaces
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)

@@ -5,4 +5,5 @@ TH_double_splice.hs:6:12: error: [GHC-26759]
       In the untyped splice: $($(error "should not happen"))
       In the Template Haskell quotation
         [| $($(error "should not happen")) |]
-    Suggested fix: Perhaps you intended to use TemplateHaskell
+    Suggested fix:
+      Perhaps you intended to use the ‘TemplateHaskell’ extension

@@ -2,4 +2,5 @@
 tcfail209a.hs:4:6: error: [GHC-77539]
     • Illegal tuple constraint: (Show a, Num a)
     • In the type signature: g :: ((Show a, Num a), Eq a) => a -> a
-    Suggested fix: Perhaps you intended to use ConstraintKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘ConstraintKinds’ extension

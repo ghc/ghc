@@ -1,4 +1,5 @@
 
 T20147.hs:6:28: error: [GHC-82311]
     Empty 'do' block
-    Suggested fix: Perhaps you intended to use NondecreasingIndentation
+    Suggested fix:
+      Perhaps you intended to use the ‘NondecreasingIndentation’ extension

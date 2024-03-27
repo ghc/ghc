@@ -3,4 +3,5 @@ T10351.hs:7:1: error: [GHC-80003]
     • Non type-variable argument in the constraint: C [a]
     • When checking the inferred type
         f :: forall {a}. C [a] => a -> ()
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension

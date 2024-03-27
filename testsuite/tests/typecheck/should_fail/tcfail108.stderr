@@ -3,4 +3,5 @@ tcfail108.hs:7:10: error: [GHC-22979]
     • The constraint ‘Eq (f (Rec f))’
         is no smaller than the instance head ‘Eq (Rec f)’
     • In the instance declaration for ‘Eq (Rec f)’
-    Suggested fix: Perhaps you intended to use UndecidableInstances
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

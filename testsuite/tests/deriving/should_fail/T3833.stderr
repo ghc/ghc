@@ -4,5 +4,5 @@ T3833.hs:10:1: error: [GHC-82023]
         ‘Monoid’ is not a stock derivable class (Eq, Show, etc.)
     • In the stand-alone deriving instance for ‘Monoid (DecodeMap e)’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension

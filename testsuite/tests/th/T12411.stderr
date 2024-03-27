@@ -1,7 +1,8 @@
 
 T12411.hs:5:1: error: [GHC-23482]
     Illegal visible type application: @Q
-    Suggested fix: Perhaps you intended to use TypeApplications
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeApplications’ extension
 
 T12411.hs:5:7: error: [GHC-76037]
     Not in scope: type constructor or class ‘Q’

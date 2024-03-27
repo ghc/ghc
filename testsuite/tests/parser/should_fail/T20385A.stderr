@@ -9,4 +9,4 @@ T20385A.hs:10:9: error: [GHC-88464]
     Variable not in scope: mdo :: a -> a
     Suggested fixes:
       • Perhaps use ‘mod’ (imported from Prelude)
-      • Perhaps you intended to use RecursiveDo
+      • Perhaps you intended to use the ‘RecursiveDo’ extension

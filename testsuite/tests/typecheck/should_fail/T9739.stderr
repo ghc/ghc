@@ -4,11 +4,13 @@ T9739.hs:4:1: error: [GHC-29210]
         one of whose superclasses is ‘Class3’
         one of whose superclasses is ‘Class1’
     • In the class declaration for ‘Class1’
-    Suggested fix: Perhaps you intended to use UndecidableSuperClasses
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableSuperClasses’ extension
 
 T9739.hs:9:1: error: [GHC-29210]
     • Superclass cycle for ‘Class3’
         one of whose superclasses is ‘Class1’
         one of whose superclasses is ‘Class3’
     • In the class declaration for ‘Class3’
-    Suggested fix: Perhaps you intended to use UndecidableSuperClasses
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableSuperClasses’ extension

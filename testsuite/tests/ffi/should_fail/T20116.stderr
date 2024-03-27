@@ -3,4 +3,5 @@ T20116.hs:8:1: error: [GHC-49692]
     • `foreign import prim' requires GHCForeignImportPrim.
     • When checking declaration:
         foreign import prim safe "test_lt" lt_s :: Int64# -> Int64# -> Int#
-    Suggested fix: Perhaps you intended to use GHCForeignImportPrim
+    Suggested fix:
+      Perhaps you intended to use the ‘GHCForeignImportPrim’ extension

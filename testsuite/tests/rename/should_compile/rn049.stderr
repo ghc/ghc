@@ -2,4 +2,5 @@
 rn049.hs:12:6: warning: [GHC-59119]
     accepting non-standard pattern guards
         x <- 1 * 2 + 3 * 4
-    Suggested fix: Perhaps you intended to use PatternGuards
+    Suggested fix:
+      Perhaps you intended to use the ‘PatternGuards’ extension

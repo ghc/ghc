@@ -4,5 +4,5 @@ readFail039.hs:9:14: error: [GHC-82023]
         ‘C’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘Foo’
     Suggested fix:
-      Perhaps you intended to use GeneralizedNewtypeDeriving
+      Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension

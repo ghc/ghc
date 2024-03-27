@@ -6,4 +6,5 @@ T16326_Fail5.hs:7:20: error: [GHC-51580]
       In the pattern: Nothing :: forall a -> Maybe a
       In an equation for ‘isJust’:
           isJust (Nothing :: forall a -> Maybe a) = False
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

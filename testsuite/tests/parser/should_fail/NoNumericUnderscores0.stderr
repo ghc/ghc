@@ -1,4 +1,5 @@
 
 NoNumericUnderscores0.hs:11:3: error: [GHC-62330]
     Illegal underscores in integer literals
-    Suggested fix: Perhaps you intended to use NumericUnderscores
+    Suggested fix:
+      Perhaps you intended to use the ‘NumericUnderscores’ extension

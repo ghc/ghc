@@ -2,4 +2,5 @@
 T23776.hs:8:6: error: [GHC-69797] [-Wdeprecated-type-abstractions (in -Wcompat), Werror=deprecated-type-abstractions]
     Type applications in constructor patterns will require
     the TypeAbstractions extension starting from GHC 9.14.
-    Suggested fix: Perhaps you intended to use TypeAbstractions
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension

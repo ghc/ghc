@@ -1,7 +1,8 @@
 
 T16270h.hs:8:22: error: [GHC-47007]
     Illegal keyword 'type'
-    Suggested fix: Perhaps you intended to use ExplicitNamespaces
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
 
 T16270h.hs:10:8: error: [GHC-21926]
     Parse error: ‘pkg?’

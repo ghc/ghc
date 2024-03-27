@@ -1,8 +1,8 @@
 
-T20007.hs:1:29: [GHC-56449]
+T20007.hs:1:29: error: [GHC-56449]
     In the import of ‘Data.Type.Equality’:
       an item called ‘(~)’ is exported, but it is a type.
     Suggested fixes:
-       Use ExplicitNamespaces
-       Add the ‘type’ keyword to the import statement:
+      • Use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      • Add the ‘type’ keyword to the import statement:
           import Data.Type.Equality ( type (~) )

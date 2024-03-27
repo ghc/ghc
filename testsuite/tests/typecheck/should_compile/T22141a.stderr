@@ -4,4 +4,5 @@ T22141a.hs:8:1: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
       Future versions of GHC will turn this warning into an error.
     • In the expansion of type synonym ‘Nat’
       In the data type declaration for ‘Vector’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)

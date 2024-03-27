@@ -5,7 +5,7 @@ Boot.hs:6:13: error: [GHC-25709]
     • In the definition of data constructor ‘D’
       In the data type declaration for ‘Data’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ‘ExistentialQuantification’ or ‘GADTs’
       You may enable these language extensions in GHCi with:
         :set -XExistentialQuantification
         :set -XGADTs

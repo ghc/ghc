@@ -2,4 +2,5 @@
 T5957.hs:4:9: error: [GHC-91510]
     • Illegal qualified type: Show a => a -> String
     • In the type signature: flex :: Int -> Show a => a -> String
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)

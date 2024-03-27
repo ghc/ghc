@@ -3,4 +3,5 @@ T22326_fail_ext2.hs:8:6: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall {k}. forall (x :: k) -> ()
     • In the type signature: f :: forall x -> ()
-    Suggested fix: Perhaps you intended to use RequiredTypeArguments
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

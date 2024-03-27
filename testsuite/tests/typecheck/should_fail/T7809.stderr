@@ -3,4 +3,5 @@ T7809.hs:8:8: error: [GHC-91510]
     • Illegal polymorphic type: forall a. a -> a
     • In the expansion of type synonym ‘PolyId’
       In the type signature: foo :: F PolyId
-    Suggested fix: Perhaps you intended to use ImpredicativeTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension

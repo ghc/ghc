@@ -6,4 +6,5 @@ T11355.hs:5:7: error: [GHC-91510]
       In an equation for ‘foo’:
           foo
             = const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))
-    Suggested fix: Perhaps you intended to use ImpredicativeTypes
+    Suggested fix:
+      Perhaps you intended to use the ‘ImpredicativeTypes’ extension

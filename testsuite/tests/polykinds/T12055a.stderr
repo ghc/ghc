@@ -4,4 +4,5 @@ T12055a.hs:30:1: error: [GHC-80003]
     • In the context: (Category (Dom f), Category (Cod f))
       While checking the super-classes of class ‘Functor’
       In the class declaration for ‘Functor’
-    Suggested fix: Perhaps you intended to use FlexibleContexts
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleContexts’ extension
