@@ -1,11 +1,15 @@
 #include "Cmm.h"
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE test_str;
+#endif
+
 section "data" {
   test_str: bits8[] "hello";
 }
 
 hello() {
-    ccall puts(test_str);
+    CInt r;
+    (r) = ccall puts(test_str "ptr");
     return ();
 }
-
