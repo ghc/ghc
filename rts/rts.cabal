@@ -458,6 +458,7 @@ library
                  linker/Elf.c
                  linker/InitFini.c
                  linker/LoadArchive.c
+                 linker/LoadNativeObjPosix.c
                  linker/M32Alloc.c
                  linker/MMap.c
                  linker/MachO.c
