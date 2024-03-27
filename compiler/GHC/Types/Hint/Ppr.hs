@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}   -- instance Outputable GhcHint
 
@@ -24,8 +25,12 @@ import GHC.Unit.Module.Imported (ImportedModsVal(..))
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
-import Data.List (intersperse)
+import GHC.Driver.Flags (impliedXFlags, turnOn)
+
 import qualified Data.List.NonEmpty as NE
+
+import qualified GHC.LanguageExtensions as LangExt
+
 
 instance Outputable GhcHint where
   ppr = \case
@@ -34,15 +39,19 @@ instance Outputable GhcHint where
     SuggestExtension extHint
       -> case extHint of
           SuggestSingleExtension extraUserInfo ext ->
-            (text "Perhaps you intended to use" <+> ppr ext) $$ extraUserInfo
+            ("Perhaps you intended to use" <+> implied ext)
+            $$ extraUserInfo
           SuggestAnyExtension extraUserInfo exts ->
-            let header = text "Enable any of the following extensions:"
-            in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
+            (enable "any" <+> unquotedListWith "or" (map implied exts))
+            $$ extraUserInfo
           SuggestExtensions extraUserInfo exts ->
-            let header = text "Enable all of the following extensions:"
-            in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
+            (enable "all" <+> unquotedListWith "and" (map implied exts))
+            $$ extraUserInfo
           SuggestExtensionInOrderTo extraUserInfo ext ->
-            (text "Use" <+> ppr ext) $$ extraUserInfo
+            ("Use" <+> implied ext)
+            $$ extraUserInfo
+      where implied ext = ppr ext <+> pprImpliedExtensions ext
+            enable any_or_all = "Enable" <+> any_or_all <+> "if the following extensions" <> colon
     SuggestCorrectPragmaName suggestions
       -> text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
     SuggestMissingDo
@@ -368,6 +377,14 @@ pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
     pp_ns rdr | ns /= tried_ns = pprNameSpace ns
               | otherwise      = empty
       where ns = rdrNameSpace rdr
+
+pprImpliedExtensions :: LangExt.Extension -> SDoc
+pprImpliedExtensions extension = case implied of
+    [] -> empty
+    xs -> parens $ "implied by" <+> unquotedListWith "and" xs
+  where implied = map (\(impl, _, _) -> ppr impl)
+                . filter (\(_, t, orig) -> orig == extension && t == turnOn)
+                $ impliedXFlags
 
 pprPrefixUnqual :: Name -> SDoc
 pprPrefixUnqual name =

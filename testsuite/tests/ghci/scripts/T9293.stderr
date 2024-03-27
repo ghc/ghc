@@ -12,7 +12,7 @@
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ExistentialQuantification or GADTs
       You may enable these language extensions in GHCi with:
         :set -XExistentialQuantification
         :set -XGADTs
@@ -23,7 +23,7 @@ ghci057.hs:4:3: error: [GHC-25709]
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ExistentialQuantification or GADTs
       You may enable these language extensions in GHCi with:
         :set -XExistentialQuantification
         :set -XGADTs
@@ -34,7 +34,7 @@ ghci057.hs:4:3: error: [GHC-25709]
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’
     Suggested fix:
-      Enable any of the following extensions: ExistentialQuantification, GADTs
+      Enable any of the following extensions: ExistentialQuantification or GADTs
       You may enable these language extensions in GHCi with:
         :set -XExistentialQuantification
         :set -XGADTs

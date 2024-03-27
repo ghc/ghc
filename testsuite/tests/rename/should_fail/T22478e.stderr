@@ -1,7 +1,8 @@
 
 T22478e.hs:6:4: error: [GHC-68567]
     Illegal type: ‘[a, b]’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:6:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @[a, b]
@@ -9,7 +10,8 @@ T22478e.hs:6:4: error: [GHC-17916]
 
 T22478e.hs:7:4: error: [GHC-68567]
     Illegal type: ‘1’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:7:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @1
@@ -30,11 +32,14 @@ T22478e.hs:9:4: error: [GHC-17916]
 T22478e.hs:9:13: error: [GHC-49378]
     • Illegal kind signature ‘k’
     • In a type argument in a pattern
-    Suggested fix: Perhaps you intended to use KindSignatures
+    Suggested fix:
+      Perhaps you intended to use KindSignatures (implied by TypeFamilies,
+                                                             PolyKinds and TypeInType)
 
 T22478e.hs:10:4: error: [GHC-68567]
     Illegal type: ‘'(a, b)’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:10:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @('(a, b))
@@ -42,7 +47,8 @@ T22478e.hs:10:4: error: [GHC-17916]
 
 T22478e.hs:11:4: error: [GHC-68567]
     Illegal type: ‘"str"’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:11:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @"str"
@@ -50,7 +56,8 @@ T22478e.hs:11:4: error: [GHC-17916]
 
 T22478e.hs:12:4: error: [GHC-68567]
     Illegal type: ‘'c'’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:12:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @'c'
@@ -58,7 +65,8 @@ T22478e.hs:12:4: error: [GHC-17916]
 
 T22478e.hs:13:4: error: [GHC-68567]
     Illegal type: ‘'True’
-    Suggested fix: Perhaps you intended to use DataKinds
+    Suggested fix:
+      Perhaps you intended to use DataKinds (implied by TypeInType and UnliftedDatatypes)
 
 T22478e.hs:13:4: error: [GHC-17916]
     Illegal visible type application in a pattern: @'True

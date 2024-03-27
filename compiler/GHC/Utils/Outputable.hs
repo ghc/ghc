@@ -33,6 +33,7 @@ module GHC.Utils.Outputable (
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
         pprQuotedList, pprWithCommas,
+        unquotedListWith,
         quotedListWithOr, quotedListWithNor, quotedListWithAnd,
         pprWithBars,
         spaceIfSingleQuote,
@@ -149,7 +150,7 @@ import System.FilePath
 import Text.Printf
 import Numeric (showFFloat)
 import Data.Graph (SCC(..))
-import Data.List (intersperse)
+import Data.List (intersperse, unsnoc)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup (Arg(..))
 import qualified Data.List.NonEmpty as NEL
@@ -1439,6 +1440,15 @@ quotedListWithAnd :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' and `z'
 quotedListWithAnd xs@(_:_:_) = quotedList (init xs) <+> text "and" <+> quotes (last xs)
 quotedListWithAnd xs = quotedList xs
+
+
+unquotedListWith :: SDoc -> [SDoc] -> SDoc
+-- [x,y,z] "whatever" ==> x, y whatever z
+unquotedListWith d xs
+  | Just (firsts@(_:_), l) <- unsnoc xs = unquotedList firsts <+> d <+> l
+  | otherwise                           = unquotedList xs
+  where
+    unquotedList = fsep . punctuate comma
 
 {-
 ************************************************************************
