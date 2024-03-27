@@ -314,7 +314,7 @@ tryUnfolding env logger id lone_variable arg_infos
         | otherwise
         -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
         where
-          some_benefit = calc_some_benefit uf_arity
+          some_benefit = calc_some_benefit uf_arity True
           enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
@@ -326,7 +326,7 @@ tryUnfolding env logger id lone_variable arg_infos
           yes = traceInline logger opts id str (mk_doc some_benefit extra_doc True)  (Just unf_template)
           no  = traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
 
-          some_benefit = calc_some_benefit (length arg_discounts)
+          some_benefit = calc_some_benefit (length arg_discounts) False
 
           -- depth_penalty: see Note [Avoid inlining into deeply nested cases]
           depth_threshold = unfoldingCaseThreshold opts
@@ -389,9 +389,9 @@ tryUnfolding env logger id lone_variable arg_infos
            -- arguments (ie n_val_args >= arity). But there must
            -- be *something* interesting about some argument, or the
            -- result context, to make it worth inlining
-    calc_some_benefit :: Arity -> Bool   -- The Arity is the number of args
+    calc_some_benefit :: Arity -> Bool -> Bool   -- The Arity is the number of args
                                          -- expected by the unfolding
-    calc_some_benefit uf_arity
+    calc_some_benefit uf_arity is_inline
        | not saturated = interesting_args       -- Under-saturated
                                         -- Note [Unsaturated applications]
        | otherwise = interesting_args   -- Saturated or over-saturated
@@ -413,7 +413,7 @@ tryUnfolding env logger id lone_variable arg_infos
               ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [RHS of lets]
               DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
-              RhsCtxt NonRecursive
+              RhsCtxt NonRecursive | is_inline
                           -> uf_arity > 0  -- See Note [RHS of lets]
               _other      -> False         -- See Note [Nested functions]
 
@@ -424,9 +424,8 @@ vselems s = nonDetStrictFoldVarSet (\v vs -> v : vs) [] s
 is_more_evald :: InScopeSet -> Id -> Bool
 -- See Note [Inlining join points]
 is_more_evald in_scope v
-  | not (isEvaldUnfolding (idUnfolding v))
-  , Just v' <- lookupInScope in_scope v
-  , isEvaldUnfolding (idUnfolding v')
+  | Just v1 <- lookupInScope in_scope v
+  , idUnfolding v1 `isBetterUnfoldingThan` idUnfolding v
   = True
   | otherwise
   = False

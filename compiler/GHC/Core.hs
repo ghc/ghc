@@ -64,7 +64,7 @@ module GHC.Core (
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
-        isInlineUnfolding, isBootUnfolding,
+        isInlineUnfolding, isBootUnfolding, isBetterUnfoldingThan,
         hasCoreUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -1639,6 +1639,23 @@ hasCoreUnfolding _                  = False
 canUnfold :: Unfolding -> Bool
 canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)
 canUnfold _                                   = False
+
+isBetterUnfoldingThan :: Unfolding -> Unfolding -> Bool
+-- Used in inlining checks
+isBetterUnfoldingThan NoUnfolding   _ = False
+isBetterUnfoldingThan BootUnfolding _ = False
+
+isBetterUnfoldingThan (CoreUnfolding {}) (CoreUnfolding {}) = False
+isBetterUnfoldingThan (CoreUnfolding {}) _                  = True
+
+isBetterUnfoldingThan (DFunUnfolding {}) (DFunUnfolding {}) = False
+isBetterUnfoldingThan (DFunUnfolding {}) _                  = True
+
+isBetterUnfoldingThan (OtherCon cs) (OtherCon cs')     = not (null cs) && null cs'  -- A bit crude
+isBetterUnfoldingThan (OtherCon {}) (CoreUnfolding {}) = False
+isBetterUnfoldingThan (OtherCon {}) (DFunUnfolding {}) = False
+isBetterUnfoldingThan (OtherCon {}) NoUnfolding        = True
+isBetterUnfoldingThan (OtherCon {}) BootUnfolding      = True
 
 {- Note [Fragile unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

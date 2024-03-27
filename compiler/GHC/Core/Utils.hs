@@ -16,7 +16,7 @@ module GHC.Core.Utils (
 
         -- * Taking expressions apart
         findDefault, addDefault, findAlt, isDefaultAlt,
-        mergeAlts, mergeCaseAlts, trimConArgs, 
+        mergeAlts, mergeCaseAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
         scaleAltsBy,
 
@@ -674,8 +674,7 @@ mergeCaseAlts outer_bndr alts
     -- duplication we are prepared to put up with.
     go 0 _ _ _ = Nothing
 
-    go n wrap free_bndrs (Tick t rhs)
-       = go n (wrap . Tick t) free_bndrs rhs
+    -- Whizzo: we can merge!
     go _ wrap free_bndrs (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        | inner_scrut_var == outer_bndr
        , let wrap_let rhs' = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
@@ -686,6 +685,26 @@ mergeCaseAlts outer_bndr alts
                | any (`elemVarSet` free_bndrs') bndrs = Nothing
                | otherwise                            = Just (Alt con bndrs (wrap (wrap_let rhs)))
        = mapM do_one inner_alts
+
+    -- Deal with tagToEnum# See See Note [Merge Nested Cases] wrinkle (MNC1)
+    go _ wrap _ (App (App (Var f) (Type type_arg)) (Var v))
+      | v == outer_bndr
+      , Just TagToEnumOp <- isPrimOpId_maybe f
+      , Just tc  <- tyConAppTyCon_maybe type_arg
+      , Just (dc:dcs) <- tyConDataCons_maybe tc
+      , dcs `lengthAtMost` 3  -- Arbitrary
+      = Just ( Alt DEFAULT [] (mk_rhs dc)
+             : [Alt (LitAlt (mk_lit dc)) [] (mk_rhs dc) | dc <- dcs] )
+
+      where
+        mk_lit dc = mkLitIntUnchecked $ toInteger $ dataConTagZ dc
+        mk_rhs dc = wrap $ Var (dataConWorkId dc)
+
+    -- Look past ticks
+    go n wrap free_bndrs (Tick t rhs)
+       = go n (wrap . Tick t) free_bndrs rhs
+
+    -- Look past cases on another variable
     go n wrap free_bndrs (Case (Var inner_scrut) inner_bndr ty inner_alts)
        | [Alt con bndrs rhs] <- inner_alts -- Wrinkle (MC1)
        , not (outer_bndr `elem` (inner_bndr : bndrs))

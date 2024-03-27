@@ -888,20 +888,22 @@ lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
   | otherwise                 = BoringCtxt   -- Nothing interesting
 
 strictArgContext :: ArgInfo -> CallCtxt
-strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
--- Use this for strict arguments
-  | encl_rules                = RuleArgCtxt
-  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                 = RhsCtxt NonRecursive
-      -- Why RhsCtxt?  if we see f (g x), and f is strict, we
-      -- want to be a bit more eager to inline g, because it may
-      -- expose an eval (on x perhaps) that can be eliminated or
-      -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
-      -- It's worth an 18% improvement in allocation for this
-      -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
-      --
-      -- Why NonRecursive?  Becuase it's a bit like
-      --   let a = g x in f a
+strictArgContext _ = DiscArgCtxt
+  --   XXXX TODO TODO  c.f. Seq is boring
+  -- Why RhsCtxt?  if we see f (g x), and f is strict, we
+  -- want to be a bit more eager to inline g, because it may
+  -- expose an eval (on x perhaps) that can be eliminated or
+  -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
+  -- It's worth an 18% improvement in allocation for this
+  -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
+  --
+  -- Why NonRecursive?  Becuase it's a bit like
+  --   let a = g x in f a
+
+-- (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+--  | encl_rules                = RuleArgCtxt
+--  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+--  | otherwise                 = RhsCtxt NonRecursive
 
 interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 -- See Note [Interesting call context]

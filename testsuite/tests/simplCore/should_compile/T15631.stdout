@@ -1,5 +1,6 @@
-      case GHC.List.$wlenAcc @a xs 0# of ww1 { __DEFAULT ->
-          = case GHC.List.$wlenAcc
-      case GHC.List.reverse1 @a xs (GHC.Types.[] @a) of {
+      case reverse @a xs of ys { __DEFAULT ->
+      case GHC.Internal.List.$wlenAcc @a xs 0# of ww1 { __DEFAULT ->
+          = case GHC.Internal.List.$wlenAcc
+      case ys of {
                  case Foo.$wf @a xs of ww [Occ=Once1] { __DEFAULT ->
       case Foo.$wf @a xs of ww { __DEFAULT -> GHC.Types.I# ww }
