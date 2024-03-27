@@ -694,6 +694,9 @@ Bugs in GHC
 -  Because of a toolchain limitation we are unable to support full Unicode paths
    on Windows. On Windows we support up to Latin-1. See :ghc-ticket:`12971` for more.
 
+- ``-fasm-shortcutting`` may result in unsound optimisations and result in incorrect
+  runtime results. See :ghc-ticket:`24507` for more details.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)

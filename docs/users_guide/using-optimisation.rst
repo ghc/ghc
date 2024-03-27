@@ -250,7 +250,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     generator, merging basic blocks and avoiding jumps right after jumps.
 
 .. ghc-flag:: -fasm-shortcutting
-    :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
+    :shortdesc: Enable shortcutting on assembly.
     :type: dynamic
     :reverse: -fno-asm-shortcutting
     :category:
@@ -266,6 +266,9 @@ as such you shouldn't need to set any of them explicitly. A flag
     So at ``-O2`` this flag runs the pass again at the assembly stage to catch
     these. Note that due to platform limitations (:ghc-ticket:`21972`) this flag
     does nothing on macOS.
+
+    This flag is known to result in unsoundness in this version of GHC
+    (:ghc-ticket:`24507`).
 
 .. ghc-flag:: -fblock-layout-cfg
     :shortdesc: Use the new cfg based block layout algorithm. Implied by :ghc-flag:`-O`.

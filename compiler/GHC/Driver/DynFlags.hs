@@ -1263,7 +1263,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
-    , ([2],     Opt_AsmShortcutting)
+    -- Disabled due to #24507
+    -- , ([2],     Opt_AsmShortcutting)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
