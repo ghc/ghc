@@ -870,6 +870,7 @@ error:
     stgFree(buf);
 
     char* errormsg = stgMallocBytes(sizeof(char) * 80, "addDLL_PEi386");
+    if (loaded) *loaded = NULL;
     snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
     /* LoadLibrary failed; return a ptr to the error msg. */
     return errormsg;
@@ -1017,7 +1018,10 @@ bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f 
     stgFree(dllName);
 
     IF_DEBUG(linker, debugBelch("loadArchive: read symbol %s from lib `%" PATH_FMT "'\n", symbol, dll));
-    const char* result = addDLL(dll);
+    // We must call `addDLL_PEi386` directly rather than `addDLL` because `addDLL`
+    // is now a wrapper around `loadNativeObj` which acquires a lock which we
+    // already have here.
+    const char* result = addDLL_PEi386(dll, NULL);
 
     stgFree(image);
 
@@ -1141,47 +1145,57 @@ SymbolAddr*
 lookupSymbolInDLLs ( const SymbolName* lbl, ObjectCode *dependent )
 {
     OpenedDLL* o_dll;
+    SymbolAddr* res;
+
+    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next)
+        if ((res = lookupSymbolInDLL_PEi386(lbl, o_dll->instance, o_dll->name, dependent)))
+            return res;
+    return NULL;
+}
+
+SymbolAddr*
+lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* dll_name STG_UNUSED, ObjectCode *dependent)
+{
     SymbolAddr* sym;
 
-    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-        /* debugBelch("look in %ls for %s\n", o_dll->name, lbl); */
+    /* debugBelch("look in %ls for %s\n", dll_name, lbl); */
 
-        sym = GetProcAddress(o_dll->instance, lbl+STRIP_LEADING_UNDERSCORE);
+    sym = GetProcAddress(instance, lbl+STRIP_LEADING_UNDERSCORE);
+    if (sym != NULL) {
+        /*debugBelch("found %s in %ls\n", lbl+STRIP_LEADING_UNDERSCORE,dll_name);*/
+        return sym;
+    }
+
+    // TODO: Drop this
+    /* Ticket #2283.
+       Long description: http://support.microsoft.com/kb/132044
+       tl;dr:
+         If C/C++ compiler sees __declspec(dllimport) ... foo ...
+         it generates call *__imp_foo, and __imp_foo here has exactly
+         the same semantics as in __imp_foo = GetProcAddress(..., "foo")
+     */
+    if (sym == NULL && strncmp (lbl, "__imp_", 6) == 0) {
+        sym = GetProcAddress(instance,
+                             lbl + 6 + STRIP_LEADING_UNDERSCORE);
         if (sym != NULL) {
-            /*debugBelch("found %s in %s\n", lbl+1,o_dll->name);*/
-            return sym;
-        }
-
-        // TODO: Drop this
-        /* Ticket #2283.
-           Long description: http://support.microsoft.com/kb/132044
-           tl;dr:
-             If C/C++ compiler sees __declspec(dllimport) ... foo ...
-             it generates call *__imp_foo, and __imp_foo here has exactly
-             the same semantics as in __imp_foo = GetProcAddress(..., "foo")
-         */
-        if (sym == NULL && strncmp (lbl, "__imp_", 6) == 0) {
-            sym = GetProcAddress(o_dll->instance,
-                                 lbl + 6 + STRIP_LEADING_UNDERSCORE);
-            if (sym != NULL) {
-                SymbolAddr** indirect = m32_alloc(dependent->rw_m32, sizeof(SymbolAddr*), 8);
-                if (indirect == NULL) {
-                    barf("lookupSymbolInDLLs: Failed to allocation indirection");
-                }
-                *indirect = sym;
-                IF_DEBUG(linker,
-                  debugBelch("warning: %s from %S is linked instead of %s\n",
-                             lbl+6+STRIP_LEADING_UNDERSCORE, o_dll->name, lbl));
-                return (void*) indirect;
-               }
-        }
-
-        sym = GetProcAddress(o_dll->instance, lbl);
-        if (sym != NULL) {
-            /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
-            return sym;
+            SymbolAddr** indirect = m32_alloc(dependent->rw_m32, sizeof(SymbolAddr*), 8);
+            if (indirect == NULL) {
+                barf("lookupSymbolInDLLs: Failed to allocation indirection");
+            }
+            *indirect = sym;
+            IF_DEBUG(linker,
+              debugBelch("warning: %s from %S is linked instead of %s\n",
+                         lbl+6+STRIP_LEADING_UNDERSCORE, dll_name, lbl));
+            return (void*) indirect;
            }
     }
+
+    sym = GetProcAddress(instance, lbl);
+    if (sym != NULL) {
+        /*debugBelch("found %s in %s\n", lbl,dll_name);*/
+        return sym;
+       }
+
     return NULL;
 }
 
