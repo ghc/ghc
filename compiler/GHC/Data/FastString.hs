@@ -305,7 +305,7 @@ See Note [Updating the FastString table] on how it's updated.
 -}
 data FastStringTable = FastStringTable
   {-# UNPACK #-} !FastMutInt -- the unique ID counter shared with all buckets
-  {-# UNPACK #-} !FastMutInt -- number of computed z-encodings for all buckets
+  {-# NOUNPACK #-} !FastMutInt -- number of computed z-encodings for all buckets
   (Array# (IORef FastStringTableSegment)) -- concurrent segments
 
 data FastStringTableSegment = FastStringTableSegment
