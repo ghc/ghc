@@ -2130,10 +2130,7 @@ instance Binary IfaceType where
     tbl -> getEntry tbl bh
 
 
-putIfaceType bh (IfaceSerialisedType fb) = do -- putFullBinData bh fb
-  deserialised <- getIfaceType =<< thawBinHandle fb
-  putIfaceType bh deserialised
-
+putIfaceType bh (IfaceSerialisedType fb) = putFullBinData bh fb
 
 putIfaceType _ (IfaceFreeTyVar tv)
    = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)

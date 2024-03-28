@@ -35,6 +35,7 @@ module GHC.Utils.Binary
    tellBin,
    castBin,
    withBinBuffer,
+   shrinkBinBuffer,
 
    foldGet, foldGet',
 
@@ -111,7 +112,7 @@ import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, copy)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
@@ -232,6 +233,8 @@ data BinHandle
      _arr_r :: !(IORef BinArray), -- the array (bounds: (0,size-1))
      prof :: {-# UNPACK #-} !BinProf
     }
+        -- XXX: should really store a "high water mark" for dumping out
+        -- the binary data to a file.
 
 data ProfKey = StringKey !String | TypeableKey !TypeRep deriving (Eq, Ord)
 
@@ -250,8 +253,6 @@ addStack s (BinProf ss i) = (BinProf (TypeableKey s:ss) i)
 recordSample :: Int -> BinProf -> IO ()
 recordSample _ _ = return ()
 recordSample weight (BinProf ss i) = modifyIORef i (Map.insertWith (+) ss weight)
-        -- XXX: should really store a "high water mark" for dumping out
-        -- the binary data to a file.
 
 getUserData :: BinHandle -> UserData
 getUserData bh = bh_usr bh
@@ -281,6 +282,17 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
   sz_r <- newFastMutInt len
   bp  <- initBinProf
   return (BinMem noUserData ix_r sz_r arr_r bp)
+
+-- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
+-- This performs a copy of the underlying buffer.
+-- The buffer may be truncated if the offset is not at the end of the written
+-- output.
+--
+-- UserData is also discarded during the copy
+-- You should just use this when translating a Put handle into a Get handle.
+shrinkBinBuffer :: BinHandle -> IO BinHandle
+shrinkBinBuffer bh = withBinBuffer bh (\bs -> unsafeUnpackBinBuffer (copy bs))
+
 
 ---------------------------------------------------------------
 -- Bin

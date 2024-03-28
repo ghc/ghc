@@ -2484,9 +2484,7 @@ instance Binary IfaceAlt where
 
 instance Binary IfaceExpr where
 
-    putNoStack_ bh (IfaceSerialisedExpr f) = do
-      deserialised <- getIfaceExpr =<< thawBinHandle f
-      putNoStack_ bh deserialised
+    putNoStack_ bh (IfaceSerialisedExpr f) = putFullBinData bh f
     putNoStack_ bh (IfaceLcl aa) = do
         putByte bh 0
         put_ bh aa

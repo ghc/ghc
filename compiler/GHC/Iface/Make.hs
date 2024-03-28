@@ -162,7 +162,7 @@ shareIface nc mi = do
   putWithUserData QuietBinIFace bh mi
   -- Copy out just the part of the buffer which is used, otherwise each interface
   -- retains a 1mb bytearray
-  bh' <- withBinBuffer bh (\bs -> unsafeUnpackBinBuffer (BS.copy bs))
+  bh' <- shrinkBinBuffer bh
   res <- getWithUserData nc bh'
   let resiface = res { mi_src_hash = mi_src_hash mi }
   forceModIface  resiface
