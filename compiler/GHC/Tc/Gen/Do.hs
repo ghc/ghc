@@ -86,11 +86,12 @@ expand_do_stmts flav [stmt@(L loc (LastStmt _ (L body_loc body) _ ret_expr))]
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = do traceTc "expand_do_stmts last" (ppr ret_expr)
-        appDo <- xoptM LangExt.ApplicativeDo
+   = do appDo <- xoptM LangExt.ApplicativeDo
         if appDo
-          then return $ mkExpandedStmtAt loc stmt flav body
-          else return $ mkExpandedStmtPopAt loc stmt flav body
+          then do traceTc "expand_do_stmts last no pop" (ppr ret_expr)
+                  return $ mkExpandedStmtAt loc stmt flav body
+          else do traceTc "expand_do_stmts last pop" (ppr ret_expr)
+                  return $ mkExpandedStmtPopAt loc stmt flav body
 
    | SyntaxExprRn ret <- ret_expr
    --
@@ -190,7 +191,7 @@ expand_do_stmts doFlavour
                              -- and potentially loop forever
 
 
-expand_do_stmts doFlavour ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
+expand_do_stmts doFlavour ((L loc (ApplicativeStmt _ args mb_join)): lstmts) =
 -- See Note [Applicative BodyStmt]
 --
 --                  stmts ~~> stmts'
@@ -213,7 +214,7 @@ expand_do_stmts doFlavour ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
      -- wrap the expanded expression with a `join` if needed
      ; let final_expr = case mb_join of
                           Just (SyntaxExprRn join_op) -> wrapGenSpan $ genHsApp join_op (wrapGenSpan expand_ado_expr)
-                          _ -> wrapGenSpan expand_ado_expr
+                          _ -> L loc expand_ado_expr
      ; traceTc "expand_do_stmts AppStmt" (vcat [ text "args:" <+> ppr args
                                                , text "mb_join:" <+> ppr mb_join
                                                , text "expansion:" <+> ppr final_expr])
@@ -242,7 +243,11 @@ expand_do_stmts doFlavour ((L _ (ApplicativeStmt _ args mb_join)): lstmts) =
     mk_apps :: HsExpr GhcRn -> (SyntaxExprRn, LHsExpr GhcRn) -> HsExpr GhcRn
     mk_apps l_expr (op, r_expr) =
       case op of
-        SyntaxExprRn op -> genHsExpApps op [ wrapGenSpan l_expr, r_expr ]
+        SyntaxExprRn op -> case r_expr of
+                             L _ (XExpr (ExpandedThingRn (OrigStmt (L l s) flav) e)) -> XExpr (ExpandedThingRn (OrigStmt (L l s) flav)
+                                                                                           (genHsExpApps op [ wrapGenSpan l_expr
+                                                                                                            , wrapGenSpan e ]))
+                             _  -> genHsExpApps op [ wrapGenSpan l_expr, r_expr ]
         NoSyntaxExprRn -> pprPanic "expand_do_stmts applicative op:" (ppr op)
 
     xbsn :: XBindStmtRn
