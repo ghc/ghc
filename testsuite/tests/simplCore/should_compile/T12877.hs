@@ -21,7 +21,7 @@ test x = case x of
          t  -> case t + 1 of
             3 -> "0"
             4 -> "1"
-            t  -> case t + 1 of
+            t  -> "n" {- case t + 1 of
                4 -> "0"
                5 -> "1"
                t  -> case t + 1 of
@@ -112,3 +112,4 @@ test x = case x of
                                                                                                       34 -> "0"
                                                                                                       35 -> "1"
                                                                                                       _  -> "n"
+-}

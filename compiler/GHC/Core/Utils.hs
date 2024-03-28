@@ -71,6 +71,7 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Ppr
+import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
@@ -643,13 +644,12 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
-mergeCaseAlts :: Id -> [CoreAlt] -> (Bool, [CoreAlt])
--- Result: (yes, alts'); if 'yes' then something actually happened
+mergeCaseAlts :: Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
 -- See Note [Merge Nested Cases]
 mergeCaseAlts outer_bndr alts
   | (Alt DEFAULT _ deflt_rhs : outer_alts) <- alts
-  , Just inner_alts <- go 5 (\e -> e) emptyVarSet deflt_rhs
-  = (True, mergeAlts outer_alts inner_alts)
+  , Just (joins, inner_alts) <- go deflt_rhs
+  = Just (joins, mergeAlts outer_alts inner_alts)
                 -- NB: mergeAlts gives priority to the left
                 --      case x of
                 --        A -> e1
@@ -660,7 +660,65 @@ mergeCaseAlts outer_bndr alts
                 -- precedence over e2 as the value for A!
 
   | otherwise
-  = (False, alts)
+  = Nothing
+
+  where
+    go :: CoreExpr -> Maybe ([CoreBind], [CoreAlt])
+    go (Let bind body)
+      | any (== outer_bndr) (bindersOf bind)
+      = Nothing
+      | isJoinBind bind
+      , not (outer_bndr `elemVarSet` bindFreeVars bind)
+      = do { (joins, alts) <- go body
+           ; return (bind:joins, alts ) }
+      | otherwise
+      = Nothing
+
+    -- Whizzo: we can merge!
+    go (Case (Var inner_scrut_var) inner_bndr _ inner_alts)
+       | inner_scrut_var == outer_bndr
+       , not (inner_bndr == outer_bndr)   -- Avoid shadowing
+       , let wrap_let rhs' = Let (NonRec inner_bndr (Var outer_bndr)) rhs'
+                             -- inner_bndr is never dead!  It's the scrutinee!
+                             -- The let is OK even for unboxed binders,
+             do_one (Alt con bndrs rhs)
+               | any (== outer_bndr) bndrs = Nothing
+               | otherwise                 = Just (Alt con bndrs (wrap_let rhs))
+       = do { alts' <- mapM do_one inner_alts
+            ; return ([], alts') }
+
+    -- Deal with tagToEnum# See See Note [Merge Nested Cases] wrinkle (MNC1)
+    go (App (App (Var f) (Type type_arg)) (Var v))
+      | v == outer_bndr
+      , Just TagToEnumOp <- isPrimOpId_maybe f
+      , Just tc  <- tyConAppTyCon_maybe type_arg
+      , Just (dc1:dcs) <- tyConDataCons_maybe tc   -- At least one data constructor
+      , dcs `lengthAtMost` 3  -- Arbitrary
+      = return ( [], mk_alts dc1 dcs)
+      where
+        mk_lit dc = mkLitIntUnchecked $ toInteger $ dataConTagZ dc
+        mk_rhs dc = Var (dataConWorkId dc)
+        mk_alts dc1 dcs =  Alt DEFAULT              [] (mk_rhs dc1)
+                        : [Alt (LitAlt (mk_lit dc)) [] (mk_rhs dc) | dc <- dcs]
+
+    go _ = Nothing
+
+{-
+mergeCaseAlts outer_bndr alts
+  | (Alt DEFAULT _ deflt_rhs : outer_alts) <- alts
+  , Just inner_alts <- go 5 (\e -> e) emptyVarSet deflt_rhs
+  = Just (mergeAlts outer_alts inner_alts)
+                -- NB: mergeAlts gives priority to the left
+                --      case x of
+                --        A -> e1
+                --        DEFAULT -> case x of
+                --                      A -> e2
+                --                      B -> e3
+                -- When we merge, we must ensure that e1 takes
+                -- precedence over e2 as the value for A!
+
+  | otherwise
+  = Nothing
   where
     go :: Int -> (OutExpr -> OutExpr) -> VarSet -> OutExpr -> Maybe [OutAlt]
     -- In the call (go wrap free_bndrs rhs), the `wrap` function has free `free_bndrs`;
@@ -714,7 +772,7 @@ mergeCaseAlts outer_bndr alts
        = go (n-1) (wrap . wrap_case) (free_bndrs `extendVarSet` inner_scrut) rhs
 
     go _ _ _ _ = Nothing
-
+-}
 
 ---------------------------------
 mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
@@ -851,7 +909,7 @@ variable is scrutinised multiple times.
 
 Wrinkles
 
-(MC1) `tryMergeCase` "looks though" an inner single-alternative case-on-variable.
+(MC1) `mergeCaseAlts` "looks though" an inner single-alternative case-on-variable.
      For example
        case x of {
           ...outer-alts...
@@ -880,7 +938,7 @@ Wrinkles
                            IS y2     -> tagToEnum# @Bool (==# x2 y2) };
                 IP x2 -> ...
                 IN x2 -> ...
-    We want to merge the outer `case x` with thea inner `case x1`.
+    We want to merge the outer `case x` with the inner `case x1`.
 
     This story is not fully robust; it will be defeated by a let-binding,
     whih we don't want to duplicate.   But accounting for single-alternative

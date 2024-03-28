@@ -1641,21 +1641,31 @@ canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)
 canUnfold _                                   = False
 
 isBetterUnfoldingThan :: Unfolding -> Unfolding -> Bool
--- Used in inlining checks
+-- See Note [Better unfolding]
 isBetterUnfoldingThan NoUnfolding   _ = False
 isBetterUnfoldingThan BootUnfolding _ = False
 
-isBetterUnfoldingThan (CoreUnfolding {}) (CoreUnfolding {}) = False
-isBetterUnfoldingThan (CoreUnfolding {}) _                  = True
+isBetterUnfoldingThan (CoreUnfolding {uf_cache = uc1}) unf2
+  = case unf2 of
+      CoreUnfolding {uf_cache = uc2} -> uf_is_value uc1 && not (uf_is_value uc2)
+      OtherCon _                     -> uf_is_value uc1
+      _                              -> True
+         -- Default case: CoreUnfolding better than NoUnfolding etc
+         -- Better than DFunUnfolding? I don't care.
 
-isBetterUnfoldingThan (DFunUnfolding {}) (DFunUnfolding {}) = False
-isBetterUnfoldingThan (DFunUnfolding {}) _                  = True
+isBetterUnfoldingThan (DFunUnfolding {}) unf2
+  | DFunUnfolding {} <- unf2 = False
+  | otherwise                = True
 
-isBetterUnfoldingThan (OtherCon cs) (OtherCon cs')     = not (null cs) && null cs'  -- A bit crude
-isBetterUnfoldingThan (OtherCon {}) (CoreUnfolding {}) = False
-isBetterUnfoldingThan (OtherCon {}) (DFunUnfolding {}) = False
-isBetterUnfoldingThan (OtherCon {}) NoUnfolding        = True
-isBetterUnfoldingThan (OtherCon {}) BootUnfolding      = True
+isBetterUnfoldingThan (OtherCon cs1) unf2
+  = case unf2 of
+      CoreUnfolding {uf_cache = uc}             -- If unf1 is OtherCon and unf2 is
+                       -> not (uf_is_value uc)  -- just a thunk, unf1 is better
+
+      OtherCon cs2     -> not (null cs1) && null cs2  -- A bit crude
+      DFunUnfolding {} -> False
+      NoUnfolding      -> True
+      BootUnfolding    -> True
 
 {- Note [Fragile unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1670,6 +1680,20 @@ ones are
                   info in simpleOptExpr; see #13077.
 
 We consider even a StableUnfolding as fragile, because it needs substitution.
+
+Note [Better unfolding]
+~~~~~~~~~~~~~~~~~~~~~~~
+(unf1 `isBetterUnfoldingThan` unf2) is used when we have
+    let x = <rhs> in   -- unf2
+    let $j y = ...x...
+    in case x of
+          K a -> ...$j v....
+
+At the /call site/ of $j, `x` has a better unfolding than it does at the
+/defnition site/ of $j; so we are keener to inline $j.  See
+Note [Inlining join points] in GHC.Core.Opt.Simplify.Inline for discussion.
+
+The notion of "better" is encapsulated here.
 
 Note [Stable unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~

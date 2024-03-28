@@ -2404,17 +2404,15 @@ OutId.  Test simplCore/should_compile/simpl013 apparently shows this
 up, although I'm not sure exactly how..
 -}
 
-prepareAlts :: SimplMode -> OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 --
 -- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
-prepareAlts mode scrut case_bndr alts
+prepareAlts scrut case_bndr alts
   | Just (tc, tys) <- splitTyConApp_maybe (idType case_bndr)
   = do { us <- getUniquesM
-       ; let (yes1,  alts1) | sm_case_merge mode = mergeCaseAlts case_bndr alts
-                            | otherwise          = (False, alts)
-               -- See Note [Merging nested cases]
-             (idcs2, alts2) = filterAlts tc tys imposs_cons alts1
+       ; let -- See Note [Merging nested cases]
+             (idcs2, alts2) = filterAlts tc tys imposs_cons alts
              (yes3,  alts3) = refineDefaultAlt us (idMult case_bndr) tc tys idcs2 alts2
                -- The multiplicity on case_bndr's is the multiplicity of the
                -- case expression The newly introduced patterns in
@@ -2422,7 +2420,6 @@ prepareAlts mode scrut case_bndr alts
              (yes4, idcs4, alts4) = combineIdenticalAlts idcs2 alts3
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
-       ; when yes1 $ tick (CaseMerge case_bndr)
        ; when yes3 $ tick (FillInCaseDefault case_bndr)
        ; when yes4 $ tick (AltMerge case_bndr)
        ; return (idcs4, alts4) }
@@ -2633,7 +2630,7 @@ and now we can do case-merge again, getting the desired
 
 -}
 
-mkCase, mkCase2, mkCase3
+mkCase, mkCase1, mkCase2, mkCase3
    :: SimplMode
    -> OutExpr -> OutId
    -> OutType -> [OutAlt]               -- Alternatives in standard (increasing) order
@@ -2646,12 +2643,26 @@ mkCase, mkCase2, mkCase3
 --             Note [Cascading case merge]
 --------------------------------------------------
 
+mkCase mode scrut outer_bndr alts_ty alts
+  | sm_case_merge mode
+  , Just (joins, alts') <- mergeCaseAlts outer_bndr alts
+  = do  { tick (CaseMerge outer_bndr)
+        ; case_expr <- mkCase1 mode scrut outer_bndr alts_ty alts'
+        ; return (mkLets joins case_expr) }
+        -- mkCase1: don't call mkCase recursively!
+        -- Firstly, there's no point, because inner alts have already had
+        -- mkCase applied to them, so they won't have a case in their default
+        -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
+        -- in munge_rhs may put a case into the DEFAULT branch!
+  | otherwise
+  = mkCase1 mode scrut outer_bndr alts_ty alts
+
 --------------------------------------------------
 --      2. Eliminate Identity Case
 --         See Note [Eliminate Identity Case]
 --------------------------------------------------
 
-mkCase _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
+mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
@@ -2690,7 +2701,8 @@ mkCase _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
-mkCase mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
+mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
+
 
 --------------------------------------------------
 --      2. Scrutinee Constant Folding

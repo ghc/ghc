@@ -165,9 +165,9 @@ mapMaybeRule [InlPrag=[2]]
                                                              Result s b #)))
                                   s1
                            of
-                           { (# ipv [Occ=Once1], ipv1 [Occ=Once1!] #) ->
-                           case ipv1 of { Result t2 [Occ=Once1] c1 [Occ=Once1] ->
-                           (# ipv,
+                           { (# new_s [Occ=Once1], a2 [Occ=Once1!] #) ->
+                           case a2 of { Result t2 [Occ=Once1] c1 [Occ=Once1] ->
+                           (# new_s,
                               T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
                            }
                            }
@@ -207,9 +207,9 @@ mapMaybeRule
                                                   Result s b #)))
                        s1
                 of
-                { (# ipv, ipv1 #) ->
-                case ipv1 of { Result t2 c1 ->
-                (# ipv,
+                { (# new_s, a2 #) ->
+                case a2 of { Result t2 c1 ->
+                (# new_s,
                    T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
                 }
                 }
