@@ -29,7 +29,7 @@ foreign import ccall "io.h _close"
    c__close :: CInt -> IO CInt
 
 foreign import ccall unsafe "io.h _get_osfhandle"
-   _get_osfhandle :: CInt -> IO CInt
+   _get_osfhandle :: CInt -> IO CIntPtr
 
 runWithPipesPOSIX :: (CreateProcess -> IO ProcessHandle)
                   -> FilePath -> [String] -> [String] -> IO (ProcessHandle, Handle, Handle)
