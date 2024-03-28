@@ -28,9 +28,9 @@ instance Semigroup a => Semigroup (Solo a)
 instance Bounded a => Bounded (Solo a)
   -- Defined in ‘GHC.Internal.Enum’
 instance Enum a => Enum (Solo a) -- Defined in ‘GHC.Internal.Enum’
-instance Read a => Read (Solo a) -- Defined in ‘GHC.Internal.Read’
 instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Classes’
 instance Ord a => Ord (Solo a) -- Defined in ‘GHC.Classes’
+instance Read a => Read (Solo a) -- Defined in ‘GHC.Internal.Read’
 instance Show a => Show (Solo a) -- Defined in ‘GHC.Internal.Show’
 () :: Unit
 (##) :: Unit#

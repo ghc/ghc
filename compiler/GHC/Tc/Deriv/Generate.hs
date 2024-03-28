@@ -710,7 +710,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     enum_from tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFrom_RDR [mkVisPat a_Pat] $
           untag_Expr [(a_RDR, ah_RDR)] $
-          nlHsApps map_RDR
+          nlHsApps headStrictMap_RDR
                 [nlHsVar tag2con_RDR,
                  nlHsPar (enum_from_to_Expr
                             (nlHsVarApps intDataCon_RDR [ah_RDR])
@@ -719,7 +719,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     enum_from_then tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFromThen_RDR (map mkVisPat [a_Pat, b_Pat]) $
           untag_Expr [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
+          nlHsApp (nlHsVarApps headStrictMap_RDR [tag2con_RDR]) $
             nlHsPar (enum_from_then_to_Expr
                     (nlHsVarApps intDataCon_RDR [ah_RDR])
                     (nlHsVarApps intDataCon_RDR [bh_RDR])
@@ -852,7 +852,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
       = mkSimpleGeneratedFunBind loc range_RDR [mkVisPat $ nlTuplePat [a_Pat, b_Pat] Boxed] $
           untag_Expr [(a_RDR, ah_RDR)] $
           untag_Expr [(b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
+          nlHsApp (nlHsVarApps headStrictMap_RDR [tag2con_RDR]) $
               nlHsPar (enum_from_to_Expr
                         (nlHsVarApps intDataCon_RDR [ah_RDR])
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
