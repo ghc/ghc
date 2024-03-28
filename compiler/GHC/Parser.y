@@ -1916,7 +1916,7 @@ rule    :: { LRuleDecl GhcPs }
                                    { rd_ext = (((fst $3) (mj AnnEqual $5 : (fst $2))), getSTRINGs $1)
                                    , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
                                    , rd_act = snd $2 `orElse` AlwaysActive
-                                   , rd_bndrs = snd $3
+                                   , rd_bndrs = ruleBndrsOrDef (snd $3)
                                    , rd_lhs = $4, rd_rhs = $6 }) }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
@@ -1952,7 +1952,7 @@ rule_explicit_activation :: { ([AddEpAnn]
                                 { ($2++[mos $1,mcs $3]
                                   ,NeverActive) }
 
-rule_foralls :: { ([AddEpAnn] -> HsRuleAnn, RuleBndrs GhcPs) }
+rule_foralls :: { ([AddEpAnn] -> HsRuleAnn, Maybe (RuleBndrs GhcPs)) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'
               {% hintExplicitForall $1
                  >> checkRuleTyVarBndrNames $2
@@ -1960,15 +1960,15 @@ rule_foralls :: { ([AddEpAnn] -> HsRuleAnn, RuleBndrs GhcPs) }
                                         (Just (mu AnnForall $1,mj AnnDot $3))
                                         (Just (mu AnnForall $4,mj AnnDot $6))
                                         anns
-                           , mkRuleBndrs (Just $2) $5 ) }
+                           , Just (mkRuleBndrs (Just $2) $5) ) }
 
         | 'forall' rule_vars '.'
            { ( \anns -> HsRuleAnn Nothing (Just (mu AnnForall $1,mj AnnDot $3)) anns
-             , mkRuleBndrs Nothing $2 ) }
+             , Just (mkRuleBndrs Nothing $2) ) }
 
         -- See Note [%shift: rule_foralls -> {- empty -}]
         | {- empty -}            %shift
-           { (\anns -> HsRuleAnn Nothing Nothing anns, mkRuleBndrs Nothing []) }
+           { (\anns -> HsRuleAnn Nothing Nothing anns, Nothing) }
 
 rule_vars :: { [LRuleTyTmVar] }
         : rule_var rule_vars                    { $1 : $2 }
@@ -2735,25 +2735,13 @@ sigdecl :: { LHsDecl GhcPs }
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
                 ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ([mo $1, mc $4], (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
-        | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
-             {% amsA' (
-                 let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInlinePrag, FunLike) (snd $2)
-                  in sLL $1 $> $ SigD noExtField $
-                     SpecSig (mo $1:mu AnnDcolon $4:mc $6:fst $2)
-                             $3 (fromOL $5)
-                             inl_prag) }
-
-        | '{-# SPECIALISE' activation rule_foralls exp '#-}'
-             {% runPV (unECP $4) >>= \ $4 ->
-                amsA' (
+        | '{-# SPECIALISE' activation rule_foralls infixexp sigtypes_maybe '#-}'
+             {% runPV (unECP $4) >>= \ $4 -> do
                 let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                             (NoUserInlinePrag, FunLike)
                                             (snd $2)
-                in sLL $1 $> $ SigD noExtField $
-                   SpecSigE (mo $1:mc $5:fst $2)
-                            (snd $3) $4
-                            inl_prag) }
+                spec <- mkSpecSig $1 inl_prag (fst $2) (snd $3) $4 $5 $6
+                amsA' $ sLL $1 $> $ SigD noExtField spec }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
              {% amsA' (sLL $1 $> $ SigD noExtField (SpecSig (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) $3 (fromOL $5)
@@ -2766,6 +2754,10 @@ sigdecl :: { LHsDecl GhcPs }
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ([mo $1,mc $3], (getMINIMAL_PRAGs $1)) $2)) }
+
+sigtypes_maybe :: { Maybe (Located Token, OrdList (LHsSigType GhcPs)) }
+        : '::' sigtypes1         { Just ($1, $2) }
+        | {- empty -}            { Nothing }
 
 activation :: { ([AddEpAnn],Maybe Activation) }
         -- See Note [%shift: activation -> {- empty -}]

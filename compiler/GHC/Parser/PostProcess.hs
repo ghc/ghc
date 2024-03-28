@@ -64,7 +64,9 @@ module GHC.Parser.PostProcess (
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
         mkRuleBndrs,
+        ruleBndrsOrDef,
         checkRuleTyVarBndrNames,
+        mkSpecSig,
         checkRecordSyntax,
         checkEmptyGADTs,
         addFatalError, hintBangPat,
@@ -1006,6 +1008,10 @@ type LRuleTyTmVar = LocatedAn NoEpAnns RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar [AddEpAnn] (LocatedN RdrName) (Maybe (LHsType GhcPs))
 -- ^ Essentially a wrapper for a @RuleBndr GhcPs@
 
+ruleBndrsOrDef :: Maybe (RuleBndrs GhcPs) -> RuleBndrs GhcPs
+ruleBndrsOrDef (Just bndrs) = bndrs
+ruleBndrsOrDef Nothing      = mkRuleBndrs Nothing []
+
 mkRuleBndrs :: Maybe [LRuleTyTmVar] -> [LRuleTyTmVar] -> RuleBndrs GhcPs
 mkRuleBndrs tvbs tmbs
   = RuleBndrs { rb_tyvs = fmap (fmap cvt_tv) tvbs
@@ -1035,6 +1041,43 @@ checkRuleTyVarBndrNames bndrs
           addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
                           PsErrParseErrorOnInput occ
     check _ = panic "checkRuleTyVarBndrNames"
+
+mkSpecSig :: Located Token
+          -> InlinePragma
+          -> [AddEpAnn]
+          -> Maybe (RuleBndrs GhcPs)
+          -> LHsExpr GhcPs
+          -> Maybe (Located Token, OrdList (LHsSigType GhcPs))
+          -> Located Token
+          -> P (Sig GhcPs)
+mkSpecSig prag_start inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr prag_end  =
+  match_on_pragma_structure m_rule_binds expr m_sigtypes_ascr
+  where
+    match_on_pragma_structure _ _ Nothing = pure $
+      SpecSigE (start_ann:end_ann:activation_anns)
+                  (ruleBndrsOrDef m_rule_binds) expr
+                  inl_prag
+
+    match_on_pragma_structure Nothing (L _ (HsVar _ var)) (Just (dcolon, sigtypes)) = pure $
+      SpecSig (start_ann:colon_ann:end_ann:activation_anns)
+                             var (fromOL sigtypes)
+                             inl_prag
+      where colon_ann = AddEpAnn (toUnicodeAnn AnnDcolon dcolon) (gl dcolon)
+
+    match_on_pragma_structure _ _ _ =
+      ps_err PsErrSpecEpxrMultipleTypeAscription
+
+
+    gl = srcSpan2e . getLoc
+    start_ann = AddEpAnn AnnOpen (gl prag_start)
+    end_ann = AddEpAnn AnnClose (gl prag_end)
+
+    toUnicodeAnn !a (L _ (ITdcolon UnicodeSyntax)) = unicodeAnn a
+    toUnicodeAnn a _ = a
+
+    ps_err = addFatalError
+          . mkPlainErrorMsgEnvelope
+              (getLoc prag_start `combineSrcSpans` getLoc prag_end)
 
 checkRecordSyntax :: (MonadP m, Outputable a) => LocatedA a -> m (LocatedA a)
 checkRecordSyntax lr@(L loc r)

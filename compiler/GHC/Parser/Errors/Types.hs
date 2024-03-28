@@ -491,6 +491,8 @@ data PsMessage
    --               T24159_pat_parse_error_6
    | PsErrTypeSyntaxInPat !PsErrTypeSyntaxDetails
 
+   | PsErrSpecEpxrMultipleTypeAscription
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps
