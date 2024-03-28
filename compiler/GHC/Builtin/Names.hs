@@ -351,7 +351,7 @@ basicKnownKeyNames
         getFieldName, setFieldName,
 
         -- List operations
-        concatName, filterName, mapName,
+        concatName, filterName, mapName, headStrictMapName,
         zipName, foldrName, buildName, augmentName, appendName,
 
         -- FFI primitive types that are not wired-in.
@@ -739,8 +739,9 @@ ltTag_RDR               = nameRdrName  ordLTDataConName
 eqTag_RDR               = nameRdrName  ordEQDataConName
 gtTag_RDR               = nameRdrName  ordGTDataConName
 
-map_RDR, append_RDR :: RdrName
+map_RDR, headStrictMap_RDR, append_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
+headStrictMap_RDR       = nameRdrName headStrictMapName
 append_RDR              = nameRdrName appendName
 
 foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
@@ -1120,7 +1121,7 @@ considerAccessibleName = varQual gHC_INTERNAL_EXTS (fsLit "considerAccessible") 
 
 -- Random GHC.Internal.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
-    mapName, appendName, assertName,
+    mapName, headStrictMapName, appendName, assertName,
     dollarName :: Name
 dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
@@ -1128,6 +1129,7 @@ foldrName         = varQual gHC_INTERNAL_BASE (fsLit "foldr")      foldrIdKey
 buildName         = varQual gHC_INTERNAL_BASE (fsLit "build")      buildIdKey
 augmentName       = varQual gHC_INTERNAL_BASE (fsLit "augment")    augmentIdKey
 mapName           = varQual gHC_INTERNAL_BASE (fsLit "map")        mapIdKey
+headStrictMapName = varQual gHC_INTERNAL_BASE (fsLit "headStrictMap") headStrictMapIdKey
 appendName        = varQual gHC_INTERNAL_BASE (fsLit "++")         appendIdKey
 assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
 fromStringName    = varQual gHC_INTERNAL_DATA_STRING (fsLit "fromString") fromStringClassOpKey
@@ -2390,8 +2392,10 @@ inlineIdKey, noinlineIdKey, noinlineConstraintIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
-mapIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
+mapIdKey, headStrictMapIdKey, dollarIdKey,
+  coercionTokenIdKey, considerAccessibleIdKey :: Unique
 mapIdKey                = mkPreludeMiscIdUnique 121
+headStrictMapIdKey      = mkPreludeMiscIdUnique 122
 dollarIdKey             = mkPreludeMiscIdUnique 123
 coercionTokenIdKey      = mkPreludeMiscIdUnique 124
 considerAccessibleIdKey = mkPreludeMiscIdUnique 125

@@ -1882,7 +1882,7 @@ augment g xs = g (:) xs
 map :: (a -> b) -> [a] -> [b]
 {-# NOINLINE [0] map #-}
   -- We want the RULEs "map" and "map/coerce" to fire first.
-  -- map is recursive, so won't inline anyway,
+  -- map is recursive, so it won't inline anyway,
   -- but saying so is more explicit, and silences warnings
 map _ []     = []
 map f (x:xs) = f x : map f xs
@@ -1913,7 +1913,7 @@ The rules for map work like this.
 
   See also Note [Inline FB functions] in GHC.Internal.List
 
-* The "mapFB" rule optimises compositions of map
+* The "mapFB/mapFB" rule optimises compositions of map
 
 * The "mapFB/id" rule gets rid of 'map id' calls.
   You might think that (mapFB c id) will turn into c simply
@@ -1930,7 +1930,7 @@ The rules for map work like this.
 {-# RULES
 "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
 "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
-"mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
+"mapFB/mapFB"    forall c f g.  mapFB (mapFB c f) g     = mapFB c (f.g)
 "mapFB/id"  forall c.           mapFB c (\x -> x)       = c
   #-}
 
@@ -1941,6 +1941,103 @@ The rules for map work like this.
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
 -- See Note [Getting the map/coerce RULE to work] in GHC.Core.SimpleOpt
 
+-- | Less lazy variant of 'map' that evaluates each /result/ list
+-- element to weak head normal form when it produces the corresponding
+-- cons cell.
+headStrictMap :: (a -> b) -> [a] -> [b]
+{-# NOINLINE [0] headStrictMap #-}
+-- See Note [The rules for map].
+-- headStrictMap is recursive, so it won't inline anyway,
+-- but saying so is more explicit, and silences warnings
+headStrictMap _ [] = []
+headStrictMap f (x:xs) = case f x of
+  !y -> y : headStrictMap f xs
+
+headStrictMapFB :: (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
+{-# INLINE [0] headStrictMapFB #-}
+-- See Note [Inline FB functions] in GHC.Internal.List
+headStrictMapFB c f = \x ys -> case f x of
+  !y -> c y ys
+
+partiallyHeadStrictMap :: (a -> (# b #)) -> [a] -> [b]
+{-# NOINLINE [0] partiallyHeadStrictMap #-}
+-- See Note [The rules for map].
+-- partiallyHeadStrictMap is recursive, so it won't inline anyway,
+-- but saying so is more explicit, and silences warnings
+partiallyHeadStrictMap f li = case li of
+  [] -> []
+  x : xs -> case f x of
+    (# y #) -> y : partiallyHeadStrictMap f xs
+
+partiallyHeadStrictMapFB :: (elt -> lst -> lst) -> (a -> (# elt #)) -> a -> lst -> lst
+{-# INLINE [0] partiallyHeadStrictMapFB #-}
+-- See Note [Inline FB functions] in GHC.Internal.List
+partiallyHeadStrictMapFB c f = \x ys -> case f x of
+  (# y #) -> c y ys
+
+-- See Note [The rules for map].
+{-# RULES
+"headStrictMap" [~1]
+  forall f xs.
+    headStrictMap f xs
+    = build (\c n -> foldr (headStrictMapFB c f) n xs)
+"headStrictMapList" [1]
+  forall f.
+    foldr (headStrictMapFB (:) f) []
+    = headStrictMap f
+
+"partiallyHeadStrictMap" [~1]
+  forall f xs.
+    partiallyHeadStrictMap f xs
+    = build (\c n -> foldr (partiallyHeadStrictMapFB c f) n xs)
+"partiallyHeadStrictMapList" [1]
+  forall f.
+    foldr (partiallyHeadStrictMapFB (:) f) []
+    = partiallyHeadStrictMap f
+
+
+"headStrictMapFB/headStrictMapFB"
+  forall c f g.
+    headStrictMapFB (headStrictMapFB c f) g
+    = headStrictMapFB c (\x -> f $! g x)
+"headStrictMapFB/partiallyHeadStrictMapFB"
+  forall c f g.
+    partiallyHeadStrictMapFB (headStrictMapFB c f) g
+    = headStrictMapFB c (\x -> case g x of (# y #) -> f y)
+"headStrictMapFB/mapFB"
+  forall c f g.
+    mapFB (headStrictMapFB c f) g
+    = headStrictMapFB c (\x -> f (g x))
+
+"partiallyHeadStrictMapFB/headStrictMapFB"
+  forall c f g.
+    headStrictMapFB (partiallyHeadStrictMapFB c f) g
+    = partiallyHeadStrictMapFB c (\x -> f $! g x)
+"partiallyHeadStrictMapFB/partiallyHeadStrictMapFB"
+  forall c f g.
+    partiallyHeadStrictMapFB (partiallyHeadStrictMapFB c f) g
+    = partiallyHeadStrictMapFB c (\x -> case g x of (# y #) -> f y)
+"partiallyHeadStrictMapFB/mapFB"
+  forall c f g.
+    mapFB (partiallyHeadStrictMapFB c f) g
+    = partiallyHeadStrictMapFB c (\x -> f (g x))
+
+"mapFB/headStrictMapFB"
+  forall c f g.
+    headStrictMapFB (mapFB c f) g
+    = partiallyHeadStrictMapFB c (\x -> case g x of !y -> (# f y #))
+"mapFB/partiallyHeadStrictMapFB"
+  forall c f g.
+    partiallyHeadStrictMapFB (mapFB c f) g
+    = partiallyHeadStrictMapFB c (\x -> case g x of (# y #) -> (# f y #))
+-- "mapFB/mapFB" rule is above
+
+
+"lazy partiallyHeadStrictMapFB"
+  forall c f.
+    partiallyHeadStrictMapFB c (\x -> (# f x #))
+    = mapFB c f
+  #-}
 ----------------------------------------------
 --              append
 ----------------------------------------------
