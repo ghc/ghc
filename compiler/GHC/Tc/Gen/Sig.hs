@@ -1136,7 +1136,8 @@ tcRule (HsRule { rd_ext  = ext
                                  , rd_rhs   = mkHsDictLet rhs_binds rhs' } }
 
 mkTcRuleBndrs (RuleBndrs { rb_tyvs = tyvs }) vars
-  = RuleBndrs { rb_tyvs = tyvs -- preserved for ppr-ing
+  = RuleBndrs { rb_ext = noAnn
+              , rb_tyvs = tyvs -- preserved for ppr-ing
               , rb_tmvs = map (noLocA . RuleBndr noAnn . noLocA) vars }
 
 generateRuleConstraints :: SkolemInfo

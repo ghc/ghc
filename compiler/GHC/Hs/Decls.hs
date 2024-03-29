@@ -62,7 +62,6 @@ module GHC.Hs.Decls (
   XViaStrategyPs(..),
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
-  HsRuleAnn(..),
   RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
   flattenRuleDecls, pprFullRuleName,
@@ -1191,7 +1190,7 @@ type instance XCRuleDecls    GhcTc = SourceText
 
 type instance XXRuleDecls    (GhcPass _) = DataConCantHappen
 
-type instance XHsRule       GhcPs = (HsRuleAnn, SourceText)
+type instance XHsRule       GhcPs = ([AddEpAnn], SourceText)
 type instance XHsRule       GhcRn = (HsRuleRn, SourceText)
 type instance XHsRule       GhcTc = (HsRuleRn, SourceText)
 
@@ -1199,20 +1198,6 @@ data HsRuleRn = HsRuleRn NameSet NameSet -- Free-vars from the LHS and RHS
   deriving Data
 
 type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
-
-data HsRuleAnn
-  = HsRuleAnn
-       { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
-                 -- ^ The locations of 'forall' and '.' for forall'd type vars
-                 -- Using AddEpAnn to capture possible unicode variants
-       , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
-                 -- ^ The locations of 'forall' and '.' for forall'd term vars
-                 -- Using AddEpAnn to capture possible unicode variants
-       , ra_rest :: [AddEpAnn]
-       } deriving (Data, Eq)
-
-instance NoAnn HsRuleAnn where
-  noAnn = HsRuleAnn Nothing Nothing []
 
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls

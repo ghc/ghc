@@ -1702,7 +1702,7 @@ zonkRule rule@(HsRule { rd_bndrs = bndrs
 zonkRuleBndrs :: RuleBndrs GhcTc -> (RuleBndrs GhcTc -> ZonkTcM a) -> ZonkTcM a
 zonkRuleBndrs (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
   = runZonkBndrT (traverse zonk_tm_bndr tmvs) $ \ new_tmvs ->
-    thing_inside (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = new_tmvs })
+    thing_inside (RuleBndrs { rb_ext = noAnn, rb_tyvs = tyvs, rb_tmvs = new_tmvs })
   where
    zonk_tm_bndr :: LRuleBndr GhcTc -> ZonkBndrTcM (LRuleBndr GhcTc)
    zonk_tm_bndr (L l (RuleBndr x (L loc v)))

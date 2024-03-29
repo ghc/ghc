@@ -932,7 +932,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
                    HsRule { rd_ext  = (noAnn, quotedSourceText nm)
                           , rd_name = rd_name'
                           , rd_act  = act
-                          , rd_bndrs = RuleBndrs { rb_tyvs = ty_bndrs', rb_tmvs = tm_bndrs' }
+                          , rd_bndrs = RuleBndrs { rb_ext = noAnn, rb_tyvs = ty_bndrs', rb_tmvs = tm_bndrs' }
                           , rd_lhs  = lhs'
                           , rd_rhs  = rhs' }
        ; returnJustLA $ Hs.RuleD noExtField

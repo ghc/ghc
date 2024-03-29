@@ -368,6 +368,11 @@ type family XHsRule          x
 type family XXRuleDecl       x
 
 -- -------------------------------------
+-- RuleBndsr type families
+type family XCRuleBndrs     x
+type family XXRuleBndrs     x
+
+-- -------------------------------------
 -- RuleBndr type families
 type family XCRuleBndr      x
 type family XRuleBndrSig    x

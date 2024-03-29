@@ -1326,7 +1326,8 @@ bindRuleBndrs doc (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
        ; names <- newLocalBndrsRn rdr_names_w_loc
        ; bindRuleTyVars doc tyvs             $ \ tyvs' ->
          bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
-         thing_inside names (RuleBndrs { rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
+         thing_inside names (RuleBndrs { rb_ext = noAnn
+                                       , rb_tyvs = tyvs', rb_tmvs = tmvs' }) }
   where
     get_var :: RuleBndr GhcPs -> LocatedN RdrName
     get_var (RuleBndrSig _ v _) = v

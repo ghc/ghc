@@ -1010,11 +1010,12 @@ data RuleTyTmVar = RuleTyTmVar [AddEpAnn] (LocatedN RdrName) (Maybe (LHsType Ghc
 
 ruleBndrsOrDef :: Maybe (RuleBndrs GhcPs) -> RuleBndrs GhcPs
 ruleBndrsOrDef (Just bndrs) = bndrs
-ruleBndrsOrDef Nothing      = mkRuleBndrs Nothing []
+ruleBndrsOrDef Nothing      = mkRuleBndrs noAnn Nothing []
 
-mkRuleBndrs :: Maybe [LRuleTyTmVar] -> [LRuleTyTmVar] -> RuleBndrs GhcPs
-mkRuleBndrs tvbs tmbs
-  = RuleBndrs { rb_tyvs = fmap (fmap cvt_tv) tvbs
+mkRuleBndrs :: HsRuleBndrsAnn -> Maybe [LRuleTyTmVar] -> [LRuleTyTmVar] -> RuleBndrs GhcPs
+mkRuleBndrs ann tvbs tmbs
+  = RuleBndrs { rb_ext = ann
+              , rb_tyvs = fmap (fmap cvt_tv) tvbs
               , rb_tmvs = fmap (fmap cvt_tm) tmbs }
   where
     -- cvt_tm turns RuleTyTmVars into RuleBnrs - this is straightforward

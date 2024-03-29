@@ -557,12 +557,14 @@ isCompleteMatchSig _                            = False
 ********************************************************************* -}
 
 data RuleBndrs pass = RuleBndrs
-       { rb_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
+       { rb_ext  :: (XCRuleBndrs pass)
+       , rb_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rb_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking;
            --   after typechecking this includes all forall'd vars
        }
+  | XRuleBndrs !(XXRuleBndrs pass)
 
 -- | Located Rule Binder
 type LRuleBndr pass = XRec pass (RuleBndr pass)

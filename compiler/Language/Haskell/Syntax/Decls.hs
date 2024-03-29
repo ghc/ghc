@@ -1635,8 +1635,8 @@ data RuleDecl pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
-       , rd_bndrs :: RuleBndrs pass
        , rd_act   :: Activation
+       , rd_bndrs :: RuleBndrs pass
        , rd_lhs   :: XRec pass (HsExpr pass)
        , rd_rhs   :: XRec pass (HsExpr pass)
        }

@@ -26,6 +26,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 module GHC.Hs.Binds
   ( module Language.Haskell.Syntax.Binds
   , module GHC.Hs.Binds
+  , HsRuleBndrsAnn(..)
   ) where
 
 import GHC.Prelude
@@ -980,7 +981,23 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 *                                                                      *
 ********************************************************************* -}
 
+data HsRuleBndrsAnn
+  = HsRuleBndrsAnn
+       { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
+                 -- ^ The locations of 'forall' and '.' for forall'd type vars
+                 -- Using AddEpAnn to capture possible unicode variants
+       , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
+                 -- ^ The locations of 'forall' and '.' for forall'd term vars
+                 -- Using AddEpAnn to capture possible unicode variants
+       } deriving (Data, Eq)
+
+instance NoAnn HsRuleBndrsAnn where
+  noAnn = HsRuleBndrsAnn Nothing Nothing
+
+
 type instance XCRuleBndr    (GhcPass _) = [AddEpAnn]
+type instance XCRuleBndrs   (GhcPass _) = HsRuleBndrsAnn
+type instance XXRuleBndrs   (GhcPass _) = DataConCantHappen
 type instance XRuleBndrSig  (GhcPass _) = [AddEpAnn]
 type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
 
