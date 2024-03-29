@@ -2551,9 +2551,11 @@ kcCheckDeclHeader_sig sig_kind name flav
        ; traceTc "kcCheckDeclHeader_sig {" $
            vcat [ text "sig_kind:" <+> ppr sig_kind
                 , text "sig_tcbs:" <+> ppr sig_tcbs
-                , text "sig_res_kind:" <+> ppr sig_res_kind ]
+                , text "sig_res_kind:" <+> ppr sig_res_kind
+                , text "implict_nms:" <+> ppr implicit_nms
+                , text "hs_tv_bndrs:" <+> ppr hs_tv_bndrs ]
 
-       ; (tclvl, wanted, (implicit_tvs, (skol_tcbs, (extra_tcbs, tycon_res_kind))))
+       ; (tclvl, wanted, (implicit_tvs, (skol_tcbs, skol_scoped_tvs, (extra_tcbs, tycon_res_kind))))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
               bindImplicitTKBndrs_Q_Tv implicit_nms                $  -- Q means don't clone
               matchUpSigWithDecl name sig_tcbs sig_res_kind hs_tv_bndrs $ \ excess_sig_tcbs sig_res_kind ->
@@ -2605,9 +2607,18 @@ kcCheckDeclHeader_sig sig_kind name flav
         -- Here p and q both map to the same kind variable k.  We don't allow this
         -- so we must check that they are distinct.  A similar thing happens
         -- in GHC.Tc.TyCl.swizzleTcTyConBinders during inference.
+        --
+        -- With visible dependent quantification, one of the binders involved
+        -- may be explicit.  Consider #24604
+        --    type UF :: forall zk -> zk -> Constraint
+        --    class UF kk (xb :: k)
+        -- Here `k` and `kk` both denote the same variable; but only `k` is implicit
+        -- Hence we need to add skol_scoped_tvs
         ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
-        ; checkForDuplicateScopedTyVars implicit_prs
+              dup_chk_prs  = implicit_prs ++ mkTyVarNamePairs skol_scoped_tvs
+        ; unless (null implicit_nms) $  -- No need if no implicit tyvars
+          checkForDuplicateScopedTyVars dup_chk_prs
         ; checkForDisconnectedScopedTyVars flav all_tcbs implicit_prs
 
         -- Swizzle the Names so that the TyCon uses the user-declared implicit names
@@ -2676,6 +2687,7 @@ matchUpSigWithDecl
   -> ([TcTyConBinder] -> TcKind -> TcM a)  -- All user-written binders are in scope
                                            --   Argument is excess TyConBinders and tail kind
   -> TcM ( [TcTyConBinder]       -- Skolemised binders, with TcTyVars
+         , [TcTyVar]             -- Skolem tyvars brought into lexical scope by this matching-up
          , a )
 -- See Note [Matching a kind signature with a declaration]
 -- Invariant: Length of returned TyConBinders + length of excess TyConBinders
@@ -2686,7 +2698,7 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
     go subst tcbs []
       = do { let (subst', tcbs') = substTyConBindersX subst tcbs
            ; res <- thing_inside tcbs' (substTy subst' sig_res_kind)
-           ; return ([], res) }
+           ; return ([], [], res) }
 
     go _ [] hs_bndrs
       = failWithTc (TcRnTooManyBinders sig_res_kind hs_bndrs)
@@ -2702,17 +2714,22 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
                    -- that come from the type declaration, not the kind signature
                  subst' = extendTCvSubstWithClone subst tv tv'
            ; tc_hs_bndr (unLoc hs_bndr) (tyVarKind tv')
-           ; (tcbs', res) <- tcExtendTyVarEnv [tv'] $
-                             go subst' tcbs' hs_bndrs'
-           ; return (Bndr tv' vis : tcbs', res) }
+           ; traceTc "musd1" (ppr tcb $$ ppr hs_bndr $$ ppr tv')
+           ; (tcbs', tvs, res) <- tcExtendTyVarEnv [tv'] $
+                                  go subst' tcbs' hs_bndrs'
+           ; return (Bndr tv' vis : tcbs', tv':tvs, res) }
+             -- We do a tcExtendTyVarEnv [tv'], so we return tv' in
+             -- the list of lexically-scoped skolem type variables
 
       | skippable (binderFlag tcb)
       = -- Invisible TyConBinder, so do not consume one of the hs_bndrs
         do { let (subst', tcb') = substTyConBinderX subst tcb
-           ; (tcbs', res) <- go subst' tcbs' hs_bndrs
+           ; traceTc "musd2" (ppr tcb $$ ppr hs_bndr $$ ppr tcb')
+           ; (tcbs', tvs, res) <- go subst' tcbs' hs_bndrs
                    -- NB: pass on hs_bndrs unchanged; we do not consume a
                    --     HsTyVarBndr for an invisible TyConBinder
-           ; return (tcb' : tcbs', res) }
+           ; return (tcb' : tcbs', tvs, res) }
+                   -- Return `tvs`; no new lexically-scoped TyVars brought into scope
 
       | otherwise =
           -- At this point we conclude that:
@@ -2726,14 +2743,19 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
       = return ()
     tc_hs_bndr (KindedTyVar _ _ (L _ hs_nm) lhs_kind) expected_kind
       = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) lhs_kind
+           ; traceTc "musd3:unifying" (ppr sig_kind $$ ppr expected_kind)
            ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
              unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
 
     -- See GHC Proposal #425, section "Kind checking",
     -- where zippable and skippable are defined.
+    -- In particular: we match up if
+    -- (a) HsBndr looks like @k, and TyCon binder is forall k. (NamedTCB Specified)
+    -- (b) HsBndr looks like a,  and TyCon binder is forall k -> (NamedTCB Required)
+    --                                            or k -> (AnonTCB)
     zippable :: TyConBndrVis -> HsBndrVis GhcRn -> Bool
-    zippable vis HsBndrRequired      = isVisibleTcbVis vis
-    zippable vis (HsBndrInvisible _) = isInvisSpecTcbVis vis
+    zippable vis (HsBndrInvisible _) = isInvisSpecTcbVis vis  -- (a)
+    zippable vis  HsBndrRequired     = isVisibleTcbVis vis    -- (b)
 
     -- See GHC Proposal #425, section "Kind checking",
     -- where zippable and skippable are defined.
@@ -3026,15 +3048,7 @@ checkForDisconnectedScopedTyVars flav sig_tcbs scoped_prs
 
 checkForDuplicateScopedTyVars :: [(Name,TcTyVar)] -> TcM ()
 -- Check for duplicates
--- E.g. data SameKind (a::k) (b::k)
---      data T (a::k1) (b::k2) c = MkT (SameKind a b) c
--- Here k1 and k2 start as TyVarTvs, and get unified with each other
--- If this happens, things get very confused later, so fail fast
---
--- In the CUSK case k1 and k2 are skolems so they won't unify;
--- but in the inference case (see generaliseTcTyCon),
--- and the type-sig case (see kcCheckDeclHeader_sig), they are
--- TcTyVars, so we must check.
+-- See Note [Aliasing in type and class declarations]
 checkForDuplicateScopedTyVars scoped_prs
   = unless (null err_prs) $
     do { mapM_ report_dup err_prs; failM }
@@ -3054,8 +3068,43 @@ checkForDuplicateScopedTyVars scoped_prs
         addErrTc $ TcRnDifferentNamesForTyVar n1 n2
 
 
-{- Note [Disconnected type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Aliasing in type and class declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data SameKind (a::k) (b::k)
+  data T1 (a::k1) (b::k2) c = MkT (SameKind a b) c
+We do not allow this, because `k1` and `k2` would both stand for the same type
+variable -- they are both aliases for `k`.
+
+Other examples
+  data T2 (a::k1)                 = MkT2 (SameKind a Int) -- k1 stands for Type
+  data T3 @k1 @k2 (a::k1) (b::k2) = MkT (SameKind a b)    -- k1 and k2 are aliases
+
+  type UF :: forall zk. zk -> Constraint
+  class UF @kk (xb :: k) where   -- kk and k are aliases
+    op :: (xs::kk) -> Bool
+
+See #24604 for an example that crashed GHC.
+
+There is a design choice here. It would be possible to allow implicit type variables
+like `k1` and `k2` in T1's declartion to stand for /abitrary kinds/.  This is in fact
+the rule we use in /terms/ pattern signatures:
+    f :: [Int] -> Int
+    f ((x::a) : xs) = ...
+Here `a` stands for `Int`.  But in type /signatures/ we make a different choice:
+    f1 :: forall (a::k1) (b::k2). SameKind a b -> blah
+    f2 :: forall (a::k). SameKind a Int -> blah
+
+Here f1's signature is rejected because `k1` and `k2` are aliased; and f2's is
+rejected because `k` stands for `Int`.
+
+Our current choice is that type and class declarations behave more like signatures;
+we do not allow aliasing.  That is what `checkForDuplicateScopedTyVars` checks.
+See !12328 for some design discussion.
+
+
+Note [Disconnected type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This note applies when kind-checking the header of a type/class decl that has
 a separate, standalone kind signature.  See #24083.
 

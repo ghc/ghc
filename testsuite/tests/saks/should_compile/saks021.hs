@@ -6,4 +6,4 @@ module SAKS_021 where
 import Data.Kind (Type)
 
 type T :: forall k -> forall (xx :: k) -> Type
-data T k (x :: hk)
+data T j (x :: j)

@@ -1,9 +1,9 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE PolyKinds, ExplicitForAll #-}
 
-module SAKS_018 where
+module SAKS_021 where
 
 import Data.Kind (Type)
 
-type T :: forall k -> k -> Type
-data T j (x :: j)
+type T :: forall k -> forall (xx :: k) -> Type
+data T k (x :: hk)
