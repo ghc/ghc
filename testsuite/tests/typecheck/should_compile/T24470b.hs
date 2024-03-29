@@ -7,4 +7,4 @@ import Data.Kind
 import Data.Data
 
 type SynOK :: forall k. k -> Type
-type SynOK @t = Proxy :: j -> Type
+type SynOK @j = Proxy :: j -> Type
