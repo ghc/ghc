@@ -1,0 +1,4 @@
+
+T24604a.hs:8:11: error: [GHC-17370]
+    • Different names for the same type variable: ‘k’ and ‘kk’
+    • In the class declaration for ‘UF’
