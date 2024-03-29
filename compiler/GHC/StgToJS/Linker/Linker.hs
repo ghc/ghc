@@ -728,12 +728,64 @@ writeRunner _settings out = do
 
 rtsExterns :: FastString
 rtsExterns =
+  -- Google Closure Compiler --externs option is deprecated.
+  -- Need pass them as a js file with @externs module-level jsdoc.
+  "/** @externs @suppress {duplicate} */\n" <>
   "// GHCJS RTS externs for closure compiler ADVANCED_OPTIMIZATIONS\n\n" <>
-  mconcat (map (\x -> "/** @type {*} */\nObject.d" <> mkFastString (show x) <> ";\n")
-               [(7::Int)..16384])
+  mconcat
+    -- See GHC.StgToJS
+    -- We connect all payload fields "dXX" on JavaScript Object.
+    -- That's most simple way to make Google Closure Compiler prevent
+    -- property names mangling.
+    (map (\x -> "/** @type {*} */\nObject.d" <> mkFastString (show x) <> ";\n")
+    [(1::Int)..16384]) <>
+  mconcat
+    (map (\x -> "/** @type {*} */\nObject." <> x <> ";\n")
+    -- We do same for special STG properties as well.
+    ["m", "f", "cc", "t", "size", "i", "n", "a", "r", "s"]) <>
+  mconcat
+    [ -- Used at h$mkForeignCallback
+      "/** @type {*} */\nObject.mv;\n"
+    ] <>
+  mconcat
+    (map (\x -> x <> ";\n")
+    [ -- Externs needed by node environment
+      "/** @type {string} */ var __dirname"
+      -- Copied minimally from https://github.com/externs/nodejs/blob/6c6882c73efcdceecf42e7ba11f1e3e5c9c041f0/v8/nodejs.js#L8
+    , "/** @const */ var NodeJS = {}"
+      -- NodeJS Stream interface
+    , "/** @interface */ NodeJS.Stream = function () {}"
+    , "/** @template THIS @this {THIS} @return {THIS} */ NodeJS.Stream.prototype.on = function() {}"
+    , "/** @return {boolean} */ NodeJS.Stream.prototype.write = function() {}"
+      -- NodeJS versions property contains actual versions of the environment
+    , "/** @interface */ NodeJS.ProcessVersions = function() {}"
+    , "/** @type {string} */ NodeJS.ProcessVersions.prototype.node"
+      -- NodeJS Process interface
+    , "/** @interface */ NodeJS.Process = function() {}"
+    , "/** @type {!NodeJS.Stream} */ NodeJS.Process.prototype.stderr"
+    , "/** @type {!NodeJS.Stream} */ NodeJS.Process.prototype.stdin"
+    , "/** @type {!NodeJS.Stream} */ NodeJS.Process.prototype.stdout"
+    , "/** @type {!NodeJS.ProcessVersions} */ NodeJS.Process.prototype.versions"
+    , "/** @return {?} */ NodeJS.Process.prototype.exit = function() {}"
+    , "/** @type {!Array<string>} */ NodeJS.Process.prototype.argv"
+      -- NodeJS Process definition
+    , "/** @type {!NodeJS.Process} */ var process"
+      -- NodeJS Buffer class
+    , "/** @extends {Uint8Array} @constructor */ function Buffer(arg1, encoding) {}"
+    , "/** @return {!Buffer} */ Buffer.alloc = function() {}"
+      -- Emscripten Module
+    , "/** @type {*} */ var Module"
+      -- Mozilla's Narcissus (JS in JS interpreter implemented on top of SpiderMonkey) environment
+    , "/** @type {*} */ var putstr"
+    , "/** @type {*} */ var printErr"
+      -- Apples's JavaScriptCore environment
+    , "/** @type {*} */ var debug"
+      -- We use only Heap8 from Emscripten
+    , "/** @type {!Int8Array} */ Module.HEAP8"
+    ])
 
 writeExterns :: FilePath -> IO ()
-writeExterns out = writeFile (out </> "all.js.externs")
+writeExterns out = writeFile (out </> "all.externs.js")
   $ unpackFS rtsExterns
 
 -- | Get all block dependencies for a given set of roots
