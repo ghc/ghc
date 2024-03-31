@@ -17,6 +17,7 @@ packages: ./compiler
            ./libraries/ghc-boot/
           -- ./libraries/ghc-boot-th/
           ./libraries/ghc-compact
+          ./libraries/ghc-experimental
           ./libraries/ghc-heap
           ./libraries/ghci
           -- ./libraries/ghc-prim
@@ -25,6 +26,7 @@ packages: ./compiler
           ./libraries/hpc
           -- ./libraries/integer-gmp
           ./libraries/mtl/
+          ./libraries/os-string/
           ./libraries/parsec/
           -- ./libraries/pretty/
           ./libraries/process/
@@ -39,6 +41,8 @@ packages: ./compiler
           ./libraries/Win32/
           ./libraries/xhtml/
           ./utils/ghc-pkg
+          ./utils/ghc-toolchain
+          ./utils/ghc-toolchain/exe
           ./utils/haddock
           ./utils/hp2ps
           ./utils/hpc
@@ -61,15 +65,10 @@ constraints: ghc +internal-interpreter +dynamic-system-linke,
              any.pretty installed,
              any.template-haskell installed
 
-allow-newer:
-  ghc-paths:Cabal,
-  *:base,
-  *:ghc-prim,
-  tree-diff:time
 
 benchmarks: False
 tests: False
-allow-boot-library-installs: False
+allow-boot-library-installs: True
 
 -- Workaround for https://github.com/haskell/cabal/issues/7297
 package *
