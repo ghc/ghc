@@ -494,21 +494,16 @@ stack-hadrian-build:
 # Testing reinstallable ghc codepath
 ####################################
 
-# As documented on the original ticket #19896, this feature already has a long
-# way to go before it can actually be used. Meanwhile, parts of it have
-# bit-rotted, possibly related to some Cabal change. The job is disabled for
-# now.
-#
-# test-cabal-reinstall-x86_64-linux-deb10:
-#   extends: nightly-x86_64-linux-deb10-validate
-#   stage: full-build
-#   variables:
-#     REINSTALL_GHC: "yes"
-#     BUILD_FLAVOUR: validate
-#     TEST_ENV: "x86_64-linux-deb10-cabal-install"
-#   rules:
-#     - if: $NIGHTLY
-#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
+test-cabal-reinstall-x86_64-linux-deb10:
+  extends: nightly-x86_64-linux-deb10-validate
+  stage: full-build
+  variables:
+    REINSTALL_GHC: "yes"
+    BUILD_FLAVOUR: validate
+    TEST_ENV: "x86_64-linux-deb10-cabal-install"
+  rules:
+    - if: $NIGHTLY
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
 
 ########################################
 # Testing ABI is invariant across builds
