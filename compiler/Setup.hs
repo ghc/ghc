@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
 import Distribution.Simple
@@ -52,10 +52,12 @@ primopIncls =
     , ("primop-vector-tys-exports.hs-incl", "--primop-vector-tys-exports")
     , ("primop-vector-tycons.hs-incl"     , "--primop-vector-tycons")
     , ("primop-docs.hs-incl"              , "--wired-in-docs")
+    , ("primop-deprecations.hs-incl"      , "--wired-in-deprecations")
     ]
 
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
-ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
+ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameMap}
+  = do
   -- Get compiler/ root directory from the cabal file
   let Just compilerRoot = takeDirectory <$> pkgDescrFile
 
@@ -77,7 +79,7 @@ ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
   -- Call genprimopcode to generate *.hs-incl
   forM_ primopIncls $ \(file,command) -> do
     contents <- readProcess "genprimopcode" [command] primopsStr
-    rewriteFileEx verbosity (buildDir </> file) contents
+    rewriteFileEx verbosity (buildDir lbi </> file) contents
 
   -- Write GHC.Platform.Constants
   let platformConstantsPath = autogenPackageModulesDir lbi </> "GHC/Platform/Constants.hs"
