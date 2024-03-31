@@ -19,6 +19,7 @@ module GHC.Utils.Fingerprint (
         fingerprintFingerprints,
         fingerprintData,
         fingerprintString,
+        fingerprintStrings,
         getFileHash
    ) where
 
@@ -43,3 +44,7 @@ readHexFingerprint s = Fingerprint w1 w2
 fingerprintByteString :: BS.ByteString -> Fingerprint
 fingerprintByteString bs = unsafeDupablePerformIO $
   BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> fingerprintData (castPtr ptr) len
+
+-- See Note [Repeated -optP hashing]
+fingerprintStrings :: [String] -> Fingerprint
+fingerprintStrings ss = fingerprintFingerprints $ map fingerprintString ss

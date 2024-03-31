@@ -24,7 +24,6 @@ import qualified GHC.Driver.Env        as GHC
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Phases     as GHC
 import qualified GHC.Driver.Pipeline   as GHC
-import qualified GHC.Fingerprint.Type  as GHC
 import qualified GHC.Parser.Lexer      as GHC
 import qualified GHC.Settings          as GHC
 import qualified GHC.Types.Error       as GHC
@@ -232,24 +231,27 @@ showErrorMessages msgs =
     $ msgs
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
-injectCppOptions CppOptions{..} dflags =
-  foldr addOptP dflags (map mkDefine cppDefine ++ map mkIncludeDir cppInclude ++ map mkInclude cppFile)
+injectCppOptions CppOptions{..} dflags = folded_opt_jsp_with_p
   where
     mkDefine = ("-D" ++)
     mkIncludeDir = ("-I" ++)
     mkInclude = ("-include" ++)
-
+    file_flags = map mkDefine cppDefine ++ map mkIncludeDir cppInclude ++ map mkInclude cppFile
+    folded_opt_p = foldr addOptP dflags file_flags
+    folded_opt_jsp_with_p = foldr addOptJSP folded_opt_p file_flags
 
 addOptP :: String -> GHC.DynFlags -> GHC.DynFlags
 addOptP   f = alterToolSettings $ \s -> s
           { GHC.toolSettings_opt_P   = f : GHC.toolSettings_opt_P s
-          , GHC.toolSettings_opt_P_fingerprint = fingerprintStrings (f : GHC.toolSettings_opt_P s)
+          , GHC.toolSettings_opt_P_fingerprint = GHC.fingerprintStrings (f : GHC.toolSettings_opt_P s)
+          }
+addOptJSP :: String -> GHC.DynFlags -> GHC.DynFlags
+addOptJSP f = alterToolSettings $ \s -> s
+          { GHC.toolSettings_opt_JSP   = f : GHC.toolSettings_opt_JSP s
+          , GHC.toolSettings_opt_JSP_fingerprint = GHC.fingerprintStrings (f : GHC.toolSettings_opt_JSP s)
           }
 alterToolSettings :: (GHC.ToolSettings -> GHC.ToolSettings) -> GHC.DynFlags -> GHC.DynFlags
 alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings dynFlags) }
-
-fingerprintStrings :: [String] -> GHC.Fingerprint
-fingerprintStrings ss = GHC.fingerprintFingerprints $ map GHC.fingerprintString ss
 
 -- ---------------------------------------------------------------------
 

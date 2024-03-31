@@ -40,23 +40,23 @@ import System.Directory
 import System.FilePath
 
 data CppOpts = CppOpts
-  { useHsCpp       :: !Bool
-  -- ^ Use the Haskell C preprocessor, otherwise use the C preprocessor.
-  -- See the Note [Preprocessing invocations]
-  , cppLinePragmas :: !Bool
+  { sourceCodePreprocessor  :: !SourceCodePreprocessor
+  , cppLinePragmas          :: !Bool
   -- ^ Enable generation of LINE pragmas
   }
 
 {-
 Note [Preprocessing invocations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must consider two distinct preprocessors when preprocessing Haskell.
+We must consider three distinct preprocessors when preprocessing Haskell.
 These are:
 
 (1) The Haskell C preprocessor (HsCpp), which preprocesses Haskell files that make use
   of the CPP language extension
 
 (2) The C preprocessor (Cpp), which is used to preprocess C and Cmm files
+
+(3) The JavaScript preprocessor (JsCpp), which preprocesses JavaScript files
 
 These preprocessors are indeed different. Despite often sharing the same
 underlying program (the C compiler), the set of flags passed determines the
@@ -79,10 +79,18 @@ Haskell source. This avoids the following situations:
   C permits long character constants, an expression involving multiple
   functions with primes in their names may not expand macros properly when
   they occur between the primed functions.
+
+Third special type of preprocessor for JavaScript was added laterly due to
+needing to keep JSDoc comments and multiline comments. Various third party
+minifying software (for example, Google Closure Compiler) uses JSDoc
+information to apply more strict rules to code reduction which results in
+better but more dangerous minification. JSDoc comments are usually used to
+instruct minifiers where dangerous optimizations could be applied.
 -}
 
--- | Run either the Haskell preprocessor or the C preprocessor, as per the
--- 'CppOpts' passed. See Note [Preprocessing invocations].
+-- | Run either the Haskell preprocessor, JavaScript preprocessor
+-- or the C preprocessor, as per the 'CppOpts' passed.
+-- See Note [Preprocessing invocations].
 --
 -- UnitEnv is needed to compute MIN_VERSION macros
 doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> FilePath -> FilePath -> IO ()
@@ -110,9 +118,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
 
     let verbFlags = getVerbFlags dflags
 
-    let cpp_prog args
-          | useHsCpp opts = GHC.SysTools.runHsCpp logger dflags args
-          | otherwise     = GHC.SysTools.runCpp logger tmpfs dflags args
+    let cpp_prog args = runSourceCodePreprocessor logger tmpfs dflags (sourceCodePreprocessor opts) args
 
     let platform   = targetPlatform dflags
         targetArch = stringEncodeArch $ platformArch platform

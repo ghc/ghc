@@ -1,22 +1,27 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module GHC.Toolchain.Tools.Cpp (HsCpp(..), findHsCpp, Cpp(..), findCpp) where
+module GHC.Toolchain.Tools.Cpp (HsCpp(..), findHsCpp, Cpp(..), findCpp, JsCpp(..), findJsCpp) where
 
 import Control.Monad
 import System.FilePath
-import Data.List(isInfixOf)
+import Data.List(isInfixOf, dropWhileEnd)
+import Data.Char(isSpace)
 
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
 import GHC.Toolchain.Tools.Cc
-import GHC.Toolchain.Utils (withTempDir, oneOf)
+import GHC.Toolchain.Utils (withTempDir, oneOf, expectFileExists)
 
 newtype Cpp = Cpp { cppProgram :: Program
                     }
     deriving (Show, Read, Eq, Ord)
 
 newtype HsCpp = HsCpp { hsCppProgram :: Program
+                      }
+    deriving (Show, Read, Eq, Ord)
+
+newtype JsCpp = JsCpp { jsCppProgram :: Program
                       }
     deriving (Show, Read, Eq, Ord)
 
@@ -76,6 +81,60 @@ findHsCppArgs cpp = withTempDir $ \dir -> do
       , tryFlag "-Wno-trigraphs"
       ]
       -}
+
+----- JavaScript preprocessor -----
+
+findJsCpp :: ProgOpt -> Cc -> M JsCpp
+findJsCpp progOpt cc = checking "for JavaScript C preprocessor" $ do
+  -- Use the specified Js Cpp
+  foundJsCppProg <- findProgram "JavaScript C preprocessor" progOpt ["emcc"] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+
+  _ <- withTempDir $ \tmp_dir -> do
+    checkIsProcessing tmp_dir foundJsCppProg
+
+  let jsCppProgram = foldr addFlagIfNew foundJsCppProg (reverse required_flags_to_add)
+  return JsCpp{jsCppProgram}
+  where
+    -- See: https://gcc.gnu.org/onlinedocs/gcc/Preprocessor-Options.html#index-CC
+    -- See: https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-CC
+    -- Emscripten supports -C and -CC options same as GCC and CLang
+    -- Always try to add the JavaScript-specific CPP flags, regardless of the user options
+    -- Always add the -E flag, regardless of the user options
+    -- We have to use -nostdinc to prevent adding copyright headers in gcc output.
+    -- This issue is known and discussed here: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=59566
+    required_flags_to_add =
+      [ "-E"
+      , "-CC"
+      , "-Wno-unicode"
+      , "-nostdinc"
+      ]
+
+    flags_for_test = required_flags_to_add ++
+      [ "-P"
+      , "-x", "assembler-with-cpp"
+      ]
+
+    file_source = "conftest.js"
+    file_output = "conftest.pp.js"
+
+    trim = dropWhileEnd isSpace . dropWhile isSpace
+
+    checkIsProcessing tmp_dir prog = do
+      let
+        file_source_in_dir = tmp_dir </> file_source
+        file_output_in_dir = tmp_dir </> file_output
+
+      writeFile file_source_in_dir "#define DEF_TEST\n#ifdef DEF_TEST\n// 1\n#endif\n"
+
+      callProgram
+        (prog{ prgFlags = [] })
+        (flags_for_test ++ ["-o", file_output_in_dir, file_source_in_dir])
+
+      expectFileExists file_output_in_dir ("JavaScript C Preprocessor didn't create the output file: " ++ file_output_in_dir)
+
+      file_output_in_dir_content <- readFile file_output_in_dir
+      unless (trim file_output_in_dir_content == "// 1")
+        $ throwE "JavaScript C Preprocessor didn't provide correct output"
 
 ----- C preprocessor -----
 

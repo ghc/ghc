@@ -31,6 +31,13 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the C pre-processor (with :ghc-flag:`-cpp` only).
 
+.. ghc-flag:: -pgmJSP ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the JavaScript C pre-processor (only for javascript-backend)
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the JavaScript C pre-processor (only for javascript-backend).
+
 .. ghc-flag:: -pgmc ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the C compiler
     :type: dynamic
@@ -164,6 +171,13 @@ the following flags:
     :category: phase-options
 
     Pass ⟨option⟩ to CPP (makes sense only if :ghc-flag:`-cpp` is also on).
+
+.. ghc-flag:: -optJSP ⟨option⟩
+    :shortdesc: pass ⟨option⟩ to JavaScript C pre-processor (only for javascript-backend)
+    :type: dynamic
+    :category: phase-options
+
+    Pass ⟨option⟩ to JavaScript C pre-processor (only for javascript-backend).
 
 .. ghc-flag:: -optF ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the custom pre-processor

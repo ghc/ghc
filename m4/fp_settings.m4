@@ -62,6 +62,8 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCPPFlags="$CONF_CPP_OPTS_STAGE2"
     SettingsHaskellCPPCommand="$HaskellCPPCmd"
     SettingsHaskellCPPFlags="$HaskellCPPArgs"
+    SettingsJavaScriptCPPCommand="$JavaScriptCPPCmd"
+    SettingsJavaScriptCPPFlags="$JavaScriptCPPArgs"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
@@ -79,6 +81,7 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         SettingsCCompilerCommand="$(basename $SettingsCCompilerCommand)"
         SettingsHaskellCPPCommand="$(basename $SettingsHaskellCPPCommand)"
+        SettingsJavaScriptCPPCommand="$(basename $SettingsJavaScriptCPPCommand)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
         SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
         SettingsArCommand="$(basename $SettingsArCommand)"
@@ -98,6 +101,8 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsCPPFlags])
         SUBST_TOOLDIR([SettingsHaskellCPPCommand])
         SUBST_TOOLDIR([SettingsHaskellCPPFlags])
+        SUBST_TOOLDIR([SettingsJavaScriptCPPCommand])
+        SUBST_TOOLDIR([SettingsJavaScriptCPPFlags])
         SUBST_TOOLDIR([SettingsMergeObjectsCommand])
         SUBST_TOOLDIR([SettingsMergeObjectsFlags])
         SUBST_TOOLDIR([SettingsArCommand])
@@ -140,6 +145,8 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCPPFlags)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
+    AC_SUBST(SettingsJavaScriptCPPCommand)
+    AC_SUBST(SettingsJavaScriptCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCxxCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)

@@ -20,6 +20,7 @@ import Development.Shake.Classes
 import Development.Shake.Command
 import Development.Shake.FilePath
 import GHC.Generics
+import GHC.Platform.ArchOS (ArchOS(..), Arch(..))
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
 import Hadrian.Builder.Ar
@@ -175,6 +176,7 @@ data Builder = Alex
              | Hp2Ps
              | Hpc
              | HsCpp
+             | JsCpp
              | Hsc2Hs Stage
              | Ld Stage --- ^ linker
              | Make FilePath
@@ -410,6 +412,7 @@ isOptional target = \case
     Alex     -> True
     -- Most ar implemententions no longer need ranlib, but some still do
     Ranlib   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
+    JsCpp    -> not $ (archOS_arch . tgtArchOs) target == ArchJavaScript -- ArchWasm32 too?
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
@@ -425,6 +428,7 @@ systemBuilderPath builder = case builder of
     GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
     HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
+    JsCpp           -> fromTargetTC "js-cpp" (maybeProg Toolchain.jsCppProgram . tgtJsCPreprocessor)
     Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
     -- MergeObjects Stage0 is a special case in case of
     -- cross-compiling. We're building stage1, e.g. code which will be

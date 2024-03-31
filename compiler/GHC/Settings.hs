@@ -26,6 +26,7 @@ module GHC.Settings
   , sArSupportsDashL
   , sPgm_L
   , sPgm_P
+  , sPgm_JSP
   , sPgm_F
   , sPgm_c
   , sPgm_cxx
@@ -45,6 +46,8 @@ module GHC.Settings
   , sOpt_L
   , sOpt_P
   , sOpt_P_fingerprint
+  , sOpt_JSP
+  , sOpt_JSP_fingerprint
   , sOpt_F
   , sOpt_c
   , sOpt_cxx
@@ -97,6 +100,8 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_L       :: String
   , -- | The Haskell C preprocessor and default options (not added by -optP)
     toolSettings_pgm_P       :: (String, [Option])
+  , -- | The JavaScript C preprocessor and default options (not added by -optP)
+    toolSettings_pgm_JSP       :: (String, [Option])
   , toolSettings_pgm_F       :: String
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_cxx     :: String
@@ -124,9 +129,13 @@ data ToolSettings = ToolSettings
   -- options for particular phases
   , toolSettings_opt_L             :: [String]
   , toolSettings_opt_P             :: [String]
+  , toolSettings_opt_JSP           :: [String]
   , -- | cached Fingerprint of sOpt_P
     -- See Note [Repeated -optP hashing]
-    toolSettings_opt_P_fingerprint :: Fingerprint
+    toolSettings_opt_P_fingerprint   :: Fingerprint
+  , -- | cached Fingerprint of sOpt_JSP
+    -- See Note [Repeated -optP hashing]
+    toolSettings_opt_JSP_fingerprint :: Fingerprint
   , toolSettings_opt_F             :: [String]
   , toolSettings_opt_c             :: [String]
   , toolSettings_opt_cxx           :: [String]
@@ -205,6 +214,8 @@ sPgm_L :: Settings -> String
 sPgm_L = toolSettings_pgm_L . sToolSettings
 sPgm_P :: Settings -> (String, [Option])
 sPgm_P = toolSettings_pgm_P . sToolSettings
+sPgm_JSP :: Settings -> (String, [Option])
+sPgm_JSP = toolSettings_pgm_JSP . sToolSettings
 sPgm_F :: Settings -> String
 sPgm_F = toolSettings_pgm_F . sToolSettings
 sPgm_c :: Settings -> String
@@ -243,6 +254,10 @@ sOpt_P :: Settings -> [String]
 sOpt_P = toolSettings_opt_P . sToolSettings
 sOpt_P_fingerprint :: Settings -> Fingerprint
 sOpt_P_fingerprint = toolSettings_opt_P_fingerprint . sToolSettings
+sOpt_JSP :: Settings -> [String]
+sOpt_JSP = toolSettings_opt_JSP . sToolSettings
+sOpt_JSP_fingerprint :: Settings -> Fingerprint
+sOpt_JSP_fingerprint = toolSettings_opt_JSP_fingerprint . sToolSettings
 sOpt_F :: Settings -> [String]
 sOpt_F = toolSettings_opt_F . sToolSettings
 sOpt_c :: Settings -> [String]

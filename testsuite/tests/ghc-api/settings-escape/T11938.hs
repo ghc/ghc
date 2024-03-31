@@ -44,6 +44,7 @@ main = do
       -- already adds the options of "C compiler flags" to this config field.
       multipleArguments = Set.fromList
         [ "Haskell CPP flags"
+        , "JavaScript CPP flags"
         , "C compiler flags"
         , "C++ compiler flags"
         , "CPP flags"
@@ -113,6 +114,9 @@ main = do
       -- Setting 'Haskell CPP flags' contains '$topdir' reference.
       -- Resolving those while containing spaces, should not introduce more options.
       recordSetting "Haskell CPP flags" (map showOpt . snd . toolSettings_pgm_P . sToolSettings)
+      -- Setting 'JavaScript CPP flags' contains '$topdir' reference.
+      -- Resolving those while containing spaces, should not introduce more options.
+      recordSetting "JavaScript CPP flags" (map showOpt . snd . toolSettings_pgm_JSP . sToolSettings)
       -- Setting 'C compiler flags' contains strings with spaces.
       -- GHC should not split these by word.
       recordSetting "C compiler flags" (toolSettings_opt_c . sToolSettings)

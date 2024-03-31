@@ -121,8 +121,8 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         (hsc_dflags hsc_env)
         (hsc_unit_env hsc_env)
         (CppOpts
-          { useHsCpp       = False
-          , cppLinePragmas = True
+          { sourceCodePreprocessor  = SCPCpp
+          , cppLinePragmas          = True
           })
         input_fn output_fn
   return output_fn
@@ -652,8 +652,8 @@ runCppPhase hsc_env input_fn output_fn = do
            (hsc_dflags hsc_env)
            (hsc_unit_env hsc_env)
            (CppOpts
-              { useHsCpp       = True
-              , cppLinePragmas = True
+              { sourceCodePreprocessor  = SCPHsCpp
+              , cppLinePragmas          = True
               })
            input_fn output_fn
   return output_fn
