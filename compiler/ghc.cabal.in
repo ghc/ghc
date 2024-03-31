@@ -50,7 +50,7 @@ extra-source-files:
 
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.10, directory, process, filepath, containers
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.14, directory, process, filepath, containers
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
