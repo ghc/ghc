@@ -63,7 +63,22 @@ underlying program (the C compiler), the set of flags passed determines the
 behaviour of the preprocessor, and Cpp and HsCpp behave differently.
 Specifically, we rely on "traditional" (pre-standard) preprocessing semantics
 (which most compilers expose via the `-traditional` flag) when preprocessing
-Haskell source. This avoids, e.g., the preprocessor removing C-style comments.
+Haskell source. This avoids the following situations:
+
+  * Removal of C-style comments, which are not comments in Haskell but valid
+    operators;
+
+  * Errors due to an ANSI C preprocessor lexing the source and failing on
+    names with single quotes (TH quotes, ticked promoted constructors,
+    names with primes in them).
+
+  Both of those cases may be subtle: gcc and clang permit C++-style //
+  comments in C code, and Data.Array and Data.Vector both export a //
+  operator whose type is such that a removed "comment" may leave code that
+  typechecks but does the wrong thing. Another example is that, since ANSI
+  C permits long character constants, an expression involving multiple
+  functions with primes in their names may not expand macros properly when
+  they occur between the primed functions.
 -}
 
 -- | Run either the Haskell preprocessor or the C preprocessor, as per the
