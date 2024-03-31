@@ -1168,8 +1168,9 @@ embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
       js_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
       let
         cpp_opts = CppOpts
-          { useHsCpp       = False
-          , cppLinePragmas = False -- LINE pragmas aren't JS compatible
+          { sourceCodePreprocessor  = SCPJsCpp
+          -- JS code requires keeping JSDoc comments for third party minification tooling
+          , cppLinePragmas          = False -- LINE pragmas aren't JS compatible
           }
       doCpp logger
               tmpfs

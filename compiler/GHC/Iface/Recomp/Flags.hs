@@ -50,11 +50,18 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- see Note [Implicit include paths]
         includePathsMinusImplicit = includePaths { includePathsQuoteImplicit = [] }
 
-        -- -I, -D and -U flags affect CPP
+        -- -I, -D and -U flags affect Haskell C/CPP Preprocessor
         cpp = ( map normalise $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
               , picPOpts dflags
               , opt_P_signature dflags)
+            -- See Note [Repeated -optP hashing]
+
+        -- -I, -D and -U flags affect JavaScript C/CPP Preprocessor
+        js = ( map normalise $ flattenIncludes includePathsMinusImplicit
+            -- normalise: eliminate spurious differences due to "./foo" vs "foo"
+              , picPOpts dflags
+              , opt_JSP_signature dflags)
             -- See Note [Repeated -optP hashing]
 
         -- Note [path flags and recompilation]
@@ -70,7 +77,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- Other flags which affect code generation
         codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
 
-        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
+        flags = ((mainis, safeHs, lang, cpp, js), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags

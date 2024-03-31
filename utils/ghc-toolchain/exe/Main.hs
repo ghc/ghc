@@ -43,6 +43,7 @@ data Opts = Opts
     , optCxx       :: ProgOpt
     , optCpp       :: ProgOpt
     , optHsCpp     :: ProgOpt
+    , optJsCpp     :: ProgOpt
     , optCcLink    :: ProgOpt
     , optAr        :: ProgOpt
     , optRanlib    :: ProgOpt
@@ -88,6 +89,7 @@ emptyOpts = Opts
     , optCxx       = po0
     , optCpp       = po0
     , optHsCpp     = po0
+    , optJsCpp     = po0
     , optCcLink    = po0
     , optAr        = po0
     , optRanlib    = po0
@@ -106,13 +108,14 @@ emptyOpts = Opts
   where
     po0 = emptyProgOpt
 
-_optCc, _optCxx, _optCpp, _optHsCpp, _optCcLink, _optAr, _optRanlib, _optNm,
-    _optReadelf, _optMergeObjs, _optWindres, _optLd
+_optCc, _optCxx, _optCpp, _optHsCpp, _optJsCpp, _optCcLink, _optAr, _optRanlib,
+    _optNm, _optReadelf, _optMergeObjs, _optWindres, _optLd
     :: Lens Opts ProgOpt
 _optCc      = Lens optCc      (\x o -> o {optCc=x})
 _optCxx     = Lens optCxx     (\x o -> o {optCxx=x})
 _optCpp     = Lens optCpp     (\x o -> o {optCpp=x})
 _optHsCpp   = Lens optHsCpp   (\x o -> o {optHsCpp=x})
+_optJsCpp   = Lens optJsCpp   (\x o -> o {optJsCpp=x})
 _optCcLink  = Lens optCcLink  (\x o -> o {optCcLink=x})
 _optAr      = Lens optAr      (\x o -> o {optAr=x})
 _optRanlib  = Lens optRanlib  (\x o -> o {optRanlib=x})
@@ -167,6 +170,7 @@ options =
     [ progOpts "cc" "C compiler" _optCc
     , progOpts "cpp" "C preprocessor" _optCpp
     , progOpts "hs-cpp" "Haskell C preprocessor" _optHsCpp
+    , progOpts "js-cpp" "JavaScript C preprocessor" _optJsCpp
     , progOpts "cxx" "C++ compiler" _optCxx
     , progOpts "cc-link" "C compiler for linking" _optCcLink
     , progOpts "ar" "ar archiver" _optAr
@@ -389,6 +393,9 @@ mkTarget opts = do
     cxx <- findCxx archOs tgtLlvmTarget (optCxx opts)
     cpp <- findCpp (optCpp opts) cc0
     hsCpp <- findHsCpp (optHsCpp opts) cc0
+    -- TODO: same case as ranlib below
+    -- TODO: we need it really only for javascript target (maybe wasm target as well)
+    jsCpp <- Just <$> findJsCpp (optJsCpp opts) cc0
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
     ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
@@ -444,6 +451,7 @@ mkTarget opts = do
                    , tgtCxxCompiler = cxx
                    , tgtCPreprocessor = cpp
                    , tgtHsCPreprocessor = hsCpp
+                   , tgtJsCPreprocessor = jsCpp
                    , tgtAr = ar
                    , tgtCCompilerLink = ccLink
                    , tgtRanlib = ranlib

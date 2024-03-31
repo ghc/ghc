@@ -419,6 +419,11 @@ FP_HSCPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
 
+# --with-js-cpp/--with-js-cpp-flags
+FP_JSCPP_CMD_WITH_ARGS(JavaScriptCPPCmd, JavaScriptCPPArgs)
+AC_SUBST([JavaScriptCPPCmd])
+AC_SUBST([JavaScriptCPPArgs])
+
 FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
 FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
@@ -1005,6 +1010,8 @@ echo "\
    cpp-flags    : $CONF_CPP_OPTS_STAGE2
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
+   js-cpp       : $JavaScriptCPPCmd
+   js-cpp-flags : $JavaScriptCPPArgs
    ar           : $ArCmd
    nm           : $NmCmd
    objdump      : $ObjdumpCmd

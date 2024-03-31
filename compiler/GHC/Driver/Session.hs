@@ -112,6 +112,8 @@ module GHC.Driver.Session (
         sOpt_L,
         sOpt_P,
         sOpt_P_fingerprint,
+        sOpt_JSP,
+        sOpt_JSP_fingerprint,
         sOpt_F,
         sOpt_c,
         sOpt_cxx,
@@ -134,11 +136,11 @@ module GHC.Driver.Session (
         ghcUsagePath, ghciUsagePath, topDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
-        pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
-        pgm_windres, pgm_ar,
+        pgm_L, pgm_P, pgm_JSP, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l,
+        pgm_lm, pgm_windres, pgm_ar,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_las, pgm_i,
-        opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
-        opt_P_signature,
+        opt_L, opt_P, opt_JSP, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
+        opt_P_signature, opt_JSP_signature,
         opt_windres, opt_lo, opt_lc, opt_las,
         updatePlatformConstants,
 
@@ -390,6 +392,8 @@ pgm_L                 :: DynFlags -> String
 pgm_L dflags = toolSettings_pgm_L $ toolSettings dflags
 pgm_P                 :: DynFlags -> (String,[Option])
 pgm_P dflags = toolSettings_pgm_P $ toolSettings dflags
+pgm_JSP               :: DynFlags -> (String,[Option])
+pgm_JSP dflags = toolSettings_pgm_JSP $ toolSettings dflags
 pgm_F                 :: DynFlags -> String
 pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
 pgm_c                 :: DynFlags -> String
@@ -423,6 +427,9 @@ opt_L dflags = toolSettings_opt_L $ toolSettings dflags
 opt_P                 :: DynFlags -> [String]
 opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
             ++ toolSettings_opt_P (toolSettings dflags)
+opt_JSP               :: DynFlags -> [String]
+opt_JSP dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+            ++ toolSettings_opt_JSP (toolSettings dflags)
 
 -- This function packages everything that's needed to fingerprint opt_P
 -- flags. See Note [Repeated -optP hashing].
@@ -430,6 +437,13 @@ opt_P_signature       :: DynFlags -> ([String], Fingerprint)
 opt_P_signature dflags =
   ( concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
   , toolSettings_opt_P_fingerprint $ toolSettings dflags
+  )
+-- This function packages everything that's needed to fingerprint opt_P
+-- flags. See Note [Repeated -optP hashing].
+opt_JSP_signature     :: DynFlags -> ([String], Fingerprint)
+opt_JSP_signature dflags =
+  ( concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+  , toolSettings_opt_JSP_fingerprint $ toolSettings dflags
   )
 
 opt_F                 :: DynFlags -> [String]
@@ -579,7 +593,7 @@ setObjectDir, setHiDir, setHieDir, setStubDir, setDumpDir, setOutputDir,
          setDynObjectSuf, setDynHiSuf,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHieSuf, setHcSuf, parseDynLibLoaderMode,
-         setPgmP, addOptl, addOptc, addOptcxx, addOptP,
+         setPgmP, setPgmJSP, addOptl, addOptc, addOptcxx, addOptP, addOptJSP,
          addCmdlineFramework, addHaddockOpts, addGhciScript,
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
@@ -669,6 +683,10 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 -- Config.hs should really use Option.
 setPgmP   f = alterToolSettings (\s -> s { toolSettings_pgm_P   = (pgm, map Option args)})
   where (pgm:args) = words f
+-- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
+-- Config.hs should really use Option.
+setPgmJSP   f = alterToolSettings (\s -> s { toolSettings_pgm_JSP   = (pgm, map Option args)})
+  where (pgm:args) = words f
 addOptl   f = alterToolSettings (\s -> s { toolSettings_opt_l   = f : toolSettings_opt_l s})
 addOptc   f = alterToolSettings (\s -> s { toolSettings_opt_c   = f : toolSettings_opt_c s})
 addOptcxx f = alterToolSettings (\s -> s { toolSettings_opt_cxx = f : toolSettings_opt_cxx s})
@@ -677,9 +695,11 @@ addOptP   f = alterToolSettings $ \s -> s
           , toolSettings_opt_P_fingerprint = fingerprintStrings (f : toolSettings_opt_P s)
           }
           -- See Note [Repeated -optP hashing]
-  where
-  fingerprintStrings ss = fingerprintFingerprints $ map fingerprintString ss
-
+addOptJSP f = alterToolSettings $ \s -> s
+          { toolSettings_opt_JSP   = f : toolSettings_opt_JSP s
+          , toolSettings_opt_JSP_fingerprint = fingerprintStrings (f : toolSettings_opt_JSP s)
+          }
+          -- See Note [Repeated -optP hashing]
 
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
 setDepMakefile f d = d { depMakefile = f }
@@ -1070,6 +1090,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_L   = f }
   , make_ord_flag defFlag "pgmP"
       (hasArg setPgmP)
+  , make_ord_flag defFlag "pgmJSP"
+      (hasArg setPgmJSP)
   , make_ord_flag defFlag "pgmF"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
@@ -1124,6 +1146,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_L   = f : toolSettings_opt_L s }
   , make_ord_flag defFlag "optP"
       (hasArg addOptP)
+  , make_ord_flag defFlag "optJSP"
+      (hasArg addOptJSP)
   , make_ord_flag defFlag "optF"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_F   = f : toolSettings_opt_F s }
   , make_ord_flag defFlag "optc"

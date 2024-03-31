@@ -382,6 +382,8 @@ generateSettings = do
         , ("CPP flags",           queryTarget cppFlags)
         , ("Haskell CPP command", queryTarget hsCppPath)
         , ("Haskell CPP flags",   queryTarget hsCppFlags)
+        , ("JavaScript CPP command", queryTarget jsCppPath)
+        , ("JavaScript CPP flags", queryTarget jsCppFlags)
         , ("ld supports compact unwind", queryTarget linkSupportsCompactUnwind)
         , ("ld supports filelist",       queryTarget linkSupportsFilelist)
         , ("ld supports single module",       queryTarget linkSupportsSingleModule)
@@ -441,6 +443,8 @@ generateSettings = do
     cppFlags = escapeArgs . prgFlags . cppProgram . tgtCPreprocessor
     hsCppPath  = prgPath . hsCppProgram . tgtHsCPreprocessor
     hsCppFlags = escapeArgs . prgFlags . hsCppProgram . tgtHsCPreprocessor
+    jsCppPath  = maybe "" (prgPath . jsCppProgram) . tgtJsCPreprocessor
+    jsCppFlags = maybe "" (escapeArgs . prgFlags . jsCppProgram) . tgtJsCPreprocessor
     mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) . tgtMergeObjs
     mergeObjsFlags = maybe "" (escapeArgs . prgFlags . mergeObjsProgram) . tgtMergeObjs
     linkSupportsSingleModule    = yesNo . ccLinkSupportsSingleModule . tgtCCompilerLink

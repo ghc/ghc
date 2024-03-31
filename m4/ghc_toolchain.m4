@@ -98,6 +98,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     echo "--cxx=$CXX" >> acargs
     echo "--cpp=$CPPCmd" >> acargs
     echo "--hs-cpp=$HaskellCPPCmd" >> acargs
+    echo "--js-cpp=$JavaScriptCPPCmd" >> acargs
     echo "--cc-link=$CC" >> acargs
     echo "--ar=$AR" >> acargs
     echo "--ranlib=$RANLIB" >> acargs
@@ -123,6 +124,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     ADD_GHC_TOOLCHAIN_ARG_CHOOSE([cxx-opt], [$USER_CONF_CXX_OPTS_STAGE2], [$USER_CXXFLAGS])
     ADD_GHC_TOOLCHAIN_ARG([cpp-opt], [$USER_CPP_ARGS])
     ADD_GHC_TOOLCHAIN_ARG([hs-cpp-opt], [$USER_HS_CPP_ARGS])
+    ADD_GHC_TOOLCHAIN_ARG([js-cpp-opt], [$USER_JS_CPP_ARGS])
 
     INVOKE_GHC_TOOLCHAIN()
 

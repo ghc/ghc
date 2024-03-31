@@ -16,6 +16,7 @@ Target
 , tgtCxxCompiler = Cxx {cxxProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @CONF_CXX_OPTS_STAGE0List@}}
 , tgtCPreprocessor = Cpp {cppProgram = Program {prgPath = "@CPPCmd_STAGE0@", prgFlags = @CONF_CPP_OPTS_STAGE0List@}}
 , tgtHsCPreprocessor = HsCpp {hsCppProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @HaskellCPPArgsList@}}
+, tgtJsCPreprocessor = Nothing
 , tgtCCompilerLink = CcLink
 { ccLinkProgram = Program {prgPath = "@CC_STAGE0@", prgFlags = @CONF_GCC_LINKER_OPTS_STAGE0List@}
 , ccLinkSupportsNoPie = False

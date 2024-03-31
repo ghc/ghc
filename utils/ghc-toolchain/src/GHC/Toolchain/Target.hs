@@ -61,6 +61,8 @@ data Target = Target
     , tgtCxxCompiler :: Cxx
     , tgtCPreprocessor :: Cpp
     , tgtHsCPreprocessor :: HsCpp
+    , tgtJsCPreprocessor :: Maybe JsCpp
+    -- ^ We set it only in javascript target
     , tgtCCompilerLink :: CcLink
     , tgtAr :: Ar
     , tgtRanlib :: Maybe Ranlib
@@ -111,6 +113,7 @@ instance Show Target where
     , ", tgtCxxCompiler = " ++ show tgtCxxCompiler
     , ", tgtCPreprocessor = " ++ show tgtCPreprocessor
     , ", tgtHsCPreprocessor = " ++ show tgtHsCPreprocessor
+    , ", tgtJsCPreprocessor = " ++ show tgtJsCPreprocessor
     , ", tgtCCompilerLink = " ++ show tgtCCompilerLink
     , ", tgtAr = " ++ show tgtAr
     , ", tgtRanlib = " ++ show tgtRanlib

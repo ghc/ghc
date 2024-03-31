@@ -107,31 +107,55 @@ cc_filter = unlines . doFilter . lines where
    | "warning: call-clobbered register used" `isContainedIn` w = False
    | otherwise = True
 
--- | Run the C preprocessor, which is different from running the
--- Haskell C preprocessor (they're configured separately!).
--- See also Note [Preprocessing invocations] in GHC.SysTools.Cpp
-runCpp :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-runCpp logger tmpfs dflags args = traceSystoolCommand logger "cpp" $ do
-  let (p,args0) = pgm_cpp dflags
-      userOpts_c = map Option $ getOpts dflags opt_c
-      args2 = args0 ++ args ++ userOpts_c
-  mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter "C pre-processor" p
-                           args2 mb_env
+-- | See the Note [Preprocessing invocations]
+data SourceCodePreprocessor
+  = SCPCpp
+    -- ^ Use the ordinary C preprocessor
+  | SCPHsCpp
+    -- ^ Use the Haskell C preprocessor (don't remove C comments, don't break on names including single quotes)
+  | SCPJsCpp
+    -- ^ Use the JavaScript preprocessor (don't remove jsdoc and multiline comments)
+  deriving (Eq)
 
--- | Run the Haskell C preprocessor.
+-- | Run source code preprocessor.
 -- See also Note [Preprocessing invocations] in GHC.SysTools.Cpp
-runHsCpp :: Logger -> DynFlags -> [Option] -> IO ()
-runHsCpp logger dflags args = traceSystoolCommand logger "hs-cpp" $ do
-  let (p,args0) = pgm_P dflags
-      opts = getOpts dflags opt_P
-      modified_imports = augmentImports dflags opts
-      args1 = map Option modified_imports
+runSourceCodePreprocessor
+  :: Logger
+  -> TmpFs
+  -> DynFlags
+  -> SourceCodePreprocessor
+  -> [Option]
+  -> IO ()
+runSourceCodePreprocessor logger tmpfs dflags preprocessor args =
+  traceSystoolCommand logger logger_name $ do
+    let
+      (p, args0) = pgm_getter dflags
+      args1 = Option <$> (augmentImports dflags $ getOpts dflags opt_getter)
       args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
                 ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
-  mb_env <- getGccEnv args2 -- romes: what about args0 and args?
-  runSomethingFiltered logger id "Haskell C pre-processor" p
-                       (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
+      all_args = args0 ++ args1 ++ args2 ++ args
+
+    mb_env <- getGccEnv (args0 ++ args1)
+
+    runSomething readable_name p all_args mb_env
+
+  where
+    (logger_name, pgm_getter, opt_getter, readable_name)
+      = case preprocessor of
+        SCPCpp -> ("cpp", pgm_cpp, opt_c, "C pre-processor")
+        SCPHsCpp -> ("hs-cpp", pgm_P, opt_P, "Haskell C pre-processor")
+        SCPJsCpp -> ("js-cpp", pgm_JSP, opt_JSP, "JavaScript C pre-processor")
+
+    runSomethingResponseFileCpp
+      = runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter
+    runSomethingFilteredOther phase_name pgm args mb_env
+      = runSomethingFiltered logger id phase_name pgm args Nothing mb_env
+
+    runSomething
+      = case preprocessor of
+        SCPCpp -> runSomethingResponseFileCpp
+        SCPHsCpp -> runSomethingFilteredOther
+        SCPJsCpp -> runSomethingFilteredOther
 
 runPp :: Logger -> DynFlags -> [Option] -> IO ()
 runPp logger dflags args = traceSystoolCommand logger "pp" $ do
