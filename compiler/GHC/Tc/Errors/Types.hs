@@ -4287,6 +4287,23 @@ data TcRnMessage where
     -> Name -- ^ Type variable's name
     -> TcRnMessage
 
+  {- TcRnMisplacedInvisPat is an error raised when invisible @-pattern
+     appears in invalid context (e.g. pattern in case of or in do-notation)
+     or nested inside the pattern. Template Haskell seems to be the only
+     source for this diagnostic.
+
+     Examples:
+
+        f (smth, $(invisP (varT (newName "blah")))) = ...
+
+        g = do
+          $(invisP (varT (newName "blah"))) <- aciton1
+          ...
+
+     Test cases:
+
+  -}
+  TcRnMisplacedInvisPat :: HsTyPat GhcPs -> TcRnMessage
   deriving Generic
 
 ----

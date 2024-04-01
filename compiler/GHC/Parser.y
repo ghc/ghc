@@ -3391,19 +3391,19 @@ pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
 -- list so that it can be used with a parameterized production rule
 --
 -- It is used only for parsing patterns in `\case` and `case of`
-pats1   :: { [LArgPat GhcPs] }
-pats1   : pat { [ mkVisPat $1 ] }
+pats1   :: { [LPat GhcPs] }
+pats1   : pat { [ $1 ] }
 
 bindpat :: { LPat GhcPs }
 bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parser.PostProcess
                              checkPattern_details incompleteDoBlock
                                               (unECP $1) }
 
-argpat   :: { LArgPat GhcPs }
-argpat    : apat                  { mkVisPat $1 }
+argpat   :: { LPat GhcPs }
+argpat    : apat                  { $1 }
           | PREFIX_AT atype       { L (getLocAnn (reLoc $2)) (InvisPat (epTok $1) (mkHsTyPat noAnn $2)) }
 
-argpats :: { [LArgPat GhcPs] }
+argpats :: { [LPat GhcPs] }
           : argpat argpats            { $1 : $2 }
           | {- empty -}               { [] }
 

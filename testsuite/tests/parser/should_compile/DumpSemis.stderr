@@ -1673,26 +1673,17 @@
                [])
               (EpaComments
                []))
-             (VisPat
+             (VarPat
               (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { DumpSemis.hs:32:3 })
-                (AnnListItem
+                (NameAnnTrailing
                  [])
                 (EpaComments
                  []))
-               (VarPat
-                (NoExtField)
-                (L
-                 (EpAnn
-                  (EpaSpan { DumpSemis.hs:32:3 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 (Unqual
-                  {OccName: x}))))))]
+               (Unqual
+                {OccName: x}))))]
            (GRHSs
             (EpaComments
              [])
@@ -2112,26 +2103,17 @@
                [])
               (EpaComments
                []))
-             (VisPat
+             (VarPat
               (NoExtField)
               (L
                (EpAnn
                 (EpaSpan { DumpSemis.hs:36:5 })
-                (AnnListItem
+                (NameAnnTrailing
                  [])
                 (EpaComments
                  []))
-               (VarPat
-                (NoExtField)
-                (L
-                 (EpAnn
-                  (EpaSpan { DumpSemis.hs:36:5 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 (Unqual
-                  {OccName: x}))))))]
+               (Unqual
+                {OccName: x}))))]
            (GRHSs
             (EpaComments
              [])
@@ -2216,32 +2198,23 @@
                           [])
                          (EpaComments
                           []))
-                        (VisPat
-                         (NoExtField)
+                        (NPat
+                         []
                          (L
                           (EpAnn
                            (EpaSpan { DumpSemis.hs:39:6 })
-                           (AnnListItem
-                            [])
+                           (NoEpAnns)
                            (EpaComments
                             []))
-                          (NPat
-                           []
-                           (L
-                            (EpAnn
-                             (EpaSpan { DumpSemis.hs:39:6 })
-                             (NoEpAnns)
-                             (EpaComments
-                              []))
-                            (OverLit
-                             (NoExtField)
-                             (HsIntegral
-                              (IL
-                               (SourceText 0)
-                               (False)
-                               (0)))))
-                           (Nothing)
-                           (NoExtField)))))]
+                          (OverLit
+                           (NoExtField)
+                           (HsIntegral
+                            (IL
+                             (SourceText 0)
+                             (False)
+                             (0)))))
+                         (Nothing)
+                         (NoExtField)))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -2292,32 +2265,23 @@
                           [])
                          (EpaComments
                           []))
-                        (VisPat
-                         (NoExtField)
+                        (NPat
+                         []
                          (L
                           (EpAnn
                            (EpaSpan { DumpSemis.hs:40:6 })
-                           (AnnListItem
-                            [])
+                           (NoEpAnns)
                            (EpaComments
                             []))
-                          (NPat
-                           []
-                           (L
-                            (EpAnn
-                             (EpaSpan { DumpSemis.hs:40:6 })
-                             (NoEpAnns)
-                             (EpaComments
-                              []))
-                            (OverLit
-                             (NoExtField)
-                             (HsIntegral
-                              (IL
-                               (SourceText 1)
-                               (False)
-                               (1)))))
-                           (Nothing)
-                           (NoExtField)))))]
+                          (OverLit
+                           (NoExtField)
+                           (HsIntegral
+                            (IL
+                             (SourceText 1)
+                             (False)
+                             (1)))))
+                         (Nothing)
+                         (NoExtField)))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -2370,32 +2334,23 @@
                           [])
                          (EpaComments
                           []))
-                        (VisPat
-                         (NoExtField)
+                        (NPat
+                         []
                          (L
                           (EpAnn
                            (EpaSpan { DumpSemis.hs:41:6 })
-                           (AnnListItem
-                            [])
+                           (NoEpAnns)
                            (EpaComments
                             []))
-                          (NPat
-                           []
-                           (L
-                            (EpAnn
-                             (EpaSpan { DumpSemis.hs:41:6 })
-                             (NoEpAnns)
-                             (EpaComments
-                              []))
-                            (OverLit
-                             (NoExtField)
-                             (HsIntegral
-                              (IL
-                               (SourceText 2)
-                               (False)
-                               (2)))))
-                           (Nothing)
-                           (NoExtField)))))]
+                          (OverLit
+                           (NoExtField)
+                           (HsIntegral
+                            (IL
+                             (SourceText 2)
+                             (False)
+                             (2)))))
+                         (Nothing)
+                         (NoExtField)))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -2450,32 +2405,23 @@
                           [])
                          (EpaComments
                           []))
-                        (VisPat
-                         (NoExtField)
+                        (NPat
+                         []
                          (L
                           (EpAnn
                            (EpaSpan { DumpSemis.hs:42:6 })
-                           (AnnListItem
-                            [])
+                           (NoEpAnns)
                            (EpaComments
                             []))
-                          (NPat
-                           []
-                           (L
-                            (EpAnn
-                             (EpaSpan { DumpSemis.hs:42:6 })
-                             (NoEpAnns)
-                             (EpaComments
-                              []))
-                            (OverLit
-                             (NoExtField)
-                             (HsIntegral
-                              (IL
-                               (SourceText 3)
-                               (False)
-                               (3)))))
-                           (Nothing)
-                           (NoExtField)))))]
+                          (OverLit
+                           (NoExtField)
+                           (HsIntegral
+                            (IL
+                             (SourceText 3)
+                             (False)
+                             (3)))))
+                         (Nothing)
+                         (NoExtField)))]
                       (GRHSs
                        (EpaComments
                         [])

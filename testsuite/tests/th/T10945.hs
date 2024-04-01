@@ -10,5 +10,5 @@ $$(return [
                  []
                  (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a"))))
  , FunD (mkName "m")
-        [Clause [VisAP $ VarP (mkName "x")] (NormalB (VarE (mkName "x"))) []]
+        [Clause [VarP (mkName "x")] (NormalB (VarE (mkName "x"))) []]
  ])

@@ -10,11 +10,7 @@
 
   * Extend `Pragma` with `SCCP`.
 
-  * Added new data type `ArgPat` with two constructors: `VisAP` and `InvisAP`.
-    The first one corresponds to the common patterns, and the second one is a type
-    abstraction `@t`. Were introduced new functions `visAP` ans `invisAP`. Was
-    introduced new type alias `ArgPatQ`. Added new function `pprArgPat`. Constructors
-    `Clause` and `LamE`, now use `ArgPat` instead of `Pat`. New functions `clauseArg` and `lamArgE` were added, both of which accept `[m ArgPat]`. (Ghc Proposal #448).
+  * Extend `Pat` with `InvisP`, introduce function `invisP`. (Ghc Proposal #448).
 
   * Add a new data type `NamespaceSpecifier` to represent `type`/`data` namespace specifiers,
     which can be used in conjunction with the `ExplicitNamespaces` extension:

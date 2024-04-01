@@ -1,0 +1,3 @@
+
+T24557b.hs:7:11: error: [GHC-11983]
+    Invisible type pattern pat is not allowed here

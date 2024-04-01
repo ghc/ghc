@@ -496,29 +496,20 @@
                     [])
                    (EpaComments
                     []))
-                  (VisPat
-                   (NoExtField)
+                  (ConPat
+                   []
                    (L
                     (EpAnn
                      (EpaSpan { Test24533.hs:14:3-5 })
-                     (AnnListItem
+                     (NameAnnTrailing
                       [])
                      (EpaComments
                       []))
-                    (ConPat
-                     []
-                     (L
-                      (EpAnn
-                       (EpaSpan { Test24533.hs:14:3-5 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: Foo}))
-                     (PrefixCon
-                      []
-                      [])))))
+                    (Unqual
+                     {OccName: Foo}))
+                   (PrefixCon
+                    []
+                    [])))
                 ,(L
                   (EpAnn
                    (EpaSpan { Test24533.hs:14:10-12 })
@@ -526,29 +517,20 @@
                     [])
                    (EpaComments
                     []))
-                  (VisPat
-                   (NoExtField)
+                  (ConPat
+                   []
                    (L
                     (EpAnn
                      (EpaSpan { Test24533.hs:14:10-12 })
-                     (AnnListItem
+                     (NameAnnTrailing
                       [])
                      (EpaComments
                       []))
-                    (ConPat
-                     []
-                     (L
-                      (EpAnn
-                       (EpaSpan { Test24533.hs:14:10-12 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: Foo}))
-                     (PrefixCon
-                      []
-                      [])))))]
+                    (Unqual
+                     {OccName: Foo}))
+                   (PrefixCon
+                    []
+                    [])))]
                 (GRHSs
                  (EpaComments
                   [])
@@ -1073,29 +1055,20 @@
                     [])
                    (EpaComments
                     []))
-                  (VisPat
-                   (NoExtField)
+                  (ConPat
+                   []
                    (L
                     (EpAnn
                      (EpaSpan { Test24533.ppr.hs:6:3-5 })
-                     (AnnListItem
+                     (NameAnnTrailing
                       [])
                      (EpaComments
                       []))
-                    (ConPat
-                     []
-                     (L
-                      (EpAnn
-                       (EpaSpan { Test24533.ppr.hs:6:3-5 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: Foo}))
-                     (PrefixCon
-                      []
-                      [])))))
+                    (Unqual
+                     {OccName: Foo}))
+                   (PrefixCon
+                    []
+                    [])))
                 ,(L
                   (EpAnn
                    (EpaSpan { Test24533.ppr.hs:6:10-12 })
@@ -1103,29 +1076,20 @@
                     [])
                    (EpaComments
                     []))
-                  (VisPat
-                   (NoExtField)
+                  (ConPat
+                   []
                    (L
                     (EpAnn
                      (EpaSpan { Test24533.ppr.hs:6:10-12 })
-                     (AnnListItem
+                     (NameAnnTrailing
                       [])
                      (EpaComments
                       []))
-                    (ConPat
-                     []
-                     (L
-                      (EpAnn
-                       (EpaSpan { Test24533.ppr.hs:6:10-12 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (Unqual
-                       {OccName: Foo}))
-                     (PrefixCon
-                      []
-                      [])))))]
+                    (Unqual
+                     {OccName: Foo}))
+                   (PrefixCon
+                    []
+                    [])))]
                 (GRHSs
                  (EpaComments
                   [])

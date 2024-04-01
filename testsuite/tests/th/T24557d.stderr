@@ -1,0 +1,3 @@
+
+T24557d.hs:12:4: error: [GHC-11983]
+    Invisible type pattern t is not allowed here

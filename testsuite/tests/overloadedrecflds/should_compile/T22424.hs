@@ -23,7 +23,7 @@ $(do
     x2 <- newName "x2"
     let expr = UInfixE (VarE fld1 `AppE` VarE x1) (VarE '(&&)) (VarE fld2 `AppE` VarE x2)
         pats = [VarP x1, VarP x2]
-        fun_decl = FunD fun [Clause (map VisAP pats) (NormalB expr) []]
+        fun_decl = FunD fun [Clause pats (NormalB expr) []]
     pure [r1,r2,fun_decl]
  )
 
@@ -37,6 +37,6 @@ $(do
     x2 <- newName "x2"
     let expr = UInfixE (VarE fld1 `AppE` VarE x1) (VarE '(&&)) (VarE fld2 `AppE` VarE x2)
         pats = [VarP x1, VarP x2]
-        fun_decl = FunD fun [Clause (map VisAP pats) (NormalB expr) []]
+        fun_decl = FunD fun [Clause pats (NormalB expr) []]
     pure [r1,r2,fun_decl]
  )

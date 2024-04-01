@@ -6,5 +6,5 @@ import Language.Haskell.TH
 
 thb = $(do { let x = mkName "x"
                  p = VarP x
-                 v = return (LamE [VisAP p] $ VarE x)
+                 v = return (LamE [p] $ VarE x)
            ; [| $v . id |] })

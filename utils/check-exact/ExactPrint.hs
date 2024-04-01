@@ -4723,19 +4723,6 @@ instance ExactPrint (Pat GhcPs) where
     tp' <- markAnnotated tp
     return (EmbTyPat toktype' tp')
 
--- ---------------------------------------------------------------------
-
-instance ExactPrint (ArgPat GhcPs) where
-  getAnnotationEntry (VisPat _ pat) = getAnnotationEntry pat
-  getAnnotationEntry InvisPat{}     = NoEntryVal
-
-  setAnnotationAnchor (VisPat x pat) anc ts cs = VisPat x (setAnnotationAnchor pat anc ts cs)
-  setAnnotationAnchor a@(InvisPat _ _) _ _ _   = a
-
-  exact (VisPat x pat) = do
-    pat' <- markAnnotated pat
-    pure (VisPat x pat')
-
   exact (InvisPat tokat tp) = do
     tokat' <- markEpToken tokat
     tp' <- markAnnotated tp

@@ -160,7 +160,7 @@ pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
                                     <+> pprInfixExp op
                                     <+> pprMaybeExp noPrec me2
 pprExp i (LamE [] e) = pprExp i e -- #13856
-pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprArgPat appPrec) ps)
+pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
 pprExp i (LamCaseE ms)
   = parensIf (i > noPrec) $ text "\\case" $$ braces (semiSep ms)
@@ -286,7 +286,7 @@ pprBody eq body = case body of
 ------------------------------
 pprClause :: Bool -> Clause -> Doc
 pprClause eqDoc (Clause ps rhs ds)
-  = hsep (map (pprArgPat appPrec) ps) <+> pprBody eqDoc rhs
+  = hsep (map (pprPat appPrec) ps) <+> pprBody eqDoc rhs
     $$ where_clause ds
 
 ------------------------------
@@ -393,13 +393,7 @@ pprPat _ (ListP ps) = brackets (commaSep ps)
 pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 pprPat _ (TypeP t) = parens $ text "type" <+> ppr t
-
-instance Ppr ArgPat where
-  ppr = pprArgPat noPrec
-
-pprArgPat :: Precedence -> ArgPat -> Doc
-pprArgPat i (VisAP pat) = pprPat i pat
-pprArgPat _ (InvisAP t) = parens $ text "@" <+> ppr t
+pprPat _ (InvisP t) = parens $ text "@" <+> ppr t
 
 ------------------------------
 instance Ppr Dec where

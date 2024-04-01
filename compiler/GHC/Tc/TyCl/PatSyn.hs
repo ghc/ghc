@@ -801,8 +801,8 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                       }
              body' = noLocA $
                      HsLam noAnn LamSingle $
-                     MG{ mg_alts = noLocA [mkSimpleMatchArg (LamAlt LamSingle)
-                                                         (map mkRetainedVisPat args)
+                     MG{ mg_alts = noLocA [mkSimpleMatch (LamAlt LamSingle)
+                                                         args
                                                          body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
@@ -944,7 +944,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
           where
-            builder_args  = [mkVisPat (L (l2l loc) (VarPat noExtField (L loc n)))
+            builder_args  = [(L (l2l loc) (VarPat noExtField (L loc n)))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
@@ -959,7 +959,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
                            (L l [L loc match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = L l [L loc (match { m_pats = mkVisPat nlWildPatName : pats })] }
+      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 
@@ -1055,6 +1055,7 @@ tcPatToExpr args pat = go pat
       where hstp_to_hswc :: HsTyPat GhcRn -> LHsWcType GhcRn
             hstp_to_hswc (HsTP { hstp_ext = HsTPRn { hstp_nwcs = wcs }, hstp_body = hs_ty })
                         = HsWC { hswc_ext = wcs, hswc_body = hs_ty }
+    go1 (InvisPat _ _tp) = panic "tcPatToExpr: invalid invisible pattern"
     go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
     -- See Note [Invertible view patterns]

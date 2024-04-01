@@ -38,7 +38,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
-import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, filterOutErasedPats, decideBangHood)
+import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
@@ -124,6 +124,7 @@ desugarPat x pat = case pat of
 
   SigPat _ p _ty -> desugarLPat x p
   EmbTyPat _ _ -> pure []
+  InvisPat _ _ -> pure []
 
   XPat ext -> case ext of
 
@@ -334,9 +335,8 @@ desugarMatches vars matches =
 
 -- Desugar a single match
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
-desugarMatch vars (L match_loc (Match { m_pats = arg_pats, m_grhss = grhss })) = do
+desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   dflags <- getDynFlags
-  let pats = filterOutErasedPats arg_pats
   -- decideBangHood: See Note [Desugaring -XStrict matches in Pmc]
   let banged_pats = map (decideBangHood dflags) pats
   pats'  <- concat <$> zipWithM desugarLPat vars banged_pats
