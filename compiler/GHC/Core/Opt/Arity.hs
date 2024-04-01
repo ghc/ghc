@@ -3023,7 +3023,7 @@ pushCoercionIntoLambda in_scope x e co
     | otherwise
     = Nothing
 
-pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
+pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercion
               -> Maybe (DataCon
                        , [Type]      -- Universal type args
                        , [CoreExpr]) -- All other args incl existentials
@@ -3033,10 +3033,20 @@ pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
 -- where co :: (T t1 .. tn) ~ to_ty
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
-pushCoDataCon dc dc_args co
-  | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
-  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, map exprToType univ_ty_args, rest_args)
+pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
+pushCoDataCon dc dc_args (MCo co) = push_dc_gen  dc dc_args co (coercionKind co)
+
+push_dc_refl :: DataCon -> [CoreExpr] -> (DataCon, [Type], [CoreExpr])
+push_dc_refl dc dc_args
+  = (dc, map exprToType univ_ty_args, rest_args)
+  where
+    !(univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
+
+push_dc_gen :: DataCon -> [CoreExpr] -> Coercion -> Pair Type
+            -> Maybe (DataCon, [Type], [CoreExpr])
+push_dc_gen dc dc_args co (Pair from_ty to_ty)
+  | from_ty `eqType` to_ty  -- try cheap test first
+  = Just $! (push_dc_refl dc dc_args)
 
   | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
   , to_tc == dataConTyCon dc
@@ -3082,8 +3092,6 @@ pushCoDataCon dc dc_args co
   | otherwise
   = Nothing
 
-  where
-    Pair from_ty to_ty = coercionKind co
 
 collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
