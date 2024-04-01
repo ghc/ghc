@@ -26,6 +26,7 @@ import GHC.Utils.Outputable
 
 import GHC.Utils.Panic
 
+-- TODO: Move function down to where it is used.
 pprProcAlignment :: IsDoc doc => NCGConfig -> doc
 pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
    where
@@ -78,10 +79,12 @@ pprLabel platform lbl =
    $$ pprTypeDecl platform lbl
    $$ line (pprAsmLabel platform lbl <> char ':')
 
+-- TODO: Delete unused parameter.
 pprAlign :: IsDoc doc => Platform -> Alignment -> doc
 pprAlign _platform alignment
         = line $ text "\t.balign " <> int (alignmentBytes alignment)
 
+-- TODO: Delete unused parameters.
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
 pprAlignForSection _platform _seg
@@ -97,8 +100,7 @@ pprAlignForSection _platform _seg
 --
 pprSectionAlign :: IsDoc doc => NCGConfig -> Section -> doc
 pprSectionAlign _config (Section (OtherSection _) _) =
-  -- TODO: Valid for RISCV64?
-  panic "AArch64.Ppr.pprSectionAlign: unknown section"
+  panic "RV64.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
     line (pprSectionHeader config sec)
     $$ pprAlignForSection (ncgPlatform config) seg
@@ -175,6 +177,7 @@ pprDatas config (CmmStaticsRaw lbl dats)
    where
       platform = ncgPlatform config
 
+-- TODO: Unused parameter.
 pprData :: IsDoc doc => NCGConfig -> CmmStatic -> doc
 pprData _config (CmmString str) = line (pprString str)
 pprData _config (CmmFileEmbed path _) = line (pprFileEmbed path)
@@ -456,6 +459,7 @@ pprInstr platform instr = case instr of
     -- This case is used for sign extension: SEXT.W op
     | OpReg W64 _ <- o1 , OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
+  -- TODO: Delete commented out code.
   -- CMN  o1 o2    -> op2 (text "\tcmn") o1 o2
   -- CMP  o1 o2
   --   | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
@@ -483,9 +487,12 @@ pprInstr platform instr = case instr of
   DIVU o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
+  -- TODO: Non-existant in RISCV - delete
   SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
+  -- TODO: Non-existant in RISCV - delete
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
   -- signed and unsigned bitfield extract
+  -- TODO: Non-existant in RISCV - delete
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
 
   -- 3. Logical and Move Instructions ------------------------------------------
@@ -679,6 +686,7 @@ pprInstr platform instr = case instr of
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
+       -- TODO: Delete commented out code.
       --  op_ldr o1 rest      = line $ text "\tld" <+> pprOp platform o1 <> comma <+> rest  <+> text "(" <> pprOp platform o1 <> text ")"
       --  op_adrp o1 rest     = line $ text "\tauipc" <+> pprOp platform o1 <> comma <+> rest
       --  op_add o1 rest      = line $ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> rest

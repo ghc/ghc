@@ -121,6 +121,8 @@ allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
 -- * Addressing modes
 
+-- TODO: AddReg seems to be just a special case of AddrRegImm. Maybe we should
+-- replace it with AddrRegImm having an Imm of 0.
 -- | Addressing modes
 data AddrMode
   = -- | A register plus some integer, e.g. @8(sp)@ or @-16(sp)@. The offset
