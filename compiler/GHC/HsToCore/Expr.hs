@@ -833,9 +833,9 @@ dsDo ctx stmts
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated OtherExpansion SkipPmc)
         mfix_arg     = noLocA $ HsLam noAnn LamSingle
-                           (MG { mg_alts = noLocA [mkSimpleMatchArg
+                           (MG { mg_alts = noLocA [mkSimpleMatch
                                                     (LamAlt LamSingle)
-                                                    [mkRetainedVisPat mfix_pat] body]
+                                                    [mfix_pat] body]
                                , mg_ext = match_group
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

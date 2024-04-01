@@ -1934,6 +1934,9 @@ instance Diagnostic TcRnMessage where
         at_bndr     = char '@' <> ppr tv_name
         forall_bndr = text "forall" <+> ppr tv_name <> text "."
 
+    TcRnMisplacedInvisPat tp -> mkSimpleDecorated $
+      text "Invisible type pattern" <+> ppr tp <+> text "is not allowed here"
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2569,6 +2572,8 @@ instance Diagnostic TcRnMessage where
     TcRnNamespacedFixitySigWithoutFlag{}
       -> ErrorWithoutFlag
     TcRnOutOfArityTyVar{}
+      -> ErrorWithoutFlag
+    TcRnMisplacedInvisPat{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3239,6 +3244,8 @@ instance Diagnostic TcRnMessage where
     TcRnNamespacedFixitySigWithoutFlag{}
       -> [suggestExtension LangExt.ExplicitNamespaces]
     TcRnOutOfArityTyVar{}
+      -> noHints
+    TcRnMisplacedInvisPat{}
       -> noHints
 
   diagnosticCode = constructorCode

@@ -2348,6 +2348,7 @@ isStrictPattern (L loc pat) =
     -- The behavior of this case is unimportant, as GHC will throw an error shortly
     -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
     EmbTyPat{}  -> False
+    InvisPat{}  -> False
 
     XPat ext        -> case ghcPass @p of
       GhcRn

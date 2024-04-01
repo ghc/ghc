@@ -607,3 +607,8 @@ test('ListTuplePunsTH', [only_ways(['ghci']), extra_files(['ListTuplePunsTH.hs',
 test('T24559', normal, compile, [''])
 test('T24571', normal, compile, [''])
 test('T24299', normal, compile, [''])
+test('T24557a', normal, compile_fail, [''])
+test('T24557b', normal, compile_fail, [''])
+test('T24557c', normal, compile_fail, [''])
+test('T24557d', normal, compile_fail, [''])
+test('T24557e', normal, compile, [''])

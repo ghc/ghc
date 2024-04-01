@@ -1234,7 +1234,7 @@ Syntax of abstractions in Pat
       \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and HsConPatTyArg (c.o. HsConPatTyArg)
       \ (type a) (x :: a)  -> rhs    -- EmbTyPat (c.o. Pat)
       \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)
-      \ @a       (x :: a)  -> rhs    -- InvisPat (c.o. ArgPat)
+      \ @a       (x :: a)  -> rhs    -- InvisPat (c.o. Pat)
 
 * A HsTyPat is not necessarily a plain variable. At the very least,
   we support kind signatures and wildcards:

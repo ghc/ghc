@@ -740,7 +740,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = map mkVisPat pats
+                                                  , m_ctxt = ctxt, m_pats = pats
                                                   , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
@@ -749,7 +749,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
 
                InfixCon p1 p2 -> return $ Match { m_ext = noAnn
                                                 , m_ctxt = ctxt
-                                                , m_pats = map mkVisPat [p1, p2]
+                                                , m_pats = [p1, p2]
                                                 , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
@@ -1213,9 +1213,9 @@ checkPattern = runPV . checkLPat
 checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
-checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LArgPat GhcPs)
+checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLArgPat (L l (ArgPatBuilderVisPat p))
-  = L l <$> (VisPat noExtField <$> checkPat l (L l p) [] [])
+  = checkPat l (L l p) [] []
 checkLArgPat (L l (ArgPatBuilderArgPat p)) = return (L l p)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
@@ -1466,7 +1466,7 @@ isFunLhs e = go e [] [] []
 
 data ArgPatBuilder p
   = ArgPatBuilderVisPat (PatBuilder p)
-  | ArgPatBuilderArgPat (ArgPat p)
+  | ArgPatBuilderArgPat (Pat p)
 
 instance Outputable (ArgPatBuilder GhcPs) where
   ppr (ArgPatBuilderVisPat p) = ppr p

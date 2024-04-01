@@ -23,7 +23,7 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
 module GHC.Rename.Pat (-- main entry points
-              rnPat, rnPats, rnArgPats, rnBindPat,
+              rnPat, rnPats, rnBindPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
@@ -97,6 +97,7 @@ import Data.Functor ((<&>))
 import GHC.Rename.Doc (rnLHsDoc)
 import GHC.Types.Hint
 import GHC.Types.Fixity (LexicalFixity(..))
+import Data.Coerce
 
 {-
 *********************************************************
@@ -418,24 +419,21 @@ There are various entry points to renaming patterns, depending on
 --   * unused and duplicate checking
 --   * no fixities
 
--- rn_pats_general is the generalisation of three functions:
---    rnArgPats, rnPats, rnPat
+-- rn_pats_general is the generalisation of two functions:
+--    rnPats, rnPat
 -- Those are the only call sites, so we inline it for improved performance.
 -- Kind of like a macro.
 {-# INLINE rn_pats_general #-}
-rn_pats_general :: Traversable f =>
-  (NameMaker -> f (LocatedA (pat GhcPs)) -> CpsRn  (f (LocatedA (pat GhcRn))))
-  -> (CollectFlag GhcRn -> [LocatedA (pat GhcRn)] -> [Name])
-  -> HsMatchContextRn
-  -> f (LocatedA (pat GhcPs))
-  -> (f (LocatedA (pat GhcRn)) -> RnM (r, FreeVars))
+rn_pats_general :: Traversable f => HsMatchContextRn
+  -> f (LPat GhcPs)
+  -> (f (LPat GhcRn) -> RnM (r, FreeVars))
   -> RnM (r, FreeVars)
-rn_pats_general rn_pats_and_then collect_pats_binders ctxt pats thing_inside = do
+rn_pats_general ctxt pats thing_inside = do
   envs_before <- getRdrEnvs
 
   -- (1) rename the patterns, bringing into scope all of the term variables
   -- (2) then do the thing inside.
-  unCpsRn (rn_pats_and_then (matchNameMaker ctxt) pats) $ \ pats' -> do
+  unCpsRn (rn_pats_fun (matchNameMaker ctxt) pats) $ \ pats' -> do
     -- Check for duplicated and shadowed names
     -- Must do this *after* renaming the patterns
     -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
@@ -445,7 +443,7 @@ rn_pats_general rn_pats_and_then collect_pats_binders ctxt pats thing_inside = d
     --    complain *twice* about duplicates e.g. f (x,x) = ...
     --
     -- See Note [Don't report shadowing for pattern synonyms]
-    let bndrs = collect_pats_binders CollVarTyVarBinders (toList pats')
+    let bndrs = collectPatsBinders CollVarTyVarBinders (toList pats')
     addErrCtxt doc_pat $
       if isPatSynCtxt ctxt
          then checkDupNames bndrs
@@ -454,26 +452,28 @@ rn_pats_general rn_pats_and_then collect_pats_binders ctxt pats thing_inside = d
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
 
-rnArgPats :: HsMatchContextRn
-          -> [LArgPat GhcPs]
-          -> ([LArgPat GhcRn] -> RnM (a, FreeVars))
-          -> RnM (a, FreeVars)
-rnArgPats = rn_pats_general rnLArgPatsAndThen collectLArgPatsBinders
+    -- See Note [Invisible binders in functions] in GHC.Hs.Pat
+    --
+    -- BTW, Or-patterns would be awesome here
+    rn_pats_fun = case ctxt of
+      FunRhs{} -> mapM . rnLArgPatAndThen
+      LamAlt LamSingle -> mapM . rnLArgPatAndThen
+      LamAlt LamCases -> mapM . rnLArgPatAndThen
+      _ -> mapM . rnLPatAndThen
 
-rnPats :: HsMatchContextRn   -- For error messages
+rnPats :: HsMatchContextRn   -- For error messages and choosing if @-patterns are allowed
        -> [LPat GhcPs]
        -> ([LPat GhcRn] -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
-rnPats = rn_pats_general (mapM . rnLPatAndThen) collectPatsBinders
+rnPats = rn_pats_general
 
-rnPat :: HsMatchContextRn      -- For error messages
+rnPat :: forall a. HsMatchContextRn      -- For error messages and choosing if @-patterns are allowed
       -> LPat GhcPs
       -> (LPat GhcRn -> RnM (a, FreeVars))
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
                                -- appear in the result FreeVars
-rnPat ctxt pat thing_inside
-       = rn_pats_general (mapM . rnLPatAndThen) collectPatsBinders
-            ctxt (Identity pat) (thing_inside . runIdentity)
+rnPat
+       = coerce (rn_pats_general @Identity @a)
 
 applyNameMaker :: NameMaker -> LocatedN RdrName -> RnM (LocatedN Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
@@ -502,16 +502,16 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 *********************************************************
 -}
 
-rnLArgPatsAndThen :: NameMaker -> [LArgPat GhcPs] -> CpsRn [LArgPat GhcRn]
-rnLArgPatsAndThen mk = mapM (wrapSrcSpanCps rnArgPatAndThen) where
-  rnArgPatAndThen (VisPat x p) = do
-    p' <- rnLPatAndThen mk p
-    pure (VisPat x p')
+
+rnLArgPatAndThen :: NameMaker -> LocatedA (Pat GhcPs) -> CpsRn (LocatedA (Pat GhcRn))
+rnLArgPatAndThen mk = wrapSrcSpanCps rnArgPatAndThen where
+
   rnArgPatAndThen (InvisPat _ tp) = do
     liftCps $ unlessXOptM LangExt.TypeAbstractions $
       addErr (TcRnIllegalInvisibleTypePattern tp)
     tp' <- rnHsTyPat HsTypePatCtx tp
     pure (InvisPat noExtField tp')
+  rnArgPatAndThen p = rnPatAndThen mk p
 
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parameterized by how you make new names
@@ -666,6 +666,13 @@ rnPatAndThen mk (SplicePat _ splice)
 rnPatAndThen _ (EmbTyPat _ tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (EmbTyPat noExtField tp') }
+rnPatAndThen _ (InvisPat _ tp)
+  = do { liftCps $ addErr (TcRnMisplacedInvisPat tp)
+         -- Invisible patterns are handled in `rnLArgPatAndThen`
+         -- so unconditionally emit error here
+       ; tp' <- rnHsTyPat HsTypePatCtx tp
+       ; return (InvisPat noExtField tp')
+       }
 
 --------------------
 rnConPatAndThen :: NameMaker

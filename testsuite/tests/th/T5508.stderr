@@ -1,7 +1,7 @@
 T5508.hs:(7,8)-(10,29): Splicing expression
     do let x = mkName "x"
            p = VarP x
-           v = return (LamE [VisAP p] $ VarE x)
+           v = return (LamE [p] $ VarE x)
        [| $v . id |]
        pending(rn) [<spn, v>]
   ======>
