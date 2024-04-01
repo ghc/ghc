@@ -20,7 +20,7 @@ module GHC.Core.TyCo.Subst
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
-        extendTvSubst, extendTvSubstBinderAndInScope, extendTvSubstWithClone,
+        extendTvSubst, extendTvSubstWithClone,
         extendTvSubstList, extendTvSubstAndInScope,
         extendTCvSubstList,
         unionSubst, zipTyEnv, zipCoEnv,
@@ -371,13 +371,6 @@ extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
   = assert (isTyVar tv) $
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
-
-extendTvSubstBinderAndInScope :: Subst -> PiTyBinder -> Type -> Subst
-extendTvSubstBinderAndInScope subst (Named (Bndr v _)) ty
-  = assert (isTyVar v )
-    extendTvSubstAndInScope subst v ty
-extendTvSubstBinderAndInScope subst (Anon {}) _
-  = subst
 
 extendTvSubstWithClone :: Subst -> TyVar -> TyVar -> Subst
 -- Adds a new tv -> tv mapping, /and/ extends the in-scope set with the clone

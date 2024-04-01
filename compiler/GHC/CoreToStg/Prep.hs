@@ -34,6 +34,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Lint    ( EndPassConfig(..), endPassIO )
 import GHC.Core
+import GHC.Core.Subst
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -55,7 +56,6 @@ import GHC.Utils.Logger
 
 import GHC.Types.Demand
 import GHC.Types.Var
-import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId )
@@ -100,25 +100,7 @@ The goal of this pass is to prepare for code generation.
 5.  ANF-isation results in additional bindings that can obscure values.
     We float these out; see Note [Floating in CorePrep].
 
-6.  Clone all local Ids.
-    This means that all such Ids are unique, rather than the
-    weaker guarantee of no clashes which the simplifier provides.
-    And that is what the code generator needs.
-
-    We don't clone TyVars or CoVars. The code gen doesn't need that,
-    and doing so would be tiresome because then we'd need
-    to substitute in types and coercions.
-
-    We need to clone ids for two reasons:
-    + Things associated with labels in the final code must be truly unique in
-      order to avoid labels being shadowed in the final output.
-    + Even binders without info tables like function arguments or alternative
-      bound binders must be unique at least in their type/unique combination.
-      We only emit a single declaration for each binder when compiling to C
-      so if binders are not unique we would either get duplicate declarations
-      or misstyped variables. The later happend in #22402.
-    + We heavily use unique-keyed maps in the backend which can go wrong when
-      ids with the same unique are meant to represent the same variable.
+6.  Clone all local Ids.  See Note [Cloning in CorePrep]
 
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
@@ -175,6 +157,65 @@ Here is the syntax of the Core produced by CorePrep:
 
 We define a synonym for each of these non-terminals.  Functions
 with the corresponding name produce a result in that syntax.
+
+Note [Cloning in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In CorePrep we
+* Always clone non-CoVar Ids, so each has a unique Unique
+* Sometimes clone CoVars and TyVars
+
+We always clone non-CoVarIds, for three reasons
+
+1. Things associated with labels in the final code must be truly unique in
+   order to avoid labels being shadowed in the final output.
+
+2. Even binders without info tables like function arguments or alternative
+   bound binders must be unique at least in their type/unique combination.
+   We only emit a single declaration for each binder when compiling to C
+   so if binders are not unique we would either get duplicate declarations
+   or misstyped variables. The later happend in #22402.
+
+3. We heavily use unique-keyed maps in the backend which can go wrong when
+   ids with the same unique are meant to represent the same variable.
+
+Generally speaking we don't clone TyVars or CoVars. The code gen doesn't need
+that (they are erased), and doing so would be tiresome because then we'd need
+to substitute in types and coercions.  But sometimes need to: see
+Note [Cloning CoVars and TyVars]
+
+Note [Cloning CoVars and TyVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally we don't need to clone TyVars and CoVars, but there is one occasion
+when we do (see #24463).  When we have
+    case unsafeEqualityProof ... of UnsafeRefl g -> ...
+we try to float it, using UnsafeEqualityCase.
+Why?  See (U3) in Note [Implementing unsafeCoerce]
+
+Alas, floating it widens the scope of `g`, and that led to catastrophe in
+#24463, when two identically-named g's shadowed.
+
+Solution: clone `g`; see `cpCloneCoVarBndr`.
+
+BUT once we clone `g` we must apply the cloning substitution to all types
+and coercions.  But that in turn means that, given a binder like
+   /\ (a :: kind |> g). blah
+we must substitute in a's kind, and hence need to substitute for `a`
+itself in `blah`.
+
+So our plan is:
+  * Maintain a full Subst in `cpe_subst`
+
+  * Clone a CoVar when we we meet an `isUnsafeEqualityCase`;
+    otherwise TyVar/CoVar binders are never cloned.
+
+  * So generally the TCvSubst is empty
+
+  * Apply the substitution to type and coercion arguments in Core; but
+    happily `substTy` has a no-op short-cut for an empty TCvSubst, so this
+    is usually very cheap.
+
+  * In `cpCloneBndr`, for a tyvar/covar binder, check for an empty substitution;
+    in that case just do nothing
 -}
 
 type CpeArg  = CoreExpr    -- Non-terminal 'arg'
@@ -760,10 +801,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE _ (Type ty)
-  = return (emptyFloats, Type ty)
-cpeRhsE _ (Coercion co)
-  = return (emptyFloats, Coercion co)
+cpeRhsE env (Type ty)
+  = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)
+  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Lit (LitNumber nt i))
    = case cp_convertNumLit (cpe_config env) nt i of
       Nothing -> return (emptyFloats, expr)
@@ -797,7 +838,7 @@ cpeRhsE env (Tick tickish expr)
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
-        ; return (floats, Cast expr' co) }
+        ; return (floats, Cast expr' (cpSubstCo env co)) }
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -805,7 +846,7 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
-cpeRhsE env (Case scrut bndr _ alts@[Alt con bs _])
+cpeRhsE env (Case scrut bndr _ alts@[Alt con [covar] _])
   -- See (U3) in Note [Implementing unsafeCoerce]
   -- We need make the Case float, otherwise we get
   --   let x = case ... of UnsafeRefl co ->
@@ -821,14 +862,18 @@ cpeRhsE env (Case scrut bndr _ alts@[Alt con bs _])
   -- (such as `print003`).
   | Just rhs <- isUnsafeEqualityCase scrut bndr alts
   = do { (floats_scrut, scrut) <- cpeBody env scrut
-       ; (env, bndr) <- cpCloneBndr env bndr
-       ; (env, bs) <- cpCloneBndrs env bs
+
+       ; (env, bndr')  <- cpCloneBndr env bndr
+       ; (env, covar') <- cpCloneCoVarBndr env covar
+                          -- Important: here we clone the CoVar
+                          -- See Note [Cloning CoVars and TyVars]
+
          -- Up until here this should do exactly the same as the regular code
          -- path of `cpeRhsE Case{}`.
        ; (floats_rhs, rhs) <- cpeBody env rhs
          -- ... but we want to float `floats_rhs` as in (U3) so that rhs' might
          -- become a value
-       ; let case_float = UnsafeEqualityCase scrut bndr con bs
+       ; let case_float = UnsafeEqualityCase scrut bndr' con [covar']
          -- NB: It is OK to "evaluate" the proof eagerly.
          --     Usually there's the danger that we float the unsafeCoerce out of
          --     a branching Case alt. Not so here, because the regular code path
@@ -847,7 +892,7 @@ cpeRhsE env (Case scrut bndr ty alts)
                where err = mkImpossibleExpr ty "cpeRhsE: missing case alternative"
        ; alts'' <- mapM (sat_alt env') alts'
 
-       ; return (floats, Case scrut' bndr2 ty alts'') }
+       ; return (floats, Case scrut' bndr2 (cpSubstTy env ty) alts'') }
   where
     sat_alt env (Alt con bs rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs
@@ -1182,10 +1227,14 @@ cpeApp top_env expr
             in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       CpeApp (Type arg_ty)
-        -> rebuild_app' env as (App fun' (Type arg_ty)) floats ss rt_ticks req_depth
+        -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
+        where
+           arg_ty' = cpSubstTy env arg_ty
 
       CpeApp (Coercion co)
-        -> rebuild_app' env as (App fun' (Coercion co)) floats (drop 1 ss) rt_ticks req_depth
+        -> rebuild_app' env as (App fun' (Coercion co')) floats (drop 1 ss) rt_ticks req_depth
+        where
+           co' = cpSubstCo env co
 
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1197,7 +1246,10 @@ cpeApp top_env expr
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       CpeCast co
-        -> rebuild_app' env as (Cast fun' co) floats ss rt_ticks req_depth
+        -> rebuild_app' env as (Cast fun' co') floats ss rt_ticks req_depth
+        where
+           co' = cpSubstCo env co
+
       -- See Note [Ticks and mandatory eta expansion]
       CpeTick tickish
         | tickishPlace tickish == PlaceRuntime
@@ -2218,6 +2270,7 @@ binding for data constructors; see Note [Data constructor workers].
 
 Note [CorePrep inlines trivial CoreExpr not Id]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO
 Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
 IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
 as per Note [Inlining in CorePrep] always have the form
@@ -2259,11 +2312,11 @@ data CorePrepEnv
         -- the case where a function we think should bottom
         -- unexpectedly returns.
 
-        , cpe_env             :: IdEnv CoreExpr   -- Clone local Ids
-        -- ^ This environment is used for three operations:
+        , cpe_subst :: Subst
+        -- ^ The IdEnv part of the substitution is used for three operations:
         --
         --      1. To support cloning of local Ids so that they are
-        --      all unique (see item (6) of CorePrep overview).
+        --      all unique (see Note [Cloning in CorePrep])
         --
         --      2. To support beta-reduction of runRW, see
         --      Note [runRW magic] and Note [runRW arg].
@@ -2271,6 +2324,9 @@ data CorePrepEnv
         --      3. To let us inline trivial RHSs of non top-level let-bindings,
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
+        --
+        -- The TyCoVar part of the substitution is used only for
+        --     Note [Cloning CoVars and TyVars]
 
         , cpe_rec_ids         :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
     }
@@ -2278,32 +2334,47 @@ data CorePrepEnv
 mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
 mkInitialCorePrepEnv cfg = CPE
       { cpe_config        = cfg
-      , cpe_env           = emptyVarEnv
+      , cpe_subst         = emptySubst
       , cpe_rec_ids       = emptyUnVarSet
       }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv cpe id id'
-    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id (Var id') }
+extendCorePrepEnv cpe@(CPE { cpe_subst = subst }) id id'
+    = cpe { cpe_subst = subst2 }
+    where
+      subst1 = extendSubstInScope subst id'
+      subst2 = extendIdSubst subst1 id (Var id')
+
+extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
+extendCorePrepEnvList cpe@(CPE { cpe_subst = subst }) prs
+    = cpe { cpe_subst = subst2 }
+    where
+      subst1 = extendSubstInScopeList subst (map snd prs)
+      subst2 = extendIdSubstList subst1 [(id, Var id') | (id,id') <- prs]
 
 extendCorePrepEnvExpr :: CorePrepEnv -> Id -> CoreExpr -> CorePrepEnv
 extendCorePrepEnvExpr cpe id expr
-    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id expr }
-
-extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
-extendCorePrepEnvList cpe prs
-    = cpe { cpe_env = extendVarEnvList (cpe_env cpe)
-                        (map (\(id, id') -> (id, Var id')) prs) }
+    = cpe { cpe_subst = extendIdSubst (cpe_subst cpe) id expr }
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> CoreExpr
 lookupCorePrepEnv cpe id
-  = case lookupVarEnv (cpe_env cpe) id of
-        Nothing  -> Var id
-        Just exp -> exp
+  = case lookupIdSubst_maybe (cpe_subst cpe) id of
+       Just e -> e
+       Nothing -> Var id
+    -- Do not use GHC.Core.Subs.lookupIdSubst because that is a no-op on GblIds;
+    -- and Tidy has made top-level externally-visible Ids into GblIds
 
 enterRecGroupRHSs :: CorePrepEnv -> [OutId] -> CorePrepEnv
 enterRecGroupRHSs env grp
   = env { cpe_rec_ids = extendUnVarSetList grp (cpe_rec_ids env) }
+
+cpSubstTy :: CorePrepEnv -> Type -> Type
+cpSubstTy (CPE { cpe_subst = subst }) ty = substTy subst ty
+          -- substTy has a short-cut if the TCvSubst is empty
+
+cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
+cpSubstCo (CPE { cpe_subst = subst }) co = substCo subst co
+          -- substCo has a short-cut if the TCvSubst is empty
 
 ------------------------------------------------------------------------------
 -- Cloning binders
@@ -2312,12 +2383,31 @@ enterRecGroupRHSs env grp
 cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
 cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
+cpCloneCoVarBndr :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
+-- Clone the CoVar
+-- See Note [Cloning CoVars and TyVars]
+cpCloneCoVarBndr env@(CPE { cpe_subst = subst }) covar
+  = assertPpr (isCoVar covar) (ppr covar) $
+    do { uniq <- getUniqueM
+       ; let covar1 = setVarUnique covar uniq
+             covar2 = updateVarType (substTy subst) covar1
+             subst1 = extendTCvSubstWithClone subst covar covar2
+       ; return (env { cpe_subst = subst1 }, covar2) }
+
 cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
-cpCloneBndr env bndr
-  | isTyCoVar bndr
-  = return (env, bndr)
-  | otherwise
-  = do { bndr' <- clone_it bndr
+-- See Note [Cloning in CorePrep]
+cpCloneBndr env@(CPE { cpe_subst = subst }) bndr
+  | isTyCoVar bndr  -- See Note [Cloning CoVars and TyVars]
+  = if isEmptyTCvSubst subst    -- The common case
+    then return (env { cpe_subst = extendSubstInScope subst bndr }, bndr)
+    else -- No need to clone the Unique; but we must apply the substitution
+         let bndr1  = updateVarType (substTy subst) bndr
+             subst1 = extendTCvSubstWithClone subst bndr bndr1
+         in return (env { cpe_subst = subst1 }, bndr1)
+
+  | otherwise  -- A non-CoVar Id
+  = do { bndr1 <- clone_it bndr
+       ; let bndr2 = updateIdTypeAndMult (substTy subst) bndr1
 
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
@@ -2327,10 +2417,10 @@ cpCloneBndr env bndr
        ; let !unfolding' = trimUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
-             bndr'' = bndr' `setIdUnfolding`      unfolding'
-                            `setIdSpecialisation` emptyRuleInfo
+             bndr3 = bndr2 `setIdUnfolding`      unfolding'
+                           `setIdSpecialisation` emptyRuleInfo
 
-       ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
+       ; return (extendCorePrepEnv env bndr bndr3, bndr3) }
   where
     clone_it bndr
       | isLocalId bndr
