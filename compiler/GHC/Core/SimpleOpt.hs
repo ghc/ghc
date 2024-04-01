@@ -1211,7 +1211,7 @@ data-con wrappers, and that cure would be worse than the disease.
 This Note exists solely to document the problem.
 -}
 
-data ConCont = CC [CoreExpr] Coercion
+data ConCont = CC [CoreExpr] MCoercion
                   -- Substitution already applied
 
 -- | Returns @Just ([b1..bp], dc, [t1..tk], [x1..xn])@ if the argument
@@ -1233,7 +1233,7 @@ exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
+  = go (Left in_scope) [] expr (CC [] MRefl)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1246,14 +1246,12 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
 
-    go subst floats (Cast expr co1) (CC args co2)
+    go subst floats (Cast expr co1) (CC args m_co2)
        | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
-       = case m_co1' of
-           MCo co1' -> go subst floats expr (CC args' (co1' `mkTransCo` co2))
-           MRefl    -> go subst floats expr (CC args' co2)
+       = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
 
-    go subst floats (App fun arg) (CC args co)
+    go subst floats (App fun arg) (CC args mco)
        | let arg_type = exprType arg
        , not (isTypeArg arg) && needsCaseBinding arg_type arg
        -- An unlifted argument that’s not ok for speculation must not simply be
@@ -1276,17 +1274,17 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
              bndr = uniqAway (subst_in_scope subst) (mkWildValBinder ManyTy arg_type)
              float = FloatCase arg' bndr DEFAULT []
              subst' = subst_extend_in_scope subst bndr
-         in go subst' (float:floats) fun (CC (Var bndr : args) co)
+         in go subst' (float:floats) fun (CC (Var bndr : args) mco)
        | otherwise
-       = go subst floats fun (CC (subst_expr subst arg : args) co)
+       = go subst floats fun (CC (subst_expr subst arg : args) mco)
 
-    go subst floats (Lam bndr body) (CC (arg:args) co)
+    go subst floats (Lam bndr body) (CC (arg:args) mco)
        | do_beta_by_substitution bndr arg
-       = go (extend subst bndr arg) floats body (CC args co)
+       = go (extend subst bndr arg) floats body (CC args mco)
        | otherwise
        = let (subst', bndr') = subst_bndr subst bndr
              float           = FloatLet (NonRec bndr' arg)
-         in go subst' (float:floats) body (CC args co)
+         in go subst' (float:floats) body (CC args mco)
 
     go subst floats (Let (NonRec bndr rhs) expr) cont
        | not (isJoinId bndr)
@@ -1311,12 +1309,12 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
             (lookupIdSubst sub v)
             cont
 
-    go (Left in_scope) floats (Var fun) cont@(CC args co)
+    go (Left in_scope) floats (Var fun) cont@(CC args mco)
 
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
         = succeedWith in_scope floats $
-          pushCoDataCon con args co
+          pushCoDataCon con args mco
 
         -- Look through data constructor wrappers: they inline late (See Note
         -- [Activation for data constructor wrappers]) but we want to do
@@ -1336,7 +1334,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
               -- simplOptExpr initialises the in-scope set with exprFreeVars,
               -- but that doesn't account for DFun unfoldings
         = succeedWith in_scope floats $
-          pushCoDataCon con (map (substExpr subst) dfun_args) co
+          pushCoDataCon con (map (substExpr subst) dfun_args) mco
 
         -- Look through unfoldings, but only arity-zero one;
         -- if arity > 0 we are effectively inlining a function call,
@@ -1354,7 +1352,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         , [arg]              <- args
         , Just (LitString str) <- exprIsLiteral_maybe ise arg
         = succeedWith in_scope floats $
-          dealWithStringLiteral fun str co
+          dealWithStringLiteral fun str mco
         where
           unfolding = id_unf fun
           extend_in_scope unf_fvs
@@ -1404,15 +1402,15 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
 
 
 -- See Note [exprIsConApp_maybe on literal strings]
-dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
+dealWithStringLiteral :: Var -> BS.ByteString -> MCoercion
                       -> Maybe (DataCon, [Type], [CoreExpr])
 
 -- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
 -- turns those into [] automatically, but just in case something else in GHC
 -- generates a string literal directly.
-dealWithStringLiteral fun str co =
+dealWithStringLiteral fun str mco =
   case utf8UnconsByteString str of
-    Nothing -> pushCoDataCon nilDataCon [Type charTy] co
+    Nothing -> pushCoDataCon nilDataCon [Type charTy] mco
     Just (char, charTail) ->
       let char_expr = mkConApp charDataCon [mkCharLit char]
           -- In singleton strings, just add [] instead of unpackCstring# ""#.
@@ -1421,7 +1419,7 @@ dealWithStringLiteral fun str co =
                    else App (Var fun)
                             (Lit (LitString charTail))
 
-      in pushCoDataCon consDataCon [Type charTy, char_expr, rest] co
+      in pushCoDataCon consDataCon [Type charTy, char_expr, rest] mco
 
 {-
 Note [Unfolding DFuns]
