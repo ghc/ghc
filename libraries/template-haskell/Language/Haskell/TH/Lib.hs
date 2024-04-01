@@ -22,7 +22,7 @@ module Language.Haskell.TH.Lib (
         TyLitQ, CxtQ, PredQ, DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ,
         StmtQ, RangeQ, SourceStrictnessQ, SourceUnpackednessQ, BangQ,
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,
-        ArgPatQ, FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
+        FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
         FamilyResultSigQ, DerivStrategyQ,
         TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis,
 
@@ -33,11 +33,8 @@ module Language.Haskell.TH.Lib (
     -- *** Patterns
         litP, varP, tupP, unboxedTupP, unboxedSumP, conP, uInfixP, parensP,
         infixP, tildeP, bangP, asP, wildP, recP,
-        listP, sigP, viewP, typeP,
+        listP, sigP, viewP, typeP, invisP,
         fieldPat,
-
-    -- *** Arg patterns
-        visAP, invisAP,
 
     -- *** Pattern Guards
         normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,

@@ -1011,8 +1011,8 @@ cvtLocalDecs declDescr ds
 
 cvtClause :: HsMatchContextPs -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
-  = do  { ps' <- cvtArgPats ps
-        ; let pps = map (parenthesizeLArgPat appPrec) ps'
+  = do  { ps' <- cvtPats ps
+        ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs WhereClause wheres
         ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs emptyComments g' ds') }
@@ -1057,11 +1057,11 @@ cvtl e = wrapLA (cvt e)
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
-    cvt (LamE ps e)    = do { ps' <- cvtArgPats ps; e' <- cvtl e
-                            ; let pats = map (parenthesizeLArgPat appPrec) ps'
+    cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
+                            ; let pats = map (parenthesizePat appPrec) ps'
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsLam noAnn LamSingle . mkMatchGroup th_origin)
-                                        [mkSimpleMatchArg (LamAlt LamSingle) pats e']}
+                                        [mkSimpleMatch (LamAlt LamSingle) pats e']}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamAlt LamCase) ms
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsLam noAnn LamCase . mkMatchGroup th_origin) ms'
@@ -1340,7 +1340,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs WhereClause decs
-        ; returnLA $ Hs.Match noAnn ctxt [mkVisPat lp] (GRHSs emptyComments g' decs') }
+        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs emptyComments g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs
@@ -1416,18 +1416,6 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""
 
-cvtArgPats :: [TH.ArgPat] -> CvtM [Hs.LArgPat GhcPs]
-cvtArgPats pats = mapM cvtArgPat pats
-
-cvtArgPat :: TH.ArgPat -> CvtM (Hs.LArgPat GhcPs)
-cvtArgPat pat = wrapLA (cvtap pat)
-
-cvtap :: TH.ArgPat -> CvtM (Hs.ArgPat GhcPs)
-cvtap (VisAP pat) = do { pat' <- cvtPat pat
-                       ; pure (VisPat noExtField pat')}
-cvtap (InvisAP t) = do { t' <- cvtType t
-                       ; pure (InvisPat noAnn (mkHsTyPat noAnn t'))}
-
 cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
 cvtPats pats = mapM cvtPat pats
 
@@ -1500,6 +1488,8 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
 cvtp (TypeP t)         = do { t' <- cvtType t
                             ; return $ EmbTyPat noAnn (mkHsTyPat noAnn t') }
+cvtp (InvisP t)        = do { t' <- cvtType t
+                            ; pure (InvisPat noAnn (mkHsTyPat noAnn t'))}
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

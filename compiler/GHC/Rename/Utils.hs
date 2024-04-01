@@ -763,7 +763,7 @@ genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpan n)
 genWildPat :: LPat GhcRn
 genWildPat = wrapGenSpan $ WildPat noExtField
 
-genSimpleFunBind :: Name -> [LArgPat GhcRn]
+genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
   = L genA $ genFunBind (L genN fun)
@@ -793,21 +793,21 @@ genHsLet bindings body = HsLet noExtField bindings body
 
 genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         => HsDoFlavour
-        -> [LArgPat (GhcPass p)]
+        -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
 genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
   where
     matches = mkMatchGroup (doExpansionOrigin doFlav)
                            (wrapGenSpan [genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body])
-    pats' = map (parenthesizeLArgPat appPrec) pats
+    pats' = map (parenthesizePat appPrec) pats
 
 
 genHsCaseAltDoExp :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ EpAnnCO,
                  Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA)
-            => HsDoFlavour -> LArgPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
+            => HsDoFlavour -> LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
             -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 genHsCaseAltDoExp doFlav pat expr
   = genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) [pat] expr
@@ -818,7 +818,7 @@ genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnnCO)
               => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-              -> [LArgPat (GhcPass p)] -> LocatedA (body (GhcPass p))
+              -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 genSimpleMatch ctxt pats rhs
   = wrapGenSpan $

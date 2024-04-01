@@ -5,10 +5,6 @@ module Language.Haskell.TH where
   data AnnLookup = AnnLookupModule Language.Haskell.TH.Syntax.Module | AnnLookupName Name
   type AnnTarget :: *
   data AnnTarget = ModuleAnnotation | TypeAnnotation Name | ValueAnnotation Name
-  type ArgPat :: *
-  data ArgPat = VisAP Pat | InvisAP Type
-  type ArgPatQ :: *
-  type ArgPatQ = Q ArgPat
   type Arity :: *
   type Arity = GHC.Types.Int
   type Bang :: *
@@ -28,7 +24,7 @@ module Language.Haskell.TH where
   type Callconv :: *
   data Callconv = CCall | StdCall | CApi | Prim | JavaScript
   type Clause :: *
-  data Clause = Clause [ArgPat] Body [Dec]
+  data Clause = Clause [Pat] Body [Dec]
   type ClauseQ :: *
   type ClauseQ = Q Clause
   type role Code representational nominal
@@ -102,7 +98,7 @@ module Language.Haskell.TH where
     | InfixE (GHC.Internal.Maybe.Maybe Exp) Exp (GHC.Internal.Maybe.Maybe Exp)
     | UInfixE Exp Exp Exp
     | ParensE Exp
-    | LamE [ArgPat] Exp
+    | LamE [Pat] Exp
     | LamCaseE [Match]
     | LamCasesE [Clause]
     | TupE [GHC.Internal.Maybe.Maybe Exp]
@@ -322,7 +318,7 @@ module Language.Haskell.TH where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type
   type PatQ :: *
   type PatQ = Q Pat
   type PatSynArgs :: *
@@ -524,7 +520,7 @@ module Language.Haskell.TH where
   intPrimL :: GHC.Num.Integer.Integer -> Lit
   integerL :: GHC.Num.Integer.Integer -> Lit
   interruptible :: Safety
-  invisAP :: forall (m :: * -> *). Quote m => m Type -> m ArgPat
+  invisP :: forall (m :: * -> *). Quote m => m Type -> m Pat
   isExtEnabled :: Extension -> Q GHC.Types.Bool
   isInstance :: Name -> [Type] -> Q GHC.Types.Bool
   isStrict :: forall (m :: * -> *). Quote m => m Strict
@@ -716,7 +712,6 @@ module Language.Haskell.TH where
   varT :: forall (m :: * -> *). Quote m => Name -> m Type
   viaStrategy :: forall (m :: * -> *). Quote m => m Type -> m DerivStrategy
   viewP :: forall (m :: * -> *). Quote m => m Exp -> m Pat -> m Pat
-  visAP :: forall (m :: * -> *). Quote m => m Pat -> m ArgPat
   wildCardT :: forall (m :: * -> *). Quote m => m Type
   wildP :: forall (m :: * -> *). Quote m => m Pat
   withDecDoc :: GHC.Internal.Base.String -> Q Dec -> Q Dec
@@ -865,8 +860,6 @@ module Language.Haskell.TH.LanguageExtensions where
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
-  type ArgPatQ :: *
-  type ArgPatQ = Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.ArgPat
   type BangQ :: *
   type BangQ = Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Bang
   type BangTypeQ :: *
@@ -1045,7 +1038,7 @@ module Language.Haskell.TH.Lib where
   intPrimL :: GHC.Num.Integer.Integer -> Language.Haskell.TH.Syntax.Lit
   integerL :: GHC.Num.Integer.Integer -> Language.Haskell.TH.Syntax.Lit
   interruptible :: Language.Haskell.TH.Syntax.Safety
-  invisAP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m Language.Haskell.TH.Syntax.ArgPat
+  invisP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m Language.Haskell.TH.Syntax.Pat
   isStrict :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Strict
   javaScript :: Language.Haskell.TH.Syntax.Callconv
   kiSigD :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Kind -> m Language.Haskell.TH.Syntax.Dec
@@ -1195,7 +1188,6 @@ module Language.Haskell.TH.Lib where
   varT :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Type
   viaStrategy :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m DerivStrategy
   viewP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Exp -> m Language.Haskell.TH.Syntax.Pat -> m Language.Haskell.TH.Syntax.Pat
-  visAP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Pat -> m Language.Haskell.TH.Syntax.ArgPat
   wildCardT :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type
   wildP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Pat
   withDecDoc :: GHC.Internal.Base.String -> Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Dec -> Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Dec
@@ -1204,8 +1196,6 @@ module Language.Haskell.TH.Lib where
 
 module Language.Haskell.TH.Lib.Internal where
   -- Safety: Trustworthy
-  type ArgPatQ :: *
-  type ArgPatQ = Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.ArgPat
   type BangQ :: *
   type BangQ = Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Bang
   type BangTypeQ :: *
@@ -1315,7 +1305,6 @@ module Language.Haskell.TH.Lib.Internal where
   classD :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Cxt -> Language.Haskell.TH.Syntax.Name -> [m (Language.Haskell.TH.Syntax.TyVarBndr Language.Haskell.TH.Syntax.BndrVis)] -> [Language.Haskell.TH.Syntax.FunDep] -> [m Language.Haskell.TH.Syntax.Dec] -> m Language.Haskell.TH.Syntax.Dec
   classP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> [m Language.Haskell.TH.Syntax.Type] -> m Language.Haskell.TH.Syntax.Pred
   clause :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.Pat] -> m Language.Haskell.TH.Syntax.Body -> [m Language.Haskell.TH.Syntax.Dec] -> m Language.Haskell.TH.Syntax.Clause
-  clauseArg :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.ArgPat] -> m Language.Haskell.TH.Syntax.Body -> [m Language.Haskell.TH.Syntax.Dec] -> m Language.Haskell.TH.Syntax.Clause
   closedTypeFamilyD :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> [m (Language.Haskell.TH.Syntax.TyVarBndr Language.Haskell.TH.Syntax.BndrVis)] -> m Language.Haskell.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> [m Language.Haskell.TH.Syntax.TySynEqn] -> m Language.Haskell.TH.Syntax.Dec
   compE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.Stmt] -> m Language.Haskell.TH.Syntax.Exp
   conE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Exp
@@ -1387,7 +1376,7 @@ module Language.Haskell.TH.Lib.Internal where
   intPrimL :: GHC.Num.Integer.Integer -> Language.Haskell.TH.Syntax.Lit
   integerL :: GHC.Num.Integer.Integer -> Language.Haskell.TH.Syntax.Lit
   interruptible :: Language.Haskell.TH.Syntax.Safety
-  invisAP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m Language.Haskell.TH.Syntax.ArgPat
+  invisP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m Language.Haskell.TH.Syntax.Pat
   isStrict :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Strict
   javaScript :: Language.Haskell.TH.Syntax.Callconv
   kiSigD :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Kind -> m Language.Haskell.TH.Syntax.Dec
@@ -1397,7 +1386,6 @@ module Language.Haskell.TH.Lib.Internal where
   kindedTV :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Kind -> m (Language.Haskell.TH.Syntax.TyVarBndr ())
   labelE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => GHC.Internal.Base.String -> m Language.Haskell.TH.Syntax.Exp
   lam1E :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Pat -> m Language.Haskell.TH.Syntax.Exp -> m Language.Haskell.TH.Syntax.Exp
-  lamArgE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.ArgPat] -> m Language.Haskell.TH.Syntax.Exp -> m Language.Haskell.TH.Syntax.Exp
   lamCaseE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.Match] -> m Language.Haskell.TH.Syntax.Exp
   lamCasesE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.Clause] -> m Language.Haskell.TH.Syntax.Exp
   lamE :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => [m Language.Haskell.TH.Syntax.Pat] -> m Language.Haskell.TH.Syntax.Exp -> m Language.Haskell.TH.Syntax.Exp
@@ -1542,7 +1530,6 @@ module Language.Haskell.TH.Lib.Internal where
   varT :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => Language.Haskell.TH.Syntax.Name -> m Language.Haskell.TH.Syntax.Type
   viaStrategy :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type -> m Language.Haskell.TH.Syntax.DerivStrategy
   viewP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Exp -> m Language.Haskell.TH.Syntax.Pat -> m Language.Haskell.TH.Syntax.Pat
-  visAP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Pat -> m Language.Haskell.TH.Syntax.ArgPat
   wildCardT :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Type
   wildP :: forall (m :: * -> *). Language.Haskell.TH.Syntax.Quote m => m Language.Haskell.TH.Syntax.Pat
   withDecDoc :: GHC.Internal.Base.String -> Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Dec -> Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Dec
@@ -1581,7 +1568,6 @@ module Language.Haskell.TH.Ppr where
   noPrec :: Precedence
   opPrec :: Precedence
   parensIf :: GHC.Types.Bool -> Language.Haskell.TH.PprLib.Doc -> Language.Haskell.TH.PprLib.Doc
-  pprArgPat :: Precedence -> Language.Haskell.TH.Syntax.ArgPat -> Language.Haskell.TH.PprLib.Doc
   pprBangType :: Language.Haskell.TH.Syntax.BangType -> Language.Haskell.TH.PprLib.Doc
   pprBndrVis :: Language.Haskell.TH.Syntax.BndrVis -> Language.Haskell.TH.PprLib.Doc -> Language.Haskell.TH.PprLib.Doc
   pprBody :: GHC.Types.Bool -> Language.Haskell.TH.Syntax.Body -> Language.Haskell.TH.PprLib.Doc
@@ -1709,8 +1695,6 @@ module Language.Haskell.TH.Syntax where
   data AnnLookup = AnnLookupModule Module | AnnLookupName Name
   type AnnTarget :: *
   data AnnTarget = ModuleAnnotation | TypeAnnotation Name | ValueAnnotation Name
-  type ArgPat :: *
-  data ArgPat = VisAP Pat | InvisAP Type
   type Arity :: *
   type Arity = GHC.Types.Int
   type Bang :: *
@@ -1728,7 +1712,7 @@ module Language.Haskell.TH.Syntax where
   type CharPos :: *
   type CharPos = (GHC.Types.Int, GHC.Types.Int)
   type Clause :: *
-  data Clause = Clause [ArgPat] Body [Dec]
+  data Clause = Clause [Pat] Body [Dec]
   type role Code representational nominal
   type Code :: (* -> *) -> forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
   newtype Code m a = Code {examineCode :: m (TExp a)}
@@ -1782,7 +1766,7 @@ module Language.Haskell.TH.Syntax where
     | InfixE (GHC.Internal.Maybe.Maybe Exp) Exp (GHC.Internal.Maybe.Maybe Exp)
     | UInfixE Exp Exp Exp
     | ParensE Exp
-    | LamE [ArgPat] Exp
+    | LamE [Pat] Exp
     | LamCaseE [Match]
     | LamCasesE [Clause]
     | TupE [GHC.Internal.Maybe.Maybe Exp]
@@ -2004,7 +1988,7 @@ module Language.Haskell.TH.Syntax where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type
   type PatSynArgs :: *
   data PatSynArgs = PrefixPatSyn [Name] | InfixPatSyn Name Name | RecordPatSyn [Name]
   type PatSynDir :: *
@@ -2222,7 +2206,6 @@ instance GHC.Internal.Control.Monad.Fail.MonadFail Language.Haskell.TH.Syntax.Q 
 instance GHC.Internal.Control.Monad.Fix.MonadFix Language.Haskell.TH.Syntax.Q -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.AnnLookup -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.AnnTarget -- Defined in ‘Language.Haskell.TH.Syntax’
-instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Data.Data.Data Language.Haskell.TH.Syntax.Body -- Defined in ‘Language.Haskell.TH.Syntax’
@@ -2283,7 +2266,6 @@ instance [safe] GHC.Internal.Enum.Bounded GHC.LanguageExtensions.Type.Extension 
 instance [safe] GHC.Internal.Enum.Enum GHC.LanguageExtensions.Type.Extension -- Defined in ‘GHC.LanguageExtensions.Type’
 instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.AnnLookup -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.AnnTarget -- Defined in ‘Language.Haskell.TH.Syntax’
-instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Generics.Generic Language.Haskell.TH.Syntax.Body -- Defined in ‘Language.Haskell.TH.Syntax’
@@ -2342,7 +2324,6 @@ instance [safe] GHC.Internal.Generics.Generic GHC.LanguageExtensions.Type.Extens
 instance [safe] GHC.Internal.Generics.Generic GHC.ForeignSrcLang.Type.ForeignSrcLang -- Defined in ‘GHC.ForeignSrcLang.Type’
 instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.AnnLookup -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.AnnTarget -- Defined in ‘Language.Haskell.TH.Syntax’
-instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Internal.Show.Show Language.Haskell.TH.Syntax.Body -- Defined in ‘Language.Haskell.TH.Syntax’
@@ -2403,7 +2384,6 @@ instance [safe] GHC.Internal.Show.Show Language.Haskell.TH.PprLib.Doc -- Defined
 instance [safe] GHC.Internal.Show.Show GHC.ForeignSrcLang.Type.ForeignSrcLang -- Defined in ‘GHC.ForeignSrcLang.Type’
 instance GHC.Classes.Eq Language.Haskell.TH.Syntax.AnnLookup -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Eq Language.Haskell.TH.Syntax.AnnTarget -- Defined in ‘Language.Haskell.TH.Syntax’
-instance GHC.Classes.Eq Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Eq Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Eq Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Eq Language.Haskell.TH.Syntax.Body -- Defined in ‘Language.Haskell.TH.Syntax’
@@ -2462,7 +2442,6 @@ instance [safe] GHC.Classes.Eq GHC.LanguageExtensions.Type.Extension -- Defined 
 instance [safe] GHC.Classes.Eq GHC.ForeignSrcLang.Type.ForeignSrcLang -- Defined in ‘GHC.ForeignSrcLang.Type’
 instance GHC.Classes.Ord Language.Haskell.TH.Syntax.AnnLookup -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Ord Language.Haskell.TH.Syntax.AnnTarget -- Defined in ‘Language.Haskell.TH.Syntax’
-instance GHC.Classes.Ord Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Ord Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Ord Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Syntax’
 instance GHC.Classes.Ord Language.Haskell.TH.Syntax.Body -- Defined in ‘Language.Haskell.TH.Syntax’
@@ -2521,7 +2500,6 @@ instance [safe] GHC.Classes.Ord GHC.LanguageExtensions.Type.Extension -- Defined
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag Language.Haskell.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Lib’
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag Language.Haskell.TH.Syntax.Specificity -- Defined in ‘Language.Haskell.TH.Lib’
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag () -- Defined in ‘Language.Haskell.TH.Lib’
-instance [safe] Language.Haskell.TH.Ppr.Ppr Language.Haskell.TH.Syntax.ArgPat -- Defined in ‘Language.Haskell.TH.Ppr’
 instance [safe] Language.Haskell.TH.Ppr.Ppr Language.Haskell.TH.Syntax.Bang -- Defined in ‘Language.Haskell.TH.Ppr’
 instance [safe] Language.Haskell.TH.Ppr.Ppr Language.Haskell.TH.Syntax.Clause -- Defined in ‘Language.Haskell.TH.Ppr’
 instance [safe] Language.Haskell.TH.Ppr.Ppr Language.Haskell.TH.Syntax.Con -- Defined in ‘Language.Haskell.TH.Ppr’

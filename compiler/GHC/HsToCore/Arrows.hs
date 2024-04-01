@@ -532,7 +532,7 @@ dsCmd ids local_vars stack_ty res_ty
           = (L _ [L _ (Match { m_pats  = pats
                              , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
         env_ids
-  = dsCmdLam ids local_vars stack_ty res_ty (filterOutErasedPats pats) body env_ids
+  = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
 dsCmd ids local_vars stack_ty res_ty
       (HsCmdLam _ lam_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
@@ -1208,7 +1208,7 @@ leavesMatch :: LMatch GhcTc (LocatedA (body GhcTc))
 leavesMatch (L _ (Match { m_pats = pats
                         , m_grhss = GRHSs _ grhss binds }))
   = let
-        defined_vars = mkVarSet (collectLArgPatsBinders CollWithDictBinders pats)
+        defined_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
                         `unionVarSet`
                        mkVarSet (collectLocalBinders CollWithDictBinders binds)
     in

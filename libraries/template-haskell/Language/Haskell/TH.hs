@@ -86,7 +86,7 @@ module Language.Haskell.TH(
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
     -- ** Patterns
-        Pat(..), ArgPat(..), FieldExp, FieldPat,
+        Pat(..), FieldExp, FieldPat,
     -- ** Types
         Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
         Syntax.Specificity(..),

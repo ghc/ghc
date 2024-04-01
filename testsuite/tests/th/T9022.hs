@@ -16,5 +16,5 @@ foo = barD
        xName = mkName "x"
        returnVarE = VarE $ mkName "return"
        xVarE = VarE xName
-       manyArgs = map (VisAP . argP) [0..9]
+       manyArgs = map argP [0..9]
        argP n = VarP $ mkName $ "arg" ++ show n

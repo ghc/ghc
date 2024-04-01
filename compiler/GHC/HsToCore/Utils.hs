@@ -42,8 +42,6 @@ module GHC.HsToCore.Utils (
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
         mkOptTickBox, mkBinaryTickBox, decideBangHood,
         isTrueLHsExpr,
-
-        filterOutErasedPats
     ) where
 
 import GHC.Prelude
@@ -88,7 +86,7 @@ import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (maybeToList, mapMaybe)
+import Data.Maybe (maybeToList)
 import qualified Data.List.NonEmpty as NEL
 
 {-
@@ -1094,29 +1092,3 @@ isTrueLHsExpr (L _ (XExpr (HsBinTick ixT _ e)))
 
 isTrueLHsExpr (L _ (HsPar _ e)) = isTrueLHsExpr e
 isTrueLHsExpr _                 = Nothing
-
--- Drop user-written arg-patterns for erased arguments, i.e. @-binders and
--- required type arguments:
---
---  f :: forall a. forall b -> Int -> blah
---  f @a b c = ...
---
--- In this example:
---
---  * InvisPat        @a   -- filtered out (corresponds to forall a.)
---  * VisPat Erased   b    -- filtered out (corresponds to forall b ->)
---  * VisPat Retained c    -- kept         (corresponds to Int ->)
---
--- filterOutErasedPats [@a, b, c] = [c]
---
--- We have no use for erased patterns in the desugarer. The type checker has
--- already produced HsWrappers to bind the corresponding type variables.
---
--- See Note [Invisible binders in functions] in GHC.Hs.Pat
-filterOutErasedPats :: [LArgPat GhcTc] -> [LPat GhcTc]
-filterOutErasedPats xs = mapMaybe (to_lpat . unLoc) xs
-  where
-    to_lpat :: ArgPat GhcTc -> Maybe (LPat GhcTc)
-    to_lpat (VisPat Retained pat) = Just pat
-    to_lpat (VisPat Erased _)     = Nothing
-    to_lpat (InvisPat _ _)        = Nothing
