@@ -166,9 +166,10 @@ writeInterfaceFile filename iface = do
                       bin_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = setUserData bh0 $ newWriteState (putName bin_symtab)
-                                           (putName bin_symtab)
-                                           (putFastString bin_dict)
+  let bh = setWriterUserData bh0
+            $ newWriteState (putName bin_symtab)
+                            (putName bin_symtab)
+                            (putFastString bin_dict)
   putInterfaceFile_ bh iface
 
   -- write the symtab pointer at the front of the file
