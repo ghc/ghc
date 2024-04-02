@@ -119,10 +119,10 @@ type IfaceTopBndr = Name
   -- We don't serialise the namespace onto the disk though; rather we
   -- drop it when serialising and add it back in when deserialising.
 
-getIfaceTopBndr :: BinHandle -> IO IfaceTopBndr
+getIfaceTopBndr :: ReadBinHandle -> IO IfaceTopBndr
 getIfaceTopBndr bh = get bh
 
-putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
+putIfaceTopBndr :: WriteBinHandle -> IfaceTopBndr -> IO ()
 putIfaceTopBndr bh name =
     case findUserDataWriter (Proxy @BindingName) bh of
       tbl ->
@@ -2445,13 +2445,13 @@ instance Binary IfGuidance where
                     c <- get bh
                     return (IfWhen a b c)
 
-putUnfoldingCache :: BinHandle -> IfUnfoldingCache -> IO ()
+putUnfoldingCache :: WriteBinHandle -> IfUnfoldingCache -> IO ()
 putUnfoldingCache bh (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
                                      , uf_is_work_free = wf, uf_expandable = exp }) = do
     let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp
     putByte bh b
 
-getUnfoldingCache :: BinHandle -> IO IfUnfoldingCache
+getUnfoldingCache :: ReadBinHandle -> IO IfUnfoldingCache
 getUnfoldingCache bh = do
     b <- getByte bh
     let hnf     = testBit b 3
