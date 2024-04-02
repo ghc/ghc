@@ -14,8 +14,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Panic.Plain
-import GHC.Iface.Type (IfaceType, putIfaceType)
-import Data.Proxy
+import GHC.Iface.Type (putIfaceType)
 import GHC.Utils.Outputable
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
@@ -39,7 +38,7 @@ computeFingerprint a = do
     fingerprintBinMem bh
   where
     set_user_data bh =
-      addWriterToUserData (mkSomeBinaryWriter (Proxy @IfaceType) $ mkWriter putIfaceType) $
+      addWriterToUserData (mkSomeBinaryWriter $ mkWriter putIfaceType) $
       setWriterUserData bh $ newWriteState putNameLiterally putFS
 
 -- | Used when we want to fingerprint a structure without depending on the
