@@ -113,7 +113,7 @@ writeHieFile hie_file_path hiefile = do
   -- write the symtab pointer at the front of the file
   symtab_p <- tellBin bh
   putAt bh symtab_p_p symtab_p
-  seekBin bh symtab_p
+  seekBinNoExpand bh symtab_p
 
   -- write the symbol table itself
   symtab_next' <- readFastMutInt symtab_next
@@ -123,7 +123,7 @@ writeHieFile hie_file_path hiefile = do
   -- write the dictionary pointer at the front of the file
   dict_p <- tellBin bh
   putAt bh dict_p_p dict_p
-  seekBin bh dict_p
+  seekBinNoExpand bh dict_p
 
   -- write the dictionary itself
   dict_next <- readFastMutInt dict_next_ref
@@ -232,17 +232,17 @@ readHieFileContents bh0 name_cache = do
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
       data_p <- tellBin bin_handle
-      seekBin bin_handle dict_p
+      seekBinNoExpand bin_handle dict_p
       dict <- getDictionary bin_handle
-      seekBin bin_handle data_p
+      seekBinNoExpand bin_handle data_p
       return dict
 
     get_symbol_table bh1 = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
-      seekBin bh1 symtab_p
+      seekBinNoExpand bh1 symtab_p
       symtab <- getSymbolTable bh1 name_cache
-      seekBin bh1 data_p'
+      seekBinNoExpand bh1 data_p'
       return symtab
 
 putFastString :: HieDictionary -> BinHandle -> FastString -> IO ()

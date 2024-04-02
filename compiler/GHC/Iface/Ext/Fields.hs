@@ -42,7 +42,7 @@ instance Binary ExtensibleFields where
     forM_ header_entries $ \(field_p_p, dat) -> do
       field_p <- tellBin bh
       putAt bh field_p_p field_p
-      seekBin bh field_p
+      seekBinNoExpand bh field_p
       put_ bh dat
 
   get bh = do
@@ -54,7 +54,7 @@ instance Binary ExtensibleFields where
 
     -- Seek to and get each field's payload:
     fields <- forM header_entries $ \(name, field_p) -> do
-      seekBin bh field_p
+      seekBinNoExpand bh field_p
       dat <- get bh
       return (name, dat)
 

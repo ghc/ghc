@@ -28,9 +28,9 @@ module GHC.Utils.Binary
    unsafeUnpackBinBuffer,
 
    openBinMem,
+   seekBinNoExpand,
 --   closeBin,
 
-   seekBin,
    tellBin,
    castBin,
    withBinBuffer,
@@ -222,10 +222,10 @@ class Binary a where
     put bh a  = do p <- tellBin bh; put_ bh a; return p
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
-putAt bh p x = do seekBin bh p; put_ bh x; return ()
+putAt bh p x = do seekBinNoExpand bh p; put_ bh x; return ()
 
 getAt  :: Binary a => BinHandle -> Bin a -> IO a
-getAt bh p = do seekBin bh p; get bh
+getAt bh p = do seekBinNoExpand bh p; get bh
 
 openBinMem :: Int -> IO BinHandle
 openBinMem size
@@ -239,13 +239,6 @@ openBinMem size
 
 tellBin :: BinHandle -> IO (Bin a)
 tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
-
-seekBin :: BinHandle -> Bin a -> IO ()
-seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
-  sz <- readFastMutInt sz_r
-  if (p > sz)
-        then do expandBin h p; writeFastMutInt ix_r p
-        else writeFastMutInt ix_r p
 
 -- | 'seekBinNoExpand' moves the index pointer to the location pointed to
 -- by 'Bin a'.
@@ -1028,7 +1021,7 @@ lazyPut bh a = do
     put_ bh a           -- dump the object
     q <- tellBin bh     -- q = ptr to after object
     putAt bh pre_a q    -- fill in slot before a with ptr to q
-    seekBin bh q        -- finally carry on writing at q
+    seekBinNoExpand bh q        -- finally carry on writing at q
 
 lazyGet :: Binary a => BinHandle -> IO a
 lazyGet bh = do
@@ -1039,7 +1032,7 @@ lazyGet bh = do
         -- safety.
         off_r <- newFastMutInt 0
         getAt bh { _off_r = off_r } p_a
-    seekBin bh p -- skip over the object for now
+    seekBinNoExpand bh p -- skip over the object for now
     return a
 
 -- | Serialize the constructor strictly but lazily serialize a value inside a

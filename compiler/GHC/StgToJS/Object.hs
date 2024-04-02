@@ -392,7 +392,7 @@ getObjectBlocks obj bids = mapMaybeM read_entry (zip (objIndex obj) [0..])
     bh = objHandle obj
     read_entry (IndexEntry syms offset,i)
       | IS.member i bids = do
-          seekBin bh offset
+          seekBinNoExpand bh offset
           Just <$> getObjBlock syms bh
       | otherwise = pure Nothing
 
