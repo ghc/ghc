@@ -146,11 +146,11 @@ writeInterfaceFile filename iface = do
   put_ bh0 binaryInterfaceVersion
 
   -- remember where the dictionary pointer will go
-  dict_p_p <- tellBin bh0
+  dict_p_p <- tellBinWriter bh0
   put_ bh0 dict_p_p
 
   -- remember where the symbol table pointer will go
-  symtab_p_p <- tellBin bh0
+  symtab_p_p <- tellBinWriter bh0
   put_ bh0 symtab_p_p
 
   -- Make some intial state
@@ -173,9 +173,9 @@ writeInterfaceFile filename iface = do
   putInterfaceFile_ bh iface
 
   -- write the symtab pointer at the front of the file
-  symtab_p <- tellBin bh
+  symtab_p <- tellBinWriter bh
   putAt bh symtab_p_p symtab_p
-  seekBin bh symtab_p
+  seekBinWriter bh symtab_p
 
   -- write the symbol table itself
   symtab_next' <- readFastMutInt symtab_next
@@ -183,9 +183,9 @@ writeInterfaceFile filename iface = do
   putSymbolTable bh symtab_next' symtab_map'
 
   -- write the dictionary pointer at the fornt of the file
-  dict_p <- tellBin bh
+  dict_p <- tellBinWriter bh
   putAt bh dict_p_p dict_p
-  seekBin bh dict_p
+  seekBinWriter bh dict_p
 
   -- write the dictionary itself
   dict_next <- readFastMutInt dict_next_ref
@@ -227,7 +227,7 @@ readInterfaceFile name_cache filename bypass_checks = do
 -------------------------------------------------------------------------------
 
 
-putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName :: BinSymbolTable -> WriteBinHandle -> Name -> IO ()
 putName BinSymbolTable{
             bin_symtab_map = symtab_map_ref,
             bin_symtab_next = symtab_next }    bh name
@@ -250,7 +250,7 @@ data BinSymbolTable = BinSymbolTable {
   }
 
 
-putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
+putFastString :: BinDictionary -> WriteBinHandle -> FastString -> IO ()
 putFastString BinDictionary { bin_dict_next = j_r,
                               bin_dict_map  = out_r}  bh f
   = do
@@ -305,7 +305,7 @@ instance Binary InterfaceFile where
     return (InterfaceFile env info ifaces)
 
 
-putInterfaceFile_ :: BinHandle -> InterfaceFile -> IO ()
+putInterfaceFile_ :: WriteBinHandle -> InterfaceFile -> IO ()
 putInterfaceFile_ bh (InterfaceFile env info ifaces) = do
   put_ bh env
   put_ bh info
