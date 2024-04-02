@@ -1299,6 +1299,72 @@ data WriterTable = WriterTable
   { putTable :: WriteBinHandle -> IO Int
   }
 
+-- ----------------------------------------------------------------------------
+-- Common data structures for constructing and maintaining lookup tables for
+-- binary serialisation and deserialisation.
+-- ----------------------------------------------------------------------------
+
+data GenericSymbolTable a = GenericSymbolTable
+  { gen_symtab_next :: !FastMutInt
+  -- ^ The next index to use
+  , gen_symtab_map  :: !(IORef (Map.Map a Int))
+  -- ^ Given a symbol, find the symbol
+  }
+
+initGenericSymbolTable :: IO (GenericSymbolTable a)
+initGenericSymbolTable = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef Map.empty
+  pure $ GenericSymbolTable
+        { gen_symtab_next = symtab_next
+        , gen_symtab_map  = symtab_map
+        }
+
+putGenericSymbolTable :: forall a. GenericSymbolTable a -> (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> IO Int
+putGenericSymbolTable gen_sym_tab serialiser bh = do
+  table_count <- readFastMutInt symtab_next
+  symtab_map  <- readIORef symtab_map
+  putGenericSymbolTable bh table_count symtab_map
+  pure table_count
+  where
+    symtab_map = gen_symtab_map gen_sym_tab
+    symtab_next = gen_symtab_next gen_sym_tab
+    putGenericSymbolTable :: WriteBinHandle -> Int -> Map.Map a Int -> IO ()
+    putGenericSymbolTable bh name_count symtab = do
+        put_ bh name_count
+        let genElements = elems (array (0,name_count-1) (fmap swap $ Map.toList symtab))
+        mapM_ (\n -> serialiser bh n) genElements
+
+getGenericSymbolTable :: forall a. (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
+getGenericSymbolTable deserialiser bh = do
+  sz <- get bh :: IO Int
+  mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
+  forM_ [0..(sz-1)] $ \i -> do
+    f <- deserialiser bh
+    writeArray mut_arr i f
+  unsafeFreeze mut_arr
+
+putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> WriteBinHandle -> a -> IO ()
+putGenericSymTab GenericSymbolTable{
+               gen_symtab_map = symtab_map_ref,
+               gen_symtab_next = symtab_next }
+        bh val = do
+  symtab_map <- readIORef symtab_map_ref
+  case Map.lookup val symtab_map of
+    Just off -> put_ bh (fromIntegral off :: Word32)
+    Nothing -> do
+      off <- readFastMutInt symtab_next
+      writeFastMutInt symtab_next (off+1)
+      writeIORef symtab_map_ref
+          $! Map.insert val off symtab_map
+      put_ bh (fromIntegral off :: Word32)
+
+getGenericSymtab :: Binary a => SymbolTable a
+              -> ReadBinHandle -> IO a
+getGenericSymtab symtab bh = do
+  i :: Word32 <- get bh
+  return $! symtab ! fromIntegral i
+
 ---------------------------------------------------------
 -- The Dictionary
 ---------------------------------------------------------
