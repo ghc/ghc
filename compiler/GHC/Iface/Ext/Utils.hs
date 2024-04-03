@@ -533,6 +533,10 @@ locOnly (RealSrcSpan span _) = do
   pure [Node e span []]
 locOnly _ = pure []
 
+locOnlyE :: Monad m => EpaLocation -> ReaderT NodeOrigin m [HieAST a]
+locOnlyE (EpaSpan s) = locOnly s
+locOnlyE _ = pure []
+
 mkScope :: (HasLoc a) => a -> Scope
 mkScope a = case getHasLoc a of
               (RealSrcSpan sp _) -> LocalScope sp
