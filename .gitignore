@@ -166,6 +166,7 @@ _darcs/
 /libraries/ghc-boot/ghc-boot.cabal
 /libraries/ghc-boot-th/GNUmakefile
 /libraries/ghc-boot-th/ghc-boot-th.cabal
+/libraries/ghc-boot-th-next/ghc-boot-th-next.cabal
 /libraries/ghc-boot-th/ghc.mk
 /libraries/ghc-heap/ghc-heap.cabal
 /libraries/ghci/GNUmakefile
@@ -182,6 +183,7 @@ _darcs/
 /libraries/synopsis.png
 /libraries/stamp/
 /libraries/template-haskell/template-haskell.cabal
+/libraries/template-haskell-next/template-haskell-next.cabal
 /linter.log
 /mk/are-validating.mk
 /mk/build.mk

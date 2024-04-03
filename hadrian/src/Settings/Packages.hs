@@ -87,6 +87,7 @@ packageArgs = do
             -- We do it through a cabal flag in ghc.cabal
             , stageVersion < makeVersion [9,8,1] ? arg "+hadrian-stage0"
             , flag StaticLibzstd `cabalFlag` "static-libzstd"
+            , stage0 `cabalFlag` "bootstrap"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
@@ -121,6 +122,10 @@ packageArgs = do
           , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
+        -------------------------------- ghcBoot ------------------------------
+        , package ghcBoot ?
+            builder (Cabal Flags) ? (stage0 `cabalFlag` "bootstrap")
+
         --------------------------------- ghci ---------------------------------
         , package ghci ? mconcat
           [
@@ -151,9 +156,12 @@ packageArgs = do
           -- compiler comes with the same versions as the one we are building.
           --
             builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
-          , builder (Cabal Flags) ? ifM stage0
-              (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
-              (arg "internal-interpreter")
+          , builder (Cabal Flags) ? mconcat
+            [ ifM stage0
+                (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
+                (arg "internal-interpreter")
+            , stage0 `cabalFlag` "bootstrap"
+            ]
 
           ]
 
@@ -177,6 +185,10 @@ packageArgs = do
         -------------------------------- haddock -------------------------------
         , package haddock ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
+
+        ---------------------------- template-haskell --------------------------
+        , package templateHaskellNext ?
+            builder (Cabal Flags) ? stage0 `cabalFlag` "bootstrap"
 
         ---------------------------------- text --------------------------------
         , package text ? mconcat

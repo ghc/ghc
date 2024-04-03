@@ -307,13 +307,17 @@ escapedPkgName = map f . pkgName
     f '-'   = '_'
     f other = other
 
-templateRule :: FilePath -> Interpolations -> Rules ()
-templateRule outPath interps = do
+templateRuleFrom :: FilePath -> FilePath -> Interpolations -> Rules ()
+templateRuleFrom inPath outPath interps = do
     outPath %> \_ -> do
-        s <- readFile' (outPath <.> "in")
+        s <- readFile' inPath
         result <- runInterpolations interps s
         writeFile' outPath result
         putSuccess ("| Successfully generated " ++ outPath ++ " from its template")
+
+templateRule :: FilePath -> Interpolations -> Rules ()
+templateRule outPath =
+  templateRuleFrom (outPath <.> "in") outPath
 
 templateRules :: Rules ()
 templateRules = do
@@ -324,11 +328,31 @@ templateRules = do
   templateRule "utils/remote-iserv/remote-iserv.cabal" $ projectVersion
   templateRule "utils/runghc/runghc.cabal" $ projectVersion
   templateRule "libraries/ghc-boot/ghc-boot.cabal" $ projectVersion
-  templateRule "libraries/ghc-boot-th/ghc-boot-th.cabal" $ projectVersion
+  templateRule "libraries/ghc-boot-th/ghc-boot-th.cabal" $ mconcat
+    [ projectVersion
+    , interpolateVar "Suffix" $ pure ""
+    , interpolateVar "SourceRoot" $ pure "."
+    ]
+  templateRuleFrom "libraries/ghc-boot-th/ghc-boot-th.cabal.in"
+                   "libraries/ghc-boot-th-next/ghc-boot-th-next.cabal" $ mconcat
+    [ projectVersion
+    , interpolateVar "Suffix" $ pure "-next"
+    , interpolateVar "SourceRoot" $ pure "../ghc-boot-th"
+    ]
   templateRule "libraries/ghci/ghci.cabal" $ projectVersion
   templateRule "libraries/ghc-heap/ghc-heap.cabal" $ projectVersion
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
-  templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
+  templateRule "libraries/template-haskell/template-haskell.cabal" $ mconcat
+    [ projectVersion
+    , interpolateVar "Suffix" $ pure ""
+    , interpolateVar "SourceRoot" $ pure "."
+    ]
+  templateRuleFrom "libraries/template-haskell/template-haskell.cabal.in"
+                   "libraries/template-haskell-next/template-haskell-next.cabal" $ mconcat
+    [ projectVersion
+    , interpolateVar "Suffix" $ pure "-next"
+    , interpolateVar "SourceRoot" $ pure "../template-haskell"
+    ]
   templateRule "libraries/prologue.txt" $ packageVersions
   templateRule "rts/include/ghcversion.h" $ mconcat
     [ interpolateSetting "ProjectVersionInt" ProjectVersionInt

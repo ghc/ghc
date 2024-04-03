@@ -4,12 +4,12 @@ module Packages (
     array, base, binary, bytestring, cabal, cabalSyntax, checkPpr,
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
-    exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
+    exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
     ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
     ghcToolchain, ghcToolchainBin, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
-    runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout,
+    runGhc, semaphoreCompat, stm, templateHaskell, templateHaskellNext, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
@@ -37,11 +37,11 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
-    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform
+    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
     , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl, osString
-    , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
+    , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell, templateHaskellNext
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml
     , timeout
     , lintersCommon
@@ -54,7 +54,7 @@ isGhcPackage = (`elem` ghcPackages)
 -- | Package definitions, see 'Package'.
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
-  exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
+  exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
   ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
@@ -87,6 +87,7 @@ ghc                 = prg  "ghc-bin"         `setPath` "ghc"
 ghcBignum           = lib  "ghc-bignum"
 ghcBoot             = lib  "ghc-boot"
 ghcBootTh           = lib  "ghc-boot-th"
+ghcBootThNext       = lib  "ghc-boot-th-next"
 ghcPlatform         = lib  "ghc-platform"
 ghcCompact          = lib  "ghc-compact"
 ghcConfig           = prg  "ghc-config"      `setPath` "testsuite/ghc-config"
@@ -123,6 +124,7 @@ runGhc              = util "runghc"
 semaphoreCompat     = lib  "semaphore-compat"
 stm                 = lib  "stm"
 templateHaskell     = lib  "template-haskell"
+templateHaskellNext = lib  "template-haskell-next"
 terminfo            = lib  "terminfo"
 text                = lib  "text"
 time                = lib  "time"
