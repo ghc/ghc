@@ -1,8 +1,8 @@
--- WARNING: template-haskell.cabal is automatically generated from template-haskell.cabal.in by
+-- WARNING: template-haskell@Suffix@.cabal is automatically generated from ../template-haskell/template-haskell.cabal.in by
 -- ../../configure.  Make sure you are editing template-haskell.cabal.in, not
--- template-haskell.cabal.
+-- template-haskell@Suffix@.cabal.
 
-name:           template-haskell
+name:           template-haskell@Suffix@
 version:        2.22.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
@@ -19,6 +19,15 @@ description:
     .
     See <http://www.haskell.org/haskellwiki/Template_Haskell> for more
     information.
+
+Flag bootstrap
+        Description:
+          Enabled when building the stage1 compiler in order to vendor the in-tree
+          `template-haskell` library (including its dependency `ghc-boot-th`), while
+          allowing dependencies to depend on the boot `template-haskell` library.
+          See Note [Bootstrapping Template Haskell]
+        Default: False
+        Manual: True
 
 extra-source-files: changelog.md
 
@@ -56,7 +65,7 @@ Library
 
     build-depends:
         base        >= 4.11 && < 4.21,
-        ghc-boot-th == @ProjectVersionMunged@,
+        ghc-boot-th@Suffix@ == @ProjectVersionMunged@,
         ghc-prim,
         pretty      == 1.1.*
 
@@ -64,12 +73,15 @@ Library
       System.FilePath
       System.FilePath.Posix
       System.FilePath.Windows
-    hs-source-dirs: ./vendored-filepath .
+    hs-source-dirs: @SourceRoot@/vendored-filepath @SourceRoot@
     default-extensions:
       ImplicitPrelude
 
     ghc-options: -Wall
 
-    -- We need to set the unit ID to template-haskell (without a
-    -- version number) as it's magic.
-    ghc-options: -this-unit-id template-haskell
+    if flag(bootstrap)
+        cpp-options: -DBOOTSTRAP_TH
+    else
+        -- We need to set the unit ID to template-haskell (without a
+        -- version number) as it's magic.
+        ghc-options: -this-unit-id template-haskell

@@ -85,23 +85,11 @@ multiSetup pkg_s = do
       need (srcs ++ gens)
       let rexp m = ["-reexported-module", m]
       let hidir = root </> "interfaces" </> pkgPath p
-      writeFile' (resp_file root p) (intercalate "\n" (th_hack arg_list
+      writeFile' (resp_file root p) (intercalate "\n" (arg_list
                                                       ++  modules cd
                                                       ++ concatMap rexp (reexportModules cd)
                                                       ++ ["-outputdir", hidir]))
       return (resp_file root p)
-
-
-    -- The template-haskell package is compiled with -this-unit-id=template-haskell but
-    -- everything which depends on it depends on `-package-id-template-haskell-2.17.0.0`
-    -- and so the logic for detetecting which home-units depend on what is defeated.
-    -- The workaround here is just to rewrite all the `-package-id` arguments to
-    -- point to `template-haskell` instead which works for the multi-repl case.
-    -- See #20887
-    th_hack :: [String] -> [String]
-    th_hack ((isPrefixOf "-package-id template-haskell" -> True) : xs) = "-package-id" : "template-haskell" : xs
-    th_hack (x:xs) = x : th_hack xs
-    th_hack [] = []
 
 
 toolRuleBody :: FilePath -> Action ()
@@ -158,7 +146,7 @@ toolTargets = [ binary
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
               , ghcBoot
-              , ghcBootTh
+              , ghcBootThNext
               , ghcPlatform
               , ghcToolchain
               , ghcToolchainBin
@@ -172,7 +160,7 @@ toolTargets = [ binary
               , mtl
               , parsec
               , time
-              , templateHaskell
+              , templateHaskellNext
               , text
               , transformers
               , semaphoreCompat

@@ -2916,3 +2916,116 @@ tcGetInterp = do
    case hsc_interp hsc_env of
       Nothing -> liftIO $ throwIO (InstallationError "Template haskell requires a target code interpreter")
       Just i  -> pure i
+
+-- Note [Bootstrapping Template Haskell]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Staged Metaprogramming as implemented in Template Haskell introduces a whole
+-- new dimension of staging to the already staged bootstrapping process.
+-- The `template-haskell` library plays a crucial role in this process.
+--
+-- Nomenclature:
+--
+--   boot/stage0 compiler: An already released compiler used to compile GHC
+--   stage(N+1) compiler: The result of compiling GHC from source with stage(N)
+--       Recall that any code compiled by the stage1 compiler should be binary
+--       identical to the same code compiled by later stages.
+--   boot TH: the `template-haskell` that comes with (and is linked to) the
+--       boot/stage0 compiler
+--   in-tree TH: the `template-haskell` library that lives in GHC's repository.
+--       Recall that building in-tree TH with the stage1 compiler yields a binary
+--       that is identical to the in-tree TH compiled by stage2.
+--   boot library: A library such as bytestring or containers that GHC depends on.
+--       CONFUSINGLY, we build these libraries with the boot compiler as well as
+--       the stage1 compiler; thus the "boot" in boot library does not refer to a
+--       stage.
+--
+-- Here is how we bootstrap `template-haskell` in tandem with GHC:
+--
+--  1. Link the stage1 compiler against the boot TH library.
+--  2. When building the stage1 compiler, build a CPP'd version of the in-tree
+--     TH using the boot compiler under a different package-id,
+--     `template-haskell-next`, and build stage1 GHC against that.
+--  3. Build the in-tree TH with the stage1 compiler.
+--  4. Build and link the stage2 compiler against the in-tree TH.
+--
+-- Observations:
+--
+--  A. The vendoring in (2) means that the fully qualified name of the in-tree TH
+--     AST will be, e.g., `template-haskell-next:...VarE`, not `template-haskell:...VarE`.
+--     That is OK, because we need it just for the `Binary` instance and to
+--     convert TH ASTs returned by splices into the Hs AST, both of which do not
+--     depend on the fully qualified name of the type to serialise! Importantly,
+--     Note [Hard-wiring in-tree template-haskell for desugaring quotes] is
+--     unaffected, because the desugaring refers to names in the in-tree TH
+--     library, which is built in the next stage, stage1, and later.
+--
+-- (Rejected) alternative designs:
+--
+--  1b. Build the in-tree TH with the stage0 compiler and link the stage1 compiler
+--      against it. This is what we did until Apr 24 and it is problematic (#23536):
+--        * (It rules out using TH in GHC, for example to derive GHC.Core.Map types,
+--           because the boot compiler expects the boot TH AST in splices, but, e.g.,
+--           splice functions in GHC.Core.Map.TH would return the in-tree TH AST.
+--           However, at the moment, we are not using TH in GHC anyway.)
+--        * Ultimately, we must link the stage1 compiler against a
+--          single version of template-haskell.
+--            (Beyond the fact that doing otherwise would invite even
+--            more "which `template-haskell` is this" confusion, it
+--            would also result in confusing linker errors: see for
+--            example #21981.  In principle we could likely lift this
+--            restriction with more aggressive name mangling, but the
+--            knock-on effects of doing so are unexplored.)
+--        * If the single version is the in-tree TH, we have to recompile all boot
+--          libraries (e.g. bytestring, containers) with this new TH version.
+--        * But the boot libraries must *not* be built against a non-boot TH version.
+--          The reason is Note [Hard-wiring in-tree template-haskell for desugaring quotes]:
+--          The boot compiler will desugar quotes wrt. names in the boot TH version.
+--          A quote like `[| unsafePackLenLiteral |]` in bytestring will desugar
+--          to `varE (mkNameS "unsafePackLenLiteral")`, and all
+--          those smart constructors refer to locations in *boot TH*, because that
+--          is all that the boot GHC knows about.
+--          If the in-tree TH were to move or rename the definition of
+--          `mkNameS`, the boot compiler would report a linker error when
+--          compiling bytestring.
+--        * (Stopping to use quotes in bytestring is no solution, either, because
+--           the `Lift` type class is wired-in as well.
+--           Only remaining option: provide an entirely TH-less variant of every
+--           boot library. That would place a huge burden on maintainers and is
+--           thus rejected.)
+--        * We have thus made it impossible to refactor in-tree TH.
+--          This problem was discussed in #23536.
+--  1c. Do not build the stage1 compiler against any template-haskell library.
+--      This is viable because no splices need to be run as part of the
+--      bootstrapping process, so we could CPP away all the code in the stage1
+--      compiler that refers to template-haskell types. However,
+--        * it is not so simple either: a surprising example is GHC.Tc.Errors.Types
+--          where we would need to replace all TH types with dummy types.
+--          (We *cannot* simply CPP away TH-specific error constructors because
+--          that affects binary compatibility with the stage2 compiler.)
+--        * we would still need to vendor the updated Extension enum, so even
+--          though we had to use a lot of CPP, we still end up depending on names
+--          that are not present in the stage2 compiler.
+--        * this design would never allow us to use TH in GHC's code base, for
+--          example in GHC.Core.Map.
+--      It seems simpler just to depend on a template-haskell library in a fake
+--      namespace.
+--  2b. Alternatively vendor the parts relevant to serialising
+--      the (new, in-tree) TH AST into `ghc-boot`, thus shadowing definitions in the
+--      implicitly linked boot TH.
+--        * We found that this led to quite a bit of duplication in the
+--          `ghc-boot` cabal file.
+
+-- Note [Hard-wiring in-tree template-haskell for desugaring quotes]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- To desugar Template Haskell quotes, GHC needs to wire in a bunch of Names in the
+-- `template-haskell` library as Note [Known-key names], in GHC.Builtin.Names.TH.
+-- Consider
+-- > foo :: Q Exp
+-- > foo = [| unwords ["hello", "world"] |]
+-- this desugars to Core that looks like this
+-- > varE (mkNameS "unwords") `appE` listE [litE (stringE "hello"), litE (stringE "world")]
+-- And all these smart constructors are known-key.
+-- NB: Since the constructors are known-key, it is impossible to link this program
+-- against another template-haskell library in which, e.g., `varE` was moved into a
+-- different module. So effectively, GHC is hard-wired against the in-tree
+-- template-haskell library.

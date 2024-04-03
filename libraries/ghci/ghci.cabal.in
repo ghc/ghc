@@ -22,6 +22,15 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
+Flag bootstrap
+        Description:
+          Enabled when building the stage1 compiler in order to vendor the in-tree
+          `template-haskell` library (including its dependency `ghc-boot-th`), while
+          allowing dependencies to depend on the boot `template-haskell` library.
+          See Note [Bootstrapping Template Haskell]
+        Default: False
+        Manual: True
+
 source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc.git
@@ -84,8 +93,14 @@ library
         filepath         >= 1.4 && < 1.6,
         ghc-boot         == @ProjectVersionMunged@,
         ghc-heap         == @ProjectVersionMunged@,
-        template-haskell == 2.22.*,
         transformers     >= 0.5 && < 0.7
+
+    if flag(bootstrap)
+      build-depends:
+            template-haskell-next == 2.22.*
+    else
+      build-depends:
+            template-haskell      == 2.22.*
 
     if !os(windows)
         Build-Depends: unix >= 2.7 && < 2.9

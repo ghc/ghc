@@ -34,49 +34,52 @@ module Language.Haskell.TH.Syntax
     -- $infix
     ) where
 
-import qualified Data.Fixed as Fixed
+import Prelude
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import System.FilePath
 import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
-import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Fix (MonadFix (..))
-import Control.Applicative (Applicative(..))
 import Control.Exception (BlockedIndefinitelyOnMVar (..), catch, throwIO)
 import Control.Exception.Base (FixIOException (..))
 import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import System.IO        ( hPutStrLn, stderr )
-import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
-import Data.Int
+import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Void        ( Void, absurd )
 import Data.Word
-import Data.Ratio
-import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
-import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
-                          TYPE, RuntimeRep(..), Levity(..), Multiplicity (..) )
 import qualified Data.Kind as Kind (Type)
-import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
-import Numeric.Natural
 import Prelude hiding (Applicative(..))
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
+import GHC.Types        (TYPE, RuntimeRep(..), Levity(..))
 
+#ifndef BOOTSTRAP_TH
+import Control.Monad (liftM)
 import Data.Array.Byte (ByteArray(..))
+import Data.Char (ord)
+import Data.Int
+import Data.Ratio
+import Data.Void        ( Void, absurd )
+import GHC.CString      ( unpackCString# )
 import GHC.Exts
   ( ByteArray#, unsafeFreezeByteArray#, copyAddrToByteArray#, newByteArray#
   , isByteArrayPinned#, isTrue#, sizeofByteArray#, unsafeCoerce#, byteArrayContents#
   , copyByteArray#, newPinnedByteArray#)
 import GHC.ForeignPtr (ForeignPtr(..), ForeignPtrContents(..))
+import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.ST (ST(..), runST)
+import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..))
+import Numeric.Natural
+import qualified Data.Fixed as Fixed
+#endif
 
 -----------------------------------------------------
 --
@@ -1018,6 +1021,8 @@ class Lift (t :: TYPE r) where
   liftTyped :: Quote m => t -> Code m t
 
 
+-- See Note [Bootstrapping Template Haskell]
+#ifndef BOOTSTRAP_TH
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
   liftTyped x = unsafeCodeCoerce (lift x)
@@ -1384,10 +1389,11 @@ rightName = 'Right
 
 nonemptyName :: Name
 nonemptyName = '(:|)
+#endif
 
 oneName, manyName :: Name
-oneName  = 'One
-manyName = 'Many
+oneName  = mkNameG DataName "ghc-prim" "GHC.Types" "One"
+manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
 
 -----------------------------------------------------
 --

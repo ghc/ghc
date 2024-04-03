@@ -1,8 +1,8 @@
--- WARNING: ghc-boot-th.cabal is automatically generated from
--- ghc-boot-th.cabal.in by ../../configure.  Make sure you are editing
--- ghc-boot-th.cabal.in, not ghc-boot-th.cabal.
+-- WARNING: ghc-boot-th@Suffix@.cabal is automatically generated from
+-- ghc-boot-th@Suffix@.cabal.in by ../../configure.  Make sure you are editing
+-- ghc-boot-th@Suffix@.cabal.in, not ghc-boot-th@Suffix@.cabal.
 
-name:           ghc-boot-th
+name:           ghc-boot-th@Suffix@
 version:        @ProjectVersionMunged@
 license:        BSD3
 license-file:   LICENSE
@@ -27,6 +27,7 @@ source-repository head
     subdir:   libraries/ghc-boot-th
 
 Library
+    hs-source-dirs: @SourceRoot@
     default-language: Haskell2010
     other-extensions: DeriveGeneric
     default-extensions: NoImplicitPrelude
