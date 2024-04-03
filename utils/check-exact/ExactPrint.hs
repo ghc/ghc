@@ -738,9 +738,9 @@ printStringAtAAC capture (EpaDelta d cs) s = do
 
 -- ---------------------------------------------------------------------
 
-markExternalSourceText :: (Monad m, Monoid w) => SrcSpan -> SourceText -> String -> EP w m ()
-markExternalSourceText l NoSourceText txt   = printStringAtRs (realSrcSpan l) txt >> return ()
-markExternalSourceText l (SourceText txt) _ = printStringAtRs (realSrcSpan l) (unpackFS txt) >> return ()
+markExternalSourceTextE :: (Monad m, Monoid w) => EpaLocation -> SourceText -> String -> EP w m EpaLocation
+markExternalSourceTextE l NoSourceText txt   = printStringAtAA l txt
+markExternalSourceTextE l (SourceText txt) _ = printStringAtAA l (unpackFS txt)
 
 -- ---------------------------------------------------------------------
 
@@ -1587,6 +1587,15 @@ instance (ExactPrint a) => ExactPrint (Located a) where
 
   exact (L l a) = L l <$> markAnnotated a
 
+instance (ExactPrint a) => ExactPrint (LocatedE a) where
+  getAnnotationEntry (L l _) = Entry l [] emptyComments NoFlushComments CanUpdateAnchorOnly
+  setAnnotationAnchor (L _ a) anc _ts _cs = L anc a
+
+  exact (L la a) = do
+    debugM $ "LocatedE a:la loc=" ++ show (ss2range $ locA la)
+    a' <- markAnnotated a
+    return (L la a')
+
 instance (ExactPrint a) => ExactPrint (LocatedA a) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor la anc ts cs = setAnchorAn la anc ts cs
@@ -2009,11 +2018,15 @@ instance ExactPrint (ForeignDecl GhcPs) where
 instance ExactPrint (ForeignImport GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (CImport (L ls src) cconv safety@(L ll _) mh imp) = do
+  exact (CImport (L ls src) cconv safety@(L l _) mh imp) = do
     cconv' <- markAnnotated cconv
-    unless (ll == noSrcSpan) $ markAnnotated safety >> return ()
-    unless (ls == noSrcSpan) $ markExternalSourceText ls src "" >> return ()
-    return (CImport (L ls src) cconv' safety mh imp)
+    safety' <- if notDodgyE l
+        then markAnnotated safety
+        else return safety
+    ls' <- if notDodgyE ls
+        then markExternalSourceTextE ls src ""
+        else return ls
+    return (CImport (L ls' src) cconv' safety' mh imp)
 
 -- ---------------------------------------------------------------------
 
@@ -2023,8 +2036,10 @@ instance ExactPrint (ForeignExport GhcPs) where
   exact (CExport (L ls src) spec) = do
     debugM $ "CExport starting"
     spec' <- markAnnotated spec
-    unless (ls == noSrcSpan) $ markExternalSourceText ls src ""
-    return (CExport (L ls src) spec')
+    ls' <- if notDodgyE ls
+        then markExternalSourceTextE ls src ""
+        else return ls
+    return (CExport (L ls' src) spec')
 
 -- ---------------------------------------------------------------------
 
@@ -3239,6 +3254,12 @@ markMaybeDodgyStmts an stmts =
       r <- markAnnotatedWithLayout stmts
       return (an, r)
     else return (an, stmts)
+
+notDodgyE :: EpaLocation -> Bool
+notDodgyE anc =
+  case anc of
+    EpaSpan s -> isGoodSrcSpan s
+    EpaDelta{} -> True
 
 -- ---------------------------------------------------------------------
 instance ExactPrint (HsPragE GhcPs) where

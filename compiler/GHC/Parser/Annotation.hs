@@ -39,6 +39,7 @@ module GHC.Parser.Annotation (
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
+  LocatedE,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -644,6 +645,8 @@ type SrcSpanAnnL = EpAnn AnnList
 type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnC = EpAnn AnnContext
 
+type LocatedE = GenLocated EpaLocation
+
 -- | General representation of a 'GenLocated' type carrying a
 -- parameterised annotation type.
 type LocatedAn an = GenLocated (EpAnn an)
@@ -1049,8 +1052,11 @@ reLoc (L la a) = L (noAnnSrcSpan $ locA (L la a) ) a
 class HasAnnotation e where
   noAnnSrcSpan :: SrcSpan -> e
 
-instance HasAnnotation (SrcSpan) where
+instance HasAnnotation SrcSpan where
   noAnnSrcSpan l = l
+
+instance HasAnnotation EpaLocation where
+  noAnnSrcSpan l = EpaSpan l
 
 instance (NoAnn ann) => HasAnnotation (EpAnn ann) where
   noAnnSrcSpan l = EpAnn (spanAsAnchor l) noAnn emptyComments
@@ -1451,6 +1457,10 @@ instance (Outputable a, OutputableBndr e)
      => OutputableBndr (GenLocated (EpAnn a) e) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
+
+instance (Outputable e)
+     => Outputable (GenLocated EpaLocation e) where
+  ppr = pprLocated
 
 instance Outputable ParenType where
   ppr t = text (show t)

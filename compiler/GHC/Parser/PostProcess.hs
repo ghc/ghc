@@ -2766,7 +2766,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
       let e = unpackFS entity
-      case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc esrc) of
+      case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
         Just importSpec -> return importSpec
@@ -2782,7 +2782,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
                         then mkExtName (unLoc v)
                         else entity
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
-        importSpec = CImport (L loc esrc) cconv safety Nothing funcTarget
+        importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
     returnSpec spec = return $ \ann -> ForD noExtField $ ForeignImport
           { fd_i_ext  = ann
@@ -2796,7 +2796,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
 -- the string "foo" is ambiguous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
 -- that one.
-parseCImport :: Located CCallConv -> Located Safety -> FastString -> String
+parseCImport :: LocatedE CCallConv -> LocatedE Safety -> FastString -> String
              -> Located SourceText
              -> Maybe (ForeignImport (GhcPass p))
 parseCImport cconv safety nm str sourceText =
@@ -2826,7 +2826,7 @@ parseCImport cconv safety nm str sourceText =
                        | id_char c -> pfail
                       _            -> return ()
 
-   mk h n = CImport sourceText cconv safety h n
+   mk h n = CImport (reLoc sourceText) (reLoc cconv) (reLoc safety) h n
 
    hdr_char c = not (isSpace c)
    -- header files are filenames, which can contain
@@ -2861,7 +2861,7 @@ mkExport :: Located CCallConv
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
  = return $ \ann -> ForD noExtField $
    ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L le esrc) (L lc (CExportStatic esrc entity' cconv)) }
+                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

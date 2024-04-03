@@ -799,7 +799,8 @@ cvt_fundep (TH.FunDep xs ys) = do { xs' <- mapM tNameN xs
 
 cvtForD :: Foreign -> CvtM (ForeignDecl GhcPs)
 cvtForD (ImportF callconv safety from nm ty) =
-  do { l <- getL
+  do { ls <- getL
+     ; let l = l2l ls
      ; if -- the prim and javascript calling conventions do not support headers
           -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
           |  callconv == TH.Prim || callconv == TH.JavaScript
@@ -809,7 +810,7 @@ cvtForD (ImportF callconv safety from nm ty) =
                                                       True)))
           |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
                                           (mkFastString (TH.nameBase nm))
-                                          from (L l $ quotedSourceText from)
+                                          from (L ls $ quotedSourceText from)
           -> mk_imp impspec
           |  otherwise
           -> failWith $ InvalidCCallImpent from }
@@ -831,7 +832,8 @@ cvtForD (ImportF callconv safety from nm ty) =
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameN nm
         ; ty' <- cvtSigType ty
-        ; l <- getL
+        ; ls <- getL
+        ; let l = l2l ls
         ; let astxt = mkFastString as
         ; let e = CExport (L l (SourceText astxt)) (L l (CExportStatic (SourceText astxt)
                                                 astxt
