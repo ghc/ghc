@@ -1226,6 +1226,15 @@ with LHSs with a complicated desugaring (and hence unlikely to match);
 But there are legitimate non-trivial args ei, like sections and
 lambdas.  So it seems simpler not to check at all, and that is why
 check_e is commented out.
+
+Note [Parens on the LHS of a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You may think that no one would write
+
+   {-# RULES "foo" (f True) = blah #-}
+
+with the LHS wrapped in parens. But Template Haskell does (#24621)!
+So we should accommodate them.
 -}
 
 checkValidRule :: FastString -> [Name] -> LHsExpr GhcRn -> NameSet -> RnM ()
@@ -1253,6 +1262,8 @@ validRuleLhs foralls lhs
     check (HsAppType _ e _)               = checkl e
     check (HsVar _ lv)
       | (unLoc lv) `notElem` foralls      = Nothing
+    -- See Note [Parens on the LHS of a RULE]
+    check (HsPar _ e)                     = checkl e
     check other                           = Just other  -- Failure
 
         -- Check an argument
