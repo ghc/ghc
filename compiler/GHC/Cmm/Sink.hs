@@ -23,7 +23,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Cmm.Config
 
-import qualified GHC.Data.Word64Set as Word64Set
 import Data.List (partition)
 import Data.Maybe
 
@@ -186,8 +185,8 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
               live_sets' | should_drop = live_sets
                         | otherwise   = map upd live_sets
 
-              upd set | r `elemLRegSet` set = set `Word64Set.union` live_rhs
-                      | otherwise          = set
+              upd set | r `elemLRegSet` set = set `unionLRegSet` live_rhs
+                      | otherwise           = set
 
               live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
 
@@ -208,7 +207,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
       -- Annotate the middle nodes with the registers live *after*
       -- the node.  This will help us decide whether we can inline
       -- an assignment in the current node or not.
-      live = Word64Set.unions (map getLive succs)
+      live = unionsLRegSet (map getLive succs)
       live_middle = gen_killL platform last live
       ann_middles = annotate platform live_middle (blockToList middle)
 
@@ -216,7 +215,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
       -- one predecessor), so identify the join points and the set
       -- of registers live in them.
       (joins, nonjoins) = partition (`mapMember` join_pts) succs
-      live_in_joins = Word64Set.unions (map getLive joins)
+      live_in_joins = unionsLRegSet (map getLive joins)
 
       -- We do not want to sink an assignment into multiple branches,
       -- so identify the set of registers live in multiple successors.

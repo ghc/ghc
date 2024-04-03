@@ -3,7 +3,6 @@
 
 module GHC.Cmm.LRegSet (
     LRegSet,
-    LRegKey,
 
     emptyLRegSet,
     nullLRegSet,
@@ -13,42 +12,52 @@ module GHC.Cmm.LRegSet (
     deleteFromLRegSet,
     sizeLRegSet,
 
-    plusLRegSet,
+    unionLRegSet,
+    unionsLRegSet,
     elemsLRegSet
   ) where
 
 import GHC.Prelude
 import GHC.Types.Unique
+import GHC.Types.Unique.Set
 import GHC.Cmm.Expr
-import GHC.Word
-
-import GHC.Data.Word64Set as Word64Set
 
 -- Compact sets for membership tests of local variables.
 
-type LRegSet = Word64Set.Word64Set
-type LRegKey = Word64
+type LRegSet = UniqueSet
 
+{-# INLINE emptyLRegSet #-}
 emptyLRegSet :: LRegSet
-emptyLRegSet = Word64Set.empty
+emptyLRegSet = emptyUniqueSet
 
+{-# INLINE nullLRegSet #-}
 nullLRegSet :: LRegSet -> Bool
-nullLRegSet = Word64Set.null
+nullLRegSet = nullUniqueSet
 
+{-# INLINE insertLRegSet #-}
 insertLRegSet :: LocalReg -> LRegSet -> LRegSet
-insertLRegSet l = Word64Set.insert (getKey (getUnique l))
+insertLRegSet l = insertUniqueSet (getUnique l)
 
+{-# INLINE elemLRegSet #-}
 elemLRegSet :: LocalReg -> LRegSet -> Bool
-elemLRegSet l = Word64Set.member (getKey (getUnique l))
+elemLRegSet l = memberUniqueSet (getUnique l)
 
+{-# INLINE deleteFromLRegSet #-}
 deleteFromLRegSet :: LRegSet -> LocalReg -> LRegSet
-deleteFromLRegSet set reg = Word64Set.delete (getKey . getUnique $ reg) set
+deleteFromLRegSet set reg = deleteUniqueSet (getUnique reg) set
 
-sizeLRegSet :: Word64Set -> Int
-sizeLRegSet = Word64Set.size
+{-# INLINE sizeLRegSet #-}
+sizeLRegSet :: LRegSet -> Int
+sizeLRegSet = sizeUniqueSet
 
-plusLRegSet :: Word64Set -> Word64Set -> Word64Set
-plusLRegSet = Word64Set.union
+{-# INLINE unionLRegSet #-}
+unionLRegSet :: LRegSet -> LRegSet -> LRegSet
+unionLRegSet = unionUniqueSet
 
-elemsLRegSet :: Word64Set -> [Word64]
-elemsLRegSet = Word64Set.toList
+{-# INLINE unionsLRegSet #-}
+unionsLRegSet :: [LRegSet] -> LRegSet
+unionsLRegSet = unionsUniqueSet
+
+{-# INLINE elemsLRegSet #-}
+elemsLRegSet :: LRegSet -> [Unique]
+elemsLRegSet = elemsUniqueSet

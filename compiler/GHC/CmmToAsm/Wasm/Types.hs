@@ -52,7 +52,6 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Functor
-import qualified GHC.Data.Word64Set as WS
 import Data.Kind
 import Data.String
 import Data.Type.Equality
@@ -66,6 +65,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable hiding ((<>))
@@ -197,7 +197,7 @@ data DataSection = DataSection
 type SymMap = UniqMap SymName
 
 -- | No need to remember the symbols.
-type SymSet = WS.Word64Set
+type SymSet = UniqueSet
 
 type GlobalInfo = (SymName, SomeWasmType)
 
@@ -427,7 +427,7 @@ initialWasmCodeGenState platform us =
   WasmCodeGenState
     { wasmPlatform =
         platform,
-      defaultSyms = WS.empty,
+      defaultSyms = emptyUniqueSet,
       funcTypes = emptyUniqMap,
       funcBodies =
         emptyUniqMap,

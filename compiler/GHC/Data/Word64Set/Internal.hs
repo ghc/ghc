@@ -205,7 +205,6 @@ import Text.Read
 import qualified GHC.Exts
 #endif
 
-import qualified Data.Foldable as Foldable
 import Data.Functor.Identity (Identity(..))
 
 infixl 9 \\{-This comment teaches CPP correct behaviour -}
@@ -519,10 +518,10 @@ alterF f k s = fmap choose (f member_)
   Union
 --------------------------------------------------------------------}
 -- | The union of a list of sets.
-unions :: Foldable f => f Word64Set -> Word64Set
-unions xs
-  = Foldable.foldl' union empty xs
 
+{-# INLINABLE unions #-}
+unions :: [Word64Set] -> Word64Set
+unions = List.foldl' union empty
 
 -- | \(O(n+m)\). The union of two sets.
 union :: Word64Set -> Word64Set -> Word64Set
@@ -1183,9 +1182,9 @@ foldlFB = foldl
 
 
 -- | \(O(n \min(n,W))\). Create a set from a list of integers.
+{-# INLINABLE fromList #-}
 fromList :: [Key] -> Word64Set
-fromList xs
-  = Foldable.foldl' ins empty xs
+fromList = List.foldl' ins empty
   where
     ins t x  = insert x t
 

@@ -44,6 +44,26 @@ module GHC.Types.Unique.Set (
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
         nonDetStrictFoldUniqSet,
+
+        -- UniqueSet
+        UniqueSet(..),
+        nullUniqueSet,
+        sizeUniqueSet,
+        memberUniqueSet,
+        emptyUniqueSet,
+        singletonUniqueSet,
+        insertUniqueSet,
+        deleteUniqueSet,
+        differenceUniqueSet,
+        unionUniqueSet,
+        unionsUniqueSet,
+        intersectionUniqueSet,
+        isSubsetOfUniqueSet,
+        filterUniqueSet,
+        foldlUniqueSet,
+        foldrUniqueSet,
+        elemsUniqueSet,
+        fromListUniqueSet,
     ) where
 
 import GHC.Prelude
@@ -56,6 +76,7 @@ import GHC.Utils.Outputable
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import qualified GHC.Data.Word64Set as S
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,6 +85,7 @@ import Control.DeepSeq
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
 
+-- | Set of Uniquable values
 newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
 
@@ -205,6 +227,83 @@ pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 -- pretty-printing.
 pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet
 
-
 forceUniqSet :: (a -> ()) -> UniqSet a -> ()
 forceUniqSet f (UniqSet fm) = seqEltsUFM f fm
+
+--------------------------------------------------------
+-- UniqueSet
+--------------------------------------------------------
+
+-- | Set of Unique values
+--
+-- Similar to 'UniqSet Unique' but with a more compact representation.
+newtype UniqueSet = US { unUniqueSet :: S.Word64Set }
+  deriving (Eq, Ord, Show, Semigroup, Monoid)
+
+{-# INLINE nullUniqueSet #-}
+nullUniqueSet :: UniqueSet -> Bool
+nullUniqueSet (US s) = S.null s
+
+{-# INLINE sizeUniqueSet #-}
+sizeUniqueSet :: UniqueSet -> Int
+sizeUniqueSet (US s) = S.size s
+
+{-# INLINE memberUniqueSet #-}
+memberUniqueSet :: Unique -> UniqueSet -> Bool
+memberUniqueSet k (US s) = S.member (getKey k) s
+
+{-# INLINE emptyUniqueSet #-}
+emptyUniqueSet :: UniqueSet
+emptyUniqueSet = US S.empty
+
+{-# INLINE singletonUniqueSet #-}
+singletonUniqueSet :: Unique -> UniqueSet
+singletonUniqueSet k = US (S.singleton (getKey k))
+
+{-# INLINE insertUniqueSet #-}
+insertUniqueSet :: Unique -> UniqueSet -> UniqueSet
+insertUniqueSet k (US s) = US (S.insert (getKey k) s)
+
+{-# INLINE deleteUniqueSet #-}
+deleteUniqueSet :: Unique -> UniqueSet -> UniqueSet
+deleteUniqueSet k (US s) = US (S.delete (getKey k) s)
+
+{-# INLINE unionUniqueSet #-}
+unionUniqueSet :: UniqueSet -> UniqueSet -> UniqueSet
+unionUniqueSet (US x) (US y) = US (S.union x y)
+
+{-# INLINE unionsUniqueSet #-}
+unionsUniqueSet :: [UniqueSet] -> UniqueSet
+unionsUniqueSet xs = US (S.unions (map unUniqueSet xs))
+
+{-# INLINE differenceUniqueSet #-}
+differenceUniqueSet :: UniqueSet -> UniqueSet -> UniqueSet
+differenceUniqueSet (US x) (US y) = US (S.difference x y)
+
+{-# INLINE intersectionUniqueSet #-}
+intersectionUniqueSet :: UniqueSet -> UniqueSet -> UniqueSet
+intersectionUniqueSet (US x) (US y) = US (S.intersection x y)
+
+{-# INLINE isSubsetOfUniqueSet #-}
+isSubsetOfUniqueSet :: UniqueSet -> UniqueSet -> Bool
+isSubsetOfUniqueSet (US x) (US y) = S.isSubsetOf x y
+
+{-# INLINE filterUniqueSet #-}
+filterUniqueSet :: (Unique -> Bool) -> UniqueSet -> UniqueSet
+filterUniqueSet f (US s) = US (S.filter (f . mkUniqueGrimily) s)
+
+{-# INLINE foldlUniqueSet #-}
+foldlUniqueSet :: (a -> Unique -> a) -> a -> UniqueSet -> a
+foldlUniqueSet k z (US s) = S.foldl' (\a b -> k a (mkUniqueGrimily b)) z s
+
+{-# INLINE foldrUniqueSet #-}
+foldrUniqueSet :: (Unique -> b -> b) -> b -> UniqueSet -> b
+foldrUniqueSet k z (US s) = S.foldr (k . mkUniqueGrimily) z s
+
+{-# INLINE elemsUniqueSet #-}
+elemsUniqueSet :: UniqueSet -> [Unique]
+elemsUniqueSet (US s) = map mkUniqueGrimily (S.elems s)
+
+{-# INLINE fromListUniqueSet #-}
+fromListUniqueSet :: [Unique] -> UniqueSet
+fromListUniqueSet ks = US (S.fromList (map getKey ks))

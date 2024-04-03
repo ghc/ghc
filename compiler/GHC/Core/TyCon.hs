@@ -2331,12 +2331,12 @@ isKindName = isKindUniquable
 
 -- | The workhorse for 'isKindTyCon' and 'isKindName'.
 isKindUniquable :: Uniquable a => a -> Bool
-isKindUniquable thing = getUnique thing `elementOfUniqSet` kindTyConKeys
+isKindUniquable thing = getUnique thing `memberUniqueSet` kindTyConKeys
 
 -- | These TyCons should be allowed at the kind level, even without
 -- -XDataKinds.
-kindTyConKeys :: UniqSet Unique
-kindTyConKeys = unionManyUniqSets
+kindTyConKeys :: UniqueSet
+kindTyConKeys = fromListUniqueSet $
   -- Make sure to keep this in sync with the following:
   --
   -- - The Overview section in docs/users_guide/exts/data_kinds.rst in the GHC
@@ -2344,10 +2344,10 @@ kindTyConKeys = unionManyUniqSets
   --
   -- - The typecheck/should_compile/T22141f.hs test case, which ensures that all
   --   of these can successfully be used without DataKinds.
-  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey, cONSTRAINTTyConKey ]
-  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, levityTyCon
-                                          , multiplicityTyCon
-                                          , vecCountTyCon, vecElemTyCon ] )
+  [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey, cONSTRAINTTyConKey ]
+  ++ concatMap tycon_with_datacons [ runtimeRepTyCon, levityTyCon
+                                   , multiplicityTyCon
+                                   , vecCountTyCon, vecElemTyCon ]
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
 

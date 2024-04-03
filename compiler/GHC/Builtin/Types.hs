@@ -1040,13 +1040,13 @@ cTupleTyConName a = tyConName (cTupleTyCon a)
 cTupleTyConNames :: [Name]
 cTupleTyConNames = map cTupleTyConName (0 : [2..mAX_CTUPLE_SIZE])
 
-cTupleTyConKeys :: UniqSet Unique
-cTupleTyConKeys = mkUniqSet $ map getUnique cTupleTyConNames
+cTupleTyConKeys :: UniqueSet
+cTupleTyConKeys = fromListUniqueSet $ map getUnique cTupleTyConNames
 
 isCTupleTyConName :: Name -> Bool
 isCTupleTyConName n
  = assertPpr (isExternalName n) (ppr n) $
-   getUnique n `elementOfUniqSet` cTupleTyConKeys
+   getUnique n `memberUniqueSet` cTupleTyConKeys
 
 -- | If the given name is that of a constraint tuple, return its arity.
 cTupleTyConNameArity_maybe :: Name -> Maybe Arity

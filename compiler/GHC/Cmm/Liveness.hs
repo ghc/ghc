@@ -26,8 +26,6 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Types.Unique
-
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
 -----------------------------------------------------------------------------
@@ -112,7 +110,7 @@ liveLatticeL :: DataflowLattice LRegSet
 liveLatticeL = DataflowLattice emptyLRegSet add
   where
     add (OldFact old) (NewFact new) =
-        let !join = plusLRegSet old new
+        let !join = unionLRegSet old new
         in changedIf (sizeLRegSet join > sizeLRegSet old) join
 
 
@@ -132,7 +130,7 @@ noLiveOnEntryL bid in_fact x =
     where
         -- We convert the int's to uniques so that the printing matches that
         -- of registers.
-        reg_uniques = map mkUniqueGrimily $ elemsLRegSet in_fact
+        reg_uniques = elemsLRegSet in_fact
 
 
 

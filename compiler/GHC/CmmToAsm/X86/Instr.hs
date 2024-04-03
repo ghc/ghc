@@ -1083,7 +1083,7 @@ shortcutStatics fn (align, CmmStaticsRaw lbl statics)
 
 shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
 shortcutLabel fn lab
-  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn emptyUniqSet blkId
+  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn emptyUniqueSet blkId
   | otherwise                              = lab
 
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
@@ -1098,15 +1098,15 @@ shortcutStatic _ other_static
 
 shortBlockId
         :: (BlockId -> Maybe JumpDest)
-        -> UniqSet Unique
+        -> UniqueSet
         -> BlockId
         -> CLabel
 
 shortBlockId fn seen blockid =
-  case (elementOfUniqSet uq seen, fn blockid) of
+  case (memberUniqueSet uq seen, fn blockid) of
     (True, _)    -> blockLbl blockid
     (_, Nothing) -> blockLbl blockid
-    (_, Just (DestBlockId blockid'))  -> shortBlockId fn (addOneToUniqSet seen uq) blockid'
+    (_, Just (DestBlockId blockid'))  -> shortBlockId fn (insertUniqueSet uq seen) blockid'
     (_, Just (DestImm (ImmCLbl lbl))) -> lbl
     (_, _other) -> panic "shortBlockId"
   where uq = getUnique blockid

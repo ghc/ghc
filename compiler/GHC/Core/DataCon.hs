@@ -1248,12 +1248,12 @@ freshNames avoids
     , let uniq = mkAlphaTyVarUnique n
           occ = mkTyVarOccFS (mkFastString ('x' : show n))
 
-    , not (uniq `elementOfUniqSet` avoid_uniqs)
+    , not (uniq `memberUniqueSet` avoid_uniqs)
     , not (occ `elemOccSet` avoid_occs) ]
 
   where
-    avoid_uniqs :: UniqSet Unique
-    avoid_uniqs = mkUniqSet (map getUnique avoids)
+    avoid_uniqs :: UniqueSet
+    avoid_uniqs = fromListUniqueSet (map getUnique avoids)
 
     avoid_occs :: OccSet
     avoid_occs = mkOccSet (map getOccName avoids)

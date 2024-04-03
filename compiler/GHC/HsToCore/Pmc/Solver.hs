@@ -1466,11 +1466,11 @@ dataConMightBeUnliftedFieldTys =
   filter mightBeUnliftedType . map scaledThing . dataConOrigArgTys
 
 isTyConTriviallyInhabited :: TyCon -> Bool
-isTyConTriviallyInhabited tc = elementOfUniqSet (getUnique tc) triviallyInhabitedTyConKeys
+isTyConTriviallyInhabited tc = memberUniqueSet (getUnique tc) triviallyInhabitedTyConKeys
 
 -- | All these types are trivially inhabited
-triviallyInhabitedTyConKeys :: UniqSet Unique
-triviallyInhabitedTyConKeys = mkUniqSet [
+triviallyInhabitedTyConKeys :: UniqueSet
+triviallyInhabitedTyConKeys = fromListUniqueSet [
     charTyConKey, doubleTyConKey, floatTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey,
     intPrimTyConKey, int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int64PrimTyConKey,

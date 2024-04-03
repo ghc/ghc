@@ -26,7 +26,6 @@ import Control.Monad
 import qualified Data.ByteString as BS
 import Data.Foldable
 import Data.Functor
-import qualified GHC.Data.Word64Set as WS
 import Data.Semigroup
 import Data.String
 import Data.Traversable
@@ -48,6 +47,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic
@@ -1600,8 +1600,8 @@ onTopSym lbl = case sym_vis of
   SymDefault -> wasmModifyM $ \s ->
     s
       { defaultSyms =
-          WS.insert
-            (getKey $ getUnique sym)
+          insertUniqueSet
+            (getUnique sym)
             $ defaultSyms s
       }
   _ -> pure ()
