@@ -41,6 +41,8 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Core.Class( Class, classTyCon )
+import GHC.Core.TyCon( isNewTyCon )
 
 import GHC.Types.Id
 import GHC.Types.Literal
