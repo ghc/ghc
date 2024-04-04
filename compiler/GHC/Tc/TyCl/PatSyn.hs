@@ -202,15 +202,15 @@ mkProvEvidence ev_id
         hetero_tys = [k1, k2, ty1, ty2]
   = case r of
       ReprEq | is_homo
-             -> Just ( mkClassPred coercibleClass    homo_tys
-                     , evDataConApp coercibleDataCon homo_tys eq_con_args )
+             -> Just ( mkClassPred coercibleClass homo_tys
+                     , evDictApp   coercibleClass homo_tys eq_con_args )
              | otherwise -> Nothing
       NomEq  | is_homo
-             -> Just ( mkClassPred eqClass    homo_tys
-                     , evDataConApp eqDataCon homo_tys eq_con_args )
+             -> Just ( mkClassPred eqClass homo_tys
+                     , evDictApp   eqClass homo_tys eq_con_args )
              | otherwise
-             -> Just ( mkClassPred heqClass    hetero_tys
-                     , evDataConApp heqDataCon hetero_tys eq_con_args )
+             -> Just ( mkClassPred heqClass hetero_tys
+                     , evDictApp   heqClass hetero_tys eq_con_args )
 
   | otherwise
   = Just (pred, EvExpr (evId ev_id))

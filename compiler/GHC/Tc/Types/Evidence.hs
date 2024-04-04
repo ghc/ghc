@@ -27,7 +27,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
+  evId, evCoercion, evCast, evDFunApp,  evDictApp, mkNewTypeDictApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -50,27 +50,34 @@ module GHC.Tc.Types.Evidence (
 
 import GHC.Prelude
 
+import GHC.Tc.Utils.TcType
+
+import GHC.Core
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Coercion
+import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
+import GHC.Core.Unfold.Make( mkDFunUnfolding )
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.Class( classTyCon )
+import GHC.Core.DataCon ( isNewDataCon, dataConWrapId )
+import GHC.Core.Class (Class, classSCSelId )
+import GHC.Core.FVs   ( exprSomeFreeVars )
+import GHC.Core.InstEnv ( Canonical )
+
+
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
-import GHC.Core.Coercion.Axiom
-import GHC.Core.Coercion
-import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
-import GHC.Tc.Utils.TcType
-import GHC.Core.Type
-import GHC.Core.TyCon
-import GHC.Core.DataCon ( DataCon, dataConWrapId )
-import GHC.Builtin.Names
+import GHC.Types.Id.Info
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
 import GHC.Types.Basic
+import GHC.Types.Name( Name )
 
-import GHC.Core
-import GHC.Core.Class (Class, classSCSelId )
-import GHC.Core.FVs   ( exprSomeFreeVars )
-import GHC.Core.InstEnv ( CanonicalEvidence(..) )
+import GHC.Builtin.Names
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -525,8 +532,51 @@ evCast et tc | isReflCo tc = EvExpr et
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
 
-evDataConApp :: DataCon -> [Type] -> [EvExpr] -> EvTerm
-evDataConApp dc tys ets = evDFunApp (dataConWrapId dc) tys ets
+evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
+-- Only for classes that are not represented by a newtype
+evDictApp cls tys args
+  = case tyConSingleDataCon_maybe (classTyCon cls) of
+      Just dc -> assertPpr (not (isNewDataCon dc)) (ppr cls) $
+                 evDFunApp (dataConWrapId dc) tys args
+      Nothing -> pprPanic "evDictApp" (ppr cls)
+
+mkNewTypeDictApp :: Name -> Class -> [Type] -> EvExpr -> EvTerm
+mkNewTypeDictApp df_name cls tys arg
+  | not (isNewTyCon tycon)
+  = evDictApp cls tys [arg]
+  | otherwise
+  = EvExpr $ Let (NonRec dfun dict_app) (Var dfun)
+  where
+    tycon     = classTyCon cls
+    dict_con  = tyConSingleDataCon tycon
+    pred_ty   = mkClassPred cls tys
+    dict_args = map Type tys ++ [arg]
+    dict_app  = mkConApp dict_con dict_args
+    dfun      = mkLocalVar (DFunId True) df_name ManyTy pred_ty dfun_info
+    unf       = mkDFunUnfolding [] dict_con dict_args
+    dfun_info = vanillaIdInfo `setUnfoldingInfo`  unf
+                              `setInlinePragInfo` dfunInlinePragma
+
+{- Here is what we are making:
+     let $fKnownNat :: KnownNat 17
+           {-# Unfolding = DFun :DKnownNat @17 (UnsafeSNat @17 17) #-}
+         $fKnownNat = :DKnownNat @17 (UnsafeSNat @17 17)
+     in $fKnownNat
+
+Here we have introduced a funny extra binding:
+
+* KnownNat is a newtype class
+
+* $fKnownNat is a full DFun, with a DFun unfolding.  So
+    - it does not inline;
+    - it interacts nicely with the class selector
+
+* :DKnowNat, the data construtor, will inline to a cast right away
+  But we don't want that to be visible to clients of this constraint
+
+All this is important for any newtype class; so evDictApp checks
+that it is not used for newtype classes.
+-}
 
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField

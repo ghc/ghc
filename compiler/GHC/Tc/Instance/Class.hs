@@ -41,7 +41,6 @@ import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
-import GHC.Types.Basic( dfunInlinePragma )
 
 import GHC.Core.Predicate
 import GHC.Core.Coercion
@@ -51,8 +50,7 @@ import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-import GHC.Core.Unfold.Make( mkDFunUnfolding )
-import GHC.Core ( Expr(..), Bind(..), mkConApp )
+import GHC.Core ( Expr(..), mkConApp )
 
 import GHC.StgToCmm.Closure ( isSmallFamily )
 
@@ -69,7 +67,6 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Tc.Errors.Types
 
-import Data.Functor
 import Data.Maybe
 
 {- *******************************************************************
@@ -231,7 +228,6 @@ match_one so canonical dfun_id mb_inst_tys warn
                                                              , iw_safe_over = so
                                                              , iw_warn = warn } } }
 
-
 {- Note [Shortcut solving: overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -262,13 +258,10 @@ was a puzzling example.
 matchCTuple :: Class -> [Type] -> TcM ClsInstResult
 matchCTuple clas tys   -- (isCTupleClass clas) holds
   = return (OneInst { cir_new_theta   = tys
-                    , cir_mk_ev       = tuple_ev
+                    , cir_mk_ev       = evDictApp clas tys
                     , cir_canonical   = EvCanonical
                     , cir_what        = BuiltinInstance })
             -- The dfun *is* the data constructor!
-  where
-     data_con = tyConSingleDataCon (classTyCon clas)
-     tuple_ev = evDFunApp (dataConWrapId data_con) tys
 
 {- ********************************************************************
 *                                                                     *
@@ -420,36 +413,21 @@ makeLitDict clas lit_ty lit_expr
   , Just rep_tc <- tyConAppTyCon_maybe (classMethodTy meth)
                   -- If the method type is forall n. KnownNat n => SNat n
                   -- then rep_tc :: TyCon is SNat
-  , [dict_con] <- tyConDataCons (classTyCon clas)
   , [rep_con]  <- tyConDataCons rep_tc
-  , let pred_ty   = mkClassPred clas [lit_ty]
-        dict_args = [ Type lit_ty, mkConApp rep_con [Type lit_ty, lit_expr] ]
-        dfun_rhs  = mkConApp dict_con dict_args
-        dfun_info = vanillaIdInfo `setUnfoldingInfo`  mkDFunUnfolding [] dict_con dict_args
-                                  `setInlinePragInfo` dfunInlinePragma
-        dfun_occ_str :: String
-          = "$f" ++ occNameString (getOccName clas) ++
-            occNameString (getDFunTyKey lit_ty)
-
-  = do { df_name <- newName (mkVarOcc dfun_occ_str)
-       ; let dfun_id = mkLocalVar (DFunId True) df_name ManyTy pred_ty dfun_info
-             ev_tm   = EvExpr (Let (NonRec dfun_id dfun_rhs) (Var dfun_id))
+  = do { df_name <- newNTDFName clas
+       ; let mk_ev _ = mkNewTypeDictApp df_name clas [lit_ty] $
+                       mkConApp rep_con [Type lit_ty, lit_expr]
        ; return $ OneInst { cir_new_theta   = []
-                          , cir_mk_ev       = \_ -> ev_tm
+                          , cir_mk_ev       = mk_ev
                           , cir_canonical   = EvCanonical
                           , cir_what        = BuiltinInstance } }
 
-    | otherwise
-    = pprPanic "makeLitDict" $
-      text "Unexpected evidence for" <+> ppr (className clas)
-      $$ vcat (map (ppr . idType) (classMethods clas))
+  | otherwise
+  = pprPanic "makeLitDict" $
+    text "Unexpected evidence for" <+> ppr (className clas)
+    $$ vcat (map (ppr . idType) (classMethods clas))
 
-{- Here is what we are making
-   let $dfKnownNat17 :: KnownNat 17
-       [Unfolding = DFun :DKnownNat @17 (UnsafeSNat @17 17)]
-       $dfKnownNat17 = :DKnownNat @17 (UnsafeSNat @17 17)
-   in $dfKnownNat17
--}
+
 
 {- ********************************************************************
 *                                                                     *
@@ -482,12 +460,10 @@ matchWithDict [cls, mty]
                    `App`
                  (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
-       ; tc <- tcLookupTyCon withDictClassName
-       ; let withdict_data_con = expectJust "matchWithDict"
-                 $ tyConSingleDataCon_maybe tc    -- "Data constructor"
-                                                  -- for WithDict
-             mk_ev [c] = evDataConApp withdict_data_con
-                            [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
+       ; wd_cls <- tcLookupClass withDictClassName
+       ; dfun_name <- newNTDFName wd_cls
+       ; let mk_ev [c] = mkNewTypeDictApp dfun_name wd_cls [cls, mty] $
+                         evWithDict (evTermCoercion (EvExpr c))
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
        ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty inst_meth_ty]
@@ -956,21 +932,24 @@ matchDataToTag dataToTagClass [levity, dty] = do
                                (mkNomReflCo ManyTy)
                                (mkSymCo repCo)
                                (mkReflCo Representational intPrimTy)
-            dataToTagDataCon = tyConSingleDataCon (classTyCon dataToTagClass)
-            mk_ev _ = evDataConApp dataToTagDataCon
-                                   [levity, dty]
-                                   [methodRep `Cast` methodCo]
-     -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
-          $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
-                     , cir_mk_ev = mk_ev
-                     , cir_canonical = EvCanonical
-                     , cir_what = BuiltinInstance
-                     }
+     -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
+           ; df_name <- newNTDFName dataToTagClass
+           ; let mk_ev _ = mkNewTypeDictApp df_name dataToTagClass [levity, dty] $
+                           methodRep `Cast` methodCo
+           ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
+                           , cir_mk_ev     = mk_ev
+                           , cir_canonical = EvCanonical
+                           , cir_what = BuiltinInstance })}
      | otherwise -> pure NoInstance
 
 matchDataToTag _ _ = pure NoInstance
 
 
+newNTDFName :: Class -> TcM Name
+newNTDFName cls = newName (mkVarOcc dfun_occ_str)
+  where
+    dfun_occ_str :: String
+    dfun_occ_str = "$f" ++ occNameString (getOccName cls)
 
 {- ********************************************************************
 *                                                                     *
@@ -1018,8 +997,8 @@ doFunTy clas ty mult arg_ty ret_ty
                      , cir_what        = BuiltinInstance }
   where
     preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
-    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
-                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
+    mk_ev [mult_ev, arg_ev, ret_ev]
+       = evTypeable ty $ EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Instance.Class.doFunTy"
 
 
@@ -1171,21 +1150,21 @@ if you'd written
 ***********************************************************************-}
 
 -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
-matchEqualityInst :: Class -> [Type] -> (DataCon, Role, Type, Type)
+matchEqualityInst :: Class -> [Type] -> (Role, Type, Type)
 -- Precondition: `cls` satisfies GHC.Core.Predicate.isEqualityClass
 -- See Note [Solving equality classes] in GHC.Tc.Solver.Dict
 matchEqualityInst cls args
   | cls `hasKey` eqTyConKey  -- Solves (t1 ~ t2)
   , [_,t1,t2] <- args
-  = (eqDataCon, Nominal, t1, t2)
+  = (Nominal, t1, t2)
 
   | cls `hasKey` heqTyConKey -- Solves (t1 ~~ t2)
   , [_,_,t1,t2] <- args
-  = (heqDataCon,  Nominal, t1, t2)
+  = (Nominal, t1, t2)
 
   | cls `hasKey` coercibleTyConKey  -- Solves (Coercible t1 t2)
   , [_, t1, t2] <- args
-  = (coercibleDataCon, Representational, t1, t2)
+  = (Representational, t1, t2)
 
   | otherwise  -- Does not satisfy the precondition
   = pprPanic "matchEqualityInst" (ppr (mkClassPred cls args))

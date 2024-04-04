@@ -417,14 +417,14 @@ solveEqualityDict :: CtEvidence -> Class -> [Type] -> SolverStage Void
 solveEqualityDict ev cls tys
   | CtWanted { ctev_dest = dest } <- ev
   = Stage $
-    do { let (data_con, role, t1, t2) = matchEqualityInst cls tys
+    do { let (role, t1, t2) = matchEqualityInst cls tys
          -- Unify t1~t2, putting anything that can't be solved
          -- immediately into the work list
        ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
                        uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
        ; setWantedEvTerm dest EvCanonical $
-         evDataConApp data_con tys [Coercion co]
+         evDictApp cls tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 
   | CtGiven { ctev_evar = ev_id, ctev_loc = loc } <- ev
@@ -835,7 +835,7 @@ shortCutSolver dflags ev_w ev_i
                                   -- Emit work for subgoals but use our local cache
                                   -- so we can solve recursive dictionaries.
 
-                       ; let ev_tm     = mk_ev (map getEvExpr evc_vs)
+                       ; let ev_tm = mk_ev (map getEvExpr evc_vs)
                              ev_binds' = extendEvBinds ev_binds $
                                          mkWantedEvBind (ctEvEvId ev) canonical ev_tm
 

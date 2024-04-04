@@ -76,8 +76,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 
-import GHC.Core.Multiplicity
 import GHC.Core
+import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 
 import GHC.Types.Name
@@ -599,7 +599,23 @@ zonkIdBndrX v
 zonkIdBndr :: TcId -> ZonkTcM Id
 zonkIdBndr v
   = do { Scaled w' ty' <- zonkScaledTcTypeToTypeX (idScaledType v)
-       ; return $ setIdMult (setIdType v ty') w' }
+       ; v' <- if isLocalId v && hasCoreUnfolding unf  -- Local DFuns are like this
+               then do { unf' <- zonkUnfolding unf
+                       ; return (setIdUnfolding v unf') }
+               else return v
+       ; return $ setIdMult (setIdType v' ty') w' }
+  where
+    unf = realIdUnfolding v
+
+zonkUnfolding :: Unfolding -> ZonkTcM Unfolding
+zonkUnfolding unf@(CoreUnfolding { uf_tmpl = tmpl })
+  = do { tmpl' <- zonkCoreExpr tmpl
+       ; return (unf { uf_tmpl = tmpl'}) }
+zonkUnfolding unf@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = runZonkBndrT (zonkCoreBndrsX bndrs) $ \ bndrs' ->
+    do { args' <- mapM zonkCoreExpr args
+       ; return (unf { df_bndrs = bndrs', df_args = args'}) }
+zonkUnfolding unf = return unf
 
 zonkIdBndrs :: [TcId] -> ZonkTcM [Id]
 zonkIdBndrs ids = mapM zonkIdBndr ids
