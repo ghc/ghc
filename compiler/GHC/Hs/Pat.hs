@@ -363,7 +363,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 instance Outputable (HsTyPat p) => Outputable (HsConPatTyArg p) where
   ppr (HsConPatTyArg _ ty) = char '@' <> ppr ty
 
-instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ Located RecFieldsDotDot)
+instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ LocatedE RecFieldsDotDot)
       => Outputable (HsRecFields p arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
@@ -1015,4 +1015,4 @@ type instance Anno (ArgPat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = EpAnnCO
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
-type instance Anno RecFieldsDotDot = SrcSpan
+type instance Anno RecFieldsDotDot = EpaLocation
