@@ -3324,12 +3324,13 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
   setAnnotationAnchor a _ _ _ = a
   exact (HsRecFields fields mdot) = do
     fields' <- markAnnotated fields
-    case mdot of
-      Nothing -> return ()
-      Just (L ss _) ->
-        printStringAtSs ss ".." >> return ()
+    mdot' <- case mdot of
+      Nothing -> return Nothing
+      Just (L ss d) -> do
+        ss' <- printStringAtAA ss ".."
+        return $ Just (L ss' d)
       -- Note: mdot contains the SrcSpan where the ".." appears, if present
-    return (HsRecFields fields' mdot)
+    return (HsRecFields fields' mdot')
 
 -- ---------------------------------------------------------------------
 

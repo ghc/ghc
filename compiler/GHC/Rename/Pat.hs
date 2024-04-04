@@ -775,7 +775,7 @@ rnHsRecPatsAndThen mk (L _ con)
       do { arg' <- rnLPatAndThen (nested_mk dd mk (RecFieldsDotDot n')) (hfbRHS fld)
          ; return (L l (fld { hfbRHS = arg' })) }
 
-    loc = maybe noSrcSpan getLoc dd
+    loc = maybe noSrcSpan getLocA dd
 
     -- Don't warn for let P{..} = ... in ...
     check_unused_wildcard = case mk of
@@ -873,12 +873,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                  , hfbRHS = arg'
                  , hfbPun = pun } }
 
-    rn_dotdot :: Maybe (Located RecFieldsDotDot)      -- See Note [DotDot fields] in GHC.Hs.Pat
+    rn_dotdot :: Maybe (LocatedE RecFieldsDotDot)     -- See Note [DotDot fields] in GHC.Hs.Pat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn (LocatedA arg)] -- Explicit fields
               -> RnM ([LHsRecField GhcRn (LocatedA arg)])   -- Field Labels we need to fill in
-    rn_dotdot (Just (L loc (RecFieldsDotDot n))) (Just con) flds -- ".." on record construction / pat match
+    rn_dotdot (Just (L loc_e (RecFieldsDotDot n))) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
@@ -910,6 +910,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              _other           -> True ]
 
            ; addUsedGREs NoDeprecationWarnings dot_dot_gres
+           ; let loc = locA loc_e
            ; let locn = noAnnSrcSpan loc
            ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hfbAnn = noAnn

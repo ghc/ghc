@@ -1830,7 +1830,7 @@ lPatImplicits = hs_lpat
     details (RecCon (HsRecFields { rec_dotdot = Nothing, rec_flds }))
       = hs_lpats $ map (hfbRHS . unLoc) rec_flds
     details (RecCon (HsRecFields { rec_dotdot = Just (L err_loc rec_dotdot), rec_flds }))
-          = [(err_loc, implicit_field_binders)]
+          = [(l2l err_loc, implicit_field_binders)]
           ++ hs_lpats explicit_pats
 
           where (explicit_pats, implicit_field_binders)
