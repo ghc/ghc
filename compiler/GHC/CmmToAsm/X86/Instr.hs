@@ -30,6 +30,7 @@ module GHC.CmmToAsm.X86.Instr
    , mkSpillInstr
    , mkRegRegMoveInstr
    , jumpDestsOfInstr
+   , canFallthroughTo
    , patchRegsOfInstr
    , patchJumpInstr
    , isMetaInstr
@@ -642,6 +643,17 @@ isJumpishInstr instr
         CALL{}          -> True
         _               -> False
 
+canFallthroughTo :: Instr -> BlockId -> Bool
+canFallthroughTo insn bid
+  = case insn of
+    JXX _ target          -> bid == target
+    JMP_TBL _ targets _ _ -> all isTargetBid targets
+    _                     -> False
+  where
+    isTargetBid target = case target of
+      Nothing                      -> True
+      Just (DestBlockId target) -> target == bid
+      _                  -> False
 
 jumpDestsOfInstr
         :: Instr

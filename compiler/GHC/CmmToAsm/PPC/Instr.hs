@@ -22,6 +22,7 @@ module GHC.CmmToAsm.PPC.Instr
    , patchJumpInstr
    , patchRegsOfInstr
    , jumpDestsOfInstr
+   , canFallthroughTo
    , takeRegRegMoveInstr
    , takeDeltaInstr
    , mkRegRegMoveInstr
@@ -498,6 +499,13 @@ isJumpishInstr instr
     BL{}        -> True
     JMP{}       -> True
     _           -> False
+
+canFallthroughTo :: Instr -> BlockId -> Bool
+canFallthroughTo instr bid
+ = case instr of
+        BCC _ target _      -> target == bid
+        BCCFAR _ target _   -> target == bid
+        _                   -> False
 
 
 -- | Checks whether this instruction is a jump/branch instruction.

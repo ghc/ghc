@@ -47,6 +47,7 @@ instance Instruction AArch64.Instr where
         patchRegsOfInstr        = AArch64.patchRegsOfInstr
         isJumpishInstr          = AArch64.isJumpishInstr
         jumpDestsOfInstr        = AArch64.jumpDestsOfInstr
+        canFallthroughTo        = AArch64.canFallthroughTo
         patchJumpInstr          = AArch64.patchJumpInstr
         mkSpillInstr            = AArch64.mkSpillInstr
         mkLoadInstr             = AArch64.mkLoadInstr
