@@ -124,15 +124,15 @@ recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
 
     -- Unfold an 'HieType' whose subterms have already been unfolded
     go :: HieType IfaceType -> IfaceType
-    go (HTyVarTy n) = IfaceTyVar (getOccFS n)
+    go (HTyVarTy n) = IfaceTyVar (mkIfLclName $ getOccFS n)
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
-    go (HForAllTy ((n,k),af) t) = let b = (getOccFS n, k)
+    go (HForAllTy ((n,k),af) t) = let b = (mkIfLclName $ getOccFS n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
     go (HFunTy w a b)  = IfaceFunTy (visArg TypeLike)   w a b          -- t1 -> t2
     go (HQualTy con b) = IfaceFunTy (invisArg TypeLike) many_ty con b  -- c => t
     go (HCastTy a) = a
-    go HCoercionTy = IfaceTyVar "<coercion type>"
+    go HCoercionTy = IfaceTyVar $ mkIfLclName "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
 
     -- This isn't fully faithful - we can't produce the 'Inferred' case
