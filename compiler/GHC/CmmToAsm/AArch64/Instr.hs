@@ -332,6 +332,12 @@ jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
 
+canFallthroughTo :: Instr -> BlockId -> Bool
+canFallthroughTo (ANN _ i) bid = canFallthroughTo i bid
+canFallthroughTo (J (TBlock target)) bid = bid == target
+canFallthroughTo (B (TBlock target)) bid = bid == target
+canFallthroughTo _ _ = False
+
 -- | Change the destination of this jump instruction.
 -- Used in the linear allocator when adding fixup blocks for join
 -- points.

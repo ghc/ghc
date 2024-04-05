@@ -79,8 +79,15 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
+    -- | Does this jump always jump to a single destination and is shortcutable?
+    --
+    -- We use this to determine shortcutable instructions - See Note [What is shortcutting]
+    -- Note that if we return a destination here we *most* support the relevant shortcutting in
+    -- shortcutStatics for jump tables and shortcutJump for the instructions itself.
     canShortcut               :: instr -> Maybe jumpDest,
+    -- | Replace references to blockIds with other destinations - used to update jump tables.
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
+    -- | Change the jump destination(s) of an instruction.
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     -- | 'Module' is only for printing internal labels. See Note [Internal proc
     -- labels] in CLabel.
@@ -105,6 +112,25 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
     }
+
+{- Note [supporting shortcutting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the concept of shortcutting see Note [What is shortcutting].
+
+In order to support shortcutting across multiple backends uniformly we
+use canShortcut, shortcutStatics and shortcutJump.
+
+canShortcut tells us if the backend support shortcutting of a instruction
+and if so what destination we should retarget instruction to instead.
+
+shortcutStatics exists to allow us to update jump destinations in jump tables.
+
+shortcutJump updates the instructions itself.
+
+A backend can opt out of those by always returning Nothing for canShortcut
+and implementing shortcutStatics/shortcutJump as \_ x -> x
+
+-}
 
 {- Note [pprNatCmmDeclS and pprNatCmmDeclH]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
