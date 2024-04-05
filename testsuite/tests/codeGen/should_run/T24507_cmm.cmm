@@ -1,0 +1,35 @@
+#include "Cmm.h"
+
+bar() {
+    return (2);
+}
+
+foo(W_ x) {
+
+    switch(x) {
+        case 1: goto a;
+        case 2: goto b;
+        case 3: goto c;
+        case 4: goto d;
+        case 5: goto e;
+        case 6: goto f;
+        case 7: goto g;
+    }
+    return (1);
+
+    a:
+    return (1);
+    b:
+    jump bar();
+    c:
+    jump bar();
+    d:
+    jump bar();
+    e:
+    jump bar();
+    f:
+    jump bar();
+    g:
+    jump bar();
+
+}

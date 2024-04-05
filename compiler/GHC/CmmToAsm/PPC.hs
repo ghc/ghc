@@ -46,6 +46,7 @@ instance Instruction PPC.Instr where
    patchRegsOfInstr    = PPC.patchRegsOfInstr
    isJumpishInstr      = PPC.isJumpishInstr
    jumpDestsOfInstr    = PPC.jumpDestsOfInstr
+   canFallthroughTo    = PPC.canFallthroughTo
    patchJumpInstr      = PPC.patchJumpInstr
    mkSpillInstr        = PPC.mkSpillInstr
    mkLoadInstr         = PPC.mkLoadInstr
