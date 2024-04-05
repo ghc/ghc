@@ -6,6 +6,7 @@ module GHCi.ResolvedBCO
   , ResolvedBCOPtr(..)
   , isLittleEndian
   , BCOByteArray(..)
+  , mkBCOByteArray
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -23,6 +24,7 @@ import qualified Data.Binary.Get.Internal as Binary
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Internal as BB
 import GHC.Exts
+import Data.Array.Base (UArray(..))
 
 import GHC.IO
 
@@ -46,8 +48,8 @@ data ResolvedBCO
         resolvedBCOIsLE   :: Bool,
         resolvedBCOArity  :: {-# UNPACK #-} !Int,
         resolvedBCOInstrs :: BCOByteArray Word16,       -- insns
-        resolvedBCOBitmap :: BCOByteArray Word64,       -- bitmap
-        resolvedBCOLits   :: BCOByteArray Word64,       -- non-ptrs
+        resolvedBCOBitmap :: BCOByteArray Word,         -- bitmap
+        resolvedBCOLits   :: BCOByteArray Word,         -- non-ptrs
         resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ptrs
    }
    deriving (Generic, Show)
@@ -61,11 +63,14 @@ data BCOByteArray a
         getBCOByteArray :: !ByteArray#
   }
 
+mkBCOByteArray :: UArray Int a -> BCOByteArray a
+mkBCOByteArray (UArray _ _ _ arr) = BCOByteArray arr
+
 instance Show (BCOByteArray Word16) where
   showsPrec _ _ = showString "BCOByteArray Word16"
 
-instance Show (BCOByteArray Word64) where
-  showsPrec _ _ = showString "BCOByteArray Word64"
+instance Show (BCOByteArray Word) where
+  showsPrec _ _ = showString "BCOByteArray Word"
 
 -- | The Binary instance for ResolvedBCOs.
 --

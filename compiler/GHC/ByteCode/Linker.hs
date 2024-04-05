@@ -42,11 +42,9 @@ import GHC.Types.Name.Env
 import Language.Haskell.Syntax.Module.Name
 
 -- Standard libraries
-import Data.Array.Base (UArray(..))
 import Data.Array.Unboxed
 import Foreign.Ptr
 import GHC.Exts
-import Data.Word (Word64)
 
 {-
   Linking interpretables into something we can run
@@ -62,13 +60,13 @@ linkBCO interp le bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
-  (lits :: [Word64]) <- mapM (fmap fromIntegral . lookupLiteral interp le) (ssElts lits0)
+  (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp le) (ssElts lits0)
   ptrs <- mapM (resolvePtr interp le bco_ix) (ssElts ptrs0)
-  let !(UArray _ _ _ lits') = listArray (0 :: Int, fromIntegral (sizeSS lits0)-1) lits
+  let lits' = listArray (0 :: Int, fromIntegral (sizeSS lits0)-1) lits
   return (ResolvedBCO isLittleEndian arity
-              (BCOByteArray (getBCOInstrs insns))
-              (BCOByteArray (getBCOBitmap bitmap))
-              (BCOByteArray lits')
+              insns
+              bitmap
+              (mkBCOByteArray lits')
               (addListToSS emptySS ptrs))
 
 lookupLiteral :: Interp -> LinkerEnv -> BCONPtr -> IO Word
