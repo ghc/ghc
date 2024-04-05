@@ -223,6 +223,10 @@ class TestConfig:
         # I have no idea what this does
         self.package_conf_cache_file = None # type: Optional[Path]
 
+        # the libdir for the test compiler. Set by hadrian, see
+        # Setting.Builders.RunTest
+        self.libdir = ''
+
         # The extra hadrian dependencies we need for all configured tests
         self.hadrian_deps = set() # type: Set[str]
 
