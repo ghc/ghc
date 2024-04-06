@@ -55,37 +55,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
--- Note [General layout of an NCG]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- @cmmTopCodeGen@ will be our main entry point to code gen.  Here we'll get
--- @RawCmmDecl@; see GHC.Cmm
---
---   RawCmmDecl = GenCmmDecl RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
---
---   GenCmmDecl d h g = CmmProc h CLabel [GlobalReg] g
---                    | CmmData Section d
---
--- As a result we want to transform this to a list of @NatCmmDecl@, which is
--- defined @GHC.CmmToAsm.Instr@ as
---
---   type NatCmmDecl statics instr
---        = GenCmmDecl statics (LabelMap RawCmmStatics) (ListGraph instr)
---
--- Thus well' turn
---   GenCmmDecl RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
--- into
---   [GenCmmDecl RawCmmStatics (LabelMap RawCmmStatics) (ListGraph Instr)]
---
--- where @CmmGraph@ is
---
---   type CmmGraph = GenCmmGraph CmmNode
---   data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
---   type CmmBlock = Block CmmNode C C
---
--- and @ListGraph Instr@ is
---
---   newtype ListGraph i = ListGraph [GenBasicBlock i]
---   data GenBasicBlock i = BasicBlock BlockId [i]
+-- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
 cmmTopCodeGen
     :: RawCmmDecl
@@ -843,6 +813,7 @@ getRegister' config plat expr =
         -- TODO: Handle sub-word case
         MO_Sub w -> intOp False w (\d x y -> unitOL $ annExpr expr (SUB d x y))
 
+        -- TODO: Check if this comment is correct
         -- Note [CSET]
         -- ~~~~~~~~~~~
         -- Setting conditional flags: the architecture internally knows the
@@ -919,11 +890,6 @@ getRegister' config plat expr =
         MO_F_Eq w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y EQ))
         MO_F_Ne w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y NE))
 
-        -- careful with the floating point operations.
-        -- SLE is effectively LE or unordered (NaN)
-        -- SLT is the same. ULE, and ULT will not return true for NaN.
-        -- This is a bit counter-intuitive. Don't let yourself be fooled by
-        -- the S/U prefix for floats, it's only meaningful for integers.
         MO_F_Ge w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FGE))
         MO_F_Le w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FLE)) -- x <= y <=> y > x
         MO_F_Gt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FGT))
