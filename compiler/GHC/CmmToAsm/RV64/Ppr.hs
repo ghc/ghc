@@ -459,11 +459,6 @@ pprInstr platform instr = case instr of
     -- This case is used for sign extension: SEXT.W op
     | OpReg W64 _ <- o1 , OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
-  -- TODO: Delete commented out code.
-  -- CMN  o1 o2    -> op2 (text "\tcmn") o1 o2
-  -- CMP  o1 o2
-  --   | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
-  --   | otherwise -> op2 (text "\tcmp") o1 o2
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
