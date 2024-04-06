@@ -305,17 +305,13 @@ data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See Note [Literal source text]
                          sl_fs :: FastString, -- literal string value
-                         sl_tc :: Maybe RealSrcSpan -- Location of
+                         sl_tc :: Maybe NoCommentsLocation
+                                                    -- Location of
                                                     -- possible
                                                     -- trailing comma
                        -- AZ: if we could have a LocatedA
                        -- StringLiteral we would not need sl_tc, but
                        -- that would cause import loops.
-
-                       -- AZ:2: sl_tc should be an EpaAnchor, to allow
-                       -- editing and reprinting the AST. Need a more
-                       -- robust solution.
-
                        } deriving Data
 
 instance Eq StringLiteral where
