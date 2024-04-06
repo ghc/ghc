@@ -87,8 +87,6 @@ regUsageOfInstr platform instr = case instr of
 
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  -- CMN l r                  -> usage (regOp l ++ regOp r, [])
-  -- CMP l r                  -> usage (regOp l ++ regOp r, [])
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
   SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -132,10 +130,6 @@ regUsageOfInstr platform instr = case instr of
   -- STLR _ src dst      L     -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
   LDRU _ dst src           -> usage (regOp src, regOp dst)
-  -- LDAR _ dst src           -> usage (regOp src, regOp dst)
-  -- TODO is this right? see STR, which I'm only partial about being right?
-  -- STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
-  -- LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY _ _                  -> usage ([], [])
@@ -216,8 +210,6 @@ patchRegsOfInstr instr env = case instr of
     DELTA{}             -> instr
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
-    -- CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
-    -- CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
     SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
@@ -235,7 +227,6 @@ patchRegsOfInstr instr env = case instr of
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
     OR o1 o2 o3    -> OR   (patchOp o1) (patchOp o2) (patchOp o3)
-    -- ANDS o1 o2 o3  -> ANDS (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
     BIC o1 o2 o3   -> BIC  (patchOp o1) (patchOp o2) (patchOp o3)
     BICS o1 o2 o3  -> BICS (patchOp o1) (patchOp o2) (patchOp o3)
@@ -264,9 +255,6 @@ patchRegsOfInstr instr env = case instr of
     -- STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
     LDRU f o1 o2    -> LDRU f (patchOp o1) (patchOp o2)
-    -- LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
-    -- STP f o1 o2 o3 -> STP f (patchOp o1) (patchOp o2) (patchOp o3)
-    -- LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 8. Synchronization Instructions -----------------------------------------
     DMBSY o1 o2    -> DMBSY o1 o2
@@ -310,7 +298,7 @@ isJumpishInstr instr = case instr of
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (J_TBL ids _mbLbl _r) = [id | Just id <- ids]
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B_FAR t) = [t]
 jumpDestsOfInstr (BL t _ _) = [id | TBlock id <- [t]]
@@ -532,9 +520,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 -- We have a few common "instructions" (nearly all the pseudo-ops) but
 -- mostly all of 'Instr' is machine-specific.
 
--- Some additional (potential future) instructions are commented out. They are
--- not needed yet for the backend but could be used in the future.
-
 -- RV64 reference card: https://cs61c.org/sp23/pdfs/resources/reference-card.pdf
 -- RV64 pseudo instructions: https://github.com/riscv-non-isa/riscv-asm-manual/blob/master/riscv-asm.md#-a-listing-of-standard-risc-v-pseudoinstructions
 -- We will target: RV64G(C). That is G = I+A+F+S+D
@@ -573,8 +558,6 @@ data Instr
     | DELTA   Int
 
     -- 0. Pseudo Instructions --------------------------------------------------
-    -- | SXTW Operand Operand
-    -- | SXTX Operand Operand
     | PUSH_STACK_FRAME
     | POP_STACK_FRAME
 
@@ -590,10 +573,7 @@ data Instr
     -- | XOR Operand Operand Operand -- rd = rs1 ^ rs2
     | LSL {- SLL -} Operand Operand Operand -- rd = rs1 << rs2 (zero ext)
     | LSR {- SRL -} Operand Operand Operand -- rd = rs1 >> rs2 (zero ext)
-    -- | ASL {- SLA -} Operand Operand Operand -- rd = rs1 << rs2 (sign ext)
     | ASR {- SRA -} Operand Operand Operand -- rd = rs1 >> rs2 (sign ext)
-    -- | SLT Operand Operand Operand -- rd = rs1 < rs2 ? 1 : 0 (signed)
-    -- | SLTU Operand Operand Operand -- rd = rs1 < rs2 ? 1 : 0 (unsigned)
 
     -- 2. Memory Load/Store Instructions ---------------------------------------
     -- Unlike arm, we don't have register shorthands for size.
@@ -609,16 +589,10 @@ data Instr
     -- powerful.
     -- JAL / JARL are effectively the BL instruction from AArch64.
 
-
-    -- | CMN Operand Operand -- rd + op2
-    -- | CMP Operand Operand -- rd - op2
-
     | MUL Operand Operand Operand -- rd = rn × rm
 
 
     -- Pseudo/synthesized:
-    -- NEG = SUB x, 0, y
-    -- NOT = XOR -1, x
     | NEG Operand Operand -- rd = -op2
 
     | DIV Operand Operand Operand -- rd = rn ÷ rm
@@ -650,13 +624,6 @@ data Instr
     | ORI Operand Operand Operand -- rd = rn | op2
     | XORI Operand Operand Operand -- rd = rn `xor` imm
     -- Load and stores.
-    -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
-    -- | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
-    -- | STLR Format Operand Operand -- stlr Xn, address-mode // Xn -> *addr
-    -- | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
-    -- | LDAR Format Operand Operand -- ldar Xn, address-mode // Xn <- *addr
-    -- | STP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn -> *addr, Xm -> *(addr + 8)
-    -- | LDP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn <- *addr, Xm <- *(addr + 8)
 
     -- Conditional instructions
     -- This is a synthetic operation.
@@ -748,10 +715,13 @@ data Target
     | TReg   Reg
 
 data Operand
-        = OpReg Width Reg            -- register
-        | OpImm Imm            -- immediate value
-        | OpAddr AddrMode       -- memory reference
-        deriving (Eq, Show)
+  = -- | register
+    OpReg Width Reg
+  | -- | immediate value
+    OpImm Imm
+  | -- | memory reference
+    OpAddr AddrMode
+  deriving (Eq, Show)
 
 operandFromReg :: Reg -> Operand
 operandFromReg = OpReg W64
