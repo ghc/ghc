@@ -310,7 +310,7 @@ rnWarningTxt :: WarningTxt GhcPs -> RnM (WarningTxt GhcRn)
 rnWarningTxt (WarningTxt mb_cat st wst) = do
   forM_ mb_cat $ \(L _ (InWarningCategory _ _ (L loc cat))) ->
     unless (validWarningCategory cat) $
-      addErrAt loc (TcRnInvalidWarningCategory cat)
+      addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
   wst' <- traverse (traverse rnHsDoc) wst
   pure (WarningTxt mb_cat st wst')
 rnWarningTxt (DeprecatedTxt st wst) = do

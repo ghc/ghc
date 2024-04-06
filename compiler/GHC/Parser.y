@@ -1964,9 +1964,9 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
                                 (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
         |  {- empty -}      { Nothing }
 
-warning_category :: { Maybe (Located InWarningCategory) }
-        : 'in' STRING                  { Just (sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
-                                                                             (sL1 $2 $ mkWarningCategory (getSTRING $2))) }
+warning_category :: { Maybe (LocatedE InWarningCategory) }
+        : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
+                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
 warnings :: { OrdList (LWarnDecl GhcPs) }
@@ -4131,8 +4131,8 @@ getSCC lt = do let s = getSTRING lt
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
                    else return s
 
-stringLiteralToHsDocWst :: Located StringLiteral -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
-stringLiteralToHsDocWst  = lexStringLiteral parseIdentifier
+stringLiteralToHsDocWst :: Located StringLiteral -> LocatedE (WithHsDocIdentifiers StringLiteral GhcPs)
+stringLiteralToHsDocWst  sl = reLoc $ lexStringLiteral parseIdentifier sl
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
