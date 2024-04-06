@@ -231,10 +231,10 @@ pprDataItem config lit
 
         imm = litToImm lit
 
-        ppr_item II8  _ = [text "\t.byte\t"  <> pprImm platform imm]
-        ppr_item II16 _ = [text "\t.short\t" <> pprImm platform imm]
-        ppr_item II32 _ = [text "\t.long\t"  <> pprImm platform imm]
-        ppr_item II64 _ = [text "\t.quad\t"  <> pprImm platform imm]
+        ppr_item II8  _ = [text "\t.byte\t"  <> pprDataImm platform imm]
+        ppr_item II16 _ = [text "\t.short\t" <> pprDataImm platform imm]
+        ppr_item II32 _ = [text "\t.long\t"  <> pprDataImm platform imm]
+        ppr_item II64 _ = [text "\t.quad\t"  <> pprDataImm platform imm]
 
         ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
@@ -246,23 +246,23 @@ pprDataItem config lit
 
         ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
 
-pprImm :: IsLine doc => Platform -> Imm -> doc
-pprImm _ (ImmInt i)     = int i
-pprImm _ (ImmInteger i) = integer i
-pprImm p (ImmCLbl l)    = pprAsmLabel p l
-pprImm p (ImmIndex l i) = pprAsmLabel p l <> char '+' <> int i
-pprImm _ (ImmLit s)     = ftext s
+-- | Pretty print an immediate value in the @data@ section
+--
+-- This does not include any checks. We rely on the Assembler to check for
+-- errors. Use `pprOpImm` for immediates in instructions (operands.)
+pprDataImm :: IsLine doc => Platform -> Imm -> doc
+pprDataImm _ (ImmInt i)     = int i
+pprDataImm _ (ImmInteger i) = integer i
+pprDataImm p (ImmCLbl l)    = pprAsmLabel p l
+pprDataImm p (ImmIndex l i) = pprAsmLabel p l <> char '+' <> int i
+pprDataImm _ (ImmLit s)     = ftext s
+pprDataImm _ (ImmFloat f) = float (fromRational f)
+pprDataImm _ (ImmDouble d) = double (fromRational d)
 
--- TODO: See pprIm below for why this is a bad idea!
-pprImm _ (ImmFloat f) = float (fromRational f)
-pprImm _ (ImmDouble d) = double (fromRational d)
+pprDataImm p (ImmConstantSum a b) = pprDataImm p a <> char '+' <> pprDataImm p b
+pprDataImm p (ImmConstantDiff a b) = pprDataImm p a <> char '-'
+                   <> lparen <> pprDataImm p b <> rparen
 
-pprImm p (ImmConstantSum a b) = pprImm p a <> char '+' <> pprImm p b
-pprImm p (ImmConstantDiff a b) = pprImm p a <> char '-'
-                   <> lparen <> pprImm p b <> rparen
-
-
--- aarch64 GNU as uses // for comments.
 asmComment :: SDoc -> SDoc
 asmComment c = text "#" <+> c
 
@@ -272,32 +272,18 @@ asmDoubleslashComment c = text "//" <+> c
 asmMultilineComment :: SDoc -> SDoc
 asmMultilineComment c =  text "/*" $+$ c $+$ text "*/"
 
-pprIm :: IsLine doc => Platform -> Imm -> doc
-pprIm platform im = case im of
-  ImmInt i     -> int i
+-- | Pretty print an immediate operand of an instruction
+--
+-- The kinds of immediates we can use here is pretty limited: RISCV doesn't
+-- support index expressions (as e.g. Aarch64 does.) Floating points need to
+-- fit in range. As we don't need them, forbit them to save us from future
+-- troubles.
+pprOpImm :: (IsLine doc) => Platform -> Imm -> doc
+pprOpImm platform im = case im of
+  ImmInt i -> int i
   ImmInteger i -> integer i
-
-  -- FIXME: This is AArch64 commentry, not necesarily correct for RISCV!
-  -- TODO: This will only work for
-  -- The floating point value must be expressible as ±n ÷ 16 × 2^r,
-  -- where n and r are integers such that 16 ≤ n ≤ 31 and -3 ≤ r ≤ 4.
-  -- and 0 needs to be encoded as wzr/xzr.
-  --
-  -- Except for 0, we might want to either split it up into enough
-  -- ADD operations into an Integer register and then just bit copy it into
-  -- the double register? See the toBytes + fromRational above for data items.
-  -- This is something the x86 backend does.
-  --
-  -- We could also just turn them into statics :-/ Which is what the
-  -- PowerPC backend does.
-  ImmFloat f | f == 0 -> text "zero"
-  ImmFloat f -> char '#' <> float (fromRational f)
-  ImmDouble d | d == 0 -> text "zero"
-  ImmDouble d -> char '#' <> double (fromRational d)
-  -- =<lbl> pseudo instruction!
-  ImmCLbl l    -> char '=' <> pprAsmLabel platform l
-  ImmIndex l o -> text "[=" <> pprAsmLabel platform l <> comma <+> char '#' <> int o <> char ']'
-  _            -> panic "AArch64.pprIm"
+  ImmCLbl l -> char '=' <> pprAsmLabel platform l
+  _ -> pprPanic "RV64.Ppr.pprOpImm" (text "Unsupported immediate for instruction operands" <> colon <+> (text . show) im)
 
 negOp :: Operand -> Operand
 negOp (OpImm (ImmInt i)) = OpImm (ImmInt (negate i))
@@ -307,8 +293,8 @@ negOp op = pprPanic "RV64.negOp" (text $ show op)
 pprOp :: IsLine doc => Platform -> Operand -> doc
 pprOp plat op = case op of
   OpReg w r           -> pprReg w r
-  OpImm im          -> pprIm plat im
-  OpAddr (AddrRegImm r1 im) -> pprImm plat im <> char '(' <> pprReg W64 r1 <> char ')'
+  OpImm im          -> pprOpImm plat im
+  OpAddr (AddrRegImm r1 im) -> pprOpImm plat im <> char '(' <> pprReg W64 r1 <> char ')'
   OpAddr (AddrReg r1)       -> text "0(" <+> pprReg W64 r1 <+> char ')'
 
 pprReg :: forall doc. IsLine doc => Width -> Reg -> doc
