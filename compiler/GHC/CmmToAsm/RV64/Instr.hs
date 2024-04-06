@@ -97,9 +97,6 @@ regUsageOfInstr platform instr = case instr of
   DIVU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
-  SBFM dst src _ _         -> usage (regOp src, regOp dst)
-  UBFM dst src _ _         -> usage (regOp src, regOp dst)
-  UBFX dst src _ _         -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -218,9 +215,6 @@ patchRegsOfInstr instr env = case instr of
     DIVU o1 o2 o3  -> DIVU (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
-    SBFM o1 o2 o3 o4 -> SBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-    UBFM o1 o2 o3 o4 -> UBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-    UBFX o1 o2 o3 o4 -> UBFX (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -600,10 +594,6 @@ data Instr
     | DIVU Operand Operand Operand -- rd = rn ÷ rm
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
-    | SBFM Operand Operand Operand Operand -- rd = rn[i,j]
-    | UBFM Operand Operand Operand Operand -- rd = rn[i,j]
-    -- Signed/Unsigned bitfield extract
-    | UBFX Operand Operand Operand Operand -- rd = rn[i,j]
 
     -- 3. Logical and Move Instructions ----------------------------------------
     -- | AND Operand Operand Operand -- rd = rn & op2
@@ -670,9 +660,6 @@ instrCon i =
       SMULH{} -> "SMULH"
       SUB{} -> "SUB"
       DIVU{} -> "DIVU"
-      SBFM{} -> "SBFM"
-      UBFM{} -> "UBFM"
-      UBFX{} -> "UBFX"
       AND{} -> "AND"
       ASR{} -> "ASR"
       XOR{} -> "XOR"
