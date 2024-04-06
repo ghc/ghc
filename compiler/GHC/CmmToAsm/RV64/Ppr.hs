@@ -487,18 +487,10 @@ pprInstr platform instr = case instr of
   DIVU o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
-  -- TODO: Non-existant in RISCV - delete
-  SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
-  -- TODO: Non-existant in RISCV - delete
-  UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
-  -- signed and unsigned bitfield extract
-  -- TODO: Non-existant in RISCV - delete
-  UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3  -> op3 (text "\tand") o1 o2 o3
   OR o1 o2 o3   -> op3 (text "\tor") o1 o2 o3
-  -- ANDS o1 o2 o3 -> op3 (text "\tands") o1 o2 o3
   ASR o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
   ASR o1 o2 o3  -> op3 (text "\tsra") o1 o2 o3
   XOR o1 o2 o3  -> op3 (text "\txor") o1 o2 o3
@@ -679,7 +671,6 @@ pprInstr platform instr = case instr of
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
-       op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
        pprDmbType DmbRead = text "r"
        pprDmbType DmbWrite = text "w"
        pprDmbType DmbReadWrite = text "rw"
