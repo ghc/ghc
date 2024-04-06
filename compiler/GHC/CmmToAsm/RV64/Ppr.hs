@@ -416,12 +416,10 @@ isImmZero _ = False
 
 isLabel :: Target -> Bool
 isLabel (TBlock _) = True
-isLabel (TLabel _) = True
 isLabel _ = False
 
 getLabel :: IsLine doc => Platform -> Target -> doc
 getLabel platform (TBlock bid) = pprBlockId platform bid
-getLabel platform (TLabel lbl) = pprAsmLabel platform lbl
 getLabel _platform _other = panic "Cannot turn this into a label"
 
 pprBlockId :: IsLine doc => Platform -> BlockId -> doc
