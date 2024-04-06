@@ -10,18 +10,20 @@ module GHC.CmmToAsm.RV64.CodeGen (
 
 where
 
--- NCG stuff:
-import GHC.Prelude hiding (EQ)
-
+import Control.Monad (mapAndUnzipM)
+import Data.Maybe
 import Data.Word
-
-import GHC.Platform.Regs
-import GHC.CmmToAsm.RV64.Instr
-import GHC.CmmToAsm.RV64.Regs
-import GHC.CmmToAsm.RV64.Cond
-
-import GHC.CmmToAsm.CPrim
+import GHC.Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.DebugBlock
+import GHC.Cmm.Switch
+import GHC.Cmm.Utils
+import GHC.CmmToAsm.CPrim
+import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Monad
   ( NatM,
     getConfig,
@@ -32,40 +34,26 @@ import GHC.CmmToAsm.Monad
     getPicBaseMaybeNat,
     getPlatform,
   )
-
--- import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
-import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.RV64.Cond
+import GHC.CmmToAsm.RV64.Instr
+import GHC.CmmToAsm.RV64.Regs
 import GHC.CmmToAsm.Types
-import GHC.Platform.Reg
-import GHC.Platform
-
--- Our intermediate code:
-import GHC.Cmm.BlockId
-import GHC.Cmm
-import GHC.Cmm.Utils
-import GHC.Cmm.Switch
-import GHC.Cmm.CLabel
-import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Graph
-import GHC.Types.Tickish ( GenTickish(..) )
-import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
-
--- The rest:
+import GHC.Data.FastString
 import GHC.Data.OrdList
-import GHC.Utils.Outputable
-
-import Control.Monad    ( mapAndUnzipM, foldM )
-import Data.Maybe
 import GHC.Float
-
+import GHC.Platform
+import GHC.Platform.Reg
+import GHC.Platform.Regs
+import GHC.Prelude hiding (EQ)
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
-import GHC.Data.FastString
-import GHC.Utils.Misc
-import GHC.Utils.Panic
+import GHC.Types.SrcLoc (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
+import GHC.Types.Tickish (GenTickish (..))
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- Note [General layout of an NCG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -379,12 +367,6 @@ getRegisterReg platform (CmmGlobal mid)
         -- ones which map to a real machine register on this
         -- platform.  Hence if it's not mapped to a registers something
         -- went wrong earlier in the pipeline.
--- | Convert a BlockId to some CmmStatic data
--- TODO: Add JumpTable Logic, see Ticket 19912
--- jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
--- jumpTableEntry config Nothing   = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
--- jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
---     where blockLabel = blockLbl blockid
 
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
@@ -1706,14 +1688,6 @@ genCCall target dest_regs arg_regs bid = do
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
-    -- TODO: Optimize using paired stores and loads (STP, LDP). It is
-    -- automatically done by the allocator for us. However it's not optimal,
-    -- as we'd rather want to have control over
-    --     all spill/load registers, so we can optimize with instructions like
-    --       STP xA, xB, [sp, #-16]!
-    --     and
-    --       LDP xA, xB, sp, #16
-    --
     passArguments :: Bool -> [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
     passArguments _packStack _ _ [] stackSpace accumRegs accumCode = return (stackSpace, accumRegs, accumCode)
     -- passArguments _ _ [] accumCode stackSpace | isEven stackSpace = return $ SUM (OpReg W64 x31) (OpReg W64 x31) OpImm (ImmInt (-8 * stackSpace))

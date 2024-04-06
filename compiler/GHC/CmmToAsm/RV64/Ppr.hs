@@ -652,10 +652,6 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
-  -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
-
-  -- STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
-  -- LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY r w -> line $ text "\tfence" <+> pprDmbType r <> char ',' <+> pprDmbType w
@@ -686,10 +682,6 @@ pprInstr platform instr = case instr of
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
-       -- TODO: Delete commented out code.
-      --  op_ldr o1 rest      = line $ text "\tld" <+> pprOp platform o1 <> comma <+> rest  <+> text "(" <> pprOp platform o1 <> text ")"
-      --  op_adrp o1 rest     = line $ text "\tauipc" <+> pprOp platform o1 <> comma <+> rest
-      --  op_add o1 rest      = line $ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> rest
        pprDmbType DmbRead = text "r"
        pprDmbType DmbWrite = text "w"
        pprDmbType DmbReadWrite = text "rw"
