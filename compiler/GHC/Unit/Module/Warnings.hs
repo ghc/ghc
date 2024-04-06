@@ -121,11 +121,11 @@ data InWarningCategory
   = InWarningCategory
     { iwc_in :: !(EpToken "in"),
       iwc_st :: !SourceText,
-      iwc_wc :: (Located WarningCategory)
+      iwc_wc :: (LocatedE WarningCategory)
     } deriving Data
 
 fromWarningCategory :: WarningCategory -> InWarningCategory
-fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLoc wc)
+fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLocA wc)
 
 
 -- See Note [Warning categories]
@@ -201,14 +201,14 @@ type LWarningTxt pass = XRec pass (WarningTxt pass)
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt pass
    = WarningTxt
-      (Maybe (Located InWarningCategory))
+      (Maybe (LocatedE InWarningCategory))
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
       SourceText
-      [Located (WithHsDocIdentifiers StringLiteral pass)]
+      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
    | DeprecatedTxt
       SourceText
-      [Located (WithHsDocIdentifiers StringLiteral pass)]
+      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
   deriving Generic
 
 -- | To which warning category does this WARNING or DEPRECATED pragma belong?
@@ -218,7 +218,7 @@ warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _
 warningTxtCategory _ = defaultWarningCategory
 
 -- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt p -> [Located (WithHsDocIdentifiers StringLiteral p)]
+warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers StringLiteral p)]
 warningTxtMessage (WarningTxt _ _ m) = m
 warningTxtMessage (DeprecatedTxt _ m) = m
 
@@ -260,7 +260,7 @@ instance Outputable (WarningTxt pass) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [Located (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
+pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
