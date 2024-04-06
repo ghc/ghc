@@ -501,8 +501,6 @@ pprInstr platform instr = case instr of
   -- ANDS o1 o2 o3 -> op3 (text "\tands") o1 o2 o3
   ASR o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
   ASR o1 o2 o3  -> op3 (text "\tsra") o1 o2 o3
-  BIC o1 o2 o3  -> op3 (text "\tbic") o1 o2 o3
-  BICS o1 o2 o3 -> op3 (text "\tbics") o1 o2 o3
   XOR o1 o2 o3  -> op3 (text "\txor") o1 o2 o3
   LSL o1 o2 o3  -> op3 (text "\tsll") o1 o2 o3
   LSR o1 o2 o3  -> op3 (text "\tsrl") o1 o2 o3

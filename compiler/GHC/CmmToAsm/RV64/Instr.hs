@@ -104,8 +104,6 @@ regUsageOfInstr platform instr = case instr of
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   XOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -228,8 +226,6 @@ patchRegsOfInstr instr env = case instr of
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
     OR o1 o2 o3    -> OR   (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
-    BIC o1 o2 o3   -> BIC  (patchOp o1) (patchOp o2) (patchOp o3)
-    BICS o1 o2 o3  -> BICS (patchOp o1) (patchOp o2) (patchOp o3)
     XOR o1 o2 o3   -> XOR  (patchOp o1) (patchOp o2) (patchOp o3)
     LSL o1 o2 o3   -> LSL  (patchOp o1) (patchOp o2) (patchOp o3)
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -613,10 +609,6 @@ data Instr
     -- | AND Operand Operand Operand -- rd = rn & op2
     -- | ANDS Operand Operand Operand -- rd = rn & op2
     -- | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    -- TODO: unused
-    | BIC Operand Operand Operand -- rd = rn & ~op2
-    -- TODO: unused
-    | BICS Operand Operand Operand -- rd = rn & ~op2
     | XOR Operand Operand Operand -- rd = rn ⊕ op2
     -- | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     -- | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
@@ -683,8 +675,6 @@ instrCon i =
       UBFX{} -> "UBFX"
       AND{} -> "AND"
       ASR{} -> "ASR"
-      BIC{} -> "BIC"
-      BICS{} -> "BICS"
       XOR{} -> "XOR"
       LSL{} -> "LSL"
       LSR{} -> "LSR"
