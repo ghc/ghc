@@ -711,6 +711,11 @@ printStringAtMLocL (EpAnn anc an cs) l s = do
 printStringAtAA :: (Monad m, Monoid w) => EpaLocation -> String -> EP w m EpaLocation
 printStringAtAA el str = printStringAtAAC CaptureComments el str
 
+printStringAtNC :: (Monad m, Monoid w) => NoCommentsLocation -> String -> EP w m NoCommentsLocation
+printStringAtNC el str = do
+  el' <- printStringAtAAC NoCaptureComments (noCommentsToEpaLocation el) str
+  return (epaToNoCommentsLocation el')
+
 printStringAtAAL :: (Monad m, Monoid w)
   => a -> Lens a EpaLocation -> String -> EP w m a
 printStringAtAAL an l str = do
@@ -2117,10 +2122,10 @@ instance ExactPrint StringLiteral where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact l@(StringLiteral src fs mcomma) = do
+  exact (StringLiteral src fs mcomma) = do
     printSourceTextAA src (show (unpackFS fs))
-    mapM_ (\r -> printStringAtRs r ",") mcomma
-    return l
+    mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
+    return (StringLiteral src fs mcomma')
 
 -- ---------------------------------------------------------------------
 
