@@ -153,7 +153,6 @@ regUsageOfInstr platform instr = case instr of
         regOp (OpImm _) = []
         regTarget :: Target -> [Reg]
         regTarget (TBlock _) = []
-        regTarget (TLabel _) = []
         regTarget (TReg r1)  = [r1]
 
         -- Is this register interesting for the register allocator?
@@ -685,10 +684,8 @@ instrCon i =
       FCVTZS{} -> "FCVTZS"
       FABS{} -> "FABS"
 
--- TODO: We don't need TLabel.
 data Target
     = TBlock BlockId
-    | TLabel CLabel
     | TReg   Reg
 
 data Operand
