@@ -454,26 +454,7 @@ instance Outputable EpaComment where
 -- annotation.
 data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 
--- | The anchor for an @'AnnKeywordId'@. The Parser inserts the
--- @'EpaSpan'@ variant, giving the exact location of the original item
--- in the parsed source.  This can be replaced by the @'EpaDelta'@
--- version, to provide a position for the item relative to the end of
--- the previous item in the source.  This is useful when editing an
--- AST prior to exact printing the changed one. The list of comments
--- in the @'EpaDelta'@ variant captures any comments between the prior
--- output and the thing being marked here, since we cannot otherwise
--- sort the relative order.
-
-data EpaLocation' a = EpaSpan !SrcSpan
-                    | EpaDelta !DeltaPos !a
-                    deriving (Data,Eq,Show)
-
 type EpaLocation = EpaLocation' [LEpaComment]
-
-type NoCommentsLocation = EpaLocation' NoComments
-
-data NoComments = NoComments
-  deriving (Data,Eq,Ord,Show)
 
 epaToNoCommentsLocation :: EpaLocation -> NoCommentsLocation
 epaToNoCommentsLocation (EpaSpan ss) = EpaSpan ss
@@ -492,47 +473,12 @@ data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
 instance Outputable a => Outputable (GenLocated TokenLocation a) where
   ppr (L _ x) = ppr x
 
--- | Spacing between output items when exact printing.  It captures
--- the spacing from the current print position on the page to the
--- position required for the thing about to be printed.  This is
--- either on the same line in which case is is simply the number of
--- spaces to emit, or it is some number of lines down, with a given
--- column offset.  The exact printing algorithm keeps track of the
--- column offset pertaining to the current anchor position, so the
--- `deltaColumn` is the additional spaces to add in this case.  See
--- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations for
--- details.
-data DeltaPos
-  = SameLine { deltaColumn :: !Int }
-  | DifferentLine
-      { deltaLine   :: !Int, -- ^ deltaLine should always be > 0
-        deltaColumn :: !Int
-      } deriving (Show,Eq,Ord,Data)
-
--- | Smart constructor for a 'DeltaPos'. It preserves the invariant
--- that for the 'DifferentLine' constructor 'deltaLine' is always > 0.
-deltaPos :: Int -> Int -> DeltaPos
-deltaPos l c = case l of
-  0 -> SameLine c
-  _ -> DifferentLine l c
-
-getDeltaLine :: DeltaPos -> Int
-getDeltaLine (SameLine _) = 0
-getDeltaLine (DifferentLine r _) = r
-
 -- | Used in the parser only, extract the 'RealSrcSpan' from an
 -- 'EpaLocation'. The parser will never insert a 'DeltaPos', so the
 -- partial function is safe.
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
 epaLocationRealSrcSpan (EpaSpan (RealSrcSpan r _)) = r
 epaLocationRealSrcSpan _ = panic "epaLocationRealSrcSpan"
-
-instance Outputable NoComments where
-  ppr NoComments = text "NoComments"
-
-instance (Outputable a) => Outputable (EpaLocation' a) where
-  ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
-  ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
@@ -1418,10 +1364,6 @@ instance (Outputable a) => Outputable (EpAnn a) where
 
 instance Outputable NoEpAnns where
   ppr NoEpAnns = text "NoEpAnns"
-
-instance Outputable DeltaPos where
-  ppr (SameLine c) = text "SameLine" <+> ppr c
-  ppr (DifferentLine l c) = text "DifferentLine" <+> ppr l <+> ppr c
 
 instance Outputable (GenLocated NoCommentsLocation EpaComment) where
   ppr (L l c) = text "L" <+> ppr l <+> ppr c

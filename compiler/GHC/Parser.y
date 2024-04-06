@@ -4559,7 +4559,7 @@ addTrailingCommaN (L anns a) span = do
   return (L anns' a)
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
-addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaLocationRealSrcSpan span) })
+addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaToNoCommentsLocation span) })
 
 -- -------------------------------------
 
