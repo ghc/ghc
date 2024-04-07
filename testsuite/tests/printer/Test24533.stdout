@@ -13,8 +13,8 @@
      []
      (Just
       ((,)
-       { Test24533.hs:15:1 }
-       { Test24533.hs:14:16-19 })))
+       { Test24533.hs:17:1 }
+       { Test24533.hs:16:16-19 })))
     (EpaCommentsBalanced
      [(L
        (EpaSpan
@@ -276,22 +276,42 @@
        (Nothing)))))
   ,(L
     (EpAnn
-     (EpaSpan { Test24533.hs:10:1-33 })
+     (EpaSpan { Test24533.hs:11:1-99 })
      (AnnListItem
       [])
      (EpaComments
-      []))
+      [(L
+        (EpaSpan
+         { Test24533.hs:10:1-18 })
+        (EpaComment
+         (EpaBlockComment
+          "{- Weird before -}")
+         { Test24533.hs:8:13 }))
+      ,(L
+        (EpaSpan
+         { Test24533.hs:11:7-18 })
+        (EpaComment
+         (EpaBlockComment
+          "{- Weird0 -}")
+         { Test24533.hs:11:1-5 }))
+      ,(L
+        (EpaSpan
+         { Test24533.hs:11:24-35 })
+        (EpaComment
+         (EpaBlockComment
+          "{- Weird1 -}")
+         { Test24533.hs:11:20-22 }))]))
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,,)
-       [(AddEpAnn AnnClass (EpaSpan { Test24533.hs:10:1-5 }))]
+       [(AddEpAnn AnnClass (EpaSpan { Test24533.hs:11:1-5 }))]
        (EpNoLayout)
        (NoAnnSortKey))
       (Nothing)
       (L
        (EpAnn
-        (EpaSpan { Test24533.hs:10:7-9 })
+        (EpaSpan { Test24533.hs:11:20-22 })
         (NameAnnTrailing
          [])
         (EpaComments
@@ -302,26 +322,47 @@
        (NoExtField)
        [(L
          (EpAnn
-          (EpaSpan { Test24533.hs:10:11-33 })
+          (EpaSpan { Test24533.hs:11:37-99 })
           (AnnListItem
            [])
           (EpaComments
            [(L
              (EpaSpan
-              { Test24533.hs:10:22-32 })
+              { Test24533.hs:11:38-49 })
              (EpaComment
               (EpaBlockComment
-               "{- Weird -}")
-              { Test24533.hs:10:17-20 }))]))
+               "{- Weird2 -}")
+              { Test24533.hs:11:37 }))
+           ,(L
+             (EpaSpan
+              { Test24533.hs:11:87-98 })
+             (EpaComment
+              (EpaBlockComment
+               "{- Weird5 -}")
+              { Test24533.hs:11:82-85 }))
+           ,(L
+             (EpaSpan
+              { Test24533.hs:11:53-64 })
+             (EpaComment
+              (EpaBlockComment
+               "{- Weird3 -}")
+              { Test24533.hs:11:51 }))
+           ,(L
+             (EpaSpan
+              { Test24533.hs:11:69-80 })
+             (EpaComment
+              (EpaBlockComment
+               "{- Weird4 -}")
+              { Test24533.hs:11:66-67 }))]))
          (KindedTyVar
-          [(AddEpAnn AnnOpenP (EpaSpan { Test24533.hs:10:11 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { Test24533.hs:10:33 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { Test24533.hs:10:14-15 }))]
+          [(AddEpAnn AnnOpenP (EpaSpan { Test24533.hs:11:37 }))
+          ,(AddEpAnn AnnCloseP (EpaSpan { Test24533.hs:11:99 }))
+          ,(AddEpAnn AnnDcolon (EpaSpan { Test24533.hs:11:66-67 }))]
           (HsBndrRequired
            (NoExtField))
           (L
            (EpAnn
-            (EpaSpan { Test24533.hs:10:12 })
+            (EpaSpan { Test24533.hs:11:51 })
             (NameAnnTrailing
              [])
             (EpaComments
@@ -330,7 +371,7 @@
             {OccName: a}))
           (L
            (EpAnn
-            (EpaSpan { Test24533.hs:10:17-20 })
+            (EpaSpan { Test24533.hs:11:82-85 })
             (AnnListItem
              [])
             (EpaComments
@@ -340,7 +381,7 @@
             (NotPromoted)
             (L
              (EpAnn
-              (EpaSpan { Test24533.hs:10:17-20 })
+              (EpaSpan { Test24533.hs:11:82-85 })
               (NameAnnTrailing
                [])
               (EpaComments
@@ -357,17 +398,31 @@
       [])))
   ,(L
     (EpAnn
-     (EpaSpan { Test24533.hs:(12,1)-(14,19) })
+     (EpaSpan { Test24533.hs:(14,1)-(16,19) })
      (AnnListItem
       [])
      (EpaComments
       [(L
         (EpaSpan
-         { Test24533.hs:13:3-10 })
+         { Test24533.hs:15:3-10 })
         (EpaComment
          (EpaLineComment
           "-- Weird")
-         { Test24533.hs:12:17-21 }))]))
+         { Test24533.hs:14:17-21 }))
+      ,(L
+        (EpaSpan
+         { Test24533.hs:11:101-112 })
+        (EpaComment
+         (EpaBlockComment
+          "{- Weird6 -}")
+         { Test24533.hs:11:99 }))
+      ,(L
+        (EpaSpan
+         { Test24533.hs:12:1-17 })
+        (EpaComment
+         (EpaBlockComment
+          "{- Weird after -}")
+         { Test24533.hs:11:101-112 }))]))
     (InstD
      (NoExtField)
      (ClsInstD
@@ -375,12 +430,12 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { Test24533.hs:12:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { Test24533.hs:12:17-21 }))]
+        [(AddEpAnn AnnInstance (EpaSpan { Test24533.hs:14:1-8 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { Test24533.hs:14:17-21 }))]
         (NoAnnSortKey))
        (L
         (EpAnn
-         (EpaSpan { Test24533.hs:12:10-15 })
+         (EpaSpan { Test24533.hs:14:10-15 })
          (AnnListItem
           [])
          (EpaComments
@@ -391,7 +446,7 @@
           (NoExtField))
          (L
           (EpAnn
-           (EpaSpan { Test24533.hs:12:10-15 })
+           (EpaSpan { Test24533.hs:14:10-15 })
            (AnnListItem
             [])
            (EpaComments
@@ -400,7 +455,7 @@
            (NoExtField)
            (L
             (EpAnn
-             (EpaSpan { Test24533.hs:12:10-11 })
+             (EpaSpan { Test24533.hs:14:10-11 })
              (AnnListItem
               [])
              (EpaComments
@@ -410,7 +465,7 @@
              (NotPromoted)
              (L
               (EpAnn
-               (EpaSpan { Test24533.hs:12:10-11 })
+               (EpaSpan { Test24533.hs:14:10-11 })
                (NameAnnTrailing
                 [])
                (EpaComments
@@ -419,7 +474,7 @@
                {OccName: Eq}))))
            (L
             (EpAnn
-             (EpaSpan { Test24533.hs:12:13-15 })
+             (EpaSpan { Test24533.hs:14:13-15 })
              (AnnListItem
               [])
              (EpaComments
@@ -429,7 +484,7 @@
              (NotPromoted)
              (L
               (EpAnn
-               (EpaSpan { Test24533.hs:12:13-15 })
+               (EpaSpan { Test24533.hs:14:13-15 })
                (NameAnnTrailing
                 [])
                (EpaComments
@@ -439,7 +494,7 @@
        {Bag(LocatedA (HsBind GhcPs)):
         [(L
           (EpAnn
-           (EpaSpan { Test24533.hs:14:3-19 })
+           (EpaSpan { Test24533.hs:16:3-19 })
            (AnnListItem
             [])
            (EpaComments
@@ -448,7 +503,7 @@
            (NoExtField)
            (L
             (EpAnn
-             (EpaSpan { Test24533.hs:14:7-8 })
+             (EpaSpan { Test24533.hs:16:7-8 })
              (NameAnnTrailing
               [])
              (EpaComments
@@ -459,7 +514,7 @@
             (FromSource)
             (L
              (EpAnn
-              (EpaSpan { Test24533.hs:14:3-19 })
+              (EpaSpan { Test24533.hs:16:3-19 })
               (AnnList
                (Nothing)
                (Nothing)
@@ -470,7 +525,7 @@
                []))
              [(L
                (EpAnn
-                (EpaSpan { Test24533.hs:14:3-19 })
+                (EpaSpan { Test24533.hs:16:3-19 })
                 (AnnListItem
                  [])
                 (EpaComments
@@ -480,7 +535,7 @@
                 (FunRhs
                  (L
                   (EpAnn
-                   (EpaSpan { Test24533.hs:14:7-8 })
+                   (EpaSpan { Test24533.hs:16:7-8 })
                    (NameAnnTrailing
                     [])
                    (EpaComments
@@ -491,7 +546,7 @@
                  (NoSrcStrict))
                 [(L
                   (EpAnn
-                   (EpaSpan { Test24533.hs:14:3-5 })
+                   (EpaSpan { Test24533.hs:16:3-5 })
                    (AnnListItem
                     [])
                    (EpaComments
@@ -500,7 +555,7 @@
                    []
                    (L
                     (EpAnn
-                     (EpaSpan { Test24533.hs:14:3-5 })
+                     (EpaSpan { Test24533.hs:16:3-5 })
                      (NameAnnTrailing
                       [])
                      (EpaComments
@@ -512,7 +567,7 @@
                     [])))
                 ,(L
                   (EpAnn
-                   (EpaSpan { Test24533.hs:14:10-12 })
+                   (EpaSpan { Test24533.hs:16:10-12 })
                    (AnnListItem
                     [])
                    (EpaComments
@@ -521,7 +576,7 @@
                    []
                    (L
                     (EpAnn
-                     (EpaSpan { Test24533.hs:14:10-12 })
+                     (EpaSpan { Test24533.hs:16:10-12 })
                      (NameAnnTrailing
                       [])
                      (EpaComments
@@ -536,22 +591,22 @@
                   [])
                  [(L
                    (EpAnn
-                    (EpaSpan { Test24533.hs:14:14-19 })
+                    (EpaSpan { Test24533.hs:16:14-19 })
                     (NoEpAnns)
                     (EpaComments
                      []))
                    (GRHS
                     (EpAnn
-                     (EpaSpan { Test24533.hs:14:14-19 })
+                     (EpaSpan { Test24533.hs:16:14-19 })
                      (GrhsAnn
                       (Nothing)
-                      (AddEpAnn AnnEqual (EpaSpan { Test24533.hs:14:14 })))
+                      (AddEpAnn AnnEqual (EpaSpan { Test24533.hs:16:14 })))
                      (EpaComments
                       []))
                     []
                     (L
                      (EpAnn
-                      (EpaSpan { Test24533.hs:14:16-19 })
+                      (EpaSpan { Test24533.hs:16:16-19 })
                       (AnnListItem
                        [])
                       (EpaComments
@@ -560,7 +615,7 @@
                       (NoExtField)
                       (L
                        (EpAnn
-                        (EpaSpan { Test24533.hs:14:16-19 })
+                        (EpaSpan { Test24533.hs:16:16-19 })
                         (NameAnnTrailing
                          [])
                         (EpaComments
