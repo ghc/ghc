@@ -942,11 +942,10 @@ checkTyVars pp_what equals_or_where tc tparms
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddEpAnn] -> [AddEpAnn] -> HsBndrVis GhcPs -> LHsType GhcPs
               -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
-    chkParens ops cps bvis (L l (HsParTy _ (L lt  ty)))
+    chkParens ops cps bvis (L l (HsParTy _ (L lt ty)))
       = let
           (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-          lcs = epAnnComments l
-          lt' = setCommentsEpAnn lt lcs
+          (_,lt') = transferCommentsOnlyA l lt
         in
           chkParens (o:ops) (c:cps) bvis (L lt' ty)
     chkParens ops cps bvis ty = chk ops cps bvis ty
@@ -1053,7 +1052,7 @@ checkTyClHdr :: Bool               -- True  <=> class header
 checkTyClHdr is_cls ty
   = goL ty [] [] [] Prefix
   where
-    goL (L l ty) acc ops cps fix = go (locA l) ty acc ops cps fix
+    goL (L l ty) acc ops cps fix = go l ty acc ops cps fix
 
     -- workaround to define '*' despite StarIsType
     go ll (HsParTy an (L l (HsStarTy _ isUni))) acc ops' cps' fix
@@ -1071,11 +1070,11 @@ checkTyClHdr is_cls ty
             rhs = HsValArg noExtField t2
     go l (HsParTy _ ty)    acc ops cps fix = goL ty acc (o:ops) (c:cps) fix
       where
-        (o,c) = mkParensEpAnn (realSrcSpan l)
+        (o,c) = mkParensEpAnn (realSrcSpan (locA l))
     go _ (HsAppTy _ t1 t2) acc ops cps fix = goL t1 (HsValArg noExtField t2:acc) ops cps fix
     go _ (HsAppKindTy at ty ki) acc ops cps fix = goL ty (HsTypeArg at ki:acc) ops cps fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
-      = return (L (noAnnSrcSpan l) (nameRdrName tup_name)
+      = return (L (l2l l) (nameRdrName tup_name)
                , map (HsValArg noExtField) ts, fix, (reverse ops)++cps)
       where
         arity = length ts
@@ -1083,17 +1082,17 @@ checkTyClHdr is_cls ty
                  | otherwise = getName (tupleTyCon Boxed arity)
           -- See Note [Unit tuples] in GHC.Hs.Type  (TODO: is this still relevant?)
     go l _ _ _ _ _
-      = addFatalError $ mkPlainErrorMsgEnvelope l $
+      = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
           (PsErrMalformedTyOrClDecl ty)
 
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
-    newAnns :: SrcSpan -> SrcSpanAnnA -> AnnParen -> SrcSpanAnnN
-    newAnns l (EpAnn ap (AnnListItem ta) csp) (AnnParen _ o c) =
+    newAnns :: SrcSpanAnnA -> SrcSpanAnnA -> AnnParen -> SrcSpanAnnN
+    newAnns l@(EpAnn _ (AnnListItem _) csp0) l1@(EpAnn ap (AnnListItem ta) csp) (AnnParen _ o c) =
       let
-        lr = combineSrcSpans (RealSrcSpan (anchor ap) Strict.Nothing) l
+        lr = combineSrcSpans (locA l1) (locA l)
       in
-        EpAnn (EpaSpan lr) (NameAnn NameParens o ap c ta) csp
+        EpAnn (EpaSpan lr) (NameAnn NameParens o ap c ta) (csp0 Semi.<> csp)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
