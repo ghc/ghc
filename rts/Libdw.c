@@ -285,6 +285,9 @@ static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
     return true;
 }
 
+// This function should persist the current machine state and call
+// dwfl_thread_state_registers. The register numbering should match
+// that defined by the platform's DWARF specification.
 static bool set_initial_registers(Dwfl_Thread *thread, void *arg);
 
 #if defined(x86_64_HOST_ARCH)
@@ -314,6 +317,53 @@ static bool set_initial_registers(Dwfl_Thread *thread,
              :"%rax"                      /* clobbered */
         );
     return dwfl_thread_state_registers(thread, 0, 17, regs);
+}
+#elif defined(aarch64_HOST_ARCH)
+// See https://github.com/ARM-software/abi-aa/blob/main/aadwarf64/aadwarf64.rst
+static bool set_initial_registers(Dwfl_Thread *thread,
+                                  void *arg STG_UNUSED) {
+    Dwarf_Word regs[33] = {};
+    __asm__ ("str x0,  [%0, 0x000]\n\t"
+             "str x1,  [%0, 0x008]\n\t"
+             "str x2,  [%0, 0x010]\n\t"
+             "str x3,  [%0, 0x018]\n\t"
+             "str x4,  [%0, 0x020]\n\t"
+             "str x5,  [%0, 0x028]\n\t"
+             "str x6,  [%0, 0x030]\n\t"
+             "str x7,  [%0, 0x038]\n\t"
+             "str x8,  [%0, 0x040]\n\t"
+             "str x9,  [%0, 0x048]\n\t"
+             "str x10, [%0, 0x050]\n\t"
+             "str x11, [%0, 0x058]\n\t"
+             "str x12, [%0, 0x060]\n\t"
+             "str x13, [%0, 0x068]\n\t"
+             "str x14, [%0, 0x070]\n\t"
+             "str x15, [%0, 0x078]\n\t"
+             "str x16, [%0, 0x080]\n\t"
+             "str x17, [%0, 0x088]\n\t"
+             "str x18, [%0, 0x090]\n\t"
+             "str x19, [%0, 0x098]\n\t"
+             "str x20, [%0, 0x0a0]\n\t"
+             "str x21, [%0, 0x0a8]\n\t"
+             "str x22, [%0, 0x0b0]\n\t"
+             "str x23, [%0, 0x0b8]\n\t"
+             "str x24, [%0, 0x0c0]\n\t"
+             "str x25, [%0, 0x0c8]\n\t"
+             "str x26, [%0, 0x0d0]\n\t"
+             "str x27, [%0, 0x0d8]\n\t"
+             "str x28, [%0, 0x0e0]\n\t"
+             "str x29, [%0, 0x0e8]\n\t"
+             "str x30, [%0, 0x0f0]\n\t"
+             "mov x1,  sp\n\t"
+             "str x1,  [%0, 0x0f8]\n\t"
+             ".here:\n\t"
+             "adr x1,  .here\n\t"
+             "str x1,  [%0, 0x100]\n\t"
+             :                            /* no output */
+             :"r" (&regs[0])              /* input */
+             :"x1"                        /* clobbered */
+        );
+    return dwfl_thread_state_registers(thread, 0, 33, regs);
 }
 #elif defined(i386_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
