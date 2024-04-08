@@ -1706,7 +1706,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
+  "nightly-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -1717,7 +1717,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
+        "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1727,14 +1727,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
+      "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11-emsdk-closure:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -1760,14 +1760,14 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
+      "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -5087,7 +5087,7 @@
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
   },
-  "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
+  "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -5098,7 +5098,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
+        "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5108,14 +5108,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
+      "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11-emsdk-closure:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -5141,14 +5141,14 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate"
+      "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate"
     }
   },
   "x86_64-linux-deb11-validate+boot_nonmoving_gc": {

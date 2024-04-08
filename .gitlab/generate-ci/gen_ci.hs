@@ -107,6 +107,7 @@ data Opsys
 data LinuxDistro
   = Debian12
   | Debian11
+  | Debian11Js
   | Debian10
   | Debian9
   | Fedora33
@@ -285,12 +286,13 @@ tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
 distroName :: LinuxDistro -> String
-distroName Debian12  = "deb12"
-distroName Debian11  = "deb11"
+distroName Debian12   = "deb12"
+distroName Debian11   = "deb11"
+distroName Debian11Js = "deb11-emsdk-closure"
 distroName Debian10   = "deb10"
-distroName Debian9   = "deb9"
-distroName Fedora33  = "fedora33"
-distroName Fedora38  = "fedora38"
+distroName Debian9    = "deb9"
+distroName Fedora33   = "fedora33"
+distroName Fedora38   = "fedora38"
 distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
@@ -1009,7 +1011,7 @@ job_groups =
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
-     , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11) javascriptConfig)
+     , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
 
      , make_wasm_jobs wasm_build_config
      , modifyValidateJobs manual $
