@@ -58,6 +58,7 @@ import Data.IORef
 import Control.Monad
 import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
 import System.IO.Unsafe
+import GHC.Iface.Type.Map (IfaceTypeMap)
 
 
 -- ---------------------------------------------------------------------------
@@ -369,7 +370,7 @@ initReadIfaceTypeTable ud = do
 
 initWriteIfaceType :: IO (WriterTable, BinaryWriter IfaceType)
 initWriteIfaceType = do
-  sym_tab <- initGenericSymbolTable
+  sym_tab <- initGenericSymbolTable @IfaceTypeMap
   pure
     ( WriterTable
         { putTable = putGenericSymbolTable sym_tab (lazyPut' putIfaceType)

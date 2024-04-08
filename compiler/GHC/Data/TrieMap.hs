@@ -13,8 +13,6 @@ module GHC.Data.TrieMap(
    MaybeMap,
    -- * Maps over 'List' values
    ListMap,
-   -- * Maps over 'Literal's
-   LiteralMap,
    -- * 'TrieMap' class
    TrieMap(..), insertTM, deleteTM, foldMapTM, isEmptyTM,
 
@@ -30,7 +28,6 @@ module GHC.Data.TrieMap(
 
 import GHC.Prelude
 
-import GHC.Types.Literal
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique( Uniquable )
 
@@ -39,6 +36,7 @@ import qualified Data.IntMap as IntMap
 import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 import Data.Kind( Type )
+import Data.Functor.Compose
 
 import qualified Data.Semigroup as S
 
@@ -343,15 +341,37 @@ ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
 ftList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = filterMaybe f mnil, lm_cons = fmap (filterTM f) mcons }
 
-{-
-************************************************************************
-*                                                                      *
-                   Basic maps
-*                                                                      *
-************************************************************************
--}
+{- Composition -}
 
-type LiteralMap  a = Map.Map Literal a
+instance (TrieMap m, TrieMap n) => TrieMap (Compose m n) where
+  type Key (Compose m n) = (Key m, Key n)
+  emptyTM  = Compose emptyTM
+  lookupTM = lkCompose lookupTM lookupTM
+  alterTM  = xtCompose alterTM alterTM
+  foldTM   = fdCompose
+  filterTM = ftCompose
+
+lkCompose :: Monad m => (t1 -> f (g a1) -> m a2) -> (t2 -> a2 -> m b) -> (t1, t2) -> Compose f g a1 -> m b
+lkCompose f g (a, b) (Compose m) = f a m >>= g b
+
+xtCompose ::
+          (TrieMap m, TrieMap n)
+          => (forall a  . Key m -> XT a -> m a -> m a)
+          -> (forall a . Key n -> XT a -> n a -> n a)
+          -> Key (Compose m n)
+          -> XT a
+          -> Compose m n a
+          -> Compose m n a
+
+xtCompose f g (a, b) xt (Compose m) = Compose ((f a |>> g b xt) m)
+
+fdCompose :: (TrieMap m1, TrieMap m2) => (a -> b -> b) -> Compose m1 m2 a -> b -> b
+fdCompose f (Compose m) = foldTM (foldTM f) m
+
+
+ftCompose :: (TrieMap n, Functor m) => (a -> Bool) -> Compose m n a -> Compose m n a
+ftCompose f (Compose m) = Compose (fmap (filterTM f) m)
+
 
 {-
 ************************************************************************

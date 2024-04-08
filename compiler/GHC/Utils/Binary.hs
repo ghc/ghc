@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -150,6 +151,9 @@ import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Coerce
+import GHC.Data.TrieMap
+
+
 
 type BinArray = ForeignPtr Word8
 
@@ -1348,23 +1352,23 @@ data WriterTable = WriterTable
 -- binary serialisation and deserialisation.
 -- ----------------------------------------------------------------------------
 
-data GenericSymbolTable a = GenericSymbolTable
+data GenericSymbolTable m = GenericSymbolTable
   { gen_symtab_next :: !FastMutInt
   -- ^ The next index to use
-  , gen_symtab_map  :: !(IORef (Map.Map a Int))
+  , gen_symtab_map  :: !(IORef (m Int))
   -- ^ Given a symbol, find the symbol
   }
 
-initGenericSymbolTable :: IO (GenericSymbolTable a)
+initGenericSymbolTable :: TrieMap m => IO (GenericSymbolTable m)
 initGenericSymbolTable = do
   symtab_next <- newFastMutInt 0
-  symtab_map <- newIORef Map.empty
+  symtab_map <- newIORef emptyTM
   pure $ GenericSymbolTable
         { gen_symtab_next = symtab_next
         , gen_symtab_map  = symtab_map
         }
 
-putGenericSymbolTable :: forall a. GenericSymbolTable a -> (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> IO Int
+putGenericSymbolTable :: forall m. (TrieMap m) => GenericSymbolTable m -> (WriteBinHandle -> Key m -> IO ()) -> WriteBinHandle -> IO Int
 putGenericSymbolTable gen_sym_tab serialiser bh = do
   putGenericSymbolTable bh
   where
@@ -1385,7 +1389,7 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
         (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
           loop 0)
 
-getGenericSymbolTable :: forall a. (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
+getGenericSymbolTable :: forall a . (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
 getGenericSymbolTable deserialiser bh = do
   sz <- forwardGet bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
@@ -1397,19 +1401,19 @@ getGenericSymbolTable deserialiser bh = do
     writeArray mut_arr i f
   unsafeFreeze mut_arr
 
-putGenericSymTab :: (Ord a, Binary a) => GenericSymbolTable a -> WriteBinHandle -> a -> IO ()
+putGenericSymTab :: (TrieMap m) => GenericSymbolTable m -> WriteBinHandle -> Key m -> IO ()
 putGenericSymTab GenericSymbolTable{
                gen_symtab_map = symtab_map_ref,
                gen_symtab_next = symtab_next }
         bh val = do
   symtab_map <- readIORef symtab_map_ref
-  case Map.lookup val symtab_map of
+  case lookupTM val symtab_map of
     Just off -> put_ bh (fromIntegral off :: Word32)
     Nothing -> do
       off <- readFastMutInt symtab_next
       writeFastMutInt symtab_next (off+1)
       writeIORef symtab_map_ref
-          $! Map.insert val off symtab_map
+          $! insertTM val off symtab_map
       put_ bh (fromIntegral off :: Word32)
 
 getGenericSymtab :: Binary a => SymbolTable a -> ReadBinHandle -> IO a
