@@ -432,6 +432,11 @@ rtsPackageArgs = package rts ? do
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
         , builder Ghc ? ghcArgs
 
+          -- Enable info table map when building RTS Cmm sources to
+          -- ensure that IPE information is available for built-in closures.
+          -- See #24403.
+        , builder (Ghc CompileHs) ? arg "-finfo-table-map"
+
         , builder HsCpp ? pure
           [ "-DTOP="             ++ show top ]
 
