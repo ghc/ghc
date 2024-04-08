@@ -2148,7 +2148,6 @@ static void initStatsFile (FILE *f)
 static StgWord64
 decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
 {
-    char c;
     const char *s;
     StgDouble m;
     StgWord64 val;
@@ -2161,19 +2160,47 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     }
     else
     {
-        m = atof(s);
-        c = s[strlen(s)-1];
+        char *end;
+        m = strtod(s, &end);
 
-        if (c == 't' || c == 'T')
-            m *= (StgWord64)1024*1024*1024*1024;
-        else if (c == 'g' || c == 'G')
-            m *= 1024*1024*1024;
-        else if (c == 'm' || c == 'M')
-            m *= 1024*1024;
-        else if (c == 'k' || c == 'K')
-            m *= 1024;
-        else if (c == 'w' || c == 'W')
-            m *= sizeof(W_);
+        if (end == s) {
+            errorBelch("error in RTS option %s: unable to parse number '%s'", flag, s);
+            stg_exit(EXIT_FAILURE);
+        }
+
+        StgWord64 unit;
+        switch (*end) {
+        case 't':
+        case 'T':
+            unit = (StgWord64)1024*1024*1024*1024;
+            break;
+        case 'g':
+        case 'G':
+            unit = 1024*1024*1024;
+            break;
+        case 'm':
+        case 'M':
+            unit = 1024*1024;
+            break;
+        case 'k':
+        case 'K':
+            unit = 1024;
+            break;
+        case 'w':
+        case 'W':
+            unit = sizeof(W_);
+            break;
+        case 'b':
+        case 'B':
+        case '\0':
+            unit = 1;
+            break;
+        default:
+            errorBelch("error in RTS option %s: unknown unit suffix '%c'", flag, *end);
+            stg_exit(EXIT_FAILURE);
+        }
+
+        m *= unit;
     }
 
     val = (StgWord64)m;
