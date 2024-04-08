@@ -137,7 +137,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set                 ( Set )
 import qualified Data.Set as Set
 import Data.Time
-import Data.List (sortOn, unfoldr)
+import Data.List (unfoldr)
 import Data.Typeable
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -1357,37 +1357,39 @@ data GenericSymbolTable m = GenericSymbolTable
   -- ^ The next index to use
   , gen_symtab_map  :: !(IORef (m Int))
   -- ^ Given a symbol, find the symbol
+  , gen_symtab_to_write :: !(IORef [Key m])
+  -- ^ Reversed list of values to write into the buffer
   }
 
 initGenericSymbolTable :: TrieMap m => IO (GenericSymbolTable m)
 initGenericSymbolTable = do
   symtab_next <- newFastMutInt 0
   symtab_map <- newIORef emptyTM
+  symtab_todo <- newIORef []
   pure $ GenericSymbolTable
         { gen_symtab_next = symtab_next
         , gen_symtab_map  = symtab_map
+        , gen_symtab_to_write = symtab_todo
         }
 
 putGenericSymbolTable :: forall m. (TrieMap m) => GenericSymbolTable m -> (WriteBinHandle -> Key m -> IO ()) -> WriteBinHandle -> IO Int
 putGenericSymbolTable gen_sym_tab serialiser bh = do
   putGenericSymbolTable bh
   where
-    symtab_map = gen_symtab_map gen_sym_tab
     symtab_next = gen_symtab_next gen_sym_tab
+    symtab_to_write = gen_symtab_to_write gen_sym_tab
     putGenericSymbolTable :: HasCallStack => WriteBinHandle -> IO Int
     putGenericSymbolTable bh  = do
-      let loop bound = do
-            d <- readIORef symtab_map
-            table_count <- readFastMutInt symtab_next
-            let vs = sortOn fst [(b, a) | (a,b) <- Map.toList  d, b >= bound]
+      let loop = do
+            vs <- atomicModifyIORef' symtab_to_write (\a -> ([], a))
             case vs of
-              [] -> return table_count
+              [] -> readFastMutInt symtab_next
               todo -> do
-                mapM_ (\n -> serialiser bh n) (map snd todo)
-                loop table_count
+                mapM_ (\n -> serialiser bh n) (reverse todo)
+                loop
       snd <$>
         (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
-          loop 0)
+          loop)
 
 getGenericSymbolTable :: forall a . (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
 getGenericSymbolTable deserialiser bh = do
@@ -1404,7 +1406,8 @@ getGenericSymbolTable deserialiser bh = do
 putGenericSymTab :: (TrieMap m) => GenericSymbolTable m -> WriteBinHandle -> Key m -> IO ()
 putGenericSymTab GenericSymbolTable{
                gen_symtab_map = symtab_map_ref,
-               gen_symtab_next = symtab_next }
+               gen_symtab_next = symtab_next,
+               gen_symtab_to_write = symtab_todo }
         bh val = do
   symtab_map <- readIORef symtab_map_ref
   case lookupTM val symtab_map of
@@ -1414,6 +1417,7 @@ putGenericSymTab GenericSymbolTable{
       writeFastMutInt symtab_next (off+1)
       writeIORef symtab_map_ref
           $! insertTM val off symtab_map
+      atomicModifyIORef symtab_todo (\todo -> (val : todo, ()))
       put_ bh (fromIntegral off :: Word32)
 
 getGenericSymtab :: Binary a => SymbolTable a -> ReadBinHandle -> IO a
