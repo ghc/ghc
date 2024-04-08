@@ -90,7 +90,7 @@ head (x:_)              =  x
 head []                 =  badHead
 {-# NOINLINE [1] head #-}
 
-{-# WARNING in "x-partial" head "This is a partial function, it throws an error on empty lists. Use pattern matching, 'GHC.Internal.Data.List.uncons' or 'GHC.Internal.Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
+{-# WARNING in "x-partial" head "This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
 
 badHead :: HasCallStack => a
 badHead = errorEmptyList "head"
