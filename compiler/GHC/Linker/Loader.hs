@@ -61,6 +61,7 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
+import qualified Data.Foldable as Foldable
 import GHC.SysTools
 
 import GHC.Types.Basic
@@ -93,6 +94,8 @@ import Control.Monad
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
+import Data.Functor ((<&>))
+import Data.Foldable (for_)
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
@@ -927,7 +930,8 @@ linkSomeBCOs :: Interp
 
 linkSomeBCOs interp pkgs_loaded le mods = foldr fun do_link mods []
  where
-  fun CompiledByteCode{..} inner accum = inner (bc_bcos : accum)
+  fun CompiledByteCode{..} inner accum =
+    inner (Foldable.toList bc_bcos : accum)
 
   do_link [] = return []
   do_link mods = do
