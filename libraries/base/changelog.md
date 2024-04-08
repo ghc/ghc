@@ -4,6 +4,7 @@
   * Improve `toInteger :: Word32 -> Integer` on 64-bit platforms ([CLC proposal #259](https://github.com/haskell/core-libraries-committee/issues/259))
 
 ## 4.20.0.0 *TBA*
+  * Deprecate `GHC.Pack` ([#21461](https://gitlab.haskell.org/ghc/ghc/-/issues/21461))
   * Export `foldl'` from `Prelude` ([CLC proposal #167](https://github.com/haskell/core-libraries-committee/issues/167))
   * The top-level handler for uncaught exceptions now displays the output of `displayException` rather than `show`  ([CLC proposal #198](https://github.com/haskell/core-libraries-committee/issues/198))
   * Add `permutations` and `permutations1` to `Data.List.NonEmpty` ([CLC proposal #68](https://github.com/haskell/core-libraries-committee/issues/68))

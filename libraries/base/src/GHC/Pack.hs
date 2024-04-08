@@ -25,6 +25,7 @@
 --
 
 module GHC.Pack
+    {-# DEPRECATED "The exports of this module should be instead imported from GHC.Exts" #-}
     (packCString#,
      unpackCString,
      unpackCString#,
