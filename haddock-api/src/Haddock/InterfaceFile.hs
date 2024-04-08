@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -29,6 +30,7 @@ module Haddock.InterfaceFile (
 import Haddock.Types
 
 import Data.IORef
+import Data.Function ((&))
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Version
@@ -44,6 +46,8 @@ import GHC hiding (NoLink)
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
+
+import GHC.Iface.Type (IfaceType, putIfaceType, getIfaceType)
 
 import Haddock.Options (Visibility (..))
 
@@ -153,6 +157,10 @@ writeInterfaceFile filename iface = do
   symtab_p_p <- tellBinWriter bh0
   put_ bh0 symtab_p_p
 
+  -- remember where the iface type table pointer will go
+  ifacetype_p_p <- tellBinWriter bh0
+  put_ bh0 ifacetype_p_p
+
   -- Make some intial state
   symtab_next <- newFastMutInt 0
   symtab_map <- newIORef emptyUFM
@@ -165,12 +173,23 @@ writeInterfaceFile filename iface = do
                       bin_dict_next = dict_next_ref,
                       bin_dict_map  = dict_map_ref }
 
+  iface_type_dict <- initGenericSymbolTable @(Map IfaceType)
+
   -- put the main thing
-  let bh = setWriterUserData bh0
-            $ newWriteState (putName bin_symtab)
-                            (putName bin_symtab)
-                            (putFastString bin_dict)
+  let bh = bh0
+            & addWriterToUserData (mkWriter $ putName bin_symtab)
+            & addWriterToUserData (simpleBindingNameWriter $ mkWriter $ putName bin_symtab)
+            & addWriterToUserData (mkWriter $ putFastString bin_dict)
+            & addWriterToUserData (mkWriter $ putGenericSymTab iface_type_dict)
   putInterfaceFile_ bh iface
+
+  -- write the iface type pointer at the front of the file
+  ifacetype_p <- tellBinWriter bh
+  putAt bh ifacetype_p_p ifacetype_p
+  seekBinWriter bh ifacetype_p
+
+  -- write the symbol table itself
+  _ <- putGenericSymbolTable iface_type_dict putIfaceType bh
 
   -- write the symtab pointer at the front of the file
   symtab_p <- tellBinWriter bh
