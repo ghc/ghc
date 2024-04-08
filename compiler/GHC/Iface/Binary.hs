@@ -25,6 +25,8 @@ module GHC.Iface.Binary (
         putName,
         putSymbolTable,
         BinSymbolTable(..),
+        initWriteIfaceType, initReadIfaceTypeTable,
+        putAllTables,
     ) where
 
 import GHC.Prelude
@@ -270,14 +272,20 @@ putWithTables bh' put_payload = do
       put_payload bh
 
   return (name_count, fs_count, r)
- where
-  putAllTables _ [] act = do
-    a <- act
-    pure ([], a)
-  putAllTables bh (x : xs) act = do
-    (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
-      putAllTables bh xs act
-    pure (r : res, a)
+
+-- | Write all deduplication tables to disk after serialising the
+-- main payload.
+--
+-- Writes forward pointers to the deduplication tables before writing the payload
+-- to allow deserialisation *before* the payload is read again.
+putAllTables :: WriteBinHandle -> [WriterTable] -> IO b -> IO ([Int], b)
+putAllTables _ [] act = do
+  a <- act
+  pure ([], a)
+putAllTables bh (x : xs) act = do
+  (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
+    putAllTables bh xs act
+  pure (r : res, a)
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
