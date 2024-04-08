@@ -63,6 +63,7 @@ import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
+import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv)
@@ -119,14 +120,14 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
-             mapM schemeTopBind flattened_binds
+             FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
              (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
-           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
         cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs
           (case modBreaks of

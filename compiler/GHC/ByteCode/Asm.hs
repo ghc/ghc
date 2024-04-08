@@ -34,6 +34,7 @@ import GHC.Utils.Panic
 
 import GHC.Core.TyCon
 import GHC.Data.FastString
+import GHC.Data.FlatBag
 import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
@@ -90,7 +91,7 @@ bcoFreeNames bco
 assembleBCOs
   :: Interp
   -> Profile
-  -> [ProtoBCO Name]
+  -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> AddrEnv
   -> Maybe ModBreaks
@@ -129,7 +130,7 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
 -- top-level string literal bindings] in GHC.StgToByteCode for some discussion
 -- about why.
 --
-mallocStrings :: Interp -> [UnlinkedBCO] -> IO [UnlinkedBCO]
+mallocStrings ::  Interp -> FlatBag UnlinkedBCO -> IO (FlatBag UnlinkedBCO)
 mallocStrings interp ulbcos = do
   let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
   ptrs <- interpCmd interp (MallocStrings bytestrings)
@@ -170,7 +171,7 @@ assembleOneBCO interp profile pbco = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   ubco <- assembleBCO (profilePlatform profile) pbco
-  [ubco'] <- mallocStrings interp [ubco]
+  UnitFlatBag ubco' <- mallocStrings interp (UnitFlatBag ubco)
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
