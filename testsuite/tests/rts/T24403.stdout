@@ -1,0 +1,1 @@
+Just (InfoProv {ipName = "stg_unpack_cstring_info", ipDesc = THUNK_STATIC, ipTyDesc = "", ipLabel = "", ipUnitId = "rts", ipMod = "Cmm$rts/StgStdThunks.cmm", ipSrcFile = "", ipSrcSpan = ""})
