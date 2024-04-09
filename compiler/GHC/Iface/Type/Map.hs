@@ -31,7 +31,7 @@ instance TrieMap IfaceTypeMap where
 
   foldTM f (IfaceTypeMap m) = foldTM f m
 
-type IfaceTypeMapG = GenMap IfaceTypeMapX
+type IfaceTypeMapG = IfaceTypeMapX
 
 data IfaceTypeMapX a
   = IFM { ifm_lit :: IfaceLiteralMap a
@@ -158,11 +158,11 @@ lkE it ifm = go it ifm
     go (IfaceFreeTyVar {}) = error "ftv"
     go (IfaceTyVar var) = ifm_var >.> lookupTM var
     go (IfaceLitTy l) = ifm_lit >.> lookupTM l
-    go (IfaceAppTy ift args) = ifm_app >.> lkG ift >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
-    go (IfaceFunTy ft t1 t2 t3) = ifm_fun_ty >.> lookupTM ft >=> lkG t1 >=> lkG t2 >=> lkG t3
-    go (IfaceForAllTy (Bndr a b) t) = ifm_forall_ty >.> lookupTM (bndrToKey a,b) >=> lkG t
+    go (IfaceAppTy ift args) = ifm_app >.> lookupTM ift >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
+    go (IfaceFunTy ft t1 t2 t3) = ifm_fun_ty >.> lookupTM ft >=> lookupTM t1 >=> lookupTM t2 >=> lookupTM t3
+    go (IfaceForAllTy (Bndr a b) t) = ifm_forall_ty >.> lookupTM (bndrToKey a,b) >=> lookupTM t
     go (IfaceTyConApp tc args) = ifm_ty_con_app >.> lookupTM tc >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
-    go (IfaceCastTy ty co) = ifm_cast_ty >.> lkG ty >=> lookupTM co
+    go (IfaceCastTy ty co) = ifm_cast_ty >.> lookupTM ty >=> lookupTM co
     go (IfaceCoercionTy co) = ifm_coercion_ty >.> lookupTM co
     go (IfaceTupleTy sort prom args) = ifm_tuple_ty >.> lookupTM sort >=> lookupTM prom >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
 
@@ -171,10 +171,10 @@ xtE :: IfaceType -> XT a -> IfaceTypeMapX a -> IfaceTypeMapX a
 xtE (IfaceFreeTyVar {}) _ _ = error "ftv"
 xtE (IfaceTyVar var) f m = m { ifm_var = ifm_var m |> alterTM var f}
 xtE (IfaceLitTy l) f m = m { ifm_lit = ifm_lit m |> alterTM l f }
-xtE (IfaceAppTy ift args) f m = m { ifm_app = ifm_app m |> xtG ift |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f }
-xtE (IfaceFunTy ft t1 t2 t3) f m = m { ifm_fun_ty = ifm_fun_ty m |> alterTM ft |>> xtG t1 |>> xtG t2 |>> xtG t3 f }
-xtE (IfaceForAllTy (Bndr a b) t) f m = m { ifm_forall_ty = ifm_forall_ty m |> alterTM (bndrToKey a,b) |>> xtG t f}
+xtE (IfaceAppTy ift args) f m = m { ifm_app = ifm_app m |> alterTM ift |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f }
+xtE (IfaceFunTy ft t1 t2 t3) f m = m { ifm_fun_ty = ifm_fun_ty m |> alterTM ft |>> alterTM t1 |>> alterTM t2 |>> alterTM t3 f }
+xtE (IfaceForAllTy (Bndr a b) t) f m = m { ifm_forall_ty = ifm_forall_ty m |> alterTM (bndrToKey a,b) |>> alterTM t f}
 xtE (IfaceTyConApp tc args) f m = m { ifm_ty_con_app = ifm_ty_con_app m |> alterTM tc |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f }
-xtE (IfaceCastTy ty co) f m = m { ifm_cast_ty = ifm_cast_ty m |> xtG ty |>> alterTM co f}
+xtE (IfaceCastTy ty co) f m = m { ifm_cast_ty = ifm_cast_ty m |> alterTM ty |>> alterTM co f}
 xtE (IfaceCoercionTy co) f m = m { ifm_coercion_ty = ifm_coercion_ty m |> alterTM co f }
 xtE (IfaceTupleTy sort prom args) f m = m { ifm_tuple_ty = ifm_tuple_ty m |> alterTM sort |>> alterTM prom |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f}
