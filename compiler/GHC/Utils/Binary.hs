@@ -1372,6 +1372,7 @@ initGenericSymbolTable = do
         , gen_symtab_to_write = symtab_todo
         }
 
+{-# INLINE putGenericSymbolTable #-}
 putGenericSymbolTable :: forall m. (TrieMap m) => GenericSymbolTable m -> (WriteBinHandle -> Key m -> IO ()) -> WriteBinHandle -> IO Int
 putGenericSymbolTable gen_sym_tab serialiser bh = do
   putGenericSymbolTable bh
@@ -1403,6 +1404,7 @@ getGenericSymbolTable deserialiser bh = do
     writeArray mut_arr i f
   unsafeFreeze mut_arr
 
+{-# INLINE putGenericSymTab #-}
 putGenericSymTab :: (TrieMap m) => GenericSymbolTable m -> WriteBinHandle -> Key m -> IO ()
 putGenericSymTab GenericSymbolTable{
                gen_symtab_map = symtab_map_ref,

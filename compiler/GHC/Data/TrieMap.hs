@@ -37,6 +37,7 @@ import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 import Data.Kind( Type )
 import Data.Functor.Compose
+import Data.Functor.Product
 
 import qualified Data.Semigroup as S
 
@@ -371,6 +372,29 @@ fdCompose f (Compose m) = foldTM (foldTM f) m
 
 ftCompose :: (TrieMap n, Functor m) => (a -> Bool) -> Compose m n a -> Compose m n a
 ftCompose f (Compose m) = Compose (fmap (filterTM f) m)
+
+{- Product -}
+instance (TrieMap m, TrieMap n) => TrieMap (Product m n) where
+  type Key (Product m n) = Either (Key m) (Key n)
+  emptyTM  = Pair emptyTM emptyTM
+  lookupTM = lkProduct lookupTM lookupTM
+  alterTM  = xtProduct alterTM alterTM
+  foldTM   = fdProduct
+  filterTM = ftProduct
+
+lkProduct f g k (Pair am bm) =
+  case k of
+    Left a -> f a am
+    Right b -> g b bm
+
+xtProduct f g k xt (Pair am bm) =
+  case k of
+    Left a -> Pair (f a xt am) bm
+    Right b -> Pair am (g b xt bm)
+
+fdProduct f (Pair am bm) = foldTM f am . foldTM f bm
+
+ftProduct f (Pair am bm) = Pair (filterTM f am) (filterTM f bm)
 
 
 {-

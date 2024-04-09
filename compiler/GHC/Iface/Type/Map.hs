@@ -8,6 +8,9 @@ import qualified Data.Map as Map
 import Data.Functor.Compose
 import GHC.Types.Basic
 import Control.Monad ((>=>))
+import GHC.Types.Unique.DFM
+import Data.Functor.Product
+import GHC.Types.Var (VarBndr(..))
 
 
 newtype IfaceTypeMap a = IfaceTypeMap (IfaceTypeMapG a)
@@ -32,7 +35,7 @@ type IfaceTypeMapG = GenMap IfaceTypeMapX
 
 data IfaceTypeMapX a
   = IFM { ifm_lit :: IfaceLiteralMap a
-        , ifm_var :: Map.Map IfLclName a
+        , ifm_var :: UniqDFM IfLclName a
         , ifm_app :: IfaceTypeMapG (IfaceAppArgsMap a)
         , ifm_fun_ty :: FunTyFlagMap (IfaceTypeMapG (IfaceTypeMapG (IfaceTypeMapG a)))
         , ifm_ty_con_app :: IfaceTyConMap (IfaceAppArgsMap a)
@@ -48,7 +51,14 @@ type ForAllTyFlagMap = Map.Map ForAllTyFlag
 type IfaceCoercionMap = Map.Map IfaceCoercion
 type TupleSortMap = Map.Map TupleSort
 type PromotionFlagMap = Map.Map PromotionFlag
-type IfaceForAllBndrMap = Map.Map IfaceForAllBndr
+type IfaceForAllBndrMap = Compose IfaceBndrMap ForAllTyFlagMap
+
+type IfaceIdBndrMap = Compose IfaceTypeMapG (Compose (UniqDFM IfLclName) IfaceTypeMapG)
+type IfaceTvBndrMap = Compose (UniqDFM IfLclName) IfaceTypeMapG
+
+type IfaceBndrMap = Product IfaceIdBndrMap IfaceTvBndrMap
+
+
 
 
 type IfaceAppArgsMap a = ListMap (Compose IfaceTypeMapG ForAllTyFlagMap) a
@@ -133,6 +143,10 @@ fdE f  IFM { ifm_lit = ilit
   . foldTM f ico
   . foldTM (foldTM (foldTM f)) itup
 
+bndrToKey :: IfaceBndr -> Either (IfaceType, (IfLclName, IfaceType)) IfaceTvBndr
+bndrToKey (IfaceIdBndr (a,b,c)) = Left (a, (b,c))
+bndrToKey (IfaceTvBndr k) = Right k
+
 lkE :: IfaceType -> IfaceTypeMapX a -> Maybe a
 lkE it ifm = go it ifm
   where
@@ -141,7 +155,7 @@ lkE it ifm = go it ifm
     go (IfaceLitTy l) = ifm_lit >.> lookupTM l
     go (IfaceAppTy ift args) = ifm_app >.> lkG ift >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
     go (IfaceFunTy ft t1 t2 t3) = ifm_fun_ty >.> lookupTM ft >=> lkG t1 >=> lkG t2 >=> lkG t3
-    go (IfaceForAllTy bndr t) = ifm_forall_ty >.> lookupTM bndr >=> lkG t
+    go (IfaceForAllTy (Bndr a b) t) = ifm_forall_ty >.> lookupTM (bndrToKey a,b) >=> lkG t
     go (IfaceTyConApp tc args) = ifm_ty_con_app >.> lookupTM tc >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
     go (IfaceCastTy ty co) = ifm_cast_ty >.> lkG ty >=> lookupTM co
     go (IfaceCoercionTy co) = ifm_coercion_ty >.> lookupTM co
@@ -153,7 +167,7 @@ xtE (IfaceTyVar var) f m = m { ifm_var = ifm_var m |> alterTM var f}
 xtE (IfaceLitTy l) f m = m { ifm_lit = ifm_lit m |> alterTM l f }
 xtE (IfaceAppTy ift args) f m = m { ifm_app = ifm_app m |> xtG ift |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f }
 xtE (IfaceFunTy ft t1 t2 t3) f m = m { ifm_fun_ty = ifm_fun_ty m |> alterTM ft |>> xtG t1 |>> xtG t2 |>> xtG t3 f }
-xtE (IfaceForAllTy bndr t) f m = m { ifm_forall_ty = ifm_forall_ty m |> alterTM bndr |>> xtG t f}
+xtE (IfaceForAllTy (Bndr a b) t) f m = m { ifm_forall_ty = ifm_forall_ty m |> alterTM (bndrToKey a,b) |>> xtG t f}
 xtE (IfaceTyConApp tc args) f m = m { ifm_ty_con_app = ifm_ty_con_app m |> alterTM tc |>> alterTM (appArgsIfaceTypesForAllTyFlags args) f }
 xtE (IfaceCastTy ty co) f m = m { ifm_cast_ty = ifm_cast_ty m |> xtG ty |>> alterTM co f}
 xtE (IfaceCoercionTy co) f m = m { ifm_coercion_ty = ifm_coercion_ty m |> alterTM co f }
