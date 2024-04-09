@@ -530,10 +530,17 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> if isUnboxedSumDataCon dc then
-                                      StgConApp dc NoNumber args' (sumPrimReps args)
-                                    else
-                                      StgConApp dc NoNumber args' []
+                  | saturated
+                  , let tc = dataConTyCon dc
+                  -> if isClassTyCon tc && isNewTyCon tc then
+                       case args' of
+                         [StgVarArg id]  -> StgApp id []
+                         [StgLitArg lit] -> StgLit lit
+                         _               -> pprPanic "coreToStgApp" (ppr dc <+> ppr args')
+                     else if isUnboxedSumDataCon dc then
+                        StgConApp dc NoNumber args' (sumPrimReps args)
+                     else
+                        StgConApp dc NoNumber args' []
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps

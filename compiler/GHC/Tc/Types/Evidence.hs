@@ -56,11 +56,10 @@ import GHC.Core
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
-import GHC.Core.Unfold.Make( mkDFunUnfolding )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Class( classTyCon )
-import GHC.Core.DataCon ( isNewDataCon, dataConWrapId )
+import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 import GHC.Core.InstEnv ( Canonical )
@@ -70,7 +69,6 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
-import GHC.Types.Id.Info
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
@@ -536,14 +534,15 @@ evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
 -- Only for classes that are not represented by a newtype
 evDictApp cls tys args
   = case tyConSingleDataCon_maybe (classTyCon cls) of
-      Just dc -> assertPpr (not (isNewDataCon dc)) (ppr cls) $
+      Just dc -> -- assertPpr (not (isNewDataCon dc)) (ppr cls) $
                  evDFunApp (dataConWrapId dc) tys args
       Nothing -> pprPanic "evDictApp" (ppr cls)
 
 mkNewTypeDictApp :: Name -> Class -> [Type] -> EvExpr -> EvTerm
-mkNewTypeDictApp df_name cls tys arg
-  | not (isNewTyCon tycon)
+mkNewTypeDictApp _df_name cls tys arg
+--  | not (isNewTyCon tycon)
   = evDictApp cls tys [arg]
+{-
   | otherwise
   = EvExpr $ Let (NonRec dfun dict_app) (Var dfun)
   where
@@ -556,6 +555,7 @@ mkNewTypeDictApp df_name cls tys arg
     unf       = mkDFunUnfolding [] dict_con dict_args
     dfun_info = vanillaIdInfo `setUnfoldingInfo`  unf
                               `setInlinePragInfo` dfunInlinePragma
+-}
 
 {- Here is what we are making:
      let $fKnownNat :: KnownNat 17

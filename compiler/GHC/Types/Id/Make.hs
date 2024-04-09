@@ -591,7 +591,7 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
+  = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty nt_work_info
       -- See Note [Newtype workers]
 
   | otherwise
@@ -631,18 +631,20 @@ mkDataConWorkId wkr_name data_con
                                             -- LFInfo stores post-unarisation arity
 
     ----------- Workers for newtypes --------------
+    nt_inl_prag  | isClassTyCon tycon = neverInlinePragma { inl_rule = ConLike }
+                 | otherwise          = dataConWrapperInlinePragma
+    newtype_unf  | isClassTyCon tycon = mkDataConUnfolding newtype_rhs
+                 | otherwise          = mkCompulsoryUnfolding newtype_rhs
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
-                  `setInlinePragInfo`     dataConWrapperInlinePragma
+                  `setInlinePragInfo`     nt_inl_prag
                   `setUnfoldingInfo`      newtype_unf
                                -- See W1 in Note [LFInfo of DataCon workers and wrappers]
                   `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = assertPpr (null ex_tcvs && isSingleton arg_tys)
-                             (ppr data_con)
+    newtype_rhs =  assertPpr (null ex_tcvs && isSingleton arg_tys) (ppr data_con) $
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 

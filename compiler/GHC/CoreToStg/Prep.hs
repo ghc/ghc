@@ -245,23 +245,22 @@ corePrepPgm :: Logger
             -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO CoreProgram
 corePrepPgm logger cp_cfg pgm_cfg
-            this_mod mod_loc binds data_tycons =
+            this_mod mod_loc binds tycons =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply 's'
-
-    let implicit_binds = mkDataConWorkers
-          (cpPgm_generateDebugInfo pgm_cfg)
-          mod_loc data_tycons
-            -- NB: we must feed mkImplicitBinds through corePrep too
-            -- so that they are suitably cloned and eta-expanded
+    let
+        gen_debug_info = cpPgm_generateDebugInfo pgm_cfg
+        implicit_binds = concatMap (mkDataConWorkers gen_debug_info mod_loc) tycons
 
         binds_out = initUs_ us $ do
                       floats1 <- corePrepTopBinds initialCorePrepEnv binds
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
+                                 -- NB: we must feed mkImplicitBinds through corePrep too
+                                 -- so that they are suitably cloned and eta-expanded
                       return (deFloatTop (floats1 `zipFloats` floats2))
 
     endPassIO logger (cpPgm_endPassConfig pgm_cfg)
@@ -291,16 +290,26 @@ corePrepTopBinds initialCorePrepEnv binds
                                floatss <- go env' binds
                                return (floats `zipFloats` floatss)
 
-mkDataConWorkers :: Bool -> ModLocation -> [TyCon] -> [CoreBind]
+mkDataConWorkers :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
 -- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
-mkDataConWorkers generate_debug_info mod_loc data_tycons
+mkDataConWorkers generate_debug_info mod_loc tycon
+  | isDataTyCon tycon
   = [ NonRec id (tick_it (getName data_con) (Var id))
-                                -- The ice is thin here, but it works
-    | tycon <- data_tycons,     -- CorePrep will eta-expand it
-      data_con <- tyConDataCons tycon,
-      let id = dataConWorkId data_con
+      -- The ice is thin here, but it works: CorePrep will eta-expand it
+    | data_con <- tyConDataCons tycon
+    , let id = dataConWorkId data_con
     ]
+
+{-
+  | isClassTyCon tycon
+  , let data_con = tyConSingleDataCon tycon
+        id       = dataConWorkId data_con
+  = [ NonRec id (unfoldingTemplate (idUnfolding id)) ]
+-}
+
+  | otherwise
+  = []  -- No worker for newtypes and family tycons
  where
    -- If we want to generate debug info, we put a source note on the
    -- worker. This is useful, especially for heap profiling.
