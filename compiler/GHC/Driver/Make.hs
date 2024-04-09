@@ -1516,17 +1516,15 @@ modNodeMapUnionWith f (ModNodeMap m) (ModNodeMap n) = ModNodeMap (M.unionWith f 
 -- were necessary, then the edge would be part of a cycle.
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
-  diag_opts <- initDiagOpts <$> getDynFlags
-  when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
-    let check ms =
-           let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn i | m <- ms, i <- ms_home_srcimps m,
-                      unLoc i `notElem`  mods_in_this_cycle ]
+  let check ms =
+         let mods_in_this_cycle = map ms_mod_name ms in
+         [ warn i (ms_hspp_opts m) | m <- ms, i <- ms_home_srcimps m,
+                    unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: Located ModuleName -> MsgEnvelope GhcMessage
-        warn (L loc mod) = GhcDriverMessage <$> mkPlainMsgEnvelope diag_opts
+      warn :: Located ModuleName -> DynFlags -> MsgEnvelope GhcMessage
+      warn (L loc mod) dflags = GhcDriverMessage <$> mkPlainMsgEnvelope (initDiagOpts dflags)
                                                   loc (DriverUnnecessarySourceImports mod)
-    logDiagnostics (mkMessages $ listToBag (concatMap (check . flattenSCC) sccs))
+  logDiagnostics (mkMessages $ listToBag (concatMap (check . flattenSCC) sccs))
 
 
 -- This caches the answer to the question, if we are in this unit, what does
