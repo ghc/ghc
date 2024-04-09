@@ -401,7 +401,7 @@ instance Binary ModIface where
         lazyPut bh warns
         lazyPut bh anns
         put_ bh decls
-        put_ bh extra_decls
+        lazyPutMaybe bh extra_decls
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -433,7 +433,7 @@ instance Binary ModIface where
         warns       <- {-# SCC "bin_warns" #-} lazyGet bh
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
-        extra_decls <- get bh
+        extra_decls <- lazyGetMaybe bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
