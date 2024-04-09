@@ -3630,10 +3630,10 @@ con_list :: { Located (NonEmpty (LocatedN RdrName)) }
 con_list : con                  { sL1 $1 (pure $1) }
          | con ',' con_list     {% sLL $1 $> . (:| toList (unLoc $3)) <\$> addTrailingCommaN $1 (gl $2) }
 
-qcon_list :: { Located [LocatedN RdrName] }
-qcon_list : qcon                  { sL1 $1 [$1] }
+qcon_list :: { [LocatedN RdrName] }
+qcon_list : qcon                  { [$1] }
           | qcon ',' qcon_list    {% do { h <- addTrailingCommaN $1 (gl $2)
-                                        ; return (sLL $1 $> (h : unLoc $3)) }}
+                                        ; return (h : $3) }}
 
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors

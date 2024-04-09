@@ -853,7 +853,7 @@ ppr_sig (SCCFunSig (_, src) fn mlabel)
           GhcTc -> ppr fn
 ppr_sig (CompleteMatchSig (_, src) cs mty)
   = pragSrcBrackets src "{-# COMPLETE"
-      ((hsep (punctuate comma (map ppr_n (unLoc cs))))
+      ((hsep (punctuate comma (map ppr_n cs)))
         <+> opt_sig)
   where
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
@@ -946,14 +946,6 @@ type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
 
--- For CompleteMatchSig
-type instance Anno [LocatedN RdrName] = SrcSpan
-type instance Anno [LocatedN Name]    = SrcSpan
-type instance Anno [LocatedN Id]      = SrcSpan
-
 type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno StringLiteral = EpAnnCO
-type instance Anno (LocatedN RdrName) = SrcSpan
-type instance Anno (LocatedN Name) = SrcSpan
-type instance Anno (LocatedN Id) = SrcSpan

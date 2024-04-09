@@ -1812,9 +1812,8 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
           [ toHie $ (C Use) name
           , maybe (pure []) (locOnly . getLocA) mtxt
           ]
-        CompleteMatchSig _ (L ispan names) typ ->
-          [ locOnly ispan
-          , toHie $ map (C Use) names
+        CompleteMatchSig _ names typ ->
+          [ toHie $ map (C Use) names
           , toHie $ fmap (C Use) typ
           ]
         XSig _ -> []

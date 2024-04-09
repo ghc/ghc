@@ -487,7 +487,7 @@ data Sig pass
        -- complete matchings which, for example, arise from pattern
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
-                     (XRec pass [LIdP pass])
+                     [LIdP pass]
                      (Maybe (LIdP pass))
   | XSig !(XXSig pass)
 
