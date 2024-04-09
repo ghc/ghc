@@ -41,7 +41,7 @@ ncgRV64 config
     where
       platform = ncgPlatform config
 
-  -- | Instruction instance for RV64
+-- | Instruction instance for RV64
 instance Instruction RV64.Instr where
         regUsageOfInstr         = RV64.regUsageOfInstr
         patchRegsOfInstr        = RV64.patchRegsOfInstr
