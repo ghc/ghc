@@ -1136,7 +1136,7 @@ renameSig ctxt sig@(SCCFunSig (_, st) v s)
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
-renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
+renameSig _ctxt sig@(CompleteMatchSig (_, s) bf mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        new_mty  <- traverse lookupLocatedOccRn mty
 
@@ -1145,7 +1145,7 @@ renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc TcRnOrphanCompletePragma
 
-       return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
+       return (CompleteMatchSig (noAnn, s) new_bf new_mty, emptyFVs)
 
 
 {-
