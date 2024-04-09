@@ -103,7 +103,10 @@ instance TrieMap IfaceTypeMapX where
   alterTM = xtE
   foldTM = fdE
   filterTM = ftE
+  {-# INLINE lookupTM #-}
+  {-# INLINE alterTM #-}
 
+{-# INLINE ftE #-}
 ftE :: (a -> Bool) -> IfaceTypeMapX a -> IfaceTypeMapX a
 ftE f  IFM { ifm_lit = ilit
           , ifm_var = ivar
@@ -125,6 +128,7 @@ ftE f  IFM { ifm_lit = ilit
           , ifm_coercion_ty = filterTM f ico
           , ifm_tuple_ty = fmap (fmap (filterTM f)) itup }
 
+{-# INLINE fdE #-}
 fdE :: (a -> b -> b) -> IfaceTypeMapX a -> b -> b
 fdE f  IFM { ifm_lit = ilit
           , ifm_var = ivar
@@ -147,6 +151,7 @@ bndrToKey :: IfaceBndr -> Either (IfaceType, (IfLclName, IfaceType)) IfaceTvBndr
 bndrToKey (IfaceIdBndr (a,b,c)) = Left (a, (b,c))
 bndrToKey (IfaceTvBndr k) = Right k
 
+{-# INLINE lkE #-}
 lkE :: IfaceType -> IfaceTypeMapX a -> Maybe a
 lkE it ifm = go it ifm
   where
@@ -161,6 +166,7 @@ lkE it ifm = go it ifm
     go (IfaceCoercionTy co) = ifm_coercion_ty >.> lookupTM co
     go (IfaceTupleTy sort prom args) = ifm_tuple_ty >.> lookupTM sort >=> lookupTM prom >=> lookupTM (appArgsIfaceTypesForAllTyFlags args)
 
+{-# INLINE xtE #-}
 xtE :: IfaceType -> XT a -> IfaceTypeMapX a -> IfaceTypeMapX a
 xtE (IfaceFreeTyVar {}) _ _ = error "ftv"
 xtE (IfaceTyVar var) f m = m { ifm_var = ifm_var m |> alterTM var f}
