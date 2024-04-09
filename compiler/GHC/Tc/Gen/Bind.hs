@@ -227,7 +227,7 @@ tcCompleteSigs sigs =
       -- combinations are invalid it will be found so at match sites.
       -- There it is also where we consider if the type of the pattern match is
       -- compatible with the result type constructor 'mb_tc'.
-      doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) (L _ ns) mb_tc_nm))
+      doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) ns mb_tc_nm))
         = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
             cls   <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
             mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
