@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.18.2.1 *April 2024*
+  * Various documentation improvements
+
 ## 4.18.2.0 *January 2024*
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
   * Improve String & IsString documentation.

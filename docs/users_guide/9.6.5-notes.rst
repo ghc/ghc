@@ -1,0 +1,111 @@
+.. _release-9.6.5:
+
+Version 9.6.5
+==============
+
+The significant changes to the various parts of the compiler are listed below.
+See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.6>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+11, 12, 13, 14 or 15.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Disable ``-fasm-shortcutting`` with ``-O2`` as it leads to unsound optimisations
+  (:ghc-ticket:`24462).
+- Fix a typechecker bug resulting in ``TYPE`` and ``CONSTRAINT`` being apart
+  (:ghc-ticket:`24279`).
+- Fix a bug resulting in incorrect runtime results due to a botched simplifier
+  pass (:ghc-ticket:`24295`).
+- Assign correct source spans to nested documentation comments in the AST (:ghc-ticket:`24378`).
+- Fix a bug causing suboptimal error messages for certain invalid cyclic
+  module graphs with hs-boot files (:ghc-ticket:`24196`, :ghc-ticket:`24275`).
+- Fix a bug resulting in infix ``(~)`` and ``(@)`` operators not being usable in
+  TH quotes (:ghc-ticket:`23748`).
+- Fix a bug arising from incorrect parsing of paths containing spaces in the
+  settings file (:ghc-ticket:`24265`).
+- Allow special pragmas to desugar correctly in a few more cases (:ghc-ticket:`24370`).
+
+Runtime system
+--------------
+
+- Fix an off-by-one while writing eventlogs (:ghc-ticket:`24287`).
+- Avoid segfaults with using ``-Dn`` with the non-moving collector (:ghc-ticket:`24393`).
+
+Build system and packaging
+--------------------------
+
+- Fix a bug resulting in the distributed ``hsc2hs`` wrapper using flags from the
+  compiler build environment (:ghc-ticket:`24050`).
+- Better compatibility for newer alex versions in the configure script (:ghc-ticket:`24302`).
+- Handle autotools adding the ``-std`` flag to the ``CC``/``CXX`` variables (:ghc-ticket:`24324`).
+- Fix a typo in the configure script resulting in the target for the linker being set incorrectly
+  when configuring a cross-compiler (:ghc-ticket:`24414`).
+- Do not override existing linker flags in ``FP_LD_NO_FIXUP_CHAINS``.
+- Ensure the ``genapply`` program is built with the write constants when cross compiling (:ghc-ticket:`24347`).
+- Ensure we take ``LDFLAGS`` into account when configuring a linker (:ghc-ticket:`24565`).
+- Fix a segfault with the non-moving GC (:ghc-ticket:`24492`).
+
+Core libraries
+--------------
+
+- Bump ``base`` to 4.18.2.1
+- Bump ``filepath`` to 1.4.300.1
+- Bump ``directory`` to 1.3.8.4
+- Bump ``Cabal`` to 3.10.3.0
+- Bump ``process`` to 1.6.19.0
+- Bump ``libffi-tarballs`` to 3.4.6
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
