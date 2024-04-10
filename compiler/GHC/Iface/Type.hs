@@ -98,6 +98,7 @@ import Control.Monad ((<$!>))
 import Control.Arrow (first)
 import qualified Data.Semigroup as Semi
 import Data.Maybe (isJust)
+import Data.Typeable (Typeable)
 
 {-
 ************************************************************************
@@ -2198,12 +2199,30 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-   put_ bh tyCon = case findUserDataWriter Proxy bh of
-    tbl -> putEntry tbl bh tyCon
+   put_ bh ty =
+    case ty of
+      IfaceTyConApp {} -> putIfaceTypeShared bh ty
+      _ -> putIfaceType bh ty
 
-   get bh = case findUserDataReader Proxy bh of
-    tbl -> getEntry tbl bh
 
+
+   get bh = getIfaceTypeShared bh
+
+
+putIfaceTypeShared :: Typeable s => WriteBinHandle -> s -> IO ()
+putIfaceTypeShared bh ty = do
+  putByte bh 99
+  case findUserDataWriter Proxy bh of
+    tbl -> putEntry tbl bh ty
+
+getIfaceTypeShared :: ReadBinHandle -> IO IfaceType
+getIfaceTypeShared bh = do
+  start <- tellBinReader bh
+  tag <- getByte bh
+  case tag of
+    99 -> case findUserDataReader Proxy bh of
+            tbl -> getEntry tbl bh
+    _ -> seekBinReader bh start >> getIfaceType bh
 
 putIfaceType :: WriteBinHandle -> IfaceType -> IO ()
 putIfaceType _ (IfaceFreeTyVar tv)
