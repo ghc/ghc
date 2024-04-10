@@ -48,6 +48,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
               arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
+            , stage1 ? package ghc ? builder (Ghc CompileHs) ? mconcat [arg "-fexternal-interpreter", arg "-pgmi ../../stage1/bin/ghc-iserv"]
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
             , getInputs

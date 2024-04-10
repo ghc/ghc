@@ -13,6 +13,7 @@ import Rules.Generate
 import Settings
 import Target
 import Utilities
+import Packages
 
 import qualified Text.Parsec as Parsec
 
@@ -218,6 +219,9 @@ compileHsObjectAndHi rs objpath = do
   ctxPath <- contextPath ctx
   (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
   need (src:deps)
+
+  when (stage == Stage1 && C.package ctx == ghc) $ do
+    need [root -/- stageString stage -/- "bin" -/- "ghc-iserv"]
 
   -- The .dependencies file lists indicating inputs. ghc will
   -- generally read more *.hi and *.hi-boot files (direct inputs).

@@ -151,10 +151,9 @@ packageArgs = do
           -- compiler comes with the same versions as the one we are building.
           --
             builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
-          , builder (Cabal Flags) ? ifM stage0
-              (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
-              (arg "internal-interpreter")
-
+          , builder (Cabal Flags) ? mconcat
+             [ arg "internal-interpreter"
+             ]
           ]
 
         , package unix ? builder (Cabal Flags) ? arg "+os-string"
