@@ -34,7 +34,7 @@ module GHC.Iface.Type (
         ifTyConBinderVar, ifTyConBinderName,
 
         -- Binary utilities
-        putIfaceType, getIfaceType,
+        putIfaceType, getIfaceType, ifaceTypeSharedByte,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -92,12 +92,13 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
-import Control.DeepSeq
-import Data.Proxy
-import Control.Monad ((<$!>))
-import Control.Arrow (first)
-import qualified Data.Semigroup as Semi
 import Data.Maybe (isJust)
+import Data.Proxy
+import qualified Data.Semigroup as Semi
+import Data.Word (Word8)
+import Control.Arrow (first)
+import Control.DeepSeq
+import Control.Monad ((<$!>))
 
 {-
 ************************************************************************
@@ -2194,12 +2195,35 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-   put_ bh tyCon = case findUserDataWriter Proxy bh of
-    tbl -> putEntry tbl bh tyCon
+   put_ bh ty =
+    case findUserDataWriter Proxy bh of
+      tbl -> putEntry tbl bh ty
 
-   get bh = case findUserDataReader Proxy bh of
-    tbl -> getEntry tbl bh
+   get bh = getIfaceTypeShared bh
 
+-- | This is the byte tag we expect to read when the next
+-- value is not an 'IfaceType' value, but an offset into a
+-- lookup value.
+--
+-- Must not overlap with any byte tag in 'getIfaceType'.
+ifaceTypeSharedByte :: Word8
+ifaceTypeSharedByte = 99
+
+-- | Like 'getIfaceType' but checks for a specific byte tag
+-- that indicates that we won't be able to read a 'IfaceType' value
+-- but rather an offset into a lookup table. Consequentially,
+-- we look up the value for the 'IfaceType' in the look up table.
+--
+-- See Note [Deduplication during iface binary serialisation]
+-- for details.
+getIfaceTypeShared :: ReadBinHandle -> IO IfaceType
+getIfaceTypeShared bh = do
+  start <- tellBinReader bh
+  tag <- getByte bh
+  if ifaceTypeSharedByte == tag
+    then case findUserDataReader Proxy bh of
+            tbl -> getEntry tbl bh
+    else seekBinReader bh start >> getIfaceType bh
 
 putIfaceType :: WriteBinHandle -> IfaceType -> IO ()
 putIfaceType _ (IfaceFreeTyVar tv)

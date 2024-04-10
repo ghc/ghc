@@ -163,7 +163,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -612,7 +612,7 @@ extract_renamed_stuff mod_summary tc_result = do
         -- enables the option which keeps the renamed source.
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
-        liftIO $ writeHieFile out_file hieFile
+        liftIO $ writeHieFile (flagsToIfCompression dflags) out_file hieFile
         liftIO $ putDumpFileMaybe logger Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
 
         -- Validate HIE files
@@ -1207,7 +1207,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           withTiming logger
               (text "WriteIface"<+>brackets (text iface_name))
               (const ())
-              (writeIface logger profile iface_name iface)
+              (writeIface logger profile (flagsToIfCompression dflags) iface_name iface)
 
     if (write_interface || force_write_interface) then do
 
