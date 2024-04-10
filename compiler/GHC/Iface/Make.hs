@@ -69,10 +69,13 @@ import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc ( unLoc )
+import GHC.Types.Name.Cache
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Binary
+import GHC.Iface.Binary
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -148,8 +151,28 @@ mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
     let unit_state = hsc_units hsc_env
     putDumpFileMaybe (hsc_logger hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
       (pprModIface unit_state full_iface)
+    final_iface <- shareIface (hsc_NC hsc_env) (flagsToIfCompression $ hsc_dflags hsc_env) full_iface
+    return final_iface
 
-    return full_iface
+shareIface :: NameCache -> CompressionIFace -> ModIface -> IO ModIface
+shareIface _ NormalCompression  mi = pure mi
+shareIface nc compressionLevel  mi = do
+  bh <- openBinMem initBinMemSize
+  start <- tellBinWriter bh
+  putIfaceWithExtFields QuietBinIFace compressionLevel bh mi
+  rbh <- shrinkBinBuffer bh
+  seekBinReader rbh start
+  res <- getIfaceWithExtFields nc rbh
+  let resiface = res
+        { mi_src_hash = mi_src_hash mi
+        , mi_globals = mi_globals mi
+        }
+  forceModIface resiface
+  return resiface
+
+-- | Initial ram buffer to allocate for writing interface files.
+initBinMemSize :: Int
+initBinMemSize = 1024 * 1024 -- 1 MB
 
 updateDecl :: [IfaceDecl] -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [IfaceDecl]
 updateDecl decls Nothing Nothing = decls
