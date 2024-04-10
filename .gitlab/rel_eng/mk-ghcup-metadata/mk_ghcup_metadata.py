@@ -216,7 +216,8 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                            , ">= 11": deb11
                            , "unknown_versioning": deb11 }
           , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
-                             , "( >= 16 && < 19 )": ubuntu1804
+                             , "( >= 16 && < 18 )": deb9
+                             , "( >= 18 && < 19 )": ubuntu1804
                              }
           , "Linux_Mint"   : { "< 20": ubuntu1804
                              , ">= 20": ubuntu2004 }
