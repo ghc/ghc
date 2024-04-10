@@ -590,9 +590,15 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
-  | isNewTyCon tycon
-  = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty nt_work_info
-      -- See Note [Newtype workers]
+  | isNewTyCon tycon       -- See Note [Newtype workers]
+  = if isClassTyCon tycon then
+      mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty
+        (nt_info `setInlinePragInfo` neverInlinePragma { inl_rule = ConLike }
+                 `setUnfoldingInfo`  mkDataConUnfolding newtype_rhs)
+    else
+      mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty
+        (nt_info `setInlinePragInfo` dataConWrapperInlinePragma
+                 `setUnfoldingInfo`  mkCompulsoryUnfolding newtype_rhs)
 
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
@@ -631,18 +637,16 @@ mkDataConWorkId wkr_name data_con
                                             -- LFInfo stores post-unarisation arity
 
     ----------- Workers for newtypes --------------
-    nt_inl_prag  | isClassTyCon tycon = neverInlinePragma { inl_rule = ConLike }
-                 | otherwise          = dataConWrapperInlinePragma
-    newtype_unf  | isClassTyCon tycon = mkDataConUnfolding newtype_rhs
-                 | otherwise          = mkCompulsoryUnfolding newtype_rhs
-    nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
-                  `setArityInfo` 1      -- Arity 1
-                  `setInlinePragInfo`     nt_inl_prag
-                  `setUnfoldingInfo`      newtype_unf
-                               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+    univ_tvs = dataConUnivTyVars data_con
+    ex_tcvs  = dataConExTyCoVars data_con
+    arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
+    nt_info  = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
+                  `setArityInfo` 1  -- Arity 1
                   `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")
-    id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
-    res_ty_args  = mkTyCoVarTys univ_tvs
+                               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+
+    id_arg1     = mkScaledTemplateLocal 1 (head arg_tys)
+    res_ty_args = mkTyCoVarTys univ_tvs
     newtype_rhs =  assertPpr (null ex_tcvs && isSingleton arg_tys) (ppr data_con) $
                               -- Note [Newtype datacons]
                    mkLams univ_tvs $ Lam id_arg1 $
@@ -667,18 +671,18 @@ How do we construct a /correct/ LFInfo for workers and wrappers?
 (Remember: `LFCon` means "a saturated constructor application")
 
 (1) Data constructor workers and wrappers with arity > 0 are unambiguously
-functions and should be given `LFReEntrant`, regardless of the runtime
-relevance of the arguments.
-  - For example, `Just :: a -> Maybe a` is given `LFReEntrant`,
-             and `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too.
+    functions and should be given `LFReEntrant`, regardless of the runtime
+    relevance of the arguments.  For example:
+       `Just :: a -> Maybe a`          is given `LFReEntrant`,
+       `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too.
 
 (2) A datacon /worker/ with zero arity is trivially fully saturated -- it takes
-no arguments whatsoever (not even zero-width args), so it is given `LFCon`.
+    no arguments whatsoever (not even zero-width args), so it is given `LFCon`.
 
 (3) Perhaps surprisingly, a datacon /wrapper/ can be an `LFCon`. See Wrinkle (W1) below.
-A datacon /wrapper/ with zero arity must be a fully saturated application of
-the worker to zero-width arguments only (which are dropped after unarisation),
-and therefore is also given `LFCon`.
+    A datacon /wrapper/ with zero arity must be a fully saturated application of
+    the worker to zero-width arguments only (which are dropped after unarisation),
+    and therefore is also given `LFCon`.
 
 For example, consider the following data constructors:
 

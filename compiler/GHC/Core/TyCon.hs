@@ -2204,9 +2204,10 @@ isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (TyCon { tyConArity = arity, tyConDetails = details })
   | AlgTyCon { algTcRhs = rhs } <- details
   = case rhs of
-       DataTyCon { is_enum = res } -> res
-       TupleTyCon {}               -> arity == 0
-       _                           -> False
+       DataTyCon { is_enum = res }     -> res
+       TupleTyCon { tup_sort = tsort }
+         | arity == 0                  -> isBoxed (tupleSortBoxity tsort)
+       _                               -> False
   | otherwise = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that defines a family?
