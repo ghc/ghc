@@ -1777,3 +1777,12 @@ as such you shouldn't need to set any of them explicitly. A flag
     This flag sets the size (in bytes) threshold above which the second approach
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
+
+.. ghc-flag:: -fwrite-if-compression=⟨n⟩
+    :shortdesc: *default: 2.* Tweak the level of interface file compression.
+    :type: dynamic
+    :category: optimization
+
+    :default: 2
+
+    TODO

@@ -43,7 +43,7 @@ import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
-import GHC.Iface.Binary (initWriteIfaceType, putAllTables, initReadIfaceTypeTable)
+import GHC.Iface.Binary (initWriteIfaceType, putAllTables, initReadIfaceTypeTable, CompressionIFace)
 import GHC.Iface.Type (IfaceType)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import qualified GHC.Utils.Binary as Binary
@@ -73,8 +73,8 @@ putBinLine bh xs = do
 
 -- | Write a `HieFile` to the given `FilePath`, with a proper header and
 -- symbol tables for `Name`s and `FastString`s
-writeHieFile :: FilePath -> HieFile -> IO ()
-writeHieFile hie_file_path hiefile = do
+writeHieFile :: CompressionIFace -> FilePath -> HieFile -> IO ()
+writeHieFile compression hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
 
   -- Write the header: hieHeader followed by the
@@ -85,7 +85,7 @@ writeHieFile hie_file_path hiefile = do
 
   (fs_tbl, fs_w) <- initFastStringWriterTable
   (name_tbl, name_w) <- initWriteNameTable
-  (iface_tbl, iface_w) <- initWriteIfaceType
+  (iface_tbl, iface_w) <- initWriteIfaceType compression
 
   let bh = setWriterUserData bh0 $ mkWriterUserData
         [ mkSomeBinaryWriter @IfaceType iface_w

@@ -26,6 +26,7 @@ module GHC.Iface.Load (
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface, writeIface,
+        flagsToIfCompression,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
@@ -965,11 +966,18 @@ read_file logger name_cache unit_state dflags wanted_mod file_path = do
 
 
 -- | Write interface file
-writeIface :: Logger -> Profile -> FilePath -> ModIface -> IO ()
-writeIface logger profile hi_file_path new_iface
+writeIface :: Logger -> Profile -> CompressionIFace -> FilePath -> ModIface -> IO ()
+writeIface logger profile compression_level hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          let printer = TraceBinIFace (debugTraceMsg logger 3)
-         writeBinIface profile printer hi_file_path new_iface
+         writeBinIface profile printer compression_level hi_file_path new_iface
+
+flagsToIfCompression :: DynFlags -> CompressionIFace
+flagsToIfCompression dflags = case ifCompression dflags of
+  0 -> NormalCompression
+  1 -> NormalCompression
+  2 -> SafeExtraCompression
+  _ -> MaximalCompression
 
 -- | @readIface@ tries just the one file.
 --

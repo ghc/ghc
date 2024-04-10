@@ -207,6 +207,7 @@ data DynFlags = DynFlags {
   dmdUnboxWidth         :: !Int,        -- ^ Whether DmdAnal should optimistically put an
                                         --   Unboxed demand on returned products with at most
                                         --   this number of fields
+  ifCompression         :: Int,
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
@@ -546,6 +547,7 @@ defaultDynFlags mySettings =
         maxPmCheckModels        = 30,
         simplTickFactor         = 100,
         dmdUnboxWidth           = 3,      -- Default: Assume an unboxed demand on function bodies returning a triple
+        ifCompression           = 2,      -- Default: Apply safe compressions
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
         specConstrRecursive     = 3,

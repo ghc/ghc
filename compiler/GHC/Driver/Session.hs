@@ -1695,6 +1695,9 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-refinement-level-hole-fits"
       (noArg (\d -> d { refLevelHoleFits = Nothing }))
 
+  , make_ord_flag defFlag "fwrite-if-compression"
+      (intSuffix (\n d -> d { ifCompression = n }))
+
   , make_dep_flag defGhcFlag "fllvm-pass-vectors-in-regs"
             (noArg id)
             "vectors registers are now passed in registers by default."
