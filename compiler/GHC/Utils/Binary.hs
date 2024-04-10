@@ -37,6 +37,8 @@ module GHC.Utils.Binary
    tellBinWriter,
    castBin,
    withBinBuffer,
+   freezeWriteHandle,
+   thawReadHandle,
 
    foldGet, foldGet',
 
@@ -326,6 +328,33 @@ openBinMem size
     , wbm_off_r = ix_r
     , wbm_sz_r = sz_r
     , wbm_arr_r = arr_r
+    }
+
+-- | Freeze the given 'WriteBinHandle' and turn it into an equivalent 'ReadBinHandle'.
+--
+-- The current offset of the 'WriteBinHandle' is maintained in the new 'ReadBinHandle'.
+freezeWriteHandle :: WriteBinHandle -> IO ReadBinHandle
+freezeWriteHandle wbm = do
+  rbm_off_r <- newFastMutInt =<< readFastMutInt (wbm_off_r wbm)
+  rbm_sz_r <- readFastMutInt (wbm_sz_r wbm)
+  rbm_arr_r <- readIORef (wbm_arr_r wbm)
+  pure $ ReadBinMem
+    { rbm_userData = noReaderUserData
+    , rbm_off_r = rbm_off_r
+    , rbm_sz_r = rbm_sz_r
+    , rbm_arr_r = rbm_arr_r
+    }
+
+thawReadHandle :: ReadBinHandle -> IO WriteBinHandle
+thawReadHandle rbm = do
+  wbm_off_r <- newFastMutInt =<< readFastMutInt (rbm_off_r rbm)
+  wbm_sz_r <- newFastMutInt (rbm_sz_r rbm)
+  wbm_arr_r <- newIORef (rbm_arr_r rbm)
+  pure $ WriteBinMem
+    { wbm_userData = noWriterUserData
+    , wbm_off_r = wbm_off_r
+    , wbm_sz_r = wbm_sz_r
+    , wbm_arr_r = wbm_arr_r
     }
 
 tellBinWriter :: WriteBinHandle -> IO (Bin a)
