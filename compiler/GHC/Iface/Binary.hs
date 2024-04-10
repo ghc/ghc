@@ -18,6 +18,8 @@ module GHC.Iface.Binary (
         getSymtabName,
         CheckHiWay(..),
         TraceBinIFace(..),
+        getIfaceWithExtFields,
+        putIfaceWithExtFields,
         getWithUserData,
         putWithUserData,
 
@@ -156,17 +158,24 @@ readBinIface
 readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
     (src_hash, bh) <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
 
-    extFields_p <- get bh
-
-    mod_iface <- getWithUserData name_cache bh
-
-    seekBinReader bh extFields_p
-    extFields <- get bh
+    mod_iface <- getIfaceWithExtFields name_cache bh
 
     return mod_iface
-      { mi_ext_fields = extFields
-      , mi_src_hash = src_hash
+      { mi_src_hash = src_hash
       }
+
+getIfaceWithExtFields :: NameCache -> ReadBinHandle -> IO ModIface
+getIfaceWithExtFields name_cache bh = do
+  extFields_p <- get bh
+
+  mod_iface <- getWithUserData name_cache bh
+
+  seekBinReader bh extFields_p
+  extFields <- get bh
+  pure mod_iface
+    { mi_ext_fields = extFields
+    }
+
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
@@ -227,18 +236,16 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     put_  bh tag
     put_  bh (mi_src_hash mod_iface)
 
-    extFields_p_p <- tellBinWriter bh
-    put_ bh extFields_p_p
-
-    putWithUserData traceBinIface compressionLevel bh mod_iface
-
-    extFields_p <- tellBinWriter bh
-    putAt bh extFields_p_p extFields_p
-    seekBinWriter bh extFields_p
-    put_ bh (mi_ext_fields mod_iface)
+    putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
 
     -- And send the result to the file
     writeBinMem bh hi_path
+
+-- | Puts the 'ModIface'
+putIfaceWithExtFields :: TraceBinIFace -> CompressionIFace -> WriteBinHandle -> ModIface -> IO ()
+putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
+  forwardPut_ bh (\_ -> put_ bh (mi_ext_fields mod_iface)) $ do
+    putWithUserData traceBinIface compressionLevel bh mod_iface
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.

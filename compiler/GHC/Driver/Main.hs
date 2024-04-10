@@ -966,10 +966,11 @@ loadByteCode iface mod_sum = do
 --------------------------------------------------------------
 
 
+
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
-initModDetails hsc_env iface =
+initModDetails hsc_env iface = do
   fixIO $ \details' -> do
     let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
                                 (HomeModInfo iface details' emptyHomeModInfoLinkable)
