@@ -36,6 +36,9 @@ module GHC.Utils.Binary
    tellBinWriter,
    castBin,
    withBinBuffer,
+   freezeWriteHandle,
+   shrinkBinBuffer,
+   thawReadHandle,
 
    foldGet, foldGet',
 
@@ -107,6 +110,7 @@ import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
+import GHC.Data.TrieMap
 import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
@@ -123,7 +127,7 @@ import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, copy)
 import Data.Coerce
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
@@ -151,8 +155,6 @@ import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
 
 import Unsafe.Coerce (unsafeCoerce)
-
-import GHC.Data.TrieMap
 
 type BinArray = ForeignPtr Word8
 
@@ -325,6 +327,44 @@ openBinMem size
     , wbm_off_r = ix_r
     , wbm_sz_r = sz_r
     , wbm_arr_r = arr_r
+    }
+
+-- | Freeze the given 'WriteBinHandle' and turn it into an equivalent 'ReadBinHandle'.
+--
+-- The current offset of the 'WriteBinHandle' is maintained in the new 'ReadBinHandle'.
+freezeWriteHandle :: WriteBinHandle -> IO ReadBinHandle
+freezeWriteHandle wbm = do
+  rbm_off_r <- newFastMutInt =<< readFastMutInt (wbm_off_r wbm)
+  rbm_sz_r <- readFastMutInt (wbm_sz_r wbm)
+  rbm_arr_r <- readIORef (wbm_arr_r wbm)
+  pure $ ReadBinMem
+    { rbm_userData = noReaderUserData
+    , rbm_off_r = rbm_off_r
+    , rbm_sz_r = rbm_sz_r
+    , rbm_arr_r = rbm_arr_r
+    }
+
+-- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
+-- This performs a copy of the underlying buffer.
+-- The buffer may be truncated if the offset is not at the end of the written
+-- output.
+--
+-- UserData is also discarded during the copy
+-- You should just use this when translating a Put handle into a Get handle.
+shrinkBinBuffer :: WriteBinHandle -> IO ReadBinHandle
+shrinkBinBuffer bh = withBinBuffer bh $ \bs -> do
+  unsafeUnpackBinBuffer (copy bs)
+
+thawReadHandle :: ReadBinHandle -> IO WriteBinHandle
+thawReadHandle rbm = do
+  wbm_off_r <- newFastMutInt =<< readFastMutInt (rbm_off_r rbm)
+  wbm_sz_r <- newFastMutInt (rbm_sz_r rbm)
+  wbm_arr_r <- newIORef (rbm_arr_r rbm)
+  pure $ WriteBinMem
+    { wbm_userData = noWriterUserData
+    , wbm_off_r = wbm_off_r
+    , wbm_sz_r = wbm_sz_r
+    , wbm_arr_r = wbm_arr_r
     }
 
 tellBinWriter :: WriteBinHandle -> IO (Bin a)
