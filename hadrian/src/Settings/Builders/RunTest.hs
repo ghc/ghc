@@ -127,7 +127,8 @@ inTreeCompilerArgs stg = do
     wordsize    <- show @Int . (*8) <$> queryTargetTarget (wordSize2Bytes . tgtWordSize)
 
     llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand
-    have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
+    llvm_as_cmd <- settingsFileSetting ToolchainSetting_LlvmAsCommand
+    have_llvm <- liftIO (all isJust <$> mapM findExecutable [llc_cmd, llvm_as_cmd])
 
     top         <- topDirectory
 
