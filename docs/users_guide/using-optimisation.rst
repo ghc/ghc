@@ -1626,7 +1626,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :ghc-flag:`-funfolding-use-threshold=⟨n⟩`.
 
 .. ghc-flag:: -funfolding-use-threshold=⟨n⟩
-    :shortdesc: *default: 80.* Tweak unfolding settings.
+    :shortdesc: *default: 90.* Tweak unfolding settings.
     :type: dynamic
     :category:
 
