@@ -198,8 +198,8 @@ mkFastZStringString str = FastZString (BSC.pack str)
 
 -- -----------------------------------------------------------------------------
 
-{-| A 'FastString' is a UTF-8 encoded string together with a unique ID. All
-'FastString's are stored in a global hashtable to support fast O(1)
+{-| A 'FastString' is a Modified UTF-8 encoded string together with a unique ID.
+All 'FastString's are stored in a global hashtable to support fast O(1)
 comparison.
 
 It is also associated with a lazy reference to the Z-encoding

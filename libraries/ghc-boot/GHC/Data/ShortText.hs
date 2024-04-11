@@ -24,6 +24,10 @@
 
 -- Very similar to FastString, but not hash-consed and with some extra instances and
 -- functions for serialisation and I/O. Should be imported qualified.
+--
+-- /Note:/ This string is stored in Modified UTF8 format,
+-- thus it's not byte-compatible with @ShortText@ type in @text-short@
+-- package.
 
 module GHC.Data.ShortText (
         -- * ShortText
