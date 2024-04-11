@@ -20,7 +20,7 @@ module GHC.Types.Id.Make (
 
         mkFCallId,
 
-        unwrapNewTypeBody, wrapFamInstBody,
+        wrapNewTypeBody, unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
         DataConBangOpts (..), BangOpts (..),

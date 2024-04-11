@@ -57,7 +57,7 @@ import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Types.Id.Make ( realWorldPrimId, wrapNewTypeBody )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, OccName )
 import GHC.Types.Name.Occurrence (occNameString)
@@ -1187,6 +1187,10 @@ cpeApp top_env expr
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
 
     cpe_app env (Var v) args
+      | Just (payload, args') <- isNewTypeClassApp v args
+      = cpe_app env payload args'
+
+    cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
                  hd = getIdFromTrivialExpr_maybe e2
@@ -1274,8 +1278,8 @@ cpeApp top_env expr
 
     rebuild_app'
         :: CorePrepEnv
-        -> [ArgInfo] -- The arguments (inner to outer)
-        -> CpeApp
+        -> [ArgInfo] -- The arguments (inner to outer); substitution not applied
+        -> CpeApp    -- Substitution already applied
         -> Floats
         -> [Demand]
         -> [CoreTickish]
@@ -1287,12 +1291,9 @@ cpeApp top_env expr
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
-      _
-        | not (null rt_ticks)
-        , req_depth <= 0
-        ->
-            let tick_fun = foldr mkTick fun' rt_ticks
-            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+      _ | not (null rt_ticks), req_depth <= 0
+        -> let tick_fun = foldr mkTick fun' rt_ticks
+           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1310,7 +1311,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-        (fs, arg') <- cpeArg top_env ss1 arg
+        (fs, arg') <- cpeArg env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       AICast co
@@ -1334,6 +1335,24 @@ isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
+
+isNewTypeClassApp :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+isNewTypeClassApp v args
+  | Just data_con <- isDataConWorkId_maybe v
+  , let tycon = dataConTyCon data_con
+  , isNewTyCon tycon
+  , let get_payload 0 rev_arg_tys (CpeApp payload : args')
+          = Just (wrapNewTypeBody tycon (reverse rev_arg_tys) payload, args')
+        get_payload n rev_arg_tys (CpeApp (Type ty) : args)
+          = get_payload (n-1) (ty:rev_arg_tys) args
+        get_payload _ _ _
+          = Nothing
+  = assertPpr (isClassTyCon tycon) (ppr v) $
+      -- Newtype data constructors are already inlined
+      -- /except/ for newtype classes
+    get_payload (tyConArity tycon) [] args
+
+  | otherwise = Nothing
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~
