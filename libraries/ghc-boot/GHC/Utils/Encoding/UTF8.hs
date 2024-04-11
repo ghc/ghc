@@ -7,7 +7,7 @@
 -- of the package database (needed in both ghc and in ghc-pkg) lives in
 -- `ghc-boot` and uses ShortText, which in turn depends on this module.
 
--- | Simple, non-streaming UTF-8 codecs.
+-- | Simple, non-streaming Modified UTF-8 codecs.
 --
 -- This is one of several UTF-8 implementations provided by GHC; see Note
 -- [GHC's many UTF-8 implementations] in "GHC.Encoding.UTF8" for an
