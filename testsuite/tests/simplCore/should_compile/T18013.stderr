@@ -131,9 +131,9 @@ Rule fired: Class op fmap (BUILTIN)
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 38, types: 90, coercions: 17, joins: 0/1}
+  = {terms: 36, types: 86, coercions: 17, joins: 0/0}
 
--- RHS size: {terms: 37, types: 78, coercions: 17, joins: 0/1}
+-- RHS size: {terms: 35, types: 74, coercions: 17, joins: 0/0}
 mapMaybeRule [InlPrag=[2]]
   :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
 [GblId,
@@ -182,12 +182,6 @@ mapMaybeRule [InlPrag=[2]]
 mapMaybeRule
   = \ (@a) (@b) (f :: Rule IO a b) ->
       case f of { Rule @s ww ww1 ->
-      let {
-        lvl :: Result s (Maybe b)
-        [LclId, Unf=OtherCon []]
-        lvl
-          = T18013a.Result
-              @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) } in
       T18013a.Rule
         @IO
         @(Maybe a)
@@ -198,7 +192,9 @@ mapMaybeRule
             (a1 :: Maybe a)
             (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
             case a1 of {
-              Nothing -> (# s1, lvl #);
+              Nothing ->
+                (# s1,
+                   T18013a.Result @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) #);
               Just x ->
                 case ((ww1 s2 x)
                       `cast` <Co:4> :: IO (Result s b)

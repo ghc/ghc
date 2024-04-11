@@ -700,15 +700,13 @@ lvlMFE env strict_ctxt ann_expr
         -- that if we'll escape a value lambda, or will go to the top level.
     float_me = saves_work || saves_alloc || is_mk_static
 
-    -- We can save work if we can move a redex outside a value lambda
-    -- But if float_is_new_lam is True, then the redex is wrapped in a
-    -- a new lambda, so no work is saved
-    saves_work = escapes_value_lam && not float_is_new_lam
-
+    -- See Note [Saving work]
+    saves_work = escapes_value_lam        -- (a)
+                 && not (exprIsHNF expr)  -- (b)
+                 && not float_is_new_lam  -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
-                  -- See Note [Escaping a value lambda]
 
-    -- See Note [Floating to the top]
+    -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (   not strict_ctxt                     -- (a)
@@ -723,30 +721,105 @@ hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 hasFreeJoin env fvs
   = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
 
-{- Note [Floating to the top]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose saves_work is False, i.e.
- - 'e' does not escape a value lambda (escapes_value_lam), or
- - 'e' would have added value lambdas if floated (float_is_new_lam)
-Then we may still be keen to float a sub-expression 'e' to the top level,
-for two reasons:
+{- Note [Saving work]
+~~~~~~~~~~~~~~~~~~~~~
+The key idea in let-floating is to
+  * float a redex out of a (value) lambda
+Doing so can save an unbounded amount of work.
+But see also Note [Saving allocation].
 
- (i) Doing so makes the function smaller, by floating out
-     bottoming expressions, or integer or string literals.  That in
-     turn makes it easier to inline, with less duplication.
-     This only matters if the floated sub-expression is inside a
-     value-lambda, which in turn may be easier to inline.
+So we definitely float an expression out if
+(a) It will escape a value lambda (escapes_value_lam)
+(b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
+(c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
+    See (SW3) below
 
- (ii) (Minor) Doing so may turn a dynamic allocation (done by machine
-      instructions) into a static one. Minor because we are assuming
-      we are not escaping a value lambda.
+Wrinkles:
 
-But only do so if (saves_alloc):
-     (a) the context is lazy (so we get allocation), or
-     (b) the expression is a HNF (so we get allocation), or
-     (c) the expression is bottoming and (i) applies
-         (NB: if the expression is a lambda, (b) will apply;
-              so this case only catches bottoming thunks)
+(SW1) Concerning (b) I experimented with using `exprIsCheap` rather than
+      `exprIsHNF` but the latter seems better, according to nofib
+      (`spectral/mate` got 10% worse with exprIsCheap).  It's really a bit of a
+      heuristic.
+
+(SW2) What about omitting (b), and hence floating HNFs as well?  The danger of
+      doing so is that we end up floating out a HNF from a cold path (where it
+      might never get allocated at all) and allocating it all the time
+      regardless.  Example
+          f xs = case xs of
+                   [x] | x>3       -> (y,y)
+                       | otherwise -> (x,y)
+                   (x:xs) -> ...f xs...
+      We can float (y,y) out, but in a particular call to `f` that path might
+      not be taken, so allocating it before the definition of `f` is a waste.
+
+      See !12410 for some data comparing the effect of omitting (b) altogether,
+      This doesn't apply, though, if we float the thing to the top level; see
+      Note [Floating to the top].  Bottom line (data from !12410): adding the
+      not.exprIsHNF test to `saves_work`:
+       - Decreases compiler allocations by 0.5%
+       - Occasionally decreases runtime allocation (T12996 -2.5%)
+       - Slightly mixed effect on nofib: (puzzle -10%, mate -5%, cichelli +5%)
+         but geometric mean is -0.09%.
+      Overall, a win.
+
+(SW3) Concerning (c), if we are wrapping the thing in extra value lambdas (in
+      abs_vars), then nothing is saved.  E.g.
+        f = \xyz. ...(e1[y],e2)....
+      If we float
+        lvl = \y. (e1[y],e2)
+        f = \xyz. ...(lvl y)...
+      we have saved nothing: one pair will still be allocated for each
+      call of `f`.  Hence the (not float_is_new_lam) in saves_work.
+
+Note [Saving allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Even if `saves_work` is false, we we may want to float even cheap/HNF
+expressions out of value lambdas, for several reasons:
+
+* Doing so may save allocation. Consider
+        f = \x.  .. (\y.e) ...
+  Then we'd like to avoid allocating the (\y.e) every time we call f,
+  (assuming e does not mention x). An example where this really makes a
+  difference is simplrun009.
+
+* It may allow SpecContr to fire on functions. Consider
+        f = \x. ....(f (\y.e))....
+  After floating we get
+        lvl = \y.e
+        f = \x. ....(f lvl)...
+  Now it's easier for SpecConstr to generate a robust specialisation for f.
+
+* It makes the function smaller, and hence more likely to inline.  This can make
+  a big difference for string literals and bottoming expressions: see Note
+  [Floating to the top]
+
+Data suggests, however, that it is better /only/ to float HNFS, /if/ they can go
+to top level. See (SW2) of Note [Saving work].  If the expression goes to top
+level we don't pay the cost of allocating cold-path thunks described in (SW2).
+
+Hence `isTopLvl dest_lvl` in `saves_alloc`.
+
+Note [Floating to the top]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Even though Note [Saving allocation] suggests that we should not, in
+general, float HNFs, the balance change if it goes to the top:
+
+* We don't pay an allocation cost for the floated expression; it
+  just becomes static data.
+
+* Floating string literal is valuable -- no point in duplicating the
+  at each call site!
+
+* Floating bottoming expressions is valuable: they are always cold
+  paths; we don't want to duplicate them at each call site; and they
+  can be quite big, inhibiting inlining. See Note [Bottoming floats]
+
+So we float an expression to the top if:
+  (a) the context is lazy (so we get allocation), or
+  (b) the expression is a HNF (so we get allocation), or
+  (c) the expression is bottoming and floating would escape a
+      value lambda (NB: if the expression itself is a lambda, (b)
+      will apply; so this case only catches bottoming thunks)
 
 Examples:
 
@@ -1126,33 +1199,6 @@ But *coercion* arguments aren’t (see Note [Coercion tokens] in
 "GHC.CoreToStg" and Note [Count coercion arguments in boring contexts] in
 "GHC.Core.Unfold"), so we still want to float out variables applied only to
 coercion arguments.
-
-Note [Escaping a value lambda]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to float even cheap expressions out of value lambdas,
-because that saves allocation.  Consider
-        f = \x.  .. (\y.e) ...
-Then we'd like to avoid allocating the (\y.e) every time we call f,
-(assuming e does not mention x). An example where this really makes a
-difference is simplrun009.
-
-Another reason it's good is because it makes SpecContr fire on functions.
-Consider
-        f = \x. ....(f (\y.e))....
-After floating we get
-        lvl = \y.e
-        f = \x. ....(f lvl)...
-and that is much easier for SpecConstr to generate a robust
-specialisation for.
-
-However, if we are wrapping the thing in extra value lambdas (in
-abs_vars), then nothing is saved.  E.g.
-        f = \xyz. ...(e1[y],e2)....
-If we float
-        lvl = \y. (e1[y],e2)
-        f = \xyz. ...(lvl y)...
-we have saved nothing: one pair will still be allocated for each
-call of 'f'.  Hence the (not float_is_lam) in float_me.
 
 
 ************************************************************************
