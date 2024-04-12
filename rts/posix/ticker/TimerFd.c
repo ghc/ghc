@@ -112,7 +112,12 @@ static void *itimer_thread_func(void *_handle_tick)
     TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
     while (!RELAXED_LOAD(&exited)) {
         if (poll(pollfds, 2, -1) == -1) {
-            sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
+            // While the RTS attempts to mask signals, some foreign libraries
+            // may rely on signal delivery may unmask them. Consequently we may
+            // see EINTR. See #24610.
+            if (errno != -EINTR) {
+                sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
+            }
         }
 
         // We check the pipe first, even though the timerfd may also have triggered.
