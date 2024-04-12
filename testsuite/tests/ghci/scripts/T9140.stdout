@@ -1,4 +1,3 @@
-
 <interactive>:2:5: error: [GHC-20036]
     You can't mix polymorphic and unlifted bindings: a = (# 1 #)
     Suggested fix: Add a type signature.
@@ -10,3 +9,4 @@
 <interactive>:1:1: error: [GHC-17999]
     GHCi can't bind a variable of unlifted type:
       a :: (# Integer, Integer #)
+

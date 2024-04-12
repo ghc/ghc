@@ -1,4 +1,3 @@
-
 CaretDiagnostics1.hs:7:8-15: error: [GHC-83865]
     • Couldn't match expected type ‘IO a0’ with actual type ‘Int’
     • In the second argument of ‘(+)’, namely ‘(3 :: Int)’
@@ -68,3 +67,4 @@ CaretDiagnostics1.hs:23:25-26: error: [GHC-83865]
    |
 23 | tabby2 =                ()
    |                         ^^
+

@@ -1,6 +1,5 @@
 w :: [a] -> a
 x :: [a] -> a
-
 <interactive>:1:1: error: [GHC-88464]
     Variable not in scope: y
     Suggested fix:
@@ -12,3 +11,4 @@ x :: [a] -> a
     Suggested fix:
       Notice that ‘z’ is a field selector
       that has been suppressed by NoFieldSelectors.
+
