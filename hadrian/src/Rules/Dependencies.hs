@@ -20,26 +20,43 @@ import qualified Data.Set as S
 
 import qualified Text.Parsec as Parsec
 
--- These modules use DeriveLift which needs Language.Haskell.TH.Lib.Internal but
+
+data PkgMod = PkgMod { pkg :: Package, _mod :: String }
+
+-- | These modules use DeriveLift which needs Language.Haskell.TH.Lib.Internal but
 -- the dependency is implicit. ghc -M should emit this additional dependency but
 -- until it does we need to add this dependency ourselves.
-extra_dependencies :: M.Map Package (Stage -> Action [(FilePath, FilePath)])
-extra_dependencies =
-  M.fromList [(containers, fmap (fmap concat . sequence) (sequence
-    [dep (containers, "Data.IntSet.Internal") th_internal
-    ,dep (containers, "Data.Set.Internal") th_internal
-    ,dep (containers, "Data.Sequence.Internal") th_internal
-    ,dep (containers, "Data.Graph") th_internal
-    ]))
+--
+-- This should be dropped when #22229 is fixed.
+extraDepsList :: [(PkgMod, PkgMod)]
+extraDepsList =
+    [ (containers, "Data.IntSet.Internal") --> th_internal
+    , (containers, "Data.Set.Internal") --> th_internal
+    , (containers, "Data.Sequence.Internal") --> th_internal
+    , (containers, "Data.Graph") --> th_internal
     ]
-
   where
+    (p1,m1) --> (p2,m2) = (PkgMod p1 m1, PkgMod p2 m2)
     th_internal = (templateHaskell, "Language.Haskell.TH.Lib.Internal")
-    dep (p1, m1) (p2, m2) s = do
-        let context = Context s p1 (error "extra_dependencies: way not set") (error "extra_dependencies: iplace not set")
+
+extraDependenciesFor :: Stage -> Package -> Action [(FilePath, FilePath)]
+extraDependenciesFor stage srcPkg
+  | Just deps <- M.lookup srcPkg byPackage = concat <$> traverse dep deps
+  | otherwise = return []
+  where
+    byPackage :: M.Map Package [(PkgMod, PkgMod)]
+    byPackage = M.fromListWith (++) [ (pkg x, [(x,y)]) | (x,y) <- extraDepsList ]
+
+    -- @dep ((p1, m1), (p2, m2))@ is an extra dependency from
+    -- module m1 of package p1 to module m2 of package p2.
+    dep :: (PkgMod, PkgMod) -> Action [(FilePath, FilePath)]
+    dep (PkgMod p1 m1, PkgMod p2 m2) = do
+        let context = Context stage p1 (error "extra_dependencies: way not set") (error "extra_dependencies: inplace not set")
         ways <- interpretInContext context getLibraryWays
-        mapM (\way -> (,) <$> path s way p1 m1 <*> path s way p2 m2) (S.toList ways)
-    path stage way p m =
+        mapM (\way -> (,) <$> path way p1 m1 <*> path way p2 m2) (S.toList ways)
+
+    path :: Way -> Package -> String -> Action FilePath
+    path way p m =
       let context = Context stage p way Inplace
       in objectPath context . moduleSource $ m
 
@@ -53,7 +70,7 @@ buildPackageDependencies rs = do
         DepMkFile stage pkgpath <- getDepMkFile root mk
         let pkg = unsafeFindPackageByPath pkgpath
             context = Context stage pkg vanilla Inplace
-        extra <- maybe (return []) ($ stage) $ M.lookup pkg extra_dependencies
+        extra <- extraDependenciesFor stage pkg
         srcs <- hsSources context
         gens <- interpretInContext context generatedDependencies
         need (srcs ++ gens)
