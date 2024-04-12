@@ -3,7 +3,6 @@ module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 import Hadrian.Haskell.Cabal.Type
 
 import Builder
-import Packages
 import Settings.Builders.Common
 import GHC.Toolchain (tgtCCompilerLink, ccLinkProgram)
 import GHC.Toolchain.Program

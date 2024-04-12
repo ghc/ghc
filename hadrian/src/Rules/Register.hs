@@ -191,11 +191,12 @@ buildConfFinal rs context@Context {..} _conf = do
     --
     -- so that if any change ends up modifying a library (but not its .conf
     -- file), we still rebuild things that depend on it.
-    dir <- (-/-) <$> libPath context <*> distDir stage
+    dyndir <- distDynDir context
+    distdir <- distDir context
     pkgid <- pkgUnitId stage package
     files <- liftIO $
-      (++) <$> getDirectoryFilesIO "." [dir -/- "*libHS"++pkgid++"*"]
-           <*> getDirectoryFilesIO "." [dir -/- pkgid -/- "**"]
+      (++) <$> getDirectoryFilesIO "." [dyndir -/- "*libHS"++pkgid++"*"]
+           <*> getDirectoryFilesIO "." [distdir -/- "**"]
     produces files
 
 buildConfInplace :: [(Resource, Int)] -> Context -> FilePath -> Action ()

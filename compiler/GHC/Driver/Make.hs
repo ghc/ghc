@@ -1917,7 +1917,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
     -- the linker can correctly load the object files.  This isn't necessary
     -- when using -fexternal-interpreter.
     dynamic_too_enable enable_spec ms
-      = hostIsDynamic && internalInterpreter &&
+      = hostIsDynamic && not hostIsProfiled && internalInterpreter &&
             not isDynWay && not isProfWay &&  not dyn_too_enabled
               && enable_object
       where

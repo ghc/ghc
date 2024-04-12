@@ -712,7 +712,8 @@ setTopSessionDynFlags dflags = do
            profiled = ways dflags `hasWay` WayProf
            dynamic  = ways dflags `hasWay` WayDyn
            flavour
-             | profiled  = "-prof" -- FIXME: can't we have both?
+             | profiled && dynamic = "-prof-dyn"
+             | profiled  = "-prof"
              | dynamic   = "-dyn"
              | otherwise = ""
            msg = text "Starting " <> text prog

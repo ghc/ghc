@@ -1,6 +1,5 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
-import Packages
 import Rules.Gmp
 import Settings.Builders.Common
 import GHC.Toolchain.Target (targetPlatformTriple)

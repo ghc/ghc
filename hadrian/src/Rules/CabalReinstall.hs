@@ -10,7 +10,6 @@ import Utilities
 import qualified System.Directory.Extra as IO
 import Data.Either
 import Rules.BinaryDist
-import Hadrian.Haskell.Cabal (pkgUnitId)
 import Oracles.Setting
 
 {-
@@ -53,13 +52,8 @@ cabalBuildRules = do
         iserv_targets <- if cross then pure [] else iservBins
         need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
 
-        distDir        <- Context.distDir Stage1
-        rtsDir         <- pkgUnitId Stage1 rts
-        -- let rtsDir = "rts"
-
-        let ghcBuildDir      = root -/- stageString Stage1
-            rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
-                               -/- "include"
+        distDir        <- Context.distDir (vanillaContext Stage1 rts)
+        let rtsIncludeDir    = distDir -/- "include"
 
         libdir  <- liftIO . IO.makeAbsolute =<< stageLibPath Stage1
         work_dir <- liftIO $ IO.makeAbsolute $ root -/- "stage-cabal"

@@ -1,8 +1,7 @@
 module Main (main) where
 
-import Control.Monad      (when)
 import Data.Either        (partitionEithers)
-import Data.Foldable      (for_, traverse_)
+import Data.Foldable      (for_)
 import Data.Maybe         (listToMaybe)
 import Data.String        (fromString)
 import Data.Traversable   (for)
@@ -92,6 +91,11 @@ main2 meta plan = do
                         P.UnitTypeLocal   -> return (Local, Nothing, Nothing)
                         t                 -> die $ "Unit of wrong type " ++ show uid ++ " " ++ show t
 
+
+                let component = case Map.keys (P.uComps unit) of
+                                      [c] -> Just (P.dispCompNameTarget pkgname c)
+                                      _ -> Nothing
+
                 return $ Right Dep
                     { depPackageName = pkgname
                     , depVersion     = ver
@@ -103,6 +107,7 @@ main2 meta plan = do
                         [ (if fval then "+" else "-") ++ T.unpack fname
                         | (P.FlagName fname, fval) <- Map.toList (P.uFlags unit)
                         ]
+                    , depComponent = component
                     }
 
     LBS.putStr $ A.encode Result
@@ -125,23 +130,15 @@ bfs plan unit0 = do
     for uids $ \uid -> do
         unit <- lookupUnit units uid
         case Map.toList (P.uComps unit) of
-            [(_, compinfo)] -> checkExeDeps uid (P.pjUnits plan) (P.ciExeDeps compinfo)
-            _               -> die $ "Unit with multiple components " ++ show uid
+            [_] -> return ()
+            _   -> die $ "Unit with multiple components " ++ show uid
         return unit
 
   where
     am :: Map.Map P.UnitId (Set.Set P.UnitId)
-    am = fmap (foldMap P.ciLibDeps . P.uComps) units
+    am = fmap (foldMap (Set.union <$> P.ciLibDeps <*> P.ciExeDeps) . P.uComps) units
 
     units = P.pjUnits plan
-
-checkExeDeps :: P.UnitId -> Map.Map P.UnitId P.Unit -> Set.Set P.UnitId -> IO ()
-checkExeDeps pkgUid units = traverse_ check . Set.toList where
-    check uid = do
-        unit <- lookupUnit units uid
-        let P.PkgId pkgname _ = P.uPId unit
-        when (pkgname /= P.PkgName (fromString "hsc2hs")) $ do
-            die $ "unit " ++ show pkgUid ++ " depends on executable " ++ show uid
 
 lookupUnit :: Map.Map P.UnitId P.Unit -> P.UnitId -> IO P.Unit
 lookupUnit units uid
@@ -172,6 +169,7 @@ data Dep = Dep
     , depRevision    :: Maybe Int
     , depRevHash     :: Maybe P.Sha256
     , depFlags       :: [String]
+    , depComponent   :: Maybe T.Text
     }
   deriving (Show)
 
@@ -201,6 +199,7 @@ instance A.ToJSON Dep where
         , fromString "revision"     A..= depRevision dep
         , fromString "cabal_sha256" A..= depRevHash dep
         , fromString "flags"        A..= depFlags dep
+        , fromString "component"    A..= depComponent dep
         ]
 
 instance A.ToJSON SrcType where

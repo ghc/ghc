@@ -87,12 +87,18 @@ registerDynamicLib root suffix dynlibpath = do
 -- archive to build is given as the third argument.
 buildDynamicLib :: FilePath -> String -> FilePath -> Action ()
 buildDynamicLib root suffix dynlibpath = do
-    dynlib <- parsePath (parseBuildLibDyn root suffix) "<dyn lib parser>" dynlibpath
+    dynlib@(BuildPath _ stage _ (LibDyn pkgname _ _  way _))
+      <- parsePath (parseBuildLibDyn root suffix) "<dyn lib parser>" dynlibpath
     let context = libDynContext dynlib
+    synopsis <- pkgSynopsis (package context)
     deps <- contextDependencies context
     registerPackages deps
     objs <- libraryObjects context
     build $ target context (Ghc LinkHs $ Context.stage context) objs [dynlibpath]
+    putSuccess $
+      renderLibrary
+        (quote pkgname ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
+        dynlibpath synopsis
 
 -- | Build a "GHCi library" ('LibGhci') under the given build root, with the
 -- complete path of the file to build is given as the second argument.

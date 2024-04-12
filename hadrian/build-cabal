@@ -31,6 +31,6 @@ then
         --directory "$PWD" \
         "$@"
 else
-    echo "Cabal version is too old; you need at least cabal-install 2.2"
+    echo "Cabal version is too old; you need at least cabal-install 3.0"
     exit 2
 fi

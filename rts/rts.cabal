@@ -171,6 +171,14 @@ library
           extra-library-flavours: _debug_p
           if flag(threaded)
             extra-library-flavours: _thr_debug_p
+        if flag(dynamic)
+          extra-dynamic-library-flavours: _p
+          if flag(threaded)
+            extra-dynamic-library-flavours: _thr_p
+          if flag(debug)
+            extra-dynamic-library-flavours: _debug_p
+            if flag(threaded)
+              extra-dynamic-library-flavours: _thr_debug_p
 
       if flag(debug)
         extra-library-flavours: _debug

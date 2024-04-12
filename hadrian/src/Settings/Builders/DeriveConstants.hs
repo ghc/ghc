@@ -3,7 +3,6 @@ module Settings.Builders.DeriveConstants (
     ) where
 
 import Builder
-import Packages
 import Settings.Builders.Common
 import GHC.Toolchain (tgtCCompiler, ccProgram, tgtUnregisterised)
 import GHC.Toolchain.Program

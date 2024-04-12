@@ -57,7 +57,6 @@ import Data.List (isSuffixOf)
 import System.FilePath
 import System.Directory
 
-
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
   , ldOneShotMode :: !Bool                          -- ^ Is the driver in one-shot mode?
@@ -375,7 +374,7 @@ checkNonStdWay opts _interp srcspan
     normalObjectSuffix :: String
     normalObjectSuffix = "o"
 
-data Way' = Normal | Prof | Dyn
+data Way' = Normal | Prof | Dyn | ProfDyn
 
 failNonStd :: LinkDepsOpts -> SrcSpan -> IO (Maybe FilePath)
 failNonStd opts srcspan = dieWith opts srcspan $
@@ -385,10 +384,12 @@ failNonStd opts srcspan = dieWith opts srcspan $
   text "  (1) Use -fexternal-interpreter, or" $$
   buildTwiceMsg
     where compWay
+            | ldWays opts `hasWay` WayDyn && ldWays opts `hasWay` WayProf = ProfDyn
             | ldWays opts `hasWay` WayDyn  = Dyn
             | ldWays opts `hasWay` WayProf = Prof
             | otherwise = Normal
           ghciWay
+            | hostIsDynamic && hostIsProfiled = ProfDyn
             | hostIsDynamic = Dyn
             | hostIsProfiled = Prof
             | otherwise = Normal
@@ -407,5 +408,5 @@ failNonStd opts srcspan = dieWith opts srcspan $
             Normal -> "the normal way"
             Prof -> "with -prof"
             Dyn -> "with -dynamic"
+            ProfDyn -> "with -prof and -dynamic"
 #endif
-
