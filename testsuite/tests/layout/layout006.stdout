@@ -1,13 +1,12 @@
 Running with -XNoAlternativeLayoutRule
-
 layout006.hs:12:4: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f | True = ...
+
 Running with -XAlternativeLayoutRule
-
 layout006.hs:12:2: error: [GHC-58481] parse error on input ‘|’
-Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 
+Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 layout006.hs:12:2: warning: [GHC-93617] [-Walternative-layout-rule-transitional (in -Wdefault)]
     transitional layout will not be accepted in the future:
     `|' at the same depth as implicit layout block
@@ -15,3 +14,4 @@ layout006.hs:12:2: warning: [GHC-93617] [-Walternative-layout-rule-transitional 
 layout006.hs:12:4: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f | True = ...
+

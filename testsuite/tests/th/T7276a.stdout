@@ -1,4 +1,3 @@
-
 <interactive>:3:9: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Dec]’ with ‘Exp’
       Expected: Q Exp
@@ -17,3 +16,4 @@
 (deferred type error)
       Code: x
     • In the untyped splice: $x
+
