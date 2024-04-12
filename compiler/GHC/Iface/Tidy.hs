@@ -615,8 +615,11 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
-  | otherwise     = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
+  | isDataTyCon tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
+  | otherwise      = []
+    -- The 'otherwise' includes family TyCons of course, but also (less obviously)
+    --  * Newtypes: see Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
+    --  * type data: we don't want any code for type-only stuff (#24620)
 
 getClassImplicitBinds :: Class -> [CoreBind]
 getClassImplicitBinds cls
