@@ -454,9 +454,23 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
     return S + A - P;
   case R_RISCV_CALL:
   case R_RISCV_CALL_PLT: {
+    addr_t GOT_Target;
+    if (GOT_S != 0) {
+      // 1. Public symbol with GOT entry.
+      GOT_Target = GOT_S;
+    } else {
+      // 2. Fake GOT entry with symbol extra entry.
+      SymbolExtra *symbolExtra = makeSymbolExtra(oc, ELF_R_SYM(rel->r_info), S);
+      addr_t* FAKE_GOT_S = &symbolExtra->addr;
+      IF_DEBUG(linker, debugBelch("R_RISCV_CALL_PLT w/ SymbolExtra = %p , "
+                                  "entry = 0x%lx\n",
+                                  symbolExtra, FAKE_GOT_S));
+      GOT_Target = FAKE_GOT_S;
+    }
+
     if (findStub(section, (void **)&S, 0)) {
       /* did not find it. Crete a new stub. */
-      if (makeStub(section, (void **)&S, (void *)GOT_S, 0)) {
+      if (makeStub(section, (void **)&S, (void *)GOT_Target, 0)) {
         abort(/* could not find or make stub */);
       }
     }
