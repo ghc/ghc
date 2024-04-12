@@ -43,7 +43,7 @@ do
     dir=${i%*/}
     tar -Jcf ../../../../../$dir.html.tar.xz $dir
 done
-mv index.html ../../../../..
+mv index.html users_guide libraries ../../../../..
 cd ..
 mv ./*.pdf ../../../.. || \
     die "failed to find PDFs"
