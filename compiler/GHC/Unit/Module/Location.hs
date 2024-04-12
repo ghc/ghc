@@ -2,17 +2,32 @@
 module GHC.Unit.Module.Location
    ( ModLocation(..)
    , addBootSuffix
+   , addBootSuffixOsPath
    , addBootSuffix_maybe
    , addBootSuffixLocn_maybe
    , addBootSuffixLocn
    , addBootSuffixLocnOut
    , removeBootSuffix
+   , mlHiFilePath
+   , mlDynHiFilePath
+   , mlObjFilePath
+   , mlDynObjFilePath
+   , mlHieFilePath
+   , mlHiFilePathLenient
+   , mlDynHiFilePathLenient
+   , mlObjFilePathLenient
+   , mlDynObjFilePathLenient
+   , mlHieFilePathLenient
    )
 where
 
+import GHC.Data.Maybe (expectJust)
 import GHC.Prelude
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import System.OsPath (OsPath)
+import qualified System.OsPath as OsPath
+import qualified Data.Semigroup as Semigroup
 
 -- | Module Location
 --
@@ -43,26 +58,26 @@ data ModLocation
                 -- ^ The source file, if we have one.  Package modules
                 -- probably don't have source files.
 
-        ml_hi_file   :: FilePath,
+        ml_hi_file   :: OsPath,
                 -- ^ Where the .hi file is, whether or not it exists
                 -- yet.  Always of form foo.hi, even if there is an
                 -- hi-boot file (we add the -boot suffix later)
 
-        ml_dyn_hi_file :: FilePath,
+        ml_dyn_hi_file :: OsPath,
                 -- ^ Where the .dyn_hi file is, whether or not it exists
                 -- yet.
 
-        ml_obj_file  :: FilePath,
+        ml_obj_file  :: OsPath,
                 -- ^ Where the .o file is, whether or not it exists yet.
                 -- (might not exist either because the module hasn't
                 -- been compiled yet, or because it is part of a
                 -- unit with a .a file)
 
-        ml_dyn_obj_file :: FilePath,
+        ml_dyn_obj_file :: OsPath,
                 -- ^ Where the .dy file is, whether or not it exists
                 -- yet.
 
-        ml_hie_file  :: FilePath
+        ml_hie_file  :: OsPath
                 -- ^ Where the .hie file is, whether or not it exists
                 -- yet.
   } deriving Show
@@ -73,6 +88,13 @@ instance Outputable ModLocation where
 -- | Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix :: FilePath -> FilePath
 addBootSuffix path = path ++ "-boot"
+
+bootSuffixOsPath :: OsPath
+bootSuffixOsPath = expectJust "bootSuffixOsPath" (OsPath.encodeUtf "-boot")
+{-# noinline bootSuffixOsPath #-}
+
+addBootSuffixOsPath :: OsPath -> OsPath
+addBootSuffixOsPath path = path Semigroup.<> bootSuffixOsPath
 
 -- | Remove the @-boot@ suffix to .hs, .hi and .o files
 removeBootSuffix :: FilePath -> FilePath
@@ -96,21 +118,38 @@ addBootSuffixLocn_maybe is_boot locn = case is_boot of
 addBootSuffixLocn :: ModLocation -> ModLocation
 addBootSuffixLocn locn
   = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
-         , ml_hi_file  = addBootSuffix (ml_hi_file locn)
-         , ml_dyn_hi_file = addBootSuffix (ml_dyn_hi_file locn)
-         , ml_obj_file = addBootSuffix (ml_obj_file locn)
-         , ml_dyn_obj_file = addBootSuffix (ml_dyn_obj_file locn)
-         , ml_hie_file = addBootSuffix (ml_hie_file locn) }
+         , ml_hi_file  = addBootSuffixOsPath (ml_hi_file locn)
+         , ml_dyn_hi_file = addBootSuffixOsPath (ml_dyn_hi_file locn)
+         , ml_obj_file = addBootSuffixOsPath (ml_obj_file locn)
+         , ml_dyn_obj_file = addBootSuffixOsPath (ml_dyn_obj_file locn)
+         , ml_hie_file = addBootSuffixOsPath (ml_hie_file locn) }
 
 -- | Add the @-boot@ suffix to all output file paths associated with the
 -- module, not including the input file itself
 addBootSuffixLocnOut :: ModLocation -> ModLocation
 addBootSuffixLocnOut locn
-  = locn { ml_hi_file  = addBootSuffix (ml_hi_file locn)
-         , ml_dyn_hi_file = addBootSuffix (ml_dyn_hi_file locn)
-         , ml_obj_file = addBootSuffix (ml_obj_file locn)
-         , ml_dyn_obj_file = addBootSuffix (ml_dyn_obj_file locn)
-         , ml_hie_file = addBootSuffix (ml_hie_file locn)
+  = locn { ml_hi_file  = addBootSuffixOsPath (ml_hi_file locn)
+         , ml_dyn_hi_file = addBootSuffixOsPath (ml_dyn_hi_file locn)
+         , ml_obj_file = addBootSuffixOsPath (ml_obj_file locn)
+         , ml_dyn_obj_file = addBootSuffixOsPath (ml_dyn_obj_file locn)
+         , ml_hie_file = addBootSuffixOsPath (ml_hie_file locn)
          }
 
+toFilePathLenient :: OsPath -> FilePath
+toFilePathLenient = fmap OsPath.toChar . OsPath.unpack
 
+mlHiFilePath, mlDynHiFilePath, mlObjFilePath, mlDynObjFilePath,
+  mlHieFilePath :: ModLocation -> IO FilePath
+mlHiFilePath ml = OsPath.decodeFS (ml_hi_file ml)
+mlDynHiFilePath ml = OsPath.decodeFS (ml_dyn_hi_file ml)
+mlObjFilePath ml = OsPath.decodeFS (ml_obj_file ml)
+mlDynObjFilePath ml = OsPath.decodeFS (ml_dyn_obj_file ml)
+mlHieFilePath ml = OsPath.decodeFS (ml_hie_file ml)
+
+mlHiFilePathLenient, mlDynHiFilePathLenient, mlObjFilePathLenient,
+  mlDynObjFilePathLenient, mlHieFilePathLenient :: ModLocation -> FilePath
+mlHiFilePathLenient ml = toFilePathLenient (ml_hi_file ml)
+mlDynHiFilePathLenient ml = toFilePathLenient (ml_dyn_hi_file ml)
+mlObjFilePathLenient ml = toFilePathLenient (ml_obj_file ml)
+mlDynObjFilePathLenient ml = toFilePathLenient (ml_dyn_obj_file ml)
+mlHieFilePathLenient ml = toFilePathLenient (ml_hie_file ml)

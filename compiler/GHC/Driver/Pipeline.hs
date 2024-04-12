@@ -229,12 +229,12 @@ compileOne' mHscMessage
 
    debugTraceMsg logger 2 (text "compile: input file" <+> text input_fnpp)
 
-   unless (gopt Opt_KeepHiFiles lcl_dflags) $
-             addFilesToClean tmpfs TFL_CurrentModule $
-                 [ml_hi_file $ ms_location summary]
-   unless (gopt Opt_KeepOFiles lcl_dflags) $
-             addFilesToClean tmpfs TFL_GhcSession $
-                 [ml_obj_file $ ms_location summary]
+   unless (gopt Opt_KeepHiFiles lcl_dflags) $ do
+     file <- msHiFilePath summary
+     addFilesToClean tmpfs TFL_CurrentModule [file]
+   unless (gopt Opt_KeepOFiles lcl_dflags) $ do
+     file <- msObjFilePath summary
+     addFilesToClean tmpfs TFL_GhcSession [file]
 
    -- Initialise plugins here for any plugins enabled locally for a module.
    plugin_hsc_env <- initializePlugins hsc_env

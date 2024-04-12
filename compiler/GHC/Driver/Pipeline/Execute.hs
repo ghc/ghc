@@ -48,6 +48,7 @@ import GHC.SysTools
 import GHC.SysTools.Cpp
 import System.Directory
 import System.FilePath
+import qualified System.OsPath as OsPath
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Unit.Info
@@ -526,8 +527,8 @@ runHscBackendPhase :: PipeEnv
 runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
   let dflags = hsc_dflags hsc_env
       logger = hsc_logger hsc_env
-      o_file = if dynamicNow dflags then ml_dyn_obj_file location else ml_obj_file location -- The real object file
       next_phase = hscPostBackendPhase src_flavour (backend dflags)
+  o_file <- if dynamicNow dflags then mlDynObjFilePath location else mlObjFilePath location -- The real object file
   case result of
       HscUpdate iface ->
           if | not (backendGeneratesCode (backend dflags))  ->
@@ -759,7 +760,7 @@ mkOneShotModLocation :: PipeEnv -> DynFlags -> HscSource -> ModuleName -> IO Mod
 mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     let PipeEnv{ src_basename=basename,
              src_suffix=suff } = pipe_env
-    let location1 = mkHomeModLocation2 fopts mod_name basename suff
+    location1 <- mkHomeModLocation2 fopts mod_name basename suff
 
     -- Boot-ify it if necessary
     let location2
@@ -770,12 +771,12 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     -- Take -ohi into account if present
     -- This can't be done in mkHomeModuleLocation because
     -- it only applies to the module being compiles
-    let ohi = outputHi dflags
-        location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
+    ohi <- traverse OsPath.encodeFS (outputHi dflags)
+    let location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
                   | otherwise      = location2
 
-    let dynohi = dynOutputHi dflags
-        location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file = fn }
+    dynohi <- traverse OsPath.encodeFS (dynOutputHi dflags)
+    let location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file = fn }
                   | otherwise         = location3
 
     -- Take -o into account if present
@@ -784,10 +785,11 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     -- the object file for one module.)
     -- Note the nasty duplication with the same computation in compileFile
     -- above
-    let expl_o_file = outputFile_ dflags
-        expl_dyn_o_file  = dynOutputFile_ dflags
-        location5 | Just ofile <- expl_o_file
-                  , let dyn_ofile = fromMaybe (ofile -<.> dynObjectSuf_ dflags) expl_dyn_o_file
+    expl_o_file <- traverse OsPath.encodeFS (outputFile_ dflags)
+    expl_dyn_o_file <- traverse OsPath.encodeFS (dynOutputFile_ dflags)
+    o_suf <- OsPath.encodeFS (dynObjectSuf_ dflags)
+    let location5 | Just ofile <- expl_o_file
+                  , let dyn_ofile = fromMaybe (ofile OsPath.-<.> o_suf) expl_dyn_o_file
                   , isNoLink (ghcLink dflags)
                   = location4 { ml_obj_file = ofile
                               , ml_dyn_obj_file = dyn_ofile }
@@ -867,8 +869,8 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
   -- 1. If we are generating object files for a .hs file, then return the odir as the ModLocation
   -- will have been modified to point to the accurate locations
  | StopLn <- next_phase, Just loc <- maybe_location  =
-      return $ if dynamicNow dflags then ml_dyn_obj_file loc
-                                    else ml_obj_file loc
+      OsPath.decodeFS $ if dynamicNow dflags then ml_dyn_obj_file loc
+                                             else ml_obj_file loc
  -- 2. If output style is persistent then
  | is_last_phase, Persistent   <- output = persistent_fn
  -- 3. Specific file is only set when outputFile is set by -o

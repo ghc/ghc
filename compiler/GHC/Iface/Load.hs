@@ -114,6 +114,7 @@ import Control.Monad
 import Data.Map ( toList )
 import System.FilePath
 import System.Directory
+import qualified System.OsPath as OsPath
 import GHC.Driver.Env.KnotVars
 import GHC.Iface.Errors.Types
 
@@ -893,7 +894,8 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                       , not (isOneShot (ghcMode dflags))
                       -> return (Failed (HomeModError mod loc))
                     _ -> do
-                        r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
+                        file <- OsPath.decodeFS (ml_hi_file loc)
+                        r <- read_file logger name_cache unit_state dflags wanted_mod file
                         case r of
                           Failed err
                             -> return (Failed $ BadIfaceFile err)
@@ -928,7 +930,8 @@ load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags
                  -> Module -> ModIface -> ModLocation
                  -> IO (MaybeErr MissingInterfaceError ())
 load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
-  read_file logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
+  file <- OsPath.decodeFS (ml_dyn_hi_file loc)
+  read_file logger name_cache unit_state dflags wanted_mod file >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
      -> return (Succeeded ())

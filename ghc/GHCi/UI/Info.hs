@@ -48,6 +48,7 @@ import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Types.Var
 import qualified GHC.Data.Strict as Strict
+import           GHC.Unit.Module.ModSummary (msObjFilePath)
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
@@ -288,8 +289,8 @@ collectInfo ms loaded = do
     cacheInvalid name = case M.lookup name ms of
         Nothing -> return True
         Just mi -> do
-            let fp = srcFilePath (modinfoSummary mi)
-                last' = modinfoLastUpdate mi
+            let last' = modinfoLastUpdate mi
+            fp <- srcFilePath (modinfoSummary mi)
             current <- getModificationTime fp
             exists <- doesFileExist fp
             if exists
@@ -299,12 +300,13 @@ collectInfo ms loaded = do
 -- | Get the source file path from a ModSummary.
 -- If the .hs file is missing, and the .o file exists,
 -- we return the .o file path.
-srcFilePath :: ModSummary -> FilePath
-srcFilePath modSum = fromMaybe obj_fp src_fp
-    where
-        src_fp = ml_hs_file ms_loc
-        obj_fp = ml_obj_file ms_loc
-        ms_loc = ms_location modSum
+srcFilePath :: ModSummary -> IO FilePath
+srcFilePath modSum = do
+  obj_fp <- msObjFilePath modSum
+  pure (fromMaybe obj_fp src_fp)
+  where
+      src_fp = ml_hs_file ms_loc
+      ms_loc = ms_location modSum
 
 -- | Get info about the module: summary, types, etc.
 getModInfo :: (GhcMonad m) => ModuleName -> m ModInfo
@@ -319,7 +321,7 @@ getModInfo name = do
             -- NB: this has already been deeply forced; no need to do that again.
             -- See test case T15369 and Note [Forcing GREInfo] in GHC.Types.GREInfo.
           Nothing   -> Strict.Nothing
-    ts <- liftIO $ getModificationTime $ srcFilePath m
+    ts <- liftIO $ getModificationTime =<< srcFilePath m
     return $
       ModInfo
         { modinfoSummary    = m

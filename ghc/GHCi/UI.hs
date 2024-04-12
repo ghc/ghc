@@ -2334,7 +2334,7 @@ modulesLoadedMsg ok mods load_type = do
         pure $ if is_interpreted
                then ppr (GHC.ms_mod mod)
                else ppr (GHC.ms_mod mod)
-                    <+> parens (text $ normalise $ msObjFilePath mod)
+                    <+> parens (text $ normalise $ msObjFilePathLenient mod)
                     -- Fix #9887
 
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors

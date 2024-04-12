@@ -123,6 +123,7 @@ import Data.List (sortOn)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
+import qualified System.OsPath as OsPath
 import System.IO        ( fixIO )
 
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
@@ -1830,7 +1831,9 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
                      let dyn_tn = tn -<.> dynsuf
                      addFilesToClean tmpfs dynLife [dyn_tn]
-                     return (tn, dyn_tn)
+                     tn_os <- OsPath.encodeFS tn
+                     dyn_tn_os <- OsPath.encodeFS dyn_tn
+                     return (tn_os, dyn_tn_os)
                  -- We don't want to create .o or .hi files unless we have been asked
                  -- to by the user. But we need them, so we patch their locations in
                  -- the ModSummary with temporary files.
@@ -2037,7 +2040,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         let fopts = initFinderOpts (hsc_dflags hsc_env)
 
         -- Make a ModLocation for this file
-        let location = mkHomeModLocation fopts pi_mod_name src_fn
+        location <- liftIO (mkHomeModLocation fopts pi_mod_name src_fn)
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path

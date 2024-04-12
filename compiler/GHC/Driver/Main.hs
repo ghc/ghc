@@ -279,6 +279,8 @@ import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
+import qualified System.Directory.OsPath as OsPath
+import qualified System.OsPath as OsPath
 import qualified Data.Map as M
 import Data.Map (Map)
 import qualified Data.Set as S
@@ -611,7 +613,7 @@ extract_renamed_stuff mod_summary tc_result = do
         -- I assume this fromJust is safe because `-fwrite-hie-file`
         -- enables the option which keeps the renamed source.
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
-        let out_file = ml_hie_file $ ms_location mod_summary
+        out_file <- liftIO $ msHieFilePath mod_summary
         liftIO $ writeHieFile out_file hieFile
         liftIO $ putDumpFileMaybe logger Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
 
@@ -937,7 +939,9 @@ checkObjects dflags mb_old_linkable summary = do
               Just old_linkable
                 | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
                 -> return $ UpToDateItem old_linkable
-              _ -> UpToDateItem <$> findObjectLinkable this_mod obj_fn obj_date
+              _ -> do
+                file <- OsPath.decodeFS obj_fn
+                UpToDateItem <$> findObjectLinkable this_mod file obj_date
       _ -> return $ outOfDateItemBecause MissingObjectFile Nothing
 
 -- | Check to see if we can reuse the old linkable, by this point we will
@@ -1202,12 +1206,13 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
         write_iface dflags' iface =
           let !iface_name = if dynamicNow dflags' then ml_dyn_hi_file mod_location else ml_hi_file mod_location
               profile     = targetProfile dflags'
-          in
-          {-# SCC "writeIface" #-}
-          withTiming logger
-              (text "WriteIface"<+>brackets (text iface_name))
-              (const ())
-              (writeIface logger profile iface_name iface)
+          in do
+            path <- OsPath.decodeFS iface_name
+            {-# SCC "writeIface" #-}
+              withTiming logger
+                  (text "WriteIface"<+>brackets (text path))
+                  (const ())
+                  (writeIface logger profile path iface)
 
     if (write_interface || force_write_interface) then do
 
@@ -1262,8 +1267,9 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           -- existence just in case, so that we don't accidentally create empty
           -- .hie files.
           let hie_file = ml_hie_file mod_location
-          whenM (doesFileExist hie_file) $
-            GHC.Utils.Touch.touch hie_file
+          whenM (OsPath.doesFileExist hie_file) $ do
+            path <- OsPath.decodeFS hie_file
+            GHC.Utils.Touch.touch path
     else
         -- See Note [Strictness in ModIface]
         forceModIface iface

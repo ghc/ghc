@@ -223,10 +223,10 @@ processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
 processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
-  = do  { let extra_suffixes = depSuffixes dflags
+  = do  { obj_file <- msObjFilePath node
+        ; let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
-              obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
               do_imp loc is_boot pkg_qual imp_mod
@@ -251,8 +251,8 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
           -- add dependency between objects and their corresponding .hi-boot
           -- files if the module has a corresponding .hs-boot file (#14482)
         ; when (isBootSummary node == IsBoot) $ do
-            let hi_boot = msHiFilePath node
-            let obj     = removeBootSuffix (msObjFilePath node)
+            hi_boot <- msHiFilePath node
+            let obj = removeBootSuffix obj_file
             forM_ extra_suffixes $ \suff -> do
                let way_obj     = insertSuffixes obj     [suff]
                let way_hi_boot = insertSuffixes hi_boot [suff]
@@ -297,7 +297,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
         | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+        -> do
+          hi_file <- mlHiFilePath loc
+          return (Just (addBootSuffix_maybe is_boot hi_file))
 
         -- Not in this package: we don't need a dependency
         | otherwise

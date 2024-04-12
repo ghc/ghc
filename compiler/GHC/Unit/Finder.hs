@@ -60,19 +60,22 @@ import GHC.Linker.Types
 import GHC.Types.PkgQual
 
 import GHC.Fingerprint
-import Data.IORef
-import System.Directory
-import System.FilePath
-import Control.Monad
-import Data.Time
-import qualified Data.Map as M
 import GHC.Driver.Env
     ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env) )
 import GHC.Driver.Config.Finder
+
+import Control.Monad
+import Data.IORef
+import qualified Data.Map as M
 import qualified Data.Set as Set
+import Data.Time
+import Data.Traversable (for)
+import System.FilePath
+import qualified System.Directory.OsPath as OsPath
+import System.OsPath (OsPath)
+import qualified System.OsPath as OsPath
 
 type FileExt = String   -- Filename extension
-type BaseName = String  -- Basename of file
 
 -- -----------------------------------------------------------------------------
 -- The Finder
@@ -390,7 +393,6 @@ findHomePackageModule fc fopts  home_unit mod_name = do
         fr_suggestions = []
       }
 
-
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
 -- as a building block for the following operations:
@@ -408,55 +410,56 @@ findHomePackageModule fc fopts  home_unit mod_name = do
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
 findInstalledHomeModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule fc fopts home_unit mod_name = do
-  homeSearchCache fc home_unit mod_name $
-   let
-     maybe_working_dir = finder_workingDirectory fopts
-     home_path = case maybe_working_dir of
-                  Nothing -> finder_importPaths fopts
-                  Just fp -> augmentImports fp (finder_importPaths fopts)
-     hi_dir_path =
-      case finder_hiDir fopts of
-        Just hiDir -> case maybe_working_dir of
-                        Nothing -> [hiDir]
-                        Just fp -> [fp </> hiDir]
+findInstalledHomeModule fc fopts home_unit mod_name =
+  homeSearchCache fc home_unit mod_name $ do
+    maybe_working_dir <- traverse OsPath.encodeFS (finder_workingDirectory fopts)
+    import_paths <- traverse OsPath.encodeFS (finder_importPaths fopts)
+    let
+      home_path = case maybe_working_dir of
+                   Nothing -> import_paths
+                   Just fp -> augmentImports fp import_paths
+    hiDir <- traverse OsPath.encodeFS (finder_hiDir fopts)
+    hisuf <- OsPath.encodeFS (finder_hiSuf fopts)
+    let
+      hi_dir_path = case hiDir of
+        Just hd -> case maybe_working_dir of
+                        Nothing -> [hd]
+                        Just fp -> [fp OsPath.</> hd]
         Nothing -> home_path
-     hisuf = finder_hiSuf fopts
-     mod = mkModule home_unit mod_name
 
-     source_exts =
-      [ ("hs",    mkHomeModLocationSearched fopts mod_name "hs")
-      , ("lhs",   mkHomeModLocationSearched fopts mod_name "lhs")
-      , ("hsig",  mkHomeModLocationSearched fopts mod_name "hsig")
-      , ("lhsig", mkHomeModLocationSearched fopts mod_name "lhsig")
-      ]
+    source_exts <- for ["hs", "lhs", "hsig", "lhsig"] $ \ ext -> do
+      ext' <- OsPath.encodeFS ext
+      pure (ext', mkHomeModLocationSearched fopts mod_name ext)
 
-     -- we use mkHomeModHiOnlyLocation instead of mkHiOnlyModLocation so that
-     -- when hiDir field is set in dflags, we know to look there (see #16500)
-     hi_exts = [ (hisuf,                mkHomeModHiOnlyLocation fopts mod_name)
-               , (addBootSuffix hisuf,  mkHomeModHiOnlyLocation fopts mod_name)
-               ]
+    let
+      mod = mkModule home_unit mod_name
 
-        -- In compilation manager modes, we look for source files in the home
-        -- package because we can compile these automatically.  In one-shot
-        -- compilation mode we look for .hi and .hi-boot files only.
-     (search_dirs, exts)
-          | finder_lookupHomeInterfaces fopts = (hi_dir_path, hi_exts)
-          | otherwise                         = (home_path, source_exts)
-   in
+      -- we use mkHomeModHiOnlyLocation instead of mkHiOnlyModLocation so that
+      -- when hiDir field is set in dflags, we know to look there (see #16500)
+      hi_exts =
+        [ (hisuf,                     mkHomeModHiOnlyLocation fopts mod_name)
+        , (addBootSuffixOsPath hisuf, mkHomeModHiOnlyLocation fopts mod_name)
+        ]
 
-   -- special case for GHC.Prim; we won't find it in the filesystem.
-   -- This is important only when compiling the base package (where GHC.Prim
-   -- is a home module).
-   if mod `installedModuleEq` gHC_PRIM
-         then return (InstalledFound (error "GHC.Prim ModLocation") mod)
-         else searchPathExts search_dirs mod exts
+         -- In compilation manager modes, we look for source files in the home
+         -- package because we can compile these automatically.  In one-shot
+         -- compilation mode we look for .hi and .hi-boot files only.
+      (search_dirs, exts)
+           | finder_lookupHomeInterfaces fopts = (hi_dir_path, hi_exts)
+           | otherwise                         = (home_path, source_exts)
+
+    -- special case for GHC.Prim; we won't find it in the filesystem.
+    -- This is important only when compiling the base package (where GHC.Prim
+    -- is a home module).
+    if mod `installedModuleEq` gHC_PRIM
+          then return (InstalledFound (error "GHC.Prim ModLocation") mod)
+          else searchPathExts search_dirs mod exts
 
 -- | Prepend the working directory to the search path.
-augmentImports :: FilePath -> [FilePath] -> [FilePath]
+augmentImports :: OsPath -> [OsPath] -> [OsPath]
 augmentImports _work_dir [] = []
-augmentImports work_dir (fp:fps) | isAbsolute fp = fp : augmentImports work_dir fps
-                                 | otherwise     = (work_dir </> fp) : augmentImports work_dir fps
+augmentImports work_dir (fp:fps) | OsPath.isAbsolute fp = fp : augmentImports work_dir fps
+                                 | otherwise     = (work_dir OsPath.</> fp) : augmentImports work_dir fps
 
 -- | Search for a module in external packages only.
 findPackageModule :: FinderCache -> UnitState -> FinderOpts -> InstalledModule -> IO InstalledFindResult
@@ -482,70 +485,75 @@ findPackageModule_ fc fopts mod pkg_conf = do
     -- special case for GHC.Prim; we won't find it in the filesystem.
     if mod `installedModuleEq` gHC_PRIM
           then return (InstalledFound (error "GHC.Prim ModLocation") mod)
-          else
+          else do
 
     let
        tag = waysBuildTag (finder_ways fopts)
 
              -- hi-suffix for packages depends on the build tag.
-       package_hisuf | null tag  = "hi"
-                     | otherwise = tag ++ "_hi"
-
-       package_dynhisuf = waysBuildTag (addWay WayDyn (finder_ways fopts)) ++ "_hi"
+    package_hisuf <- OsPath.encodeFS $ if null tag then "hi" else tag ++ "_hi"
+    package_dynhisuf <- OsPath.encodeFS $
+      waysBuildTag (addWay WayDyn (finder_ways fopts)) ++ "_hi"
+    let
 
        mk_hi_loc = mkHiOnlyModLocation fopts package_hisuf package_dynhisuf
-
-       import_dirs = map ST.unpack $ unitImportDirs pkg_conf
         -- we never look for a .hi-boot file in an external package;
         -- .hi-boot files only make sense for the home package.
-    in
+    import_dirs <- traverse (OsPath.encodeFS . ST.unpack) $ unitImportDirs pkg_conf
     case import_dirs of
-      [one] | finder_bypassHiFileCheck fopts ->
+      [one] | finder_bypassHiFileCheck fopts -> do
             -- there's only one place that this .hi file can be, so
             -- don't bother looking for it.
-            let basename = moduleNameSlashes (moduleName mod)
-                loc = mk_hi_loc one basename
-            in return $ InstalledFound loc mod
+            basename <- OsPath.encodeFS (moduleNameSlashes (moduleName mod))
+            loc <- mk_hi_loc one basename
+            return $ InstalledFound loc mod
       _otherwise ->
             searchPathExts import_dirs mod [(package_hisuf, mk_hi_loc)]
 
 -- -----------------------------------------------------------------------------
 -- General path searching
 
-searchPathExts :: [FilePath]      -- paths to search
+searchPathExts :: [OsPath]      -- paths to search
                -> InstalledModule -- module name
                -> [ (
-                     FileExt,                             -- suffix
-                     FilePath -> BaseName -> ModLocation  -- action
+                     OsPath,                             -- suffix
+                     OsPath -> OsPath -> IO ModLocation  -- action
                     )
                   ]
                -> IO InstalledFindResult
 
-searchPathExts paths mod exts = search to_search
-  where
-    basename = moduleNameSlashes (moduleName mod)
-
-    to_search :: [(FilePath, ModLocation)]
+searchPathExts paths mod exts = do
+  basename <- OsPath.encodeFS (moduleNameSlashes (moduleName mod))
+  dot <- OsPath.encodeFS "."
+  let
+    to_search :: [(OsPath, IO ModLocation)]
     to_search = [ (file, fn path basename)
                 | path <- paths,
                   (ext,fn) <- exts,
-                  let base | path == "." = basename
-                           | otherwise   = path </> basename
-                      file = base <.> ext
+                  let base | path == dot = basename
+                           | otherwise = path OsPath.</> basename
+                      file = base OsPath.<.> ext
                 ]
 
-    search [] = return (InstalledNotFound (map fst to_search) (Just (moduleUnit mod)))
+    search [] = do
+      fps <- traverse (OsPath.decodeFS . fst) to_search
+      return (InstalledNotFound fps (Just (moduleUnit mod)))
 
-    search ((file, loc) : rest) = do
-      b <- doesFileExist file
+    search ((file, getLoc) : rest) = do
+      b <- OsPath.doesFileExist file
       if b
-        then return $ InstalledFound loc mod
+        then do
+          loc <- getLoc
+          return $ InstalledFound loc mod
         else search rest
 
+  search to_search
+  where
+
 mkHomeModLocationSearched :: FinderOpts -> ModuleName -> FileExt
-                          -> FilePath -> BaseName -> ModLocation
-mkHomeModLocationSearched fopts mod suff path basename =
-  mkHomeModLocation2 fopts mod (path </> basename) suff
+                          -> OsPath -> OsPath -> IO ModLocation
+mkHomeModLocationSearched fopts mod ext path basename = do
+  mkHomeModLocationOsPath fopts mod (path OsPath.</> basename) ext
 
 
 -- -----------------------------------------------------------------------------
@@ -581,7 +589,7 @@ mkHomeModLocationSearched fopts mod suff path basename =
 -- ext
 --      The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation :: FinderOpts -> ModuleName -> FilePath -> ModLocation
+mkHomeModLocation :: FinderOpts -> ModuleName -> FilePath -> IO ModLocation
 mkHomeModLocation dflags mod src_filename =
    let (basename,extension) = splitExtension src_filename
    in mkHomeModLocation2 dflags mod basename extension
@@ -590,129 +598,108 @@ mkHomeModLocation2 :: FinderOpts
                    -> ModuleName
                    -> FilePath  -- Of source module, without suffix
                    -> String    -- Suffix
-                   -> ModLocation
-mkHomeModLocation2 fopts mod src_basename ext =
-   let mod_basename = moduleNameSlashes mod
+                   -> IO ModLocation
+mkHomeModLocation2 fopts mod src_basename ext = do
+  src_basename_os <- OsPath.encodeFS src_basename
+  mkHomeModLocationOsPath fopts mod src_basename_os ext
 
-       obj_fn = mkObjPath  fopts src_basename mod_basename
-       dyn_obj_fn = mkDynObjPath  fopts src_basename mod_basename
-       hi_fn  = mkHiPath   fopts src_basename mod_basename
-       dyn_hi_fn  = mkDynHiPath   fopts src_basename mod_basename
-       hie_fn = mkHiePath  fopts src_basename mod_basename
-
-   in (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
-                        ml_hi_file   = hi_fn,
-                        ml_dyn_hi_file = dyn_hi_fn,
-                        ml_obj_file  = obj_fn,
-                        ml_dyn_obj_file = dyn_obj_fn,
-                        ml_hie_file  = hie_fn })
+mkHomeModLocationOsPath :: FinderOpts
+                        -> ModuleName
+                        -> OsPath  -- Of source module, without suffix
+                        -> FileExt
+                        -> IO ModLocation
+mkHomeModLocationOsPath fopts mod src_basename ext = do
+  mod_basename <- OsPath.encodeFS (moduleNameSlashes mod)
+  obj_fn <- mkObjPath fopts src_basename mod_basename
+  dyn_obj_fn <- mkDynObjPath fopts src_basename mod_basename
+  hi_fn  <- mkHiPath fopts src_basename mod_basename
+  dyn_hi_fn  <- mkDynHiPath fopts src_basename mod_basename
+  hie_fn <- mkHiePath fopts src_basename mod_basename
+  original <- OsPath.decodeFS src_basename
+  pure ModLocation {
+    ml_hs_file = Just (original <.> ext),
+    ml_hi_file = hi_fn,
+    ml_dyn_hi_file = dyn_hi_fn,
+    ml_obj_file = obj_fn,
+    ml_dyn_obj_file = dyn_obj_fn,
+    ml_hie_file = hie_fn
+  }
 
 mkHomeModHiOnlyLocation :: FinderOpts
                         -> ModuleName
-                        -> FilePath
-                        -> BaseName
-                        -> ModLocation
-mkHomeModHiOnlyLocation fopts mod path basename =
-   let loc = mkHomeModLocation2 fopts mod (path </> basename) ""
-   in loc { ml_hs_file = Nothing }
+                        -> OsPath
+                        -> OsPath
+                        -> IO ModLocation
+mkHomeModHiOnlyLocation fopts mod path basename = do
+  loc <- mkHomeModLocationOsPath fopts mod (path OsPath.</> basename) ""
+  pure loc { ml_hs_file = Nothing }
 
 -- This function is used to make a ModLocation for a package module. Hence why
 -- we explicitly pass in the interface file suffixes.
-mkHiOnlyModLocation :: FinderOpts -> Suffix -> Suffix -> FilePath -> String
-                    -> ModLocation
-mkHiOnlyModLocation fopts hisuf dynhisuf path basename
- = let full_basename = path </> basename
-       obj_fn = mkObjPath fopts full_basename basename
-       dyn_obj_fn = mkDynObjPath fopts full_basename basename
-       hie_fn = mkHiePath fopts full_basename basename
-   in ModLocation{    ml_hs_file   = Nothing,
-                             ml_hi_file   = full_basename <.> hisuf,
-                                -- Remove the .hi-boot suffix from
-                                -- hi_file, if it had one.  We always
-                                -- want the name of the real .hi file
-                                -- in the ml_hi_file field.
-                             ml_dyn_obj_file = dyn_obj_fn,
-                             -- MP: TODO
-                             ml_dyn_hi_file  = full_basename <.> dynhisuf,
-                             ml_obj_file  = obj_fn,
-                             ml_hie_file  = hie_fn
-                  }
+mkHiOnlyModLocation :: FinderOpts -> OsPath -> OsPath -> OsPath -> OsPath
+                    -> IO ModLocation
+mkHiOnlyModLocation fopts hisuf dynhisuf path basename = do
+  let full_basename = path OsPath.</> basename
+  obj_fn <- mkObjPath fopts full_basename basename
+  dyn_obj_fn <- mkDynObjPath fopts full_basename basename
+  hie_fn <- mkHiePath fopts full_basename basename
+  pure ModLocation {
+    ml_hs_file = Nothing,
+    ml_hi_file = full_basename OsPath.<.> hisuf,
+    -- Remove the .hi-boot suffix from
+    -- hi_file, if it had one.  We always
+    -- want the name of the real .hi file
+    -- in the ml_hi_file field.
+    ml_dyn_obj_file = dyn_obj_fn,
+    -- MP: TODO
+    ml_dyn_hi_file = full_basename OsPath.<.> dynhisuf,
+    ml_obj_file = obj_fn,
+    ml_hie_file = hie_fn
+  }
+
+mk_path
+  :: (FinderOpts -> Maybe FilePath)
+  -> (FinderOpts -> FilePath)
+  -> FinderOpts
+  -> OsPath -- the filename of the source file, minus the extension
+  -> OsPath -- the module name with dots replaced by slashes
+  -> IO OsPath
+mk_path get_suf_dir get_suf fopts basename mod_basename = do
+  suf <- OsPath.encodeFS (get_suf fopts)
+  suf_dir <- traverse OsPath.encodeFS (get_suf_dir fopts)
+  let
+    obj_basename
+      | Just dir <- suf_dir
+      = dir OsPath.</> mod_basename
+      | otherwise
+      = basename
+  pure (obj_basename OsPath.<.> suf)
 
 -- | Constructs the filename of a .o file for a given source file.
 -- Does /not/ check whether the .o file exists
-mkObjPath
-  :: FinderOpts
-  -> FilePath           -- the filename of the source file, minus the extension
-  -> String             -- the module name with dots replaced by slashes
-  -> FilePath
-mkObjPath fopts basename mod_basename = obj_basename <.> osuf
-  where
-                odir = finder_objectDir fopts
-                osuf = finder_objectSuf fopts
-
-                obj_basename | Just dir <- odir = dir </> mod_basename
-                             | otherwise        = basename
+mkObjPath :: FinderOpts -> OsPath -> OsPath -> IO OsPath
+mkObjPath = mk_path finder_objectDir finder_objectSuf
 
 -- | Constructs the filename of a .dyn_o file for a given source file.
 -- Does /not/ check whether the .dyn_o file exists
-mkDynObjPath
-  :: FinderOpts
-  -> FilePath           -- the filename of the source file, minus the extension
-  -> String             -- the module name with dots replaced by slashes
-  -> FilePath
-mkDynObjPath fopts basename mod_basename = obj_basename <.> dynosuf
-  where
-                odir = finder_objectDir fopts
-                dynosuf = finder_dynObjectSuf fopts
-
-                obj_basename | Just dir <- odir = dir </> mod_basename
-                             | otherwise        = basename
+mkDynObjPath :: FinderOpts -> OsPath -> OsPath -> IO OsPath
+mkDynObjPath = mk_path finder_objectDir finder_dynObjectSuf
 
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
-mkHiPath
-  :: FinderOpts
-  -> FilePath           -- the filename of the source file, minus the extension
-  -> String             -- the module name with dots replaced by slashes
-  -> FilePath
-mkHiPath fopts basename mod_basename = hi_basename <.> hisuf
- where
-                hidir = finder_hiDir fopts
-                hisuf = finder_hiSuf fopts
-
-                hi_basename | Just dir <- hidir = dir </> mod_basename
-                            | otherwise         = basename
+mkHiPath :: FinderOpts -> OsPath -> OsPath -> IO OsPath
+mkHiPath = mk_path finder_hiDir finder_hiSuf
 
 -- | Constructs the filename of a .dyn_hi file for a given source file.
 -- Does /not/ check whether the .dyn_hi file exists
-mkDynHiPath
-  :: FinderOpts
-  -> FilePath           -- the filename of the source file, minus the extension
-  -> String             -- the module name with dots replaced by slashes
-  -> FilePath
-mkDynHiPath fopts basename mod_basename = hi_basename <.> dynhisuf
- where
-                hidir = finder_hiDir fopts
-                dynhisuf = finder_dynHiSuf fopts
-
-                hi_basename | Just dir <- hidir = dir </> mod_basename
-                            | otherwise         = basename
+mkDynHiPath :: FinderOpts -> OsPath -> OsPath -> IO OsPath
+mkDynHiPath = mk_path finder_hiDir finder_dynHiSuf
 
 -- | Constructs the filename of a .hie file for a given source file.
 -- Does /not/ check whether the .hie file exists
-mkHiePath
-  :: FinderOpts
-  -> FilePath           -- the filename of the source file, minus the extension
-  -> String             -- the module name with dots replaced by slashes
-  -> FilePath
-mkHiePath fopts basename mod_basename = hie_basename <.> hiesuf
- where
-                hiedir = finder_hieDir fopts
-                hiesuf = finder_hieSuf fopts
-
-                hie_basename | Just dir <- hiedir = dir </> mod_basename
-                             | otherwise          = basename
+mkHiePath :: FinderOpts -> OsPath -> OsPath -> IO OsPath
+mkHiePath = mk_path finder_hieDir finder_hieSuf
 
 
 
@@ -750,11 +737,13 @@ mkStubPaths fopts mod location
 
 findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
 findObjectLinkableMaybe mod locn
-   = do let obj_fn = ml_obj_file locn
-        maybe_obj_time <- modificationTimeIfExists obj_fn
+   = do let obj_op = ml_obj_file locn
+        maybe_obj_time <- modificationTimeIfExists obj_op
         case maybe_obj_time of
           Nothing -> return Nothing
-          Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)
+          Just obj_time -> do
+            obj_fn <- OsPath.decodeFS obj_op
+            liftM Just (findObjectLinkable mod obj_fn obj_time)
 
 -- Make an object linkable when we know the object file exists, and we know
 -- its modification time.

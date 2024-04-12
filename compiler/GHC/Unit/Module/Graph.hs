@@ -284,8 +284,8 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
     op       = normalise
     mod_str  = moduleNameString (moduleName (ms_mod mod_summary)) ++
                hscSourceString (ms_hsc_src mod_summary)
-    dyn_file = op $ msDynObjFilePath mod_summary
-    obj_file = op $ msObjFilePath mod_summary
+    dyn_file = op $ msDynObjFilePathLenient mod_summary
+    obj_file = op $ msObjFilePathLenient mod_summary
     files    = [ obj_file ]
                ++ [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
                ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]

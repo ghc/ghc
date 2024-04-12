@@ -287,7 +287,7 @@ check_old_iface hsc_env mod_summary maybe_iface
                     trace_if logger (text "We already have the old interface for" <+>
                       ppr (ms_mod mod_summary))
                     return maybe_iface
-                Nothing -> loadIface dflags (msHiFilePath mod_summary)
+                Nothing -> loadIface dflags =<< liftIO (msHiFilePath mod_summary)
 
         loadIface read_dflags iface_path = do
              let ncu        = hsc_NC hsc_env
@@ -312,7 +312,8 @@ check_old_iface hsc_env mod_summary maybe_iface
           res <- recomp_check
           case res of
             UpToDateItem _ -> do
-              maybe_dyn_iface <- liftIO $ loadIface (setDynamicNow dflags) (msDynHiFilePath mod_summary)
+              path <- liftIO $ msDynHiFilePath mod_summary
+              maybe_dyn_iface <- liftIO $ loadIface (setDynamicNow dflags) path
               case maybe_dyn_iface of
                 Nothing -> return $ outOfDateItemBecause MissingDynHiFile Nothing
                 Just dyn_iface | mi_iface_hash (mi_final_exts dyn_iface)

@@ -351,8 +351,8 @@ hiModuleNameMismatchWarn requested_mod read_mod
 dynamicHashMismatchError :: Module -> ModLocation -> SDoc
 dynamicHashMismatchError wanted_mod loc  =
   vcat [ text "Dynamic hash doesn't match for" <+> quotes (ppr wanted_mod)
-       , text "Normal interface file from"  <+> text (ml_hi_file loc)
-       , text "Dynamic interface file from" <+> text (ml_dyn_hi_file loc)
+       , text "Normal interface file from"  <+> text (mlHiFilePathLenient loc)
+       , text "Dynamic interface file from" <+> text (mlDynHiFilePathLenient loc)
        , text "You probably need to recompile" <+> quotes (ppr wanted_mod) ]
 
 homeModError :: InstalledModule -> ModLocation -> SDoc

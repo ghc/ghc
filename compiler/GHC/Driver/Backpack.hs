@@ -771,7 +771,7 @@ summariseRequirement pn mod_name = do
     let fopts = initFinderOpts dflags
 
     let PackageName pn_fs = pn
-    let location = mkHomeModLocation2 fopts mod_name
+    location <- liftIO $ mkHomeModLocation2 fopts mod_name
                     (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
 
     env <- getBkpEnv
@@ -854,7 +854,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- To add insult to injury, we don't even actually use
     -- these filenames to figure out where the hi files go.
     -- A travesty!
-    let location0 = mkHomeModLocation2 fopts modname
+    location0 <- liftIO $ mkHomeModLocation2 fopts modname
                              (unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of

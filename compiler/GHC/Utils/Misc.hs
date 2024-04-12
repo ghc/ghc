@@ -134,6 +134,8 @@ import Control.Monad.IO.Class ( MonadIO, liftIO )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime, renameFile )
 import System.FilePath
+import System.OsPath (OsPath)
+import qualified System.Directory.OsPath as OsPath
 
 import Data.Bifunctor   ( first, second )
 import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpper
@@ -1230,9 +1232,9 @@ getModificationUTCTime = getModificationTime
 -- --------------------------------------------------------------
 -- check existence & modification time at the same time
 
-modificationTimeIfExists :: FilePath -> IO (Maybe UTCTime)
+modificationTimeIfExists :: OsPath -> IO (Maybe UTCTime)
 modificationTimeIfExists f =
-  (do t <- getModificationUTCTime f; return (Just t))
+  (do t <- OsPath.getModificationTime f; return (Just t))
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing
                         else ioError e

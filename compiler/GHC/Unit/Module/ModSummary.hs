@@ -17,6 +17,12 @@ module GHC.Unit.Module.ModSummary
    , msHsFilePath
    , msObjFilePath
    , msDynObjFilePath
+   , msHieFilePath
+   , msHiFilePathLenient
+   , msDynHiFilePathLenient
+   , msObjFilePathLenient
+   , msDynObjFilePathLenient
+   , msHieFilePathLenient
    , msDeps
    , isBootSummary
    , findTarget
@@ -139,12 +145,24 @@ ms_home_imps = home_imps . ms_imps
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_hash and imports can, of course, change
 
-msHsFilePath, msDynHiFilePath, msHiFilePath, msObjFilePath, msDynObjFilePath :: ModSummary -> FilePath
-msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
-msHiFilePath  ms = ml_hi_file  (ms_location ms)
-msDynHiFilePath ms = ml_dyn_hi_file (ms_location ms)
-msObjFilePath ms = ml_obj_file (ms_location ms)
-msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
+msHsFilePath :: ModSummary -> FilePath
+msHsFilePath ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+
+msHiFilePath, msDynHiFilePath, msObjFilePath, msDynObjFilePath,
+  msHieFilePath :: ModSummary -> IO FilePath
+msHiFilePath ms = mlHiFilePath (ms_location ms)
+msDynHiFilePath ms = mlDynHiFilePath (ms_location ms)
+msObjFilePath ms = mlObjFilePath (ms_location ms)
+msDynObjFilePath ms = mlDynObjFilePath (ms_location ms)
+msHieFilePath ms = mlHieFilePath (ms_location ms)
+
+msHiFilePathLenient, msDynHiFilePathLenient, msObjFilePathLenient,
+  msDynObjFilePathLenient, msHieFilePathLenient :: ModSummary -> FilePath
+msHiFilePathLenient ms = mlHiFilePathLenient (ms_location ms)
+msDynHiFilePathLenient ms = mlDynHiFilePathLenient (ms_location ms)
+msObjFilePathLenient ms = mlObjFilePathLenient (ms_location ms)
+msDynObjFilePathLenient ms = mlDynObjFilePathLenient (ms_location ms)
+msHieFilePathLenient ms = mlHieFilePathLenient (ms_location ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
 isBootSummary :: ModSummary -> IsBootInterface
