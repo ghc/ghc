@@ -2078,6 +2078,81 @@ preceded by `type`, with the following restrictions:
 
 (R5) There are no deriving clauses.
 
+The data constructors of a `type data` declaration obey the following
+Core invariant:
+
+(I1) The data constructors of a `type data` declaration may be mentioned in
+     /types/, but never in /terms/ or the /pattern of a case alternative/.
+
+Wrinkles:
+
+(W0) Wrappers.  The data constructor of a `type data` declaration has a worker
+     (like every data constructor) but does /not/ have a wrapper.  Wrappers
+     only make sense for value-level data constructors. Indeed, the worker Id
+     is never used (invariant (I1)), so it barely makes sense to talk about
+     the worker. A `type data` constructor only shows up in types, where it
+     appears as a TyCon, specifically a PromotedDataCon -- no Id in sight.
+     See #24620 for an example of what happens if you accidentally include
+     a wrapper.
+
+     See `wrapped_reqd` in GHC.Types.Id.Make.mkDataConRep` for the place where
+     this check is implemented.
+
+     This specifically includes `type data` declarations implemented as GADTs,
+     such as this example from #22948:
+
+        type data T a where
+          A :: T Int
+          B :: T a
+
+     If `T` were an ordinary `data` declaration, then `A` would have a wrapper
+     to account for the GADT-like equality in its return type. Because `T` is
+     declared as a `type data` declaration, however, the wrapper is omitted.
+
+(W1) To prevent users from conjuring up `type data` values at the term level,
+     we disallow using the tagToEnum# function on a type headed by a `type
+     data` type. For instance, GHC will reject this code:
+
+       type data Letter = A | B | C
+
+       f :: Letter
+       f = tagToEnum# 0#
+
+     See `GHC.Tc.Gen.App.checkTagToEnum`, specifically `check_enumeration`.
+
+(W2) Although `type data` data constructors do not exist at the value level,
+     it is still possible to match on a value whose type is headed by a `type data`
+     type constructor, such as this example from #22964:
+
+       type data T a where
+         A :: T Int
+         B :: T a
+
+       f :: T a -> ()
+       f x = case x of {}
+
+     And yet we must guarantee invariant (I1). This has three consequences:
+
+     (W2a) During checking the coverage of `f`'s pattern matches, we treat `T`
+           as if it were an empty data type so that GHC does not warn the user
+           to match against `A` or `B`. (Otherwise, you end up with the bug
+           reported in #22964.)  See GHC.HsToCore.Pmc.Solver.vanillaCompleteMatchTC.
+
+     (W2b) In `GHC.Core.Utils.refineDataAlt`, do /not/ fill in the DEFAULT case
+           with the data constructor, else (I1) is violated. See GHC.Core.Utils
+           Note [Refine DEFAULT case alternatives] Exception 2
+
+     (W2c) In `GHC.Core.Opt.ConstantFold.caseRules`, we do not want to transform
+              case dataToTagLarge# x of t -> blah
+           into
+              case x of { A -> ...; B -> .. }
+           because again that conjures up the type-level-only data constructors
+           `A` and `B` in a pattern, violating (I1) (#23023).
+           So we check for "type data" TyCons before applying this
+           transformation.  (In practice, this doesn't matter because
+           we also refuse to solve DataToTag instances at types
+           corresponding to type data declarations.
+
 The main parts of the implementation are:
 
 * (R0): The parser recognizes `type data` (but not `type newtype`).

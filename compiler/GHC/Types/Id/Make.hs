@@ -788,15 +788,25 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     -- needs a wrapper. This wrapper is injected into the program later in the
     -- CoreTidy pass. See Note [Injecting implicit bindings] in GHC.Iface.Tidy,
     -- along with the accompanying implementation in getTyConImplicitBinds.
-    wrapper_reqd =
-        (not new_tycon
+    wrapper_reqd
+      | isTypeDataTyCon tycon
+        -- `type data` declarations never have data-constructor wrappers
+        -- Their data constructors only live at the type level, in the
+        -- form of PromotedDataCon, and therefore do not need wrappers.
+        -- See wrinkle (W0) in Note [Type data declarations] in GHC.Rename.Module.
+      = False
+
+      | otherwise
+      = (not new_tycon
                      -- (Most) newtypes have only a worker, with the exception
                      -- of some newtypes written with GADT syntax.
                      -- See dataConUserTyVarsNeedWrapper below.
          && (any isBanged (ev_ibangs ++ arg_ibangs)))
                      -- Some forcing/unboxing (includes eq_spec)
+
       || isFamInstTyCon tycon -- Cast result
-      || (dataConUserTyVarsNeedWrapper data_con
+
+      || dataConUserTyVarsNeedWrapper data_con
                      -- If the data type was written with GADT syntax and
                      -- orders the type variables differently from what the
                      -- worker expects, it needs a data con wrapper to reorder
@@ -805,19 +815,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                      --
                      -- NB: All GADTs return true from this function, but there
                      -- is one exception that we must check below.
-         && not (isTypeDataTyCon tycon))
-                     -- An exception to this rule is `type data` declarations.
-                     -- Their data constructors only live at the type level and
-                     -- therefore do not need wrappers.
-                     -- See Note [Type data declarations] in GHC.Rename.Module.
-                     --
-                     -- Note that the other checks in this definition will
-                     -- return False for `type data` declarations, as:
-                     --
-                     -- - They cannot be newtypes
-                     -- - They cannot have strict fields
-                     -- - They cannot be data family instances
-                     -- - They cannot have datatype contexts
+
       || not (null stupid_theta)
                      -- If the data constructor has a datatype context,
                      -- we need a wrapper in order to drop the stupid arguments.
