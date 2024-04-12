@@ -5,11 +5,17 @@ There are problems in package testpkg-2.0:
   import-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
   library-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
   include-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
-  cannot find any of ["A.hi","A.p_hi","A.dyn_hi"]
-  cannot find any of ["B.hi","B.p_hi","B.dyn_hi"]
-  cannot find any of ["C/D.hi","C/D.p_hi","C/D.dyn_hi"]
-  cannot find any of ["C/E.hi","C/E.p_hi","C/E.dyn_hi"]
-  cannot find any of ["libtestpkg-2.0-XXX.a","libtestpkg-2.0-XXX_p.a","libtestpkg-2.0-XXX-ghc7.11.20150825.so","libtestpkg-2.0-XXX-ghc7.11.20150825.dylib","testpkg-2.0-XXX-ghc7.11.20150825.dll"] on library path
+  cannot find any of ["A.hi","A.p_hi","A.dyn_hi","A.p_dyn_hi"]
+  cannot find any of ["B.hi","B.p_hi","B.dyn_hi","B.p_dyn_hi"]
+  cannot find any of ["C/D.hi","C/D.p_hi","C/D.dyn_hi","C/D.p_dyn_hi"]
+  cannot find any of ["C/E.hi","C/E.p_hi","C/E.dyn_hi","C/E.p_dyn_hi"]
+  cannot find any of ["libtestpkg-2.0-XXX.a","libtestpkg-2.0-XXX_p.a","libtestpkg-2.0-XXX-ghc9.11.20240612.so","libtestpkg-2.0-XXX_p-ghc9.11.20240612.so","libtestpkg-2.0-XXX-ghc9.11.20240612.dylib","libtestpkg-2.0-XXX_p-ghc9.11.20240612.dylib","testpkg-2.0-XXX-ghc9.11.20240612.dll","testpkg-2.0-XXX_p-ghc9.11.20240612.dll"] on library path
+Warning: library-dirs: /nix/store/04px0zqwp0f0r62k5vanhmbmgd42aym3-elfutils-0.189-bin/lib doesn't exist or isn't a directory
+Warning: dynamic-library-dirs: /nix/store/04px0zqwp0f0r62k5vanhmbmgd42aym3-elfutils-0.189-bin/lib doesn't exist or isn't a directory
+Warning: include-dirs: /nix/store/04px0zqwp0f0r62k5vanhmbmgd42aym3-elfutils-0.189-bin/include doesn't exist or isn't a directory
+Warning: haddock-interfaces: /home/matt/ghc-prof-dyn/_build/stage1/lib/../../doc/html/libraries/rts-1.0.2/rts.haddock doesn't exist or isn't a file
+Warning: haddock-html: /home/matt/ghc-prof-dyn/_build/stage1/lib/../../doc/html/libraries/rts-1.0.2 doesn't exist or isn't a directory
+Warning: include-dirs: /home/matt/ghc-prof-dyn/_build/stage1/lib/../lib/x86_64-linux-ghc-9.11.20240612/directory-1.3.8.4-inplace/include doesn't exist or isn't a directory
 
 The following packages are broken, either because they have a problem
 listed above, or because they depend on a broken package.

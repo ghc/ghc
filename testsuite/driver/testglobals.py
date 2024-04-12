@@ -127,6 +127,9 @@ class TestConfig:
         # Do we have profiling support?
         self.have_profiling = False
 
+        # Do we have profiling dynamic support?
+        self.have_profiling_dynamic = False
+
         # Do we have interpreter support?
         self.have_interp = False
 

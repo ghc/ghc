@@ -56,8 +56,9 @@ getProgramContexts stage = do
   fmap concat . forM allPackages $ \pkg -> do
     -- the iserv pkg results in three different programs at
     -- the moment, ghc-iserv (built the vanilla way),
-    -- ghc-iserv-prof (built the profiling way), and
-    -- ghc-iserv-dyn (built the dynamic way).
+    -- ghc-iserv-prof (built the profiling way),
+    -- ghc-iserv-dyn (built the dynamic way), and
+    -- ghc-iserv-prof-dyn (built the profiling+dynamic way).
     -- The testsuite requires all to be present, so we
     -- make sure that we cover these
     -- "prof-build-under-other-name" cases.
@@ -67,6 +68,7 @@ getProgramContexts stage = do
         then [ vanillaContext stage pkg
              , Context stage pkg profiling Final
              , Context stage pkg dynamic Final
+             , Context stage pkg profilingDynamic Final
              ]
         else [ ctx ]
     forM allCtxs $ \ctx -> do

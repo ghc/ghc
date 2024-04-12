@@ -2038,8 +2038,12 @@ checkHSLib _verbosity dirs lib = do
   let filenames = ["lib" ++ lib ++ ".a",
                    "lib" ++ lib ++ "_p.a",
                    "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".so",
+                   "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".so",
                    "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
-                            lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"]
+                   "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
+                   lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
+                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"
+                  ]
   b <- liftIO $ doesFileExistOnPath filenames dirs
   when (not b) $
     verror ForceFiles ("cannot find any of " ++ show filenames ++
@@ -2075,7 +2079,7 @@ checkModuleFile pkg modl =
       -- there's no interface file for GHC.Prim
       unless (modl == ModuleName.fromString "GHC.Prim") $ do
       let files = [ ModuleName.toFilePath modl <.> extension
-                  | extension <- ["hi", "p_hi", "dyn_hi" ] ]
+                  | extension <- ["hi", "p_hi", "dyn_hi", "p_dyn_hi"] ]
       b <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (not b) $
          verror ForceFiles ("cannot find any of " ++ show files)

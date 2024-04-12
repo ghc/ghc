@@ -17,8 +17,7 @@ programContext stage pkg = do
     return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
     where wayFor prof dyn
-            | prof && dyn                          =
-                error "programContext: profiling+dynamic not supported"
+            | prof && dyn                          = profilingDynamic
             | pkg == ghc && prof && notStage0 stage = profiling
             | dyn && notStage0 stage                = dynamic
             | otherwise                            = vanilla

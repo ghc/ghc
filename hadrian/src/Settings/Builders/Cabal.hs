@@ -144,6 +144,7 @@ libraryArgs = do
     let ways = Set.insert contextWay flavourWays
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways
+        hasProfilingShared = profilingDynamic `elem` ways
         hasDynamic = any (wayUnit Dynamic) ways
     pure [ if hasVanilla
            then  "--enable-library-vanilla"
@@ -151,6 +152,9 @@ libraryArgs = do
          , if hasProfiling
            then  "--enable-library-profiling"
            else "--disable-library-profiling"
+         , if hasProfilingShared
+            then "--enable-profiling-shared"
+            else "--disable-profiling-shared"
          , if ghciObjsSupported &&
               (hasVanilla || hasProfiling) &&
               package /= rts && withGhci && not dynPrograms

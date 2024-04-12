@@ -5,9 +5,10 @@
   "compiler-id": "ghc-9.10.1",
   "install-plan": [
     {
+      "build-info": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/Cabal-3.13.0.0/noopt/build-info.json",
       "component-name": "lib",
       "depends": [
-        "Cabal-syntax-3.10.3.0-16fa731ae4aaca01d3debcdc890212d2fd816f1d22f19365d4163e9edafdcd63",
+        "Cabal-syntax-3.13.0.0-inplace",
         "array-0.5.7.0-20cf",
         "base-4.20.0.0-7b2c",
         "bytestring-0.12.1.0-3a9c",
@@ -19,29 +20,25 @@
         "parsec-3.1.17.0-52f5",
         "pretty-1.1.3.6-d2be",
         "process-1.6.19.0-4783",
-        "text-2.1.1-ffc6",
         "time-1.12.2-c1d3",
         "transformers-0.6.1.1-f453",
         "unix-2.8.5.1-c70e"
       ],
+      "dist-dir": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/Cabal-3.13.0.0/noopt",
       "exe-depends": [],
       "flags": {},
-      "id": "Cabal-3.10.3.0-962eeb4d69d7702e1d9e02bf4be95e3e3c9339cd44a6f0d30ff32c10033e324a",
-      "pkg-cabal-sha256": "4a36954a66769eef90353daa0dbb07d43e49c228281383c7e4134445d495f714",
+      "id": "Cabal-3.13.0.0-inplace",
       "pkg-name": "Cabal",
       "pkg-src": {
-        "repo": {
-          "type": "secure-repo",
-          "uri": "http://hackage.haskell.org/"
-        },
-        "type": "repo-tar"
+        "path": "/home/matt/ghc-prof-dyn/hadrian/vendored/Cabal/Cabal",
+        "type": "local"
       },
-      "pkg-src-sha256": "cb7f7c66626d7555f799e786513ddd65a874fd23f1cf312990c7a48abfc0b2c6",
-      "pkg-version": "3.10.3.0",
-      "style": "global",
+      "pkg-version": "3.13.0.0",
+      "style": "local",
       "type": "configured"
     },
     {
+      "build-info": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/Cabal-syntax-3.13.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "array-0.5.7.0-20cf",
@@ -57,14 +54,37 @@
         "pretty-1.1.3.6-d2be",
         "text-2.1.1-ffc6",
         "time-1.12.2-c1d3",
-        "transformers-0.6.1.1-f453",
-        "unix-2.8.5.1-c70e"
+        "transformers-0.6.1.1-f453"
+      ],
+      "dist-dir": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/Cabal-syntax-3.13.0.0",
+      "exe-depends": [
+        "alex-3.5.1.0-e-alex-f079309d60214a3540ad86d17deeb0e31494d03b80eda59c4bee00fbc7acbac7"
+      ],
+      "flags": {},
+      "id": "Cabal-syntax-3.13.0.0-inplace",
+      "pkg-name": "Cabal-syntax",
+      "pkg-src": {
+        "path": "/home/matt/ghc-prof-dyn/hadrian/vendored/Cabal/Cabal-syntax",
+        "type": "local"
+      },
+      "pkg-version": "3.13.0.0",
+      "style": "local",
+      "type": "configured"
+    },
+    {
+      "bin-file": "/home/matt/.cabal/store/ghc-9.10.1/alex-3.5.1.0-e-alex-f079309d60214a3540ad86d17deeb0e31494d03b80eda59c4bee00fbc7acbac7/bin/alex",
+      "component-name": "exe:alex",
+      "depends": [
+        "array-0.5.7.0-20cf",
+        "base-4.20.0.0-7b2c",
+        "containers-0.7-ade3",
+        "directory-1.3.8.3-0bdc"
       ],
       "exe-depends": [],
       "flags": {},
-      "id": "Cabal-syntax-3.10.3.0-16fa731ae4aaca01d3debcdc890212d2fd816f1d22f19365d4163e9edafdcd63",
-      "pkg-cabal-sha256": "c2ca36499bf9365726968b1e11a757e6d846c47cdf0c2c26a003698fd3c300fe",
-      "pkg-name": "Cabal-syntax",
+      "id": "alex-3.5.1.0-e-alex-f079309d60214a3540ad86d17deeb0e31494d03b80eda59c4bee00fbc7acbac7",
+      "pkg-cabal-sha256": "de553eefe0b6548a560e9d8100486310548470a403c1fa21108dd03713da5fc7",
+      "pkg-name": "alex",
       "pkg-src": {
         "repo": {
           "type": "secure-repo",
@@ -72,8 +92,8 @@
         },
         "type": "repo-tar"
       },
-      "pkg-src-sha256": "75d6a0aa9c00990a0d6e7720ac50c6954f6c942fa1be42c8add7f1c025f7e212",
-      "pkg-version": "3.10.3.0",
+      "pkg-src-sha256": "c92efe86f8eb959ee03be6c04ee57ebc7e4abc75a6c4b26551215d7443e92a07",
+      "pkg-version": "3.5.1.0",
       "style": "global",
       "type": "configured"
     },
@@ -339,18 +359,18 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-platform-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-platform-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.20.0.0-7b2c"
       ],
-      "dist-dir": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-platform-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-platform-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-platform-0.1.0.0-inplace",
       "pkg-name": "ghc-platform",
       "pkg-src": {
-        "path": "/home/matt/ghc-llvm/hadrian/../libraries/ghc-platform",
+        "path": "/home/matt/ghc-prof-dyn/hadrian/../libraries/ghc-platform",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -367,7 +387,7 @@
       "type": "pre-existing"
     },
     {
-      "build-info": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-toolchain-0.1.0.0/build-info.json",
+      "build-info": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-toolchain-0.1.0.0/build-info.json",
       "component-name": "lib",
       "depends": [
         "base-4.20.0.0-7b2c",
@@ -378,13 +398,13 @@
         "text-2.1.1-ffc6",
         "transformers-0.6.1.1-f453"
       ],
-      "dist-dir": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-toolchain-0.1.0.0",
+      "dist-dir": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/ghc-toolchain-0.1.0.0",
       "exe-depends": [],
       "flags": {},
       "id": "ghc-toolchain-0.1.0.0-inplace",
       "pkg-name": "ghc-toolchain",
       "pkg-src": {
-        "path": "/home/matt/ghc-llvm/hadrian/../utils/ghc-toolchain",
+        "path": "/home/matt/ghc-prof-dyn/hadrian/../utils/ghc-toolchain",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",
@@ -392,11 +412,11 @@
       "type": "configured"
     },
     {
-      "bin-file": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
-      "build-info": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian/build-info.json",
+      "bin-file": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian/build/hadrian/hadrian",
+      "build-info": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian/build-info.json",
       "component-name": "exe:hadrian",
       "depends": [
-        "Cabal-3.10.3.0-962eeb4d69d7702e1d9e02bf4be95e3e3c9339cd44a6f0d30ff32c10033e324a",
+        "Cabal-3.13.0.0-inplace",
         "base-4.20.0.0-7b2c",
         "base16-bytestring-1.0.2.0-2ae56325f3ce7000c1709961853d7d4454526b4d8a0f1003a7387e3699e1966b",
         "bytestring-0.12.1.0-3a9c",
@@ -415,7 +435,7 @@
         "transformers-0.6.1.1-f453",
         "unordered-containers-0.2.20-8830d699d9fce50100e11680eca9dbfef6e6ba09ea6f0ca8d8df9b7c74a6cc44"
       ],
-      "dist-dir": "/home/matt/ghc-llvm/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian",
+      "dist-dir": "/home/matt/ghc-prof-dyn/hadrian/dist-newstyle/build/x86_64-linux/ghc-9.10.1/hadrian-0.1.0.0/x/hadrian",
       "exe-depends": [],
       "flags": {
         "selftest": false,
@@ -424,7 +444,7 @@
       "id": "hadrian-0.1.0.0-inplace-hadrian",
       "pkg-name": "hadrian",
       "pkg-src": {
-        "path": "/home/matt/ghc-llvm/hadrian/.",
+        "path": "/home/matt/ghc-prof-dyn/hadrian/.",
         "type": "local"
       },
       "pkg-version": "0.1.0.0",

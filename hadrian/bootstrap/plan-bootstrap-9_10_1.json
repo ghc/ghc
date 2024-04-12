@@ -41,16 +41,12 @@
       "version": "2.22.0.0"
     },
     {
-      "package": "bytestring",
-      "version": "0.12.1.0"
-    },
-    {
       "package": "containers",
       "version": "0.7"
     },
     {
-      "package": "binary",
-      "version": "0.8.9.2"
+      "package": "bytestring",
+      "version": "0.12.1.0"
     },
     {
       "package": "transformers",
@@ -89,6 +85,10 @@
       "version": "1.3.8.3"
     },
     {
+      "package": "binary",
+      "version": "0.8.9.2"
+    },
+    {
       "package": "text",
       "version": "2.1.1"
     },
@@ -103,25 +103,38 @@
   ],
   "dependencies": [
     {
-      "cabal_sha256": "c2ca36499bf9365726968b1e11a757e6d846c47cdf0c2c26a003698fd3c300fe",
+      "cabal_sha256": "de553eefe0b6548a560e9d8100486310548470a403c1fa21108dd03713da5fc7",
+      "component": "exe:alex",
       "flags": [],
-      "package": "Cabal-syntax",
+      "package": "alex",
       "revision": 0,
       "source": "hackage",
-      "src_sha256": "75d6a0aa9c00990a0d6e7720ac50c6954f6c942fa1be42c8add7f1c025f7e212",
-      "version": "3.10.3.0"
+      "src_sha256": "c92efe86f8eb959ee03be6c04ee57ebc7e4abc75a6c4b26551215d7443e92a07",
+      "version": "3.5.1.0"
     },
     {
-      "cabal_sha256": "4a36954a66769eef90353daa0dbb07d43e49c228281383c7e4134445d495f714",
+      "cabal_sha256": null,
+      "component": "lib:Cabal-syntax",
+      "flags": [],
+      "package": "Cabal-syntax",
+      "revision": null,
+      "source": "local",
+      "src_sha256": null,
+      "version": "3.13.0.0"
+    },
+    {
+      "cabal_sha256": null,
+      "component": "lib:Cabal",
       "flags": [],
       "package": "Cabal",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "cb7f7c66626d7555f799e786513ddd65a874fd23f1cf312990c7a48abfc0b2c6",
-      "version": "3.10.3.0"
+      "revision": null,
+      "source": "local",
+      "src_sha256": null,
+      "version": "3.13.0.0"
     },
     {
       "cabal_sha256": "a694e88f9ec9fc79f0b03f233d3fea592b68f70a34aac2ddb5bcaecb6562e2fd",
+      "component": "lib:base16-bytestring",
       "flags": [],
       "package": "base16-bytestring",
       "revision": 1,
@@ -131,6 +144,7 @@
     },
     {
       "cabal_sha256": "b938655b00cf204ce69abfff946021bed111d2609a9f7a9c22e28a1a202e9115",
+      "component": "lib:clock",
       "flags": [
         "-llvm"
       ],
@@ -142,6 +156,7 @@
     },
     {
       "cabal_sha256": "200d756a7b3bab7ca2bac6eb50ed8252f26de77ac8def490a3ad743f2933acbd",
+      "component": "lib:cryptohash-sha256",
       "flags": [
         "-exe",
         "+use-cbits"
@@ -154,6 +169,7 @@
     },
     {
       "cabal_sha256": "edd191f77adf31acb1b53960b4d1ca9fca925ac28345a396c614414cb7bfa7ec",
+      "component": "lib:extra",
       "flags": [],
       "package": "extra",
       "revision": 0,
@@ -163,6 +179,7 @@
     },
     {
       "cabal_sha256": "372c1733d83b90045eb29da9f010fed79bfef8771ce65eb126a1d83ecc54a9a2",
+      "component": "lib:filepattern",
       "flags": [],
       "package": "filepattern",
       "revision": 0,
@@ -172,6 +189,7 @@
     },
     {
       "cabal_sha256": null,
+      "component": "lib:ghc-platform",
       "flags": [],
       "package": "ghc-platform",
       "revision": null,
@@ -181,6 +199,7 @@
     },
     {
       "cabal_sha256": null,
+      "component": "lib:ghc-toolchain",
       "flags": [],
       "package": "ghc-toolchain",
       "revision": null,
@@ -190,6 +209,7 @@
     },
     {
       "cabal_sha256": "ae22238274c572aa91e90c6c353e7206386708912ac5e6dc40ac61d1dcc553db",
+      "component": "lib:hashable",
       "flags": [
         "+integer-gmp",
         "-random-initial-seed"
@@ -202,6 +222,7 @@
     },
     {
       "cabal_sha256": "66b19fcd813b0e4db3e0bac541bd46606c3b13d3d081d9f9666f4be0f5ff14b8",
+      "component": "lib:heaps",
       "flags": [],
       "package": "heaps",
       "revision": 0,
@@ -211,6 +232,7 @@
     },
     {
       "cabal_sha256": "f75cb4fa53c88c65794becdd48eb0d3b2b8abd89a3d5c19e87af91f5225c15e4",
+      "component": "lib:js-dgtable",
       "flags": [],
       "package": "js-dgtable",
       "revision": 0,
@@ -220,6 +242,7 @@
     },
     {
       "cabal_sha256": "4c1c447a9a2fba0adba6d30678302a30c32b9dfde9e7aa9e9156483e1545096d",
+      "component": "lib:js-flot",
       "flags": [],
       "package": "js-flot",
       "revision": 0,
@@ -229,6 +252,7 @@
     },
     {
       "cabal_sha256": "59ab6c79159549ef94b584abce8e6d3b336014c2cce1337b59a8f637e2856df5",
+      "component": "lib:js-jquery",
       "flags": [],
       "package": "js-jquery",
       "revision": 0,
@@ -238,6 +262,7 @@
     },
     {
       "cabal_sha256": "2e08c5409e3559c7f1669ef50e9a0d9a397e68ecf51110d5e2cedf05cdd7d93c",
+      "component": "lib:primitive",
       "flags": [],
       "package": "primitive",
       "revision": 1,
@@ -247,6 +272,7 @@
     },
     {
       "cabal_sha256": "caa9b4a92abf1496c7f6a3c0f4e357426a54880077cb9f04e260a8bfa034b77b",
+      "component": "lib:splitmix",
       "flags": [
         "-optimised-mixer"
       ],
@@ -258,6 +284,7 @@
     },
     {
       "cabal_sha256": "32397de181e20ccaacf806ec70de9308cf044f089a2be37c936f3f8967bde867",
+      "component": "lib:random",
       "flags": [],
       "package": "random",
       "revision": 0,
@@ -267,6 +294,7 @@
     },
     {
       "cabal_sha256": "5a3e730fb548640f2ec050ec7517af67deede21de51e32bbebf6b7b222e6d0f5",
+      "component": "lib:unordered-containers",
       "flags": [
         "-debug"
       ],
@@ -278,6 +306,7 @@
     },
     {
       "cabal_sha256": "79416292186feeaf1f60e49ac5a1ffae9bf1b120e040a74bf0e81ca7f1d31d3f",
+      "component": "lib:utf8-string",
       "flags": [],
       "package": "utf8-string",
       "revision": 0,
@@ -287,6 +316,7 @@
     },
     {
       "cabal_sha256": "03c8f06de478e07ad6fde95984c9206920106d0d8432ecb7ab825ef108d45382",
+      "component": "lib:shake",
       "flags": [
         "-cloud",
         "-embed-files",
@@ -301,6 +331,7 @@
     },
     {
       "cabal_sha256": null,
+      "component": "exe:hadrian",
       "flags": [
         "-selftest",
         "+threaded"
