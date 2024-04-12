@@ -1972,6 +1972,8 @@ Wrinkles:
      is never used (invariant (I1)), so it barely makes sense to talk about
      the worker. A `type data` constructor only shows up in types, where it
      appears as a TyCon, specifically a PromotedDataCon -- no Id in sight.
+     See #24620 for an example of what happens if you accidentally include
+     a wrapper.
 
      See `wrapped_reqd` in GHC.Types.Id.Make.mkDataConRep` for the place where
      this check is implemented.
