@@ -557,12 +557,17 @@ doc-tarball:
     LINUX_BINDIST: "ghc-x86_64-linux-deb10.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-windows.tar.xz"
   artifacts:
+    expose_as: "Documentation Preview"
     paths:
       - haddock.html.tar.xz
+      - docs/haddock/
       - libraries.html.tar.xz
+      - docs/libraries/
       - users_guide.html.tar.xz
-      - index.html
-      - "*.pdf"
+      - docs/users_guide/
+      - docs/index.html
+      - Haddock.pdf
+      - users_guide.pdf
   script:
     - |
       mv "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
@@ -582,8 +587,8 @@ doc-tarball:
       fi
     - rm -Rf docs
     - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
+    - mv docs/*.tar.xz docs/*.pdf .
     - ls -lh
-    - mv docs/*.tar.xz docs/index.html .
 
 hackage-doc-tarball:
   stage: packaging
