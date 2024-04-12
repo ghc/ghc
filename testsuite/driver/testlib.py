@@ -228,10 +228,6 @@ def req_profiling( name, opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
-    # JS backend doesn't support profiling yet
-    if arch("js"):
-        opts.expect = 'fail'
-
 def req_dynamic_lib_support( name, opts ):
     '''
     Require that the platform have shared object support (N.B. this doesn't
@@ -967,6 +963,11 @@ def have_dynamic( ) -> bool:
     ''' Were libraries built in the dynamic way? '''
     return config.have_dynamic
 
+def have_dynamic_prof( ) -> bool:
+    ''' Were libraries built in the profiled dynamic way? '''
+    return config.have_profiling_dynamic
+
+''' Were libraries built in the profiled way? '''
 def have_profiling( ) -> bool:
     return config.have_profiling
 

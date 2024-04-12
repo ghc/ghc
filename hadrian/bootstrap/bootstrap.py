@@ -64,6 +64,7 @@ BootstrapDep = NamedTuple('BootstrapDep', [
     ('revision', Optional[int]),
     ('cabal_sha256', Optional[SHA256Hash]),
     ('flags', List[str]),
+    ('component', Optional[str]),
 ])
 
 BootstrapInfo = NamedTuple('BootstrapInfo', [
@@ -127,6 +128,7 @@ def package_url(package: PackageName, version: Version) -> str:
 def package_cabal_url(package: PackageName, version: Version, revision: int) -> str:
     return f'https://hackage.haskell.org/package/{package}-{version}/revision/{revision}.cabal'
 
+
 def verify_sha256(expected_hash: SHA256Hash, f: Path):
     print(f"Verifying {f}...")
     h = hash_file(hashlib.sha256(), f.open('rb'))
@@ -179,6 +181,10 @@ def resolve_dep(dep : BootstrapDep) -> Path:
             sdist_dir = Path(sys.path[0]).parent.parent.resolve() / f'utils' / f'ghc-toolchain'
         elif dep.package == 'ghc-platform':
             sdist_dir = Path(sys.path[0]).parent.parent.resolve() / f'libraries' / f'ghc-platform'
+        elif dep.package == 'Cabal':
+            sdist_dir = Path(sys.path[0]).parent.resolve() / f'vendored' / f'Cabal' / f'Cabal'
+        elif dep.package == 'Cabal-syntax':
+            sdist_dir = Path(sys.path[0]).parent.resolve() / f'vendored' / f'Cabal' / f'Cabal-syntax'
         else:
             raise ValueError(f'Unknown local package {dep.package}')
     return sdist_dir
@@ -189,9 +195,9 @@ def install_dep(dep: BootstrapDep, ghc: Compiler) -> None:
 
     sdist_dir = resolve_dep(dep)
 
-    install_sdist(dist_dir, sdist_dir, ghc, dep.flags)
+    install_sdist(dist_dir, sdist_dir, ghc, dep.flags, dep.component)
 
-def install_sdist(dist_dir: Path, sdist_dir: Path, ghc: Compiler, flags: List[str]):
+def install_sdist(dist_dir: Path, sdist_dir: Path, ghc: Compiler, flags: List[str], component):
     prefix = PSEUDOSTORE.resolve()
     flags_option = ' '.join(flags)
     setup_dist_dir = dist_dir / 'setup'
@@ -206,9 +212,11 @@ def install_sdist(dist_dir: Path, sdist_dir: Path, ghc: Compiler, flags: List[st
         f'--prefix={prefix}',
         f'--bindir={BINDIR.resolve()}',
         f'--with-compiler={ghc.ghc_path}',
+        f'--extra-prog-path={BINDIR.resolve()}',
         f'--with-hc-pkg={ghc.ghc_pkg_path}',
         f'--with-hsc2hs={ghc.hsc2hs_path}',
         f'--flags={flags_option}',
+        f'{component or ""}'
     ]
 
     def check_call(args: List[str]) -> None:
@@ -345,7 +353,7 @@ def fetch_from_plan(plan : FetchPlan, output_dir : Path):
 def gen_fetch_plan(info : BootstrapInfo) -> FetchPlan :
     sources_dict = {}
     for dep in info.dependencies:
-      if not dep.package in ['hadrian', 'ghc-platform', 'ghc-toolchain']:
+      if not dep.package in ['hadrian', 'ghc-platform', 'ghc-toolchain', 'Cabal', 'Cabal-syntax']:
         sources_dict[f"{dep.package}-{dep.version}.tar.gz"] = FetchInfo(package_url(dep.package, dep.version), dep.src_sha256)
         if dep.revision is not None:
           sources_dict[f"{dep.package}.cabal"] = FetchInfo(package_cabal_url(dep.package, dep.version, dep.revision), dep.cabal_sha256)

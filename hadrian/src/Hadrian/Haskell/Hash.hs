@@ -32,7 +32,6 @@ import Packages
 import Development.Shake.Classes
 import Control.Monad
 import Base
-import Context
 import System.Directory.Extra (listFilesRecursive)
 import CommandLine
 import Control.Arrow (first)

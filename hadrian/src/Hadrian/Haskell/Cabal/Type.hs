@@ -70,6 +70,11 @@ data ContextData = ContextData
     , buildGhciLib       :: Bool
     , frameworks         :: [String]
     , packageDescription :: PackageDescription
+
+    -- The location where normal library files go
+    , contextLibdir    :: FilePath
+    -- The location where dynamic libraries go
+    , contextDynLibdir :: FilePath
     } deriving (Eq, Generic, Show, Typeable)
 
 instance Binary   PackageData

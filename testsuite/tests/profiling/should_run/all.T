@@ -40,8 +40,9 @@ test('T21455',
 
 
 # Below this line, run tests only with profiling ways.
-setTestOpts(req_profiling)
-setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
+prun_ways = (['prof', 'ghci-ext-prof'] if have_profiling() else []) + (['profdyn'] if have_dynamic_prof() else [])
+test_opts = [ extra_ways(prun_ways) if prun_ways else skip ]
+setTestOpts(test_opts)
 setTestOpts(only_ways(prof_ways))
 setTestOpts(keep_prof_callstacks)
 

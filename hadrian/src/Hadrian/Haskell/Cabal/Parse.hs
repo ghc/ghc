@@ -40,10 +40,10 @@ import qualified Distribution.Simple.Configure                 as C (getPersistB
 import qualified Distribution.Simple.Build                     as C
 import qualified Distribution.Types.BuildInfo.Lens             as CL (HasBuildInfo(..), traverseBuildInfos)
 import qualified Distribution.Types.ComponentLocalBuildInfo    as C
+import qualified Distribution.Simple.LocalBuildInfo            as C
 import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
-import qualified Distribution.Types.LocalBuildInfo             as C
 import qualified Distribution.Types.MungedPackageId            as C
 #if MIN_VERSION_Cabal(3,5,0)
 import qualified Distribution.Utils.Path                       as C
@@ -81,7 +81,7 @@ import Packages
 parsePackageData :: Package -> Action PackageData
 parsePackageData pkg = do
     gpd <- traced "cabal-read" $
-        C.readGenericPackageDescription C.verbose (pkgCabalFile pkg)
+        C.readGenericPackageDescription C.verbose Nothing (C.makeSymbolicPath (pkgCabalFile pkg))
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
@@ -106,7 +106,7 @@ parsePackageData pkg = do
 
 -- | Parse the package identifier from a Cabal file.
 parseCabalPkgId :: FilePath -> IO String
-parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent file
+parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent Nothing (C.makeSymbolicPath file)
 
 biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe [C.ModuleName], Maybe (C.ModuleName, String))
 biModules pd = go [ comp | comp@(bi,_,_,_) <-
@@ -120,11 +120,11 @@ biModules pd = go [ comp | comp@(bi,_,_,_) <-
                        -- inject "Main" into the modules.  This does not respect
                        -- "-main-is" ghc-arguments! See Cabal's
                        -- Distribution.Simple.GHC for the glory details.
-                       if takeExtension (C.modulePath exe) `elem` [".hs", ".lhs"]
+                       if takeExtension (C.getSymbolicPath (C.modulePath exe)) `elem` [".hs", ".lhs"]
                            then C.main : C.exeModules exe
                                 -- The module `Main` still need to be kept in `modules` of PD.
                            else C.exeModules exe, Nothing,
-                       Just (C.main, C.modulePath exe))
+                       Just (C.main, C.getSymbolicPath (C.modulePath exe)))
     go []  = error "No buildable component found."
     go [x] = x
     go _   = error "Cannot handle more than one buildinfo yet."
@@ -180,6 +180,7 @@ configurePackage context@Context {..} = do
         C.Configure -> autoconfUserHooks
         C.Simple -> pure C.simpleUserHooks
         C.Make -> fail "build-type: Make is not supported"
+        C.Hooks -> fail "build-type: Hooks is not supported"
         -- The 'time' package has a 'C.Custom' Setup.hs, but it's actually
         -- 'C.Configure' plus a @./Setup test@ hook. However, Cabal is also
         -- 'C.Custom', but doesn't have a configure script.
@@ -246,12 +247,16 @@ data MainSourceType = HsMain | CppMain | CMain
 -- | Parse the 'ContextData' of a given 'Context'.
 resolveContextData :: Context -> Action ContextData
 resolveContextData context@Context {..} = do
+    setupConfig <- pkgSetupConfigFile context
+    need [setupConfig] -- This triggers 'configurePackage' which generates LBI
     cPath <- Context.contextPath context
-    lbi <- liftIO $ C.getPersistBuildConfig cPath
+    lbi <- liftIO $ C.getPersistBuildConfig Nothing (C.makeSymbolicPath cPath)
 
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
     pdi <- liftIO $ getHookedBuildInfo [pkgPath package, cPath -/- "build"]
+
+    pkgDbPath <- packageDbPath (PackageDbLoc stage iplace)
     let pd'  = C.updatePackageDescription pdi (C.localPkgDescr lbi)
         lbi' = lbi { C.localPkgDescr = pd' }
 
@@ -302,6 +307,7 @@ resolveContextData context@Context {..} = do
           | takeExtension fp `elem` [".cpp", ".cxx", ".c++"]= CppMain
           | otherwise = CMain
 
+        install_dirs = absoluteInstallDirs pd' lbi' (CopyToDb pkgDbPath)
         main_src = fmap (first C.display) mainIs
         cdata = ContextData
           { dependencies    = deps
@@ -317,16 +323,16 @@ resolveContextData context@Context {..} = do
                                   (C.hsSourceDirs buildInfo)
           , depIds          = depIds
           , depNames        = map (C.display . C.mungedName . snd) extDeps
-          , includeDirs     = C.includeDirs     buildInfo
-          , includes        = C.includes        buildInfo
-          , installIncludes = C.installIncludes buildInfo
+          , includeDirs     = map C.getSymbolicPath (C.includeDirs     buildInfo)
+          , includes        = map C.getSymbolicPath (C.includes        buildInfo)
+          , installIncludes = map C.getSymbolicPath (C.installIncludes buildInfo)
           , extraLibs       = C.extraLibs       buildInfo
-          , extraLibDirs    = C.extraLibDirs    buildInfo
-          , asmSrcs         = C.asmSources      buildInfo
-          , cSrcs           = C.cSources        buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CMain   <- pure (classifyMain ms)]
-          , cxxSrcs         = C.cxxSources      buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CppMain <- pure (classifyMain ms)]
-          , cmmSrcs         = C.cmmSources      buildInfo
-          , jsSrcs          = C.jsSources       buildInfo
+          , extraLibDirs    = map C.getSymbolicPath (C.extraLibDirs    buildInfo)
+          , asmSrcs         = map C.getSymbolicPath (C.asmSources      buildInfo)
+          , cSrcs           = map C.getSymbolicPath (C.cSources        buildInfo) ++ [ ms | Just (_,ms) <- pure main_src, CMain   <- pure (classifyMain ms)]
+          , cxxSrcs         = map C.getSymbolicPath (C.cxxSources      buildInfo) ++ [ ms | Just (_,ms) <- pure main_src, CppMain <- pure (classifyMain ms)]
+          , cmmSrcs         = map C.getSymbolicPath (C.cmmSources      buildInfo)
+          , jsSrcs          = map C.getSymbolicPath (C.jsSources       buildInfo)
           , hcOpts          = C.programDefaultArgs ghcProg
               ++ C.hcOptions C.GHC buildInfo
               ++ C.languageToFlags   (C.compiler lbi') (C.defaultLanguage buildInfo)
@@ -342,8 +348,10 @@ resolveContextData context@Context {..} = do
           , depCcOpts          = forDeps Installed.ccOptions
           , depLdOpts          = forDeps Installed.ldOptions
           , buildGhciLib       = C.withGHCiLib lbi'
-          , frameworks         = C.frameworks buildInfo
-          , packageDescription = pd' }
+          , frameworks         = map C.getSymbolicPath (C.frameworks buildInfo)
+          , packageDescription = pd'
+          , contextLibdir        = libdir install_dirs
+          , contextDynLibdir     = dynlibdir install_dirs }
 
       in return cdata
 
@@ -359,7 +367,7 @@ write_inplace_conf pkg_path res_path pd lbi = do
                       prefix = "${pkgroot}/../../../"
               let installedPkgInfo =
 
-                    C.inplaceInstalledPackageInfo (cwd </> pkg_path) build_dir pd (C.mkAbiHash "inplace") lib lbi clbi
+                    C.inplaceInstalledPackageInfo (cwd </> pkg_path) (C.makeSymbolicPath build_dir) pd (C.mkAbiHash "inplace") lib lbi clbi
 
                   build_dir = "${pkgroot}/../" ++ pkg_path ++ "/build"
                   pkg_name = C.display (C.pkgName (CP.sourcePackageId installedPkgInfo))
@@ -393,7 +401,7 @@ registerPackage rs context = do
     pid <- pkgUnitId (stage context) (package context)
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
-    lbi <- liftIO $ C.getPersistBuildConfig cPath
+    lbi <- liftIO $ C.getPersistBuildConfig Nothing (C.makeSymbolicPath cPath)
     liftIO $ register db_path pid pd lbi
     -- Then after the register, which just writes the .conf file, do the recache step.
     buildWithResources rs $
@@ -435,8 +443,11 @@ buildAutogenFiles context = do
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
     traced "cabal-autogen" $ do
-        lbi <- C.getPersistBuildConfig cPath
-        C.initialBuildSteps cPath pd (lbi { C.localPkgDescr = pd }) C.silent
+        lbi <- C.getPersistBuildConfig Nothing (C.makeSymbolicPath cPath)
+        let lbi' = lbi { C.localPkgDescr = pd }
+        C.withAllComponentsInBuildOrder pd lbi' $ \_comp clbi -> do
+          C.createDirectoryIfMissingVerbose C.silent True (C.getSymbolicPath (componentBuildDir lbi' clbi))
+          C.writeBuiltinAutogenFiles C.silent pd lbi' clbi
 
 -- | Write a .conf file for the inplace package database which points into the
 -- build directories rather than the final install locations.
@@ -449,7 +460,7 @@ writeInplacePkgConf context = do
     conf <- pkgInplaceConfig context
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
-    lbi <- liftIO $ C.getPersistBuildConfig cPath
+    lbi <- liftIO $ C.getPersistBuildConfig Nothing (C.makeSymbolicPath cPath)
     liftIO $ write_inplace_conf (pkgPath (package context)) conf pd (lbi { C.localPkgDescr = pd })
 
 
@@ -458,10 +469,10 @@ writeInplacePkgConf context = do
 getHookedBuildInfo :: [FilePath] -> IO C.HookedBuildInfo
 getHookedBuildInfo [] = return C.emptyHookedBuildInfo
 getHookedBuildInfo (baseDir:baseDirs) = do
-    maybeInfoFile <- C.findHookedPackageDesc C.normal baseDir
+    maybeInfoFile <- C.findHookedPackageDesc C.normal Nothing (C.makeSymbolicPath baseDir)
     case maybeInfoFile of
         Nothing       -> getHookedBuildInfo baseDirs
-        Just infoFile -> C.readHookedBuildInfo C.silent infoFile
+        Just infoFile -> C.readHookedBuildInfo C.silent Nothing infoFile
 
 externalPackageDeps :: C.LocalBuildInfo -> [(C.UnitId, C.MungedPackageId)]
 externalPackageDeps lbi =

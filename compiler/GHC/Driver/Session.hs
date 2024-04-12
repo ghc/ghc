@@ -3527,6 +3527,13 @@ makeDynFlagsConsistent dflags
     = loop dflags{targetWays_ = addWay WayProf (targetWays_ dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
 
+ | gopt Opt_ByteCode dflags || gopt Opt_ByteCodeAndObjectCode dflags
+ , not (gopt Opt_ExternalInterpreter dflags)
+ , hostIsProfiled
+ , ways dflags `hasNotWay` WayProf
+    = loop (gopt_set dflags Opt_ExternalInterpreter)
+         "Enabling external interpreter, because GHC is profiled and bytecode is being used for TH"
+
  | LinkMergedObj <- ghcLink dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"

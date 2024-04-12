@@ -98,9 +98,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     -- Relative path from the output (rpath $ORIGIN).
     originPath <- dropFileName <$> getOutput
     context <- getContext
-    libPath' <- expr (libPath context)
-    st <- getStage
-    distDir <- expr (Context.distDir st)
+    distPath <- expr (Context.distDynDir context)
 
     useSystemFfi <- expr (flag UseSystemFfi)
     buildPath <- getBuildPath
@@ -112,7 +110,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
 
     let
         dynamic = Dynamic `wayUnit` way
-        distPath = libPath' -/- distDir
         originToLibsDir = makeRelativeNoSysLink originPath distPath
         rpath
             -- Programs will end up in the bin dir ($ORIGIN) and will link to

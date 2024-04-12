@@ -839,16 +839,20 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
                              minus_big_ls
                         -- See Note [-Xlinker -rpath vs -Wl,-rpath]
                         ++ map (\l -> Option ("-l" ++ l)) minus_ls,
+
+
                       -- Add -l options and -L options from dflags.
                       --
                       -- When running TH for a non-dynamic way, we still
                       -- need to make -l flags to link against the dynamic
                       -- libraries, so we need to add WayDyn to ways.
                       --
-                      -- Even if we're e.g. profiling, we still want
-                      -- the vanilla dynamic libraries, so we set the
-                      -- ways / build tag to be just WayDyn.
-                      targetWays_ = Set.singleton WayDyn,
+                      -- Likewise if loading if the profiled way then need to
+                      -- add WayProf.
+                      targetWays_ = let ws = Set.singleton WayDyn
+                                     in if interpreterProfiled interp
+                                        then addWay WayProf ws
+                                        else ws,
                       outputFile_ = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
@@ -1390,7 +1394,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
                      , lib <.> "dll.a"
                      ]
 
-     hs_dyn_lib_name = lib ++ dynLibSuffix (ghcNameVersion dflags)
+     hs_dyn_lib_name = lib ++ lib_tag ++ dynLibSuffix (ghcNameVersion dflags)
      hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
 
 #if defined(CAN_LOAD_DLL)
