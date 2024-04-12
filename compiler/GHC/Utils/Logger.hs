@@ -417,14 +417,13 @@ defaultLogAction logflags msg_class srcSpan msg
       message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
 
       printDiagnostics = do
-        hPutChar stderr '\n'
         caretDiagnostic <-
             if log_show_caret logflags
             then getCaretDiagnostic msg_class srcSpan
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic)
+            (message $+$ caretDiagnostic $+$ blankLine)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of

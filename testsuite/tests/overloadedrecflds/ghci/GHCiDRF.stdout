@@ -1,10 +1,10 @@
 GHCiDRF.foo :: T -> Int
-
 <interactive>:1:1: error: [GHC-87543]
     Ambiguous occurrence ‘GHCiDRF.bar’.
     It could refer to
        either the field ‘bar’ of record ‘T’, defined at GHCiDRF.hs:3:28,
            or the field ‘bar’ of record ‘U’, defined at GHCiDRF.hs:4:16.
+
 type T :: *
 data T = MkT {foo :: Int, ...}
   	-- Defined at GHCiDRF.hs:3:16
@@ -16,7 +16,6 @@ type U :: *
 data U = MkU {bar :: Bool}
   	-- Defined at GHCiDRF.hs:4:16
 GHCiDRF.foo :: GHCiDRF.T -> Int
-
 <interactive>:1:1: error: [GHC-87543]
     Ambiguous occurrence ‘GHCiDRF.bar’.
     It could refer to
@@ -26,6 +25,7 @@ GHCiDRF.foo :: GHCiDRF.T -> Int
            or the field ‘bar’ belonging to data constructor ‘MkU’,
               imported qualified from ‘GHCiDRF’
               (and originally defined at GHCiDRF.hs:4:16-18).
+
 type GHCiDRF.T :: *
 data GHCiDRF.T = GHCiDRF.MkT {GHCiDRF.foo :: Int, ...}
   	-- Defined at GHCiDRF.hs:3:16
@@ -36,7 +36,6 @@ data GHCiDRF.T = GHCiDRF.MkT {..., GHCiDRF.bar :: Int}
 type GHCiDRF.U :: *
 data GHCiDRF.U = GHCiDRF.MkU {GHCiDRF.bar :: Bool}
   	-- Defined at GHCiDRF.hs:4:16
-
 <interactive>:11:1: error: [GHC-87543]
     Ambiguous occurrence ‘GHCiDRF.bar’.
     It could refer to
@@ -46,3 +45,4 @@ data GHCiDRF.U = GHCiDRF.MkU {GHCiDRF.bar :: Bool}
            or the field ‘bar’ belonging to data constructor ‘MkU’,
               imported qualified from ‘GHCiDRF’
               (and originally defined at GHCiDRF.hs:4:16-18).
+

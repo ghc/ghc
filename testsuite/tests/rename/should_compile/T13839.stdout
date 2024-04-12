@@ -1,5 +1,5 @@
-
 T13839a.hs:10:1: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘nonUsed’
+
 nonUsed :: ()
 nonUsed :: ()
