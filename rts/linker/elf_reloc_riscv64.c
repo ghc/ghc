@@ -66,6 +66,10 @@ char *relocationTypeToString(Elf64_Xword type) {
     return "R_RISCV_PCREL_LO12_S";
   case R_RISCV_RELAX:
     return "R_RISCV_RELAX";
+  case R_RISCV_RVC_BRANCH:
+    return "R_RISCV_RVC_BRANCH";
+  case R_RISCV_RVC_JUMP:
+    return "R_RISCV_RVC_JUMP";
   default:
     return "Unknown relocation type";
   }
