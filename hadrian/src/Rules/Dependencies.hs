@@ -29,18 +29,6 @@ extraDepsList =
     , (containers, "Data.Set.Internal") --> th_internal
     , (containers, "Data.Sequence.Internal") --> th_internal
     , (containers, "Data.Graph") --> th_internal
-    , (time, "Data.Time.Calendar.CalendarDiffDays") --> th_internal
-    , (time, "Data.Time.Calendar.Days") --> th_internal
-    , (time, "Data.Time.Calendar.Month") --> th_internal
-    , (time, "Data.Time.Calendar.Quarter") --> th_internal
-    , (time, "Data.Time.Calendar.Week") --> th_internal
-    , (time, "Data.Time.Calendar.WeekDate") --> th_internal
-    , (time, "Data.Time.Clock.Internal.AbsoluteTime") --> th_internal
-    , (time, "Data.Time.Clock.Internal.DiffTime") --> th_internal
-    , (time, "Data.Time.Clock.Internal.NominalDiffTime") --> th_internal
-    , (time, "Data.Time.Clock.Internal.SystemTime") --> th_internal
-    , (time, "Data.Time.Clock.Internal.UTCTime") --> th_internal
-    , (time, "Data.Time.Clock.Internal.UniversalTime") --> th_internal
     ]
   where
     (p1,m1) --> (p2,m2) = (PkgMod p1 m1, PkgMod p2 m2)
