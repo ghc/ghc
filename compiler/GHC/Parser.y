@@ -881,7 +881,7 @@ signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
-                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) Nothing) cs)
+                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) [] Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
                                             (Just $2) $4 (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
@@ -891,7 +891,7 @@ module :: { Located (HsModule GhcPs) }
        : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) eof) cs)
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) [] eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
                                                   (Just $2) $4 (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
@@ -899,7 +899,7 @@ module :: { Located (HsModule GhcPs) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) eof) cs)
+                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) [] eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -939,14 +939,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }

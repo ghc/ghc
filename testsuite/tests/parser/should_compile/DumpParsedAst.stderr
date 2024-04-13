@@ -11,6 +11,7 @@
      [(AddEpAnn AnnModule (EpaSpan { DumpParsedAst.hs:4:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:4:22-26 }))]
      []
+     []
      (Just
       ((,)
        { DumpParsedAst.hs:26:1 }
@@ -228,7 +229,10 @@
             (EpaComments
              []))
            (HsListTy
-            (AnnParen AnnParensSquare (EpaSpan { DumpParsedAst.hs:9:16 }) (EpaSpan { DumpParsedAst.hs:9:18 }))
+            (AnnParen
+             AnnParensSquare
+             (EpaSpan { DumpParsedAst.hs:9:16 })
+             (EpaSpan { DumpParsedAst.hs:9:18 }))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:9:17 })
@@ -315,7 +319,10 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:11:10 }) (EpaSpan { DumpParsedAst.hs:11:17 }))
+                (AnnParen
+                 AnnParens
+                 (EpaSpan { DumpParsedAst.hs:11:10 })
+                 (EpaSpan { DumpParsedAst.hs:11:17 }))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:11:11-16 })
@@ -410,7 +417,10 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:11:26 }) (EpaSpan { DumpParsedAst.hs:11:36 }))
+                (AnnParen
+                 AnnParens
+                 (EpaSpan { DumpParsedAst.hs:11:26 })
+                 (EpaSpan { DumpParsedAst.hs:11:36 }))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:11:27-35 })
@@ -555,7 +565,10 @@
              (EpaComments
               []))
             (HsListTy
-             (AnnParen AnnParensSquare (EpaSpan { DumpParsedAst.hs:10:27 }) (EpaSpan { DumpParsedAst.hs:10:29 }))
+             (AnnParen
+              AnnParensSquare
+              (EpaSpan { DumpParsedAst.hs:10:27 })
+              (EpaSpan { DumpParsedAst.hs:10:29 }))
              (L
               (EpAnn
                (EpaSpan { DumpParsedAst.hs:10:28 })
@@ -732,7 +745,10 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:15:25 }) (EpaSpan { DumpParsedAst.hs:15:29 }))
+                (AnnParen
+                 AnnParens
+                 (EpaSpan { DumpParsedAst.hs:15:25 })
+                 (EpaSpan { DumpParsedAst.hs:15:29 }))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:15:26-28 })
@@ -867,7 +883,10 @@
               (EpaComments
                []))
              (HsParTy
-              (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:17:17 }) (EpaSpan { DumpParsedAst.hs:17:27 }))
+              (AnnParen
+               AnnParens
+               (EpaSpan { DumpParsedAst.hs:17:17 })
+               (EpaSpan { DumpParsedAst.hs:17:27 }))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:17:18-26 })
@@ -1460,7 +1479,10 @@
             (EpaComments
              []))
            (HsParTy
-            (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:22:22 }) (EpaSpan { DumpParsedAst.hs:22:37 }))
+            (AnnParen
+             AnnParens
+             (EpaSpan { DumpParsedAst.hs:22:22 })
+             (EpaSpan { DumpParsedAst.hs:22:37 }))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:22:23-36 })
@@ -1567,7 +1589,10 @@
               (EpaComments
                []))
              (HsParTy
-              (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:22:42 }) (EpaSpan { DumpParsedAst.hs:22:52 }))
+              (AnnParen
+               AnnParens
+               (EpaSpan { DumpParsedAst.hs:22:42 })
+               (EpaSpan { DumpParsedAst.hs:22:52 }))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:22:43-51 })
@@ -1688,7 +1713,10 @@
                  (EpaComments
                   []))
                 (HsParTy
-                 (AnnParen AnnParens (EpaSpan { DumpParsedAst.hs:23:10 }) (EpaSpan { DumpParsedAst.hs:23:34 }))
+                 (AnnParen
+                  AnnParens
+                  (EpaSpan { DumpParsedAst.hs:23:10 })
+                  (EpaSpan { DumpParsedAst.hs:23:34 }))
                  (L
                   (EpAnn
                    (EpaSpan { DumpParsedAst.hs:23:11-33 })
