@@ -11,6 +11,7 @@
      [(AddEpAnn AnnSignature (EpaSpan { T23315.hsig:1:1-9 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T23315.hsig:1:18-22 }))]
      []
+     []
      (Nothing))
     (EpaComments
      []))
@@ -94,7 +95,10 @@
            (EpaComments
             []))
           (HsTupleTy
-           (AnnParen AnnParens (EpaSpan { T23315.hsig:3:6 }) (EpaSpan { T23315.hsig:3:7 }))
+           (AnnParen
+            AnnParens
+            (EpaSpan { T23315.hsig:3:6 })
+            (EpaSpan { T23315.hsig:3:7 }))
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L
