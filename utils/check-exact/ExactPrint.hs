@@ -961,8 +961,10 @@ lepa k epAnn = fmap (\newAnns -> epAnn { anns = newAnns })
 
 -- data AnnsModule
 --   = AnnsModule {
---     am_main :: [AddEpAnn],
---     am_decls :: AnnList
+--     am_main  :: [AddEpAnn],
+--     am_decls :: [TrailingAnn],
+--     am_cs    :: [LEpaComment],
+--     am_eof   :: Maybe (RealSrcSpan, RealSrcSpan)
 --     } deriving (Data, Eq)
 
 lam_main :: Lens AnnsModule [AddEpAnn]
