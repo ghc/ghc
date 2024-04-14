@@ -284,9 +284,30 @@ jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
                   hPutChar h '\n'
                   let emcc_opts' = emcc_opts <> opts
                   go_entries emcc_opts' cc_objs es
-                Nothing -> do
-                  logInfo logger (vcat [text "Ignoring unexpected archive entry: ", text (Ar.filename e)])
-                  go_entries emcc_opts cc_objs es
+                Nothing -> case Ar.filename e of
+                  -- JavaScript code linker does not support symbol table processing.
+                  -- Currently the linker does nothing when the symbol table is met.
+                  -- Ar/Ranlib usually do not create a record for the symbol table
+                  -- in the object archive when the table has no entries.
+                  -- For JavaScript code it should not be created by default.
+
+                  "__.SYMDEF" ->
+                    -- GNU Ar added the symbol table.
+
+                    -- Emscripten Ar (at least 3.1.24 version)
+                    -- adds it even when the symbol table is empty.
+                    go_entries emcc_opts cc_objs es
+                  "__.SYMDEF SORTED" ->
+                    -- BSD-like Ar added the symbol table.
+
+                    -- By default, Clang Ar does not add it when the
+                    -- symbol table is empty (and it should be empty) but we left
+                    -- it here to handle the case with symbol table completely
+                    -- for GNU and BSD tools.
+                    go_entries emcc_opts cc_objs es
+                  unknown_name -> do
+                    logInfo logger (vcat [text "Ignoring unexpected archive entry: ", text unknown_name])
+                    go_entries emcc_opts cc_objs es
 
             -- additional JS objects (e.g. from the command-line)
             go_extra emcc_opts = \case
