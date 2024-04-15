@@ -736,7 +736,7 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
      { res_kind' <- tcIfaceType res_kind    -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tc_fam_flav tc_name fam_flav
-     ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
+     ; res_name <- traverse (newIfaceName . mkTyVarOccFS . ifLclNameFS) res
      ; let tycon = mkFamilyTyCon tc_name binders' res_kind' res_name rhs parent inj
      ; return (ATyCon tycon) }
    where
@@ -785,7 +785,7 @@ tc_iface_decl _parent ignore_prags
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
     ; let mindef_occ = fromIfaceBooleanFormula if_mindef
-    ; mindef <- traverse (lookupIfaceTop . mkVarOccFS) mindef_occ
+    ; mindef <- traverse (lookupIfaceTop . mkVarOccFS . ifLclNameFS) mindef_occ
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
@@ -939,8 +939,8 @@ mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
        ; let occ = case details' of
                  RecSelId { sel_tycon = parent }
                    -> let con_fs = getOccFS $ recSelFirstConName parent
-                      in mkRecFieldOccFS con_fs raw_name
-                 _ -> mkVarOccFS raw_name
+                      in mkRecFieldOccFS con_fs (ifLclNameFS raw_name)
+                 _ -> mkVarOccFS (ifLclNameFS raw_name)
        ; name <- newIfaceName occ }
    info' <- tcIdInfo False TopLevel name ty info
    let new_id = mkGlobalId details' name ty info'
@@ -1446,7 +1446,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 -----------------------------------------
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
-tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
+tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit (getLexicalFastString n))
 tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 
 {-
@@ -1490,7 +1490,7 @@ tcIfaceCo = go
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 
-    go_var :: FastString -> IfL CoVar
+    go_var :: IfLclName -> IfL CoVar
     go_var = tcIfaceLclId
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
@@ -1569,7 +1569,7 @@ tcIfaceExpr (IfaceECase scrut ty)
 
 tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     scrut' <- tcIfaceExpr scrut
-    case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
+    case_bndr_name <- newIfaceName (mkVarOccFS (ifLclNameFS case_bndr))
     let
         scrut_ty   = exprType scrut'
         case_mult  = ManyTy
@@ -1588,7 +1588,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
-  = do  { name    <- newIfaceName (mkVarOccFS fs)
+  = do  { name    <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
@@ -1606,7 +1606,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
        ; return (Let (Rec pairs') body') } }
  where
    tc_rec_bndr (IfLetBndr fs ty _ ji)
-     = do { name <- newIfaceName (mkVarOccFS fs)
+     = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
           ; ty'  <- tcIfaceType ty
           ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
@@ -1663,12 +1663,12 @@ tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_st
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
         ; tcIfaceDataAlt mult con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
                -> IfL CoreAlt
 tcIfaceDataAlt mult con inst_tys arg_strs rhs
   = do  { uniqs <- getUniquesM
         ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat arg_strs uniqs mult con inst_tys
+                      = dataConRepFSInstPat (map ifLclNameFS arg_strs) uniqs mult con inst_tys
 
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $
@@ -2039,7 +2039,7 @@ tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
 --   - axioms for type-level literals (Nat and Symbol),
 --     enumerated in typeNatCoAxiomRules
 tcIfaceCoAxiomRule n
-  | Just ax <- lookupUFM typeNatCoAxiomRules n
+  | Just ax <- lookupUFM typeNatCoAxiomRules (ifLclNameFS n)
   = return ax
   | otherwise
   = pprPanic "tcIfaceCoAxiomRule" (ppr n)
@@ -2083,7 +2083,7 @@ tcIfaceImplicit n = do
 
 bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
 bindIfaceId (w, fs, ty) thing_inside
-  = do  { name <- newIfaceName (mkVarOccFS fs)
+  = do  { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty' <- tcIfaceType ty
         ; w' <- tcIfaceType w
         ; let id = mkLocalIdOrCoVar name w' ty'
@@ -2126,7 +2126,7 @@ bindIfaceForAllBndr (Bndr (IfaceIdBndr tv) vis) thing_inside
 
 bindIfaceTyVar :: IfaceTvBndr -> (TyVar -> IfL a) -> IfL a
 bindIfaceTyVar (occ,kind) thing_inside
-  = do  { name <- newIfaceName (mkTyVarOccFS occ)
+  = do  { name <- newIfaceName (mkTyVarOccFS (ifLclNameFS occ))
         ; tyvar <- mk_iface_tyvar name kind
         ; extendIfaceTyVarEnv [tyvar] (thing_inside tyvar) }
 

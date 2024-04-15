@@ -1216,8 +1216,8 @@ addFingerprints hsc_env iface0
        getOcc (IfLclTopBndr fs _ _ details) =
         case details of
           IfRecSelId { ifRecSelFirstCon = first_con }
-            -> mkRecFieldOccFS (getOccFS first_con) fs
-          _ -> mkVarOccFS fs
+            -> mkRecFieldOccFS (getOccFS first_con) (ifLclNameFS fs)
+          _ -> mkVarOccFS (ifLclNameFS fs)
 
        binding_key (IfaceNonRec b _) = IfaceNonRec (getOcc b) ()
        binding_key (IfaceRec bs) = IfaceRec (map (\(b, _) -> (getOcc b, ())) bs)

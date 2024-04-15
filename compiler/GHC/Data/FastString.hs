@@ -283,12 +283,15 @@ instance Ord NonDetFastString where
 -- `lexicalCompareFS` (i.e. which compares FastStrings on their String
 -- representation). Hence it is deterministic from one run to the other.
 newtype LexicalFastString
-   = LexicalFastString FastString
+   = LexicalFastString { getLexicalFastString :: FastString }
    deriving newtype (Eq, Show)
    deriving stock Data
 
 instance Ord LexicalFastString where
    compare (LexicalFastString fs1) (LexicalFastString fs2) = lexicalCompareFS fs1 fs2
+
+instance NFData LexicalFastString where
+  rnf (LexicalFastString f) = rnf f
 
 -- -----------------------------------------------------------------------------
 -- Construction

@@ -78,6 +78,7 @@ import Data.Eq
 import Data.Bool
 import Data.Char
 import Prelude (Integer, length)
+import Data.Ord (Ord)
 
 {-
 ************************************************************************
@@ -91,7 +92,7 @@ import Prelude (Integer, length)
 data PromotionFlag
   = NotPromoted
   | IsPromoted
-  deriving ( Eq, Data )
+  deriving ( Eq, Data, Ord )
 
 isPromoted :: PromotionFlag -> Bool
 isPromoted IsPromoted  = True

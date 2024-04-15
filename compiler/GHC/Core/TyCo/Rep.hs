@@ -951,13 +951,13 @@ data CoSel  -- See Note [SelCo]
 
   | SelForAll          -- Decomposes (forall a. co)
 
-  deriving( Eq, Data.Data )
+  deriving( Eq, Data.Data, Ord )
 
 data FunSel  -- See Note [SelCo]
   = SelMult  -- Multiplicity
   | SelArg   -- Argument of function
   | SelRes   -- Result of function
-  deriving( Eq, Data.Data )
+  deriving( Eq, Data.Data, Ord )
 
 type CoercionN = Coercion       -- always nominal
 type CoercionR = Coercion       -- always representational
