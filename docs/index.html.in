@@ -39,7 +39,7 @@
 
       <LI>
         <P>
-          <B><A HREF="libraries/ghc-@LIBRARY_ghc_VERSION@/index.html">GHC API</A></B>
+          <B><A HREF="libraries/@LIBRARY_ghc_UNIT_ID@/index.html">GHC API</A></B>
         </P>
         <P>
           Documentation for the GHC API.
