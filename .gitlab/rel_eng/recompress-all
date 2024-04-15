@@ -21,7 +21,7 @@ usage :
 
 %.zip : %.tar.xz
 	echo "[tarxz->zip] $< to $@..."
-	tmp="$$(mktemp tmp.XXX)" && \
+	tmp="$$(mktemp -d tmp.XXX)" && \
 		tar -C "$$tmp" -xf $< && \
 		cd "$$tmp" && \
 		zip -9 -r ../$@ * && \
