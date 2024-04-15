@@ -335,7 +335,7 @@ templateRules = do
     , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
     , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
     ]
-  templateRule "docs/index.html" $ packageVersions
+  templateRule "docs/index.html" $ packageUnitIds Stage1
   templateRule "docs/users_guide/ghc_config.py" $ mconcat
     [ projectVersion
     , packageUnitIds Stage1
