@@ -341,7 +341,7 @@ templateRules = do
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
-  templateRule "docs/index.html" $ packageVersions
+  templateRule "docs/index.html" $ packageUnitIds
   templateRule "doc/users_guide/ghc_config.py" $ packageUnitIds
 
 
