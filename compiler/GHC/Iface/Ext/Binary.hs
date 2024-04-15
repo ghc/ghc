@@ -38,20 +38,19 @@ import Data.ByteString            ( ByteString )
 import qualified Data.ByteString  as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Word                  ( Word8, Word32 )
-import Control.Monad              ( replicateM, when, forM_ )
+import Control.Monad              ( replicateM, when, forM_, foldM )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
+import GHC.Iface.Binary (initWriteIfaceType, putAllTables, initReadIfaceTypeTable)
+import GHC.Iface.Type (IfaceType)
+import System.IO.Unsafe (unsafeInterleaveIO)
+import qualified GHC.Utils.Binary as Binary
 
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
   , hie_symtab_map  :: !(IORef (UniqFM Name (Int, HieName)))
-  }
-
-data HieDictionary = HieDictionary
-  { hie_dict_next :: !FastMutInt -- The next index to use
-  , hie_dict_map  :: !(IORef (UniqFM FastString (Int,FastString))) -- indexed by FastString
   }
 
 initBinMemSize :: Int
@@ -84,57 +83,57 @@ writeHieFile hie_file_path hiefile = do
   putBinLine bh0 $ BSC.pack $ show hieVersion
   putBinLine bh0 $ ghcVersion
 
-  -- remember where the dictionary pointer will go
-  dict_p_p <- tellBinWriter bh0
-  put_ bh0 dict_p_p
+  (fs_tbl, fs_w) <- initFastStringWriterTable
+  (name_tbl, name_w) <- initWriteNameTable
+  (iface_tbl, iface_w) <- initWriteIfaceType
 
-  -- remember where the symbol table pointer will go
-  symtab_p_p <- tellBinWriter bh0
-  put_ bh0 symtab_p_p
+  let bh = setWriterUserData bh0 $ mkWriterUserData
+        [ mkSomeBinaryWriter @IfaceType iface_w
+        , mkSomeBinaryWriter @Name name_w
+        , mkSomeBinaryWriter @BindingName (simpleBindingNameWriter name_w)
+        , mkSomeBinaryWriter @FastString fs_w
+        ]
 
-  -- Make some initial state
-  symtab_next <- newFastMutInt 0
-  symtab_map <- newIORef emptyUFM :: IO (IORef (UniqFM Name (Int, HieName)))
-  let hie_symtab = HieSymbolTable {
-                      hie_symtab_next = symtab_next,
-                      hie_symtab_map  = symtab_map }
-  dict_next_ref <- newFastMutInt 0
-  dict_map_ref <- newIORef emptyUFM
-  let hie_dict = HieDictionary {
-                      hie_dict_next = dict_next_ref,
-                      hie_dict_map  = dict_map_ref }
-
-  -- put the main thing
-  let bh = setWriterUserData bh0
-          $ newWriteState (putName hie_symtab)
-                          (putName hie_symtab)
-                          (putFastString hie_dict)
-  put_ bh hiefile
-
-  -- write the symtab pointer at the front of the file
-  symtab_p <- tellBinWriter bh
-  putAt bh symtab_p_p symtab_p
-  seekBinWriter bh symtab_p
-
-  -- write the symbol table itself
-  symtab_next' <- readFastMutInt symtab_next
-  symtab_map'  <- readIORef symtab_map
-  putSymbolTable bh symtab_next' symtab_map'
-
-  -- write the dictionary pointer at the front of the file
-  dict_p <- tellBinWriter bh
-  putAt bh dict_p_p dict_p
-  seekBinWriter bh dict_p
-
-  -- write the dictionary itself
-  dict_next <- readFastMutInt dict_next_ref
-  dict_map  <- readIORef dict_map_ref
-  putDictionary bh dict_next dict_map
+  -- Discard number of written elements
+  -- Order matters! See Note [Order of deduplication tables during iface binary serialisation]
+  _ <- putAllTables bh [fs_tbl, name_tbl, iface_tbl] $ do
+    put_ bh hiefile
 
   -- and send the result to the file
   createDirectoryIfMissing True (takeDirectory hie_file_path)
   writeBinMem bh hie_file_path
   return ()
+
+initWriteNameTable :: IO (WriterTable, BinaryWriter Name)
+initWriteNameTable = do
+  symtab_next <- newFastMutInt 0
+  symtab_map <- newIORef emptyUFM
+  let bin_symtab =
+        HieSymbolTable
+          { hie_symtab_next = symtab_next
+          , hie_symtab_map = symtab_map
+          }
+
+  let put_symtab bh = do
+        name_count <- readFastMutInt symtab_next
+        symtab_map <- readIORef symtab_map
+        putSymbolTable bh name_count symtab_map
+        pure name_count
+
+  return
+    ( WriterTable
+        { putTable = put_symtab
+        }
+    , mkWriter $ putName bin_symtab
+    )
+
+initReadNameTable :: NameCache -> IO (ReaderTable Name)
+initReadNameTable cache = do
+  return $
+    ReaderTable
+      { getTable = \bh -> getSymbolTable bh cache
+      , mkReaderFromTable = \tbl -> mkReader (getSymTabName tbl)
+      }
 
 data HieFileResult
   = HieFileResult
@@ -216,50 +215,32 @@ readHieFileHeader file bh0 = do
 
 readHieFileContents :: ReadBinHandle -> NameCache -> IO HieFile
 readHieFileContents bh0 name_cache = do
-  dict <- get_dictionary bh0
+  bhRef <- newIORef (error "used too soon")
+  -- It is important this is passed to 'getTable'
+  ud <- unsafeInterleaveIO (readIORef bhRef)
+
+  fsReaderTable <- initFastStringReaderTable
+  nameReaderTable <- initReadNameTable name_cache
+  ifaceTypeReaderTable <- initReadIfaceTypeTable ud
+
   -- read the symbol table so we are capable of reading the actual data
-  bh1 <- do
-      let bh1 = setReaderUserData bh0
-              $ newReadState (error "getSymtabName")
-                             (getDictFastString dict)
-      symtab <- get_symbol_table bh1
-      let bh1' = setReaderUserData bh1
-               $ newReadState (getSymTabName symtab)
-                              (getDictFastString dict)
-      return bh1'
+  bh1 <-
+    foldM (\bh tblReader -> tblReader bh) bh0
+      [ get_dictionary fsReaderTable
+      , get_dictionary nameReaderTable
+      , get_dictionary ifaceTypeReaderTable
+      ]
 
   -- load the actual data
   get bh1
   where
-    get_dictionary bin_handle = do
-      dict_p <- get bin_handle
-      data_p <- tellBinReader bin_handle
-      seekBinReader bin_handle dict_p
-      dict <- getDictionary bin_handle
-      seekBinReader bin_handle data_p
-      return dict
+    get_dictionary tbl bin_handle = do
+      fsTable <- Binary.forwardGet bin_handle (getTable tbl bin_handle)
+      let
+        fsReader = mkReaderFromTable tbl fsTable
+        bhFs = addReaderToUserData fsReader bin_handle
+      pure bhFs
 
-    get_symbol_table bh1 = do
-      symtab_p <- get bh1
-      data_p'  <- tellBinReader bh1
-      seekBinReader bh1 symtab_p
-      symtab <- getSymbolTable bh1 name_cache
-      seekBinReader bh1 data_p'
-      return symtab
-
-putFastString :: HieDictionary -> WriteBinHandle -> FastString -> IO ()
-putFastString HieDictionary { hie_dict_next = j_r,
-                              hie_dict_map  = out_r}  bh f
-  = do
-    out <- readIORef out_r
-    let !unique = getUnique f
-    case lookupUFM_Directly out unique of
-        Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
-        Nothing -> do
-           j <- readFastMutInt j_r
-           put_ bh (fromIntegral j :: Word32)
-           writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM_Directly out unique (j, f)
 
 putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,HieName) -> IO ()
 putSymbolTable bh next_off symtab = do

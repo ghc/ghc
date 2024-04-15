@@ -33,6 +33,8 @@ module GHC.Iface.Type (
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
 
+        -- Binary utilities
+        putIfaceType, getIfaceType,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -91,10 +93,11 @@ import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
 import Control.DeepSeq
+import Data.Proxy
 import Control.Monad ((<$!>))
 import Control.Arrow (first)
 import qualified Data.Semigroup as Semi
-import Data.Maybe( isJust )
+import Data.Maybe (isJust)
 
 {-
 ************************************************************************
@@ -2191,38 +2194,47 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    put_ _ (IfaceFreeTyVar tv)
-       = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+   put_ bh tyCon = case findUserDataWriter Proxy bh of
+    tbl -> putEntry tbl bh tyCon
 
-    put_ bh (IfaceForAllTy aa ab) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-    put_ bh (IfaceTyVar ad) = do
-            putByte bh 1
-            put_ bh ad
-    put_ bh (IfaceAppTy ae af) = do
-            putByte bh 2
-            put_ bh ae
-            put_ bh af
-    put_ bh (IfaceFunTy af aw ag ah) = do
-            putByte bh 3
-            put_ bh af
-            put_ bh aw
-            put_ bh ag
-            put_ bh ah
-    put_ bh (IfaceTyConApp tc tys)
-      = do { putByte bh 5; put_ bh tc; put_ bh tys }
-    put_ bh (IfaceCastTy a b)
-      = do { putByte bh 6; put_ bh a; put_ bh b }
-    put_ bh (IfaceCoercionTy a)
-      = do { putByte bh 7; put_ bh a }
-    put_ bh (IfaceTupleTy s i tys)
-      = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
-    put_ bh (IfaceLitTy n)
-      = do { putByte bh 9; put_ bh n }
+   get bh = case findUserDataReader Proxy bh of
+    tbl -> getEntry tbl bh
 
-    get bh = do
+
+putIfaceType :: WriteBinHandle -> IfaceType -> IO ()
+putIfaceType _ (IfaceFreeTyVar tv)
+   = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+
+putIfaceType bh (IfaceForAllTy aa ab) = do
+        putByte bh 0
+        put_ bh aa
+        put_ bh ab
+putIfaceType bh (IfaceTyVar ad) = do
+        putByte bh 1
+        put_ bh ad
+putIfaceType bh (IfaceAppTy ae af) = do
+        putByte bh 2
+        put_ bh ae
+        put_ bh af
+putIfaceType bh (IfaceFunTy af aw ag ah) = do
+        putByte bh 3
+        put_ bh af
+        put_ bh aw
+        put_ bh ag
+        put_ bh ah
+putIfaceType bh (IfaceTyConApp tc tys)
+  = do { putByte bh 5; put_ bh tc; put_ bh tys }
+putIfaceType bh (IfaceCastTy a b)
+  = do { putByte bh 6; put_ bh a; put_ bh b }
+putIfaceType bh (IfaceCoercionTy a)
+  = do { putByte bh 7; put_ bh a }
+putIfaceType bh (IfaceTupleTy s i tys)
+  = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
+putIfaceType bh (IfaceLitTy n)
+  = do { putByte bh 9; put_ bh n }
+
+getIfaceType :: HasCallStack => ReadBinHandle -> IO IfaceType
+getIfaceType bh = do
             h <- getByte bh
             case h of
               0 -> do aa <- get bh
