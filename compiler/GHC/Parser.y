@@ -3401,7 +3401,7 @@ bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parse
 
 argpat   :: { LPat GhcPs }
 argpat    : apat                  { $1 }
-          | PREFIX_AT atype       { L (getLocAnn (reLoc $2)) (InvisPat (epTok $1) (mkHsTyPat noAnn $2)) }
+          | PREFIX_AT atype       { sLLa $1 $> (InvisPat (epTok $1) (mkHsTyPat $2)) }
 
 argpats :: { [LPat GhcPs] }
           : argpat argpats            { $1 : $2 }

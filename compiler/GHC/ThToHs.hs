@@ -1446,7 +1446,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                             ; ps' <- cvtPats ps
                             ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
-                                  pts = map (\t -> HsConPatTyArg noAnn (mkHsTyPat noAnn t)) ts'
+                                  pts = map (\t -> HsConPatTyArg noAnn (mkHsTyPat t)) ts'
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
@@ -1489,9 +1489,9 @@ cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
 cvtp (TypeP t)         = do { t' <- cvtType t
-                            ; return $ EmbTyPat noAnn (mkHsTyPat noAnn t') }
+                            ; return $ EmbTyPat noAnn (mkHsTyPat t') }
 cvtp (InvisP t)        = do { t' <- cvtType t
-                            ; pure (InvisPat noAnn (mkHsTyPat noAnn t'))}
+                            ; pure (InvisPat noAnn (mkHsTyPat t'))}
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)
