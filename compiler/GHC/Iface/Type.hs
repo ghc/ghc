@@ -10,7 +10,8 @@ This module defines interface types and binders
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
 module GHC.Iface.Type (
-        IfExtName, IfLclName,
+        IfExtName,
+        IfLclName(..), mkIfLclName, ifLclNameFS,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
         IfaceMCoercion(..),
@@ -91,6 +92,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
 import Control.DeepSeq
 import Control.Monad ((<$!>))
+import Control.Arrow (first)
 import qualified Data.Semigroup as Semi
 import Data.Maybe( isJust )
 
@@ -102,7 +104,16 @@ import Data.Maybe( isJust )
 ************************************************************************
 -}
 
-type IfLclName = FastString     -- A local name in iface syntax
+-- | A local name in iface syntax
+newtype IfLclName = IfLclName
+  { getIfLclName :: LexicalFastString
+  } deriving (Eq, Ord, Show)
+
+ifLclNameFS :: IfLclName -> FastString
+ifLclNameFS = getLexicalFastString . getIfLclName
+
+mkIfLclName :: FastString -> IfLclName
+mkIfLclName = IfLclName . LexicalFastString
 
 type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
                         -- (However Internal or System Names never should)
@@ -110,6 +121,8 @@ type IfExtName = Name   -- An External or WiredIn Name can appear in Iface synta
 data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
+  deriving (Eq, Ord)
+
 
 type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
@@ -178,6 +191,7 @@ data IfaceType
           -- In an experiment, removing IfaceTupleTy resulted in a 0.75% regression
           -- in interface file size (in GHC's boot libraries).
           -- See !3987.
+  deriving (Eq, Ord)
 
 type IfaceMult = IfaceType
 
@@ -186,9 +200,9 @@ type IfaceContext = [IfacePredType]
 
 data IfaceTyLit
   = IfaceNumTyLit Integer
-  | IfaceStrTyLit FastString
+  | IfaceStrTyLit LexicalFastString
   | IfaceCharTyLit Char
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
 type IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
@@ -230,6 +244,7 @@ data IfaceAppArgs
                         --    arguments in @{...}.
 
            IfaceAppArgs -- The rest of the arguments
+  deriving (Eq, Ord)
 
 instance Semi.Semigroup IfaceAppArgs where
   IA_Nil <> xs              = xs
@@ -244,8 +259,19 @@ instance Monoid IfaceAppArgs where
 -- We have to tag them in order to pretty print them
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
-                             , ifaceTyConInfo :: IfaceTyConInfo }
-    deriving (Eq)
+                             , ifaceTyConInfo :: !IfaceTyConInfo
+                             -- ^ We add a bang to this field as heap analysis
+                             -- showed that this constructor retains a thunk to
+                             -- a value that is usually shared.
+                             --
+                             -- See !12200 for how this bang saved ~10% residency
+                             -- when loading 'mi_extra_decls' on the agda
+                             -- code base.
+                             --
+                             -- See Note [Sharing IfaceTyConInfo] for why
+                             -- sharing is so important for 'IfaceTyConInfo'.
+                             }
+    deriving (Eq, Ord)
 
 -- | The various types of TyCons which have special, built-in syntax.
 data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
@@ -265,7 +291,7 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- that is actually being applied to two types
                       -- of the same kind.  This affects pretty-printing
                       -- only: see Note [Equality predicates in IfaceType]
-                    deriving (Eq)
+                    deriving (Eq, Ord)
 
 instance Outputable IfaceTyConSort where
   ppr IfaceNormalTyCon         = text "normal"
@@ -359,7 +385,7 @@ data IfaceTyConInfo   -- Used only to guide pretty-printing
                       -- should be printed as 'D to distinguish it from
                       -- an existing type constructor D.
                    , ifaceTyConSort       :: IfaceTyConSort }
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 -- This smart constructor allows sharing of the two most common
 -- cases. See #19194
@@ -370,7 +396,7 @@ mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom        sort
 
 data IfaceMCoercion
   = IfaceMRefl
-  | IfaceMCo IfaceCoercion
+  | IfaceMCo IfaceCoercion deriving (Eq, Ord)
 
 data IfaceCoercion
   = IfaceReflCo       IfaceType
@@ -395,11 +421,14 @@ data IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
+  deriving (Eq, Ord)
 
 data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
+  deriving (Eq, Ord)
+
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -571,11 +600,11 @@ type IfaceTySubst = FastStringEnv IfaceType -- Note [Substitution on IfaceType]
 
 mkIfaceTySubst :: [(IfLclName,IfaceType)] -> IfaceTySubst
 -- See Note [Substitution on IfaceType]
-mkIfaceTySubst eq_spec = mkFsEnv eq_spec
+mkIfaceTySubst eq_spec = mkFsEnv (map (first ifLclNameFS) eq_spec)
 
 inDomIfaceTySubst :: IfaceTySubst -> IfaceTvBndr -> Bool
 -- See Note [Substitution on IfaceType]
-inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst fs)
+inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst (ifLclNameFS fs))
 
 substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
 -- See Note [Substitution on IfaceType]
@@ -631,7 +660,7 @@ substIfaceAppArgs env args
 
 substIfaceTyVar :: IfaceTySubst -> IfLclName -> IfaceType
 substIfaceTyVar env tv
-  | Just ty <- lookupFsEnv env tv = ty
+  | Just ty <- lookupFsEnv env (ifLclNameFS tv) = ty
   | otherwise                     = IfaceTyVar tv
 
 
@@ -1134,7 +1163,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
      | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
-      = let subs' = extendFsEnv subs var substituted_ty
+      = let subs' = extendFsEnv subs (ifLclNameFS var) substituted_ty
             -- Record that we should replace it with LiftedRep/Lifted/Many,
             -- and recurse, discarding the forall
         in go subs' True ty
@@ -1142,7 +1171,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go subs rank1 (IfaceForAllTy bndr ty)
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
+    go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
       Just s -> s
       Nothing -> ty
 
@@ -1570,7 +1599,7 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
                 Required (IA_Arg ty Required IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
-         $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
+         $ char '?' <> ftext (getLexicalFastString n) <> text "::" <> ppr_ty topPrec ty
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug
@@ -1958,6 +1987,9 @@ pprIfaceUnivCoProv (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
 
 -------------------
+instance Outputable IfLclName where
+  ppr = ppr . ifLclNameFS
+
 instance Outputable IfaceTyCon where
   ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
 
@@ -2161,6 +2193,13 @@ instance Binary IfaceType where
                       ; return (IfaceTupleTy s i tys) }
               _  -> do n <- get bh
                        return (IfaceLitTy n)
+
+instance Binary IfLclName where
+  put_ bh = put_ bh . ifLclNameFS
+
+  get bh = do
+    fs <- get bh
+    pure $ IfLclName $ LexicalFastString fs
 
 instance Binary IfaceMCoercion where
   put_ bh IfaceMRefl =
@@ -2406,6 +2445,9 @@ instance NFData IfaceTyConSort where
     IfaceTupleTyCon arity sort -> rnf arity `seq` sort `seq` ()
     IfaceSumTyCon arity -> rnf arity
     IfaceEqualityTyCon -> ()
+
+instance NFData IfLclName where
+  rnf (IfLclName lfs) = rnf lfs
 
 instance NFData IfaceTyConInfo where
   rnf (IfaceTyConInfo f s) = f `seq` rnf s

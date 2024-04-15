@@ -45,7 +45,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
-import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.BooleanFormula
 
@@ -147,7 +146,7 @@ tyConToIfaceDecl env tycon
   | Just fam_flav <- famTyConFlav_maybe tycon
   = ( tc_env1
     , IfaceFamily { ifName    = getName tycon,
-                    ifResVar  = if_res_var,
+                    ifResVar  = mkIfLclName <$> if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
                     ifResKind = if_res_kind,
@@ -288,7 +287,7 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = toIfaceBooleanFormula $ fmap getOccFS (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula $ fmap (mkIfLclName . getOccFS) (classMinimalDef clas)
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
@@ -334,7 +333,7 @@ tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
 tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
 tidyTyConBinders = mapAccumL tidyTyConBinder
 
-tidyTyVar :: TidyEnv -> TyVar -> FastString
+tidyTyVar :: TidyEnv -> TyVar -> IfLclName
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
 toIfaceBooleanFormula :: BooleanFormula IfLclName -> IfaceBooleanFormula
