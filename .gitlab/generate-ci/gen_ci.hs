@@ -995,7 +995,6 @@ job_groups =
      , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , addValidateRule TestPrimops (standardBuilds Amd64 Darwin)
-     , allowFailureGroup (onlyRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
      , fastCI (standardBuilds AArch64 Darwin)
      , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
