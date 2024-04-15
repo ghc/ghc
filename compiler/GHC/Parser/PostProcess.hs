@@ -386,7 +386,7 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
                         OpenTypeFamily      -> empty
                         ClosedTypeFamily {} -> whereDots
 
-mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
+mkSpliceDecl :: LHsExpr GhcPs -> (LHsDecl GhcPs)
 -- If the user wrote
 --      [pads| ... ]   then return a QuasiQuoteD
 --      $(e)           then return a SpliceD
@@ -397,18 +397,15 @@ mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
 -- Typed splices are not allowed at the top level, thus we do not represent them
 -- as spliced declaration.  See #10945
 mkSpliceDecl lexpr@(L loc expr)
-  | HsUntypedSplice _ splice@(HsUntypedSpliceExpr {}) <- expr = do
-    !cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+  | HsUntypedSplice _ splice@(HsUntypedSpliceExpr {}) <- expr
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField (L (l2l loc) splice) DollarSplice)
 
-  | HsUntypedSplice _ splice@(HsQuasiQuote {}) <- expr = do
-    cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+  | HsUntypedSplice _ splice@(HsQuasiQuote {}) <- expr
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField (L (l2l loc) splice) DollarSplice)
 
-  | otherwise = do
-    !cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField
-                                 (L loc (HsUntypedSpliceExpr noAnn lexpr))
+  | otherwise
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField
+                                 (L (l2l loc) (HsUntypedSpliceExpr noAnn (la2la lexpr)))
                                        BareSplice)
 
 mkRoleAnnotDecl :: SrcSpan
