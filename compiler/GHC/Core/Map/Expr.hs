@@ -129,7 +129,7 @@ instance TrieMap CoreMap where
 -- inside another 'TrieMap', this is the type you want.
 type CoreMapG = GenMap CoreMapX
 
-type LiteralMap  a = Map.Map Literal a
+type LiteralMap a = Map.Map Literal a
 
 -- | @CoreMapX a@ is the base map from @DeBruijn CoreExpr@ to @a@, but without
 -- the 'GenMap' optimization.
