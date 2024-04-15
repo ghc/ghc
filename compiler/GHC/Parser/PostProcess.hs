@@ -1458,9 +1458,12 @@ isFunLhs e = go e [] [] []
               op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
                                     (L loc' op) r (reverse ops ++ cps))
           reassociate _other = Nothing
-   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L loc _)))) es ops cps
-             = go pat (L loc (ArgPatBuilderArgPat invis_pat) : es) ops cps
+   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
+             = go pat (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
              where invis_pat = InvisPat tok ty_pat
+                   anc' = case tok of
+                     NoEpTok -> anc
+                     EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
    go _ _ _ _ = return Nothing
 
 data ArgPatBuilder p
@@ -1920,8 +1923,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
   mkHsAppTypePV l p at t = do
     !cs <- getCommentsFor (locA l)
-    let anns = EpAnn (spanAsAnchor (getLocA t)) NoEpAnns cs
-    return $ L l (PatBuilderAppType p at (mkHsTyPat anns t))
+    return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
@@ -1978,7 +1980,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkSumOrTuplePV = mkSumOrTuplePat
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
-      PatBuilderPat (EmbTyPat toktype (mkHsTyPat noAnn ty))
+      PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
   rejectPragmaPV _ = return ()
 
 -- | Ensure that a literal pattern isn't of type Addr#, Float#, Double#.
