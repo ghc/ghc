@@ -25,6 +25,8 @@ module GHC.Iface.Binary (
         putName,
         putSymbolTable,
         BinSymbolTable(..),
+        initWriteIfaceType, initReadIfaceTypeTable,
+        putAllTables,
     ) where
 
 import GHC.Prelude
@@ -46,14 +48,19 @@ import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint
+import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
 
+import Control.Monad
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
 import Data.Char
-import Data.Word
 import Data.IORef
-import Control.Monad
+import Data.Map.Strict (Map)
+import Data.Word
+import System.IO.Unsafe
+import Data.Typeable (Typeable)
+
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -158,24 +165,37 @@ getWithUserData name_cache bh = do
 -- Reading names has the side effect of adding them into the given NameCache.
 getTables :: NameCache -> ReadBinHandle -> IO ReadBinHandle
 getTables name_cache bh = do
+    bhRef <- newIORef (error "used too soon")
+    -- It is important this is passed to 'getTable'
+    -- See Note [Lazy ReaderUserData during IfaceType serialisation]
+    ud <- unsafeInterleaveIO (readIORef bhRef)
+
     fsReaderTable <- initFastStringReaderTable
     nameReaderTable <- initNameReaderTable name_cache
+    ifaceTypeReaderTable <- initReadIfaceTypeTable ud
 
+    let -- For any 'ReaderTable', we decode the table that is found at the location
+        -- the forward reference points to.
+        -- After decoding the table, we create a 'BinaryReader' and immediately
+        -- add it to the 'ReaderUserData' of 'ReadBinHandle'.
+        decodeReaderTable :: Typeable a => ReaderTable a -> ReadBinHandle -> IO ReadBinHandle
+        decodeReaderTable tbl bh0 = do
+          table <- Binary.forwardGet bh (getTable tbl bh0)
+          let binaryReader = mkReaderFromTable tbl table
+          pure $ addReaderToUserData binaryReader bh0
 
-    -- The order of these deserialisation matters!
-    --
-    -- See Note [Order of deduplication tables during iface binary serialisation] for details.
-    fsTable <- Binary.forwardGet bh (getTable fsReaderTable bh)
-    let
-      fsReader = mkReaderFromTable fsReaderTable fsTable
-      bhFs = addReaderToUserData (mkSomeBinaryReader fsReader) bh
+    -- Decode all the tables and populate the 'ReaderUserData'.
+    bhFinal <- foldM (\bh0 act -> act bh0) bh
+      -- The order of these deserialisation matters!
+      --
+      -- See Note [Order of deduplication tables during iface binary serialisation] for details.
+      [ decodeReaderTable fsReaderTable
+      , decodeReaderTable nameReaderTable
+      , decodeReaderTable ifaceTypeReaderTable
+      ]
 
-    nameTable <- Binary.forwardGet bh (getTable nameReaderTable bhFs)
-    let
-      nameReader = mkReaderFromTable nameReaderTable nameTable
-      bhName = addReaderToUserData (mkSomeBinaryReader nameReader) bhFs
-
-    pure bhName
+    writeIORef bhRef (getReaderUserData bhFinal)
+    pure bhFinal
 
 -- | Write an interface file.
 --
@@ -239,6 +259,7 @@ putWithTables bh' put_payload = do
   -- Initialise deduplicating tables.
   (fast_wt, fsWriter) <- initFastStringWriterTable
   (name_wt, nameWriter) <- initNameWriterTable
+  (ifaceType_wt, ifaceTypeWriter) <- initWriteIfaceType
 
   -- Initialise the 'WriterUserData'.
   let writerUserData = mkWriterUserData
@@ -250,6 +271,7 @@ putWithTables bh' put_payload = do
         --
         -- See Note [Binary UserData]
         , mkSomeBinaryWriter @BindingName  $ mkWriter (\bh name -> putEntry nameWriter bh (getBindingName name))
+        , mkSomeBinaryWriter @IfaceType ifaceTypeWriter
         ]
   let bh = setWriterUserData bh' writerUserData
 
@@ -257,18 +279,24 @@ putWithTables bh' put_payload = do
     -- The order of these entries matters!
     --
     -- See Note [Order of deduplication tables during iface binary serialisation] for details.
-    putAllTables bh [fast_wt, name_wt] $ do
+    putAllTables bh [fast_wt, name_wt, ifaceType_wt] $ do
       put_payload bh
 
   return (name_count, fs_count, r)
- where
-  putAllTables _ [] act = do
-    a <- act
-    pure ([], a)
-  putAllTables bh (x : xs) act = do
-    (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
-      putAllTables bh xs act
-    pure (r : res, a)
+
+-- | Write all deduplication tables to disk after serialising the
+-- main payload.
+--
+-- Writes forward pointers to the deduplication tables before writing the payload
+-- to allow deserialisation *before* the payload is read again.
+putAllTables :: WriteBinHandle -> [WriterTable] -> IO b -> IO ([Int], b)
+putAllTables _ [] act = do
+  a <- act
+  pure ([], a)
+putAllTables bh (x : xs) act = do
+  (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
+    putAllTables bh xs act
+  pure (r : res, a)
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
@@ -445,10 +473,68 @@ Here, a visualisation of the table structure we currently have (ignoring 'Extens
 
 -}
 
+{-
+Note [Lazy ReaderUserData during IfaceType serialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Serialising recursive data types, such as 'IfaceType', requires some trickery
+to inject the deduplication table at the right moment.
+
+When we serialise a value of 'IfaceType', we might encounter new 'IfaceType' values.
+For example, 'IfaceAppTy' has an 'IfaceType' field, which we want to deduplicate as well.
+Thus, when we serialise an 'IfaceType', we might add new 'IfaceType's to the 'GenericSymbolTable'
+(i.e., the deduplication table). These 'IfaceType's are then subsequently also serialised to disk,
+and uncover new 'IfaceType' values, etc...
+In other words, when we serialise an 'IfaceType' we write it out using a post-order traversal.
+See 'putGenericSymbolTable' for the implementation.
+
+Now, when we deserialise the deduplication table, reading the first element of the deduplication table
+will fail, as deserialisation requires that we read the child elements first. Remember, we wrote them to disk
+using a post-order traversal.
+To make this work, we therefore use 'lazyGet'' to lazily read the parent 'IfaceType', but delay the actual
+deserialisation. We just assume that once you need to force a value, the deduplication table for 'IfaceType'
+will be available.
+
+That's where 'bhRef' comes into play:
+
+@
+    bhRef <- newIORef (error "used too soon")
+    ud <- unsafeInterleaveIO (readIORef bhRef)
+    ...
+    ifaceTypeReaderTable <- initReadIfaceTypeTable ud
+    ...
+    writeIORef bhRef (getReaderUserData bhFinal)
+@
+
+'ud' is the 'ReaderUserData' that will eventually contain the deduplication table for 'IfaceType'.
+As deserialisation of the 'IfaceType' needs the deduplication table, we provide a
+promise that it will exist in the future (represented by @unsafeInterleaveIO (readIORef bhRef)@).
+We pass 'ud' to 'initReadIfaceTypeTable', so the deserialisation will use the promised deduplication table.
+
+Once we have "read" the deduplication table, it will be available in 'bhFinal', and we fulfill the promise
+that the deduplication table for 'IfaceType' exists when forced.
+-}
 
 -- -----------------------------------------------------------------------------
 -- The symbol table
 --
+
+initReadIfaceTypeTable :: ReaderUserData -> IO (ReaderTable IfaceType)
+initReadIfaceTypeTable ud = do
+  pure $
+    ReaderTable
+      { getTable = getGenericSymbolTable (\bh -> lazyGet' getIfaceType (setReaderUserData bh ud))
+      , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
+      }
+
+initWriteIfaceType :: IO (WriterTable, BinaryWriter IfaceType)
+initWriteIfaceType = do
+  sym_tab <- initGenericSymbolTable @(Map IfaceType)
+  pure
+    ( WriterTable
+        { putTable = putGenericSymbolTable sym_tab (lazyPut' putIfaceType)
+        }
+    , mkWriter $ putGenericSymTab sym_tab
+    )
 
 
 initNameReaderTable :: NameCache -> IO (ReaderTable Name)
