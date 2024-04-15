@@ -102,7 +102,20 @@ import Data.Maybe( isJust )
 ************************************************************************
 -}
 
-type IfLclName = FastString     -- A local name in iface syntax
+-- | A local name in iface syntax
+newtype IfLclName = IfLclName
+  { getIfLclName :: LexicalFastString
+  } deriving (Eq, Ord, Show)
+
+instance Uniquable IfLclName where
+  getUnique = getUnique . ifLclNameFS
+
+
+ifLclNameFS :: IfLclName -> FastString
+ifLclNameFS = getLexicalFastString . getIfLclName
+
+mkIfLclName :: FastString -> IfLclName
+mkIfLclName = IfLclName . LexicalFastString
 
 type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
                         -- (However Internal or System Names never should)

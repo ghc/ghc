@@ -39,6 +39,8 @@ import qualified Data.IntMap as IntMap
 import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 import Data.Kind( Type )
+import Data.Functor.Compose
+import Data.Functor.Product
 
 import qualified Data.Semigroup as S
 
@@ -342,6 +344,95 @@ fdList k m = foldMaybe k          (lm_nil m)
 ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
 ftList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = filterMaybe f mnil, lm_cons = fmap (filterTM f) mcons }
+
+
+{-
+************************************************************************
+*                                                                      *
+                   Composition
+*                                                                      *
+************************************************************************
+-}
+
+instance (TrieMap m, TrieMap n) => TrieMap (Compose m n) where
+  type Key (Compose m n) = (Key m, Key n)
+  emptyTM  = Compose emptyTM
+  lookupTM = lkCompose lookupTM lookupTM
+  {-# INLINE lookupTM #-}
+  alterTM  = xtCompose alterTM alterTM
+  {-# INLINE alterTM #-}
+  foldTM   = fdCompose
+  {-# INLINE foldTM #-}
+  filterTM = ftCompose
+  {-# INLINE filterTM #-}
+
+lkCompose :: Monad m => (t1 -> f (g a1) -> m a2) -> (t2 -> a2 -> m b) -> (t1, t2) -> Compose f g a1 -> m b
+lkCompose f g (a, b) (Compose m) = f a m >>= g b
+{-# INLINE lkCompose #-}
+
+xtCompose ::
+          (TrieMap m, TrieMap n)
+          => (forall a  . Key m -> XT a -> m a -> m a)
+          -> (forall a . Key n -> XT a -> n a -> n a)
+          -> Key (Compose m n)
+          -> XT a
+          -> Compose m n a
+          -> Compose m n a
+
+xtCompose f g (a, b) xt (Compose m) = Compose ((f a |>> g b xt) m)
+
+{-# INLINE xtCompose #-}
+
+fdCompose :: (TrieMap m1, TrieMap m2) => (a -> b -> b) -> Compose m1 m2 a -> b -> b
+fdCompose f (Compose m) = foldTM (foldTM f) m
+
+{-# INLINE fdCompose #-}
+
+
+ftCompose :: (TrieMap n, Functor m) => (a -> Bool) -> Compose m n a -> Compose m n a
+ftCompose f (Compose m) = Compose (fmap (filterTM f) m)
+
+{-# INLINE ftCompose #-}
+
+{- Product -}
+instance (TrieMap m, TrieMap n) => TrieMap (Product m n) where
+  type Key (Product m n) = Either (Key m) (Key n)
+  emptyTM  = Pair emptyTM emptyTM
+  lookupTM = lkProduct
+  {-# INLINE lookupTM #-}
+  alterTM  = xtProduct
+  {-# INLINE alterTM #-}
+  foldTM   = fdProduct
+  {-# INLINE foldTM #-}
+  filterTM = ftProduct
+  {-# INLINE filterTM #-}
+
+lkProduct :: (TrieMap m1, TrieMap m2) => Either (Key m1) (Key m2) -> Product m1 m2 b -> Maybe b
+lkProduct k (Pair am bm) =
+  case k of
+    Left a -> lookupTM a am
+    Right b -> lookupTM b bm
+
+{-# INLINE lkProduct #-}
+
+xtProduct :: (TrieMap f, TrieMap g) => Either (Key f) (Key g) -> XT a -> Product f g a -> Product f g a
+xtProduct k xt (Pair am bm) =
+  case k of
+    Left a -> Pair (alterTM a xt am) bm
+    Right b -> Pair am (alterTM b xt bm)
+
+{-# INLINE xtProduct #-}
+
+fdProduct :: (TrieMap f, TrieMap g) => (a -> c -> c) -> Product f g a -> c -> c
+fdProduct f (Pair am bm) = foldTM f am . foldTM f bm
+
+{-# INLINE fdProduct #-}
+
+ftProduct :: (TrieMap f, TrieMap g) => (a -> Bool) -> Product f g a -> Product f g a
+ftProduct f (Pair am bm) = Pair (filterTM f am) (filterTM f bm)
+
+{-# INLINE ftProduct #-}
+
 
 {-
 ************************************************************************
