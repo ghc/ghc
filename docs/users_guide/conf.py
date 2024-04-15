@@ -237,6 +237,15 @@ def haddock_role(lib):
             parts = text.split('.')
             module_parts = parts[:-1]
             thing = parts[-1]
+
+            # Escape any symbols in the identifier;
+            # see also Haddock.Utils.makeAnchorId
+            def escapeChar(c):
+                if (c in ':_.') or (c.isascii() and c.isalnum()):
+                    return c
+                return '-%d-' % ord(c)
+            thing = ''.join(escapeChar(c) for c in thing)
+
             if thing != '':
                 # reference to type or identifier
                 tag = 't' if thing[0].isupper() else 'v'
