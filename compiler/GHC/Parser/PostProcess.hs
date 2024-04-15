@@ -3318,12 +3318,12 @@ withCombinedComments ::
   HasLoc l2 =>
   l1 ->
   l2 ->
-  (SrcSpan -> EpAnnComments -> P a) ->
+  (SrcSpan -> P a) ->
   P (LocatedA a)
 withCombinedComments start end use = do
   cs <- getCommentsFor fullSpan
-  a <- use fullSpan cs
-  pure (L (noAnnSrcSpan fullSpan) a)
+  a <- use fullSpan
+  pure (L (EpAnn (spanAsAnchor fullSpan) noAnn cs) a)
   where
     fullSpan = combineSrcSpans (getHasLoc start) (getHasLoc end)
 
@@ -3363,15 +3363,14 @@ mkTupleSyntaxTycon boxity n =
 mkListSyntaxTy0 :: EpaLocation
                 -> EpaLocation
                 -> SrcSpan
-                -> EpAnnComments
                 -> P (HsType GhcPs)
-mkListSyntaxTy0 brkOpen brkClose span comments =
+mkListSyntaxTy0 brkOpen brkClose span =
   punsIfElse enabled disabled
   where
     enabled = HsTyVar noAnn NotPromoted rn
 
     -- attach the comments only to the RdrName since it's the innermost AST node
-    rn = L (EpAnn fullLoc rdrNameAnn comments) listTyCon_RDR
+    rn = L (EpAnn fullLoc rdrNameAnn emptyComments) listTyCon_RDR
 
     disabled =
       HsExplicitListTy annsKeyword NotPromoted []
