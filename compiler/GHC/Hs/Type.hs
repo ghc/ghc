@@ -219,7 +219,7 @@ type instance XHsPS GhcPs = EpAnnCO
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
-type instance XHsTP GhcPs = EpAnnCO
+type instance XHsTP GhcPs = NoExtField
 type instance XHsTP GhcRn = HsTyPatRn
 type instance XHsTP GhcTc = DataConCantHappen
 
@@ -295,9 +295,9 @@ mkHsPatSigType :: EpAnnCO -> LHsType GhcPs -> HsPatSigType GhcPs
 mkHsPatSigType ann x = HsPS { hsps_ext  = ann
                             , hsps_body = x }
 
-mkHsTyPat :: EpAnnCO -> LHsType GhcPs -> HsTyPat GhcPs
-mkHsTyPat ann x = HsTP { hstp_ext  = ann
-                       , hstp_body = x }
+mkHsTyPat :: LHsType GhcPs -> HsTyPat GhcPs
+mkHsTyPat x = HsTP { hstp_ext  = noExtField
+                   , hstp_body = x }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
@@ -589,7 +589,7 @@ mkHsAppTys = foldl' mkHsAppTy
 mkHsAppKindTy :: XAppKindTy (GhcPass p)
               -> LHsType (GhcPass p) -> LHsType (GhcPass p)
               -> LHsType (GhcPass p)
-mkHsAppKindTy x ty k = addCLocA ty k (HsAppKindTy x ty k)
+mkHsAppKindTy at ty k = addCLocA ty k (HsAppKindTy at ty k)
 
 {-
 ************************************************************************
