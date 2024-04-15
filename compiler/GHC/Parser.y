@@ -1257,8 +1257,7 @@ topdecl :: { LHsDecl GhcPs }
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
         | infixexp                              {% runPV (unECP $1) >>= \ $1 ->
-                                                    do { d <- mkSpliceDecl $1
-                                                       ; commentsPA d }}
+                                                       commentsPA $ mkSpliceDecl $1 }
 
 -- Type classes
 --
@@ -2603,7 +2602,7 @@ decl    :: { LHsDecl GhcPs }
         -- Why do we only allow naked declaration splices in top-level
         -- declarations and not here? Short answer: because readFail009
         -- fails terribly with a panic in cvBindsAndSigs otherwise.
-        | splice_exp            {% mkSpliceDecl $1 }
+        | splice_exp            { mkSpliceDecl $1 }
 
 rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
