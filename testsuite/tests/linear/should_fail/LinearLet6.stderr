@@ -13,7 +13,7 @@ LinearLet6.hs:10:3: error: [GHC-18872]
             where
                 (Just y) = x
 
-LinearLet6.hs:15:14: error: [GHC-18872]
+LinearLet6.hs:15:11: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
         arising from a non-linear pattern ‘Just y’
           (non-variable lazy pattern aren't linear)

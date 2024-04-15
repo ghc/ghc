@@ -1323,7 +1323,7 @@ checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig [sigAnn]
                         >>= checkLPat
-       checkPatBind loc [] lhs' grhss mult
+       checkPatBind loc lhs' grhss mult
 
 checkValDef loc lhs (mult_ann, Nothing) grhss
   | HsNoMultAnn{} <- mult_ann
@@ -1334,12 +1334,12 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
                            fun is_infix pats grhss
             Nothing -> do
               lhs' <- checkPattern lhs
-              checkPatBind loc [] lhs' grhss mult_ann }
+              checkPatBind loc lhs' grhss mult_ann }
 
 checkValDef loc lhs (mult_ann, Nothing) ghrss
         -- %p x = rhs  parses as a *pattern* binding
   = do lhs' <- checkPattern lhs
-       checkPatBind loc [] lhs' ghrss mult_ann
+       checkPatBind loc lhs' ghrss mult_ann
 
 checkFunBind :: SrcStrictness
              -> SrcSpan
@@ -1377,15 +1377,14 @@ makeFunBind fn ms
 
 -- See Note [FunBind vs PatBind]
 checkPatBind :: SrcSpan
-             -> [AddEpAnn]
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
-checkPatBind loc annsIn (L _ (BangPat ans (L _ (VarPat _ v))))
+checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
                         (L _match_span grhss) (HsNoMultAnn _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
-                [L (noAnnSrcSpan loc) (m (ans++annsIn) v)]))
+                [L (noAnnSrcSpan loc) (m ans v)]))
   where
     m a v = Match { m_ext = a
                   , m_ctxt = FunRhs { mc_fun    = v
@@ -1394,8 +1393,8 @@ checkPatBind loc annsIn (L _ (BangPat ans (L _ (VarPat _ v))))
                   , m_pats = []
                  , m_grhss = grhss }
 
-checkPatBind _loc annsIn lhs (L _ grhss) mult = do
-  return (PatBind annsIn lhs mult grhss)
+checkPatBind _loc lhs (L _ grhss) mult = do
+  return (PatBind noExtField lhs mult grhss)
 
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)

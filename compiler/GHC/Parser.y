@@ -2585,7 +2585,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | PREFIX_PERCENT atype infixexp     opt_sig rhs  {% runPV (unECP $3) >>= \ $3 ->
-                                       do { let { l = comb2 $3 $> }
+                                       do { let { l = comb2 $1 $> }
                                           ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2, $4) $5;
                                         -- parses bindings of the form %p x or
                                         -- %p x :: sig
