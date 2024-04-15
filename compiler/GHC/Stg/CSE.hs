@@ -124,7 +124,7 @@ data StgArgMap a = SAM
     , sam_lit :: LiteralMap a
     }
 
-type LiteralMap  a = Map.Map Literal a
+type LiteralMap = Map.Map Literal
 
 -- TODO(22292): derive
 instance Functor StgArgMap where

@@ -594,6 +594,7 @@ Library
         GHC.Iface.Tidy.StaticPtrTable
         GHC.IfaceToCore
         GHC.Iface.Type
+        GHC.Iface.Type.Map
         GHC.JS.Ident
         GHC.JS.Make
         GHC.JS.Optimizer

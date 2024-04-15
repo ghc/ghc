@@ -113,6 +113,10 @@ newtype IfLclName = IfLclName
   { getIfLclName :: LexicalFastString
   } deriving (Eq, Ord, Show)
 
+instance Uniquable IfLclName where
+  getUnique = getUnique . ifLclNameFS
+
+
 ifLclNameFS :: IfLclName -> FastString
 ifLclNameFS = getLexicalFastString . getIfLclName
 
