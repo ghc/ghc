@@ -8,8 +8,6 @@ module GHCi.UI.Exception
     ( printGhciException
     , GHCiMessage(..)
     , GhciCommandError(..)
-    , GhciArgumentParseError(..)
-    , GhciInput
     , reportError) where
 
 import GHC.Prelude
@@ -40,21 +38,46 @@ import GHC.Utils.Outputable
 import Control.Monad.IO.Class
 import GHC.Generics
 
-import Control.Monad.Trans.Except (ExceptT (..), throwE)
+import Control.Exception (Exception, throwIO)
 import System.Console.Haskeline (InputT)
 import Control.Monad.Trans.Class
 
--- JADE_TODO
-newtype GhciInput m a = GhciInput
-  { getGhciInput :: ExceptT GhciCommandError (InputT m) a }
-  deriving (Functor, Applicative, Monad, MonadIO)
+reportError :: MonadIO m => GhciCommandError -> m a
+reportError = liftIO . throwIO
 
-instance MonadTrans GhciInput where
-  lift = lift -- JADE_TODO
+instance Exception GhciCommandError
 
-reportError :: Monad m => GhciCommandError -> GhciInput m a
-reportError = GhciInput . throwE
+data GhciCommandError
+  -- macro errors
+  = GhciMacroAlreadyDefined String
+  | GhciMacroInvalidStart String
+  | GhciMacroNotDefined
+  | GhciMacroOverwritesBuiltin String
+  -- module name errors
+  | GhciModuleNotFound String
+  | GhciNoModuleNameGuess
+  | GhciNoModuleInfoForCurrentFile
+  | GhciNoLocationInfoForModule ModuleName
+  | GhciNoResolvedModules
+  | GhciNoModuleForName Name
+  | GhciNoMatchingModuleExport
+  -- argument parse error
+  | GhciArgumentParseError SDoc
+  -- Basic errors
+  | GhciCommandNotSupportedInMultiMode
+  | GhciInvalidArgumentString String
+  | GhciFileNotFound String
+  | GhciCommandSyntaxError String [String]
+  | GhciInvalidPromptString
+  | GhciPromptCallError String
+  | GhciUnknownCommand String String
+  | GhciNoLastCommandAvailable String
+  | GhciUnknownFlag String [String]
+  | GhciNoSetEditor
+  deriving Generic
 
+instance Show GhciCommandError where
+  show = showSDocUnsafe . ppr
 
 -- | Print the all diagnostics in a 'SourceError'.  Specialised for GHCi error reporting
 -- for some error messages.
@@ -166,49 +189,6 @@ ghciDiagnosticMessage ghc_opts msg =
               text "to expose it." $$
               text "(Note: this unloads all the modules in the current scope.)"
 
-data GhciArgumentParseError
-  = SpanPrematureEnd
-  | SpanNoReadAs String String
-  | SpanExpectedWS String
-
-instance Outputable GhciArgumentParseError where
-  ppr = \case
-    SpanPrematureEnd
-      -> "Premature end of string while expecting Int"
-    SpanNoReadAs actual expected
-      -> "Couldn't read" <+> text actual <+> "as" <+> text expected
-    SpanExpectedWS str
-      -> "Expected whitespace in" <+> text str
-
-data GhciCommandError
-  -- macro errors
-  = GhciMacroAlreadyDefined String
-  | GhciMacroInvalidStart String
-  | GhciMacroNotDefined
-  | GhciMacroOverwritesBuiltin String
-  -- module name errors
-  | GhciModuleNotFound String
-  | GhciNoModuleNameGuess
-  | GhciNoModuleInfoForCurrentFile
-  | GhciNoLocationInfoForModule ModuleName
-  | GhciNoResolvedModules
-  | GhciNoModuleForName Name
-  | GhciNoMatchingModuleExport
-  -- argument parse error
-  | GhciArgumentParseError GhciArgumentParseError
-  -- Basic errors
-  | GhciCommandNotSupportedInMultiMode
-  | GhciInvalidArgumentString String
-  | GhciFileNotFound String
-  | GhciCommandSyntaxError String [String]
-  | GhciInvalidPromptString
-  | GhciPromptCallError String
-  | GhciUnknownCommand String String
-  | GhciNoLastCommandAvailable String
-  | GhciUnknownFlag String [String]
-  | GhciNoSetEditor
-  deriving Generic
-
 instance Outputable GhciCommandError where
   ppr = \case
     GhciMacroAlreadyDefined name
@@ -231,7 +211,7 @@ instance Outputable GhciCommandError where
       -> "No module for" <+> ppr name
     GhciNoMatchingModuleExport
       -> "No matching export in any local modules."
-    GhciArgumentParseError ape -> ppr ape
+    GhciArgumentParseError ape -> ape
     GhciCommandNotSupportedInMultiMode
       -> "Command is not supported (yet) in multi-mode"
     GhciInvalidArgumentString str

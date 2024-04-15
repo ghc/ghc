@@ -14,7 +14,6 @@ module GHCi.UI.Monad (
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
-        GhciInput,
         CmdExecOutcome(..),
         LocalConfigBehaviour(..),
         PromptFunction,
@@ -59,7 +58,7 @@ import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
-import GHCi.UI.Exception (printGhciException, GhciCommandError, ExceptGhciError, reportError)
+import GHCi.UI.Exception (printGhciException, GhciCommandError, reportError)
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
@@ -92,9 +91,6 @@ import Control.Monad.Trans.Except
 -----------------------------------------------------------------------------
 -- GHCi monad
 
-runGhciInput :: GhciMonad m => Settings m -> GhciInput m a -> m (Either GhciCommandError a)
-runGhciInput settings = runExceptT . runInputT settings . getGhciInput
-
 data GHCiState = GHCiState
      {
         progname       :: String,
@@ -121,7 +117,7 @@ data GHCiState = GHCiState
         last_command   :: Maybe Command,
             -- ^ @:@ at the GHCi prompt repeats the last command, so we
             -- remember it here
-        cmd_wrapper    :: GhciInput CommandResult -> GhciInput (Maybe Bool),
+        cmd_wrapper    :: InputT GHCi CommandResult -> InputT GHCi (Maybe Bool),
             -- ^ The command wrapper is run for each command or statement.
             -- The 'Bool' value denotes whether the command is successful and
             -- 'Nothing' means to exit GHCi.
@@ -187,7 +183,7 @@ data Command
    = Command
    { cmdName           :: String
      -- ^ Name of GHCi command (e.g. "exit")
-   , cmdAction         :: String -> GhciInput CmdExecOutcome
+   , cmdAction         :: String -> InputT GHCi CmdExecOutcome
      -- ^ The 'CmdExecOutcome' value denotes whether to exit GHCi cleanly or error out
    , cmdHidden         :: Bool
      -- ^ Commands which are excluded from default completion
@@ -228,7 +224,7 @@ cmdSuccess CommandIncomplete = return $ Just True
 
 type PromptFunction = [String]
                    -> Int
-                   -> ExceptGhciError GHCi SDoc
+                   -> GHCi SDoc
 
 data GHCiOption
         = ShowTiming            -- show time/allocs after evaluation
@@ -322,19 +318,11 @@ instance GhciMonad GHCi where
   modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef' r f
   reifyGHCi f       = GHCi $ \r -> reifyGhc $ \s -> f (s, r)
 
-{-
 instance GhciMonad (InputT GHCi) where
   getGHCiState    = lift getGHCiState
   setGHCiState    = lift . setGHCiState
   modifyGHCiState = lift . modifyGHCiState
   reifyGHCi       = lift . reifyGHCi
-
-instance GhciMonad m => GhciMonad (ExceptGhciError m) where
-  getGHCiState    = lift getGHCiState
-  setGHCiState    = lift . setGHCiState
-  modifyGHCiState = lift . modifyGHCiState
-  reifyGHCi       = lift . reifyGHCi
--}
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
@@ -358,14 +346,7 @@ instance HasDynFlags (InputT GHCi) where
 instance HasLogger (InputT GHCi) where
   getLogger = lift getLogger
 
-instance (Monad m, HasLogger m) => HasLogger (ExceptGhciError m) where
-  getLogger = lift getLogger
-
 instance GhcMonad (InputT GHCi) where
-  setSession = lift . setSession
-  getSession = lift getSession
-
-instance GhcMonad m => GhcMonad (ExceptGhciError m) where
   setSession = lift . setSession
   getSession = lift getSession
 

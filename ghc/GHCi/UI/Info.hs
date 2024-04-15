@@ -20,6 +20,7 @@ module GHCi.UI.Info
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.IO.Class
 import           Control.Monad.Catch as MC
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
@@ -116,18 +117,15 @@ findLoc :: GhcMonad m
         => Map ModuleName ModInfo
         -> RealSrcSpan
         -> String
-        -> GhciInput m (ModInfo,Name,SrcSpan)
+        -> m (ModInfo,Name,SrcSpan)
 findLoc infos span0 string = do
-    name  <- maybeToExceptT GhciNoModuleNameGuess $
-             guessModule infos (srcSpanFilePath span0)
-
-    info  <- lift $ maybeToExceptT GhciNoModuleInfoForCurrentFile $
-             MaybeT $ pure $ M.lookup name infos
+    name  <- guessModule infos (srcSpanFilePath span0) `orElseThrow` GhciNoModuleNameGuess
+    info  <- hoistMaybe (M.lookup name infos) `orElseThrow` GhciNoModuleInfoForCurrentFile
 
     name' <- findName infos span0 info string
 
     case getSrcSpan name' of
-        UnhelpfulSpan{} -> reportError $ GhciNoLocationInfoForModule $ maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name')
+        UnhelpfulSpan{} -> reportError $ GhciNoLocationInfoForModule (maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name'))
         span' -> pure (info,name',span')
 
 -- | Find any uses of the given identifier in the codebase.
@@ -135,7 +133,7 @@ findNameUses :: (GhcMonad m)
              => Map ModuleName ModInfo
              -> RealSrcSpan
              -> String
-             -> GhciInput m [SrcSpan]
+             -> m [SrcSpan]
 findNameUses infos span0 string =
     locToSpans <$> findLoc infos span0 string
   where
@@ -163,7 +161,7 @@ findName :: GhcMonad m
          -> RealSrcSpan
          -> ModInfo
          -> String
-         -> GhciInput m Name
+         -> m Name
 findName infos span0 mi string =
     case resolveName (modinfoSpans mi) (spanInfoFromRealSrcSpan' span0) of
       Nothing -> tryExternalModuleResolution
@@ -187,10 +185,9 @@ findName infos span0 mi string =
 resolveNameFromModule :: GhcMonad m
                       => Map ModuleName ModInfo
                       -> Name
-                      -> GhciInput m Name
+                      -> m Name
 resolveNameFromModule infos name = do
-     modL <- maybe (reportError $ GhciNoModuleForName name) pure $
-             nameModule_maybe name
+     modL <- hoistMaybe (nameModule_maybe name) `orElseThrow` GhciNoModuleForName name
 
      -- info <- maybe (throwE (ppr (moduleUnit modL) <> ":" <> JADE_TODO
      --                       ppr modL)) return $
@@ -212,23 +209,25 @@ resolveName :: [SpanInfo] -> SpanInfo -> Maybe Var
 resolveName spans' si = listToMaybe $ mapMaybe spaninfoVar $
                         reverse spans' `spaninfosWithin` si
 
-orErrorWith :: Maybe a -> GhciCommandError -> GhciInput m a
-orErrorWith m err = maybe (reportError err) pure m
+orElseThrow :: MonadIO m => MaybeT m a -> GhciCommandError -> m a
+orElseThrow mt err = do
+  x <- runMaybeT mt
+  maybe (reportError err) pure x
+
 
 -- | Try to find the type of the given span.
 findType :: GhcMonad m
          => Map ModuleName ModInfo
          -> RealSrcSpan
          -> String
-         -> GhciInput m (ModInfo, Type)
+         -> m (ModInfo, Type)
 findType infos span0 string = do
-    name <- guessModule infos (srcSpanFilePath span0) `orErrorWith` GhciNoModuleNameGuess
-    -- info  <- lift $ maybeToExceptT GhciNoModuleInfoForCurrentFile  $ M.lookup name infos
-    info <- M.lookup name infos `orErrorWith` GhciNoModuleInfoForCurrentFile
+    name  <- guessModule infos (srcSpanFilePath span0) `orElseThrow` GhciNoModuleNameGuess
+    info  <- hoistMaybe (M.lookup name infos) `orElseThrow` GhciNoModuleInfoForCurrentFile
 
     case resolveType (modinfoSpans info) (spanInfoFromRealSrcSpan' span0) of
-        Nothing -> (,) info <$> lift (exprType TM_Inst string)
-        Just ty -> return (info, ty)
+        Nothing -> (,) info <$> (exprType TM_Inst string)
+        Just ty -> pure (info, ty)
   where
     -- | Try to resolve the type display from the given span.
     resolveType :: [SpanInfo] -> SpanInfo -> Maybe Type
