@@ -1,17 +1,18 @@
 {-# language NoListTuplePuns #-}
+{-# OPTIONS -ddump-parsed-ast #-}
 module AnnotationNoListTuplePuns where
 
 type A =
-  -- comment pre
+  -- comment pre A
   [
-    -- comment inside
+    -- comment inside A
   ]
-  -- comment post
+  -- comment post A
 
 type B =
-  -- comment pre
+  -- comment pre B
   [
-    -- comment inside
+    -- comment inside B
     Bool
   ]
-  -- comment post
+  -- comment post B
