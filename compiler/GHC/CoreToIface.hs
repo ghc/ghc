@@ -121,7 +121,7 @@ toIfaceTvBndr :: TyVar -> IfaceTvBndr
 toIfaceTvBndr = toIfaceTvBndrX emptyVarSet
 
 toIfaceTvBndrX :: VarSet -> TyVar -> IfaceTvBndr
-toIfaceTvBndrX fr tyvar = ( occNameFS (getOccName tyvar)
+toIfaceTvBndrX fr tyvar = ( mkIfLclName (occNameFS (getOccName tyvar))
                           , toIfaceTypeX fr (tyVarKind tyvar)
                           )
 
@@ -133,7 +133,7 @@ toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
 toIfaceIdBndrX fr covar = ( toIfaceType (idMult covar)
-                          , occNameFS (getOccName covar)
+                          , mkIfLclName (occNameFS (getOccName covar))
                           , toIfaceTypeX fr (varType covar)
                           )
 
@@ -218,11 +218,11 @@ toIfaceTypeX fr (TyConApp tc tys)
     arity = tyConArity tc
     n_tys = length tys
 
-toIfaceTyVar :: TyVar -> FastString
-toIfaceTyVar = occNameFS . getOccName
+toIfaceTyVar :: TyVar -> IfLclName
+toIfaceTyVar = mkIfLclName . occNameFS . getOccName
 
-toIfaceCoVar :: CoVar -> FastString
-toIfaceCoVar = occNameFS . getOccName
+toIfaceCoVar :: CoVar -> IfLclName
+toIfaceCoVar = mkIfLclName . occNameFS . getOccName
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
@@ -264,7 +264,7 @@ toIfaceTyCon_name n = IfaceTyCon n info
 
 toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceTyLit (NumTyLit x) = IfaceNumTyLit x
-toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
+toIfaceTyLit (StrTyLit x) = IfaceStrTyLit (LexicalFastString x)
 toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 
 ----------------
@@ -296,7 +296,7 @@ toIfaceCoercionX fr co
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (KindCo c)           = IfaceKindCo (go c)
     go (SubCo co)           = IfaceSubCo (go co)
-    go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
+    go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (mkIfLclName (coaxrName co)) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
     go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
                                           (toIfaceTypeX fr t1)
@@ -433,7 +433,7 @@ toIfaceSrcBang :: HsSrcBang -> IfaceSrcBang
 toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 
 toIfaceLetBndr :: Id -> IfaceLetBndr
-toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
+toIfaceLetBndr id  = IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
                                (toIfaceType (idType id))
                                (toIfaceIdInfo (idInfo id))
                                (idJoinPointHood id)
@@ -444,7 +444,7 @@ toIfaceTopBndr :: Id -> IfaceTopBndrInfo
 toIfaceTopBndr id
   = if isExternalName name
       then IfGblTopBndr name
-      else IfLclTopBndr (occNameFS (getOccName id)) (toIfaceType (idType id))
+      else IfLclTopBndr (mkIfLclName (occNameFS (getOccName id))) (toIfaceType (idType id))
                         (toIfaceIdInfo (idInfo id)) (toIfaceIdDetails (idDetails id))
   where
     name = getName id
@@ -555,7 +555,7 @@ toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfac
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
+  | otherwise               = IfaceCase (toIfaceExpr s) (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e)      = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
@@ -610,7 +610,7 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
-toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map getOccFS bs) (toIfaceExpr r)
+toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
@@ -655,7 +655,7 @@ toIfaceVar v
                                       -- Foreign calls have special syntax
 
     | isExternalName name             = IfaceExt name
-    | otherwise                       = IfaceLcl (occNameFS $ nameOccName name)
+    | otherwise                       = IfaceLcl (mkIfLclName (occNameFS $ nameOccName name))
   where
     name = idName v
     ty   = idType v

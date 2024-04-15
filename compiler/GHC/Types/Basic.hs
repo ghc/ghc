@@ -148,7 +148,7 @@ import qualified Data.Semigroup as Semi
 ********************************************************************* -}
 
 data LeftOrRight = CLeft | CRight
-                 deriving( Eq, Data )
+                 deriving( Eq, Data, Ord )
 
 pickLR :: LeftOrRight -> (a,a) -> a
 pickLR CLeft  (l,_) = l
