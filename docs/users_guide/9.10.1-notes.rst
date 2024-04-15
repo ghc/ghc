@@ -28,6 +28,12 @@ Language
   compatible, and future releases of GHC may change the default, it is highly
   recommended to specify the language edition explicitly.
 
+- GHC Proposal `#575 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0575-deprecated-instances.rst>`_
+  has been implemented, allowing ``DEPRECATED`` and ``WARNING``
+  pragmas to be applied to class ``instance`` declarations.
+  Doing so will cause warnings to be emitted whenever such instances are used
+  to solve a constraint.  For details, see :ref:`warning-deprecated-pragma`.
+
 - GHC Proposal `#281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
   "Visible forall in types of terms" has been partially implemented.
   The following code is now accepted by GHC::
