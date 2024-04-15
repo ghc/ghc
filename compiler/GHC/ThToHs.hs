@@ -218,7 +218,7 @@ cvtDec (TH.ValD pat body ds)
         ; returnJustLA $ Hs.ValD noExtField $
           PatBind { pat_lhs = pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
-                  , pat_ext = noAnn
+                  , pat_ext = noExtField
                   , pat_mult = HsNoMultAnn noExtField
                   } }
 
