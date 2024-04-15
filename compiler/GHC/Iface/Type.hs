@@ -33,6 +33,8 @@ module GHC.Iface.Type (
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
 
+        -- Binary utilities
+        putIfaceType, getIfaceType,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -91,10 +93,11 @@ import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
 import Control.DeepSeq
+import Data.Proxy
 import Control.Monad ((<$!>))
 import Control.Arrow (first)
 import qualified Data.Semigroup as Semi
-import Data.Maybe( isJust )
+import Data.Maybe (isJust)
 
 {-
 ************************************************************************
@@ -192,6 +195,34 @@ data IfaceType
           -- in interface file size (in GHC's boot libraries).
           -- See !3987.
   deriving (Eq, Ord)
+  -- See Note [Ord instance of IfaceType]
+
+{-
+Note [Ord instance of IfaceType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need an 'Ord' instance to have a 'Map' keyed by 'IfaceType'. This 'Map' is
+required for implementing the deduplication table during interface file
+serialisation.
+See Note [Deduplication during iface binary serialisation] for the implementation details.
+
+We experimented with a 'TrieMap' based implementation, but it seems to be
+slower than using a straight-forward 'Map IfaceType'.
+The experiments loaded the full agda library into a ghci session with the
+following scenarios:
+
+* normal: a plain ghci session.
+* cold: a ghci session that uses '-fwrite-if-simplified-core -fforce-recomp',
+  forcing a cold-cache.
+* warm: a subsequent ghci session that uses a warm cache for
+  '-fwrite-if-simplified-core', e.g. nothing needs to be recompiled.
+
+The implementation was up to 5% slower in some execution runs. However, on
+'lib:Cabal', the performance difference between 'Map IfaceType' and
+'TrieMap IfaceType' was negligible.
+
+We share our implementation of the 'TrieMap' in the ticket #24816, so that
+further performance analysis and improvements don't need to start from scratch.
+-}
 
 type IfaceMult = IfaceType
 
@@ -2194,39 +2225,56 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    put_ _ (IfaceFreeTyVar tv)
-       = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
-           -- See Note [Free TyVars and CoVars in IfaceType]
+   put_ bh tyCon = case findUserDataWriter Proxy bh of
+    tbl -> putEntry tbl bh tyCon
 
-    put_ bh (IfaceForAllTy aa ab) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-    put_ bh (IfaceTyVar ad) = do
-            putByte bh 1
-            put_ bh ad
-    put_ bh (IfaceAppTy ae af) = do
-            putByte bh 2
-            put_ bh ae
-            put_ bh af
-    put_ bh (IfaceFunTy af aw ag ah) = do
-            putByte bh 3
-            put_ bh af
-            put_ bh aw
-            put_ bh ag
-            put_ bh ah
-    put_ bh (IfaceTyConApp tc tys)
-      = do { putByte bh 5; put_ bh tc; put_ bh tys }
-    put_ bh (IfaceCastTy a b)
-      = do { putByte bh 6; put_ bh a; put_ bh b }
-    put_ bh (IfaceCoercionTy a)
-      = do { putByte bh 7; put_ bh a }
-    put_ bh (IfaceTupleTy s i tys)
-      = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
-    put_ bh (IfaceLitTy n)
-      = do { putByte bh 9; put_ bh n }
+   get bh = case findUserDataReader Proxy bh of
+    tbl -> getEntry tbl bh
 
-    get bh = do
+
+-- | Serialises an 'IfaceType' to the given 'WriteBinHandle'.
+--
+-- Serialising inner 'IfaceType''s uses the 'Binary.put' of 'IfaceType' which may be using
+-- a deduplication table. See Note [Deduplication during iface binary serialisation].
+putIfaceType :: WriteBinHandle -> IfaceType -> IO ()
+putIfaceType _ (IfaceFreeTyVar tv)
+  = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
+  -- See Note [Free TyVars and CoVars in IfaceType]
+
+putIfaceType bh (IfaceForAllTy aa ab) = do
+        putByte bh 0
+        put_ bh aa
+        put_ bh ab
+putIfaceType bh (IfaceTyVar ad) = do
+        putByte bh 1
+        put_ bh ad
+putIfaceType bh (IfaceAppTy ae af) = do
+        putByte bh 2
+        put_ bh ae
+        put_ bh af
+putIfaceType bh (IfaceFunTy af aw ag ah) = do
+        putByte bh 3
+        put_ bh af
+        put_ bh aw
+        put_ bh ag
+        put_ bh ah
+putIfaceType bh (IfaceTyConApp tc tys)
+  = do { putByte bh 5; put_ bh tc; put_ bh tys }
+putIfaceType bh (IfaceCastTy a b)
+  = do { putByte bh 6; put_ bh a; put_ bh b }
+putIfaceType bh (IfaceCoercionTy a)
+  = do { putByte bh 7; put_ bh a }
+putIfaceType bh (IfaceTupleTy s i tys)
+  = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
+putIfaceType bh (IfaceLitTy n)
+  = do { putByte bh 9; put_ bh n }
+
+-- | Deserialises an 'IfaceType' from the given 'ReadBinHandle'.
+--
+-- Reading inner 'IfaceType''s uses the 'Binary.get' of 'IfaceType' which may be using
+-- a deduplication table. See Note [Deduplication during iface binary serialisation].
+getIfaceType :: HasCallStack => ReadBinHandle -> IO IfaceType
+getIfaceType bh = do
             h <- getByte bh
             case h of
               0 -> do aa <- get bh

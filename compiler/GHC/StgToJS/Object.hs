@@ -314,7 +314,7 @@ putObject bh mod_name deps os = do
   put_ bh (moduleNameString mod_name)
 
   (fs_tbl, fs_writer) <- initFastStringWriterTable
-  let bh_fs = addWriterToUserData (mkSomeBinaryWriter fs_writer) bh
+  let bh_fs = addWriterToUserData fs_writer bh
 
   forwardPut_ bh (const (putTable fs_tbl bh_fs)) $ do
     put_ bh_fs deps
