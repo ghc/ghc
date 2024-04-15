@@ -720,7 +720,7 @@ Currently there are nine different uses of 'VarBndr':
 
 data VarBndr var argf = Bndr var argf
   -- See Note [The VarBndr type and its uses]
-  deriving( Data )
+  deriving( Data, Eq, Ord)
 
 -- | Variable Binder
 --
