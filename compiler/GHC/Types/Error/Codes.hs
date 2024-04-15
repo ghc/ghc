@@ -43,9 +43,6 @@ import GHC.TypeNats ( Nat, KnownNat, natVal' )
 import Data.Map.Strict ( Map )
 import qualified Data.Map.Strict as Map
 
-import qualified GHCi.UI.Exception as GhciEx
-
-
 {- Note [Diagnostic codes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Every time a new diagnostic (error or warning) is introduced to GHC,
@@ -896,12 +893,19 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "GhciUnknownFlag"                               = 15670
   GhcDiagnosticCode "GhciNoSetEditor"                               = 34086
 
-  GhcDiagnosticCode "MacroInvalidStart"                         = 64996
-  GhcDiagnosticCode "MacroAlreadyDefined"                       = 93909
-  GhcDiagnosticCode "MacroIsNotDefined"                         = 40561
-  GhcDiagnosticCode "MacroOverwritesBuiltin"                    = 86201
-  GhcDiagnosticCode "FileNotFound"                              = 31901
-  GhcDiagnosticCode "ModuleNotFound"                            = 23305
+  GhcDiagnosticCode "GhciMacroInvalidStart"                         = 64996
+  GhcDiagnosticCode "GhciMacroAlreadyDefined"                       = 93909
+  GhcDiagnosticCode "GhciMacroNotDefined"                           = 40561
+  GhcDiagnosticCode "GhciMacroOverwritesBuiltin"                    = 86201
+  GhcDiagnosticCode "GhciFileNotFound"                              = 31901
+  GhcDiagnosticCode "GhciModuleNotFound"                            = 23305
+  GhcDiagnosticCode "GhciNoModuleNameGuess"                         = 21939
+  GhcDiagnosticCode "GhciNoModuleInfoForCurrentFile"                = 96587
+  GhcDiagnosticCode "GhciNoLocationInfoForModule"                   = 12769
+  GhcDiagnosticCode "GhciNoResolvedModules"                         = 54909
+  GhcDiagnosticCode "GhciNoModuleForName"                           = 21847
+  GhcDiagnosticCode "GhciNoMatchingModuleExport"                    = 59723
+  GhcDiagnosticCode "GhciArgumentParseError"                        = 35671
 
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
@@ -1089,11 +1093,6 @@ type family ConRecursInto con where
   ConRecursInto "ImportLookupBad"          = 'Just BadImportKind
 
   ConRecursInto "TcRnUnpromotableThing"    = 'Just PromotionErr
-
-
-  ----------------------------------
-  -- GHCi
-  ConRecursInto "GhciModuleError"          = 'Just GhciEx.ModuleError
 
   ----------------------------------
   -- Any other constructors: don't recur, instead directly

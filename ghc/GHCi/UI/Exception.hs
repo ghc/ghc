@@ -8,10 +8,9 @@ module GHCi.UI.Exception
     ( printGhciException
     , GHCiMessage(..)
     , GhciCommandError(..)
-    , GhciModuleError(..)
-    , GhciMacroError(..)
     , GhciArgumentParseError(..)
-    , ExceptGhciError) where
+    , GhciInput
+    , reportError) where
 
 import GHC.Prelude
 
@@ -41,7 +40,21 @@ import GHC.Utils.Outputable
 import Control.Monad.IO.Class
 import GHC.Generics
 
-import Control.Monad.Trans.Except (ExceptT (..))
+import Control.Monad.Trans.Except (ExceptT (..), throwE)
+import System.Console.Haskeline (InputT)
+import Control.Monad.Trans.Class
+
+-- JADE_TODO
+newtype GhciInput m a = GhciInput
+  { getGhciInput :: ExceptT GhciCommandError (InputT m) a }
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans GhciInput where
+  lift = lift -- JADE_TODO
+
+reportError :: Monad m => GhciCommandError -> GhciInput m a
+reportError = GhciInput . throwE
+
 
 -- | Print the all diagnostics in a 'SourceError'.  Specialised for GHCi error reporting
 -- for some error messages.
@@ -153,51 +166,6 @@ ghciDiagnosticMessage ghc_opts msg =
               text "to expose it." $$
               text "(Note: this unloads all the modules in the current scope.)"
 
-
-data GhciMacroError
-  = MacroAlreadyDefined String
-  | MacroInvalidStart String
-  | MacroNotDefined
-  | MacroOverwritesBuiltin String
-
-instance Outputable GhciMacroError where
-  ppr = \case
-    MacroAlreadyDefined name
-      -> "Macro" <+> quotes (text name) <+> "is already defined" <.> macro_name_hint
-    MacroOverwritesBuiltin name
-      -> "Macro" <+> quotes (text name) <+> "overwrites builtin command" <.> macro_name_hint
-    MacroInvalidStart str
-      -> "Macro name cannot start with" <+> text str
-
-    where
-      macro_name_hint = "Use" <+> quotes (colon <> "def!") <+> "to overwrite" <> dot
-
-data GhciModuleError
-  = ModuleNotFound String --ModuleName
-  | NoModuleNameGuess
-  | NoModuleInfoForCurrentFile
-  | NoLocationInfoForModule ModuleName
-  | NoResolvedModules
-  | NoModuleForName Name
-  | NoMatchingModuleExport
-
-instance Outputable GhciModuleError where
-  ppr = \case
-    ModuleNotFound modN
-      -> "Module" <+> text modN <+> "not found"
-    NoModuleNameGuess
-      -> "Couldn't guess that module name. Does it exist?"
-    NoModuleInfoForCurrentFile
-      -> "No module info for current file! Try loading it?"
-    NoLocationInfoForModule name
-      -> "Found a name, but no location information" <.> "The module is" <:> ppr name
-    NoResolvedModules
-      -> "Couldn't resolve to any modules."
-    NoModuleForName name
-      -> "No module for" <+> ppr name
-    NoMatchingModuleExport
-      -> "No matching export in any local modules."
-
 data GhciArgumentParseError
   = SpanPrematureEnd
   | SpanNoReadAs String String
@@ -213,9 +181,20 @@ instance Outputable GhciArgumentParseError where
       -> "Expected whitespace in" <+> text str
 
 data GhciCommandError
-  -- composite errors
-  = GhciMacroError GhciMacroError
-  | GhciModuleError GhciModuleError
+  -- macro errors
+  = GhciMacroAlreadyDefined String
+  | GhciMacroInvalidStart String
+  | GhciMacroNotDefined
+  | GhciMacroOverwritesBuiltin String
+  -- module name errors
+  | GhciModuleNotFound String
+  | GhciNoModuleNameGuess
+  | GhciNoModuleInfoForCurrentFile
+  | GhciNoLocationInfoForModule ModuleName
+  | GhciNoResolvedModules
+  | GhciNoModuleForName Name
+  | GhciNoMatchingModuleExport
+  -- argument parse error
   | GhciArgumentParseError GhciArgumentParseError
   -- Basic errors
   | GhciCommandNotSupportedInMultiMode
@@ -228,19 +207,31 @@ data GhciCommandError
   | GhciNoLastCommandAvailable String
   | GhciUnknownFlag String [String]
   | GhciNoSetEditor
-
   deriving Generic
-
-
-
-type ExceptGhciError = ExceptT GhciCommandError
 
 instance Outputable GhciCommandError where
   ppr = \case
-    GhciMacroError me -> ppr me
-    GhciModuleError me -> ppr me
+    GhciMacroAlreadyDefined name
+      -> "Macro" <+> quotes (text name) <+> "is already defined" <.> macro_name_hint
+    GhciMacroOverwritesBuiltin name
+      -> "Macro" <+> quotes (text name) <+> "overwrites builtin command" <.> macro_name_hint
+    GhciMacroInvalidStart str
+      -> "Macro name cannot start with" <+> text str
+    GhciModuleNotFound modN
+      -> "Module" <+> text modN <+> "not found"
+    GhciNoModuleNameGuess
+      -> "Couldn't guess that module name. Does it exist?"
+    GhciNoModuleInfoForCurrentFile
+      -> "No module info for current file! Try loading it?"
+    GhciNoLocationInfoForModule name
+      -> "Found a name, but no location information" <.> "The module is" <:> ppr name
+    GhciNoResolvedModules
+      -> "Couldn't resolve to any modules."
+    GhciNoModuleForName name
+      -> "No module for" <+> ppr name
+    GhciNoMatchingModuleExport
+      -> "No matching export in any local modules."
     GhciArgumentParseError ape -> ppr ape
-
     GhciCommandNotSupportedInMultiMode
       -> "Command is not supported (yet) in multi-mode"
     GhciInvalidArgumentString str
@@ -265,10 +256,12 @@ instance Outputable GhciCommandError where
       -> text err
     GhciNoSetEditor
       -> "editor not set, use :set editor"
+    where
+      macro_name_hint = "Use" <+> quotes (colon <> "def!") <+> "to overwrite" <> dot
 
 
 (<:>) :: SDoc -> SDoc -> SDoc
 l <:> r = l <> colon <+> r
 
 (<.>) :: SDoc -> SDoc -> SDoc
-l <.> r = l <> dot   <+> r
+l <.> r = l <> dot <+> r

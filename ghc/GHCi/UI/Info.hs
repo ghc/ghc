@@ -116,18 +116,18 @@ findLoc :: GhcMonad m
         => Map ModuleName ModInfo
         -> RealSrcSpan
         -> String
-        -> ExceptGhciError m (ModInfo,Name,SrcSpan)
+        -> GhciInput m (ModInfo,Name,SrcSpan)
 findLoc infos span0 string = do
-    name  <- maybeToExceptT (GhciModuleError NoModuleNameGuess) $
+    name  <- maybeToExceptT GhciNoModuleNameGuess $
              guessModule infos (srcSpanFilePath span0)
 
-    info  <- maybeToExceptT (GhciModuleError NoModuleInfoForCurrentFile) $
+    info  <- lift $ maybeToExceptT GhciNoModuleInfoForCurrentFile $
              MaybeT $ pure $ M.lookup name infos
 
     name' <- findName infos span0 info string
 
     case getSrcSpan name' of
-        UnhelpfulSpan{} -> throwE $ GhciModuleError (NoLocationInfoForModule $ maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name'))
+        UnhelpfulSpan{} -> reportError $ GhciNoLocationInfoForModule $ maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name')
         span' -> pure (info,name',span')
 
 -- | Find any uses of the given identifier in the codebase.
@@ -135,7 +135,7 @@ findNameUses :: (GhcMonad m)
              => Map ModuleName ModInfo
              -> RealSrcSpan
              -> String
-             -> ExceptGhciError m [SrcSpan]
+             -> GhciInput m [SrcSpan]
 findNameUses infos span0 string =
     locToSpans <$> findLoc infos span0 string
   where
@@ -163,7 +163,7 @@ findName :: GhcMonad m
          -> RealSrcSpan
          -> ModInfo
          -> String
-         -> ExceptGhciError m Name
+         -> GhciInput m Name
 findName infos span0 mi string =
     case resolveName (modinfoSpans mi) (spanInfoFromRealSrcSpan' span0) of
       Nothing -> tryExternalModuleResolution
@@ -175,7 +175,7 @@ findName infos span0 mi string =
     rdrs = modInfo_rdrs mi
     tryExternalModuleResolution =
       case find (matchName $ mkFastString string) rdrs of
-        Nothing -> throwE $ GhciModuleError NoResolvedModules
+        Nothing -> reportError GhciNoResolvedModules
         Just imported -> resolveNameFromModule infos imported
 
     matchName :: FastString -> Name -> Bool
@@ -187,9 +187,9 @@ findName infos span0 mi string =
 resolveNameFromModule :: GhcMonad m
                       => Map ModuleName ModInfo
                       -> Name
-                      -> ExceptGhciError m Name
+                      -> GhciInput m Name
 resolveNameFromModule infos name = do
-     modL <- maybe (throwE $ GhciModuleError (NoModuleForName name)) pure $
+     modL <- maybe (reportError $ GhciNoModuleForName name) pure $
              nameModule_maybe name
 
      -- info <- maybe (throwE (ppr (moduleUnit modL) <> ":" <> JADE_TODO
@@ -200,7 +200,7 @@ resolveNameFromModule infos name = do
 
      let all_names = modInfo_rdrs info
 
-     maybe (throwE $ GhciModuleError NoMatchingModuleExport) pure $
+     maybe (reportError GhciNoMatchingModuleExport) pure $
          find (matchName name) all_names
   where
     matchName :: Name -> Name -> Bool
@@ -212,18 +212,19 @@ resolveName :: [SpanInfo] -> SpanInfo -> Maybe Var
 resolveName spans' si = listToMaybe $ mapMaybe spaninfoVar $
                         reverse spans' `spaninfosWithin` si
 
+orErrorWith :: Maybe a -> GhciCommandError -> GhciInput m a
+orErrorWith m err = maybe (reportError err) pure m
+
 -- | Try to find the type of the given span.
 findType :: GhcMonad m
          => Map ModuleName ModInfo
          -> RealSrcSpan
          -> String
-         -> ExceptGhciError m (ModInfo, Type)
+         -> GhciInput m (ModInfo, Type)
 findType infos span0 string = do
-    name  <- maybeToExceptT (GhciModuleError NoModuleNameGuess) $
-             guessModule infos (srcSpanFilePath span0)
-
-    info  <- maybeToExceptT (GhciModuleError NoModuleInfoForCurrentFile) $
-             MaybeT $ pure $ M.lookup name infos
+    name <- guessModule infos (srcSpanFilePath span0) `orErrorWith` GhciNoModuleNameGuess
+    -- info  <- lift $ maybeToExceptT GhciNoModuleInfoForCurrentFile  $ M.lookup name infos
+    info <- M.lookup name infos `orErrorWith` GhciNoModuleInfoForCurrentFile
 
     case resolveType (modinfoSpans info) (spanInfoFromRealSrcSpan' span0) of
         Nothing -> (,) info <$> lift (exprType TM_Inst string)
