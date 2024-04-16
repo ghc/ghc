@@ -8,10 +8,7 @@ module Builder (
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilders,
     runBuilder, runBuilderWith, runBuilderWithCmdOptions, getBuilderPath,
-    builderEnvironment,
-
-    -- * Ad hoc builder invocation
-    applyPatch
+    builderEnvironment
     ) where
 
 import Control.Exception.Extra (Partial)
@@ -182,7 +179,6 @@ data Builder = Alex
              | MergeObjects Stage -- ^ linker to be used to merge object files.
              | Nm
              | Objdump
-             | Patch
              | Python
              | Ranlib
              | Testsuite TestMode
@@ -439,7 +435,6 @@ systemBuilderPath builder = case builder of
     Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromTargetTC "nm" (Toolchain.nmProgram . tgtNm)
     Objdump         -> fromKey "objdump"
-    Patch           -> fromKey "patch"
     Python          -> fromKey "python"
     Ranlib          -> fromTargetTC "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
     Testsuite _     -> fromKey "python"
@@ -506,15 +501,6 @@ systemBuilderPath builder = case builder of
 -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool
 isSpecified = fmap (not . null) . systemBuilderPath
-
--- | Apply a patch by executing the 'Patch' builder in a given directory.
-applyPatch :: FilePath -> FilePath -> Action ()
-applyPatch dir patch = do
-    let file = dir -/- patch
-    needBuilders [Patch]
-    path <- builderPath Patch
-    putBuild $ "| Apply patch " ++ file
-    quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
 
 -- Note [cmd wrapper]
 -- ~~~~~~~~~~~~~~~~~~
