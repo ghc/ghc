@@ -139,22 +139,17 @@ gmpRules = do
                 gmpP      = takeDirectory gmpBuildP
             ctx <- makeGmpPathContext gmpP
             removeDirectory gmpBuildP
-            -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
-            -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
+            -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.xz, which is
+            -- gmp-4.2.4.tar.xz repacked without the doc/ directory contents.
             -- That's because the doc/ directory contents are under the GFDL,
             -- which causes problems for Debian.
             tarball <- unifyPath . fromSingleton "Exactly one GMP tarball is expected"
-                   <$> getDirectoryFiles top [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
+                   <$> getDirectoryFiles top [gmpBase -/- "gmp-tarballs/gmp*.tar.xz"]
 
             withTempDir $ \dir -> do
                 let tmp = unifyPath dir
                 need [top -/- tarball]
                 build $ target ctx (Tar Extract) [top -/- tarball] [tmp]
-
-                let patch     = gmpBase -/- "gmpsrc.patch"
-                    patchName = takeFileName patch
-                copyFile patch $ tmp -/- patchName
-                applyPatch tmp patchName
 
                 let name    = dropExtension . dropExtension $ takeFileName tarball
                     unpack  = fromMaybe . error $ "gmpRules: expected suffix "
