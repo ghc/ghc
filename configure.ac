@@ -735,10 +735,6 @@ dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gnutar gtar tar,tar)
 
-dnl ** check for patch
-dnl if GNU patch is named gpatch, look for it first
-AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
-
 dnl ** check for autoreconf
 AC_PATH_PROG(AutoreconfCmd, autoreconf, autoreconf)
 
