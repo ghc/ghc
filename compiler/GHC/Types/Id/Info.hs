@@ -179,7 +179,7 @@ data IdDetails
         -- should be instantiated to concrete type variables?
         --
         -- See Note [Representation-polymorphism checking built-ins]
-        -- in GHC.Tc.Gen.Head.
+        -- in GHC.Tc.Utils.Concrete.
 
   -- | The 'Id' is for a primitive operator.
   | PrimOpId
@@ -192,7 +192,7 @@ data IdDetails
         -- type variables.
         --
         -- See Note [Representation-polymorphism checking built-ins]
-        -- in GHC.Tc.Gen.Head.
+        -- in GHC.Tc.Utils.Concrete.
 
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc

@@ -1802,7 +1802,7 @@ check_implic implic@(Implic { ic_tclvl = lvl
 
     check_details :: TcTyVar -> TcTyVarDetails -> Maybe SDoc
     check_details tv (SkolemTv tv_skol_info tv_lvl _)
-      | not (tv_lvl == lvl)
+      | not (tv_lvl `sameDepthAs` lvl)
       = Just (vcat [ ppr tv <+> text "has level" <+> ppr tv_lvl
                    , text "ic_lvl" <+> ppr lvl ])
       | not (skol_info `checkSkolInfoAnon` skol_info_anon)

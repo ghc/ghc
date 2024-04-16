@@ -456,7 +456,7 @@ data DataCon
         -- variables of unboxed tuples and unboxed sums.
         --
         -- See Note [Representation-polymorphism checking built-ins]
-        -- in GHC.Tc.Gen.Head.
+        -- in GHC.Tc.Utils.Concrete.
         dcConcreteTyVars :: ConcreteTyVars,
 
         -- The type/coercion vars in the order the user wrote them [c,y,x,b]
@@ -1309,7 +1309,7 @@ dataConUnivAndExTyCoVars (MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tv
 -- For example: the RuntimeRep variables of unboxed tuples and unboxed sums.
 --
 -- See Note [Representation-polymorphism checking built-ins]
--- in GHC.Tc.Gen.Head.
+-- in GHC.Tc.Utils.Concrete
 dataConConcreteTyVars :: DataCon -> ConcreteTyVars
 dataConConcreteTyVars (MkData { dcConcreteTyVars = concs }) = concs
 

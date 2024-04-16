@@ -1,5 +1,5 @@
 
-T2846b.hs:5:11: error: [GHC-91028]
+T2846b.hs:5:10: error: [GHC-91028]
     • Couldn't match expected type ‘a1’
                   with actual type ‘[Num a0 => a0]’
       Cannot instantiate unification variable ‘a1’

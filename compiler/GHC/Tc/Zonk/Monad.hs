@@ -9,7 +9,7 @@
 module GHC.Tc.Zonk.Monad
   ( -- * The 'ZonkM' monad, a stripped down 'TcM' for zonking
     ZonkM(ZonkM,runZonkM)
-  , ZonkGblEnv(..), getZonkGblEnv
+  , ZonkGblEnv(..), getZonkGblEnv, getZonkTcLevel
 
    -- ** Logging within 'ZonkM'
   , traceZonk
@@ -96,6 +96,9 @@ instance MonadIO ZonkM where
 getZonkGblEnv :: ZonkM ZonkGblEnv
 getZonkGblEnv = ZonkM return
 {-# INLINE getZonkGblEnv #-}
+
+getZonkTcLevel :: ZonkM TcLevel
+getZonkTcLevel = ZonkM (\env -> return (zge_tc_level env))
 
 -- | Same as 'traceTc', but for the 'ZonkM' monad.
 traceZonk :: String -> SDoc -> ZonkM ()

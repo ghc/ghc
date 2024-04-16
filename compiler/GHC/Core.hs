@@ -694,7 +694,7 @@ an eta-expansion (see GHC.CoreToStg.Prep.maybeSaturate):
 However, this transformation would be invalid, because now the binding of x
 in the lambda abstraction would violate I1.
 
-See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head
+See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete
 and Note [Linting representation-polymorphic builtins] in GHC.Core.Lint for
 more details.
 

@@ -59,7 +59,7 @@ import {-# SOURCE #-} GHC.Core.Coercion( coercionLKind )
 
 import GHC.Builtin.Types.Prim( funTyFlagTyCon )
 
-import Data.Monoid as DM ( Endo(..), Any(..) )
+import Data.Monoid as DM ( Any(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom( coAxiomTyCon )
@@ -74,6 +74,8 @@ import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Pair
+
+import Data.Semigroup
 
 {-
 %************************************************************************
@@ -228,6 +230,17 @@ then we won't look at it at all. If it is free, then all the variables free in i
 kind are free -- regardless of whether some local variable has the same Unique.
 So if we're looking at a variable occurrence at all, then all variables in its
 kind are free.
+
+Note [Free vars and synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When finding free variables we generally do not expand synonyms.  So given
+   type T a = Int
+the type (T [b]) will return `b` as a free variable, even though expanding the
+synonym would get rid of it.  Expanding synonyms might lead to types that look
+ill-scoped; an alternative we have not explored.
+
+But see `occCheckExpand` in this module for a function that does, selectively,
+expand synonyms to reduce free-var occurences.
 -}
 
 {- *********************************************************************
@@ -317,7 +330,7 @@ deep_cos :: [Coercion] -> Endo TyCoVarSet
 (deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
 
 deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
-deepTcvFolder = TyCoFolder { tcf_view = noView
+deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
@@ -375,7 +388,7 @@ shallow_cos :: [Coercion] -> Endo TyCoVarSet
 (shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
 
 shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
-shallowTcvFolder = TyCoFolder { tcf_view = noView
+shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
@@ -592,6 +605,7 @@ tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
                                emptyVarSet   -- See Note [Closing over free variable kinds]
                                (v:acc_list, extendVarSet acc_set v)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
+                                                    -- See Note [Free vars and synonyms]
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
 tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
@@ -950,7 +964,9 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 
 {-# INLINE afvFolder #-}   -- so that specialization to (const True) works
 afvFolder :: (TyCoVar -> Bool) -> TyCoFolder TyCoVarSet DM.Any
-afvFolder check_fv = TyCoFolder { tcf_view = noView
+-- 'afvFolder' is short for "any-free-var folder", good for checking
+-- if any free var of a type satisfies a predicate `check_fv`
+afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                 , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                                 , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where

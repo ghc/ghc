@@ -1,4 +1,3 @@
-
 VisFlag1_ql.hs:14:16: error: [GHC-83865]
     • Expecting one more argument to ‘V’
       Expected kind ‘forall j. j -> *’,
@@ -21,3 +20,4 @@ VisFlag1_ql.hs:20:15: error: [GHC-83865]
     • In the first argument of ‘f’, namely ‘MkV’
       In the expression: f MkV
       In an equation for ‘bad_infer’: bad_infer = f MkV
+

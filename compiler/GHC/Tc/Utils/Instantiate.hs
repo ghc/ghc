@@ -44,7 +44,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Builtin.Types  ( heqDataCon, integerTyConName )
+import GHC.Builtin.Types  ( integerTyConName )
 import GHC.Builtin.Names
 
 import GHC.Hs
@@ -52,16 +52,13 @@ import GHC.Hs.Syn.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Predicate
-import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
+import GHC.Core ( isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
-import GHC.Core.DataCon
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
@@ -289,7 +286,7 @@ topInstantiate orig sigma
   = do { (_, wrap1, body3) <- instantiateSigma orig noConcreteTyVars tvs theta body2
            -- Why 'noConcreteTyVars' here?
            -- See Note [Representation-polymorphism checking built-ins]
-           -- in GHC.Tc.Gen.Head.
+           -- in GHC.Tc.Utils.Concrete.
 
        -- Loop, to account for types like
        --       forall a. Num a => forall b. Ord b => ...
@@ -332,7 +329,7 @@ instantiateSigma orig concs tvs theta body_ty
     new_meta final_subst subst tv
       -- Is this a type variable that must be instantiated to a concrete type?
       -- If so, create a ConcreteTv metavariable instead of a plain TauTv.
-      -- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+      -- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete.
       | Just conc_orig0 <- lookupNameEnv concs (tyVarName tv)
       , let conc_orig = substConcreteTvOrigin final_subst body_ty conc_orig0
       -- See Note [substConcreteTvOrigin].
@@ -403,24 +400,42 @@ instCallConstraints orig preds
   | null preds
   = return idHsWrapper
   | otherwise
-  = do { evs <- mapM go preds
+  = do { evs <- mapM (emitWanted orig) preds
+                -- See Note [Possible fast path for equality constraints]
        ; traceTc "instCallConstraints" (ppr evs)
        ; return (mkWpEvApps evs) }
-  where
-    go :: TcPredType -> TcM EvTerm
-    go pred
-     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
-     = do  { co <- unifyType Nothing ty1 ty2
-           ; return (evCoercion co) }
 
-       -- Try short-cut #2
-     | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
-     , tc `hasKey` heqTyConKey
-     = do { co <- unifyType Nothing ty1 ty2
-          ; return (evDFunApp (dataConWrapId heqDataCon) args [Coercion co]) }
+{- Note [Possible fast path for equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given  f :: forall a b. (a ~ [b]) => a -> b -> blah
+rather than emitting ([W] alpha ~ [beta]) we could imagine calling unifyType
+right here. But note
 
-     | otherwise
-     = emitWanted orig pred
+* Often such constraints look like (F a ~ G b), in which case unification would end up
+  spitting out a wanted-equality anyway.
+
+* So perhaps the main fast-path would be where the LHS or RHS was an instantiation
+  variable. But note that this could, perhaps, impact on Quick Look:
+
+  - The first arg of `f` changes from the naked `a` to the guarded `[b]` (or would do so
+    if we zonked it).  That might affect typing under Quick Look.
+
+  - We might imagine using the let-bound skolems trick:
+         g :: forall a b. (a ~ forall c. c->c) => a -> [a] -> [a]
+    Here we are just using `a` as a local abreviation for (forall c. c->c)
+    See Note [Let-bound skolems] in GHC.Tc.Solver.InertSet.
+
+    If we substitute aggressively (including zonking) that abbreviation could work.  But
+    again it affects what is typeable.  And we don't support equalities over polytypes,
+    currently, anyway.
+
+* There is little point in trying to optimise for
+   - (s ~# t), because this has kind Constraint#, not Constraint, and so will not be
+               in the theta instantiated in instCall
+   - (s ~~ t), becaues heterogeneous equality is rare, and more complicated.
+
+Anyway, for now we don't take advantage of these potential effects.
+-}
 
 instDFunType :: DFunId -> [DFunInstType]
              -> TcM ( [TcType]      -- instantiated argument types

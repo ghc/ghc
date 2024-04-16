@@ -50,7 +50,7 @@ module GHC.Tc.Solver.Monad (
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications, touchabilityAndShapeTest,
+    unifyTyVar, reportUnifications,
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, emitNewGivens,
@@ -622,7 +622,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
        | otherwise
        = (cts, qci)
 
-    belongs_to_this_level ev = ctLocLevel (ctEvLoc ev) == this_lvl
+    belongs_to_this_level ev = ctLocLevel (ctEvLoc ev) `sameDepthAs` this_lvl
     -- We only want Givens from this level; see (3a) in
     -- Note [The superclass story] in GHC.Tc.Solver.Dict
 
@@ -682,9 +682,9 @@ getHasGivenEqs tclvl
 
              -- See Note [HasGivenEqs] in GHC.Tc.Types.Constraint, and
              -- Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
-             has_ge | ge_lvl == tclvl = MaybeGivenEqs
-                    | given_eqs       = LocalGivenEqs
-                    | otherwise       = NoGivenEqs
+             has_ge | ge_lvl `sameDepthAs` tclvl = MaybeGivenEqs
+                    | given_eqs                  = LocalGivenEqs
+                    | otherwise                  = NoGivenEqs
 
        ; traceTcS "getHasGivenEqs" $
          vcat [ text "given_eqs:" <+> ppr given_eqs
@@ -2087,8 +2087,7 @@ checkTouchableTyVarEq
 --   with extra wanteds 'cts'
 -- If it returns (PuFail reason) we can't unify, and the reason explains why.
 checkTouchableTyVarEq ev lhs_tv rhs
-  | simpleUnifyCheck True lhs_tv rhs
-    -- True <=> type families are ok on the RHS
+  | simpleUnifyCheck UC_Solver lhs_tv rhs
   = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
        ; return (pure (mkReflRedn Nominal rhs)) }
 

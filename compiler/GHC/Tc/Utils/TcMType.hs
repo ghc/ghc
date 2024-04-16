@@ -1106,7 +1106,7 @@ GHC.Tc.Types.Origin.
 
 However, we have to be careful in the example above, in which we are
 instantiating a built-in representation-polymorphic 'Id'. As described in the
-Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head, in such
+Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete, in such
 cases we end up storing types appearing in the original type of the primop,
 which means for the situation above with 'coerce' we end up with a ConcreteTvOrigin
 which includes type variables bound in the original type of 'coerce':
@@ -1498,12 +1498,12 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | tcTyVarLevel tv <= cur_lvl
+      | cur_lvl `deeperThanOrSame` tcTyVarLevel tv
       = return dv   -- This variable is from an outer context; skip
                     -- See Note [Use level numbers for quantification]
 
       | case tcTyVarDetails tv of
-          SkolemTv _ lvl _ -> lvl > pushTcLevel cur_lvl
+          SkolemTv _ lvl _ -> lvl `strictlyDeeperThan` pushTcLevel cur_lvl
           _                -> False
       = return dv  -- Skip inner skolems
         -- This only happens for erroneous program with bad telescopes
@@ -1799,7 +1799,7 @@ isQuantifiableTv :: TcLevel   -- Level of the context, outside the quantificatio
                  -> Bool
 isQuantifiableTv outer_tclvl tcv
   | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separately
-  = tcTyVarLevel tcv > outer_tclvl
+  = tcTyVarLevel tcv `strictlyDeeperThan` outer_tclvl
   | otherwise
   = False
 

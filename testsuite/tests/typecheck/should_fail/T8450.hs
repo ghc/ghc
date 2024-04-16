@@ -7,5 +7,8 @@ runEffect = undefined
 run :: forall a. a
 run = runEffect $ (undefined :: Either a ())
 
-{-  Either a () ~ Either Bool alpha
-    a ~ alpha -}
+{-
+r:=a
+Expected: Either Bool a
+Actual:   Either a ()
+-}

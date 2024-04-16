@@ -361,12 +361,14 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
           else do { expanded_expr <- expandDoStmts doExpr stmts
                                                -- Do expansion on the fly
-                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty }
+                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$>
+                    tcExpr (unLoc expanded_expr) res_ty }
         }
 
 tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
-        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$> tcExpr (unLoc expanded_expr) res_ty  }
+        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$>
+          tcExpr (unLoc expanded_expr) res_ty  }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
@@ -1201,7 +1203,7 @@ the variables they bind into scope, and typecheck the thing_inside.
 -}
 
 -- | @checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
--- number of /required/ args are used in each equation.
+-- number of /required/ (aka visible) args are used in each equation.
 -- Returns the arity, the number of required args
 -- E.g.  f @a True  y = ...
 --       f    False z = ...
@@ -1229,5 +1231,5 @@ checkArgCounts (MG { mg_alts = L _ (match1:matches) })
     mb_bad_matches = NE.nonEmpty [m | m <- matches, reqd_args_in_match m /= n_args1]
 
     reqd_args_in_match :: LocatedA (Match GhcRn body1) -> VisArity
-    -- Counts the number of /required/ args in the match
+    -- Counts the number of /required/ (aka visible) args in the match
     reqd_args_in_match (L _ (Match { m_pats = pats })) = count (isVisArgPat . unLoc) pats

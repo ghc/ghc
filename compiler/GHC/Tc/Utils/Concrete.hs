@@ -382,6 +382,233 @@ its runtime representation using `typePrimRep`.
     this shouldn't cause any problems in practice.  See ticket #18170.
 
     Test case: rep-poly/T18170a.
+
+
+Note [Representation-polymorphic Ids with no binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We cannot have representation-polymorphic or levity-polymorphic
+function arguments. See Note [Representation polymorphism invariants]
+in GHC.Core.  That is checked in 'GHC.Tc.Gen.App.tcInstFun', see the call
+to 'matchActualFunTy', which performs the representation-polymorphism
+check.
+
+However, some special Ids have representation-polymorphic argument
+types. These are all GHC built-ins or data constructors. They have no binding;
+instead they have compulsory unfoldings. Specifically, these Ids are:
+
+1. Some wired-in Ids, such as coerce, oneShot and unsafeCoerce# (which is only
+   partly wired-in),
+2. Representation-polymorphic primops, such as raise#.
+3. Representation-polymorphic data constructors: unboxed tuples
+   and unboxed sums.
+4. Newtype constructors with `UnliftedNewtypes` which have
+   a representation-polymorphic argument.
+
+For (1) consider
+  badId :: forall r (a :: TYPE r). a -> a
+  badId = unsafeCoerce# @r @r @a @a
+
+The (partly) wired-in function
+  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                   (a :: TYPE r1) (b :: TYPE r2).
+                   a -> b
+has a convenient but representation-polymorphic type. It has no
+binding; instead it has a compulsory unfolding, after which we
+would have
+  badId = /\r /\(a :: TYPE r). \(x::a). ...body of unsafeCorece#...
+And this is no good because of that rep-poly \(x::a).  So we want
+to reject this.
+
+On the other hand
+  goodId :: forall (a :: Type). a -> a
+  goodId = unsafeCoerce# @LiftedRep @LiftedRep @a @a
+
+is absolutely fine, because after we inline the unfolding, the \(x::a)
+is representation-monomorphic.
+
+Test cases: T14561, RepPolyWrappedVar2.
+
+For primops (2) and unboxed tuples/sums (3), the situation is similar;
+they are eta-expanded in CorePrep to be saturated, and that eta-expansion
+must not add a representation-polymorphic lambda.
+
+Test cases: T14561b, RepPolyWrappedVar, UnliftedNewtypesCoerceFail.
+
+The Note [Representation-polymorphism checking built-ins] explains how we handle
+cases (1) (2) and (3).
+
+For (4), consider a representation-polymorphic newtype with
+UnliftedNewtypes:
+
+  type Id :: forall r. TYPE r -> TYPE r
+  newtype Id a where { MkId :: a }
+
+  bad :: forall r (a :: TYPE r). a -> Id a
+  bad = MkId @r @a             -- Want to reject
+
+  good :: forall (a :: Type). a -> Id a
+  good = MkId @LiftedRep @a   -- Want to accept
+
+Test cases: T18481, UnliftedNewtypesLevityBinder
+
+(4) is handled differently than (1) (2) and (3);
+see Note [Eta-expanding rep-poly unlifted newtypes].
+
+Note [Representation-polymorphism checking built-ins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some primops and wired-in functions are representation-polymorphic, but must
+only be instantiated at particular, concrete representations.
+There are three cases, all for `hasNoBinding` Ids:
+
+* Wired-in Ids.  For example, `seq`
+  is a wired-in Id, defined in GHC.Types.Id.Make.seqId, with this type:
+
+  seq :: forall {r} a (b :: TYPE r). a -> b -> b
+
+  It is more like a macro than a regular Id: it has /compulsory/ unfolding, so
+  we inline it at every call site.  At those call sites we should instantiate
+  `r` with a concrete RuntimeRep, so that the lambda has a concrete representation.
+  So somehow the type checker has to ensure that `seq` is called with a concrete
+  instantiation for `r`.
+
+  NB: unsafeCoerce# is not quite wired-in (see Note [Wiring in unsafeCoerce#] in GHC.HsToCore),
+  but it gets a similar treatment.
+
+* PrimOps. Some representation-polymorphic primops must be called at a concrete
+  type.  For example:
+
+  catch# :: forall {r} {l} (k :: TYPE r) (w :: TYPE (BoxedRep l)).
+              (State# RealWorld -> (# State# RealWorld, k #) )
+           -> (w -> State# RealWorld -> (# State# RealWorld, k #) )
+           -> State# RealWorld -> (# State# RealWorld, k #)
+
+  This primop pushes a "catch frame" on the stack, which must "know"
+  the return convention of `k`.  So `k` must be concrete, so we know
+  what kind of catch-frame to push. (See #21868 for more details.
+
+  So again we want to ensure that `r` is instantiated with a concrete RuntimeRep.
+
+* Unboxed-tuple data constructors.  Consider the unboxed pair data constructor:
+
+  (#,#) :: forall {r1} {r2} (a :: TYPE r1) (b :: TYPE r2). a -> b -> (# a, b #)
+
+  Again, we need concrete `r1` and `r2`. For example, we want to reject
+
+    f :: forall r (a :: TYPE r). a -> (# Int, a #)
+    f = (#,#) 3
+
+As pointed out in #21906; we see here that it is not enough to simply check
+the representation of the argument types, as for example "k :: TYPE r" in the
+type of catch# occurs in negative position but not directly as the type of
+an argument.
+
+NB: we specifically *DO NOT* handle representation-polymorphic unlifted newtypes
+with this mechanism. See Note [Eta-expanding rep-poly unlifted newtypes] for an
+overview of representation-polymorphism checks for those.
+
+To achieve this goal, for these these three kinds of `hasNoBinding` functions:
+
+* We identify the quantified variable `r` as a "concrete quantifier"
+
+* When instantiating a concrete quantifier, such as `r`, at a call site, we
+  instantiate with a ConcreteTv meta-tyvar, `r0[conc]`.
+  See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
+
+Now the type checker will ensure that `r0` is instantiated with a concrete
+RuntimeRep.
+
+Here are the moving parts:
+
+* In the IdDetails of an Id, we record a mapping from type variable name
+  to concreteness information, in the form of a ConcreteTvOrigin.
+  See 'idDetailsConcreteTvs'.
+
+  The ConcreteTvOrigin is used to determine which error message to show
+  to the user if the type variable gets instantiated to a non-concrete type;
+  this is slightly more granular than simply storing a set of type variable names.
+
+* The domain of this NameEnv is the outer forall'd TyVars of that
+  Id's type.  (A bit yukky because it means that alpha-renaming that type
+  would be invalid.  But we never do that.)  So `seq` has
+    Type:       forall {r} a (b :: TYPE r). a -> b -> b
+    IdDetails:  RepPolyId [ r :-> ConcreteFRR (FixedRuntimeRepOrigin b (..)) ]
+
+* When instantiating the type of an Id at a call site, at the call to
+  GHC.Tc.Utils.Instantiate.instantiateSigma in GHC.Tc.Gen.App.tcInstFun,
+  create ConcreteTv metavariables (instead of TauTvs) based on the
+  ConcreteTyVars stored in the IdDetails of the Id.
+
+Note that the /only/ place that one of these restricted rep-poly Ids can enter
+typechecking is in `tcInferId`, and all the interesting cases then land
+in `tcInstFun` where we take care to instantantiate those concrete
+type variables correctly.
+
+  Design alternative: in some ways, it would be more kosher for the concrete-ness
+  to be stored in the /type/, thus  forall (r[conc] :: RuntimeRep). ty.
+  But that pollutes Type for a very narrow use-case; so instead we adopt the
+  more ad-hoc solution described above.
+
+Examples:
+
+  ok :: forall (a :: Type) (b :: Type). a -> b -> b
+  ok = seq
+
+  bad :: forall s (b :: TYPE s). Int -> b -> b
+  bad x = seq x
+
+    Here we will instantiate the RuntimeRep skolem variable r from the type
+    of seq to a concrete metavariable rr[conc].
+    For 'ok' we will unify rr := LiftedRep, and for 'bad' we will fail to
+    solve rr[conc] ~# s[sk] and report a representation-polymorphism error to
+    the user.
+
+  type RR :: RuntimeRep
+  type family RR where { RR = IntRep }
+
+  tricky1, tricky2 :: forall (b :: TYPE RR). Int -> b -> b
+  tricky1 = seq
+  tricky2 = seq @RR
+
+    'tricky1' proceeds as above: we instantiate r |-> rr[conc], get a Wanted
+    rr[conc] ~# RR, which we solve by rewriting the type family.
+
+    For 'tricky2', we again create a fresh ConcreteTv metavariable rr[conc],
+    and we then proceed as if the user had written "seq @rr", but adding an
+    additional [W] rr ~ RR to the constraint solving context.
+
+[Wrinkle: VTA]
+
+  We must also handle the case when the user has instantiated the type variables
+  themselves, with a visible type application. We do this in GHC.Tc.Gen.App.tcVTA.
+
+  For example:
+
+    type F :: Type -> RuntimeRep
+    type family F a where { F Bool = IntRep }
+
+    foo = (# , #) @(F Bool) @FloatRep
+
+  We want to accept "foo" even though "F Bool" is not a concrete RuntimeRep.
+  We proceed as follows (see tcVTA):
+
+    - create a fresh concrete metavariable kappa,
+    - emit [W] F Bool ~ kappa[conc]
+    - pretend the user wrote (#,#) @kappa.
+
+  The solver will then unify kappa := IntRep, after rewriting the type family
+  application on the LHS of the Wanted.
+
+  Note that this is a bit of a corner case: only a few built-ins, such as
+  unsafeCoerce# and unboxed tuples, have specified (not inferred) RuntimeRep
+  quantified variables which can be instantiated by the user with a
+  visible type application.
+  For example,
+
+    coerce :: forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r)
+           .  Coercible a b => a -> b
+
+  does not allow the RuntimeRep argument to be specified by a visible type
+  application.
 -}
 
 -- | Given a type @ty :: ki@, this function ensures that @ty@
@@ -701,7 +928,7 @@ makeTypeConcrete conc_orig ty =
 
 -- | Which type variables of this 'Id' must be concrete when instantiated?
 --
--- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+-- See Note [Representation-polymorphism checking built-ins]
 idConcreteTvs :: TcId -> ConcreteTyVars
 idConcreteTvs id
 

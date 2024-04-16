@@ -15,7 +15,7 @@ module GHC.Tc.Zonk.TcType
     module GHC.Tc.Zonk.Monad
 
     -- ** Zonking types
-  , zonkTcType, zonkTcTypes
+  , zonkTcType, zonkTcTypes, zonkScaledTcType
   , zonkTcTyVar, zonkTcTyVars
   , zonkTcTyVarToTcTyVar, zonkTcTyVarsToTcTyVars
   , zonkInvisTVBinder
@@ -201,6 +201,10 @@ See for example test T5631, which regresses without this change.
 ************************************************************************
 -}
 
+zonkScaledTcType :: Scaled TcType -> ZonkM (Scaled TcType)
+zonkScaledTcType (Scaled m ty)
+  = Scaled <$> zonkTcType m <*> zonkTcType ty
+
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --      type variable and zonks the kind too
@@ -209,25 +213,25 @@ zonkTcTypes :: [TcType] -> ZonkM [TcType]
 zonkCo      :: Coercion -> ZonkM Coercion
 (zonkTcType, zonkTcTypes, zonkCo, _)
   = mapTyCo zonkTcTypeMapper
-
--- | A suitable TyCoMapper for zonking a type during type-checking,
--- before all metavars are filled in.
-zonkTcTypeMapper :: TyCoMapper () ZonkM
-zonkTcTypeMapper = TyCoMapper
-  { tcm_tyvar = const zonkTcTyVar
-  , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
-  , tcm_hole  = hole
-  , tcm_tycobinder = \ _env tcv _vis k -> zonkTyCoVarKind tcv >>= k ()
-  , tcm_tycon      = zonkTcTyCon }
   where
-    hole :: () -> CoercionHole -> ZonkM Coercion
-    hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
-      = do { contents <- readTcRef ref
-           ; case contents of
-               Just co -> do { co' <- zonkCo co
-                             ; checkCoercionHole cv co' }
-               Nothing -> do { cv' <- zonkCoVar cv
-                             ; return $ HoleCo (hole { ch_co_var = cv' }) } }
+    -- A suitable TyCoMapper for zonking a type during type-checking,
+    -- before all metavars are filled in.
+    zonkTcTypeMapper :: TyCoMapper () ZonkM
+    zonkTcTypeMapper = TyCoMapper
+      { tcm_tyvar = const zonkTcTyVar
+      , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
+      , tcm_hole  = hole
+      , tcm_tycobinder = \ _env tcv _vis k -> zonkTyCoVarKind tcv >>= k ()
+      , tcm_tycon      = zonkTcTyCon }
+      where
+        hole :: () -> CoercionHole -> ZonkM Coercion
+        hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
+          = do { contents <- readTcRef ref
+               ; case contents of
+                   Just co -> do { co' <- zonkCo co
+                                 ; checkCoercionHole cv co' }
+                   Nothing -> do { cv' <- zonkCoVar cv
+                                 ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
 zonkTcTyCon :: TcTyCon -> ZonkM TcTyCon
 -- Only called on TcTyCons

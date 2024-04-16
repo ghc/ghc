@@ -268,7 +268,10 @@ tcMonoExprNC (L loc expr) res_ty
         ; return (L loc expr') }
 
 ---------------
-tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcExpr :: HsExpr GhcRn
+       -> ExpRhoType   -- DeepSubsumption <=> when checking, this type
+                       --                     is deeply skolemised
+       -> TcM (HsExpr GhcTc)
 
 -- Use tcApp to typecheck applications, which are treated specially
 -- by Quick Look.  Specifically:

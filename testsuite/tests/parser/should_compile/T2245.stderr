@@ -1,4 +1,3 @@
-
 T2245.hs:4:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
@@ -11,12 +10,13 @@ T2245.hs:5:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
         ‘fromRational’ and (either ‘recip’ or ‘/’)
     • In the instance declaration for ‘Fractional T’
 
-T2245.hs:7:27: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]
+T2245.hs:7:29: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]
     • Defaulting the type variable ‘b0’ to type ‘T’ in the following constraints
-        (Ord b0) arising from a use of ‘<’ at T2245.hs:7:27
         (Fractional b0)
           arising from the literal ‘1e400’ at T2245.hs:7:29-33
+        (Ord b0) arising from a use of ‘<’ at T2245.hs:7:27
         (Read b0) arising from a use of ‘read’ at T2245.hs:7:38-41
-    • In the expression: (<)
+    • In the expression: 1e400
       In the first argument of ‘(.)’, namely ‘(< 1e400)’
       In the second argument of ‘(.)’, namely ‘(< 1e400) . read’
+

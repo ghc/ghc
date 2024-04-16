@@ -1,11 +1,15 @@
-
-T8450.hs:8:7: error: [GHC-25897]
-    • Couldn't match expected type ‘a’ with actual type ‘()’
+T8450.hs:8:19: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘Bool’
+      Expected: Either Bool ()
+        Actual: Either a ()
       ‘a’ is a rigid type variable bound by
         the type signature for:
           run :: forall a. a
         at T8450.hs:7:1-18
-    • In the expression: runEffect $ (undefined :: Either a ())
+    • In the second argument of ‘($)’, namely
+        ‘(undefined :: Either a ())’
+      In the expression: runEffect $ (undefined :: Either a ())
       In an equation for ‘run’:
           run = runEffect $ (undefined :: Either a ())
     • Relevant bindings include run :: a (bound at T8450.hs:8:1)
+

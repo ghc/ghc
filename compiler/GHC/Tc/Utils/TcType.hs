@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE MagicHash           #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -55,6 +56,7 @@ module GHC.Tc.Utils.TcType (
   ConcreteTyVars, noConcreteTyVars,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
+  isQLInstTyVar, isRuntimeUnkTyVar,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isPromotableMetaTyVar,
   findDupTyVarTvs, mkTyVarNamePairs,
@@ -431,10 +433,13 @@ type ExpTypeFRR      = ExpType
 type ExpSigmaTypeFRR = ExpTypeFRR
   -- TODO: consider making this a newtype.
 
-type ExpRhoType      = ExpType
+type ExpRhoType = ExpType
+      -- Invariant: if -XDeepSubsumption is on,
+      --            and we are checking (i.e. the ExpRhoType is (Check rho)),
+      --            then the `rho` is deeply skolemised
 
 -- | Like 'ExpType', but on kind level
-type ExpKind         = ExpType
+type ExpKind = ExpType
 
 instance Outputable ExpType where
   ppr (Check ty) = text "Check" <> braces (ppr ty)
@@ -675,9 +680,8 @@ data ConcreteTvOrigin
 
 -- | A mapping from skolem type variable 'Name' to concreteness information,
 --
--- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+-- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete.
 type ConcreteTyVars = NameEnv ConcreteTvOrigin
-
 -- | The 'Id' has no outer forall'd type variables which must be instantiated
 -- to concrete types.
 noConcreteTyVars :: ConcreteTyVars
@@ -689,9 +693,11 @@ noConcreteTyVars = emptyNameEnv
 *                                                                      *
 ********************************************************************* -}
 
-newtype TcLevel = TcLevel Int deriving( Eq, Ord )
+data TcLevel = TcLevel {-# UNPACK #-} !Int
+             | QLInstVar
   -- See Note [TcLevel invariants] for what this Int is
   -- See also Note [TcLevel assignment]
+  -- See also Note [The QLInstVar TcLevel]
 
 {-
 Note [TcLevel invariants]
@@ -726,14 +732,35 @@ Note [TcLevel invariants]
 The level of a MetaTyVar also governs its untouchability.  See
 Note [Unification preconditions] in GHC.Tc.Utils.Unify.
 
+  -- See also Note [The QLInstVar TcLevel]
+
 Note [TcLevel assignment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 We arrange the TcLevels like this
 
-   0   Top level
-   1   First-level implication constraints
-   2   Second-level implication constraints
+   0          Top level
+   1          First-level implication constraints
+   2          Second-level implication constraints
    ...etc...
+   QLInstVar  The level for QuickLook instantiation variables
+              See Note [The QLInstVar TcLevel]
+
+Note [The QLInstVar TcLevel]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QuickLook instantiation variables are identified by having a TcLevel
+of QLInstVar.  See Note [Quick Look overview] in GHC.Tc.Gen.App.
+
+The QLInstVar level behaves like infinity: it is greater than any
+other TcLevel.  See `strictlyDeeperThan` and friends in this module.
+That ensures that we never unify an ordinary unification variable
+with a QL instantiation variable, e.g.
+      alpha[tau:3] := Maybe beta[tau:qlinstvar]
+(This is an immediate consequence of our general rule that we never
+unify a variable with a type mentioning deeper variables; the skolem
+escape check.)
+
+QL instantation variables are eventually turned into ordinary unificaiton
+variables; see (QL3) in Note [Quick Look overview].
 
 Note [GivenInv]
 ~~~~~~~~~~~~~~~
@@ -784,10 +811,18 @@ touchable; but then 'b' has escaped its scope into the outer implication.
 -}
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
-maxTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `max` b)
+maxTcLevel (TcLevel a) (TcLevel b)
+  | a > b      = TcLevel a
+  | otherwise  = TcLevel b
+maxTcLevel _ _ = QLInstVar
 
 minTcLevel :: TcLevel -> TcLevel -> TcLevel
-minTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `min` b)
+minTcLevel tcla@(TcLevel a) tclb@(TcLevel b)
+  | a < b                              = tcla
+  | otherwise                          = tclb
+minTcLevel tcla@(TcLevel {}) QLInstVar = tcla
+minTcLevel QLInstVar tclb@(TcLevel {}) = tclb
+minTcLevel QLInstVar QLInstVar         = QLInstVar
 
 topTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
@@ -795,29 +830,39 @@ topTcLevel = TcLevel 0   -- 0 = outermost level
 
 isTopTcLevel :: TcLevel -> Bool
 isTopTcLevel (TcLevel 0) = True
-isTopTcLevel _           = False
+isTopTcLevel _            = False
 
 pushTcLevel :: TcLevel -> TcLevel
 -- See Note [TcLevel assignment]
 pushTcLevel (TcLevel us) = TcLevel (us + 1)
+pushTcLevel QLInstVar    = QLInstVar
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
+-- See Note [The QLInstVar TcLevel]
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl > ctxt_tclvl
+strictlyDeeperThan QLInstVar (TcLevel {})  = True
+strictlyDeeperThan _ _                     = False
 
 deeperThanOrSame :: TcLevel -> TcLevel -> Bool
+-- See Note [The QLInstVar TcLevel]
 deeperThanOrSame (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl >= ctxt_tclvl
+deeperThanOrSame (TcLevel {}) QLInstVar  = False
+deeperThanOrSame QLInstVar    _           = True
 
 sameDepthAs :: TcLevel -> TcLevel -> Bool
 sameDepthAs (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
-  = ctxt_tclvl == tv_tclvl   -- NB: invariant ctxt_tclvl >= tv_tclvl
-                             --     So <= would be equivalent
+  = ctxt_tclvl == tv_tclvl
+    -- NB: invariant ctxt_tclvl >= tv_tclvl
+    --     So <= would be equivalent
+sameDepthAs QLInstVar QLInstVar = True
+sameDepthAs _         _         = False
 
 checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
 -- Checks (WantedInv) from Note [TcLevel invariants]
-checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
-  = ctxt_tclvl >= tv_tclvl
+checkTcLevelInvariant ctxt_tclvl tv_tclvl
+  = ctxt_tclvl `deeperThanOrSame` tv_tclvl
 
 -- Returns topTcLevel for non-TcTyVars
 tcTyVarLevel :: TcTyVar -> TcLevel
@@ -840,7 +885,8 @@ tcTypeLevel ty
       | otherwise = lvl
 
 instance Outputable TcLevel where
-  ppr (TcLevel us) = ppr us
+  ppr (TcLevel n) = ppr n
+  ppr QLInstVar   = text "qlinst"
 
 {- *********************************************************************
 *                                                                      *
@@ -1171,6 +1217,18 @@ isAmbiguousTyVar tv
         RuntimeUnk {} -> True
         _             -> False
   | otherwise = False
+
+isQLInstTyVar :: TcTyVar -> Bool
+isQLInstTyVar tv
+  = case tcTyVarDetails tv of
+      MetaTv { mtv_tclvl = QLInstVar } -> True
+      _                                -> False
+
+isRuntimeUnkTyVar :: TcTyVar -> Bool
+isRuntimeUnkTyVar tv
+  = case tcTyVarDetails tv of
+      MetaTv { mtv_info = RuntimeUnkTv } -> True
+      _                                  -> False
 
 isCycleBreakerTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
@@ -1911,10 +1969,7 @@ isSigmaTy _                            = False
 
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
-isRhoTy (ForAllTy (Bndr _ af) _)     = isVisibleForAllTyFlag af
-isRhoTy (FunTy { ft_af = af })       = isVisibleFunArg af
-isRhoTy ty | Just ty' <- coreView ty = isRhoTy ty'
-isRhoTy _                            = True
+isRhoTy ty = not (isSigmaTy ty)
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool

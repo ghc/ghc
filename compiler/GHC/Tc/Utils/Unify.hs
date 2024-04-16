@@ -19,13 +19,13 @@ module GHC.Tc.Utils.Unify (
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Skolemisation
-  DeepSubsumptionFlag(..), getDeepSubsumptionFlag,
+  DeepSubsumptionFlag(..), getDeepSubsumptionFlag, isRhoTyDS,
   tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
 
   -- Various unifications
   unifyType, unifyKind, unifyInvisibleType, unifyExpectedType,
-  unifyTypeAndEmit, promoteTcType,
-  swapOverTyVars, touchabilityAndShapeTest,
+  unifyExprType, unifyTypeAndEmit, promoteTcType,
+  swapOverTyVars, touchabilityAndShapeTest, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
   uType,
 
@@ -42,7 +42,8 @@ module GHC.Tc.Utils.Unify (
   checkTyEqRhs, recurseIntoTyConApp,
   PuResult(..), failCheckWith, okCheckRefl, mapCheck,
   TyEqFlags(..), TyEqFamApp(..), AreUnifying(..), LevelCheck(..), FamAppBreaker,
-  famAppArgFlags, simpleUnifyCheck, checkPromoteFreeVars,
+  famAppArgFlags,  checkPromoteFreeVars,
+  simpleUnifyCheck, UnifyCheckCaller(..),
 
   fillInferResult,
   ) where
@@ -402,7 +403,7 @@ tcSkolemiseGeneral
   -> ([(Name, TcInvisTVBinder)] -> TcType -> TcM result)
   -> TcM (HsWrapper, result)
 tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
-  | definitely_mono ds_flag expected_ty
+  | isRhoTyDS ds_flag expected_ty
     -- Fast path for a very very common case: no skolemisation to do
     -- But still call checkConstraints in case we need an implication regardless
   = do { let sig_skol = SigSkol ctxt top_ty []
@@ -1325,21 +1326,17 @@ tcSubType orig ctxt ty_actual ty_expected
 
 ---------------
 tcSubTypeDS :: HsExpr GhcRn
-            -> TcRhoType   -- Actual -- a rho-type not a sigma-type
-            -> ExpRhoType  -- Expected
+            -> TcRhoType   -- Actual type -- a rho-type not a sigma-type
+            -> TcRhoType   -- Expected type
+                           -- DeepSubsumption <=> when checking, this type
+                           --                     is deeply skolemised
             -> TcM HsWrapper
 -- Similar signature to unifyExpectedType; does deep subsumption
 -- Only one call site, in GHC.Tc.Gen.App.tcApp
-tcSubTypeDS rn_expr act_rho res_ty
-  = case res_ty of
-      Check exp_rho -> tc_sub_type_ds Deep (unifyType m_thing) orig
-                                      GenSigCtxt act_rho exp_rho
-
-      Infer inf_res -> do { co <- fillInferResult act_rho inf_res
-                          ; return (mkWpCastN co) }
+tcSubTypeDS rn_expr act_rho exp_rho
+  = tc_sub_type_deep (unifyExprType rn_expr) orig GenSigCtxt act_rho exp_rho
   where
-    orig    = exprCtOrigin rn_expr
-    m_thing = Just (HsExprRnThing rn_expr)
+    orig = exprCtOrigin rn_expr
 
 ---------------
 tcSubTypeNC :: CtOrigin          -- ^ Used when instantiating
@@ -1465,7 +1462,7 @@ tc_sub_type_ds :: DeepSubsumptionFlag
 -- It takes an explicit DeepSubsumptionFlag
 tc_sub_type_ds ds_flag unify inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected   -- See Note [Don't skolemise unnecessarily]
-  , definitely_mono ds_flag ty_actual
+  , isRhoTyDS ds_flag ty_actual
   = do { traceTc "tc_sub_type (drop to equality)" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
@@ -1478,25 +1475,25 @@ tc_sub_type_ds ds_flag unify inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
 
        ; (sk_wrap, inner_wrap)
-           <- case ds_flag of
-                Shallow -> -- Shallow: skolemise, instantiate and unify
-                           tcSkolemise Shallow ctxt ty_expected $ \sk_rho ->
-                           do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
-                              ; cow           <- unify rho_a sk_rho
-                              ; return (mkWpCastN cow <.> wrap) }
-                Deep -> -- Deep: we have co/contra work to do
-                        tcSkolemise Deep ctxt ty_expected $ \sk_rho ->
-                        tc_sub_type_deep unify inst_orig ctxt ty_actual sk_rho
+            <- tcSkolemise ds_flag ctxt ty_expected $ \sk_rho ->
+               case ds_flag of
+                 Deep    -> tc_sub_type_deep unify inst_orig ctxt ty_actual sk_rho
+                 Shallow -> tc_sub_type_shallow unify inst_orig ty_actual sk_rho
 
        ; return (sk_wrap <.> inner_wrap) }
 
 ----------------------
-definitely_mono :: DeepSubsumptionFlag -> TcType -> Bool
-definitely_mono ds_flag ty
-  = case ds_flag of
-      Shallow -> isRhoTy ty      -- isRhoTy: no top level forall or (=>)
-      Deep    -> isDeepRhoTy ty  -- "deep" version: no nested forall or (=>)
+tc_sub_type_shallow :: (TcType -> TcType -> TcM TcCoercionN)
+                    -> CtOrigin
+                    -> TcSigmaType
+                    -> TcRhoType   -- Skolemised (shallow-ly)
+                    -> TcM HsWrapper
+tc_sub_type_shallow unify inst_orig ty_actual sk_rho
+  = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
+       ; cow           <- unify rho_a sk_rho
+       ; return (mkWpCastN cow <.> wrap) }
 
+----------------------
 definitely_poly :: TcType -> Bool
 -- A very conservative test:
 -- see Note [Don't skolemise unnecessarily]
@@ -1629,8 +1626,17 @@ Consider (1)
 We must skolemise the `forall b` before instantiating the `forall a`.
 See also Note [Deep skolemisation].
 
-Note that we /always/ use shallow subsumption in the ambiguity check.
-See Note [Ambiguity check and deep subsumption].
+Wrinkles:
+
+(DS1) Note that we /always/ use shallow subsumption in the ambiguity check.
+      See Note [Ambiguity check and deep subsumption].
+
+(DS2) Deep subsumption requires deep instantiation too.
+      See Note [The need for deep instantiation]
+
+(DS3) The interaction between deep subsumption and required foralls
+      (forall a -> ty) is a bit subtle.  See #24696 and
+      Note [Deep subsumption and required foralls]
 
 Note [Deep skolemisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1706,15 +1712,95 @@ complains.
 
 The easiest solution was to use tcEqMult in tc_sub_type_deep, and
 insist on equality. This is only in the DeepSubsumption code anyway.
+
+Note [The need for deep instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this, without Quick Look, but with Deep Subsumption:
+   f :: ∀a b c. a b c -> Int
+   g :: Bool -> ∀d. d -> d
+Consider the application (f g).  We need to do the subsumption test
+
+  (Bool -> ∀ d. d->d)   <=   (alpha beta gamma)
+
+where alpha, beta, gamma are the unification variables that instantiate a,b,c,
+respectively.  We must not drop down to unification, or we will reject the call.
+Rather we must deeply instantiate the LHS to get
+
+  (Bool -> delta -> delta)   <=   (alpha beta gamma)
+
+and now we can unify to get
+
+   alpha = (->)
+   beta = Bool
+   gamma = delta -> delta
+
+Hence the call to `deeplyInstantiate` in `tc_sub_type_deep`.
+
+See typecheck/should_compile/T11305 for an example of when this is important.
+
+Note [Deep subsumption and required foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A required forall, (forall a -> ty) behaves like a "rho-type", one with no
+top-level quantification.  In particular, it is neither implicitly instantiated nor
+skolemised.  So
+
+  rid1 :: forall a -> a -> a
+  rid1 = id
+
+  rid2 :: forall a -> a -> a
+  rid2 a = id
+
+Here `rid2` wll typecheck, but `rid1` will not, because we don't implicitly skolemise
+the  type.
+
+This "no implicit subsumption nor skolemisation" applies during subsumption.
+For example
+   (forall a. a->a)  <=  (forall a -> a -> a)  -- NOT!
+does /not/ hold, because that would require implicitly skoleming the (forall a->).
+
+Note also that, in Core, `eqType` distinguishes between
+   (forall a. blah) and forall a -> blah)
+See discussion on #22762 and these Notes in GHC.Core.TyCo.Compare
+  * Note [ForAllTy and type equality]
+  * Note [Comparing visibility]
+
+So during deep subsumption we simply stop (and drop down to equality) when we encounter
+a (forall a->).  This is a little odd:
+* Deep subsumption looks inside invisible foralls (forall a. ty)
+* Deep subsumption looks inside arrows (t1 -> t2)
+* But it does not look inside required foralls (forall a -> ty)
+
+There is discussion on #24696.  How is this implemented?
+
+* In `tc_sub_type_deep`, the calls to `topInstantiate` and `deeplyInstantiate`
+  instantiate only /invisible/ binders.
+* In `tc_sub_type_ds`, the call to `tcSkolemise` skolemises only /invisible/
+  binders.
+
+Here is a slightly more powerful alternative
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ In the story above, if we have
+    (forall a -> Eq a => a -> a)  <=  (forall a -> Ord a => a -> a)
+we'll reject it, because both are rho-types but they aren't equal.  But in the
+"drop to equality" stage we could instead see if both rho-types are headed with
+(forall a ->) and if so strip that off and go back into deep subsumption.
+
+This is a bit more powerful, but also a bit more complicated, so GHC
+doesn't do it yet, awaiting credible user demand.  See #24696.
 -}
 
 data DeepSubsumptionFlag = Deep | Shallow
+
+instance Outputable DeepSubsumptionFlag where
+    ppr Deep    = text "Deep"
+    ppr Shallow = text "Shallow"
 
 getDeepSubsumptionFlag :: TcM DeepSubsumptionFlag
 getDeepSubsumptionFlag = do { ds <- xoptM LangExt.DeepSubsumption
                             ; if ds then return Deep else return Shallow }
 
-tc_sub_type_deep :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
+tc_sub_type_deep :: HasDebugCallStack
+                 => (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
                  -> CtOrigin       -- Used when instantiating
                  -> UserTypeCtxt   -- Used when skolemising
                  -> TcSigmaType    -- Actual; a sigma-type
@@ -1727,7 +1813,8 @@ tc_sub_type_deep :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
 -- Precondition: ty_expected is deeply skolemised
 
 tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
-  = do { traceTc "tc_sub_type_deep" $
+  = assertPpr (isDeepRhoTy ty_expected) (ppr ty_expected) $
+    do { traceTc "tc_sub_type_deep" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; go ty_actual ty_expected }
@@ -1775,10 +1862,7 @@ tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
       | otherwise   -- Revert to unification
       = do { -- It's still possible that ty_actual has nested foralls. Instantiate
              -- these, as there's no way unification will succeed with them in.
-             -- See typecheck/should_compile/T11305 for an example of when this
-             -- is important. The problem is that we're checking something like
-             --  a -> forall b. b -> b     <=   alpha beta gamma
-             -- where we end up with alpha := (->)
+             -- See Note [The need for deep instantiation]
              (inst_wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
            ; unify_wrap         <- just_unify rho_a ty_expected
            ; return (unify_wrap <.> inst_wrap) }
@@ -1870,6 +1954,12 @@ isDeepRhoTy ty
   | Just (_, res) <- tcSplitFunTy_maybe ty = isDeepRhoTy res
   | otherwise                              = True   -- No forall, (=>), or (->) at top
 
+isRhoTyDS :: DeepSubsumptionFlag -> TcType -> Bool
+isRhoTyDS ds_flag ty
+  = case ds_flag of
+      Shallow -> isRhoTy ty      -- isRhoTy: no top level forall or (=>)
+      Deep    -> isDeepRhoTy ty  -- "deep" version: no nested forall or (=>)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1880,6 +1970,10 @@ isDeepRhoTy ty
 The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
+
+unifyExprType :: HsExpr GhcRn -> TcType -> TcType -> TcM TcCoercionN
+unifyExprType rn_expr ty1 ty2
+  = unifyType (Just (HsExprRnThing rn_expr)) ty1 ty2
 
 unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
           -> TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
@@ -2356,8 +2450,8 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
            -- Here we don't know about given equalities here; so we treat
            -- /any/ level outside this one as untouchable.  Hence cur_lvl.
        ; if not (touchabilityAndShapeTest cur_lvl tv1 ty2
-                 && simpleUnifyCheck False tv1 ty2)
-         then not_ok_so_defer
+                 && simpleUnifyCheck UC_OnTheFly tv1 ty2)
+         then not_ok_so_defer cur_lvl
          else
     do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
 
@@ -2390,8 +2484,12 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
     ty1 = mkTyVarTy tv1
     defer = unSwap swapped (uType_defer env) ty1 ty2
 
-    not_ok_so_defer =
-      do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
+    not_ok_so_defer cur_lvl =
+      do { traceTc "uUnfilledVar2 not ok" $
+             vcat [ text "tv1:" <+> ppr tv1
+                  , text "ty2:" <+> ppr ty2
+                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly tv1 ty2)
+                  , text "touchability:" <+> ppr (touchabilityAndShapeTest cur_lvl tv1 ty2)]
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occurred in type family parameter
@@ -2428,18 +2526,23 @@ swapOverTyVars is_given tv1 tv2
 lhsPriority :: TcTyVar -> Int
 -- Higher => more important to be on the LHS
 --        => more likely to be eliminated
+-- Only used when the levels are identical
 -- See Note [TyVar/TyVar orientation]
 lhsPriority tv
   = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
-      MetaTv { mtv_info = info } -> case info of
-                                     CycleBreakerTv -> 0
-                                     TyVarTv        -> 1
-                                     ConcreteTv {}  -> 2
-                                     TauTv          -> 3
-                                     RuntimeUnkTv   -> 4
+      MetaTv { mtv_info = info, mtv_tclvl = lvl }
+        | QLInstVar <- lvl
+        -> 5  -- Eliminate instantiation variables first
+        | otherwise
+        -> case info of
+             CycleBreakerTv -> 0
+             TyVarTv        -> 1
+             ConcreteTv {}  -> 2
+             TauTv          -> 3
+             RuntimeUnkTv   -> 4
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2778,51 +2881,69 @@ matchExpectedFunKind hs_ty n k = go n k
 *                                                                      *
 ********************************************************************* -}
 
-simpleUnifyCheck :: Bool -> TcTyVar -> TcType -> Bool
--- A fast check: True <=> unification is OK
+data UnifyCheckCaller
+  = UC_OnTheFly   -- Called from the on-the-fly unifier
+  | UC_QuickLook  -- Called from Quick Look
+  | UC_Solver     -- Called from constraint solver
+
+simpleUnifyCheck :: UnifyCheckCaller -> TcTyVar -> TcType -> Bool
+-- simpleUnifyCheck does a fast check: True <=> unification is OK
 -- If it says 'False' then unification might still be OK, but
 -- it'll take more work to do -- use the full checkTypeEq
 --
--- * Always rejects foralls unless lhs_tv is RuntimeUnk
---   (used by GHCi debugger)
+-- * Rejects foralls unless
+--      lhs_tv is RuntimeUnk (used by GHCi debugger)
+--          or is a QL instantiation variable
 -- * Rejects a non-concrete type if lhs_tv is concrete
 -- * Rejects type families unless fam_ok=True
 -- * Does a level-check for type variables
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
-simpleUnifyCheck fam_ok lhs_tv rhs
+simpleUnifyCheck caller lhs_tv rhs
   = go rhs
   where
+
     !(occ_in_ty, occ_in_co) = mkOccFolders lhs_tv
 
     lhs_tv_lvl         = tcTyVarLevel lhs_tv
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
-    forall_ok          = case tcTyVarDetails lhs_tv of
-                            MetaTv { mtv_info = RuntimeUnkTv } -> True
-                            _                                  -> False
+
+    forall_ok = case caller of
+                   UC_QuickLook -> isQLInstTyVar lhs_tv
+                   _            -> isRuntimeUnkTyVar lhs_tv
+
+    -- This fam_ok thing relates to a very specific perf problem
+    -- See Note [Prevent unification with type families]
+    -- A couple of QuickLook regression tests rely on unifying with type
+    --   families, so we let it through there (not very principled, but let's
+    --   see if it bites us)
+    fam_ok = case caller of
+               UC_Solver    -> True
+               UC_QuickLook -> True
+               UC_OnTheFly  -> False
 
     go (TyVarTy tv)
-      | lhs_tv == tv                                 = False
-      | tcTyVarLevel tv > lhs_tv_lvl                 = False
-      | lhs_tv_is_concrete, not (isConcreteTyVar tv) = False
-      | occ_in_ty $! (tyVarKind tv)                  = False
-      | otherwise                                    = True
+      | lhs_tv == tv                                    = False
+      | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
+      | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
+      | occ_in_ty $! (tyVarKind tv)                     = False
+      | otherwise                                       = True
 
     go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
-      | isInvisibleFunArg af, not forall_ok = False
+      | not forall_ok, isInvisibleFunArg af = False
       | otherwise                           = go w && go a && go r
 
     go (TyConApp tc tys)
       | lhs_tv_is_concrete, not (isConcreteTyCon tc) = False
-      | not (isTauTyCon tc)                          = False
-      | not fam_ok, not (isFamFreeTyCon tc)          = False
+      | not forall_ok, not (isTauTyCon tc)           = False
+      | not fam_ok,    not (isFamFreeTyCon tc)       = False
       | otherwise                                    = all go tys
 
-    go (AppTy t1 t2)    = go t1 && go t2
     go (ForAllTy (Bndr tv _) ty)
       | forall_ok = go (tyVarKind tv) && (tv == lhs_tv || go ty)
       | otherwise = False
 
+    go (AppTy t1 t2)    = go t1 && go t2
     go (CastTy ty co)   = not (occ_in_co co) && go ty
     go (CoercionTy co)  = not (occ_in_co co)
     go (LitTy {})       = True
@@ -3426,8 +3547,9 @@ touchabilityAndShapeTest :: TcLevel -> TcTyVar -> TcType -> Bool
 -- True <=> touchability and shape are OK
 touchabilityAndShapeTest given_eq_lvl tv rhs
   | MetaTv { mtv_info = info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
+  , tv_lvl `deeperThanOrSame` given_eq_lvl
   , checkTopShape info rhs
-  = tv_lvl `deeperThanOrSame` given_eq_lvl
+  = True
   | otherwise
   = False
 

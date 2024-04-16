@@ -16,17 +16,18 @@
 -}
 
 module GHC.Tc.Gen.Head
-       ( HsExprArg(..), EValArg(..), TcPass(..)
+       ( HsExprArg(..), TcPass(..), QLFlag(..), EWrap(..)
        , AppCtxt(..), appCtxtLoc, insideExpansion
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
-       , leadingValArgs, isVisibleArg, pprHsExprArgTc
+       , leadingValArgs, isVisibleArg
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId, obviousSig
        , tyConOf, tyConOfET, fieldNotInType
        , nonBidirectionalErr
 
+       , pprArgInst
        , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
@@ -42,21 +43,21 @@ import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
-import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( singleUsageUE )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Zonk.TcType
 
 
+import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.UsageEnv      ( singleUsageUE )
 import GHC.Core.PatSyn( PatSyn )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
@@ -109,9 +110,8 @@ is a very local type, used only within this module and GHC.Tc.Gen.App
       The result of splitHsApps, which decomposes a HsExpr GhcRn
 
   - HsExprArg TcpInst:
-      The result of tcInstFun, which instantiates the function type
-      Adds EWrap nodes, the argument type in EValArg,
-      and the kind-checked type in ETypeArg
+      The result of tcInstFun, which instantiates the function type,
+      perhaps taking a quick look at arguments.
 
   - HsExprArg TcpTc:
       The result of tcArg, which typechecks the value args
@@ -120,19 +120,6 @@ is a very local type, used only within this module and GHC.Tc.Gen.App
 * rebuildPrefixApps is dual to splitHsApps, and zips an application
   back into a HsExpr
 
-Note [EValArg]
-~~~~~~~~~~~~~~
-The data type EValArg is the payload of the EValArg constructor of
-HsExprArg; i.e. a value argument of the application.  EValArg has two
-forms:
-
-* ValArg: payload is just the expression itself. Simple.
-
-* ValArgQL: captures the results of applying quickLookArg to the
-  argument in a ValArg.  When we later want to typecheck that argument
-  we can just carry on from where quick-look left off.  The fields of
-  ValArgQL exactly capture what is needed to complete the job.
-
 Invariants:
 
 1. With QL switched off, all arguments are ValArg; no ValArgQL
@@ -140,6 +127,17 @@ Invariants:
 2. With QL switched on, tcInstFun converts some ValArgs to ValArgQL,
    under the conditions when quick-look should happen (eg the argument
    type is guarded) -- see quickLookArg
+
+Note [EValArgQL]
+~~~~~~~~~~~~~~~~
+Data constructor EValArgQL represents an argument that has been
+partly-type-checked by Quick Look: the first part of `tcApp` has been
+done, but not the second, `finishApp` part.
+
+The constuctor captures all the bits and pieces needed to complete
+typechecking.  (An alternative would to to store a function closure,
+but that's less concrete.)  See Note [Quick Look at value arguments]
+in GHC.Tc.Gen.App
 
 Note [splitHsApps]
 ~~~~~~~~~~~~~~~~~~
@@ -165,36 +163,49 @@ data TcPass = TcpRn     -- Arguments decomposed
             | TcpInst   -- Function instantiated
             | TcpTc     -- Typechecked
 
-data HsExprArg (p :: TcPass)
-  = -- See Note [HsExprArg]
-    EValArg  { eva_ctxt   :: AppCtxt
-             , eva_arg    :: EValArg p
-             , eva_arg_ty :: !(XEVAType p) }
+data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
 
-  | ETypeArg { eva_ctxt  :: AppCtxt
-             , eva_hs_ty :: LHsWcType GhcRn  -- The type arg
-             , eva_ty    :: !(XETAType p) }  -- Kind-checked type arg
+  -- Data constructor EValArg represents a value argument
+  EValArg :: { ea_ctxt   :: AppCtxt
+             , ea_arg_ty :: !(XEVAType p)
+             , ea_arg    :: LHsExpr (GhcPass (XPass p)) }
+          -> HsExprArg p
 
-  | EPrag    AppCtxt
-             (HsPragE (GhcPass (XPass p)))
+  -- Data constructor EValArgQL represents an argument that has been
+  -- partly-type-checked by Quick Look; see Note [EValArgQL]
+  EValArgQL :: { eaql_ctxt    :: AppCtxt
+               , eaql_arg_ty  :: Scaled TcSigmaType  -- Argument type expected by function
+               , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
+                                                     -- location and error msgs
+               , eaql_tc_fun  :: (HsExpr GhcTc, AppCtxt) -- Typechecked head
+               , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
+               , eaql_wanted  :: WantedConstraints
+               , eaql_encl    :: Bool                  -- True <=> we have already qlUnified
+                                                       --   eaql_arg_ty and eaql_res_rho
+               , eaql_res_rho :: TcRhoType }           -- Result type of the application
+            -> HsExprArg 'TcpInst  -- Only exists in TcpInst phase
 
-  | EWrap    EWrap
+  ETypeArg :: { ea_ctxt   :: AppCtxt
+              , ea_hs_ty  :: LHsWcType GhcRn  -- The type arg
+              , ea_ty_arg :: !(XETAType p) }  -- Kind-checked type arg
+           -> HsExprArg p
+
+  EPrag :: AppCtxt -> (HsPragE (GhcPass (XPass p))) -> HsExprArg p
+  EWrap :: EWrap                                    -> HsExprArg p
+
+type family XETAType (p :: TcPass) where  -- Type arguments
+  XETAType 'TcpRn = NoExtField
+  XETAType _      = Type
+
+type family XEVAType (p :: TcPass) where   -- Value arguments
+  XEVAType 'TcpInst = Scaled TcSigmaType
+  XEVAType _        = NoExtField
+
+data QLFlag = DoQL | NoQL
 
 data EWrap = EPar    AppCtxt
            | EExpand HsThingRn
            | EHsWrap HsWrapper
-
-data EValArg (p :: TcPass) where  -- See Note [EValArg]
-  ValArg   :: LHsExpr (GhcPass (XPass p))
-           -> EValArg p
-
-  ValArgQL :: { va_expr :: LHsExpr GhcRn        -- Original application
-                                                -- For location and error msgs
-              , va_fun  :: (HsExpr GhcTc, AppCtxt) -- Function of the application,
-                                                   -- typechecked, plus its context
-              , va_args :: [HsExprArg 'TcpInst] -- Args, instantiated
-              , va_ty   :: TcRhoType }          -- Result type
-           -> EValArg 'TcpInst  -- Only exists in TcpInst phase
 
 data AppCtxt
   = VAExpansion
@@ -206,6 +217,7 @@ data AppCtxt
        (HsExpr GhcRn) Int  -- In the third argument of function f
        SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
                          --    noSrcSpan if outermost; see Note [AppCtxt]
+
 
 {- Note [AppCtxt]
 ~~~~~~~~~~~~~~~~~
@@ -242,32 +254,28 @@ insideExpansion :: AppCtxt -> Bool
 insideExpansion (VAExpansion {}) = True
 insideExpansion (VACall {})      = False -- but what if the VACall has a generated context?
 
+instance Outputable QLFlag where
+  ppr DoQL = text "DoQL"
+  ppr NoQL = text "NoQL"
+
 instance Outputable AppCtxt where
   ppr (VAExpansion e l _) = text "VAExpansion" <+> ppr e <+> ppr l
   ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
-type family XPass p where
+type family XPass (p :: TcPass) where
   XPass 'TcpRn   = 'Renamed
   XPass 'TcpInst = 'Renamed
   XPass 'TcpTc   = 'Typechecked
 
-type family XETAType p where  -- Type arguments
-  XETAType 'TcpRn = NoExtField
-  XETAType _      = Type
-
-type family XEVAType p where  -- Value arguments
-  XEVAType 'TcpRn = NoExtField
-  XEVAType _      = Scaled Type
-
 mkEValArg :: AppCtxt -> LHsExpr GhcRn -> HsExprArg 'TcpRn
-mkEValArg ctxt e = EValArg { eva_arg = ValArg e, eva_ctxt = ctxt
-                           , eva_arg_ty = noExtField }
+mkEValArg ctxt e = EValArg { ea_arg = e, ea_ctxt = ctxt
+                           , ea_arg_ty = noExtField }
 
 mkETypeArg :: AppCtxt -> LHsWcType GhcRn -> HsExprArg 'TcpRn
 mkETypeArg ctxt hs_ty =
-  ETypeArg { eva_ctxt = ctxt
-           , eva_hs_ty = hs_ty
-           , eva_ty = noExtField }
+  ETypeArg { ea_ctxt = ctxt
+           , ea_hs_ty = hs_ty
+           , ea_ty_arg = noExtField }
 
 addArgWrap :: HsWrapper -> [HsExprArg p] -> [HsExprArg p]
 addArgWrap wrap args
@@ -344,6 +352,8 @@ splitHsApps e = go e (top_ctxt 0 e) []
       = pure ( (op, VACall op 0 (locA l))
              ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
                : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+                    -- generatedSrcSpan because this the span of the call,
+                    -- and its hard to say exactly what that is
                : EWrap (EExpand (OrigExpr e))
                : args )
 
@@ -365,380 +375,45 @@ splitHsApps e = go e (top_ctxt 0 e) []
 -- representation-polymorphic unlifted newtypes have been eta-expanded.
 --
 -- See Note [Eta-expanding rep-poly unlifted newtypes].
-rebuildHsApps :: HsExpr GhcTc
+rebuildHsApps :: (HsExpr GhcTc, AppCtxt)
                       -- ^ the function being applied
-              -> AppCtxt
-              -> [HsExprArg 'TcpTc]
-                      -- ^ the arguments to the function
-              -> TcRhoType
-                      -- ^ result type of the application
-              -> TcM (HsExpr GhcTc)
-rebuildHsApps fun ctxt args app_res_rho
-  = do { rejectRepPolyNewtypes args app_res_rho fun
-       ; return $ rebuild_hs_apps fun ctxt args }
-
--- | The worker function for 'rebuildHsApps': simply rebuilds
--- an application chain in which arguments are specified as
--- typechecked 'HsExprArg's.
-rebuild_hs_apps :: HsExpr GhcTc
-                      -- ^ the function being applied
-              -> AppCtxt
               -> [HsExprArg 'TcpTc]
                       -- ^ the arguments to the function
               -> HsExpr GhcTc
-rebuild_hs_apps fun _ [] = fun
-rebuild_hs_apps fun ctxt (arg : args)
+rebuildHsApps (fun, _) [] = fun
+rebuildHsApps (fun, ctxt) (arg : args)
   = case arg of
-      EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
-        -> rebuild_hs_apps (HsApp noExtField lfun arg) ctxt' args
-      ETypeArg { eva_hs_ty = hs_ty, eva_ty = ty, eva_ctxt = ctxt' }
-        -> rebuild_hs_apps (HsAppType ty lfun hs_ty) ctxt' args
+      EValArg { ea_arg = arg, ea_ctxt = ctxt' }
+        -> rebuildHsApps (HsApp noExtField lfun arg, ctxt') args
+      ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_ctxt = ctxt' }
+        -> rebuildHsApps (HsAppType ty lfun hs_ty, ctxt') args
       EPrag ctxt' p
-        -> rebuild_hs_apps (HsPragE noExtField p lfun) ctxt' args
+        -> rebuildHsApps (HsPragE noExtField p lfun, ctxt') args
       EWrap (EPar ctxt')
-        -> rebuild_hs_apps (gHsPar lfun) ctxt' args
+        -> rebuildHsApps (gHsPar lfun, ctxt') args
       EWrap (EExpand orig)
         | OrigExpr oe <- orig
-        -> rebuild_hs_apps (mkExpandedExprTc oe fun) ctxt args
+        -> rebuildHsApps (mkExpandedExprTc oe fun, ctxt) args
         | otherwise
-        -> rebuild_hs_apps fun ctxt args
+        -> rebuildHsApps (fun, ctxt) args
       EWrap (EHsWrap wrap)
-        -> rebuild_hs_apps (mkHsWrap wrap fun) ctxt args
+        -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
   where
     lfun = L (noAnnSrcSpan $ appCtxtLoc' ctxt) fun
     appCtxtLoc' (VAExpansion _ _ l) = l
     appCtxtLoc' v = appCtxtLoc v
 
-{- Note [Representation-polymorphic Ids with no binding]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We cannot have representation-polymorphic or levity-polymorphic
-function arguments. See Note [Representation polymorphism invariants]
-in GHC.Core.  That is checked in 'GHC.Tc.Gen.App.tcInstFun', see the call
-to 'matchActualFunTy', which performs the representation-polymorphism
-check.
-
-However, some special Ids have representation-polymorphic argument
-types. These are all GHC built-ins or data constructors. They have no binding;
-instead they have compulsory unfoldings. Specifically, these Ids are:
-
-1. Some wired-in Ids, such as coerce, oneShot and unsafeCoerce# (which is only
-   partly wired-in),
-2. Representation-polymorphic primops, such as raise#.
-3. Representation-polymorphic data constructors: unboxed tuples
-   and unboxed sums.
-4. Newtype constructors with `UnliftedNewtypes` which have
-   a representation-polymorphic argument.
-
-For (1) consider
-  badId :: forall r (a :: TYPE r). a -> a
-  badId = unsafeCoerce# @r @r @a @a
-
-The (partly) wired-in function
-  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-                   (a :: TYPE r1) (b :: TYPE r2).
-                   a -> b
-has a convenient but representation-polymorphic type. It has no
-binding; instead it has a compulsory unfolding, after which we
-would have
-  badId = /\r /\(a :: TYPE r). \(x::a). ...body of unsafeCorece#...
-And this is no good because of that rep-poly \(x::a).  So we want
-to reject this.
-
-On the other hand
-  goodId :: forall (a :: Type). a -> a
-  goodId = unsafeCoerce# @LiftedRep @LiftedRep @a @a
-
-is absolutely fine, because after we inline the unfolding, the \(x::a)
-is representation-monomorphic.
-
-Test cases: T14561, RepPolyWrappedVar2.
-
-For primops (2) and unboxed tuples/sums (3), the situation is similar;
-they are eta-expanded in CorePrep to be saturated, and that eta-expansion
-must not add a representation-polymorphic lambda.
-
-Test cases: T14561b, RepPolyWrappedVar, UnliftedNewtypesCoerceFail.
-
-The Note [Representation-polymorphism checking built-ins] explains how we handle
-cases (1) (2) and (3).
-
-For (4), consider a representation-polymorphic newtype with
-UnliftedNewtypes:
-
-  type Id :: forall r. TYPE r -> TYPE r
-  newtype Id a where { MkId :: a }
-
-  bad :: forall r (a :: TYPE r). a -> Id a
-  bad = MkId @r @a             -- Want to reject
-
-  good :: forall (a :: Type). a -> Id a
-  good = MkId @LiftedRep @a   -- Want to accept
-
-Test cases: T18481, UnliftedNewtypesLevityBinder
-
-(4) is handled differently than (1) (2) and (3);
-see Note [Eta-expanding rep-poly unlifted newtypes].
-
-Note [Representation-polymorphism checking built-ins]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some primops and wired-in functions are representation-polymorphic, but must
-only be instantiated at particular, concrete representations.
-There are three cases, all for `hasNoBinding` Ids:
-
-* Wired-in Ids.  For example, `seq`
-  is a wired-in Id, defined in GHC.Types.Id.Make.seqId, with this type:
-
-  seq :: forall {r} a (b :: TYPE r). a -> b -> b
-
-  It is more like a macro than a regular Id: it has /compulsory/ unfolding, so
-  we inline it at every call site.  At those call sites we should instantiate
-  `r` with a concrete RuntimeRep, so that the lambda has a concrete representation.
-  So somehow the type checker has to ensure that `seq` is called with a concrete
-  instantiation for `r`.
-
-  NB: unsafeCoerce# is not quite wired-in (see Note [Wiring in unsafeCoerce#] in GHC.HsToCore),
-  but it gets a similar treatment.
-
-* PrimOps. Some representation-polymorphic primops must be called at a concrete
-  type.  For example:
-
-  catch# :: forall {r} {l} (k :: TYPE r) (w :: TYPE (BoxedRep l)).
-              (State# RealWorld -> (# State# RealWorld, k #) )
-           -> (w -> State# RealWorld -> (# State# RealWorld, k #) )
-           -> State# RealWorld -> (# State# RealWorld, k #)
-
-  This primop pushes a "catch frame" on the stack, which must "know"
-  the return convention of `k`.  So `k` must be concrete, so we know
-  what kind of catch-frame to push. (See #21868 for more details.
-
-  So again we want to ensure that `r` is instantiated with a concrete RuntimeRep.
-
-* Unboxed-tuple data constructors.  Consider the unboxed pair data constructor:
-
-  (#,#) :: forall {r1} {r2} (a :: TYPE r1) (b :: TYPE r2). a -> b -> (# a, b #)
-
-  Again, we need concrete `r1` and `r2`. For example, we want to reject
-
-    f :: forall r (a :: TYPE r). a -> (# Int, a #)
-    f = (#,#) 3
-
-As pointed out in #21906; we see here that it is not enough to simply check
-the representation of the argument types, as for example "k :: TYPE r" in the
-type of catch# occurs in negative position but not directly as the type of
-an argument.
-
-NB: we specifically *DO NOT* handle representation-polymorphic unlifted newtypes
-with this mechanism. See Note [Eta-expanding rep-poly unlifted newtypes] for an
-overview of representation-polymorphism checks for those.
-
-To achieve this goal, for these these three kinds of `hasNoBinding` functions:
-
-* We identify the quantified variable `r` as a "concrete quantifier"
-
-* When instantiating a concrete quantifier, such as `r`, at a call site, we
-  instantiate with a ConcreteTv meta-tyvar, `r0[conc]`.
-  See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
-
-Now the type checker will ensure that `r0` is instantiated with a concrete
-RuntimeRep.
-
-Here are the moving parts:
-
-* In the IdDetails of an Id, we record a mapping from type variable name
-  to concreteness information, in the form of a ConcreteTvOrigin.
-  See 'idDetailsConcreteTvs'.
-
-  The ConcreteTvOrigin is used to determine which error message to show
-  to the user if the type variable gets instantiated to a non-concrete type;
-  this is slightly more granular than simply storing a set of type variable names.
-
-* The domain of this NameEnv is the outer forall'd TyVars of that
-  Id's type.  (A bit yukky because it means that alpha-renaming that type
-  would be invalid.  But we never do that.)  So `seq` has
-    Type:       forall {r} a (b :: TYPE r). a -> b -> b
-    IdDetails:  RepPolyId [ r :-> ConcreteFRR (FixedRuntimeRepOrigin b (..)) ]
-
-* When instantiating the type of an Id at a call site, at the call to
-  GHC.Tc.Utils.Instantiate.instantiateSigma in GHC.Tc.Gen.App.tcInstFun,
-  create ConcreteTv metavariables (instead of TauTvs) based on the
-  ConcreteTyVars stored in the IdDetails of the Id.
-
-Note that the /only/ place that one of these restricted rep-poly Ids can enter
-typechecking is in `tcInferId`, and all the interesting cases then land
-in `tcInstFun` where we take care to instantantiate those concrete
-type variables correctly.
-
-  Design alternative: in some ways, it would be more kosher for the concrete-ness
-  to be stored in the /type/, thus  forall (r[conc] :: RuntimeRep). ty.
-  But that pollutes Type for a very narrow use-case; so instead we adopt the
-  more ad-hoc solution described above.
-
-Examples:
-
-  ok :: forall (a :: Type) (b :: Type). a -> b -> b
-  ok = seq
-
-  bad :: forall s (b :: TYPE s). Int -> b -> b
-  bad x = seq x
-
-    Here we will instantiate the RuntimeRep skolem variable r from the type
-    of seq to a concrete metavariable rr[conc].
-    For 'ok' we will unify rr := LiftedRep, and for 'bad' we will fail to
-    solve rr[conc] ~# s[sk] and report a representation-polymorphism error to
-    the user.
-
-  type RR :: RuntimeRep
-  type family RR where { RR = IntRep }
-
-  tricky1, tricky2 :: forall (b :: TYPE RR). Int -> b -> b
-  tricky1 = seq
-  tricky2 = seq @RR
-
-    'tricky1' proceeds as above: we instantiate r |-> rr[conc], get a Wanted
-    rr[conc] ~# RR, which we solve by rewriting the type family.
-
-    For 'tricky2', we again create a fresh ConcreteTv metavariable rr[conc],
-    and we then proceed as if the user had written "seq @rr", but adding an
-    additional [W] rr ~ RR to the constraint solving context.
-
-[Wrinkle: VTA]
-
-  We must also handle the case when the user has instantiated the type variables
-  themselves, with a visible type application. We do this in GHC.Tc.Gen.App.tcVTA.
-
-  For example:
-
-    type F :: Type -> RuntimeRep
-    type family F a where { F Bool = IntRep }
-
-    foo = (# , #) @(F Bool) @FloatRep
-
-  We want to accept "foo" even though "F Bool" is not a concrete RuntimeRep.
-  We proceed as follows (see tcVTA):
-
-    - create a fresh concrete metavariable kappa,
-    - emit [W] F Bool ~ kappa[conc]
-    - pretend the user wrote (#,#) @kappa.
-
-  The solver will then unify kappa := IntRep, after rewriting the type family
-  application on the LHS of the Wanted.
-
-  Note that this is a bit of a corner case: only a few built-ins, such as
-  unsafeCoerce# and unboxed tuples, have specified (not inferred) RuntimeRep
-  quantified variables which can be instantiated by the user with a
-  visible type application.
-  For example,
-
-    coerce :: forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r)
-           .  Coercible a b => a -> b
-
-  does not allow the RuntimeRep argument to be specified by a visible type
-  application.
-
-Note [Eta-expanding rep-poly unlifted newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Any occurrence of a newtype constructor must appear at a known representation.
-If the newtype is applied to an argument, then we are done: by (I2) in
-Note [Representation polymorphism invariants], the argument has a known
-representation, and we are done. So we are left with the situation of an
-unapplied newtype constructor. For example:
-
-  type N :: TYPE r -> TYPE r
-  newtype N a = MkN a
-
-  ok :: N Int# -> N Int#
-  ok = MkN
-
-  bad :: forall r (a :: TYPE r). N (# Int, r #) -> N (# Int, r #)
-  bad = MkN
-
-The difficulty is that, unlike the situation described in
-Note [Representation-polymorphism checking built-ins],
-it is not necessarily the case that we simply need to check the instantiation
-of a single variable. Consider for example:
-
-  type RR :: Type -> Type -> RuntimeRep
-  type family RR a b where ...
-
-  type T :: forall a -> forall b -> TYPE (RR a b)
-  type family T a b where ...
-
-  type M :: forall a -> forall b -> TYPE (RR a b)
-  newtype M a b = MkM (T a b)
-
-Now, suppose we instantiate MkM, say with two types X, Y from the environment:
-
-  foo :: T X Y -> M X Y
-  foo = MkM @X @Y
-
-we need to check that we can eta-expand MkM, for which we need to know the
-representation of its argument, which is "RR X Y".
-
-To do this, in "rejectRepPolyNewtypes", we perform a syntactic representation-
-polymorphism check on the instantiated argument of the newtype, and reject
-the definition if the representation isn't concrete (in the sense of Note [Concrete types]
-in GHC.Tc.Utils.Concrete).
-
-For example, we would accept "ok" above, as "IntRep" is a concrete RuntimeRep.
-However, we would reject "foo", because "RR X Y" is not a concrete RuntimeRep.
-If we wanted to accept "foo" (performing a PHASE 2 check (in the sense of
-Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete), we would have to
-significantly re-engineer unlifted newtypes in GHC. Currently, "MkM" has type:
-
-  MkM :: forall a b. T a b %1 -> M a b
-
-However, we should only be able to use MkM when we know the representation of
-T a b (which is RR a b). This means that MkM should instead have type:
-
-  MkM :: forall {must_be_conc} a b (co :: RR a b ~# must_be_conc)
-      .  T a b |> GRefl Nominal (TYPE co) %1 -> M a b
-
-where "must_be_conc" is a skolem type variable that must be instantiated to
-a concrete type, just as in Note [Representation-polymorphism checking built-ins].
-This means that any instantiation of "MkM", such as "MkM @X @Y" from "foo",
-would create a fresh concrete metavariable "gamma[conc]" and emit a Wanted constraint
-
-  [W] co :: RR X Y ~# gamma[conc]
-
-However, this all seems like a lot of work for a feature that no one is asking for,
-so we decided to keep the much simpler syntactic check. Note that one possible
-advantage of this approach is that we should be able to stop skipping
-representation-polymorphism checks in the output of the desugarer; see (C) in
-Wrinkle [Representation-polymorphic lambdas] in Note [Typechecking data constructors].
--}
-
--- | Reject any unsaturated use of an unlifted newtype constructor
--- if the representation of its argument isn't known.
---
--- See Note [Eta-expanding rep-poly unlifted newtypes].
-rejectRepPolyNewtypes :: [HsExprArg 'TcpTc]
-                      -> TcRhoType
-                      -> HsExpr GhcTc
-                      -> TcM ()
-rejectRepPolyNewtypes _applied_args app_res_rho fun = case fun of
-
-  XExpr (ConLikeTc (RealDataCon con) _ _)
-    -- Check that this is an unsaturated occurrence of a
-    -- representation-polymorphic newtype constructor.
-    | isNewDataCon con
-    , not $ tcHasFixedRuntimeRep $ dataConTyCon con
-    , Just (_rem_arg_af, _rem_arg_mult, rem_arg_ty, _nt_res_ty)
-        <- splitFunTy_maybe app_res_rho
-    -> do { let frr_ctxt = FRRRepPolyUnliftedNewtype con
-          ; hasFixedRuntimeRep_syntactic frr_ctxt rem_arg_ty }
-
-  _ -> return ()
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
 isHsValArg _            = False
 
-leadingValArgs :: [HsExprArg id] -> [EValArg id]
-leadingValArgs []                        = []
-leadingValArgs (arg@(EValArg {}) : args) = eva_arg arg : leadingValArgs args
-leadingValArgs (EWrap {}    : args)      = leadingValArgs args
-leadingValArgs (EPrag {}    : args)      = leadingValArgs args
-leadingValArgs (ETypeArg {} : _)         = []
+leadingValArgs :: [HsExprArg 'TcpRn] -> [LHsExpr GhcRn]
+leadingValArgs []                                = []
+leadingValArgs (EValArg { ea_arg = arg } : args) = arg : leadingValArgs args
+leadingValArgs (EWrap {}    : args)              = leadingValArgs args
+leadingValArgs (EPrag {}    : args)              = leadingValArgs args
+leadingValArgs (ETypeArg {} : _)                 = []
 
 isValArg :: HsExprArg id -> Bool
 isValArg (EValArg {}) = True
@@ -750,26 +425,31 @@ isVisibleArg (ETypeArg {}) = True
 isVisibleArg _             = False
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
-  ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg
-  ppr (EPrag _ p)                      = text "EPrag" <+> ppr p
-  ppr (ETypeArg { eva_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
-  ppr (EWrap wrap)                     = ppr wrap
+  ppr (EPrag _ p)                     = text "EPrag" <+> ppr p
+  ppr (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
+  ppr (EWrap wrap)                    = ppr wrap
+  ppr (EValArg { ea_arg = arg, ea_ctxt = ctxt })
+    = text "EValArg" <> braces (ppr ctxt) <+> ppr arg
+  ppr (EValArgQL { eaql_tc_fun = fun, eaql_args = args, eaql_res_rho = ty})
+    = hang (text "EValArgQL" <+> ppr fun)
+         2 (vcat [ ppr args, text "ea_ql_ty:" <+> ppr ty ])
+
+pprArgInst :: HsExprArg 'TcpInst -> SDoc
+-- Ugh!  A special version for 'TcpInst, se we can print the arg_ty of EValArg
+pprArgInst (EPrag _ p)                     = text "EPrag" <+> ppr p
+pprArgInst (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
+pprArgInst (EWrap wrap)                    = ppr wrap
+pprArgInst (EValArg { ea_arg = arg, ea_arg_ty = ty })
+  = hang (text "EValArg" <+> ppr arg)
+       2 (text "arg_ty" <+> ppr ty)
+pprArgInst (EValArgQL { eaql_tc_fun = fun, eaql_args = args, eaql_res_rho = ty})
+  = hang (text "EValArgQL" <+> ppr fun)
+       2 (vcat [ vcat (map pprArgInst args), text "ea_ql_ty:" <+> ppr ty ])
 
 instance Outputable EWrap where
   ppr (EPar _)       = text "EPar"
   ppr (EHsWrap w)    = text "EHsWrap" <+> ppr w
   ppr (EExpand orig) = text "EExpand" <+> ppr orig
-
-instance OutputableBndrId (XPass p) => Outputable (EValArg p) where
-  ppr (ValArg e) = ppr e
-  ppr (ValArgQL { va_fun = fun, va_args = args, va_ty = ty})
-    = hang (text "ValArgQL" <+> ppr fun)
-         2 (vcat [ ppr args, text "va_ty:" <+> ppr ty ])
-
-pprHsExprArgTc :: HsExprArg 'TcpInst -> SDoc
-pprHsExprArgTc (EValArg { eva_arg = tm, eva_arg_ty = ty })
-  = text "EValArg" <+> hang (ppr tm) 2 (dcolon <+> ppr ty)
-pprHsExprArgTc arg = ppr arg
 
 {- Note [Desugar OpApp in the typechecker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1115,7 +795,7 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt rn_fun [] actual_res_ty res_ty $
+       ; addFunResCtxt expr [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
   where
     rn_fun = HsVar noExtField (noLocA name)
@@ -1358,7 +1038,7 @@ Wrinkles
          ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
            :: Int# -> T IntRep Int#
 
-         See Note [Representation-polymorphic Ids with no binding] in GHC.Tc.Gen.Head.
+         See Note [Representation-polymorphic Ids with no binding] in GHC.Tc.Utils.Concrete
 
       C. In the output of the desugarer in (4) above, we have a representation
          polymorphic lambda, which Lint would normally reject. So for that one
@@ -1476,7 +1156,7 @@ naughtiness in both branches.  c.f. GHC.Tc.TyCl.Utils.mkRecSelBinds.
 *                                                                      *
 ********************************************************************* -}
 
-addFunResCtxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn]
+addFunResCtxt :: HsExpr GhcTc -> [HsExprArg p]
               -> TcType -> ExpRhoType
               -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function

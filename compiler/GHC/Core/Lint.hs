@@ -1300,7 +1300,7 @@ checkRepPolyBuiltinApp fun_id args = checkL (null not_concs) err_msg
 -- | Compute the 1-indexed positions in the outer forall'd quantified type variables
 -- of the type in which the concrete type variables occur.
 --
--- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+-- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete.
 concreteTyVarPositions :: Id -> ConcreteTyVars -> IntMap ConcreteTvOrigin
 concreteTyVarPositions fun_id conc_tvs
   | isNullUFM conc_tvs

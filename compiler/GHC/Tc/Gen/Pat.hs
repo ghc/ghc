@@ -341,7 +341,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
   | otherwise                          -- No signature
   = do { (co, bndr_ty) <- case scaledThing exp_pat_ty of
              Check pat_ty    -> promoteTcType bind_lvl pat_ty
-             Infer infer_res -> assert (bind_lvl == ir_lvl infer_res) $
+             Infer infer_res -> assert (bind_lvl `sameDepthAs` ir_lvl infer_res) $
                                 -- If we were under a constructor that bumped the
                                 -- level, we'd be in checking mode (see tcConArg)
                                 -- hence this assertion
