@@ -45,7 +45,7 @@ module GHC.Core.Coercion (
         mkPhantomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
         mkProofIrrelCo,
-        downgradeRole, upgradeRole, mkAxiomCo,
+        downgradeRole,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
@@ -1403,10 +1403,6 @@ downgradeRole r1 r2 co
   = case downgradeRole_maybe r1 r2 co of
       Just co' -> co'
       Nothing  -> pprPanic "downgradeRole" (ppr co)
-
-upgradeRole :: Coercion -> Coercion
-upgradeRole (SubCo co) = co
-upgradeRole co         = co
 
 -- | Make a "coercion between coercions".
 mkProofIrrelCo :: Role       -- ^ role of the created coercion, "r"

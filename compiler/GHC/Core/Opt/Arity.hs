@@ -3170,7 +3170,7 @@ Consider
 and the expression
   MkN @Int e |> co
 where
-   d :: Maybe Int
+   e :: Maybe Int
   co :: N Int ~R# N T   is a coercion
 
 Then can we use pushCoDataCon to transform this to

@@ -2063,7 +2063,8 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
     go_alg_rep (SumTyCon {})      _               = True
     go_alg_rep (DataTyCon {})     _               = True
     go_alg_rep (AbstractTyCon {}) _               = False
-    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
+-- Not sure why we need this
+--    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
     go_alg_rep (NewTyCon {})      _               = False
 
 {- Note [Newtype classes]
@@ -2207,6 +2208,7 @@ isEnumerationTyCon (TyCon { tyConArity = arity, tyConDetails = details })
        DataTyCon { is_enum = res }     -> res
        TupleTyCon { tup_sort = tsort }
          | arity == 0                  -> isBoxed (tupleSortBoxity tsort)
+                                          -- () is an enumeration, but (##) is not
        _                               -> False
   | otherwise = False
 

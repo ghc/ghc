@@ -1465,7 +1465,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
-  | isDFunId bndr                            = Nothing
+--  | isDFunId bndr                            = Nothing
   | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]

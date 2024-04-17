@@ -2260,15 +2260,18 @@ simplIdF env var cont
 
 simplCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplCall env var cont
+{-
   | ClassOpId clas idx _     <- idDetails var
   , Just (env', arg', cont') <- classOpDictApp_maybe env clas idx cont
   = simplExprF env' arg' cont'
-
   | otherwise
+-}
+
   = do { rule_base <- getSimplRules
        ; let info  = mkArgInfo env rule_base var cont
        ; rebuildCall env info cont }
 
+{-
 classOpDictApp_maybe :: SimplEnv -> Class -> Int -> SimplCont
                      -> Maybe (SimplEnv, InExpr, SimplCont)
 classOpDictApp_maybe env cls idx cont
@@ -2296,6 +2299,7 @@ classOpDictApp_maybe env cls idx cont
           DoneEx e _           -> splitInApp (zapSubstEnv env)             e args
     splitInApp _ _ _
        = Nothing
+-}
 
 ---------------------------------------------------------
 --      Dealing with a call site
