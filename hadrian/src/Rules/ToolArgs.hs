@@ -132,15 +132,11 @@ mkToolTarget es p = do
 -- critically the `exe:ghc` component as that depends on the GHC library
 -- which takes a while to compile.
 toolTargets :: [Package]
-toolTargets = [ binary
-              , bytestring
-              , cabalSyntax
+toolTargets = [ cabalSyntax
               , cabal
               , compiler
-              , containers
               , directory
               , process
-              , exceptions
               , filepath
               , osString
               -- , ghc     -- # depends on ghc library
@@ -157,12 +153,8 @@ toolTargets = [ binary
               , hsc2hs  -- # executable
               , hpc
               , hpcBin  -- # executable
-              , mtl
-              , parsec
               , time
               , templateHaskellNext
-              , text
-              , transformers
               , semaphoreCompat
               , unlit  -- # executable
               ] ++ if windowsHost then [ win32 ] else [ unix ]
