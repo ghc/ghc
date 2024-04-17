@@ -80,39 +80,31 @@ stageBootPackages = return
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
-    return $ [ binary
-             , bytestring
-             , cabalSyntax
+    return $ [ cabalSyntax
              , cabal
              , compiler
-             , containers
-             , directory
-             , process
-             , exceptions
-             , filepath
+             , directory -- depends on filepath
+             , filepath -- depends on os-string
              , ghc
-             , runGhc
              , ghcBoot
              , ghcBootThNext
-             , ghcPlatform
              , ghcHeap
+             , ghcPkg
+             , ghcPlatform
              , ghcToolchain
              , ghci
-             , ghcPkg
              , haddock
-             , hsc2hs
+             , hp2ps
              , hpc
              , hpcBin
-             , mtl
-             , osString
-             , parsec
+             , hsc2hs
+             , osString -- new library not yet present for boot compilers
+             , process -- depends on filepath
+             , runGhc
              , semaphoreCompat
-             , time
              , templateHaskellNext
-             , text
-             , transformers
+             , time -- depends on win32
              , unlit
-             , hp2ps
              , if windowsHost then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
@@ -143,12 +135,14 @@ stage1Packages = do
       [ libraries0 -- Build all Stage0 libraries in Stage1
       , [ array
         , base
+        , binary
+        , bytestring
         , containers
         , deepseq
         , exceptions
         , ghc
-        , ghcBootTh
         , ghcBignum
+        , ghcBootTh
         , ghcCompact
         , ghcExperimental
         , ghcInternal
@@ -158,11 +152,16 @@ stage1Packages = do
         , hp2ps
         , hsc2hs
         , integerGmp
+        , mtl
+        , parsec
         , pretty
         , rts
         , semaphoreCompat
-        , templateHaskell
         , stm
+        , templateHaskell
+        , text
+        , time
+        , transformers
         , unlit
         , xhtml
         , if winTarget then win32 else unix
