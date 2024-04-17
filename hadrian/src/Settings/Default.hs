@@ -80,40 +80,38 @@ stageBootPackages = return
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
-    return $ [ binary
-             , bytestring
-             , cabalSyntax
+    return $ [ cabalSyntax
              , cabal
              , compiler
-             , containers
-             , directory
-             , process
-             , exceptions
-             , filepath
+             , directory -- depends on filepath
+             , filepath -- depends on os-string
              , ghc
-             , runGhc
              , ghcBoot
              , ghcBootThNext
-             , ghcPlatform
              , ghcHeap
+             , ghcPkg
+             , ghcPlatform
              , ghcToolchain
              , ghci
-             , ghcPkg
              , haddock
-             , hsc2hs
+             , hp2ps
              , hpc
              , hpcBin
-             , mtl
-             , osString
-             , parsec
-             , semaphoreCompat
-             , time
+             , hsc2hs
+             , osString -- new library not yet present for boot compilers
+             , process -- depends on filepath
+             , runGhc
+             , semaphoreCompat -- depends on
              , templateHaskellNext
-             , text
-             , transformers
+             , time -- depends on win32
              , unlit
-             , hp2ps
              , if windowsHost then win32 else unix
+             -- We must use the in-tree `Win32` as the version
+             -- bundled with GHC 9.6 is too old for `semaphore-compat`.
+             -- Once 9.6 is no longer a boot compiler, we can drop win32/unix.
+             -- These depend on `filepath`/`os-string` through an automatic flag
+             -- that confused Hadrian, so we must make those a stage0 package as well.
+             -- Once we drop `Win32`/`unix` it should be possible to drop those too.
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
@@ -143,12 +141,14 @@ stage1Packages = do
       [ libraries0 -- Build all Stage0 libraries in Stage1
       , [ array
         , base
+        , binary
+        , bytestring
         , containers
         , deepseq
         , exceptions
         , ghc
-        , ghcBootTh
         , ghcBignum
+        , ghcBootTh
         , ghcCompact
         , ghcExperimental
         , ghcInternal
@@ -158,11 +158,15 @@ stage1Packages = do
         , hp2ps
         , hsc2hs
         , integerGmp
+        , mtl
+        , parsec
         , pretty
         , rts
         , semaphoreCompat
-        , templateHaskell
         , stm
+        , templateHaskell
+        , text
+        , transformers
         , unlit
         , xhtml
         , if winTarget then win32 else unix
