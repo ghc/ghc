@@ -71,6 +71,7 @@ import System.Directory (getCurrentDirectory)
 import qualified Distribution.InstalledPackageInfo as CP
 import Distribution.Simple.Utils (writeUTF8File)
 import Utilities
+import Packages
 
 
 -- | Parse the Cabal file of a given 'Package'. This operation is cached by the
@@ -150,8 +151,20 @@ configurePackage context@Context {..} = do
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
+
+
+    -- Normally we will depend on Inplace package databases which enables
+    -- cross-package parallelism, but see #24436 for why we lineariese the build
+    -- of base and ghc-internal.
+    let forceBaseAfterGhcInternal dep =
+           if dep == ghcInternal && package == base
+              then Final
+              else iplace
+
+
+
     -- We'll need those packages in our package database.
-    deps <- sequence [ pkgConfFile (context { package = pkg })
+    deps <- sequence [ pkgConfFile (context { package = pkg, iplace = forceBaseAfterGhcInternal pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
     need $ extraPreConfigureDeps ++ deps
 
