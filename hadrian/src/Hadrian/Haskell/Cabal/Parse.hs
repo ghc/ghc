@@ -31,6 +31,7 @@ import qualified Distribution.PackageDescription.Parsec        as C
 import qualified Distribution.Simple.Compiler                  as C
 import qualified Distribution.Simple.Program.Db                as C
 import qualified Distribution.Simple                           as C
+import qualified Distribution.Simple.GHC                       as GHC
 import qualified Distribution.Simple.Program.Builtin           as C
 import qualified Distribution.Simple.Utils                     as C
 import qualified Distribution.Simple.Program.Types             as C
@@ -342,12 +343,11 @@ registerPackage rs context = do
     need [setupConfig] -- This triggers 'configurePackage'
     pd <- packageDescription <$> readContextData context
     db_path <- packageDbPath (PackageDbLoc (stage context) (iplace context))
-    dist_dir <- Context.buildPath context
     pid <- pkgUnitId (stage context) (package context)
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
     lbi <- liftIO $ C.getPersistBuildConfig cPath
-    liftIO $ register db_path pid dist_dir pd lbi
+    liftIO $ register db_path pid pd lbi
     -- Then after the register, which just writes the .conf file, do the recache step.
     buildWithResources rs $
       target context (GhcPkg Recache (stage context)) [] []
@@ -356,25 +356,23 @@ registerPackage rs context = do
 -- into a different package database to the one it was configured against.
 register :: FilePath
          -> String -- ^ Package Identifier
-         -> FilePath
          -> C.PackageDescription
          -> LocalBuildInfo
          -> IO ()
-register pkg_db pid build_dir pd lbi
+register pkg_db pid pd lbi
   = withLibLBI pd lbi $ \lib clbi -> do
 
-    absPackageDBs    <- C.absolutePackageDBPaths packageDbs
-    installedPkgInfo <- C.generateRegistrationInfo
-                           C.silent pd lib lbi clbi False reloc build_dir
-                           (C.registrationPackageDB absPackageDBs)
-
+    when reloc $ error "register does not support reloc"
+    installedPkgInfo <- generateRegistrationInfo pd lbi lib clbi
     writeRegistrationFile installedPkgInfo
 
   where
     regFile   = pkg_db </> pid <.> "conf"
     reloc     = relocatable lbi
-    -- Using a specific package db here is why we have to copy the function from Cabal.
-    packageDbs = [C.SpecificPackageDB pkg_db]
+
+    generateRegistrationInfo pkg lbi lib clbi = do
+      abi_hash <- C.mkAbiHash <$> GHC.libAbiHash C.silent pkg lbi lib clbi
+      return (C.absoluteInstalledPackageInfo pkg abi_hash lib lbi clbi)
 
     writeRegistrationFile installedPkgInfo = do
       writeUTF8File regFile (CP.showInstalledPackageInfo installedPkgInfo)
