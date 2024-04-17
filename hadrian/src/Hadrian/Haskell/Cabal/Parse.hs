@@ -70,6 +70,7 @@ import System.Directory (getCurrentDirectory)
 import qualified Distribution.InstalledPackageInfo as CP
 import Distribution.Simple.Utils (writeUTF8File)
 import Utilities
+import Packages
 
 
 -- | Parse the Cabal file of a given 'Package'. This operation is cached by the
@@ -150,8 +151,11 @@ configurePackage context@Context {..} = do
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
     -- We'll need those packages in our package database.
-    deps <- sequence [ pkgConfFile (context { package = pkg })
-                     | pkg <- depPkgs, pkg `elem` stagePkgs ]
+    deps <- sequence [ pkgConfFile (context { package = pkg, iplace = iplace' })
+                     | pkg <- depPkgs, pkg `elem` stagePkgs
+                     , let iplace' = if pkg == ghcInternal && package == base
+                                      then Final
+                                      else iplace ]
     need $ extraPreConfigureDeps ++ deps
 
     -- Figure out what hooks we need.
