@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Generate $WIDTH modules with one type each $FIELDS type variables.
+# The type has $CONSTRS constructors with each $FIELDS fields.
+# All types derive 'Generic' to generate a large amount of Types.
+# MultiLayerModules.hs imports all the modules
+WIDTH=10
+FIELDS=10
+CONSTRS=15
+FIELD_VARS=$(for field in $(seq -w 1 $FIELDS); do echo -n "a${field} "; done)
+for i in $(seq -w 1 $WIDTH); do
+  echo "module DummyLevel$i where" > DummyLevel$i.hs;
+  echo "import GHC.Generics" >> DummyLevel$i.hs;
+  echo "data Type_${i} ${FIELD_VARS}" >> DummyLevel$i.hs;
+  for constr in $(seq -w 1 $CONSTRS); do
+    if [ $constr -eq 1 ]; then
+      echo -n " = Constr_${i}_${constr} " >> DummyLevel$i.hs;
+    else
+      echo -n " | Constr_${i}_${constr} " >> DummyLevel$i.hs;
+    fi
+    echo ${FIELD_VARS} >> DummyLevel$i.hs;
+  done
+  echo " deriving (Show, Eq, Ord, Generic)"  >> DummyLevel$i.hs;
+done
+
+echo "module MultiLayerModules where" > MultiLayerModules.hs
+for j in $(seq -w 1 $WIDTH); do
+  echo "import DummyLevel$j" >> MultiLayerModules.hs;
+done
