@@ -1,7 +1,8 @@
 
 TH_NestedSplicesFail3.hs:4:12: error: [GHC-39999]
-    • No instance for ‘Language.Haskell.TH.Syntax.Quote
-                         (Language.Haskell.TH.Syntax.Code Language.Haskell.TH.Syntax.Q)’
+    • No instance for ‘Language.Haskell.TH.Lib.Syntax.Quote
+                         (Language.Haskell.TH.Lib.Syntax.Code
+                            Language.Haskell.TH.Lib.Syntax.Q)’
         arising from a quotation bracket
     • In the expression: [| 'x' |]
       In the Template Haskell splice $$([| 'x' |])

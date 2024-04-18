@@ -12,17 +12,17 @@ Derived class instances:
                 ((GHC.Internal.Base..)
                    GHC.Internal.Show.showSpace (GHC.Internal.Show.showsPrec 11 b2))))
   
-  instance Language.Haskell.TH.Syntax.Lift T14682.Foo where
-    Language.Haskell.TH.Syntax.lift (T14682.Foo a1 a2)
+  instance Language.Haskell.TH.Lib.Syntax.Lift T14682.Foo where
+    Language.Haskell.TH.Lib.Syntax.lift (T14682.Foo a1 a2)
       = [| T14682.Foo
-             $(Language.Haskell.TH.Syntax.lift a1)
-             $(Language.Haskell.TH.Syntax.lift a2) |]
-        pending(rn) [<spn, Language.Haskell.TH.Syntax.lift a2>,
-                     <spn, Language.Haskell.TH.Syntax.lift a1>]
-    Language.Haskell.TH.Syntax.liftTyped (T14682.Foo a1 a2)
+             $(Language.Haskell.TH.Lib.Syntax.lift a1)
+             $(Language.Haskell.TH.Lib.Syntax.lift a2) |]
+        pending(rn) [<spn, Language.Haskell.TH.Lib.Syntax.lift a2>,
+                     <spn, Language.Haskell.TH.Lib.Syntax.lift a1>]
+    Language.Haskell.TH.Lib.Syntax.liftTyped (T14682.Foo a1 a2)
       = [|| T14682.Foo
-              $$(Language.Haskell.TH.Syntax.liftTyped a1)
-              $$(Language.Haskell.TH.Syntax.liftTyped a2) ||]
+              $$(Language.Haskell.TH.Lib.Syntax.liftTyped a1)
+              $$(Language.Haskell.TH.Lib.Syntax.liftTyped a2) ||]
   
   instance GHC.Internal.Data.Data.Data T14682.Foo where
     GHC.Internal.Data.Data.gfoldl k z (T14682.Foo a1 a2)

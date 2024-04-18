@@ -1,9 +1,10 @@
 
 TH_NestedSplicesFail4.hs:4:11: error: [GHC-83865]
-    • Couldn't match type: Language.Haskell.TH.Syntax.Code m0 Char
-                     with: Language.Haskell.TH.Syntax.Q Language.Haskell.TH.Syntax.Exp
+    • Couldn't match type: Language.Haskell.TH.Lib.Syntax.Code m0 Char
+                     with: Language.Haskell.TH.Lib.Syntax.Q
+                             Language.Haskell.TH.Lib.Syntax.Exp
       Expected: Language.Haskell.TH.Lib.Internal.ExpQ
-        Actual: Language.Haskell.TH.Syntax.Code m0 Char
+        Actual: Language.Haskell.TH.Lib.Syntax.Code m0 Char
     • In the Template Haskell quotation [|| 'y' ||]
       In the expression: [|| 'y' ||]
       In the untyped splice: $([|| 'y' ||])

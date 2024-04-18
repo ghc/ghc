@@ -1,28 +1,28 @@
 
 TH_localname.hs:3:11: error: [GHC-39999]
-    • Ambiguous type variable ‘t0’ arising from a use of ‘Language.Haskell.TH.Syntax.lift’
-      prevents the constraint ‘(Language.Haskell.TH.Syntax.Lift
+    • Ambiguous type variable ‘t0’ arising from a use of ‘Language.Haskell.TH.Lib.Syntax.lift’
+      prevents the constraint ‘(Language.Haskell.TH.Lib.Syntax.Lift
                                   t0)’ from being solved.
       Relevant bindings include
         y :: t0 (bound at TH_localname.hs:3:6)
-        x :: t0 -> m0 Language.Haskell.TH.Syntax.Exp
+        x :: t0 -> m0 Language.Haskell.TH.Lib.Syntax.Exp
           (bound at TH_localname.hs:3:1)
       Probable fix: use a type annotation to specify what ‘t0’ should be.
       Potentially matching instances:
-        instance (Language.Haskell.TH.Syntax.Lift a,
-                  Language.Haskell.TH.Syntax.Lift b) =>
-                 Language.Haskell.TH.Syntax.Lift (Either a b)
-          -- Defined in ‘Language.Haskell.TH.Syntax’
-        instance Language.Haskell.TH.Syntax.Lift Integer
-          -- Defined in ‘Language.Haskell.TH.Syntax’
+        instance (Language.Haskell.TH.Lib.Syntax.Lift a,
+                  Language.Haskell.TH.Lib.Syntax.Lift b) =>
+                 Language.Haskell.TH.Lib.Syntax.Lift (Either a b)
+          -- Defined in ‘Language.Haskell.TH.Lib.Syntax’
+        instance Language.Haskell.TH.Lib.Syntax.Lift Integer
+          -- Defined in ‘Language.Haskell.TH.Lib.Syntax’
         ...plus 15 others
         ...plus 14 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the expression: Language.Haskell.TH.Syntax.lift y
+    • In the expression: Language.Haskell.TH.Lib.Syntax.lift y
       In the expression:
         [| y |]
-        pending(rn) [<y, Language.Haskell.TH.Syntax.lift y>]
+        pending(rn) [<y, Language.Haskell.TH.Lib.Syntax.lift y>]
       In the expression:
         \ y
           -> [| y |]
-             pending(rn) [<y, Language.Haskell.TH.Syntax.lift y>]
+             pending(rn) [<y, Language.Haskell.TH.Lib.Syntax.lift y>]

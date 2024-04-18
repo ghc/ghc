@@ -5,7 +5,7 @@ interfacePlugin: Language.Haskell.TH.Quote
 interfacePlugin: GHC.Internal.Base
 interfacePlugin: GHC.Internal.Float
 interfacePlugin: GHC.Prim.Ext
-interfacePlugin: Language.Haskell.TH.Syntax
+interfacePlugin: Language.Haskell.TH.Lib.Syntax
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)
 parsePlugin(a)

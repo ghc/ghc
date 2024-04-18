@@ -430,11 +430,15 @@ W4:
   as long as the module which defines Eq imports GHC.Magic this cannot
   cause trouble.
 
-  Embarrassingly, we do not follow this plan for the Lift class.
-  Derived Lift instances refer to machinery in Language.Haskell.TH.Lib,
-  which is not imported by the module Language.Haskell.TH.Syntax that
-  defines the Lift class.  This is still causing annoyance for boot
-  library maintainers as of March 2024:  See #22229.
+  Things are a bit more complex for the Lift class (see #22229).
+  * Derived Lift instances refer to machinery in
+  Language.Haskell.TH.Lib.Internal, which is not imported by the module
+  Language.Haskell.TH.Lib.Syntax that defines the Lift class.
+  * Language.Haskell.TH.Lib.Internal imports Language.Haskell.TH.Lib.Syntax, so
+  we can't add the reverse dependency without using a .hs-boot file
+  * What we do instead is that we expose a module Language.Haskell.TH.Syntax
+  importing both Language.Haskell.TH.Lib.{Syntax,Internal). Users are expected
+  to import this module.
 
 W5:
   If no explicit "default" declaration is present, the assumed

@@ -2,10 +2,10 @@
 T7276.hs:6:5: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         T7276.hs:6:8: error: [GHC-83865]
-    • Couldn't match type ‘[Language.Haskell.TH.Syntax.Dec]’
-                     with ‘Language.Haskell.TH.Syntax.Exp’
+    • Couldn't match type ‘[Language.Haskell.TH.Lib.Syntax.Dec]’
+                     with ‘Language.Haskell.TH.Lib.Syntax.Exp’
       Expected: Language.Haskell.TH.Lib.Internal.ExpQ
-        Actual: Language.Haskell.TH.Syntax.Q
+        Actual: Language.Haskell.TH.Lib.Syntax.Q
                   Language.Haskell.TH.Lib.Internal.Decs
     • In the expression: [d| y = 3 |]
       In the untyped splice: $([d| y = 3 |])

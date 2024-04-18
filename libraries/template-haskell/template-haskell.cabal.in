@@ -59,6 +59,7 @@ Library
         Language.Haskell.TH.LanguageExtensions
         Language.Haskell.TH.CodeDo
         Language.Haskell.TH.Lib.Internal
+        Language.Haskell.TH.Lib.Syntax
 
     other-modules:
         Language.Haskell.TH.Lib.Map

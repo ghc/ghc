@@ -19,8 +19,8 @@
 
 module Language.Haskell.TH.Lib.Internal where
 
-import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
-import qualified Language.Haskell.TH.Syntax as TH
+import Language.Haskell.TH.Lib.Syntax hiding (Role, InjectivityAnn)
+import qualified Language.Haskell.TH.Lib.Syntax as TH
 import Control.Applicative(liftA, Applicative(..))
 import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )

@@ -180,7 +180,7 @@ templateHaskellNames = [
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
 thSyn, thLib, qqLib :: Module
-thSyn = mkTHModule (fsLit "Language.Haskell.TH.Syntax")
+thSyn = mkTHModule (fsLit "Language.Haskell.TH.Lib.Syntax")
 thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib.Internal")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
