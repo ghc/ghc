@@ -687,6 +687,23 @@ as such you shouldn't need to set any of them explicitly. A flag
     ``-fno-full-laziness``. If that is inconvenient for you, please leave a
     comment `on the issue tracker (#21204) <https://gitlab.haskell.org/ghc/ghc/-/issues/21204>`__.
 
+.. ghc-flag:: -finter-module-far-jumps
+    :shortdesc: Assume code sections can be very large.
+    :type: dynamic
+    :reverse: -fno-inter-module-far-jumps
+    :category:
+
+    :default: Off
+
+    This flag forces GHC to use far jumps instead of near jumps for all jumps
+    which cross module boundries. This removes the need for jump islands/linker
+    jump fixups which some linkers struggle to deal with. (:ghc-ticket:`24648`)
+
+    This comes at a very modest code size (~2%) and runtime (~0.6%) overhead.
+
+    Note that this flag currently only affects the NCG AArch64 backend.
+
+
 .. ghc-flag:: -fignore-asserts
     :shortdesc: Ignore assertions in the source. Implied by :ghc-flag:`-O`.
     :type: dynamic
