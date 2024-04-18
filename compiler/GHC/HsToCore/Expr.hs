@@ -978,8 +978,11 @@ warnDiscardedDoBindings rhs rhs_ty
     do { fam_inst_envs <- dsGetFamInstEnvs
        ; let norm_elt_ty = topNormaliseType fam_inst_envs elt_ty
 
-           -- Warn about discarding non-() things in 'monadic' binding
-       ; if warn_unused && not (isUnitTy norm_elt_ty)
+       -- Warn about discarding non-() and non-Empty things in 'monadic' binding
+       -- We want to suppress spurious value discarded warnings for empty types
+       -- as the suggestions given in the warnings are wrong.
+       -- See #8671 and tests T8671.hs, T8671a.hs, T8671b.hs
+       ; if warn_unused && not (isUnitTy norm_elt_ty) && not (isEmptyTy norm_elt_ty)
          then diagnosticDs (DsUnusedDoBind rhs elt_ty)
          else
 
