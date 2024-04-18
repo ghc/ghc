@@ -22,6 +22,7 @@ import GHC.StgToJS.Symbols
 import GHC.Data.FastString
 import GHC.Types.Literal
 import GHC.Types.Basic
+import GHC.Types.RepType
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -68,7 +69,27 @@ genLit = \case
     | otherwise              -> return [ toJExpr (global (mkRawSymbol True name))
                                        , ValExpr (JInt 0)
                                        ]
-  LitRubbish {} -> return [ null_ ]
+  LitRubbish _ rr_ty ->
+    -- Generate appropriate rubbish literals, otherwise it might trip up the
+    -- code generator when a primop is applied to a rubbish literal (see #24664)
+    let reps = runtimeRepPrimRep (text "GHC.StgToJS.Literal.genLit") rr_ty
+        rub  = \case
+                  BoxedRep _ -> [ null_ ]
+                  AddrRep    -> [ null_, ValExpr (JInt 0) ]
+                  WordRep    -> [ ValExpr (JInt 0) ]
+                  Word8Rep   -> [ ValExpr (JInt 0) ]
+                  Word16Rep  -> [ ValExpr (JInt 0) ]
+                  Word32Rep  -> [ ValExpr (JInt 0) ]
+                  Word64Rep  -> [ ValExpr (JInt 0), ValExpr (JInt 0) ]
+                  IntRep     -> [ ValExpr (JInt 0) ]
+                  Int8Rep    -> [ ValExpr (JInt 0) ]
+                  Int16Rep   -> [ ValExpr (JInt 0) ]
+                  Int32Rep   -> [ ValExpr (JInt 0) ]
+                  Int64Rep   -> [ ValExpr (JInt 0), ValExpr (JInt 0) ]
+                  DoubleRep  -> [ ValExpr (JInt 0) ]
+                  FloatRep   -> [ ValExpr (JInt 0) ]
+                  VecRep _ _ -> panic "GHC.StgToJS.Literal.genLit: VecRep unsupported"
+    in return (concatMap rub reps)
 
 -- | generate a literal for the static init tables
 genStaticLit :: Literal -> G [StaticLit]
