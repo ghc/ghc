@@ -3052,6 +3052,8 @@ push_dc_gen dc dc_args co (Pair from_ty to_ty)
         -- where S is a type function.  In fact, exprIsConApp
         -- will probably not be called in such circumstances,
         -- but there's nothing wrong with it
+  = Just (push_data_con to_tc to_tc_arg_tys dc dc_args co Representational)
+{-
   = case isSubCo_maybe co of
       Just co' -> Just (push_data_con to_tc to_tc_arg_tys dc dc_args co' Nominal)
       _        | isInjectiveTyCon to_tc Representational
@@ -3063,6 +3065,7 @@ push_dc_gen dc dc_args co (Pair from_ty to_ty)
 --                            , text "of type:" <+> ppr (coercionType co)
                             , text "role:" <+> ppr (coercionRole co) ])
                   Nothing
+-}
 
   | otherwise
   = Nothing
