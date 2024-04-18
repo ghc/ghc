@@ -1191,6 +1191,17 @@ defaultFlags settings
 
     ++ validHoleFitDefaults
 
+    -- Platform/OS specific stuff
+    ++ case platformOS platform of
+        -- On mac naturally the linker is broken for jumps with very large
+        -- offsets. (#24648) So we enable HugeTextSections by default to generate
+        -- far jumps when crossing module boundries instead. As these don't rely
+        -- on linker fixups.
+        OSDarwin
+          | platformArch platform == ArchAArch64
+          -> [Opt_InterModuleFarJumps]
+        _ -> []
+
 
     where platform = sTargetPlatform settings
 
