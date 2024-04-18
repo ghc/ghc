@@ -1194,7 +1194,6 @@ defaultFlags settings
 
     ++ validHoleFitDefaults
 
-
     where platform = sTargetPlatform settings
 
 -- | These are the default settings for the display and sorting of valid hole
