@@ -47,6 +47,7 @@ data NCGConfig = NCGConfig
    , ncgDwarfSourceNotes      :: !Bool            -- ^ Enable GHC-specific source note DIEs
    , ncgCmmStaticPred         :: !Bool            -- ^ Enable static control-flow prediction
    , ncgEnableShortcutting    :: !Bool            -- ^ Enable shortcutting (don't jump to blocks only containing a jump)
+   , ncgEnableInterModuleFarJumps:: !Bool            -- ^ Use far-jumps for cross-module jumps.
    , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
    , ncgEnableDeadCodeElimination :: !Bool        -- ^ Whether to enable the dead-code elimination
    }
