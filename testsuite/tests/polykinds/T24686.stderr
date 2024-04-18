@@ -1,0 +1,7 @@
+
+T24686.hs:25:80: error: [GHC-25897]
+    Couldn't match kind ‘r’ with ‘LiftedRep’
+    Expected kind ‘*’, but ‘a’ has kind ‘TYPE r’
+    ‘r’ is a rigid type variable bound by
+      the type signature for ‘Bug’
+      at T24686.hs:25:48

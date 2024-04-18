@@ -36,7 +36,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcMType ( checkTypeHasFixedRuntimeRep )
+import GHC.Tc.Utils.TcMType ( checkTypeHasFixedRuntimeRep, newOpenTypeKind )
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
@@ -386,14 +386,16 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [Report unsolved equalities in tcPatSynSig]
-              tcOuterTKBndrs skol_info hs_outer_bndrs   $
-              tcExplicitTKBndrs skol_info ex_hs_tvbndrs $
-              do { req     <- tcHsContext hs_req
-                 ; prov    <- tcHsContext hs_prov
-                 ; body_ty <- tcHsOpenType hs_body_ty
-                     -- A (literal) pattern can be unlifted;
-                     -- e.g. pattern Zero <- 0#   (#12094)
-                 ; return (req, prov, body_ty) }
+              do { res_kind  <- newOpenTypeKind
+                             -- "open" because a (literal) pattern can be unlifted;
+                             -- e.g. pattern Zero <- 0#   (#12094)
+                   -- See Note [Escaping kind in type signatures] in GHC.Tc.Gen.HsType
+                 ; tcOuterTKBndrs skol_info hs_outer_bndrs   $
+                   tcExplicitTKBndrs skol_info ex_hs_tvbndrs $
+                   do { req     <- tcHsContext hs_req
+                      ; prov    <- tcHsContext hs_prov
+                      ; body_ty <- tcCheckLHsType hs_body_ty res_kind
+                      ; return (req, prov, body_ty) } }
 
        ; let implicit_tvs :: [TcTyVar]
              univ_bndrs   :: [TcInvisTVBinder]

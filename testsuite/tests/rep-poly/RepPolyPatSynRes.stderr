@@ -1,4 +1,7 @@
 
-RepPolyPatSynRes.hs:13:1: error: [GHC-18478]
-    The pattern synonym scrutinee does not have a fixed runtime representation:
-    • a :: TYPE rep
+RepPolyPatSynRes.hs:13:59: error: [GHC-25897]
+    Couldn't match kind ‘rep’ with ‘LiftedRep’
+    Expected kind ‘*’, but ‘a’ has kind ‘TYPE rep’
+    ‘rep’ is a rigid type variable bound by
+      the type signature for ‘Pat’
+      at RepPolyPatSynRes.hs:13:23-25

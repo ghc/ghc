@@ -56,7 +56,7 @@ module GHC.Tc.Gen.HsType (
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsType, tcInferLHsTypeKind, tcInferLHsTypeUnsaturated,
-        tcCheckLHsTypeInContext,
+        tcCheckLHsTypeInContext, tcCheckLHsType,
         tcHsContext, tcLHsPredType,
 
         kindGeneralizeAll,
@@ -496,7 +496,7 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
 
 {- Note [Escaping kind in type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider kind-checking the signature for `foo` (#19495):
+Consider kind-checking the signature for `foo` (#19495, #24686):
   type family T (r :: RuntimeRep) :: TYPE r
 
   foo :: forall (r :: RuntimeRep). T r
@@ -508,7 +508,8 @@ because we allow signatures like `foo :: Int#`.)
 
 Suppose we are at level L currently.  We do this
   * pushLevelAndSolveEqualitiesX: moves to level L+1
-  * newExpectedKind: allocates delta{L+1}
+  * newExpectedKind: allocates delta{L+1}. Note carefully that
+    this call is /outside/ the tcOuterTKBndrs call.
   * tcOuterTKBndrs: pushes the level again to L+2, binds skolem r{L+2}
   * kind-check the body (T r) :: TYPE delta{L+1}
 
@@ -607,9 +608,9 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
-                 tcOuterTKBndrs skol_info hs_outer_bndrs $
                  do { kind <- newExpectedKind (expectedKindInCtxt ctxt)
-                    ; tc_check_lhs_type (mkMode tyki) body kind }
+                    ; tcOuterTKBndrs skol_info hs_outer_bndrs $
+                      tc_check_lhs_type (mkMode tyki) body kind }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
        ; let outer_tv_bndrs = outerTyVarBndrs outer_bndrs
