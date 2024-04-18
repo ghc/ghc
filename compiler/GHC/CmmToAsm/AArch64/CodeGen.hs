@@ -23,7 +23,7 @@ import GHC.Cmm.DebugBlock
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat
    , getPicBaseMaybeNat, getPlatform, getConfig
-   , getDebugBlock, getFileId, getNewLabelNat
+   , getDebugBlock, getFileId, getNewLabelNat, getThisModuleNat
    )
 -- import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -1494,8 +1494,19 @@ assignReg_FltCode = assignReg_IntCode
 -- Jumps
 
 genJump :: CmmExpr{-the branch target-} -> NatM InstrBlock
-genJump expr@(CmmLit (CmmLabel lbl))
-  = return $ unitOL (annExpr expr (J (TLabel lbl)))
+genJump expr@(CmmLit (CmmLabel lbl)) = do
+  cur_mod <- getThisModuleNat
+  !useFarJumps <- ncgEnableInterModuleFarJumps <$> getConfig
+  let is_local = isLocalCLabel cur_mod lbl
+
+  -- We prefer to generate a near jump using a simble `B` instruction
+  -- with a range (+/-128MB). But if the target is outside the current module
+  -- we might have to account for large code offsets. (#24648)
+  if not useFarJumps || is_local
+    then return $ unitOL (annExpr expr (J (TLabel lbl)))
+    else do
+      (target, _format, code) <- getSomeReg expr
+      return (code `appOL` unitOL (annExpr expr (J (TReg target))))
 
 genJump expr = do
     (target, _format, code) <- getSomeReg expr
