@@ -118,3 +118,6 @@
 [submodule "libraries/file-io"]
 	path = libraries/file-io
 	url = https://gitlab.haskell.org/ghc/packages/file-io.git
+[submodule "trace-foreign-calls"]
+	path = trace-foreign-calls
+	url = https://github.com/well-typed/trace-foreign-calls.git

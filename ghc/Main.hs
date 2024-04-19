@@ -100,6 +100,7 @@ import GHC.ResponseFile (expandResponse)
 import Data.Bifunctor
 import GHC.Data.Graph.Directed
 import qualified Data.List.NonEmpty as NE
+import qualified Plugin.TraceForeignCalls as Edsko
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -152,6 +153,11 @@ main = do
             GHC.runGhc mbMinusB $ do
 
             dflags <- GHC.getSessionDynFlags
+            let fc_plugin = StaticPlugin (PluginWithArgs Edsko.plugin []) False
+            hsc_env <- getSession
+            let hsc_env' = hsc_env { hsc_plugins = (hsc_plugins hsc_env) { staticPlugins = [fc_plugin] } }
+            setSession hsc_env'
+
 
             case postStartupMode of
                 Left preLoadMode ->

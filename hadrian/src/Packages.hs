@@ -12,7 +12,7 @@ module Packages (
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
-    ghcPackages, isGhcPackage,
+    ghcPackages, isGhcPackage, traceForeign,
 
     -- * Package information
     crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
@@ -43,7 +43,7 @@ ghcPackages =
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
     , lintersCommon
-    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
+    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, traceForeign ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -134,6 +134,7 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
+traceForeign        = lib  "trace-foreign-calls" `setPath` "trace-foreign-calls/trace-foreign-calls"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"
