@@ -120,3 +120,6 @@
 [submodule "libraries/os-string"]
 	path = libraries/os-string
 	url = https://gitlab.haskell.org/ghc/packages/os-string
+[submodule "trace-foreign-calls"]
+	path = trace-foreign-calls
+	url = https://github.com/well-typed/trace-foreign-calls.git

@@ -113,6 +113,7 @@ stage0Packages = do
              , transformers
              , unlit
              , hp2ps
+             , traceForeign
              , if windowsHost then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
