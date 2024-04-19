@@ -153,17 +153,33 @@ mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
     final_iface <- shareIface (hsc_NC hsc_env) (flagsToIfCompression $ hsc_dflags hsc_env) full_iface
     return final_iface
 
+-- | Compress an 'ModIface' and share as many values as possible, depending on the 'CompressionIFace' level.
+--
+-- We compress the 'ModIface' by serialising the 'ModIface' to an in-memory byte array, and then deserialising it.
+-- The deserialisation will deduplicate certain values depending on the 'CompressionIFace' level.
+-- See Note [Deduplication during iface binary serialisation] for how we do that.
+--
+-- Additionally, we cache the serialised byte array, so if the 'ModIface' is not modified
+-- after calling 'shareIface', 'writeBinIface' will reuse that buffer without serialising the 'ModIface' again.
+-- Modifying the 'ModIface' forces us to re-serialise it again.
 shareIface :: NameCache -> CompressionIFace -> ModIface -> IO ModIface
+shareIface _ NormalCompression mi = do
+  -- In 'NormalCompression', the sharing isn't reducing the memory usage, as 'Name's and 'FastString's are
+  -- already shared, and at this compression level, we don't compress/share anything else.
+  -- Thus, for a brief moment we simply double the memory residency for no reason.
+  -- Therefore, we only try to share expensive values if the compression mode is higher than
+  -- 'NormalCompression'
+  pure mi
 shareIface nc compressionLevel  mi = do
   bh <- openBinMem (1024 * 1024)
   start <- tellBinWriter bh
   putIfaceWithExtFields QuietBinIFace compressionLevel bh mi
-  rbh <- freezeWriteHandle bh
+  rbh <- shrinkBinBuffer bh
   seekBinReader rbh start
   res <- getIfaceWithExtFields nc rbh
   let resiface = res { mi_src_hash = mi_src_hash mi }
   forceModIface  resiface
-  return resiface
+  pure resiface
 
 
 updateDecl :: [IfaceDecl] -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [IfaceDecl]
@@ -318,40 +334,40 @@ mkIface_ hsc_env
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = maybeGlobalRdrEnv rdr_env
 
-    ModIface {
-          mi_module      = this_mod,
+    emptyPartialModIface this_mod
           -- Need to record this because it depends on the -instantiated-with flag
           -- which could change
-          mi_sig_of      = if semantic_mod == this_mod
+          & set_mi_sig_of      ( if semantic_mod == this_mod
                             then Nothing
-                            else Just semantic_mod,
-          mi_hsc_src     = hsc_src,
-          mi_deps        = deps,
-          mi_usages      = usages,
-          mi_exports     = mkIfaceExports exports,
+                            else Just semantic_mod)
+          & set_mi_hsc_src     ( hsc_src)
+          & set_mi_deps        ( deps)
+          & set_mi_usages      ( usages)
+          & set_mi_exports     ( mkIfaceExports exports)
 
           -- Sort these lexicographically, so that
           -- the result is stable across compilations
-          mi_insts       = sortBy cmp_inst     iface_insts,
-          mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-          mi_rules       = sortBy cmp_rule     iface_rules,
+          & set_mi_insts       ( sortBy cmp_inst     iface_insts)
+          & set_mi_fam_insts   ( sortBy cmp_fam_inst iface_fam_insts)
+          & set_mi_rules       ( sortBy cmp_rule     iface_rules)
 
-          mi_fixities    = fixities,
-          mi_warns       = warns,
-          mi_anns        = annotations,
-          mi_globals     = rdrs,
-          mi_used_th     = used_th,
-          mi_decls       = decls,
-          mi_extra_decls = extra_decls,
-          mi_hpc         = isHpcUsed hpc_info,
-          mi_trust       = trust_info,
-          mi_trust_pkg   = pkg_trust_req,
-          mi_complete_matches = icomplete_matches,
-          mi_docs        = docs,
-          mi_final_exts  = (),
-          mi_ext_fields  = emptyExtensibleFields,
-          mi_src_hash = ms_hs_hash mod_summary
-          }
+          & set_mi_fixities    ( fixities)
+          & set_mi_warns       ( warns)
+          & set_mi_anns        ( annotations)
+          & set_mi_globals     ( rdrs)
+          & set_mi_used_th     ( used_th)
+          & set_mi_decls       ( decls)
+          & set_mi_extra_decls ( extra_decls)
+          & set_mi_hpc         ( isHpcUsed hpc_info)
+          & set_mi_trust       ( trust_info)
+          & set_mi_trust_pkg   ( pkg_trust_req)
+          & set_mi_complete_matches ( icomplete_matches)
+          & set_mi_docs        ( docs)
+          & set_mi_final_exts  ( ())
+          & set_mi_ext_fields  ( emptyExtensibleFields)
+          & set_mi_src_hash ( ms_hs_hash mod_summary)
+          & set_mi_hi_bytes ( PartialIfaceBinHandle)
+
   where
      cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,

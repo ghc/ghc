@@ -235,7 +235,7 @@ readHieFileContents bh0 name_cache = do
   get bh1
   where
     get_dictionary tbl bin_handle = do
-      fsTable <- Binary.forwardGet bin_handle (getTable tbl bin_handle)
+      fsTable <- Binary.forwardGetRel bin_handle (getTable tbl bin_handle)
       let
         fsReader = mkReaderFromTable tbl fsTable
         bhFs = addReaderToUserData fsReader bin_handle

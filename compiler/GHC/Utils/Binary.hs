@@ -4,7 +4,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
-{-# LANGUAGE TypeFamilies #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -20,7 +19,7 @@
 --     http://www.cs.york.ac.uk/fp/nhc98/
 
 module GHC.Utils.Binary
-  ( {-type-}  Bin,
+  ( {-type-}  Bin, RelBin(..), getRelBin,
     {-class-} Binary(..),
     {-type-}  ReadBinHandle, WriteBinHandle,
     SymbolTable, Dictionary,
@@ -33,6 +32,7 @@ module GHC.Utils.Binary
 
    seekBinWriter,
    seekBinReader,
+   seekBinReaderRel,
    tellBinReader,
    tellBinWriter,
    castBin,
@@ -47,7 +47,9 @@ module GHC.Utils.Binary
    readBinMemN,
 
    putAt, getAt,
+   putAtRel,
    forwardPut, forwardPut_, forwardGet,
+   forwardPutRel, forwardPutRel_, forwardGetRel,
 
    -- * For writing instances
    putByte,
@@ -102,6 +104,10 @@ module GHC.Utils.Binary
    BindingName(..),
    simpleBindingNameWriter,
    simpleBindingNameReader,
+   FullBinData(..), freezeBinHandle, thawBinHandle, putFullBinData,
+   shrinkBinBuffer,
+   freezeBinHandle2,
+   BinArray,
   ) where
 
 import GHC.Prelude
@@ -126,7 +132,7 @@ import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, copy)
 import Data.Coerce
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
@@ -156,7 +162,6 @@ import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 import Unsafe.Coerce (unsafeCoerce)
 
 import GHC.Data.TrieMap
-
 type BinArray = ForeignPtr Word8
 
 #if !MIN_VERSION_base(4,15,0)
@@ -195,6 +200,63 @@ dataHandle (BinData size bin) = do
 
 handleData :: WriteBinHandle -> IO BinData
 handleData (WriteBinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
+
+---------------------------------------------------------------
+-- FullBinData
+---------------------------------------------------------------
+
+data FullBinData = FullBinData
+  { fbd_readerUserData :: ReaderUserData
+  , fbd_off_s :: {-# UNPACK #-} !Int
+  -- ^ start offset
+  , fbd_off_e :: {-# UNPACK #-} !Int
+  -- ^ end offset
+  , fbd_size :: {-# UNPACK #-} !Int
+  -- ^ total buffer size
+  , fbd_buffer :: {-# UNPACK #-} !BinArray
+  }
+
+-- Equality and Ord assume that two distinct buffers are different, even if they compare the same things.
+instance Eq FullBinData where
+  (FullBinData _ b c d e) == (FullBinData _ b1 c1 d1 e1) = b == b1 && c == c1 && d == d1 && e == e1
+
+instance Ord FullBinData where
+  compare (FullBinData _ b c d e) (FullBinData _ b1 c1 d1 e1) =
+    compare b b1 `mappend` compare c c1 `mappend` compare d d1 `mappend` compare e e1
+
+putFullBinData :: WriteBinHandle -> FullBinData -> IO ()
+putFullBinData bh (FullBinData _ o1 o2 _sz ba) = do
+  let sz = o2 - o1
+  putPrim bh sz $ \dest ->
+    unsafeWithForeignPtr (ba `plusForeignPtr` o1) $ \orig ->
+    copyBytes dest orig sz
+
+freezeBinHandle :: Bin () -> ReadBinHandle -> IO FullBinData
+freezeBinHandle (BinPtr len) (ReadBinMem user_data ixr sz binr) = do
+  ix <- readFastMutInt ixr
+  pure (FullBinData user_data ix len sz binr)
+
+freezeBinHandle2 :: ReadBinHandle -> Bin () -> IO FullBinData
+freezeBinHandle2 (ReadBinMem user_data ixr sz binr) (BinPtr start) = do
+  ix <- readFastMutInt ixr
+  pure (FullBinData user_data start ix sz binr)
+
+thawBinHandle :: FullBinData -> IO ReadBinHandle
+thawBinHandle (FullBinData user_data ix _end sz ba) = do
+  ixr <- newFastMutInt ix
+  return $ ReadBinMem user_data ixr sz ba
+
+-- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
+-- This performs a copy of the underlying buffer.
+-- The buffer may be truncated if the offset is not at the end of the written
+-- output.
+--
+-- UserData is also discarded during the copy
+-- You should just use this when translating a Put handle into a Get handle.
+shrinkBinBuffer :: WriteBinHandle -> IO ReadBinHandle
+shrinkBinBuffer bh = withBinBuffer bh $ \bs -> do
+  unsafeUnpackBinBuffer (copy bs)
+
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -289,8 +351,29 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
 newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
 
+data RelBin a = RelBin !(Bin a) !(Bin a)
+  deriving (Eq, Ord, Show, Bounded)
+
+newtype RelBinPtr a = RelBinPtr (Bin a)
+
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
+
+getRelBin :: ReadBinHandle -> IO (RelBin a)
+getRelBin bh = do
+  start <- tellBinReader bh
+  off <- get bh
+  pure $ RelBin start off
+
+makeAbsoluteBin ::  RelBin a -> Bin a
+makeAbsoluteBin (RelBin (BinPtr !start) (BinPtr !offset)) = BinPtr (start + offset)
+
+makeRelativeBin :: RelBin a -> RelBinPtr a
+makeRelativeBin (RelBin _ offset) = RelBinPtr offset
+
+toRelBin :: Bin (RelBinPtr a) -> Bin a -> RelBin a
+toRelBin (BinPtr !start) (BinPtr !goal) =
+  RelBin (BinPtr start) (BinPtr $! goal - start)
 
 ---------------------------------------------------------------
 -- class Binary
@@ -311,6 +394,9 @@ class Binary a where
 
 putAt  :: Binary a => WriteBinHandle -> Bin a -> a -> IO ()
 putAt bh p x = do seekBinWriter bh p; put_ bh x; return ()
+
+putAtRel :: WriteBinHandle -> Bin (RelBinPtr a) -> Bin a -> IO ()
+putAtRel bh from to = putAt bh from (makeRelativeBin $ toRelBin from to)
 
 getAt  :: Binary a => ReadBinHandle -> Bin a -> IO a
 getAt bh p = do seekBinReader bh p; get bh
@@ -382,11 +468,17 @@ seekBinNoExpandWriter (WriteBinMem _ ix_r sz_r _) (BinPtr !p) = do
         else writeFastMutInt ix_r p
 
 -- | SeekBin but without calling expandBin
-seekBinReader :: ReadBinHandle -> Bin a -> IO ()
+seekBinReader :: HasCallStack => ReadBinHandle -> Bin a -> IO ()
 seekBinReader (ReadBinMem _ ix_r sz_r _) (BinPtr !p) = do
   if (p > sz_r)
         then panic "seekBinReader: seek out of range"
         else writeFastMutInt ix_r p
+
+seekBinReaderRel :: HasCallStack => ReadBinHandle -> RelBin a -> IO ()
+seekBinReaderRel (ReadBinMem _ ix_r sz_r _) (RelBin (BinPtr !start) (BinPtr !offset)) = do
+  if (start + offset > sz_r)
+        then panic "seekBinReaderRel: seek out of range"
+        else writeFastMutInt ix_r (start + offset)
 
 writeBinMem :: WriteBinHandle -> FilePath -> IO ()
 writeBinMem (WriteBinMem _ ix_r _ arr_r) fn = do
@@ -1108,6 +1200,11 @@ instance Binary (Bin a) where
   put_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
   get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
 
+-- Instance uses fixed-width encoding to allow inserting
+-- Bin placeholders in the stream.
+instance Binary (RelBinPtr a) where
+  put_ bh (RelBinPtr i) = put_ bh i
+  get bh = RelBinPtr <$> get bh
 
 -- -----------------------------------------------------------------------------
 -- Forward reading/writing
@@ -1136,7 +1233,7 @@ forwardPut_ :: WriteBinHandle -> (b -> IO a) -> IO b -> IO ()
 forwardPut_ bh put_A put_B = void $ forwardPut bh put_A put_B
 
 -- | Read a value stored using a forward reference
-forwardGet :: ReadBinHandle -> IO a -> IO a
+forwardGet :: HasCallStack => ReadBinHandle -> IO a -> IO a
 forwardGet bh get_A = do
     -- read forward reference
     p <- get bh -- a BinPtr
@@ -1144,6 +1241,43 @@ forwardGet bh get_A = do
     p_a <- tellBinReader bh
     -- go read the forward value, then seek back
     seekBinReader bh p
+    r <- get_A
+    seekBinReader bh p_a
+    pure r
+
+
+-- | "forwardPutRel put_A put_B" outputs A after B but allows A to be read before B
+-- by using a forward reference.
+forwardPutRel :: WriteBinHandle -> (b -> IO a) -> IO b -> IO (a,b)
+forwardPutRel bh put_A put_B = do
+  -- write placeholder pointer to A
+  pre_a <- tellBinWriter bh
+  put_ bh pre_a
+
+  -- write B
+  r_b <- put_B
+
+  -- update A's pointer
+  a <- tellBinWriter bh
+  putAtRel bh pre_a a
+  seekBinNoExpandWriter bh a
+
+  -- write A
+  r_a <- put_A r_b
+  pure (r_a,r_b)
+
+forwardPutRel_ :: WriteBinHandle -> (b -> IO a) -> IO b -> IO ()
+forwardPutRel_ bh put_A put_B = void $ forwardPutRel bh put_A put_B
+
+-- | Read a value stored using a forward reference
+forwardGetRel :: ReadBinHandle -> IO a -> IO a
+forwardGetRel bh get_A = do
+    -- read forward reference
+    p <- getRelBin bh
+    -- store current position
+    p_a <- tellBinReader bh
+    -- go read the forward value, then seek back
+    seekBinReader bh $ makeAbsoluteBin p
     r <- get_A
     seekBinReader bh p_a
     pure r
@@ -1157,19 +1291,19 @@ lazyPut = lazyPut' put_
 lazyGet :: Binary a => ReadBinHandle -> IO a
 lazyGet = lazyGet' get
 
-lazyPut' :: HasDebugCallStack => (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
+lazyPut' :: (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
 lazyPut' f bh a = do
     -- output the obj with a ptr to skip over it:
     pre_a <- tellBinWriter bh
     put_ bh pre_a       -- save a slot for the ptr
     f bh a           -- dump the object
     q <- tellBinWriter bh     -- q = ptr to after object
-    putAt bh pre_a q    -- fill in slot before a with ptr to q
+    putAtRel bh pre_a q    -- fill in slot before a with ptr to q
     seekBinWriter bh q        -- finally carry on writing at q
 
 lazyGet' :: HasDebugCallStack => (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
 lazyGet' f bh = do
-    p <- get bh -- a BinPtr
+    p <- getRelBin bh -- a BinPtr
     p_a <- tellBinReader bh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh rbm_off_r variable in the child thread, for thread
@@ -1178,7 +1312,7 @@ lazyGet' f bh = do
         let bh' = bh { rbm_off_r = off_r }
         seekBinReader bh' p_a
         f bh'
-    seekBinReader bh p -- skip over the object for now
+    seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
     return a
 
 -- | Serialize the constructor strictly but lazily serialize a value inside a
@@ -1472,13 +1606,13 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
                 mapM_ (\n -> serialiser bh n) (reverse todo)
                 loop
       snd <$>
-        (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
+        (forwardPutRel bh (const $ readFastMutInt symtab_next >>= put_ bh) $
           loop)
 
 -- | Read the elements of a 'GenericSymbolTable' from disk into a 'SymbolTable'.
 getGenericSymbolTable :: forall a . (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
 getGenericSymbolTable deserialiser bh = do
-  sz <- forwardGet bh (get bh) :: IO Int
+  sz <- forwardGetRel bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
   forM_ [0..(sz-1)] $ \i -> do
     f <- deserialiser bh

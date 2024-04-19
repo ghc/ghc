@@ -7,7 +7,59 @@
 
 module GHC.Unit.Module.ModIface
    ( ModIface
-   , ModIface_ (..)
+   , ModIface_
+   , mi_module
+   , mi_sig_of
+   , mi_hsc_src
+   , mi_src_hash
+   , mi_hi_bytes
+   , mi_deps
+   , mi_usages
+   , mi_exports
+   , mi_used_th
+   , mi_fixities
+   , mi_warns
+   , mi_anns
+   , mi_insts
+   , mi_fam_insts
+   , mi_rules
+   , mi_decls
+   , mi_extra_decls
+   , mi_globals
+   , mi_hpc
+   , mi_trust
+   , mi_trust_pkg
+   , mi_complete_matches
+   , mi_docs
+   , mi_final_exts
+   , mi_ext_fields
+   , set_mi_module
+   , set_mi_sig_of
+   , set_mi_hsc_src
+   , set_mi_src_hash
+   , set_mi_hi_bytes
+   , set_mi_deps
+   , set_mi_usages
+   , set_mi_exports
+   , set_mi_used_th
+   , set_mi_fixities
+   , set_mi_warns
+   , set_mi_anns
+   , set_mi_insts
+   , set_mi_fam_insts
+   , set_mi_rules
+   , set_mi_decls
+   , set_mi_extra_decls
+   , set_mi_globals
+   , set_mi_hpc
+   , set_mi_trust
+   , set_mi_trust_pkg
+   , set_mi_complete_matches
+   , set_mi_docs
+   , set_mi_final_exts
+   , set_mi_ext_fields
+   , completePartialModIface
+   , IfaceBinHandle(..)
    , PartialModIface
    , ModIfaceBackend (..)
    , IfaceDeclExts
@@ -58,6 +110,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import qualified GHC.Data.Strict as Strict
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -139,7 +192,9 @@ type family IfaceBackendExts (phase :: ModIfacePhase) = bk | bk -> phase where
   IfaceBackendExts 'ModIfaceCore = ()
   IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
 
-
+data IfaceBinHandle (phase :: ModIfacePhase) where
+  PartialIfaceBinHandle :: IfaceBinHandle 'ModIfaceCore
+  FullIfaceBinHandle :: Strict.Maybe FullBinData -> IfaceBinHandle 'ModIfaceFinal
 
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
@@ -262,8 +317,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- chosen over `ByteString`s.
                 --
 
-        mi_src_hash :: !Fingerprint
+        mi_src_hash :: !Fingerprint,
                 -- ^ Hash of the .hs source, used for recompilation checking.
+        mi_hi_bytes :: !(IfaceBinHandle phase)
      }
 
 {-
@@ -349,6 +405,7 @@ instance Binary ModIface where
                  mi_src_hash = _src_hash, -- Don't `put_` this in the instance
                                           -- because we are going to write it
                                           -- out separately in the actual file
+                 mi_hi_bytes  = _hi_bytes, -- TODO: explain
                  mi_deps      = deps,
                  mi_usages    = usages,
                  mi_exports   = exports,
@@ -449,6 +506,7 @@ instance Binary ModIface where
                  mi_hsc_src     = hsc_src,
                  mi_src_hash = fingerprint0, -- placeholder because this is dealt
                                              -- with specially when the file is read
+                 mi_hi_bytes    = FullIfaceBinHandle Strict.Nothing,
                  mi_deps        = deps,
                  mi_usages      = usages,
                  mi_exports     = exports,
@@ -487,6 +545,7 @@ instance Binary ModIface where
                    mi_hash_fn = mkIfaceHashCache decls
                  }})
 
+
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
 
@@ -496,6 +555,7 @@ emptyPartialModIface mod
                mi_sig_of      = Nothing,
                mi_hsc_src     = HsSrcFile,
                mi_src_hash    = fingerprint0,
+               mi_hi_bytes    = PartialIfaceBinHandle,
                mi_deps        = noDependencies,
                mi_usages      = [],
                mi_exports     = [],
@@ -522,6 +582,7 @@ emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
       { mi_decls = []
+      , mi_hi_bytes = FullIfaceBinHandle Strict.Nothing
       , mi_final_exts = ModIfaceBackend
         { mi_iface_hash = fingerprint0,
           mi_mod_hash = fingerprint0,
@@ -626,5 +687,97 @@ type WhetherHasOrphans   = Bool
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
 
+completePartialModIface :: PartialModIface
+  -> [(Fingerprint, IfaceDecl)]
+  -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
+  -> ModIfaceBackend
+  -> IfaceBinHandle 'ModIfaceFinal
+  -> ModIface
+completePartialModIface partial decls extra_decls final_exts hi_bytes = partial
+  { mi_decls = decls
+  , mi_extra_decls = extra_decls
+  , mi_final_exts = final_exts
+  , mi_hi_bytes = hi_bytes
+  }
 
+set_mi_module :: Module -> ModIface_ phase -> ModIface_ phase
+set_mi_module val iface = clear_mi_hi_bytes $ iface { mi_module = val }
 
+set_mi_sig_of :: Maybe Module -> ModIface_ phase -> ModIface_ phase
+set_mi_sig_of val iface = clear_mi_hi_bytes $ iface { mi_sig_of = val }
+
+set_mi_hsc_src :: HscSource -> ModIface_ phase -> ModIface_ phase
+set_mi_hsc_src val iface = clear_mi_hi_bytes $ iface { mi_hsc_src = val }
+
+set_mi_src_hash :: Fingerprint -> ModIface_ phase -> ModIface_ phase
+set_mi_src_hash val iface = clear_mi_hi_bytes $ iface { mi_src_hash = val }
+
+set_mi_hi_bytes :: IfaceBinHandle phase -> ModIface_ phase -> ModIface_ phase
+set_mi_hi_bytes val iface = iface { mi_hi_bytes = val }
+
+set_mi_deps :: Dependencies -> ModIface_ phase -> ModIface_ phase
+set_mi_deps val iface = clear_mi_hi_bytes $ iface { mi_deps = val }
+
+set_mi_usages :: [Usage] -> ModIface_ phase -> ModIface_ phase
+set_mi_usages val iface = clear_mi_hi_bytes $ iface { mi_usages = val }
+
+set_mi_exports :: [IfaceExport] -> ModIface_ phase -> ModIface_ phase
+set_mi_exports val iface = clear_mi_hi_bytes $ iface { mi_exports = val }
+
+set_mi_used_th :: Bool -> ModIface_ phase -> ModIface_ phase
+set_mi_used_th val iface = clear_mi_hi_bytes $ iface { mi_used_th = val }
+
+set_mi_fixities :: [(OccName, Fixity)] -> ModIface_ phase -> ModIface_ phase
+set_mi_fixities val iface = clear_mi_hi_bytes $ iface { mi_fixities = val }
+
+set_mi_warns :: IfaceWarnings -> ModIface_ phase -> ModIface_ phase
+set_mi_warns val iface = clear_mi_hi_bytes $ iface { mi_warns = val }
+
+set_mi_anns :: [IfaceAnnotation] -> ModIface_ phase -> ModIface_ phase
+set_mi_anns val iface = clear_mi_hi_bytes $ iface { mi_anns = val }
+
+set_mi_insts :: [IfaceClsInst] -> ModIface_ phase -> ModIface_ phase
+set_mi_insts val iface = clear_mi_hi_bytes $ iface { mi_insts = val }
+
+set_mi_fam_insts :: [IfaceFamInst] -> ModIface_ phase -> ModIface_ phase
+set_mi_fam_insts val iface = clear_mi_hi_bytes $ iface { mi_fam_insts = val }
+
+set_mi_rules :: [IfaceRule] -> ModIface_ phase -> ModIface_ phase
+set_mi_rules val iface = clear_mi_hi_bytes $ iface { mi_rules = val }
+
+set_mi_decls :: [IfaceDeclExts phase] -> ModIface_ phase -> ModIface_ phase
+set_mi_decls val iface = clear_mi_hi_bytes $ iface { mi_decls = val }
+
+set_mi_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> ModIface_ phase -> ModIface_ phase
+set_mi_extra_decls val iface = clear_mi_hi_bytes $ iface { mi_extra_decls = val }
+
+set_mi_globals :: Maybe IfGlobalRdrEnv -> ModIface_ phase -> ModIface_ phase
+set_mi_globals val iface = clear_mi_hi_bytes $ iface { mi_globals = val }
+
+set_mi_hpc :: AnyHpcUsage -> ModIface_ phase -> ModIface_ phase
+set_mi_hpc val iface = clear_mi_hi_bytes $ iface { mi_hpc = val }
+
+set_mi_trust :: IfaceTrustInfo -> ModIface_ phase -> ModIface_ phase
+set_mi_trust val iface = clear_mi_hi_bytes $ iface { mi_trust = val }
+
+set_mi_trust_pkg :: Bool -> ModIface_ phase -> ModIface_ phase
+set_mi_trust_pkg val iface = clear_mi_hi_bytes $ iface { mi_trust_pkg = val }
+
+set_mi_complete_matches :: [IfaceCompleteMatch] -> ModIface_ phase -> ModIface_ phase
+set_mi_complete_matches val iface = clear_mi_hi_bytes $ iface { mi_complete_matches = val }
+
+set_mi_docs :: Maybe Docs -> ModIface_ phase -> ModIface_ phase
+set_mi_docs val iface = clear_mi_hi_bytes $  iface { mi_docs = val }
+
+set_mi_final_exts :: IfaceBackendExts phase -> ModIface_ phase -> ModIface_ phase
+set_mi_final_exts val iface = clear_mi_hi_bytes $ iface { mi_final_exts = val }
+
+set_mi_ext_fields :: ExtensibleFields -> ModIface_ phase -> ModIface_ phase
+set_mi_ext_fields val iface = clear_mi_hi_bytes $ iface { mi_ext_fields = val }
+
+clear_mi_hi_bytes :: ModIface_ phase -> ModIface_ phase
+clear_mi_hi_bytes iface = iface
+  { mi_hi_bytes = case mi_hi_bytes iface of
+      PartialIfaceBinHandle -> PartialIfaceBinHandle
+      FullIfaceBinHandle _ -> FullIfaceBinHandle Strict.Nothing
+  }

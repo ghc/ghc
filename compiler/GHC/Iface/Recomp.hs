@@ -83,6 +83,7 @@ import Data.Ord
 import Data.Containers.ListUtils
 import Data.Bifunctor
 import GHC.Iface.Errors.Ppr
+import qualified GHC.Data.Strict as Strict
 
 {-
   -----------------------------------------------
@@ -1283,7 +1284,9 @@ addFingerprints hsc_env iface0
       , mi_fix_fn         = fix_fn
       , mi_hash_fn        = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_extra_decls = sorted_extra_decls, mi_final_exts = final_iface_exts }
+    final_iface = completePartialModIface iface0
+        (sorted_decls) (sorted_extra_decls) (final_iface_exts)
+        (FullIfaceBinHandle Strict.Nothing)
    --
    return final_iface
 
