@@ -13,8 +13,8 @@ relocateObjectCode(ObjectCode * oc) {
 }
 
 
-void flushInstructionCache(){
-   return ADD_SUFFIX(flushInstructionCache)();
+void flushInstructionCache(ObjectCode * oc){
+   return ADD_SUFFIX(flushInstructionCache)(oc);
 }
 #endif
 
