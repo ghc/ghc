@@ -16,6 +16,43 @@
 
 #if defined(OBJFORMAT_ELF)
 
+typedef uint64_t addr_t;
+
+/* regular instructions are 32bit */
+typedef uint32_t inst_t;
+
+/* compressed instructions are 16bit */
+typedef uint16_t cinst_t;
+
+// TODO: These instances could be static. They are not yet, because we might
+// need their debugging symbols.
+char *relocationTypeToString(Elf64_Xword type);
+int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel);
+bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
+int32_t SignExtend32(uint32_t X, unsigned B);
+void write8le(uint8_t *p, uint8_t v);
+uint8_t read8le(const uint8_t *P);
+void write16le(cinst_t *p, uint16_t v);
+uint16_t read16le(const cinst_t *P);
+uint32_t read32le(const inst_t *P);
+void write32le(inst_t *p, uint32_t v);
+uint64_t read64le(const uint64_t *P);
+void write64le(uint64_t *p, uint64_t v);
+uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end);
+void setCJType(cinst_t *loc, uint32_t val);
+void setCBType(cinst_t *loc, uint32_t val);
+void setBType(inst_t *loc, uint32_t val);
+void setSType(inst_t *loc, uint32_t val);
+int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *rel, ElfSymbol *symbol,
+                      int64_t addend, ObjectCode *oc);
+void setJType(inst_t *loc, uint32_t val);
+void setIType(inst_t *loc, int32_t val);
+void checkInt(inst_t *loc, int32_t v, int n);
+uint32_t setLO12_I(uint32_t insn, uint32_t imm);
+uint32_t setLO12_S(uint32_t insn, uint32_t imm);
+void setUType(inst_t *loc, int32_t val);
+
+
 char *relocationTypeToString(Elf64_Xword type) {
   switch (ELF64_R_TYPE(type)) {
   case R_RISCV_NONE:
@@ -77,18 +114,6 @@ char *relocationTypeToString(Elf64_Xword type) {
 
 #define Page(x) ((x) & ~0xFFF)
 
-typedef uint64_t addr_t;
-
-int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel) STG_NORETURN;
-bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
-
-/* regular instructions are 32bit */
-typedef uint32_t inst_t;
-
-/* compressed instructions are 16bit */
-typedef uint16_t cinst_t;
-
-// TODO: Decide which functions should be static and/or inlined.
 int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
   debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not "
@@ -469,7 +494,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
       IF_DEBUG(linker, debugBelch("R_RISCV_CALL_PLT w/ SymbolExtra = %p , "
                                   "entry = 0x%lx\n",
                                   symbolExtra, FAKE_GOT_S));
-      GOT_Target = FAKE_GOT_S;
+      GOT_Target = (addr_t) FAKE_GOT_S;
     }
 
     if (findStub(section, (void **)&S, 0)) {
