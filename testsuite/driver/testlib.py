@@ -461,6 +461,12 @@ def signal_exit_code( val: int ):
 
 # -----
 
+def pre_cmd_timeout_multiplier( val: float ):
+    return lambda name, opts, v=val: _pre_cmd_timeout_multiplier(name, opts, v)
+
+def _pre_cmd_timeout_multiplier( name, opts, v ):
+    opts.pre_cmd_timeout_multiplier = v
+
 def compile_timeout_multiplier( val: float ):
     return lambda name, opts, v=val: _compile_timeout_multiplier(name, opts, v)
 
@@ -1259,7 +1265,9 @@ def do_test(name: TestName,
         exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
                            stdout = stdout_path,
                            stderr = stderr_path,
-                           print_output = config.verbose >= 3)
+                           print_output = config.verbose >= 3,
+                           timeout_multiplier = opts.pre_cmd_timeout_multiplier,
+                           )
 
         # If user used expect_broken then don't record failures of pre_cmd
         if exit_code != 0 and opts.expect not in ['fail']:
