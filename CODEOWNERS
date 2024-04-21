@@ -1,5 +1,5 @@
 # Confused about what this is? See
-# https://gitlab.haskell.org/help/user/project/code_owners
+# https://docs.gitlab.com/ee/user/project/codeowners/
 
 # Catch-all
 * @bgamari
