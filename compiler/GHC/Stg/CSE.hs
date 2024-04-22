@@ -109,6 +109,8 @@ import GHC.Core.Map.Expr
 import GHC.Data.TrieMap
 import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
+import qualified Data.Map as Map
+import GHC.Types.Literal (Literal)
 
 --------------
 -- The Trie --
@@ -121,6 +123,8 @@ data StgArgMap a = SAM
     { sam_var :: DVarEnv a
     , sam_lit :: LiteralMap a
     }
+
+type LiteralMap  a = Map.Map Literal a
 
 -- TODO(22292): derive
 instance Functor StgArgMap where
