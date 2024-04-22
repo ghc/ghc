@@ -40,6 +40,7 @@ import GHC.Utils.Outputable
 import qualified Data.Map    as Map
 import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
+import GHC.Types.Literal (Literal)
 
 {-
 This module implements TrieMaps over Core related data structures
@@ -127,6 +128,8 @@ instance TrieMap CoreMap where
 -- but it is strictly internal to this module.  If you are including a 'CoreMap'
 -- inside another 'TrieMap', this is the type you want.
 type CoreMapG = GenMap CoreMapX
+
+type LiteralMap  a = Map.Map Literal a
 
 -- | @CoreMapX a@ is the base map from @DeBruijn CoreExpr@ to @a@, but without
 -- the 'GenMap' optimization.
