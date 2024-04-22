@@ -3,6 +3,7 @@
 ## 4.21.0.0 *TBA*
   * Add the `MonadFix` instance for `(,) a`, similar to the one for `Writer a` ([CLC proposal #238](https://github.com/haskell/core-libraries-committee/issues/238))
   * Improve `toInteger :: Word32 -> Integer` on 64-bit platforms ([CLC proposal #259](https://github.com/haskell/core-libraries-committee/issues/259))
+  * Make `read` accept binary integer notation ([CLC proposal #177](https://github.com/haskell/core-libraries-committee/issues/177))
 
 ## 4.20.0.0 *TBA*
   * Deprecate `GHC.Pack` ([#21461](https://gitlab.haskell.org/ghc/ghc/-/issues/21461))

@@ -1,7 +1,8 @@
 -- !!! Testing the behaviour of Char.lexLitChar a little..
 
--- [March 2003]  We now allow \X and \O as escapes although the 
--- spec only permits \x and \o.  Seems more consistent. 
+-- [March 2003]  We now allow \X and \O as escapes although the
+-- spec only permits \x and \o.  Seems more consistent.
+-- [January 2024]  Binary character literals, something like '\b100' are not permitted.
 
 module Main where
 
@@ -33,9 +34,15 @@ octs = do
   lex' "'\\o14b'"
   lex' "'\\0a4bg'"
 
+-- Binaries are NOT supported. '\b' stands for backspace.
+bins = do
+  lex' "'\\b'"
+  lex' "'\\b00'"
+
 main = do
   hexes
   octs
+  bins
 
 
 

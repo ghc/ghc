@@ -445,15 +445,15 @@ In ``Prelude`` support
 
 ``Read``\ ing integers
     GHC's implementation of the ``Read`` class for integral types
-    accepts hexadecimal and octal literals (the code in the Haskell 98
+    accepts hexadecimal, octal and binary literals (the code in the Haskell 98
     report doesn't). So, for example, ::
 
         read "0xf00" :: Int
 
     works in GHC.
 
-    A possible reason for this is that ``readLitChar`` accepts hex and
-    octal escapes, so it seems inconsistent not to do so for integers
+    This is to maintain consistency with the language's syntax. Haskell98
+    accepts hexadecimal and octal formats, and GHC2021 accepts binary formats
     too.
 
 ``isAlpha``

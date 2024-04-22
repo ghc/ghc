@@ -300,6 +300,17 @@ lexCharE =
        n    <- lexInteger base
        guard (n <= toInteger (ord maxBound))
        return (chr (fromInteger n))
+    where
+      -- Slightly different variant of lexBaseChar that denies binary format.
+      -- Binary formats are not allowed for character/string literal.
+      lexBaseChar = do
+        c <- get
+        case c of
+          'o' -> return 8
+          'O' -> return 8
+          'x' -> return 16
+          'X' -> return 16
+          _   -> pfail
 
   lexCntrlChar =
     do _ <- char '^'
@@ -415,27 +426,28 @@ type Digits = [Int]
 
 lexNumber :: ReadP Lexeme
 lexNumber
-  = lexHexOct  <++      -- First try for hex or octal 0x, 0o etc
+  = lexHexOctBin  <++   -- First try for hex, octal or binary 0x, 0o, 0b etc
                         -- If that fails, try for a decimal number
     lexDecNumber        -- Start with ordinary digits
 
-lexHexOct :: ReadP Lexeme
-lexHexOct
+lexHexOctBin :: ReadP Lexeme
+lexHexOctBin
   = do  _ <- char '0'
         base <- lexBaseChar
         digits <- lexDigits base
         return (Number (MkNumber base digits))
-
-lexBaseChar :: ReadP Int
--- Lex a single character indicating the base; fail if not there
-lexBaseChar = do
-  c <- get
-  case c of
-    'o' -> return 8
-    'O' -> return 8
-    'x' -> return 16
-    'X' -> return 16
-    _   -> pfail
+  where
+    -- Lex a single character indicating the base; fail if not there
+    lexBaseChar = do
+      c <- get
+      case c of
+        'b' -> return 2
+        'B' -> return 2
+        'o' -> return 8
+        'O' -> return 8
+        'x' -> return 16
+        'X' -> return 16
+        _   -> pfail
 
 lexDecNumber :: ReadP Lexeme
 lexDecNumber =
