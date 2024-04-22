@@ -128,7 +128,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr034.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr035.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr036.hs" Nothing
- "../../testsuite/tests/printer/Ppr037.hs" Nothing
+ "../../testsuite/tests/printer/MatchPatComments.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr038.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr039.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr040.hs" Nothing
