@@ -168,7 +168,7 @@ wasmHeader = unsafePerformIO $ B.unsafePackAddressLen 4 "\0asm"#
 data Object = Object
   { objModuleName    :: !ModuleName
     -- ^ name of the module
-  , objHandle        :: !BinHandle
+  , objHandle        :: !ReadBinHandle
     -- ^ BinHandle that can be used to read the ObjBlocks
   , objPayloadOffset :: !(Bin ObjBlock)
     -- ^ Offset of the payload (units)
@@ -253,7 +253,7 @@ instance Outputable ExportedFun where
 
 -- | Write an ObjBlock, except for the top level symbols which are stored in the
 -- index
-putObjBlock :: BinHandle -> ObjBlock -> IO ()
+putObjBlock :: WriteBinHandle -> ObjBlock -> IO ()
 putObjBlock bh (ObjBlock _syms b c d e f g) = do
     put_ bh b
     put_ bh c
@@ -264,7 +264,7 @@ putObjBlock bh (ObjBlock _syms b c d e f g) = do
 
 -- | Read an ObjBlock and associate it to the given symbols (that must have been
 -- read from the index)
-getObjBlock :: [FastString] -> BinHandle -> IO ObjBlock
+getObjBlock :: [FastString] -> ReadBinHandle -> IO ObjBlock
 getObjBlock syms bh = do
     b <- get bh
     c <- get bh
@@ -299,7 +299,7 @@ data IndexEntry = IndexEntry
 -- | Given a handle to a Binary payload, add the module, 'mod_name', its
 -- dependencies, 'deps', and its linkable units to the payload.
 putObject
-  :: BinHandle
+  :: WriteBinHandle
   -> ModuleName -- ^ module
   -> BlockInfo  -- ^ block infos
   -> [ObjBlock] -- ^ linkable units and their symbols
@@ -322,7 +322,7 @@ putObject bh mod_name deps os = do
     -- forward put the index
     forwardPut_ bh_fs (put_ bh_fs) $ do
       idx <- forM os $ \o -> do
-        p <- tellBin bh_fs
+        p <- tellBinWriter bh_fs
         -- write units without their symbols
         putObjBlock bh_fs o
         -- return symbols and offset to store in the index
@@ -330,7 +330,7 @@ putObject bh mod_name deps os = do
       pure idx
 
 -- | Parse object header
-getObjectHeader :: BinHandle -> IO (Either String ModuleName)
+getObjectHeader :: ReadBinHandle -> IO (Either String ModuleName)
 getObjectHeader bh = do
   magic <- getByteString bh (B.length hsHeader)
   case magic == hsHeader of
@@ -345,7 +345,7 @@ getObjectHeader bh = do
 
 
 -- | Parse object body. Must be called after a successful getObjectHeader
-getObjectBody :: BinHandle -> ModuleName -> IO Object
+getObjectBody :: ReadBinHandle -> ModuleName -> IO Object
 getObjectBody bh0 mod_name = do
   -- Read the string table
   dict <- forwardGet bh0 (getDictionary bh0)
@@ -353,7 +353,7 @@ getObjectBody bh0 mod_name = do
 
   block_info  <- get bh
   idx         <- forwardGet bh (get bh)
-  payload_pos <- tellBin bh
+  payload_pos <- tellBinReader bh
 
   pure $ Object
     { objModuleName    = mod_name
@@ -364,7 +364,7 @@ getObjectBody bh0 mod_name = do
     }
 
 -- | Parse object
-getObject :: BinHandle -> IO (Maybe Object)
+getObject :: ReadBinHandle -> IO (Maybe Object)
 getObject bh = do
   getObjectHeader bh >>= \case
     Left _err      -> pure Nothing
@@ -393,7 +393,7 @@ getObjectBlocks obj bids = mapMaybeM read_entry (zip (objIndex obj) [0..])
     bh = objHandle obj
     read_entry (IndexEntry syms offset,i)
       | IS.member i bids = do
-          seekBin bh offset
+          seekBinReader bh offset
           Just <$> getObjBlock syms bh
       | otherwise = pure Nothing
 
@@ -409,12 +409,12 @@ readObjectBlocks file bids = do
 -- Helper functions
 --------------------------------------------------------------------------------
 
-putEnum :: Enum a => BinHandle -> a -> IO ()
+putEnum :: Enum a => WriteBinHandle -> a -> IO ()
 putEnum bh x | n > 65535 = error ("putEnum: out of range: " ++ show n)
              | otherwise = put_ bh n
   where n = fromIntegral $ fromEnum x :: Word16
 
-getEnum :: Enum a => BinHandle -> IO a
+getEnum :: Enum a => ReadBinHandle -> IO a
 getEnum bh = toEnum . fromIntegral <$> (get bh :: IO Word16)
 
 -- | Helper to convert Int to Int32
@@ -779,7 +779,7 @@ writeJSObject opts contents output_fn = do
 
 
 -- | Read a JS object from BinHandle
-parseJSObject :: BinHandle -> IO (JSOptions, B.ByteString)
+parseJSObject :: ReadBinHandle -> IO (JSOptions, B.ByteString)
 parseJSObject bh = do
   magic <- getByteString bh (B.length jsHeader)
   case magic == jsHeader of
