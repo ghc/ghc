@@ -377,18 +377,27 @@ the process id).
 
 This is ok, as the temporary directory used contains the pid (see getTempDir).
 -}
+
+manyWithTrace :: Logger -> String -> ([FilePath] -> IO ()) -> [FilePath] -> IO ()
+manyWithTrace _ _ _ [] = pure () -- do silent nothing on zero filepaths
+manyWithTrace logger phase act paths
+  = traceCmd logger phase ("Deleting: " ++ unwords paths) (act paths)
+
 removeTmpDirs :: Logger -> [FilePath] -> IO ()
-removeTmpDirs logger ds
-  = traceCmd logger "Deleting temp dirs"
-             ("Deleting: " ++ unwords ds)
-             (mapM_ (removeWith logger removeDirectory) ds)
+removeTmpDirs logger
+  = manyWithTrace logger "Deleting temp dirs"
+                  (mapM_ (removeWith logger removeDirectory))
+
+removeTmpSubdirs :: Logger -> [FilePath] -> IO ()
+removeTmpSubdirs logger
+  = manyWithTrace logger "Deleting temp subdirs"
+                  (mapM_ (removeWith logger removeDirectory))
 
 removeTmpFiles :: Logger -> [FilePath] -> IO ()
 removeTmpFiles logger fs
   = warnNon $
-    traceCmd logger "Deleting temp files"
-             ("Deleting: " ++ unwords deletees)
-             (mapM_ (removeWith logger removeFile) deletees)
+    manyWithTrace logger "Deleting temp files"
+                  (mapM_ (removeWith logger removeFile)) deletees
   where
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
@@ -404,12 +413,6 @@ removeTmpFiles logger fs
         act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
-
-removeTmpSubdirs :: Logger -> [FilePath] -> IO ()
-removeTmpSubdirs logger fs
-  = traceCmd logger "Deleting temp subdirs"
-             ("Deleting: " ++ unwords fs)
-             (mapM_ (removeWith logger removeDirectory) fs)
 
 removeWith :: Logger -> (FilePath -> IO ()) -> FilePath -> IO ()
 removeWith logger remover f = remover f `Exception.catchIO`

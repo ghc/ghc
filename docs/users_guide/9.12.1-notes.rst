@@ -85,6 +85,9 @@ Compiler
 GHCi
 ~~~~
 
+- Fix a bug where GHCi would not start alongside a local file called ``Prelude.hs``
+  or ``Prelude.lhs`` (:ghc-ticket:`10920`).
+
 
 Runtime system
 ~~~~~~~~~~~~~~

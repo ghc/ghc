@@ -1,0 +1,47 @@
+--
+-- Tests that we can don't crash with a local Prelude module present (bug #10920).
+--
+
+-- this is default, but the test makes zero sense with NoImplicitPrelude, it should *not* be set here
+:seti -XImplicitPrelude
+-- this is default too, (ab)used in the following macro
+:seti -fimplicit-import-qualified
+-- for a bit neater output
+:def! section \title -> let echo=System.IO.putStrLn in (echo "" GHC.Base.>> echo title GHC.Base.>> GHC.Base.return "")
+
+:section -- should not crash with local prelude
+:load T10920.hs
+:main
+:show imports
+:show modules
+
+:load
+:section -- unless loaded, HomeModError is expected (on stderr)
+import Prelude
+:show imports
+
+:load
+:section -- but if loaded, can be imported
+:load T10920
+import Prelude
+:t Prelude.storefront
+:show imports
+:show modules
+
+:load
+:section -- can also be star-imported
+:load T10920
+:module *Prelude
+:t Prelude.backyard
+:show imports
+:show modules
+
+-- also test ghci-script similar to what stack repl generates...
+-- the sequence is a tad weird, but it is what it is.
+:load
+:section -- double-loading is fine as well
+:add Prelude ./T10920.hs
+:module + Prelude
+:show imports
+:show modules
+:main
