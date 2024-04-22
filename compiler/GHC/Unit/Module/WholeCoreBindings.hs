@@ -332,7 +332,7 @@ instance Outputable IfaceCStubs where
     ]
 
 -- | 'Binary' 'put_' for 'ForeignSrcLang'.
-binary_put_ForeignSrcLang :: BinHandle -> ForeignSrcLang -> IO ()
+binary_put_ForeignSrcLang :: WriteBinHandle -> ForeignSrcLang -> IO ()
 binary_put_ForeignSrcLang bh lang =
   put_ @Word8 bh $ case lang of
     LangC -> 0
@@ -344,7 +344,7 @@ binary_put_ForeignSrcLang bh lang =
     RawObject -> 6
 
 -- | 'Binary' 'get' for 'ForeignSrcLang'.
-binary_get_ForeignSrcLang :: BinHandle -> IO ForeignSrcLang
+binary_get_ForeignSrcLang :: ReadBinHandle -> IO ForeignSrcLang
 binary_get_ForeignSrcLang bh = do
   b <- getByte bh
   pure $ case b of
