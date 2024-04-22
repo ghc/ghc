@@ -35,7 +35,7 @@ instance Binary TyCon where
     get bh =
         mkTyCon <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
-getSomeTypeRep :: BinHandle -> IO SomeTypeRep
+getSomeTypeRep :: ReadBinHandle -> IO SomeTypeRep
 getSomeTypeRep bh = do
     tag <- get bh :: IO Word8
     case tag of
@@ -167,7 +167,7 @@ instance Binary TypeLitSort where
           2 -> pure TypeLitChar
           _ -> fail "Binary.putTypeLitSort: invalid tag"
 
-putTypeRep :: BinHandle -> TypeRep a -> IO ()
+putTypeRep :: WriteBinHandle -> TypeRep a -> IO ()
 putTypeRep bh rep -- Handle Type specially since it's so common
   | Just HRefl <- rep `eqTypeRep` (typeRep :: TypeRep Type)
   = put_ bh (0 :: Word8)

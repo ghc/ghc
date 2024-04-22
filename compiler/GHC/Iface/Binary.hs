@@ -75,7 +75,7 @@ readBinIfaceHeader
   -> CheckHiWay
   -> TraceBinIFace
   -> FilePath
-  -> IO (Fingerprint, BinHandle)
+  -> IO (Fingerprint, ReadBinHandle)
 readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     let platform = profilePlatform profile
 
@@ -137,7 +137,7 @@ readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
 
     mod_iface <- getWithUserData name_cache bh
 
-    seekBin bh extFields_p
+    seekBinReader bh extFields_p
     extFields <- get bh
 
     return mod_iface
@@ -148,7 +148,7 @@ readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
 -- Names or FastStrings.
-getWithUserData :: Binary a => NameCache -> BinHandle -> IO a
+getWithUserData :: Binary a => NameCache -> ReadBinHandle -> IO a
 getWithUserData name_cache bh = do
   bh <- getTables name_cache bh
   get bh
@@ -156,7 +156,7 @@ getWithUserData name_cache bh = do
 -- | Setup a BinHandle to read something written using putWithTables
 --
 -- Reading names has the side effect of adding them into the given NameCache.
-getTables :: NameCache -> BinHandle -> IO BinHandle
+getTables :: NameCache -> ReadBinHandle -> IO ReadBinHandle
 getTables name_cache bh = do
     fsReaderTable <- initFastStringReaderTable
     nameReaderTable <- initNameReaderTable name_cache
@@ -192,14 +192,14 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     put_  bh tag
     put_  bh (mi_src_hash mod_iface)
 
-    extFields_p_p <- tellBin bh
+    extFields_p_p <- tellBinWriter bh
     put_ bh extFields_p_p
 
     putWithUserData traceBinIface bh mod_iface
 
-    extFields_p <- tellBin bh
+    extFields_p <- tellBinWriter bh
     putAt bh extFields_p_p extFields_p
-    seekBin bh extFields_p
+    seekBinWriter bh extFields_p
     put_ bh (mi_ext_fields mod_iface)
 
     -- And send the result to the file
@@ -209,7 +209,7 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
+putWithUserData :: Binary a => TraceBinIFace -> WriteBinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
   (name_count, fs_count, _b) <- putWithTables bh (\bh' -> put bh' payload)
 
@@ -234,7 +234,7 @@ putWithUserData traceBinIface bh payload = do
 -- It returns (number of names, number of FastStrings, payload write result)
 --
 -- See Note [Order of deduplication tables during iface binary serialisation]
-putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int, Int, b)
+putWithTables :: WriteBinHandle -> (WriteBinHandle -> IO b) -> IO (Int, Int, b)
 putWithTables bh' put_payload = do
   -- Initialise deduplicating tables.
   (fast_wt, fsWriter) <- initFastStringWriterTable
@@ -489,7 +489,7 @@ initNameWriterTable = do
     )
 
 
-putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
+putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
 putSymbolTable bh name_count symtab = do
     put_ bh name_count
     let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
@@ -498,7 +498,7 @@ putSymbolTable bh name_count symtab = do
     mapM_ (\n -> serialiseName bh n symtab) names
 
 
-getSymbolTable :: BinHandle -> NameCache -> IO (SymbolTable Name)
+getSymbolTable :: ReadBinHandle -> NameCache -> IO (SymbolTable Name)
 getSymbolTable bh name_cache = do
     sz <- get bh :: IO Int
     -- create an array of Names for the symbols and add them to the NameCache
@@ -519,7 +519,7 @@ getSymbolTable bh name_cache = do
         arr <- unsafeFreeze mut_arr
         return (cache, arr)
 
-serialiseName :: BinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
+serialiseName :: WriteBinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
     put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
@@ -543,7 +543,7 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName :: BinSymbolTable -> WriteBinHandle -> Name -> IO ()
 putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
@@ -569,7 +569,7 @@ putName BinSymbolTable{
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: SymbolTable Name
-              -> BinHandle -> IO Name
+              -> ReadBinHandle -> IO Name
 getSymtabName symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of

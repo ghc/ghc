@@ -89,10 +89,10 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
-import Data.Maybe( isJust )
-import qualified Data.Semigroup as Semi
 import Control.DeepSeq
-import Control.Monad
+import Control.Monad ((<$!>))
+import qualified Data.Semigroup as Semi
+import Data.Maybe( isJust )
 
 {-
 ************************************************************************

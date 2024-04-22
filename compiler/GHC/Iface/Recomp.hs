@@ -1032,7 +1032,7 @@ addFingerprints hsc_env iface0
         -- change if the fingerprint for anything it refers to (transitively)
         -- changes.
        mk_put_name :: OccEnv (OccName,Fingerprint)
-                   -> BinHandle -> Name -> IO  ()
+                   -> WriteBinHandle -> Name -> IO  ()
        mk_put_name local_env bh name
           | isWiredInName name  =  putNameLiterally bh name
            -- wired-in names don't have fingerprints
