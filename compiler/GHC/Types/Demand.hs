@@ -2364,9 +2364,8 @@ dmdTransformSeqHash sd0 = let
   !num_calls = n1 `multCard` n2
   arg_SubDmd = case viewProd 2 sd2 of
     Just (_, [_state_token_dmd, result_dmd])
-      -> case trimBoxity result_dmd of
+      -> case trimBoxity (strictifyDmd result_dmd) of
            -- trimBoxity: We can't unbox through seq# yet. (But see #24334.)
-           AbsDmd -> seqSubDmd
            _ :* result_SubDmd -> result_SubDmd
     _ -> topSubDmd
   !arg_dmd = num_calls `multDmd` (C_01 :* arg_SubDmd)
