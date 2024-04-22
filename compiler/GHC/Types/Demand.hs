@@ -658,7 +658,7 @@ viewDmdPair (D n sd) = (n, sd)
 -- If the matched demand was 'BotDmd', it will match as @C_10 :* botSubDmd@.
 -- The builder of this pattern synonym simply /discards/ the 'SubDemand' if the
 -- 'Card' was absent and returns 'AbsDmd' or 'BotDmd' instead. It will assert
--- that the discarded sub-demand was 'seqSubDmd' and 'botSubDmd', respectively.
+-- that the discarded sub-demand was 'botSubDmd'.
 --
 -- Call sites should consider whether they really want to look at the
 -- 'SubDemand' of an absent demand and match on 'AbsDmd' and/or 'BotDmd'
@@ -2361,16 +2361,22 @@ dmdTransformSeqHash :: DmdTransformer
 dmdTransformSeqHash sd0 = let
   !(n1, sd1) = peelCallDmd sd0
   !(n2, sd2) = peelCallDmd sd1
-  !result_card = n1 `multCard` n2 `multCard` C_01
+  !num_calls = n1 `multCard` n2
+  arg_SubDmd = case viewProd 2 sd2 of
+    Just (_, [_state_token_dmd, result_dmd])
+      -> case trimBoxity result_dmd of
+           -- trimBoxity: We can't unbox through seq# yet. (But see #24334.)
+           AbsDmd -> seqSubDmd
+           _ :* result_SubDmd -> result_SubDmd
+    _ -> topSubDmd
+  !arg_dmd = num_calls `multDmd` (C_01 :* arg_SubDmd)
     -- Why C_01? A call to seq# always evaluates its argument exactly once,
     -- but since the evalaution it performs is well-sequenced
     -- we must not consider it strict. See Note [seq# magic], (SEQ3)
-  in case viewProd 2 sd2 of
-       Just (_, [_state_token_dmd, result_dmd])
-         | _ :* !result_SubDmd <- trimBoxity result_dmd
-           -- trimBoxity: We can't unbox through seq# yet. (But see #24334.)
-         -> DmdType nopDmdEnv [result_card :* result_SubDmd, topDmd]
-       _ -> DmdType nopDmdEnv [result_card  :*  topSubDmd  , topDmd]
+  !tok_dmd = num_calls `multDmd` topDmd
+  in --pprTrace "dmdTransformSeqHash"
+     --(ppr sd0 $$ ppr (num_calls, sd2) $$ ppr arg_dmd $$ ppr tok_dmd)
+     DmdType nopDmdEnv [arg_dmd, tok_dmd]
 
 {-
 Note [What are demand signatures?]

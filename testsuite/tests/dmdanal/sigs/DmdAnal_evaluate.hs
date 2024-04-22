@@ -20,3 +20,9 @@ funD :: (Int, Int) -> IO Int
 funD p = do
   (x, y) <- evaluate p
   evaluate (x + y)
+
+funE :: a -> b -> IO a
+funE x y = do
+  x' <- evaluate x
+  _  <- evaluate y
+  pure x'
