@@ -1244,7 +1244,7 @@ transferAnnsOnlyA (EpAnn a an cs) (EpAnn a' an' cs')
 
 -- | Transfer comments from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
-transferCommentsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferCommentsOnlyA :: EpAnn a -> EpAnn b -> (EpAnn a,  EpAnn b)
 transferCommentsOnlyA (EpAnn a an cs) (EpAnn a' an' cs')
   = (EpAnn a an emptyComments, EpAnn a' an' (cs <> cs'))
 
