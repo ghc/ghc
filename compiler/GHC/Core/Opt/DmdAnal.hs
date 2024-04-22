@@ -1025,7 +1025,10 @@ dmdTransform env var sd
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
     dmdTransformDictSelSig (idDmdSig var) sd
   | var `hasKey` seqHashKey
-  = dmdTransformSeqHash sd
+  = if isGlobalId var
+      then dmdTransformSeqHash sd
+      else -- stupid hack to make sure seq# isn't found absent in its own module
+           addVarDmd (dmdTransformSeqHash sd) var topDmd
   -- Imported functions
   | isGlobalId var
   , let res = dmdTransformSig (idDmdSig var) sd
