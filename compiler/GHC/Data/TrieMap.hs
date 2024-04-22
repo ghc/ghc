@@ -13,8 +13,6 @@ module GHC.Data.TrieMap(
    MaybeMap,
    -- * Maps over 'List' values
    ListMap,
-   -- * Maps over 'Literal's
-   LiteralMap,
    -- * 'TrieMap' class
    TrieMap(..), insertTM, deleteTM, foldMapTM, isEmptyTM,
 
@@ -30,7 +28,6 @@ module GHC.Data.TrieMap(
 
 import GHC.Prelude
 
-import GHC.Types.Literal
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique( Uniquable )
 
@@ -342,16 +339,6 @@ fdList k m = foldMaybe k          (lm_nil m)
 ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
 ftList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = filterMaybe f mnil, lm_cons = fmap (filterTM f) mcons }
-
-{-
-************************************************************************
-*                                                                      *
-                   Basic maps
-*                                                                      *
-************************************************************************
--}
-
-type LiteralMap  a = Map.Map Literal a
 
 {-
 ************************************************************************
