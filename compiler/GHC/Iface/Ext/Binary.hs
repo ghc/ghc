@@ -105,9 +105,10 @@ writeHieFile hie_file_path hiefile = do
                       hie_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = setUserData bh0 $ newWriteState (putName hie_symtab)
-                                           (putName hie_symtab)
-                                           (putFastString hie_dict)
+  let bh = setWriterUserData bh0
+          $ newWriteState (putName hie_symtab)
+                          (putName hie_symtab)
+                          (putFastString hie_dict)
   put_ bh hiefile
 
   -- write the symtab pointer at the front of the file
@@ -218,10 +219,11 @@ readHieFileContents bh0 name_cache = do
   dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
   bh1 <- do
-      let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
-                                               (getDictFastString dict)
+      let bh1 = setReaderUserData bh0
+              $ newReadState (error "getSymtabName")
+                             (getDictFastString dict)
       symtab <- get_symbol_table bh1
-      let bh1' = setUserData bh1
+      let bh1' = setReaderUserData bh1
                $ newReadState (getSymTabName symtab)
                               (getDictFastString dict)
       return bh1'
@@ -265,7 +267,7 @@ putSymbolTable bh next_off symtab = do
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
+getSymbolTable :: BinHandle -> NameCache -> IO (SymbolTable Name)
 getSymbolTable bh name_cache = do
   sz <- get bh
   mut_arr <- A.newArray_ (0, sz-1) :: IO (A.IOArray Int Name)
@@ -275,7 +277,7 @@ getSymbolTable bh name_cache = do
     A.writeArray mut_arr i name
   A.unsafeFreeze mut_arr
 
-getSymTabName :: SymbolTable -> BinHandle -> IO Name
+getSymTabName :: SymbolTable Name -> BinHandle -> IO Name
 getSymTabName st bh = do
   i :: Word32 <- get bh
   return $ st A.! (fromIntegral i)
