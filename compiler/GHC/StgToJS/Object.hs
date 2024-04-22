@@ -66,6 +66,9 @@ import GHC.Prelude
 import           Control.Monad
 
 import           Data.Array
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Unsafe   as B
+import           Data.Char (isSpace)
 import           Data.Int
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
@@ -75,10 +78,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Word
 import           Data.Semigroup
-import qualified Data.ByteString          as B
-import qualified Data.ByteString.Unsafe   as B
-import Data.Char (isSpace)
-import System.IO
+import           System.IO
 
 import GHC.Settings.Constants (hiVersion)
 
@@ -313,9 +313,10 @@ putObject bh mod_name deps os = do
   -- object in an archive.
   put_ bh (moduleNameString mod_name)
 
-  (bh_fs, _bin_dict, put_dict) <- initFSTable bh
+  (fs_tbl, fs_writer) <- initFastStringWriterTable
+  let bh_fs = addWriterToUserData (mkSomeBinaryWriter fs_writer) bh
 
-  forwardPut_ bh (const put_dict) $ do
+  forwardPut_ bh (const (putTable fs_tbl bh_fs)) $ do
     put_ bh_fs deps
 
     -- forward put the index
@@ -348,7 +349,7 @@ getObjectBody :: BinHandle -> ModuleName -> IO Object
 getObjectBody bh0 mod_name = do
   -- Read the string table
   dict <- forwardGet bh0 (getDictionary bh0)
-  let bh = setUserData bh0 $ noUserData { ud_get_fs = getDictFastString dict }
+  let bh = setReaderUserData bh0 $ newReadState (panic "No name allowed") (getDictFastString dict)
 
   block_info  <- get bh
   idx         <- forwardGet bh (get bh)
