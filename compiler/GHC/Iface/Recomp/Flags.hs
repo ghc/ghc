@@ -31,7 +31,7 @@ import System.FilePath (normalise)
 -- NB: The 'Module' parameter is the 'Module' recorded by the *interface*
 -- file, not the actual 'Module' according to our 'DynFlags'.
 fingerprintDynFlags :: HscEnv -> Module
-                    -> (BinHandle -> Name -> IO ())
+                    -> (WriteBinHandle -> Name -> IO ())
                     -> IO Fingerprint
 
 fingerprintDynFlags hsc_env this_mod nameio =
@@ -88,7 +88,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
 -- object files as they can.
 -- See Note [Ignoring some flag changes]
 fingerprintOptFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
+                      -> (WriteBinHandle -> Name -> IO ())
                       -> IO Fingerprint
 fingerprintOptFlags DynFlags{..} nameio =
       let
@@ -106,7 +106,7 @@ fingerprintOptFlags DynFlags{..} nameio =
 -- file compiled for HPC when not actually using HPC.
 -- See Note [Ignoring some flag changes]
 fingerprintHpcFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
+                      -> (WriteBinHandle -> Name -> IO ())
                       -> IO Fingerprint
 fingerprintHpcFlags dflags@DynFlags{..} nameio =
       let
