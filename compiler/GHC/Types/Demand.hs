@@ -70,7 +70,9 @@ module GHC.Types.Demand (
     prependArgsDmdSig, etaConvertDmdSig,
 
     -- * Demand transformers from demand signatures
-    DmdTransformer, dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
+    DmdTransformer, dmdTransformSig,
+    -- * Special demand transformers
+    dmdTransformDataConSig, dmdTransformDictSelSig, dmdTransformSeqHash,
 
     -- * Trim to a type shape
     TypeShape(..), trimToType, trimBoxity,
@@ -2354,6 +2356,21 @@ dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod])) call_sd
     enhance sd _dmd_var = C_11 :* sd  -- This is the one!
                                       -- C_11, because we multiply with n above
 dmdTransformDictSelSig sig sd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr sd)
+
+dmdTransformSeqHash :: DmdTransformer
+dmdTransformSeqHash sd0 = let
+  !(n1, sd1) = peelCallDmd sd0
+  !(n2, sd2) = peelCallDmd sd1
+  !result_card = n1 `multCard` n2 `multCard` C_01
+    -- Why C_01? A call to seq# always evaluates its argument exactly once,
+    -- but since the evalaution it performs is well-sequenced
+    -- we must not consider it strict. See Note [seq# magic], (SEQ3)
+  in case viewProd 2 sd2 of
+       Just (_, [_state_token_dmd, result_dmd])
+         | _ :* !result_SubDmd <- trimBoxity result_dmd
+           -- trimBoxity: We can't unbox through seq# yet. (But see #24334.)
+         -> DmdType nopDmdEnv [result_card :* result_SubDmd, topDmd]
+       _ -> DmdType nopDmdEnv [result_card  :*  topSubDmd  , topDmd]
 
 {-
 Note [What are demand signatures?]

@@ -1024,6 +1024,8 @@ dmdTransform env var sd
   | Just _ <- isClassOpId_maybe var
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
     dmdTransformDictSelSig (idDmdSig var) sd
+  | var `hasKey` seqHashKey
+  = dmdTransformSeqHash sd
   -- Imported functions
   | isGlobalId var
   , let res = dmdTransformSig (idDmdSig var) sd

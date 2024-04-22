@@ -2260,18 +2260,38 @@ Its (NOINLINE) definition in GHC.Magic is simply
 Things to note
 
 (SEQ1)
-  It must be NOINLINE, because otherwise the eval !a' would be decoupled from
-  the state token s, and GHC's optimisations, in particular strictness analysis,
-  would happily move the eval around.
+  Obviously a call `seq# x s` is strict in x in the sense that whenever
+  evaluation of `x` diverges, so does evaluation of `seq# x s`.
+  However, there is another sense in which `seq# x s` is not strict in x:
+  It is not generally sound in Core to rewrite a call `seq# x s`
+  into `case x of x' { __DEFAULT -> seq# x' s }`, because the outer
+  eval on x would be decoupled from the state token s, and GHC's
+  optimisations, in particular strictness analysis, would happily move
+  the eval around, defeating the sequencing guarantees that seq# is
+  meant to provide.
+
+(SEQ2)
+  For basically the same reason, it is not generally sound to
+  inline seq# during simplification.
 
   However, we *do* inline saturated applications of seq# in CorePrep, where
   evaluation order is fixed; see the implementation notes below.
   This is one reason why we need seq# to be known-key.
 
-(SEQ2)
-  The use of `lazy` ensures that strictness analysis does not see the eval
-  that takes place, so the final demand signature is <L><L>, not <1L><L>.
-  This is important for a definition like
+(SEQ3)
+  What demand signature should seq# have? Per SEQ1, there is one sense
+  in which seq# is strict and another in which it is not strict.  And
+  it turns out that demand analysis is mostly interested in the latter
+  sense of strictness.  After all, one of the main ideas of strictness
+  analysis is to find out when a variable or function argument
+
+   1. will certainly be evaluated later in program execution,
+   2. such that it is safe to evaluate it eagerly at birth rather than
+      creating a thunk to enable lazy evaluation.
+
+  Considering seq# strict for the purposes of demand analysis would be
+  OK with respect to part 1 but not part 2.  This is important for a
+  definition like
 
     foo x y = evaluate y >> evaluate x
 
@@ -2279,14 +2299,24 @@ Things to note
   they want to evaluate y *before* x.
   But if strictness analysis sees the evals, it infers foo as strict in
   both parameters. This strictness would be exploited in the backend by
-  picking a call-by-value calling convention for foo, one that would evaluate
+  picking a call-by-value calling convention for foo, one that may evaluate
   x *before* y. Nononono!
 
-  Because the definition of seq# uses `lazy`, it must live in a different module
-  (GHC.Internal.IO); otherwise strictness analysis uses its own strictness
-  signature for the definition of `lazy` instead of the one we wire in.
+  We hide the eval that takes place in the definition of seq# from
+  strictness analysis using the magic id `lazy` (see Note [lazyId magic]),
+  so that its final demand signature is <L><L>, not <1L><L>.
 
-(SEQ3)
+  (Because the definition of seq# uses `lazy`, it must live in a different module
+  (GHC.Internal.IO); otherwise strictness analysis uses its own strictness
+  signature for the definition of `lazy` instead of the one we wire in.)
+
+  In principle we could do a bit better, and give seq# a demand signature
+  of <ML><L>, indicating that it only evaluates its argument once, but
+  this doesn't really matter because we wire a custom demand
+  transformer for seq# into demand analysis anyway.
+  See GHC.Types.Demand.dmdTransformSeqHash.
+
+(SEQ4)
   Why does seq# return the value? Consider
      let x = e in
      case seq# x s of (# _, x' #) -> ... x' ... case x' of __DEFAULT -> ...
@@ -2299,7 +2329,7 @@ Implementing seq#.  The compiler has magic for `seq#` in
 
 - GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s)
 
-- Simplify.addEvals records evaluated-ness for the result (cf. (SEQ3)); see
+- Simplify.addEvals records evaluated-ness for the result (cf. (SEQ4)); see
   Note [Adding evaluatedness info to pattern-bound variables]
   in GHC.Core.Opt.Simplify.Iteration
 
@@ -2307,6 +2337,11 @@ Implementing seq#.  The compiler has magic for `seq#` in
   Historically, seq# used to be a primop, and the majority of primops
   should return False in exprMayThrowPreciseException, so we do the same
   for seq# for back compat.
+
+- GHC.Core.Opt.DmdAnal.dmdTransform and GHC.Types.Demand.dmdTransformSeqHash:
+  We give seq# a custom demand transformer, so that the (sub-)demand
+  placed on the second component of the result can be transfered onto
+  the first argument.
 
 - GHC.CoreToStg.Prep: Inline saturated applications to a Case, e.g.,
 
