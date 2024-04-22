@@ -164,7 +164,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -967,6 +967,13 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> HscEnv
+add_iface_to_hpt iface details =
+  hscUpdateHPT $ \ hpt ->
+    addToHpt hpt (moduleName (mi_module iface'))
+    (HomeModInfo iface' details emptyHomeModInfoLinkable)
+  where
+    iface' = set_mi_extra_decls Nothing iface
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
@@ -975,7 +982,7 @@ initModDetails hsc_env iface =
   fixIO $ \details' -> do
     let -- For memory efficiency, HPT is not populated with serialized core bindings.
         act hpt  =
-          let iface' = iface { mi_extra_decls = Nothing }
+          let iface' = set_mi_extra_decls Nothing iface
           in addToHpt hpt (moduleName $ mi_module iface')
                           (HomeModInfo iface' details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
@@ -1003,7 +1010,7 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
     go (CoreBindings fi) = do
         let act hpt  =
               -- For memory efficiency, HPT is not populated with serialized core bindings.
-              let mod_iface' = mod_iface { mi_extra_decls = Nothing }
+              let mod_iface' = set_mi_extra_decls Nothing mod_iface
                in addToHpt hpt (moduleName $ mi_module mod_iface')
                                (HomeModInfo mod_iface' details emptyHomeModInfoLinkable)
         types_var <- newIORef (md_types details)
@@ -1223,7 +1230,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           withTiming logger
               (text "WriteIface"<+>brackets (text iface_name))
               (const ())
-              (writeIface logger profile iface_name iface)
+              (writeIface logger profile (flagsToIfCompression dflags) iface_name iface)
 
     if (write_interface || force_write_interface) then do
 
@@ -1282,7 +1289,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             GHC.Utils.Touch.touch hie_file
     else
         -- See Note [Strictness in ModIface]
-        forceModIface iface
+        return ()
 
 --------------------------------------------------------------
 -- NoRecomp handlers

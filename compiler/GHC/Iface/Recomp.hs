@@ -1033,7 +1033,7 @@ addFingerprints hsc_env iface0
         -- change if the fingerprint for anything it refers to (transitively)
         -- changes.
        mk_put_name :: OccEnv (OccName,Fingerprint)
-                   -> BinHandle -> Name -> IO  ()
+                   -> WriteBinHandle -> Name -> IO  ()
        mk_put_name local_env bh name
           | isWiredInName name  =  putNameLiterally bh name
            -- wired-in names don't have fingerprints
@@ -1061,31 +1061,36 @@ addFingerprints hsc_env iface0
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
 
+       mkBoxedDecl :: Fingerprint -> IfaceDecl -> IfaceDeclBoxed
+       mkBoxedDecl fingerprint decl = IfaceDeclBoxed fingerprint (ifName decl) (ifaceDeclImplicitBndrs decl) decl
+
        fingerprint_group :: (OccEnv (OccName,Fingerprint),
-                             [(Fingerprint,IfaceDecl)])
+                             [IfaceDeclBoxed])
                          -> SCC IfaceDeclABI
                          -> IO (OccEnv (OccName,Fingerprint),
-                                [(Fingerprint,IfaceDecl)])
+                                [IfaceDeclBoxed])
 
        fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
           = do let hash_fn = mk_put_name local_env
                    decl = abiDecl abi
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
                hash <- computeFingerprint hash_fn abi
-               env' <- extend_hash_env local_env (hash,decl)
-               return (env', (hash,decl) : decls_w_hashes)
+               env' <- extend_hash_env local_env (mkBoxedDecl hash decl)
+               return (env', mkBoxedDecl hash decl : decls_w_hashes)
+
+
 
        fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
           = do let stable_abis = sortBy cmp_abiNames abis
                    stable_decls = map abiDecl stable_abis
                local_env1 <- foldM extend_hash_env local_env
-                                   (zip (map mkRecFingerprint [0..]) stable_decls)
+                                   (zipWith mkBoxedDecl (map mkRecFingerprint [0..]) stable_decls)
                 -- See Note [Fingerprinting recursive groups]
                let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                 -- put the cycle in a canonical order
                hash <- computeFingerprint hash_fn stable_abis
-               let pairs = zip (map (bumpFingerprint hash) [0..]) stable_decls
+               let pairs = zipWith mkBoxedDecl (map (bumpFingerprint hash) [0..]) stable_decls
                 -- See Note [Fingerprinting recursive groups]
                local_env2 <- foldM extend_hash_env local_env pairs
                return (local_env2, pairs ++ decls_w_hashes)
@@ -1102,11 +1107,11 @@ addFingerprints hsc_env iface0
        -- use when referencing those OccNames in later declarations.
        --
        extend_hash_env :: OccEnv (OccName,Fingerprint)
-                       -> (Fingerprint,IfaceDecl)
-                       -> IO (OccEnv (OccName,Fingerprint))
-       extend_hash_env env0 (hash,d) =
+                        -> IfaceDeclBoxed
+                        -> IO (OccEnv (OccName,Fingerprint))
+       extend_hash_env env0 boxed =
           return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env0
-                 (ifaceDeclFingerprints hash d))
+                 (ifaceDeclFingerprints boxed))
 
    --
    (local_env, decls_w_hashes) <-
@@ -1179,46 +1184,19 @@ addFingerprints hsc_env iface0
                        mi_trust iface0)
                         -- Make sure change of Safe Haskell mode causes recomp.
 
-   -- Note [Export hash depends on non-orphan family instances]
-   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   --
-   -- Suppose we have:
-   --
-   --   module A where
-   --       type instance F Int = Bool
-   --
-   --   module B where
-   --       import A
-   --
-   --   module C where
-   --       import B
-   --
-   -- The family instance consistency check for C depends on the dep_finsts of
-   -- B.  If we rename module A to A2, when the dep_finsts of B changes, we need
-   -- to make sure that C gets rebuilt. Effectively, the dep_finsts are part of
-   -- the exports of B, because C always considers them when checking
-   -- consistency.
-   --
-   -- A full discussion is in #12723.
-   --
-   -- We do NOT need to hash dep_orphs, because this is implied by
-   -- dep_orphan_hashes, and we do not need to hash ordinary class instances,
-   -- because there is no eager consistency check as there is with type families
-   -- (also we didn't store it anywhere!)
-   --
 
    -- put the declarations in a canonical order, sorted by OccName
-   let sorted_decls :: [(Fingerprint, IfaceDecl)]
+   let sorted_decls :: [IfaceDeclBoxed]
        sorted_decls = Map.elems $ Map.fromList $
-                          [(getOccName d, e) | e@(_, d) <- decls_w_hashes]
+                          [(getOccName name, e) | e@(IfaceDeclBoxed _ name _ _) <- decls_w_hashes]
 
        -- This key is safe because mi_extra_decls contains tidied things.
        getOcc (IfGblTopBndr b) = getOccName b
        getOcc (IfLclTopBndr fs _ _ details) =
         case details of
           IfRecSelId { ifRecSelFirstCon = first_con }
-            -> mkRecFieldOccFS (getOccFS first_con) fs
-          _ -> mkVarOccFS fs
+            -> mkRecFieldOccFS (getOccFS first_con) (ifLclNameFS fs)
+          _ -> mkVarOccFS (ifLclNameFS fs)
 
        binding_key (IfaceNonRec b _) = IfaceNonRec (getOcc b) ()
        binding_key (IfaceRec bs) = IfaceRec (map (\(b, _) -> (getOcc b, ())) bs)
@@ -1245,7 +1223,7 @@ addFingerprints hsc_env iface0
    --   - deprecations
    --   - flag abi hash
    mod_hash <- computeFingerprint putNameLiterally
-                      (map fst sorted_decls,
+                      (map ifBoxedFingerprint sorted_decls,
                        export_hash,  -- includes orphan_hash
                        mi_warns iface0)
 
@@ -1284,7 +1262,8 @@ addFingerprints hsc_env iface0
       , mi_fix_fn         = fix_fn
       , mi_hash_fn        = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_extra_decls = sorted_extra_decls, mi_final_exts = final_iface_exts }
+    final_iface = completePartialModIface iface0
+                    sorted_decls sorted_extra_decls final_iface_exts
    --
    return final_iface
 
