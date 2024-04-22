@@ -3342,7 +3342,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
-                         acsA (sLLAsl $1 $> ()) (\loc cs -> L (locA loc)
+                         amsA' (sLLAsl $1 $>
                                          (Match { m_ext = []
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
                                                 , m_pats = $1
