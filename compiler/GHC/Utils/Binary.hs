@@ -66,15 +66,29 @@ module GHC.Utils.Binary
    lazyPutMaybe,
 
    -- * User data
-   UserData(..), getUserData, setUserData,
-   newReadState, newWriteState, noUserData,
-
+   ReaderUserData, getReaderUserData, setReaderUserData, noReaderUserData,
+   WriterUserData, getWriterUserData, setWriterUserData, noWriterUserData,
+   mkWriterUserData, mkReaderUserData,
+   newReadState, newWriteState,
+   addReaderToUserData, addWriterToUserData,
+   findUserDataReader, findUserDataWriter,
+   -- * Binary Readers & Writers
+   BinaryReader(..), BinaryWriter(..),
+   mkWriter, mkReader,
+   SomeBinaryReader, SomeBinaryWriter,
+   mkSomeBinaryReader, mkSomeBinaryWriter,
+   -- * Tables
+   ReaderTable(..),
+   WriterTable(..),
    -- * String table ("dictionary")
+   initFastStringReaderTable, initFastStringWriterTable,
    putDictionary, getDictionary, putFS,
-   FSTable, initFSTable, getDictFastString, putDictFastString,
+   FSTable(..), getDictFastString, putDictFastString,
 
    -- * Newtype wrappers
-   BinSpan(..), BinSrcSpan(..), BinLocated(..)
+   BinSpan(..), BinSrcSpan(..), BinLocated(..),
+   -- * Newtypes for types that have canonically more than one valid encoding
+   BindingName(..),
   ) where
 
 import GHC.Prelude
@@ -87,37 +101,45 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
+import GHC.Utils.Misc (HasCallStack)
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
 
 import Control.DeepSeq
+import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
 import Data.ByteString (ByteString)
+import Data.Coerce
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.List.NonEmpty       ( NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Proxy
 import Data.Set                 ( Set )
 import qualified Data.Set as Set
 import Data.Time
 import Data.List (unfoldr)
-import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
+import qualified Type.Reflection as Refl
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
+
+import Unsafe.Coerce (unsafeCoerce)
 
 type BinArray = ForeignPtr Word8
 
@@ -155,10 +177,10 @@ dataHandle (BinData size bin) = do
   ixr <- newFastMutInt 0
   szr <- newFastMutInt size
   binr <- newIORef bin
-  return (BinMem noUserData ixr szr binr)
+  return (BinMem noReaderUserData noWriterUserData ixr szr binr)
 
 handleData :: BinHandle -> IO BinData
-handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
+handleData (BinMem _ _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -166,7 +188,8 @@ handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef 
 
 data BinHandle
   = BinMem {                     -- binary data stored in an unboxed array
-     bh_usr :: UserData,         -- sigh, need parameterized modules :-)
+     bh_reader :: ReaderUserData, -- sigh, need parameterized modules :-)
+     bh_writer :: WriterUserData, -- sigh, need parameterized modules :-)
      _off_r :: !FastMutInt,      -- the current offset
      _sz_r  :: !FastMutInt,      -- size of the array (cached)
      _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
@@ -174,15 +197,35 @@ data BinHandle
         -- XXX: should really store a "high water mark" for dumping out
         -- the binary data to a file.
 
-getUserData :: BinHandle -> UserData
-getUserData bh = bh_usr bh
+getReaderUserData :: BinHandle -> ReaderUserData
+getReaderUserData bh = bh_reader bh
 
-setUserData :: BinHandle -> UserData -> BinHandle
-setUserData bh us = bh { bh_usr = us }
+getWriterUserData :: BinHandle -> WriterUserData
+getWriterUserData bh = bh_writer bh
+
+setWriterUserData :: BinHandle -> WriterUserData -> BinHandle
+setWriterUserData bh us = bh { bh_writer = us }
+
+setReaderUserData :: BinHandle -> ReaderUserData -> BinHandle
+setReaderUserData bh us = bh { bh_reader = us }
+
+addReaderToUserData :: SomeBinaryReader -> BinHandle -> BinHandle
+addReaderToUserData cache@(SomeBinaryReader typRep _) bh = bh
+  { bh_reader = (bh_reader bh)
+      { ud_reader_data = Map.insert (Refl.SomeTypeRep typRep) cache (ud_reader_data (bh_reader bh))
+      }
+  }
+
+addWriterToUserData :: SomeBinaryWriter -> BinHandle -> BinHandle
+addWriterToUserData cache@(SomeBinaryWriter typRep _) bh = bh
+  { bh_writer = (bh_writer bh)
+      { ud_writer_data = Map.insert (Refl.SomeTypeRep typRep) cache (ud_writer_data (bh_writer bh))
+      }
+  }
 
 -- | Get access to the underlying buffer.
 withBinBuffer :: BinHandle -> (ByteString -> IO a) -> IO a
-withBinBuffer (BinMem _ ix_r _ arr_r) action = do
+withBinBuffer (BinMem _ _ ix_r _ arr_r) action = do
   arr <- readIORef arr_r
   ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
@@ -192,7 +235,7 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt len
-  return (BinMem noUserData ix_r sz_r arr_r)
+  return (BinMem noReaderUserData noWriterUserData ix_r sz_r arr_r)
 
 ---------------------------------------------------------------
 -- Bin
@@ -235,13 +278,13 @@ openBinMem size
    arr_r <- newIORef arr
    ix_r <- newFastMutInt 0
    sz_r <- newFastMutInt size
-   return (BinMem noUserData ix_r sz_r arr_r)
+   return (BinMem noReaderUserData noWriterUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
-tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
+tellBin (BinMem _ _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
+seekBin h@(BinMem _ _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p > sz)
         then do expandBin h p; writeFastMutInt ix_r p
@@ -252,14 +295,14 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
 -- This operation may 'panic', if the pointer location is out of bounds of the
 -- buffer of 'BinHandle'.
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
-seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
+seekBinNoExpand (BinMem _ _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p > sz)
         then panic "seekBinNoExpand: seek out of range"
         else writeFastMutInt ix_r p
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
-writeBinMem (BinMem _ ix_r _ arr_r) fn = do
+writeBinMem (BinMem _ _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
@@ -291,11 +334,11 @@ readBinMem_ filesize h = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize
-  return (BinMem noUserData ix_r sz_r arr_r)
+  return (BinMem noReaderUserData noWriterUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ _ sz_r arr_r) !off = do
+expandBin (BinMem _ _ _ sz_r arr_r) !off = do
    !sz <- readFastMutInt sz_r
    let !sz' = getSize sz
    arr <- readIORef arr_r
@@ -354,7 +397,7 @@ foldGet' n bh init_b f = go 0 init_b
 --   After the action has run advance the index to the buffer
 --   by size bytes.
 putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
-putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
+putPrim h@(BinMem _ _ ix_r sz_r arr_r) size f = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   when (ix + size > sz) $
@@ -376,7 +419,7 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
 --   writeFastMutInt ix_r (ix + written)
 
 getPrim :: BinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
-getPrim (BinMem _ ix_r sz_r arr_r) size f = do
+getPrim (BinMem _ _ ix_r sz_r arr_r) size f = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   when (ix + size > sz) $
@@ -1065,7 +1108,9 @@ lazyGetMaybe bh = do
 -- UserData
 -- -----------------------------------------------------------------------------
 
--- | Information we keep around during interface file
+-- Note [Binary UserData]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- Information we keep around during interface file
 -- serialization/deserialization. Namely we keep the functions for serializing
 -- and deserializing 'Name's and 'FastString's. We do this because we actually
 -- use serialization in two distinct settings,
@@ -1084,64 +1129,221 @@ lazyGetMaybe bh = do
 --   non-binding Name is serialized as the fingerprint of the thing they
 --   represent. See Note [Fingerprinting IfaceDecls] for further discussion.
 --
-data UserData =
-   UserData {
-        -- for *deserialising* only:
-        ud_get_name :: BinHandle -> IO Name,
-        ud_get_fs   :: BinHandle -> IO FastString,
 
-        -- for *serialising* only:
-        ud_put_nonbinding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a non-binding 'Name' (e.g. a reference to another
-        -- binding).
-        ud_put_binding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a binding 'Name' (e.g. the name of an IfaceDecl)
-        ud_put_fs   :: BinHandle -> FastString -> IO ()
+-- | Newtype to serialise binding names differently to non-binding 'Name'.
+-- See Note [Binary UserData]
+newtype BindingName = BindingName { getBindingName :: Name }
+  deriving ( Eq )
+
+-- | Existential for 'BinaryWriter' with a type witness.
+data SomeBinaryWriter = forall a . SomeBinaryWriter (Refl.TypeRep a) (BinaryWriter a)
+
+-- | Existential for 'BinaryReader' with a type witness.
+data SomeBinaryReader = forall a . SomeBinaryReader (Refl.TypeRep a) (BinaryReader a)
+
+-- | UserData required to serialise symbols for interface files.
+--
+-- See Note [Binary UserData]
+data WriterUserData =
+   WriterUserData {
+      ud_writer_data :: Map Refl.SomeTypeRep SomeBinaryWriter
+      -- ^ A mapping from a type witness to the 'Writer' for the associated type.
+      -- This is a 'Map' because microbenchmarks indicated this is more efficient
+      -- than other representations for less than ten elements.
+      --
+      -- Considered representations:
+      --
+      -- * [(TypeRep, SomeBinaryWriter)]
+      -- * bytehash (on hackage)
+      -- * Map TypeRep SomeBinaryWriter
    }
+
+-- | UserData required to deserialise symbols for interface files.
+--
+-- See Note [Binary UserData]
+data ReaderUserData =
+   ReaderUserData {
+      ud_reader_data :: Map Refl.SomeTypeRep SomeBinaryReader
+      -- ^ A mapping from a type witness to the 'Reader' for the associated type.
+      -- This is a 'Map' because microbenchmarks indicated this is more efficient
+      -- than other representations for less than ten elements.
+      --
+      -- Considered representations:
+      --
+      -- * [(TypeRep, SomeBinaryReader)]
+      -- * bytehash (on hackage)
+      -- * Map TypeRep SomeBinaryReader
+   }
+
+mkWriterUserData :: [SomeBinaryWriter] -> WriterUserData
+mkWriterUserData caches = noWriterUserData
+  { ud_writer_data = Map.fromList $ map (\cache@(SomeBinaryWriter typRep _) -> (Refl.SomeTypeRep typRep, cache)) caches
+  }
+
+mkReaderUserData :: [SomeBinaryReader] -> ReaderUserData
+mkReaderUserData caches = noReaderUserData
+  { ud_reader_data = Map.fromList $ map (\cache@(SomeBinaryReader typRep _) -> (Refl.SomeTypeRep typRep, cache)) caches
+  }
+
+mkSomeBinaryWriter :: forall a . Refl.Typeable a => BinaryWriter a -> SomeBinaryWriter
+mkSomeBinaryWriter cb = SomeBinaryWriter (Refl.typeRep @a) cb
+
+mkSomeBinaryReader :: forall a . Refl.Typeable a => BinaryReader a -> SomeBinaryReader
+mkSomeBinaryReader cb = SomeBinaryReader (Refl.typeRep @a) cb
+
+newtype BinaryReader s = BinaryReader
+  { getEntry :: BinHandle -> IO s
+  } deriving (Functor)
+
+newtype BinaryWriter s = BinaryWriter
+  { putEntry :: BinHandle -> s -> IO ()
+  }
+
+mkWriter :: (BinHandle -> s -> IO ()) -> BinaryWriter s
+mkWriter f = BinaryWriter
+  { putEntry = f
+  }
+
+mkReader :: (BinHandle -> IO s) -> BinaryReader s
+mkReader f = BinaryReader
+  { getEntry = f
+  }
+
+-- | Find the 'BinaryReader' for the 'Binary' instance for the type identified by 'Proxy a'.
+--
+-- If no 'BinaryReader' for that type can be found, this function will panic at run-time.
+findUserDataReader :: forall a . (HasCallStack, Refl.Typeable a) => Proxy a -> BinHandle -> BinaryReader a
+findUserDataReader query bh =
+  case Map.lookup (Refl.someTypeRep query) (ud_reader_data $ getReaderUserData bh) of
+    Nothing -> panic $ "Failed to find BinaryReader for the key: " ++ show (Refl.someTypeRep query)
+    Just (SomeBinaryReader _ (reader :: BinaryReader x)) ->
+      unsafeCoerce @(BinaryReader x) @(BinaryReader a) reader
+      -- This 'unsafeCoerce' could be written safely like this:
+      --
+      -- @
+      --   Just (SomeBinaryReader _ (reader :: BinaryReader x)) ->
+      --     case testEquality (typeRep @a) tyRep of
+      --       Just Refl -> coerce @(BinaryReader x) @(BinaryReader a) reader
+      --       Nothing -> panic $ "Invariant violated"
+      -- @
+      --
+      -- But it comes at a slight performance cost and this function is used in
+      -- binary serialisation hot loops, thus, we prefer the small performance boost over
+      -- the additional type safety.
+
+-- | Find the 'BinaryWriter' for the 'Binary' instance for the type identified by 'Proxy a'.
+--
+-- If no 'BinaryWriter' for that type can be found, this function will panic at run-time.
+findUserDataWriter :: forall a . (HasCallStack, Refl.Typeable a) => Proxy a -> BinHandle -> BinaryWriter a
+findUserDataWriter query bh =
+  case Map.lookup (Refl.someTypeRep query) (ud_writer_data $ getWriterUserData bh) of
+    Nothing -> panic $ "Failed to find BinaryWriter for the key: " ++ show (Refl.someTypeRep query)
+    Just (SomeBinaryWriter _ (writer :: BinaryWriter x)) ->
+      unsafeCoerce @(BinaryWriter x) @(BinaryWriter a) writer
+      -- This 'unsafeCoerce' could be written safely like this:
+      --
+      -- @
+      --   Just (SomeBinaryWriter tyRep (writer :: BinaryWriter x)) ->
+      --     case testEquality (typeRep @a) tyRep of
+      --       Just Refl -> coerce @(BinaryWriter x) @(BinaryWriter a) writer
+      --       Nothing -> panic $ "Invariant violated"
+      -- @
+      --
+      -- But it comes at a slight performance cost and this function is used in
+      -- binary serialisation hot loops, thus, we prefer the small performance boost over
+      -- the additional type safety.
+
+
+noReaderUserData :: ReaderUserData
+noReaderUserData = ReaderUserData
+  { ud_reader_data = Map.empty
+  }
+
+noWriterUserData :: WriterUserData
+noWriterUserData = WriterUserData
+  { ud_writer_data = Map.empty
+  }
 
 newReadState :: (BinHandle -> IO Name)   -- ^ how to deserialize 'Name's
              -> (BinHandle -> IO FastString)
-             -> UserData
-newReadState get_name get_fs
-  = UserData { ud_get_name = get_name,
-               ud_get_fs   = get_fs,
-               ud_put_nonbinding_name = undef "put_nonbinding_name",
-               ud_put_binding_name    = undef "put_binding_name",
-               ud_put_fs   = undef "put_fs"
-             }
+             -> ReaderUserData
+newReadState get_name get_fs =
+  mkReaderUserData
+    [ mkSomeBinaryReader $ mkReader get_name
+    , mkSomeBinaryReader $ mkReader @BindingName (coerce get_name)
+    , mkSomeBinaryReader $ mkReader get_fs
+    ]
 
 newWriteState :: (BinHandle -> Name -> IO ())
                  -- ^ how to serialize non-binding 'Name's
               -> (BinHandle -> Name -> IO ())
                  -- ^ how to serialize binding 'Name's
               -> (BinHandle -> FastString -> IO ())
-              -> UserData
-newWriteState put_nonbinding_name put_binding_name put_fs
-  = UserData { ud_get_name = undef "get_name",
-               ud_get_fs   = undef "get_fs",
-               ud_put_nonbinding_name = put_nonbinding_name,
-               ud_put_binding_name    = put_binding_name,
-               ud_put_fs   = put_fs
-             }
+              -> WriterUserData
+newWriteState put_non_binding_name put_binding_name put_fs =
+  mkWriterUserData
+    [ mkSomeBinaryWriter $ mkWriter (\bh name -> put_binding_name bh (getBindingName name))
+    , mkSomeBinaryWriter $ mkWriter put_non_binding_name
+    , mkSomeBinaryWriter $ mkWriter put_fs
+    ]
 
-noUserData :: UserData
-noUserData = UserData
-  { ud_get_name            = undef "get_name"
-  , ud_get_fs              = undef "get_fs"
-  , ud_put_nonbinding_name = undef "put_nonbinding_name"
-  , ud_put_binding_name    = undef "put_binding_name"
-  , ud_put_fs              = undef "put_fs"
+-- ----------------------------------------------------------------------------
+-- Types for lookup and deduplication tables.
+-- ----------------------------------------------------------------------------
+
+-- | A 'ReaderTable' describes how to deserialise a table from disk,
+-- and how to create a 'BinaryReader' that looks up values in the deduplication table.
+data ReaderTable a = ReaderTable
+  { getTable :: BinHandle -> IO (SymbolTable a)
+  -- ^ Deserialise a list of elements into a 'SymbolTable'.
+  , mkReaderFromTable :: SymbolTable a -> BinaryReader a
+  -- ^ Given the table from 'getTable', create a 'BinaryReader'
+  -- that reads values only from the 'SymbolTable'.
   }
 
-undef :: String -> a
-undef s = panic ("Binary.UserData: no " ++ s)
+-- | A 'WriterTable' is an interface any deduplication table can implement to
+-- describe how the table can be written to disk.
+newtype WriterTable = WriterTable
+  { putTable :: BinHandle -> IO Int
+  -- ^ Serialise a table to disk. Returns the number of written elements.
+  }
 
 ---------------------------------------------------------
 -- The Dictionary
 ---------------------------------------------------------
 
-type Dictionary = Array Int FastString -- The dictionary
-                                       -- Should be 0-indexed
+-- | A 'SymbolTable' of 'FastString's.
+type Dictionary = SymbolTable FastString
+
+initFastStringReaderTable :: IO (ReaderTable FastString)
+initFastStringReaderTable = do
+  return $
+    ReaderTable
+      { getTable = getDictionary
+      , mkReaderFromTable = \tbl -> mkReader (getDictFastString tbl)
+      }
+
+initFastStringWriterTable :: IO (WriterTable, BinaryWriter FastString)
+initFastStringWriterTable = do
+  dict_next_ref <- newFastMutInt 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict =
+        FSTable
+          { fs_tab_next = dict_next_ref
+          , fs_tab_map = dict_map_ref
+          }
+  let put_dict bh = do
+        fs_count <- readFastMutInt dict_next_ref
+        dict_map <- readIORef dict_map_ref
+        putDictionary bh fs_count dict_map
+        pure fs_count
+
+  return
+    ( WriterTable
+        { putTable = put_dict
+        }
+    , mkWriter $ putDictFastString bin_dict
+    )
 
 putDictionary :: BinHandle -> Int -> UniqFM FastString (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
@@ -1163,28 +1365,6 @@ getDictFastString :: Dictionary -> BinHandle -> IO FastString
 getDictFastString dict bh = do
     j <- get bh
     return $! (dict ! fromIntegral (j :: Word32))
-
-
-initFSTable :: BinHandle -> IO (BinHandle, FSTable, IO Int)
-initFSTable bh = do
-  dict_next_ref <- newFastMutInt 0
-  dict_map_ref <- newIORef emptyUFM
-  let bin_dict = FSTable
-        { fs_tab_next = dict_next_ref
-        , fs_tab_map  = dict_map_ref
-        }
-  let put_dict = do
-        fs_count <- readFastMutInt dict_next_ref
-        dict_map  <- readIORef dict_map_ref
-        putDictionary bh fs_count dict_map
-        pure fs_count
-
-  -- BinHandle with FastString writing support
-  let ud = getUserData bh
-  let ud_fs = ud { ud_put_fs = putDictFastString bin_dict }
-  let bh_fs = setUserData bh ud_fs
-
-  return (bh_fs,bin_dict,put_dict)
 
 putDictFastString :: FSTable -> BinHandle -> FastString -> IO ()
 putDictFastString dict bh fs = allocateFastString dict fs >>= put_ bh
@@ -1215,10 +1395,9 @@ data FSTable = FSTable { fs_tab_next :: !FastMutInt -- The next index to use
 -- The Symbol Table
 ---------------------------------------------------------
 
--- On disk, the symbol table is an array of IfExtName, when
--- reading it in we turn it into a SymbolTable.
-
-type SymbolTable = Array Int Name
+-- | Symbols that are read from disk.
+-- The 'SymbolTable' index starts on '0'.
+type SymbolTable a = Array Int a
 
 ---------------------------------------------------------
 -- Reading and writing FastStrings
@@ -1263,12 +1442,12 @@ instance Binary ByteString where
 
 instance Binary FastString where
   put_ bh f =
-    case getUserData bh of
-        UserData { ud_put_fs = put_fs } -> put_fs bh f
+    case findUserDataWriter (Proxy :: Proxy FastString) bh of
+      tbl -> putEntry tbl bh f
 
   get bh =
-    case getUserData bh of
-        UserData { ud_get_fs = get_fs } -> get_fs bh
+    case findUserDataReader (Proxy :: Proxy FastString) bh of
+      tbl -> getEntry tbl bh
 
 deriving instance Binary NonDetFastString
 deriving instance Binary LexicalFastString

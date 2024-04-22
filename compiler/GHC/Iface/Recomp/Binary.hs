@@ -35,7 +35,7 @@ computeFingerprint put_nonbinding_name a = do
     fingerprintBinMem bh
   where
     set_user_data bh =
-      setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
+      setWriterUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
 
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.

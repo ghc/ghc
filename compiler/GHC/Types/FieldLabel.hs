@@ -140,9 +140,7 @@ instance Binary Name => Binary FieldLabel where
     put_ bh (FieldLabel aa ab ac) = do
         put_ bh aa
         put_ bh ab
-        case getUserData bh of
-          UserData{ ud_put_binding_name = put_binding_name } ->
-              put_binding_name bh ac
+        put_ bh ac
     get bh = do
         aa <- get bh
         ab <- get bh

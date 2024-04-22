@@ -9,7 +9,6 @@ This module defines interface types and binders
 
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
-
 module GHC.Iface.Type (
         IfExtName, IfLclName,
 
@@ -93,6 +92,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import Control.Monad
 
 {-
 ************************************************************************
@@ -1988,11 +1988,12 @@ instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
+  put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
 
-   get bh = do n <- get bh
-               i <- get bh
-               return (IfaceTyCon n i)
+  get bh = do
+    n <- get bh
+    i <- get bh
+    return (IfaceTyCon n i)
 
 instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0
