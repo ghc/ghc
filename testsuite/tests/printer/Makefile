@@ -826,3 +826,13 @@ Test24533:
 PprLetIn:
 	$(CHECK_PPR)   $(LIBDIR) PprLetIn.hs
 	$(CHECK_EXACT) $(LIBDIR) PprLetIn.hs
+
+.PHONY: CaseAltComments
+CaseAltComments:
+	$(CHECK_PPR)   $(LIBDIR) CaseAltComments.hs
+	$(CHECK_EXACT) $(LIBDIR) CaseAltComments.hs
+
+.PHONY: MatchPatComments
+MatchPatComments:
+	$(CHECK_PPR)   $(LIBDIR) MatchPatComments.hs
+	$(CHECK_EXACT) $(LIBDIR) MatchPatComments.hs

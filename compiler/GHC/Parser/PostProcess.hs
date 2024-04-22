@@ -1221,19 +1221,23 @@ checkLPat e@(L l _) = checkPat l e [] []
 checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
-  | isRdrDataCon c = return . L loc $ ConPat
-      { pat_con_ext = noAnn -- AZ: where should this come from?
-      , pat_con = L ln c
-      , pat_args = PrefixCon tyargs args
-      }
+  | isRdrDataCon c = do
+      let (_l', loc') = transferCommentsOnlyA l loc
+      return . L loc' $ ConPat
+        { pat_con_ext = noAnn -- AZ: where should this come from?
+        , pat_con = L ln c
+        , pat_args = PrefixCon tyargs args
+        }
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc (L _ (PatBuilderAppType f at t)) tyargs args =
-  checkPat loc f (HsConPatTyArg at t : tyargs) args
-checkPat loc (L _ (PatBuilderApp f e)) [] args = do
-  p <- checkLPat e
-  checkPat loc f [] (p : args)
+checkPat loc (L _ (PatBuilderAppType (L lf f) at t)) tyargs args = do
+  let (loc', lf') = transferCommentsOnlyA loc lf
+  checkPat loc' (L lf' f) (HsConPatTyArg at t : tyargs) args
+checkPat loc (L _ (PatBuilderApp f (L le e))) [] args = do
+  let (loc', le') = transferCommentsOnlyA loc le
+  p <- checkLPat (L le' e)
+  checkPat loc' f [] (p : args)
 checkPat loc (L l e) [] [] = do
   p <- checkAPat loc e
   return (L l p)
@@ -1433,20 +1437,27 @@ isFunLhs e = go e [] [] []
  where
    mk = fmap ArgPatBuilderVisPat
 
-   go (L _ (PatBuilderVar (L loc f))) es ops cps
-       | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, (reverse ops) ++ cps))
-   go (L _ (PatBuilderApp f e))   es       ops cps = go f (mk e:es) ops cps
-   go (L l (PatBuilderPar _ e _)) es@(_:_) ops cps = go e es (o:ops) (c:cps)
+   go (L l (PatBuilderVar (L loc f))) es ops cps
+       | not (isRdrDataCon f)        = do
+           let (_l, loc') = transferCommentsOnlyA l loc
+           return (Just (L loc' f, Prefix, es, (reverse ops) ++ cps))
+   go (L l (PatBuilderApp (L lf f) e))   es       ops cps = do
+     let (_l, lf') = transferCommentsOnlyA l lf
+     go (L lf' f) (mk e:es) ops cps
+   go (L l (PatBuilderPar _ (L le e) _)) es@(_:_) ops cps = go (L le' e) es (o:ops) (c:cps)
       -- NB: es@(_:_) means that there must be an arg after the parens for the
       -- LHS to be a function LHS. This corresponds to the Haskell Report's definition
       -- of funlhs.
      where
+       (_l, le') = transferCommentsOnlyA l le
        (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-   go (L loc (PatBuilderOpApp l (L loc' op) r anns)) es ops cps
+   go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r anns)) es ops cps
       | not (isRdrDataCon op)         -- We have found the function!
-      = return (Just (L loc' op, Infix, (mk l:mk r:es), (anns ++ reverse ops ++ cps)))
+      = do { let (_l, ll') = transferCommentsOnlyA loc ll
+           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (anns ++ reverse ops ++ cps))) }
       | otherwise                     -- Infix data con; keep going
-      = do { mb_l <- go l es ops cps
+      = do { let (_l, ll') = transferCommentsOnlyA loc ll
+           ; mb_l <- go (L ll' l) es ops cps
            ; return (reassociate =<< mb_l) }
         where
           reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', anns')
@@ -1455,12 +1466,13 @@ isFunLhs e = go e [] [] []
               op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
                                     (L loc' op) r (reverse ops ++ cps))
           reassociate _other = Nothing
-   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
-             = go pat (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
+   go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
+             = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
              where invis_pat = InvisPat tok ty_pat
                    anc' = case tok of
                      NoEpTok -> anc
                      EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
+                   (_l, lp') = transferCommentsOnlyA l lp
    go _ _ _ _ = return Nothing
 
 data ArgPatBuilder p
