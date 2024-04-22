@@ -1,0 +1,28 @@
+
+-- should not crash with local prelude
+it's fine: A project-local Prelude
+:module +*Main -- added automatically
+Main             ( T10920.hs, interpreted )
+Prelude          ( Prelude.hs, interpreted )
+
+-- unless loaded, HomeModError is expected (on stderr)
+
+-- but if loaded, can be imported
+Prelude.storefront :: GHC.Internal.Base.String
+import Prelude
+:module +*Main -- added automatically
+Main             ( T10920.hs, interpreted )
+Prelude          ( Prelude.hs, interpreted )
+
+-- can also be star-imported
+Prelude.backyard :: GHC.Internal.Base.String
+:module +*Prelude
+Main             ( T10920.hs, interpreted )
+Prelude          ( Prelude.hs, interpreted )
+
+-- double-loading is fine as well
+import Prelude
+:module +*Main -- added automatically
+Main             ( T10920.hs, interpreted )
+Prelude          ( Prelude.hs, interpreted )
+it's fine: A project-local Prelude

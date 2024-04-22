@@ -444,9 +444,6 @@ loadInterface doc_str mod from
         ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
-                        -- The (src_imp == mi_boot iface) test checks that the already-loaded
-                        -- interface isn't a boot iface.  This can conceivably happen,
-                        -- if an earlier import had a before we got to real imports.   I think.
             _ -> do {
 
         -- READ THE MODULE IN
