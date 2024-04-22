@@ -93,7 +93,6 @@
 [GHC-41843] is untested (constructor = IOResultExpected)
 [GHC-07641] is untested (constructor = AtLeastOneArgExpected)
 [GHC-64852] is untested (constructor = BadSourceImport)
-[GHC-58427] is untested (constructor = HomeModError)
 [GHC-94559] is untested (constructor = CouldntFindInFiles)
 [GHC-22211] is untested (constructor = MissingPackageFiles)
 [GHC-88719] is untested (constructor = MissingPackageWayFiles)

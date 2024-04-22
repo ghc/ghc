@@ -337,6 +337,7 @@ import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import GHC.Parser.Utils
 
+import GHC.Iface.Env ( trace_if )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
@@ -1703,6 +1704,7 @@ findModule mod_name maybe_pkg = do
 
 findQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
+  liftIO $ trace_if (hsc_logger hsc_env) (text "findQualifiedModule" <+> ppr mod_name <+> ppr pkgqual)
   let mhome_unit = hsc_home_unit_maybe hsc_env
   let dflags    = hsc_dflags hsc_env
   case pkgqual of
@@ -1765,7 +1767,8 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
 lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
-lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env ->
+lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> do
+  liftIO $ trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModule" <+> ppr mod_name <+> ppr uid)
   case lookupHug  (hsc_HUG hsc_env) uid mod_name  of
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing

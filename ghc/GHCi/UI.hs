@@ -2273,7 +2273,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: GHC.GhcMonad m => InteractiveImport -> m Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
+         = do pkgqual <- GHC.renameRawPkgQualM mod_name (ideclPkgQual d)
               e <- MC.try $ GHC.findQualifiedModule pkgqual mod_name
               case e :: Either SomeException Module of
                 Left _  -> return False
@@ -2281,7 +2281,30 @@ keepPackageImports = filterM is_pkg_import
         where
           mod_name = unLoc (ideclName d)
 
+{- Note [GHCi and local Preludes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's compilation manager has no issues when the package being compiled
+defines its own local Prelude module. It'll just shadow the Prelude from base.
 
+GHCi however must check this condition, when it calls setContext ["Prelude"]
+to prepopulate the interactive session's scope. This is because of two facts.
+
+1. setContext must use previously compiled .hi interfaces only; it cannot
+recurse into compiling .hs modules (even with LinkIntoMemory), simply because
+it's not the right phase to do it. Import resolution happens way before GHC
+properly "loads" modules (GHC.Linker.Loader.loadModule, GHC.load & siblings);
+or in other words, at time of setContext the linker isn't even initialized yet.
+
+2. The local Prelude.hs (or .lhs) may've never been compiled before, so its
+interface file Prelude.hi can be outdated or altogether missing.
+
+Thankfully, there's a simple solution: just let CM load the local Prelude normally
+(either as a :load target, or as a dependency of another target) later. To do that,
+detect if the implicit `import Prelude` resolves to the "home unit" (i.e. not base),
+and if so, omit it from the early setContext call.
+
+If we don't, a HomeModError will be (correctly) thrown. See #10920.
+-}
 
 modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> LoadType -> m ()
 modulesLoadedMsg ok mods load_type = do
@@ -2841,7 +2864,7 @@ checkAdd ii = do
        m <- GHC.lookupQualifiedModule pkgqual modname
        when safe $ do
            t <- GHC.isModuleTrusted m
-           when (not t) $ throwGhcException $ ProgramError $ ""
+           unless t $ throwGhcException $ ProgramError $ ""
 
 -- -----------------------------------------------------------------------------
 -- Update the GHC API's view of the context
@@ -2895,7 +2918,8 @@ getImplicitPreludeImports iidecls = do
                  , not (any (sameImpModule imp) iidecls) ]
             else []
 
-  return prel_iidecls
+  -- See Note [GHCi and local Preludes]
+  keepPackageImports prel_iidecls
 
 -- -----------------------------------------------------------------------------
 -- Utils on InteractiveImport
