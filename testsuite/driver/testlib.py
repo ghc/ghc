@@ -1653,7 +1653,13 @@ def override_options(pre_cmd):
 
 def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str) -> None:
     opts = getTestOpts()
-    directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
+    # framework_fail can be called before testdir is initialised,
+    # so we need to take care not to blow up with the wrong way
+    # and report the actual reason for the failure.
+    try:
+      directory = re.sub(r'^\.[/\\]', '', str(opts.testdir))
+    except:
+      directory = ''
     full_name = '%s(%s)' % (name, way)
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     name2 = name if name is not None else TestName('none')
