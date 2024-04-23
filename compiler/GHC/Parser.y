@@ -1303,7 +1303,7 @@ ty_decl :: { LTyClDecl GhcPs }
         | type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-            {% mkTyData (comb4 $1 $3 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
+            {% mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
                             (fmap reverse $6)
                             ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)++(fst $ unLoc $5)) }

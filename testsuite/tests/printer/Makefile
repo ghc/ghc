@@ -836,3 +836,8 @@ CaseAltComments:
 MatchPatComments:
 	$(CHECK_PPR)   $(LIBDIR) MatchPatComments.hs
 	$(CHECK_EXACT) $(LIBDIR) MatchPatComments.hs
+
+.PHONY: DataDeclShort
+DataDeclShort:
+	$(CHECK_PPR)   $(LIBDIR) DataDeclShort.hs
+	$(CHECK_EXACT) $(LIBDIR) DataDeclShort.hs
