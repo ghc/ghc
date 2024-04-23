@@ -6,12 +6,12 @@ module PprExportWarning (
         reallyreallyreallyreallyreallyreallyreallyreallylongname,
         {-# DEPRECATED "Just because" #-} Bar(Bar1, Bar2),
         {-# WARNING "Just because" #-} name,
-        {-# DEPRECATED ["Reason", 
-                        "Another reason"] #-} 
+        {-# DEPRECATED ["Reason",
+                        "Another reason"] #-}
         Baz,
         {-# DEPRECATED [ ] #-} module GHC,
         {-# WARNING "Dummy Pattern" #-} pattern Dummy,
-        Foo'(..), 
+        Foo'(..),
         reallyreallyreallyreallyreallyreallyreallyreallylongname',
         Bar'(Bar1, Bar2), name', Baz', module Data.List, pattern Dummy'
     ) where
