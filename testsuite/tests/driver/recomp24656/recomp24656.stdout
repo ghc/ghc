@@ -1,0 +1,9 @@
+[1 of 1] Compiling A                ( A.hs, A.o )
+[1 of 1] Compiling A                ( A.hs, A.o ) [Flags changed]
+extra decls:
+  $trModule = GHC.Types.Module $trModule2 $trModule4
+  $trModule1 = "main"#
+  $trModule2 = GHC.Types.TrNameS $trModule1
+  $trModule3 = "A"#
+  $trModule4 = GHC.Types.TrNameS $trModule3
+  foo = GHC.Types.I# 1#
