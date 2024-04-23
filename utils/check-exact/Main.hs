@@ -319,8 +319,10 @@ testOneFile _ libdir fileName mchanger = do
            expectedSource <- readFile newFileExpected
            changedSource  <- readFile newFileChanged
            return (expectedSource == changedSource, expectedSource, changedSource)
-         Nothing -> return (True, "", "")
-
+         Nothing -> do
+           expectedSource <- readFile fileName
+           changedSource  <- readFile newFile
+           return (expectedSource == changedSource, expectedSource, changedSource)
 
        (p',_) <- parseOneFile libdir newFile
        let newAstStr :: String
