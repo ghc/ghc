@@ -70,7 +70,10 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- Other flags which affect code generation
         codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
 
-        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
+        -- Did we include core for all bindings?
+        fat_iface = gopt Opt_WriteIfSimplifiedCore dflags
+
+        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters, fat_iface))
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags
