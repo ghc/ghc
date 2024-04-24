@@ -795,7 +795,7 @@ We make boxed one-tuple names have known keys so that `data Solo a = MkSolo a`,
 defined in GHC.Tuple, will be used when one-tuples are spliced in through
 Template Haskell. This program (from #18097) crucially relies on this:
 
-  case $( tupE [ [| "ok" |] ] ) of Solo x -> putStrLn x
+  case $( tupE [ [| "ok" |] ] ) of MkSolo x -> putStrLn x
 
 Unless Solo has a known key, the type of `$( tupE [ [| "ok" |] ] )` (an
 ExplicitTuple of length 1) will not match the type of Solo (an ordinary
@@ -838,26 +838,10 @@ isBuiltInOcc_maybe occ =
         , (commas, rest') <- BS.span (==',') rest
         , ")" <- rest'
              -> Just $ tup_name Boxed (1+BS.length commas)
-      _ | Just rest <- "Tuple" `BS.stripPrefix` name
-        , Just (num, trailing) <- BS.readInt rest
-        , num >= 2 && num <= 64
-             -> if
-             | BS.null trailing -> Just $ tup_name Boxed num
-             | "#" == trailing -> Just $ tup_name Unboxed num
-             | otherwise -> Nothing
-
-      "CUnit" -> Just $ choose_ns (cTupleTyConName 0) (cTupleDataConName 0)
-      "CSolo" -> Just $ choose_ns (cTupleTyConName 1) (cTupleDataConName 1)
-      _ | Just rest <- "CTuple" `BS.stripPrefix` name
-        , Just (num, trailing) <- BS.readInt rest
-        , BS.null trailing
-        , num >= 2 && num <= 64
-             -> Just $ choose_ns (cTupleTyConName num) (cTupleDataConName num)
 
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
-      "Unit#" -> Just $ tup_name Unboxed 0
-      "Solo#" -> Just $ tup_name Unboxed 1
+      "(# #)" -> Just $ tup_name Unboxed 1
       _ | Just rest <- "(#" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , "#)" <- rest'
@@ -878,11 +862,6 @@ isBuiltInOcc_maybe occ =
              -> let arity = nb_pipes1 + nb_pipes2 + 1
                     alt = nb_pipes1 + 1
                 in Just $ dataConName $ sumDataCon alt arity
-      _ | Just rest <- "Sum" `BS.stripPrefix` name
-        , Just (num, trailing) <- BS.readInt rest
-        , num >= 2 && num <= 64
-        , trailing == "#"
-             -> Just $ tyConName $ sumTyCon num
 
       _ -> Nothing
   where
@@ -920,6 +899,21 @@ isTupleTyOcc_maybe mod occ
       | otherwise = isTupleNTyOcc_maybe occ
 isTupleTyOcc_maybe _ _ = Nothing
 
+isCTupleOcc_maybe :: Module -> OccName -> Maybe Name
+isCTupleOcc_maybe mod occ
+  | mod == gHC_CLASSES
+  = match_occ
+  where
+    match_occ
+      | occ == occName (cTupleTyConName 0) = Just (cTupleTyConName 0)
+      | occ == occName (cTupleTyConName 1) = Just (cTupleTyConName 1)
+      | 'C':'T':'u':'p':'l':'e' : rest <- occNameString occ
+      , Just (BoxedTuple, num) <- arity_and_boxity rest
+      , num >= 2 && num <= 64
+           = Just $ cTupleTyConName num
+      | otherwise = Nothing
+
+isCTupleOcc_maybe _ _ = Nothing
 
 -- | This is only for Tuple<n>, not for Unit or Solo
 isTupleNTyOcc_maybe :: OccName -> Maybe Name
@@ -985,13 +979,12 @@ isPunOcc_maybe :: Module -> OccName -> Maybe Name
 isPunOcc_maybe mod occ
   | mod == gHC_TYPES, occ == occName listTyConName
   = Just listTyConName
-  | mod == gHC_INTERNAL_TUPLE, occ == occName unitTyConName
-  = Just unitTyConName
-  | mod == gHC_TYPES, occ == occName unboxedUnitTyConName
-  = Just unboxedUnitTyConName
-  | mod == gHC_INTERNAL_TUPLE || mod == gHC_TYPES
-  = isTupleNTyOcc_maybe occ <|> isSumNTyOcc_maybe occ
-isPunOcc_maybe _ _ = Nothing
+  | mod == gHC_TYPES, occ == occName unboxedSoloDataConName
+  = Just unboxedSoloDataConName
+  | otherwise
+  = isTupleTyOcc_maybe mod occ <|>
+    isCTupleOcc_maybe  mod occ <|>
+    isSumTyOcc_maybe   mod occ
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple
@@ -1304,6 +1297,8 @@ unboxedSoloTyCon = tupleTyCon Unboxed 1
 unboxedSoloTyConName :: Name
 unboxedSoloTyConName = tyConName unboxedSoloTyCon
 
+unboxedSoloDataConName :: Name
+unboxedSoloDataConName = tupleDataConName Unboxed 1
 
 {- *********************************************************************
 *                                                                      *
