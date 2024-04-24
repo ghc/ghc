@@ -116,7 +116,7 @@ type instance XFunBind    (GhcPass pL) GhcTc = (HsWrapper, [CoreTickish])
 -- type         Int -> forall a'. a' -> a'
 -- Notice that the coercion captures the free a'.
 
-type instance XPatBind    GhcPs (GhcPass pR) = [AddEpAnn]
+type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- See Note [Bind free vars]
 type instance XPatBind    GhcTc (GhcPass pR) =
     ( Type                  -- Type of the GRHSs

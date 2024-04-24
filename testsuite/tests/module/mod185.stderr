@@ -10,6 +10,7 @@
     (AnnsModule
      []
      []
+     []
      (Just
       ((,)
        { mod185.hs:6:1 }

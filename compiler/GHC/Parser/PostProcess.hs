@@ -386,7 +386,7 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
                         OpenTypeFamily      -> empty
                         ClosedTypeFamily {} -> whereDots
 
-mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
+mkSpliceDecl :: LHsExpr GhcPs -> (LHsDecl GhcPs)
 -- If the user wrote
 --      [pads| ... ]   then return a QuasiQuoteD
 --      $(e)           then return a SpliceD
@@ -397,18 +397,15 @@ mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
 -- Typed splices are not allowed at the top level, thus we do not represent them
 -- as spliced declaration.  See #10945
 mkSpliceDecl lexpr@(L loc expr)
-  | HsUntypedSplice _ splice@(HsUntypedSpliceExpr {}) <- expr = do
-    !cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+  | HsUntypedSplice _ splice@(HsUntypedSpliceExpr {}) <- expr
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField (L (l2l loc) splice) DollarSplice)
 
-  | HsUntypedSplice _ splice@(HsQuasiQuote {}) <- expr = do
-    cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) DollarSplice)
+  | HsUntypedSplice _ splice@(HsQuasiQuote {}) <- expr
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField (L (l2l loc) splice) DollarSplice)
 
-  | otherwise = do
-    !cs <- getCommentsFor (locA loc)
-    return $ L (addCommentsToEpAnn loc cs) $ SpliceD noExtField (SpliceDecl noExtField
-                                 (L loc (HsUntypedSpliceExpr noAnn lexpr))
+  | otherwise
+    = L loc $ SpliceD noExtField (SpliceDecl noExtField
+                                 (L (l2l loc) (HsUntypedSpliceExpr noAnn (la2la lexpr)))
                                        BareSplice)
 
 mkRoleAnnotDecl :: SrcSpan
@@ -1323,7 +1320,7 @@ checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig [sigAnn]
                         >>= checkLPat
-       checkPatBind loc [] lhs' grhss mult
+       checkPatBind loc lhs' grhss mult
 
 checkValDef loc lhs (mult_ann, Nothing) grhss
   | HsNoMultAnn{} <- mult_ann
@@ -1334,12 +1331,12 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
                            fun is_infix pats grhss
             Nothing -> do
               lhs' <- checkPattern lhs
-              checkPatBind loc [] lhs' grhss mult_ann }
+              checkPatBind loc lhs' grhss mult_ann }
 
 checkValDef loc lhs (mult_ann, Nothing) ghrss
         -- %p x = rhs  parses as a *pattern* binding
   = do lhs' <- checkPattern lhs
-       checkPatBind loc [] lhs' ghrss mult_ann
+       checkPatBind loc lhs' ghrss mult_ann
 
 checkFunBind :: SrcStrictness
              -> SrcSpan
@@ -1377,15 +1374,14 @@ makeFunBind fn ms
 
 -- See Note [FunBind vs PatBind]
 checkPatBind :: SrcSpan
-             -> [AddEpAnn]
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
-checkPatBind loc annsIn (L _ (BangPat ans (L _ (VarPat _ v))))
+checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
                         (L _match_span grhss) (HsNoMultAnn _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
-                [L (noAnnSrcSpan loc) (m (ans++annsIn) v)]))
+                [L (noAnnSrcSpan loc) (m ans v)]))
   where
     m a v = Match { m_ext = a
                   , m_ctxt = FunRhs { mc_fun    = v
@@ -1394,8 +1390,8 @@ checkPatBind loc annsIn (L _ (BangPat ans (L _ (VarPat _ v))))
                   , m_pats = []
                  , m_grhss = grhss }
 
-checkPatBind _loc annsIn lhs (L _ grhss) mult = do
-  return (PatBind annsIn lhs mult grhss)
+checkPatBind _loc lhs (L _ grhss) mult = do
+  return (PatBind noExtField lhs mult grhss)
 
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
@@ -1459,9 +1455,12 @@ isFunLhs e = go e [] [] []
               op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
                                     (L loc' op) r (reverse ops ++ cps))
           reassociate _other = Nothing
-   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L loc _)))) es ops cps
-             = go pat (L loc (ArgPatBuilderArgPat invis_pat) : es) ops cps
+   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
+             = go pat (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
              where invis_pat = InvisPat tok ty_pat
+                   anc' = case tok of
+                     NoEpTok -> anc
+                     EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
    go _ _ _ _ = return Nothing
 
 data ArgPatBuilder p
@@ -1921,8 +1920,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
   mkHsAppTypePV l p at t = do
     !cs <- getCommentsFor (locA l)
-    let anns = EpAnn (spanAsAnchor (getLocA t)) NoEpAnns cs
-    return $ L l (PatBuilderAppType p at (mkHsTyPat anns t))
+    return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
@@ -1979,7 +1977,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkSumOrTuplePV = mkSumOrTuplePat
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
-      PatBuilderPat (EmbTyPat toktype (mkHsTyPat noAnn ty))
+      PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
   rejectPragmaPV _ = return ()
 
 -- | Ensure that a literal pattern isn't of type Addr#, Float#, Double#.
@@ -3318,12 +3316,12 @@ withCombinedComments ::
   HasLoc l2 =>
   l1 ->
   l2 ->
-  (SrcSpan -> EpAnnComments -> P a) ->
+  (SrcSpan -> P a) ->
   P (LocatedA a)
 withCombinedComments start end use = do
   cs <- getCommentsFor fullSpan
-  a <- use fullSpan cs
-  pure (L (noAnnSrcSpan fullSpan) a)
+  a <- use fullSpan
+  pure (L (EpAnn (spanAsAnchor fullSpan) noAnn cs) a)
   where
     fullSpan = combineSrcSpans (getHasLoc start) (getHasLoc end)
 
@@ -3363,15 +3361,14 @@ mkTupleSyntaxTycon boxity n =
 mkListSyntaxTy0 :: EpaLocation
                 -> EpaLocation
                 -> SrcSpan
-                -> EpAnnComments
                 -> P (HsType GhcPs)
-mkListSyntaxTy0 brkOpen brkClose span comments =
+mkListSyntaxTy0 brkOpen brkClose span =
   punsIfElse enabled disabled
   where
     enabled = HsTyVar noAnn NotPromoted rn
 
     -- attach the comments only to the RdrName since it's the innermost AST node
-    rn = L (EpAnn fullLoc rdrNameAnn comments) listTyCon_RDR
+    rn = L (EpAnn fullLoc rdrNameAnn emptyComments) listTyCon_RDR
 
     disabled =
       HsExplicitListTy annsKeyword NotPromoted []

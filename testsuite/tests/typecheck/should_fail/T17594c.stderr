@@ -1,5 +1,5 @@
 
-T17594c.hs:5:11: error: [GHC-14964]
+T17594c.hs:5:10: error: [GHC-14964]
     • Invisible type pattern t has no associated forall
     • In the expression: \ @t -> undefined :: t
       In the expression: [\ @t -> undefined :: t]

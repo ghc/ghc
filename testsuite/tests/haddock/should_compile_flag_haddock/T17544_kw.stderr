@@ -11,6 +11,7 @@
      [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
      []
+     []
      (Just
       ((,)
        { T17544_kw.hs:25:1 }
@@ -227,7 +228,10 @@
                (EpaComments
                 []))
               (HsTupleTy
-               (AnnParen AnnParens (EpaSpan { T17544_kw.hs:19:18 }) (EpaSpan { T17544_kw.hs:19:19 }))
+               (AnnParen
+                AnnParens
+                (EpaSpan { T17544_kw.hs:19:18 })
+                (EpaSpan { T17544_kw.hs:19:19 }))
                (HsBoxedOrConstraintTuple)
                [])))])
           (L

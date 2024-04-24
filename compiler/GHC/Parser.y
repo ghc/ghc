@@ -881,7 +881,7 @@ signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
-                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) Nothing) cs)
+                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) [] Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
                                             (Just $2) $4 (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
@@ -891,7 +891,7 @@ module :: { Located (HsModule GhcPs) }
        : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) eof) cs)
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) [] eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
                                                   (Just $2) $4 (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
@@ -899,7 +899,7 @@ module :: { Located (HsModule GhcPs) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) eof) cs)
+                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) [] eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -939,14 +939,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
@@ -1257,8 +1257,7 @@ topdecl :: { LHsDecl GhcPs }
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
         | infixexp                              {% runPV (unECP $1) >>= \ $1 ->
-                                                    do { d <- mkSpliceDecl $1
-                                                       ; commentsPA d }}
+                                                       commentsPA $ mkSpliceDecl $1 }
 
 -- Type classes
 --
@@ -2585,7 +2584,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | PREFIX_PERCENT atype infixexp     opt_sig rhs  {% runPV (unECP $3) >>= \ $3 ->
-                                       do { let { l = comb2 $3 $> }
+                                       do { let { l = comb2 $1 $> }
                                           ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2, $4) $5;
                                         -- parses bindings of the form %p x or
                                         -- %p x :: sig
@@ -2603,7 +2602,7 @@ decl    :: { LHsDecl GhcPs }
         -- Why do we only allow naked declaration splices in top-level
         -- declarations and not here? Short answer: because readFail009
         -- fails terribly with a panic in cvBindsAndSigs otherwise.
-        | splice_exp            {% mkSpliceDecl $1 }
+        | splice_exp            { mkSpliceDecl $1 }
 
 rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
@@ -3401,7 +3400,7 @@ bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parse
 
 argpat   :: { LPat GhcPs }
 argpat    : apat                  { $1 }
-          | PREFIX_AT atype       { L (getLocAnn (reLoc $2)) (InvisPat (epTok $1) (mkHsTyPat noAnn $2)) }
+          | PREFIX_AT atype       { sLLa $1 $> (InvisPat (epTok $1) (mkHsTyPat $2)) }
 
 argpats :: { [LPat GhcPs] }
           : argpat argpats            { $1 : $2 }
@@ -4559,7 +4558,8 @@ addTrailingCommaN (L anns a) span = do
   return (L anns' a)
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
-addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaToNoCommentsLocation span) })
+addTrailingCommaS (L l sl) span
+    = L (widenSpan l [AddEpAnn AnnComma span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
 
 -- -------------------------------------
 

@@ -652,6 +652,10 @@ printSourceText :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
 printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
 printSourceText (SourceText   txt) _ =  printStringAdvance (unpackFS txt) >> return ()
 
+printSourceTextAA :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
+printSourceTextAA (NoSourceText) txt   = printStringAtAA (EpaDelta (SameLine 0) []) txt >> return ()
+printSourceTextAA (SourceText   txt) _ =  printStringAtAA (EpaDelta (SameLine 0) []) (unpackFS txt) >> return ()
+
 -- ---------------------------------------------------------------------
 
 printStringAtSs :: (Monad m, Monoid w) => SrcSpan -> String -> EP w m ()
@@ -961,8 +965,10 @@ lepa k epAnn = fmap (\newAnns -> epAnn { anns = newAnns })
 
 -- data AnnsModule
 --   = AnnsModule {
---     am_main :: [AddEpAnn],
---     am_decls :: AnnList
+--     am_main  :: [AddEpAnn],
+--     am_decls :: [TrailingAnn],
+--     am_cs    :: [LEpaComment],
+--     am_eof   :: Maybe (RealSrcSpan, RealSrcSpan)
 --     } deriving (Data, Eq)
 
 lam_main :: Lens AnnsModule [AddEpAnn]
@@ -2119,7 +2125,7 @@ instance ExactPrint StringLiteral where
   setAnnotationAnchor a _ _ _ = a
 
   exact (StringLiteral src fs mcomma) = do
-    printSourceText src (show (unpackFS fs))
+    printSourceTextAA src (show (unpackFS fs))
     mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
     return (StringLiteral src fs mcomma')
 
