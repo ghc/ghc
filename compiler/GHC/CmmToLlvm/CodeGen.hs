@@ -56,6 +56,7 @@ data Signage = Signed | Unsigned deriving (Eq, Show)
 genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
 genLlvmProc (CmmProc infos lbl live graph) = do
     let blocks = toBlockListEntryFirstFalseFallthrough graph
+
     (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)
@@ -66,6 +67,11 @@ genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
 -- -----------------------------------------------------------------------------
 -- * Block code generation
 --
+
+-- | Unreachable basic block
+--
+-- See Note [Unreachable block as default destination in Switch]
+newtype UnreachableBlockId = UnreachableBlockId BlockId
 
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
@@ -82,20 +88,27 @@ basicBlocksCodeGen live cmmBlocks
        (prologue, prologueTops) <- funPrologue live cmmBlocks
        let entryBlock = BasicBlock bid (fromOL prologue)
 
+       -- allocate one unreachable basic block that can be used as a default
+       -- destination in exhaustive switches.
+       --
+       -- See Note [Unreachable block as default destination in Switch]
+       ubid@(UnreachableBlockId ubid') <- (UnreachableBlockId . mkBlockId) <$> getUniqueM
+       let ubblock = BasicBlock ubid' [Unreachable]
+
        -- Generate code
-       (blocks, topss) <- fmap unzip $ mapM basicBlockCodeGen cmmBlocks
+       (blocks, topss) <- fmap unzip $ mapM (basicBlockCodeGen ubid) cmmBlocks
 
        -- Compose
-       return (entryBlock : blocks, prologueTops ++ concat topss)
+       return (entryBlock : ubblock : blocks, prologueTops ++ concat topss)
 
 
 -- | Generate code for one block
-basicBlockCodeGen :: CmmBlock -> LlvmM ( LlvmBasicBlock, [LlvmCmmDecl] )
-basicBlockCodeGen block
+basicBlockCodeGen :: UnreachableBlockId -> CmmBlock -> LlvmM ( LlvmBasicBlock, [LlvmCmmDecl] )
+basicBlockCodeGen ubid block
   = do let (_, nodes, tail)  = blockSplit block
            id = entryLabel block
-       (mid_instrs, top) <- stmtsToInstrs $ blockToList nodes
-       (tail_instrs, top')  <- stmtToInstrs tail
+       (mid_instrs, top) <- stmtsToInstrs ubid $ blockToList nodes
+       (tail_instrs, top')  <- stmtToInstrs ubid tail
        let instrs = fromOL (mid_instrs `appOL` tail_instrs)
        return (BasicBlock id instrs, top' ++ top)
 
@@ -110,15 +123,15 @@ type StmtData = (LlvmStatements, [LlvmCmmDecl])
 
 
 -- | Convert a list of CmmNode's to LlvmStatement's
-stmtsToInstrs :: [CmmNode e x] -> LlvmM StmtData
-stmtsToInstrs stmts
-   = do (instrss, topss) <- fmap unzip $ mapM stmtToInstrs stmts
+stmtsToInstrs :: UnreachableBlockId -> [CmmNode e x] -> LlvmM StmtData
+stmtsToInstrs ubid stmts
+   = do (instrss, topss) <- fmap unzip $ mapM (stmtToInstrs ubid) stmts
         return (concatOL instrss, concat topss)
 
 
 -- | Convert a CmmStmt to a list of LlvmStatement's
-stmtToInstrs :: CmmNode e x -> LlvmM StmtData
-stmtToInstrs stmt = case stmt of
+stmtToInstrs :: UnreachableBlockId -> CmmNode e x -> LlvmM StmtData
+stmtToInstrs ubid stmt = case stmt of
 
     CmmComment _         -> return (nilOL, []) -- nuke comments
     CmmTick    _         -> return (nilOL, [])
@@ -131,7 +144,7 @@ stmtToInstrs stmt = case stmt of
     CmmBranch id         -> genBranch id
     CmmCondBranch arg true false likely
                          -> genCondBranch arg true false likely
-    CmmSwitch arg ids    -> genSwitch arg ids
+    CmmSwitch arg ids    -> genSwitch ubid arg ids
 
     -- Foreign Call
     CmmUnsafeForeignCall target res args
@@ -1305,19 +1318,36 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 
 
 -- | Switch branch
-genSwitch :: CmmExpr -> SwitchTargets -> LlvmM StmtData
-genSwitch cond ids = do
+genSwitch :: UnreachableBlockId -> CmmExpr -> SwitchTargets -> LlvmM StmtData
+genSwitch (UnreachableBlockId ubid) cond ids = do
     (vc, stmts, top) <- exprToVar cond
     let ty = getVarType vc
 
     let labels = [ (mkIntLit ty ix, blockIdToLlvm b)
                  | (ix, b) <- switchTargetsCases ids ]
-    -- out of range is undefined, so let's just branch to first label
     let defLbl | Just l <- switchTargetsDefault ids = blockIdToLlvm l
-               | otherwise                          = snd (head labels)
+               | otherwise                          = blockIdToLlvm ubid
+                 -- switch to an unreachable basic block for exhaustive
+                 -- switches. See Note [Unreachable block as default destination
+                 -- in Switch]
 
     let s1 = Switch vc defLbl labels
     return $ (stmts `snocOL` s1, top)
+
+
+-- Note [Unreachable block as default destination in Switch]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- LLVM IR requires a default destination (a block label) for its Switch
+-- operation, even if the switch is exhaustive. An LLVM switch is considered
+-- exhausitve (e.g. to omit range checks for bit tests [1]) if the default
+-- destination is unreachable.
+--
+-- When we codegen a Cmm function, we always reserve an unreachable basic block
+-- that is used as a default destination for exhaustive Cmm switches in
+-- genSwitch. See #24717
+--
+-- [1] https://reviews.llvm.org/D68131
+
 
 
 -- -----------------------------------------------------------------------------
