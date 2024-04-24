@@ -60,6 +60,8 @@ import GHC.Utils.Binary
 import Control.DeepSeq
 import Control.Exception
 import GHC.Types.Name.Reader (IfGlobalRdrEnv)
+import qualified GHC.Data.Strict as Strict
+import Data.ByteString (ByteString)
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -210,7 +212,14 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- combined with mi_decls allows us to restart code generation.
                 -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
 
-        mi_top_env  :: !(Maybe IfaceTopEnv),
+        mi_stub_objs :: ![ByteString],
+                -- ^ Serialized foreign stub dynamic objects when
+                -- compiled with -fbyte-code-and-object-code, empty
+                -- and unused in other cases. This is required to make
+                -- whole core bindings properly work with foreign
+                -- stubs (see #24634).
+
+        mi_top_env :: !(Maybe IfaceTopEnv),
                 -- ^ Just enough information to reconstruct the top level environment in
                 -- the /original source/ code for this module. which
                 -- is NOT the same as mi_exports, nor mi_decls (which
@@ -361,23 +370,24 @@ instance Binary ModIface where
                  mi_src_hash = _src_hash, -- Don't `put_` this in the instance
                                           -- because we are going to write it
                                           -- out separately in the actual file
-                 mi_deps      = deps,
-                 mi_usages    = usages,
-                 mi_exports   = exports,
-                 mi_used_th   = used_th,
-                 mi_fixities  = fixities,
-                 mi_warns     = warns,
-                 mi_anns      = anns,
-                 mi_decls     = decls,
+                 mi_deps       = deps,
+                 mi_usages     = usages,
+                 mi_exports    = exports,
+                 mi_used_th    = used_th,
+                 mi_fixities   = fixities,
+                 mi_warns      = warns,
+                 mi_anns       = anns,
+                 mi_decls      = decls,
                  mi_extra_decls = extra_decls,
-                 mi_insts     = insts,
-                 mi_fam_insts = fam_insts,
-                 mi_rules     = rules,
-                 mi_hpc       = hpc_info,
-                 mi_trust     = trust,
-                 mi_trust_pkg = trust_pkg,
+                 mi_stub_objs  = stub_objs,
+                 mi_insts      = insts,
+                 mi_fam_insts  = fam_insts,
+                 mi_rules      = rules,
+                 mi_hpc        = hpc_info,
+                 mi_trust      = trust,
+                 mi_trust_pkg  = trust_pkg,
                  mi_complete_matches = complete_matches,
-                 mi_docs      = docs,
+                 mi_docs       = docs,
                  mi_ext_fields = _ext_fields, -- Don't `put_` this in the instance so we
                                               -- can deal with it's pointer in the header
                                               -- when we write the actual file
@@ -414,6 +424,7 @@ instance Binary ModIface where
         lazyPut bh anns
         put_ bh decls
         put_ bh extra_decls
+        put_ bh stub_objs
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -446,6 +457,7 @@ instance Binary ModIface where
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
         extra_decls <- get bh
+        stub_objs   <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -461,22 +473,23 @@ instance Binary ModIface where
                  mi_hsc_src     = hsc_src,
                  mi_src_hash = fingerprint0, -- placeholder because this is dealt
                                              -- with specially when the file is read
-                 mi_deps        = deps,
-                 mi_usages      = usages,
-                 mi_exports     = exports,
-                 mi_used_th     = used_th,
-                 mi_anns        = anns,
-                 mi_fixities    = fixities,
-                 mi_warns       = warns,
-                 mi_decls       = decls,
-                 mi_extra_decls = extra_decls,
-                 mi_top_env     = Nothing,
-                 mi_insts       = insts,
-                 mi_fam_insts   = fam_insts,
-                 mi_rules       = rules,
-                 mi_hpc         = hpc_info,
-                 mi_trust       = trust,
-                 mi_trust_pkg   = trust_pkg,
+                 mi_deps         = deps,
+                 mi_usages       = usages,
+                 mi_exports      = exports,
+                 mi_used_th      = used_th,
+                 mi_anns         = anns,
+                 mi_fixities     = fixities,
+                 mi_warns        = warns,
+                 mi_decls        = decls,
+                 mi_extra_decls  = extra_decls,
+                 mi_stub_objs    = stub_objs,
+                 mi_top_env      = Nothing,
+                 mi_insts        = insts,
+                 mi_fam_insts    = fam_insts,
+                 mi_rules        = rules,
+                 mi_hpc          = hpc_info,
+                 mi_trust        = trust,
+                 mi_trust_pkg    = trust_pkg,
                         -- And build the cached values
                  mi_complete_matches = complete_matches,
                  mi_docs        = docs,
@@ -504,31 +517,33 @@ type IfaceExport = AvailInfo
 
 emptyPartialModIface :: Module -> PartialModIface
 emptyPartialModIface mod
-  = ModIface { mi_module      = mod,
-               mi_sig_of      = Nothing,
-               mi_hsc_src     = HsSrcFile,
-               mi_src_hash    = fingerprint0,
-               mi_deps        = noDependencies,
-               mi_usages      = [],
-               mi_exports     = [],
-               mi_used_th     = False,
-               mi_fixities    = [],
-               mi_warns       = IfWarnSome [] [],
-               mi_anns        = [],
-               mi_insts       = [],
-               mi_fam_insts   = [],
-               mi_rules       = [],
-               mi_decls       = [],
-               mi_extra_decls = Nothing,
-               mi_top_env     = Nothing,
-               mi_hpc         = False,
-               mi_trust       = noIfaceTrustInfo,
-               mi_trust_pkg   = False,
-               mi_complete_matches = [],
-               mi_docs        = Nothing,
-               mi_final_exts  = (),
-               mi_ext_fields  = emptyExtensibleFields
-             }
+  = ModIface
+      { mi_module       = mod,
+        mi_sig_of       = Nothing,
+        mi_hsc_src      = HsSrcFile,
+        mi_src_hash     = fingerprint0,
+        mi_deps         = noDependencies,
+        mi_usages       = [],
+        mi_exports      = [],
+        mi_used_th      = False,
+        mi_fixities     = [],
+        mi_warns        = IfWarnSome [] [],
+        mi_anns         = [],
+        mi_insts        = [],
+        mi_fam_insts    = [],
+        mi_rules        = [],
+        mi_decls        = [],
+        mi_extra_decls  = Nothing,
+        mi_stub_objs    = [],
+        mi_top_env      = Nothing,
+        mi_hpc          = False,
+        mi_trust        = noIfaceTrustInfo,
+        mi_trust_pkg    = False,
+        mi_complete_matches = [],
+        mi_docs         = Nothing,
+        mi_final_exts   = (),
+        mi_ext_fields   = emptyExtensibleFields
+      }
 
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
@@ -569,9 +584,10 @@ emptyIfaceHashCache _occ = Nothing
 instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          , NFData (IfaceDeclExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
-  rnf (ModIface{ mi_module, mi_sig_of, mi_hsc_src, mi_deps, mi_usages
+  rnf (ModIface
+               { mi_module, mi_sig_of, mi_hsc_src, mi_deps, mi_usages
                , mi_exports, mi_used_th, mi_fixities, mi_warns, mi_anns
-               , mi_decls, mi_extra_decls, mi_top_env, mi_insts
+               , mi_decls, mi_extra_decls, mi_stub_objs, mi_top_env, mi_insts
                , mi_fam_insts, mi_rules, mi_hpc, mi_trust, mi_trust_pkg
                , mi_complete_matches, mi_docs, mi_final_exts
                , mi_ext_fields, mi_src_hash })
@@ -587,6 +603,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_anns
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
+    `seq` rnf mi_stub_objs
     `seq` rnf mi_top_env
     `seq` rnf mi_insts
     `seq` rnf mi_fam_insts
@@ -637,6 +654,3 @@ type WhetherHasOrphans   = Bool
 
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
-
-
-
