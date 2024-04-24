@@ -1241,10 +1241,12 @@ addFingerprints hsc_env iface0
    --   - orphans
    --   - deprecations
    --   - flag abi hash
+   --   - foreign stubs and files
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0)
+                       mi_warns iface0,
+                       mi_foreign iface0)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus

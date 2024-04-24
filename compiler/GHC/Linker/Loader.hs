@@ -32,7 +32,6 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
-   , partitionLinkable
    )
 where
 
@@ -100,7 +99,6 @@ import Data.Maybe
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
 import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
 
 import System.FilePath
 import System.Directory
@@ -727,8 +725,11 @@ loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (Load
 loadModuleLinkables interp hsc_env pls linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
-        let (objs, bcos) = partition linkableIsNativeCodeOnly
-                              (concatMap partitionLinkable linkables)
+        debugTraceMsg (hsc_logger hsc_env) 3 $
+          hang (text "Loading module linkables") 2 $ vcat [
+            hang (text "Objects:") 2 (vcat (ppr <$> objs)),
+            hang (text "Bytecode:") 2 (vcat (ppr <$> bcos))
+          ]
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -738,15 +739,9 @@ loadModuleLinkables interp hsc_env pls linkables
           else do
                 pls2 <- dynLinkBCOs interp pls1 bcos
                 return (pls2, Succeeded)
+  where
+    (objs, bcos) = partitionLinkables linkables
 
-
--- HACK to support f-x-dynamic in the interpreter; no other purpose
-partitionLinkable :: Linkable -> [Linkable]
-partitionLinkable li = case linkablePartitionParts li of
-  (o:os, bco:bcos) -> [ li { linkableParts = o   :| os }
-                      , li { linkableParts = bco :| bcos }
-                      ]
-  _ -> [li]
 
 linkableInSet :: Linkable -> LinkableSet -> Bool
 linkableInSet l objs_loaded =
