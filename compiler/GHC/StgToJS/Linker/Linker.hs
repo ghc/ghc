@@ -1284,7 +1284,16 @@ staticDeclStat (StaticInfo global_name static_value _) = jStgStatToJS decl
       StaticUnboxedBool b          -> app "h$p" [toJExpr b]
       StaticUnboxedInt i           -> app "h$p" [toJExpr i]
       StaticUnboxedDouble d        -> app "h$p" [toJExpr (unSaneDouble d)]
-      StaticUnboxedString str      -> app "h$rawStringData" [ValExpr (to_byte_list str)]
+      -- GHCJS used a function wrapper for this:
+      -- StaticUnboxedString str      -> ApplExpr (initStr str) []
+      -- But we are defining it statically for now.
+      StaticUnboxedString str      -> initStr str
       StaticUnboxedStringOffset {} -> 0
 
     to_byte_list = JList . map (Int . fromIntegral) . BS.unpack
+
+    initStr :: BS.ByteString -> JStgExpr
+    initStr str =
+      case decodeModifiedUTF8 str of
+        Just t  -> app "h$encodeModifiedUtf8" [ValExpr (JStr t)]
+        Nothing -> app "h$rawStringData" [ValExpr $ to_byte_list str]

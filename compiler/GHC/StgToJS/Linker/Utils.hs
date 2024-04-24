@@ -21,6 +21,7 @@ module GHC.StgToJS.Linker.Utils
   , getInstalledPackageLibDirs
   , getInstalledPackageHsLibs
   , commonCppDefs
+  , decodeModifiedUTF8
   )
 where
 
@@ -283,3 +284,15 @@ jsExeFileName dflags
     dropPrefix prefix xs
       | prefix `isPrefixOf` xs = drop (length prefix) xs
       | otherwise              = xs
+
+-- GHC produces string literals in ByteString.
+-- When ByteString has all bytes UTF-8 compatbile we make attempt to
+-- represent it as FastString.
+-- Otherwise (for example when string literal encodes long integers or zero bytes) we
+-- leave it as is.
+-- Having zero bytes points that this literal never was assumed to be a Modified UTF8 compatible.
+decodeModifiedUTF8 :: B.ByteString -> Maybe FastString
+decodeModifiedUTF8 bs
+  | B.any (==0) bs         = Nothing
+  | not $ B.isValidUtf8 bs = Nothing
+  | otherwise              = Just . mkFastStringByteString $ bs
