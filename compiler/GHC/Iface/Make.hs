@@ -12,6 +12,7 @@
 module GHC.Iface.Make
    ( mkPartialIface
    , mkFullIface
+   , mkFullIfaceWithForeignStubs
    , mkIfaceTc
    , mkIfaceExports
    )
@@ -88,6 +89,8 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
 
+import qualified Data.ByteString as BS
+import Data.Traversable
 import Data.Function
 import Data.List ( sortBy )
 import Data.Ord
@@ -126,23 +129,30 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
   = mkIface_ hsc_env this_mod core_prog hsc_src used_th deps rdr_env import_decls fix_env warns hpc_info self_trust
              safe_mode usages docs mod_summary mod_details
 
+-- | Backwards compat interface for 'mkFullIfaceWithForeignStubs'.
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos =
+  mkFullIfaceWithForeignStubs hsc_env partial_iface mb_stg_infos mb_cmm_infos []
+
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
 --
 -- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
+mkFullIfaceWithForeignStubs :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [FilePath] -> IO ModIface
+mkFullIfaceWithForeignStubs hsc_env partial_iface mb_stg_infos mb_cmm_infos fos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
+    stub_objs <- for fos BS.readFile
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env (set_mi_decls decls partial_iface)
+      addFingerprints hsc_env $ set_mi_stub_objs stub_objs $ set_mi_decls decls partial_iface
 
     -- Debug printing
     let unit_state = hsc_units hsc_env

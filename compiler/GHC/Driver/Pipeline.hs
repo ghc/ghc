@@ -796,7 +796,7 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
       HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
       HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing) <*> pure emptyHomeModInfoLinkable
     -- TODO: Why is there not a linkable?
-    -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
+    -- Interpreter -> (,) <$> use (T_IO (mkFullIfaceWithForeignStubs hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
 
 hscGenBackendPipeline :: P m
   => PipeEnv
