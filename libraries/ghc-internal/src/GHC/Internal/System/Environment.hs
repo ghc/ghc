@@ -225,6 +225,13 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
 -- contains an equals sign.
 --
+-- Beware that this function must not be executed concurrently
+-- with 'getEnv', 'lookupEnv', 'getEnvironment' and such. One thread
+-- reading environment variables at the same time with another one modifying them
+-- can result in a segfault, see
+-- [Setenv is not Thread Safe](https://www.evanjones.ca/setenv-is-not-thread-safe.html)
+-- for discussion.
+--
 -- @since base-4.7.0.0
 setEnv :: String -> String -> IO ()
 setEnv key_ value_
@@ -268,6 +275,13 @@ foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
 --
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
 -- contains an equals sign.
+--
+-- Beware that this function must not be executed concurrently
+-- with 'getEnv', 'lookupEnv', 'getEnvironment' and such. One thread
+-- reading environment variables at the same time with another one modifying them
+-- can result in a segfault, see
+-- [Setenv is not Thread Safe](https://www.evanjones.ca/setenv-is-not-thread-safe.html)
+-- for discussion.
 --
 -- @since base-4.7.0.0
 unsetEnv :: String -> IO ()
