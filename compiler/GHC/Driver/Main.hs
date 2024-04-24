@@ -50,6 +50,7 @@ module GHC.Driver.Main
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , initWholeCoreBindings
+    , initWholeCoreBindingsEps
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -106,6 +107,7 @@ module GHC.Driver.Main
     , showModuleIndex
     , hscAddSptEntries
     , writeInterfaceOnlyMode
+    , loadByteCode
     ) where
 
 import GHC.Prelude
@@ -292,6 +294,8 @@ import GHC.Types.TypeEnv
 import System.IO
 import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
+import Data.Traversable
+import qualified Data.ByteString as BS
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -989,29 +993,69 @@ initModDetails hsc_env iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
 
--- Hydrate any WholeCoreBindings linkables into BCOs
-initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM utc_time this_mod <$> mapM go uls
+-- | Hydrate any WholeCoreBindings linkables into BCOs, using the supplied
+-- action to initialize the appropriate environment for type checking.
+initWholeCoreBindingsWith ::
+  IO (HscEnv, IORef TypeEnv, TypeEnv) ->
+  HscEnv ->
+  ModIface ->
+  Linkable ->
+  IO Linkable
+initWholeCoreBindingsWith mk_tc_env hsc_env mod_iface (LM utc_time this_mod uls) = do
+  -- If a module is compiled with -fbyte-code-and-object-code and it
+  -- makes use of foreign stubs, then the interface file will also
+  -- contain serialized stub dynamic objects, and we can simply write
+  -- them to temporary objects and refer to them as unlinked items
+  -- directly.
+  stub_uls <- for (mi_stub_objs mod_iface) $ \stub_obj -> do
+    f <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) TFL_GhcSession "dyn_o"
+    BS.writeFile f stub_obj
+    pure $ DotO f
+  bytecode_uls <- for uls go
+  pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
   where
     go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
-        types_var <- newIORef (md_types details)
-        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
         LoadedBCOs <$> (unsafeInterleaveIO $ do
-                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
-                  -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
-                  -- reports a bug.
-                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
+                  (tc_hsc_env, types_var, initial_types) <- mk_tc_env
+                  core_binds <- initIfaceCheck (text "l") tc_hsc_env $
+                                typecheckWholeCoreBindings types_var fi
+                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons initial_types) NoStubs Nothing []
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
+                  -- TODO why are we not using tc_hsc_env here?
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
+
+-- | Hydrate core bindings for a module in the home package table, for which we
+-- can obtain a 'ModDetails'.
+initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
+initWholeCoreBindings hsc_env mod_iface details linkable@LM {linkableModule} =
+  initWholeCoreBindingsWith mk_tc_env hsc_env mod_iface linkable
+  where
+    mk_tc_env = do
+      types_var <- newIORef initial_types
+      let
+        kv = knotVarsFromModuleEnv (mkModuleEnv [(linkableModule, types_var)])
+        hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+      pure (hsc_env', types_var, initial_types)
+      where
+        initial_types = md_types details
+        act hpt = addToHpt hpt (moduleName $ mi_module mod_iface)
+                  (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+
+-- | Hydrate core bindings for a module in the external package state.
+initWholeCoreBindingsEps :: HscEnv -> ModIface -> Linkable -> IO Linkable
+initWholeCoreBindingsEps hsc_env =
+  initWholeCoreBindingsWith mk_tc_env hsc_env
+  where
+    mk_tc_env = do
+      initial_types <- eps_PTE <$> hscEPS hsc_env
+      types_var <- newIORef initial_types
+      pure (hsc_env, types_var, initial_types)
+
 
 {-
 Note [ModDetails and --make mode]
@@ -2044,7 +2088,10 @@ generateByteCode hsc_env cgguts mod_location = do
   stub_o <- case hasStub of
             Nothing -> return []
             Just stub_c -> do
-                stub_o <- compileForeign hsc_env LangC stub_c
+                -- Always compile foreign stubs as shared objects so
+                -- they can be properly loaded later when the bytecode
+                -- is loaded.
+                stub_o <- compileForeign (hscUpdateFlags setDynamicNow hsc_env) LangC stub_c
                 return [DotO stub_o]
 
   let hs_unlinked = [BCOs comp_bc spt_entries]

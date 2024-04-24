@@ -52,10 +52,14 @@ import Control.Applicative
 
 import qualified Data.Set as Set
 import qualified Data.Map as M
-import Data.List (isSuffixOf)
 
 import System.FilePath
 import System.Directory
+import GHC.Driver.Env
+import {-# SOURCE #-} GHC.Driver.Main
+import Data.Time.Clock
+import GHC.Driver.Flags
+import GHC.Driver.Session
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -70,6 +74,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldLoadIface   :: SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface)
                                                     -- ^ Interface loader function
+  , ldHscEnv      :: !HscEnv
   }
 
 data LinkDeps = LinkDeps
@@ -140,7 +145,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-      lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
+      lnks_needed <- mapM get_linkable mods_needed
 
       return $ LinkDeps
         { ldNeededLinkables = lnks_needed
@@ -266,7 +271,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         then homeModInfoByteCode hmi <|> homeModInfoObject hmi
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
-    get_linkable osuf mod      -- A home-package module
+    get_linkable mod      -- A home-package module
         | Just mod_info <- lookupHugByModule mod (ue_home_unit_graph unit_env)
         = adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
         | otherwise
@@ -283,13 +288,27 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   Found loc mod -> found loc mod
                   _ -> no_obj (moduleName mod)
         where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
+            found loc mod
+              | prefer_bytecode = do
+                  Succeeded iface <- ldLoadIface opts (text "makima") mod
+                  case mi_extra_decls iface of
+                    Just extra_decls -> do
+                      t <- getCurrentTime
+                      initWholeCoreBindingsEps hsc_env iface $ LM t mod [CoreBindings $ WholeCoreBindings extra_decls mod undefined]
+                    _ -> fallback_no_bytecode loc mod
+              | otherwise = fallback_no_bytecode loc mod
+
+            fallback_no_bytecode loc mod = do
+              mb_lnk <- findObjectLinkableMaybe mod loc
+              case mb_lnk of
+                Nothing  -> no_obj mod
+                Just lnk -> adjust_linkable lnk
+
+            prefer_bytecode = gopt Opt_UseBytecodeRatherThanObjects dflags
+
+            dflags = hsc_dflags hsc_env
+
+            hsc_env = ldHscEnv opts
 
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do
@@ -300,9 +319,13 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                massert (osuf `isSuffixOf` file)
-                let file_base = fromJust (stripExtension osuf file)
-                    new_file = file_base <.> new_osuf
+                -- file may already has new_osuf suffix. One example
+                -- is when we load bytecode from whole core bindings,
+                -- then the corresponding foreign stub objects are
+                -- compiled as shared objects and file may already has
+                -- .dyn_o suffix. And it's okay as long as the file to
+                -- load is already there.
+                let new_file = file -<.> new_osuf
                 ok <- doesFileExist new_file
                 if (not ok)
                    then dieWith opts span $
