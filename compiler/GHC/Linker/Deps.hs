@@ -301,7 +301,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                         return lnk
 
             adjust_part new_osuf part = case part of
-              DotO file -> do
+              DotO file ModuleObject -> do
                 massert (osuf `isSuffixOf` file)
                 let file_base = fromJust (stripExtension osuf file)
                     new_file = file_base <.> new_osuf
@@ -310,12 +310,14 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                    then dieWith opts span $
                           text "cannot find object file "
                                 <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
+                   else return (DotO new_file ModuleObject)
+              DotO file ForeignObject -> pure (DotO file ForeignObject)
               DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
               DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
               BCOs {}    -> pure part
               LazyBCOs{} -> pure part
-              CoreBindings (WholeCoreBindings _ mod _) -> pprPanic "Unhydrated core bindings" (ppr mod)
+              CoreBindings WholeCoreBindings {wcb_module} ->
+                pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]

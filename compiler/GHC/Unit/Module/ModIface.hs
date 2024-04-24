@@ -41,6 +41,7 @@ import GHC.Iface.Ext.Fields
 import GHC.Unit
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.WholeCoreBindings (IfaceForeign (..), emptyIfaceForeign)
 
 import GHC.Types.Avail
 import GHC.Types.Fixity
@@ -53,6 +54,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM
 
 import GHC.Data.Maybe
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
@@ -225,6 +227,10 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- Strictly speaking this field should live in the
                 -- 'HomeModInfo', but that leads to more plumbing.
 
+        mi_foreign :: !IfaceForeign,
+                -- ^ Foreign stubs and files to supplement 'mi_extra_decls_'.
+                -- See Note [Foreign stubs and TH bytecode linking]
+
                 -- Instance declarations and rules
         mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
         mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
@@ -370,6 +376,7 @@ instance Binary ModIface where
                  mi_anns      = anns,
                  mi_decls     = decls,
                  mi_extra_decls = extra_decls,
+                 mi_foreign   = foreign_,
                  mi_insts     = insts,
                  mi_fam_insts = fam_insts,
                  mi_rules     = rules,
@@ -414,6 +421,7 @@ instance Binary ModIface where
         lazyPut bh anns
         put_ bh decls
         put_ bh extra_decls
+        put_ bh foreign_
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -446,6 +454,7 @@ instance Binary ModIface where
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
         extra_decls <- get bh
+        foreign_    <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -470,6 +479,7 @@ instance Binary ModIface where
                  mi_warns       = warns,
                  mi_decls       = decls,
                  mi_extra_decls = extra_decls,
+                 mi_foreign     = foreign_,
                  mi_top_env     = Nothing,
                  mi_insts       = insts,
                  mi_fam_insts   = fam_insts,
@@ -520,6 +530,7 @@ emptyPartialModIface mod
                mi_rules       = [],
                mi_decls       = [],
                mi_extra_decls = Nothing,
+               mi_foreign     = emptyIfaceForeign,
                mi_top_env     = Nothing,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
@@ -571,7 +582,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
   rnf (ModIface{ mi_module, mi_sig_of, mi_hsc_src, mi_deps, mi_usages
                , mi_exports, mi_used_th, mi_fixities, mi_warns, mi_anns
-               , mi_decls, mi_extra_decls, mi_top_env, mi_insts
+               , mi_decls, mi_extra_decls, mi_foreign, mi_top_env, mi_insts
                , mi_fam_insts, mi_rules, mi_hpc, mi_trust, mi_trust_pkg
                , mi_complete_matches, mi_docs, mi_final_exts
                , mi_ext_fields, mi_src_hash })
@@ -587,6 +598,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_anns
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
+    `seq` rnf mi_foreign
     `seq` rnf mi_top_env
     `seq` rnf mi_insts
     `seq` rnf mi_fam_insts

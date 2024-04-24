@@ -21,8 +21,10 @@ import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Pipeline.Phases
 import GHC.Driver.Env hiding (Hsc)
 import GHC.Unit.Module.Location
+import GHC.Unit.Module.ModGuts (cg_foreign, cg_foreign_files)
 import GHC.Driver.Phases
 import GHC.Unit.Types
+import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.SourceFile
 import GHC.Unit.Module.Status
 import GHC.Unit.Module.ModIface
@@ -568,25 +570,27 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
              do
               output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env (Just location)
               (outputFilename, mStub, foreign_files, stg_infos, cg_infos) <-
-
                 hscGenHardCode hsc_env cgguts mod_location output_fn
-              final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos
+
+              stub_o <- mapM (compileStub hsc_env) mStub
+              foreign_os <-
+                mapM (uncurry (compileForeign hsc_env)) foreign_files
+              let fos = maybe [] return stub_o ++ foreign_os
+                  (iface_stubs, iface_files)
+                    | gopt Opt_WriteIfSimplifiedCore dflags = (cg_foreign cgguts, cg_foreign_files cgguts)
+                    | otherwise = (NoStubs, [])
+
+              final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos iface_stubs iface_files
 
               -- See Note [Writing interface files]
               hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
               mlinkable <-
-                if backendGeneratesCode (backend dflags) && gopt Opt_ByteCodeAndObjectCode dflags
+                if gopt Opt_ByteCodeAndObjectCode dflags
                   then do
                     bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
                     return $ emptyHomeModInfoLinkable { homeMod_bytecode = Just bc }
 
                   else return emptyHomeModInfoLinkable
-
-
-              stub_o <- mapM (compileStub hsc_env) mStub
-              foreign_os <-
-                mapM (uncurry (compileForeign hsc_env)) foreign_files
-              let fos = (maybe [] return stub_o ++ foreign_os)
 
               -- This is awkward, no linkable is produced here because we still
               -- have some way to do before the object file is produced
@@ -598,7 +602,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- In interpreted mode the regular codeGen backend is not run so we
               -- generate a interface without codeGen info.
             do
-              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing
+              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
               bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
