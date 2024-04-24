@@ -54,6 +54,7 @@ import GHC.Driver.Plugins
 
 import GHC.Types.Id
 import GHC.Types.Fixity.Env
+import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.SafeHaskell
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -87,6 +88,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
+import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign, emptyIfaceForeign)
 
 import Data.Function
 import Data.List ( sortBy )
@@ -132,17 +134,20 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
 -- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> ForeignStubs -> [(ForeignSrcLang, FilePath)] -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
+    -- See Note [Foreign stubs and TH bytecode linking]
+    foreign_ <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) stubs foreign_files
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface{ mi_decls = decls }
+      addFingerprints hsc_env partial_iface{ mi_decls = decls, mi_foreign = foreign_ }
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -240,7 +245,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing Nothing
+          mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]
@@ -329,6 +334,7 @@ mkIface_ hsc_env
           mi_used_th     = used_th,
           mi_decls       = decls,
           mi_extra_decls = extra_decls,
+          mi_foreign     = emptyIfaceForeign,
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,

@@ -30,6 +30,7 @@ module GHC.Linker.Types
    -- * Linkable
    , Linkable(..)
    , LinkablePart(..)
+   , LinkableObjectSort (..)
    , linkableIsNativeCodeOnly
    , linkableObjs
    , linkableLibs
@@ -41,7 +42,9 @@ module GHC.Linker.Types
    , linkablePartAllBCOs
    , isNativeCode
    , isNativeLib
-   , isInterpretable
+   , linkableFilterByteCode
+   , linkableFilterNative
+   , partitionLinkables
    )
 where
 
@@ -63,8 +66,8 @@ import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
-import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (mapMaybe)
+import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
 
 
@@ -252,10 +255,28 @@ instance Outputable Linkable where
 
 type ObjFile = FilePath
 
+-- | Classify the provenance of @.o@ products.
+data LinkableObjectSort =
+  -- | The object is the final product for a module.
+  -- When linking splices, its file extension will be adapted to the
+  -- interpreter's way if needed.
+  ModuleObject
+  |
+  -- | The object was created from generated code for foreign stubs or foreign
+  -- sources added by the user.
+  -- Its file extension must be preserved, since there are no objects for
+  -- alternative ways available.
+  ForeignObject
+
 -- | Objects which have yet to be linked by the compiler
 data LinkablePart
-  = DotO ObjFile
+  = DotO
+      ObjFile
       -- ^ An object file (.o)
+      LinkableObjectSort
+      -- ^ Whether the object is an internal, intermediate build product that
+      -- should not be adapted to the interpreter's way. Used for foreign stubs
+      -- loaded from interfaces.
 
   | DotA FilePath
       -- ^ Static archive file (.a)
@@ -268,18 +289,22 @@ data LinkablePart
       -- used by some other backend See Note [Interface Files with Core
       -- Definitions]
 
-  | LazyBCOs (NonEmpty LinkablePart)
-    -- ^ Some BCOs generated on-demand when forced. This is used for
-    -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
-    --
-    -- We use `NonEmpty LinkablePart` instead of `CompiledByteCode` because the list
-    -- also contains the stubs objects (DotO) for the BCOs.
+  | LazyBCOs
+      CompiledByteCode
+      -- ^ Some BCOs generated on-demand when forced. This is used for
+      -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
+      [FilePath]
+      -- ^ Objects containing foreign stubs and files
 
   | BCOs CompiledByteCode
     -- ^ A byte-code object, lives only in memory.
 
 instance Outputable LinkablePart where
-  ppr (DotO path)       = text "DotO" <+> text path
+  ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
+    where
+      pprSort = \case
+        ModuleObject -> empty
+        ForeignObject -> brackets (text "foreign")
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
   ppr (BCOs bco)        = text "BCOs" <+> ppr bco
@@ -306,7 +331,7 @@ linkablePartitionParts l = NE.partition isNativeCode (linkableParts l)
 
 -- | List the native objects (.o) of a linkable
 linkableObjs :: Linkable -> [FilePath]
-linkableObjs l = [ f | DotO f <- NE.toList (linkableParts l) ]
+linkableObjs l = concatMap linkablePartObjectPaths (linkableParts l)
 
 -- | List the native libraries (.so/.dll) of a linkable
 linkableLibs :: Linkable -> [LinkablePart]
@@ -314,7 +339,7 @@ linkableLibs l = NE.filter isNativeLib (linkableParts l)
 
 -- | List the paths of the native objects and libraries (.o/.so/.dll)
 linkableFiles :: Linkable -> [FilePath]
-linkableFiles l = mapMaybe linkablePartPath (NE.toList (linkableParts l))
+linkableFiles l = concatMap linkablePartNativePaths (NE.toList (linkableParts l))
 
 -------------------------------------------
 
@@ -338,30 +363,86 @@ isNativeLib = \case
   LazyBCOs{}      -> False
   CoreBindings {} -> False
 
--- | Is this a bytecode linkable with no file on disk?
-isInterpretable :: LinkablePart -> Bool
-isInterpretable = not . isNativeCode
-
 -- | Get the FilePath of linkable part (if applicable)
 linkablePartPath :: LinkablePart -> Maybe FilePath
 linkablePartPath = \case
-  DotO fn         -> Just fn
+  DotO fn _       -> Just fn
   DotA fn         -> Just fn
   DotDLL fn       -> Just fn
   CoreBindings {} -> Nothing
   LazyBCOs {}     -> Nothing
   BCOs {}         -> Nothing
 
+-- | Return the paths of all object code files (.o, .a, .so) contained in this
+-- 'LinkablePart'.
+linkablePartNativePaths :: LinkablePart -> [FilePath]
+linkablePartNativePaths = \case
+  DotO fn _       -> [fn]
+  DotA fn         -> [fn]
+  DotDLL fn       -> [fn]
+  CoreBindings {} -> []
+  LazyBCOs _ fos  -> fos
+  BCOs {}         -> []
+
+-- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
+linkablePartObjectPaths :: LinkablePart -> [FilePath]
+linkablePartObjectPaths = \case
+  DotO fn _ -> [fn]
+  DotA _ -> []
+  DotDLL _ -> []
+  CoreBindings {} -> []
+  LazyBCOs _ fos -> fos
+  BCOs {} -> []
+
 -- | Retrieve the compiled byte-code from the linkable part.
 --
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
---
--- Warning: this may force byte-code for LazyBCOs.
 linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartAllBCOs = \case
   BCOs bco    -> [bco]
-  LazyBCOs ps -> concatMap linkablePartAllBCOs (NE.toList ps)
+  LazyBCOs bcos _ -> [bcos]
   _           -> []
+
+linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
+linkableFilter f linkable = do
+  new <- nonEmpty (concatMap f (linkableParts linkable))
+  Just linkable {linkableParts = new}
+
+linkablePartNative :: LinkablePart -> [LinkablePart]
+linkablePartNative = \case
+  u@DotO {}  -> [u]
+  u@DotA {} -> [u]
+  u@DotDLL {} -> [u]
+  LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
+  _ -> []
+
+linkablePartByteCode :: LinkablePart -> [LinkablePart]
+linkablePartByteCode = \case
+  u@BCOs {}  -> [u]
+  LazyBCOs bcos _ -> [BCOs bcos]
+  _ -> []
+
+-- | Transform the 'LinkablePart' list in this 'Linkable' to contain only
+-- object code files (.o, .a, .so) without 'LazyBCOs'.
+-- If no 'LinkablePart' remains, return 'Nothing'.
+linkableFilterNative :: Linkable -> Maybe Linkable
+linkableFilterNative = linkableFilter linkablePartNative
+
+-- | Transform the 'LinkablePart' list in this 'Linkable' to contain only byte
+-- code without 'LazyBCOs'.
+-- If no 'LinkablePart' remains, return 'Nothing'.
+linkableFilterByteCode :: Linkable -> Maybe Linkable
+linkableFilterByteCode = linkableFilter linkablePartByteCode
+
+-- | Split the 'LinkablePart' lists in each 'Linkable' into only object code
+-- files (.o, .a, .so) and only byte code, without 'LazyBCOs', and return two
+-- lists containing the nonempty 'Linkable's for each.
+partitionLinkables :: [Linkable] -> ([Linkable], [Linkable])
+partitionLinkables linkables =
+  (
+    mapMaybe linkableFilterNative linkables,
+    mapMaybe linkableFilterByteCode linkables
+  )
 
 {- **********************************************************************
 

@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -----------------------------------------------------------------------------
 --
 -- Object-file symbols (called CLabel for historical reasons).
@@ -134,7 +136,10 @@ module GHC.Cmm.CLabel (
         -- * Others
         dynamicLinkerLabelInfo,
         addLabelSize,
-        foreignLabelStdcallInfo
+        foreignLabelStdcallInfo,
+        CStubLabel (..),
+        cStubLabel,
+        fromCStubLabel,
     ) where
 
 import GHC.Prelude
@@ -1878,3 +1883,42 @@ The transformation is performed because
      T15155.a_closure `mayRedirectTo` a1_rXq_closure+1
 returns True.
 -}
+
+-- | This type encodes the subset of 'CLabel' that occurs in C stubs of foreign
+-- declarations for the purpose of serializing to interface files.
+--
+-- See Note [Foreign stubs and TH bytecode linking]
+data CStubLabel =
+  CStubLabel {
+    csl_is_initializer :: Bool,
+    csl_module :: Module,
+    csl_name :: FastString
+  }
+
+instance Outputable CStubLabel where
+  ppr CStubLabel {csl_is_initializer, csl_module, csl_name} =
+    text ini <+> ppr csl_module <> colon <> text (unpackFS csl_name)
+    where
+      ini = if csl_is_initializer then "initializer" else "finalizer"
+
+-- | Project the constructor 'ModuleLabel' out of 'CLabel' if it is an
+-- initializer or finalizer.
+cStubLabel :: CLabel -> Maybe CStubLabel
+cStubLabel = \case
+  ModuleLabel csl_module label_kind -> do
+    (csl_is_initializer, csl_name) <- case label_kind of
+      MLK_Initializer (LexicalFastString s) -> Just (True, s)
+      MLK_Finalizer (LexicalFastString s) -> Just (False, s)
+      _ -> Nothing
+    Just (CStubLabel {csl_is_initializer, csl_module, csl_name})
+  _ -> Nothing
+
+-- | Inject a 'CStubLabel' into a 'CLabel' as a 'ModuleLabel'.
+fromCStubLabel :: CStubLabel -> CLabel
+fromCStubLabel (CStubLabel {csl_is_initializer, csl_module, csl_name}) =
+  ModuleLabel csl_module (label_kind (LexicalFastString csl_name))
+  where
+    label_kind =
+      if csl_is_initializer
+      then MLK_Initializer
+      else MLK_Finalizer

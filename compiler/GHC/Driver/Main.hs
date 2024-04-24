@@ -959,6 +959,7 @@ loadByteCode iface mod_sum = do
     case mi_extra_decls iface of
       Just extra_decls -> do
           let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
+                   (mi_foreign iface)
           return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 --------------------------------------------------------------
@@ -980,29 +981,46 @@ initModDetails hsc_env iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
 
--- Hydrate any WholeCoreBindings linkables into BCOs
+-- | If the 'Linkable' contains Core bindings loaded from an interface, replace
+-- them with a lazy IO thunk that compiles them to bytecode and foreign objects.
+--
+-- The laziness is necessary because this value is stored purely in a
+-- 'HomeModLinkable' in the home package table, rather than some dedicated
+-- mutable state that would generate bytecode on demand, so we have to call this
+-- function even when we don't know that we'll need the bytecode.
+--
+-- In addition, the laziness has to be hidden inside 'LazyBCOs' because
+-- 'Linkable' is used too generally, so that looking at the constructor to
+-- decide whether to discard it when linking native code would force the thunk
+-- otherwise, incurring a significant performance penalty.
+--
+-- This is sound because generateByteCode just depends on things already loaded
+-- in the interface file.
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (Linkable utc_time this_mod uls) = Linkable utc_time this_mod <$> mapM go uls
+initWholeCoreBindings hsc_env mod_iface details (Linkable utc_time this_mod uls) =
+  Linkable utc_time this_mod <$> mapM go uls
   where
-    go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+    go (CoreBindings wcb@WholeCoreBindings {wcb_foreign, wcb_mod_location}) = do
         types_var <- newIORef (md_types details)
-        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        -- The bytecode generation itself is lazy because otherwise even when doing
-        -- recompilation checking the bytecode will be generated (which slows things down a lot)
-        -- the laziness is OK because generateByteCode just depends on things already loaded
-        -- in the interface file.
-        LazyBCOs <$> (unsafeInterleaveIO $ do
-                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
-                  -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
-                  -- reports a bug.
-                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
-                  trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
-                  generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
+        let act hpt = addToHpt hpt (moduleName $ mi_module mod_iface)
+                      (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+            kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
+            hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        ~(bcos, fos) <- unsafeInterleaveIO $ do
+          core_binds <- initIfaceCheck (text "l") hsc_env' $
+                        typecheckWholeCoreBindings types_var wcb
+          (stubs, foreign_files) <-
+            decodeIfaceForeign logger (hsc_tmpfs hsc_env)
+            (tmpDir (hsc_dflags hsc_env)) wcb_foreign
+          let cgi_guts = CgInteractiveGuts this_mod core_binds
+                         (typeEnvTyCons (md_types details)) stubs foreign_files
+                         Nothing []
+          trace_if logger (text "Generating ByteCode for" <+> ppr this_mod)
+          generateByteCode hsc_env cgi_guts wcb_mod_location
+        pure (LazyBCOs bcos fos)
     go ul = return ul
+
+    logger = hsc_logger hsc_env
 
 {-
 Note [ModDetails and --make mode]
@@ -1970,13 +1988,14 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_binds  :: CoreProgram
                                            , cgi_tycons :: [TyCon]
                                            , cgi_foreign :: ForeignStubs
+                                           , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
@@ -2026,20 +2045,18 @@ hscInteractive hsc_env cgguts location = do
         <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc)
 
+-- | Compile Core bindings and foreign inputs that were loaded from an
+-- interface, to produce bytecode and potential foreign objects for the purpose
+-- of linking splices.
 generateByteCode :: HscEnv
   -> CgInteractiveGuts
   -> ModLocation
-  -> IO (NonEmpty LinkablePart)
+  -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
   (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
-
-  stub_o <- case hasStub of
-            Nothing -> return []
-            Just stub_c -> do
-                stub_o <- compileForeign hsc_env LangC stub_c
-                return [DotO stub_o]
-
-  return (BCOs comp_bc :| stub_o)
+  stub_o <- traverse (compileForeign hsc_env LangC) hasStub
+  foreign_files_o <- traverse (uncurry (compileForeign hsc_env)) (cgi_foreign_files cgguts)
+  pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
 
 generateFreshByteCode :: HscEnv
   -> ModuleName
@@ -2048,8 +2065,11 @@ generateFreshByteCode :: HscEnv
   -> IO Linkable
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
   bco_time <- getCurrentTime
-  bco <- generateByteCode hsc_env cgguts mod_location
-  return $! Linkable bco_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) bco
+  (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
+  return $!
+    Linkable bco_time
+    (mkHomeModule (hsc_home_unit hsc_env) mod_name)
+    (BCOs bcos :| [DotO fo ForeignObject | fo <- fos])
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2735,10 +2755,9 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     deps <- getLinkDeps link_opts interp pls srcspan needed_mods
     -- We update the LinkerState even if the JS interpreter maintains its linker
     -- state independently to load new objects here.
-    let (objs, _bcos) = partition linkableIsNativeCodeOnly
-                          (concatMap partitionLinkable (ldNeededLinkables deps))
 
-    let (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
+    let objs = mapMaybe linkableFilterNative (ldNeededLinkables deps)
+        (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
 
     -- FIXME: we should make the JS linker load new_objs here, instead of
     -- on-demand.
