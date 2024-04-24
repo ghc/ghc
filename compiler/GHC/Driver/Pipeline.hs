@@ -96,6 +96,7 @@ import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
 import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
+import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -795,9 +796,7 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
   else
     case result of
       HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
-      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing) <*> pure emptyHomeModInfoLinkable
-    -- TODO: Why is there not a linkable?
-    -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing NoStubs []) <*> pure emptyHomeModInfoLinkable
 
 hscGenBackendPipeline :: P m
   => PipeEnv
@@ -816,9 +815,9 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       -- No object file produced, bytecode or NoBackend
       Nothing -> return mlinkable
       Just o_fp -> do
-        part_time <- liftIO (liftIO getCurrentTime)
-        final_part <- DotO <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
-        let !linkable = Linkable part_time (ms_mod mod_sum) (NE.singleton final_part)
+        part_time <- liftIO getCurrentTime
+        final_object <- use (T_MergeForeign pipe_env hsc_env o_fp fos)
+        let !linkable = Linkable part_time (ms_mod mod_sum) (NE.singleton (DotO final_object ModuleObject))
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
   return (miface, final_linkable)
@@ -930,7 +929,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
-   objFromLinkable (_, homeMod_object -> Just (Linkable _ _ (DotO lnk :| []))) = Just lnk
+   objFromLinkable (_, homeMod_object -> Just (Linkable _ _ (DotO lnk _ :| []))) = Just lnk
    objFromLinkable _ = Nothing
 
    fromPhase :: P m => Phase -> m (Maybe FilePath)
