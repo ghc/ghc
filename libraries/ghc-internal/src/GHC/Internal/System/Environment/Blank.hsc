@@ -109,6 +109,13 @@ getEnvDefault name fallback = fromMaybe fallback <$> getEnv name
 -- | Like 'GHC.Internal.System.Environment.setEnv', but allows blank environment values
 -- and mimics the function signature of 'System.Posix.Env.setEnv' from the
 -- @unix@ package.
+--
+-- Beware that this function must not be executed concurrently
+-- with 'getEnv', 'lookupEnv', 'getEnvironment' and such. One thread
+-- reading environment variables at the same time with another one modifying them
+-- can result in a segfault, see
+-- [Setenv is not Thread Safe](https://www.evanjones.ca/setenv-is-not-thread-safe.html)
+-- for discussion.
 setEnv ::
   String {- ^ variable name  -} ->
   String {- ^ variable value -} ->
@@ -151,6 +158,13 @@ foreign import ccall unsafe "setenv"
 -- | Like 'GHC.Internal.System.Environment.unsetEnv', but allows for the removal of
 -- blank environment variables. May throw an exception if the underlying
 -- platform doesn't support unsetting of environment variables.
+--
+-- Beware that this function must not be executed concurrently
+-- with 'getEnv', 'lookupEnv', 'getEnvironment' and such. One thread
+-- reading environment variables at the same time with another one modifying them
+-- can result in a segfault, see
+-- [Setenv is not Thread Safe](https://www.evanjones.ca/setenv-is-not-thread-safe.html)
+-- for discussion.
 unsetEnv :: String -> IO ()
 #if defined(mingw32_HOST_OS)
 unsetEnv key = withCWString key $ \k -> do
