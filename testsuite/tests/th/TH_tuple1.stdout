@@ -3,8 +3,8 @@ GHC.Tuple.(,) 1 2 :: GHC.Tuple.Tuple2 GHC.Num.Integer.Integer
                                       GHC.Num.Integer.Integer
 SigE (AppE (ConE GHC.Tuple.MkSolo) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Solo) (ConT GHC.Num.Integer.Integer))
 GHC.Tuple.MkSolo 1 :: GHC.Tuple.Solo GHC.Num.Integer.Integer
-SigE (AppE (AppE (ConE GHC.Prim.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Prim.Tuple2#) (ConT GHC.Num.Integer.Integer)) (ConT GHC.Num.Integer.Integer))
-GHC.Prim.(#,#) 1 2 :: GHC.Prim.Tuple2# GHC.Num.Integer.Integer
-                                       GHC.Num.Integer.Integer
-SigE (AppE (ConE GHC.Prim.Solo#) (LitE (IntegerL 1))) (AppT (ConT GHC.Prim.Solo#) (ConT GHC.Num.Integer.Integer))
-GHC.Prim.Solo# 1 :: GHC.Prim.Solo# GHC.Num.Integer.Integer
+SigE (AppE (AppE (ConE GHC.Types.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Types.Tuple2#) (ConT GHC.Num.Integer.Integer)) (ConT GHC.Num.Integer.Integer))
+GHC.Types.(#,#) 1 2 :: GHC.Types.Tuple2# GHC.Num.Integer.Integer
+                                         GHC.Num.Integer.Integer
+SigE (AppE (ConE GHC.Types.(# #)) (LitE (IntegerL 1))) (AppT (ConT GHC.Types.Solo#) (ConT GHC.Num.Integer.Integer))
+GHC.Types.(# #) 1 :: GHC.Types.Solo# GHC.Num.Integer.Integer

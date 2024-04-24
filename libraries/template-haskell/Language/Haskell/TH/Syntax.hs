@@ -1924,14 +1924,18 @@ mk_tup_name n space boxed
       | boxed     = "("  ++ thing ++ ")"
       | otherwise = "(#" ++ thing ++ "#)"
     tup_occ | n == 0, space == TcClsName = if boxed then "Unit" else "Unit#"
-            | n == 1 = if boxed then solo else "Solo#"
+            | n == 1 = if boxed then solo else unboxed_solo
             | space == TcClsName = "Tuple" ++ show n ++ if boxed then "" else "#"
             | otherwise = withParens (replicate n_commas ',')
     n_commas = n - 1
-    tup_mod  = mkModName (if boxed then "GHC.Tuple" else "GHC.Prim")
+    tup_mod  = mkModName (if boxed then "GHC.Tuple" else "GHC.Types")
     solo
       | space == DataName = "MkSolo"
       | otherwise = "Solo"
+
+    unboxed_solo
+      | space == DataName = "(# #)"
+      | otherwise = "Solo#"
 
 -- Unboxed sum data and type constructors
 -- | Unboxed sum data constructor

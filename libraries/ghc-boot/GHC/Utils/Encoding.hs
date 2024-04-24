@@ -236,7 +236,6 @@ maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
                                  (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
                                  _                  -> Nothing
 maybe_tuple "()" = Just("Z0T")
-maybe_tuple "MkSolo" = Just("Z1T")
 maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
                                  (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
                                  _            -> Nothing
