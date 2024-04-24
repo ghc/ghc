@@ -2044,7 +2044,10 @@ generateByteCode hsc_env cgguts mod_location = do
   stub_o <- case hasStub of
             Nothing -> return []
             Just stub_c -> do
-                stub_o <- compileForeign hsc_env LangC stub_c
+                -- Always compile foreign stubs as shared objects so
+                -- they can be properly loaded later when the bytecode
+                -- is loaded.
+                stub_o <- compileForeign (hscUpdateFlags setDynamicNow hsc_env) LangC stub_c
                 return [DotO stub_o]
 
   let hs_unlinked = [BCOs comp_bc spt_entries]
