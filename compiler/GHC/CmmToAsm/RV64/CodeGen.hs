@@ -26,6 +26,7 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Monad
   ( NatM,
+    getBlockIdNat,
     getConfig,
     getDebugBlock,
     getFileId,
@@ -54,6 +55,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain (assert)
 
 -- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
@@ -476,6 +478,10 @@ getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i <
 getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
 
+getRegister' config platform (CmmMachOp (MO_AlignmentCheck align wordWidth) [e])
+  = do
+      reg <- getRegister' config platform e
+      addAlignmentCheck align wordWidth reg
 
 -- Generic case.
 getRegister' config plat expr =
@@ -1079,6 +1085,34 @@ truncateReg w w' r =
     ]
   where
     shift = 64 - widthInBits w'
+
+-- | Given a 'Register', produce a new 'Register' with an instruction block
+-- which will check the value for alignment. Used for @-falignment-sanitisation@.
+addAlignmentCheck :: Int -> Width -> Register -> NatM Register
+addAlignmentCheck align wordWidth reg = do
+  jumpReg <- getNewRegNat II64
+  cmpReg <- getNewRegNat II64
+  okayLblId <- getBlockIdNat
+
+  pure $ case reg of
+    Fixed fmt reg code -> Fixed fmt reg (code `appOL` check fmt jumpReg cmpReg okayLblId reg)
+    Any fmt f -> Any fmt (\reg -> f reg `appOL` check fmt jumpReg cmpReg okayLblId reg)
+  where
+    -- TODO: Reduce amount of parameters by making this a let binding
+    check :: Format -> Reg -> Reg -> BlockId -> Reg -> InstrBlock
+    check fmt jumpReg cmpReg okayLblId reg =
+      let width = formatToWidth fmt
+       in assert (not $ isFloatFormat fmt)
+            $ toOL
+              [ ann
+                  (text "Alignment check - alignment: " <> int align <> text ", word width: " <> text (show wordWidth))
+                  (AND (OpReg width cmpReg) (OpReg width reg) (OpImm $ ImmInt $ align - 1))
+                  , BCOND EQ (OpReg width cmpReg) zero (TBlock okayLblId)
+                  , COMMENT (text "Alignment check failed")
+                  , LDR II64 (OpReg W64 jumpReg) (OpImm $ ImmCLbl mkBadAlignmentLabel)
+                  , J (TReg jumpReg)
+                  , NEWBLOCK okayLblId
+              ]
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
