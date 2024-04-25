@@ -693,6 +693,9 @@ mightBeFunTy :: Type -> Bool
 -- AK: It would be nice to figure out and document the difference
 -- between this and isFunTy at some point.
 mightBeFunTy ty
+  -- Currently ghc has no unlifted functions.
+  | definitelyUnliftedType ty
+  = False
   | [BoxedRep _] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc

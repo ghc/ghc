@@ -1954,6 +1954,8 @@ isPiTy ty = case coreFullView ty of
   _           -> False
 
 -- | Is this a function?
+-- Note: `forall {b}. Show b => b -> IO b` will not be considered a function by this function.
+--       It would merely be a forall wrapping a function type.
 isFunTy :: Type -> Bool
 isFunTy ty
   | FunTy {} <- coreFullView ty = True

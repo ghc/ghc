@@ -1805,7 +1805,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                   if gopt Opt_ProfLateInlineCcs dflags then
                     LateCCNone
                   else if gopt Opt_ProfLateCcs dflags then
-                    LateCCAllBinds
+                    LateCCBinds
                   else if gopt Opt_ProfLateOverloadedCcs dflags then
                     LateCCOverloadedBinds
                   else

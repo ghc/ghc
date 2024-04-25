@@ -3,15 +3,17 @@ module GHC.Core.LateCC.TopLevelBinds where
 
 import GHC.Prelude
 
-import GHC.Core
--- import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 import GHC.Core.LateCC.Utils
+
+import GHC.Core
 import GHC.Core.Opt.Monad
 import GHC.Driver.DynFlags
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Unit.Module.ModGuts
+
+import Data.Maybe
 
 {- Note [Collecting late cost centres]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,7 +28,7 @@ us from collecting them here when we run this pass before tidy.
 
 Note [Adding late cost centres to top level bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The basic idea is very simple. For every top level binder
+The basic idea is very simple. For a top level binder
 `f = rhs` we compile it as if the user had written
 `f = {-# SCC f #-} rhs`.
 
@@ -36,6 +38,21 @@ before the cost centre will be included in the unfolding and
 might inhibit optimizations at the call site. For this reason
 we provide flags for both approaches as they have different
 tradeoffs.
+
+To reduce overhead we ignore workfree bindings because they don't contribute
+meaningfully to a performance profile. This reduces code size massively as it
+allows us to allocate definitions like `val = Just 32` at compile time instead
+of turning them into a CAF of the form `val = <scc val> let x = Just 32 in x` which
+would be the alternative.
+
+We make an exception for rhss with function types. This allows us to get
+cost centres on eta-reduced definitions like `f = g`. By putting a tick onto
+`f`s rhs we end up with
+
+    f = \eta1 eta2 ... etan ->
+        <scc f> g eta1 ... etan
+
+Which can make it easier to understand call graphs of an application.
 
 We also don't add a cost centre for any binder that is a constructor
 worker or wrapper. These will never meaningfully enrich the resulting
@@ -89,15 +106,20 @@ topLevelBindsCC pred core_bind =
 
     doBndr :: Id -> CoreExpr -> LateCCM s CoreExpr
     doBndr bndr rhs
-      -- Cost centres on constructor workers are pretty much useless
-      -- so we don't emit them if we are looking at the rhs of a constructor
-      -- binding.
-      | Just _ <- isDataConId_maybe bndr = pure rhs
-      | otherwise = if pred rhs then addCC bndr rhs else pure rhs
+      -- Not a constructor worker.
+      -- Cost centres on constructor workers are pretty much useless so we don't emit them
+      -- if we are looking at the rhs of a constructor binding.
+      | isNothing (isDataConId_maybe bndr)
+      , pred rhs
+      = addCC bndr rhs
+      | otherwise = pure rhs
 
     -- We want to put the cost centre below the lambda as we only care about
-    -- executions of the RHS.
+    -- executions of the RHS. Note that the lambdas might be hidden under ticks
+    -- or casts. So look through these as well.
     addCC :: Id -> CoreExpr -> LateCCM s CoreExpr
+    addCC bndr (Cast rhs co) = pure Cast <*> addCC bndr rhs <*> pure co
+    addCC bndr (Tick t rhs) = (Tick t) <$> addCC bndr rhs
     addCC bndr (Lam b rhs) = Lam b <$> addCC bndr rhs
     addCC bndr rhs = do
       let name = idName bndr
