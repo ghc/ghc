@@ -398,10 +398,12 @@ data EvalStatus_ a b
 
 instance Binary a => Binary (EvalStatus_ a b)
 
-data EvalBreakpoint =
-  EvalBreakpoint
-    Int -- ^ break index
-    String -- ^ ModuleName
+data EvalBreakpoint = EvalBreakpoint
+  { eb_tick_mod   :: String -- ^ Breakpoint tick module
+  , eb_tick_index :: Int    -- ^ Breakpoint tick index
+  , eb_info_mod   :: String -- ^ Breakpoint info module
+  , eb_info_index :: Int    -- ^ Breakpoint info index
+  }
   deriving (Generic, Show)
 
 instance Binary EvalBreakpoint

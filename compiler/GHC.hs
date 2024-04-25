@@ -157,14 +157,14 @@ module GHC (
         -- ** The debugger
         SingleStep(..),
         Resume(..),
-        History(historyBreakInfo, historyEnclosingDecls),
+        History(historyBreakpointId, historyEnclosingDecls),
         GHC.getHistorySpan, getHistoryModule,
         abandon, abandonAll,
         getResumeContext,
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
-        BreakInfo(..),
+        BreakpointId(..), InternalBreakpointId(..),
         GHC.Runtime.Eval.back,
         GHC.Runtime.Eval.forward,
         GHC.Runtime.Eval.setupBreakpoint,
@@ -392,7 +392,7 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
-import GHC.Types.BreakInfo
+import GHC.Types.Breakpoint
 import GHC.Types.PkgQual
 import GHC.Types.Unique.FM
 

@@ -72,6 +72,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.SourceError ( SourceError )
 import GHC.Types.Name
+import GHC.Types.Breakpoint
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
@@ -1408,15 +1409,13 @@ runAllocs m = do
     _ -> Nothing
 
 toBreakIdAndLocation :: GhciMonad m
-                     => Maybe GHC.BreakInfo -> m (Maybe (Int, BreakLocation))
+                     => Maybe GHC.InternalBreakpointId -> m (Maybe (Int, BreakLocation))
 toBreakIdAndLocation Nothing = return Nothing
 toBreakIdAndLocation (Just inf) = do
-  let md = GHC.breakInfo_module inf
-      nm = GHC.breakInfo_number inf
   st <- getGHCiState
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
-                                  breakModule loc == md,
-                                  breakTick loc == nm ]
+                                  breakModule loc == ibi_tick_mod inf,
+                                  breakTick loc == ibi_tick_index inf ]
 
 printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
 printStoppedAtBreakInfo res names = do
@@ -1544,15 +1543,11 @@ getCallStackAtCurrentBreakpoint = do
 getCurrentBreakModule :: GHC.GhcMonad m => m (Maybe Module)
 getCurrentBreakModule = do
   resumes <- GHC.getResumeContext
-  case resumes of
-    [] -> return Nothing
-    (r:_) -> do
-        let ix = GHC.resumeHistoryIx r
-        if ix == 0
-           then return (GHC.breakInfo_module `liftM` GHC.resumeBreakInfo r)
-           else do
-                let hist = GHC.resumeHistory r !! (ix-1)
-                return $ Just $ GHC.getHistoryModule  hist
+  return $ case resumes of
+    [] -> Nothing
+    (r:_) -> case GHC.resumeHistoryIx r of
+      0  -> ibi_tick_mod <$> GHC.resumeBreakpointId r
+      ix -> Just $ GHC.getHistoryModule $ GHC.resumeHistory r !! (ix-1)
 
 -----------------------------------------------------------------------------
 --
@@ -3474,7 +3469,7 @@ pprStopped res =
          <> text (GHC.resumeDecl res))
     <> char ',' <+> ppr (GHC.resumeSpan res)
  where
-  mb_mod_name = moduleName <$> GHC.breakInfo_module <$> GHC.resumeBreakInfo res
+  mb_mod_name = moduleName <$> ibi_tick_mod <$> GHC.resumeBreakpointId res
 
 showUnits :: GHC.GhcMonad m => m ()
 showUnits = do
@@ -4035,8 +4030,11 @@ ignoreCmd argLine = withSandboxOnly ":ignore" $ do
     case result of
       Left sdoc -> printForUser sdoc
       Right (loc, count)   -> do
-        let breakInfo = GHC.BreakInfo (breakModule loc) (breakTick loc)
-        setupBreakpoint breakInfo count
+        let bi = GHC.BreakpointId
+                  { bi_tick_mod   = breakModule loc
+                  , bi_tick_index = breakTick loc
+                  }
+        setupBreakpoint bi count
 
 ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int))
 ignoreSwitch [break, count] = do
@@ -4053,7 +4051,7 @@ getIgnoreCount str =
     where
       sdocIgnore = text "Ignore count" <+> quotes (text str)
 
-setupBreakpoint :: GhciMonad m => GHC.BreakInfo -> Int -> m()
+setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m()
 setupBreakpoint loc count = do
     hsc_env <- GHC.getSession
     GHC.setupBreakpoint hsc_env loc count
@@ -4542,7 +4540,7 @@ setBreakFlag :: GhciMonad m => Module -> Int -> Bool ->m ()
 setBreakFlag  md ix enaDisa = do
   let enaDisaToCount True = breakOn
       enaDisaToCount False = breakOff
-  setupBreakpoint (GHC.BreakInfo md ix) $ enaDisaToCount enaDisa
+  setupBreakpoint (GHC.BreakpointId md ix) $ enaDisaToCount enaDisa
 
 -- ---------------------------------------------------------------------------
 -- User code exception handling

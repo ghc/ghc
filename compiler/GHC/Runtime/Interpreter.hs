@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 
 -- | Interacting with the iserv interpreter, whether it is running on an
@@ -28,7 +27,7 @@ module GHC.Runtime.Interpreter
   , getClosure
   , getModBreaks
   , seqHValue
-  , evalBreakInfo
+  , evalBreakpointToId
   , interpreterDynamic
   , interpreterProfiled
 
@@ -74,7 +73,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.Types.BreakInfo (BreakInfo(..))
+import GHC.Types.Breakpoint
 import GHC.ByteCode.Types
 
 import GHC.Linker.Types
@@ -395,14 +394,15 @@ seqHValue interp unit_env ref =
     status <- interpCmd interp (Seq hval)
     handleSeqHValueStatus interp unit_env status
 
-evalBreakInfo :: HomePackageTable -> EvalBreakpoint -> BreakInfo
-evalBreakInfo hpt (EvalBreakpoint ix mod_name) =
-  BreakInfo modl ix
-  where
-    modl = mi_module $
-           hm_iface $
-           expectJust "evalBreakInfo" $
-           lookupHpt hpt (mkModuleName mod_name)
+evalBreakpointToId :: HomePackageTable -> EvalBreakpoint -> InternalBreakpointId
+evalBreakpointToId hpt eval_break =
+  let load_mod x = mi_module $ hm_iface $ expectJust "evalBreakpointToId" $ lookupHpt hpt (mkModuleName x)
+  in InternalBreakpointId
+        { ibi_tick_mod   = load_mod (eb_tick_mod eval_break)
+        , ibi_tick_index = eb_tick_index eval_break
+        , ibi_info_mod   = load_mod (eb_info_mod eval_break)
+        , ibi_info_index = eb_info_index eval_break
+        }
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
@@ -412,7 +412,7 @@ handleSeqHValueStatus interp unit_env eval_status =
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      let bp = evalBreakInfo (ue_hpt unit_env) <$> maybe_break
+      let bp = evalBreakpointToId (ue_hpt unit_env) <$> maybe_break
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
             (showSDocUnsafe $ sdocBpLoc bp))
@@ -422,14 +422,15 @@ handleSeqHValueStatus interp unit_env eval_status =
         handleSeqHValueStatus interp unit_env status
     (EvalComplete _ r) -> return r
   where
-    getSeqBpSpan :: Maybe BreakInfo -> SrcSpan
-    -- Just case: Stopped at a breakpoint, extract SrcSpan information
-    -- from the breakpoint.
-    getSeqBpSpan (Just BreakInfo{..}) =
-      (modBreaks_locs (breaks breakInfo_module)) ! breakInfo_number
-    -- Nothing case - should not occur!
-    -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
-    getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
+    getSeqBpSpan :: Maybe InternalBreakpointId -> SrcSpan
+    getSeqBpSpan = \case
+      Just bi -> (modBreaks_locs (breaks (ibi_tick_mod bi))) ! ibi_tick_index bi
+        -- Just case: Stopped at a breakpoint, extract SrcSpan information
+        -- from the breakpoint.
+      Nothing -> mkGeneralSrcSpan (fsLit "<unknown>")
+        -- Nothing case - should not occur!
+        -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
+        --
     breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
       lookupHpt (ue_hpt unit_env) (moduleName mod)
 

@@ -206,7 +206,11 @@ data BCInstr
                    -- Note [unboxed tuple bytecodes and tuple_BCO] in GHC.StgToByteCode
 
    -- Breakpoints
-   | BRK_FUN          (ForeignRef BreakArray) !Word16 (RemotePtr ModuleName)
+   | BRK_FUN          (ForeignRef BreakArray)
+                      (RemotePtr ModuleName) -- breakpoint tick module
+                      !Word16                -- breakpoint tick index
+                      (RemotePtr ModuleName) -- breakpoint info module
+                      !Word16                -- breakpoint info index
                       (RemotePtr CostCentre)
 
 -- -----------------------------------------------------------------------------
@@ -358,8 +362,11 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
-   ppr (BRK_FUN _ index _ _) = text "BRK_FUN" <+> text "<breakarray>"
-                               <+> ppr index <+> text "<module>" <+> text "<cc>"
+   ppr (BRK_FUN _ _tick_mod tickx _info_mod infox _)
+                             = text "BRK_FUN" <+> text "<breakarray>"
+                               <+> text "<tick_module>" <+> ppr tickx
+                               <+> text "<info_module>" <+> ppr infox
+                               <+> text "<cc>"
 
 
 

@@ -329,7 +329,7 @@ withBreakAction opts breakMVar statusMVar act
         -- as soon as it is hit, or in resetBreakAction below.
 
    onBreak :: BreakpointCallback
-   onBreak ix# mod_name# is_exception apStack = do
+   onBreak tick_mod# tickx# info_mod# infox# is_exception apStack = do
      tid <- myThreadId
      let resume = ResumeContext
            { resumeBreakMVar = breakMVar
@@ -342,8 +342,9 @@ withBreakAction opts breakMVar statusMVar act
        if is_exception
        then pure Nothing
        else do
-         mod_name <- peekCString (Ptr mod_name#)
-         pure (Just (EvalBreakpoint (I# ix#) mod_name))
+         tick_mod <- peekCString (Ptr tick_mod#)
+         info_mod <- peekCString (Ptr info_mod#)
+         pure (Just (EvalBreakpoint tick_mod (I# tickx#) info_mod (I# infox#)))
      putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
      takeMVar breakMVar
 
@@ -392,8 +393,10 @@ resetStepFlag :: IO ()
 resetStepFlag = poke stepFlag 0
 
 type BreakpointCallback
-     = Int#    -- the breakpoint index
-    -> Addr#   -- pointer to the module name
+     = Addr#   -- pointer to the breakpoint tick module name
+    -> Int#    -- breakpoint tick index
+    -> Addr#   -- pointer to the breakpoint info module name
+    -> Int#    -- breakpoint info index
     -> Bool    -- exception?
     -> HValue  -- the AP_STACK, or exception
     -> IO ()
@@ -405,8 +408,8 @@ noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 
 noBreakAction :: BreakpointCallback
-noBreakAction _ _ False _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction _ _ True  _ = return () -- exception: just continue
+noBreakAction _ _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
+noBreakAction _ _ _ _ True  _ = return () -- exception: just continue
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.
