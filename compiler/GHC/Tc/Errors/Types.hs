@@ -3503,7 +3503,7 @@ data TcRnMessage where
   -}
   TcRnAbstractClosedTyFamDecl :: TcRnMessage
 
-  {-| TcRnPartialFieldSelector is a warning indicating that a record selector
+  {-| TcRnPartialFieldSelector is a warning indicating that a record field
     was not defined for all constructors of a data type.
 
     Test cases:
