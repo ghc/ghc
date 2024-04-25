@@ -1,3 +1,4 @@
 
 DRFPartialFields.hs:4:17: error: [GHC-82712] [-Wpartial-fields, Werror=partial-fields]
-    Use of partial record field selector: ‘foo’
+    Definition of partial record field: ‘foo’
+    Record selection and update using this field will be partial.

@@ -2154,7 +2154,7 @@ of ``-W(no-)*``.
 
     The option :ghc-flag:`-Wpartial-fields` warns about a record field
     ``f`` that is defined in some, but not all, of the constructors of a
-    data type, as such selector functions are partial. For example, when
+    data type, as record selection and update will be partial. For example, when
     :ghc-flag:`-Wpartial-fields` is enabled the compiler will emit a warning at
     the definition of ``Foo`` below: ::
 
@@ -2164,8 +2164,9 @@ of ``-W(no-)*``.
 
         data Foo = Foo { _f :: Int } | Bar
 
-    Another related warning is :ghc-flag:`-Wincomplete-record-selectors`,
-    which warns at use sites rather than definition sites.
+    Related warnings are :ghc-flag:`-Wincomplete-record-selectors` and
+    :ghc-flag:`-Wincomplete-record-updates`,
+    which warn at use sites rather than definition sites.
 
 .. ghc-flag:: -Wunused-packages
     :shortdesc: warn when package is requested on command line, but not needed.

@@ -1501,8 +1501,9 @@ instance Diagnostic TcRnMessage where
       text "You may define an abstract closed type family" $$
       text "only in a .hs-boot file"
     TcRnPartialFieldSelector fld -> mkSimpleDecorated $
-      sep [text "Use of partial record field selector" <> colon,
-           nest 2 $ quotes (ppr (occName fld))]
+      vcat [ sep [ text "Definition of partial record field" <> colon
+                 , nest 2 $ quotes (ppr (occName fld)) ]
+           , text "Record selection and update using this field will be partial." ]
     TcRnHasFieldResolvedIncomplete name -> mkSimpleDecorated $
       text "The invocation of `getField` on the record field" <+> quotes (ppr name)
       <+> text "may produce an error since it is not defined for all data constructors"
