@@ -468,7 +468,8 @@ pprInstr platform instr = case instr of
   -- 2. Bit Manipulation Instructions ------------------------------------------
 
   -- 3. Logical and Move Instructions ------------------------------------------
-  AND o1 o2 o3  -> op3 (text "\tand") o1 o2 o3
+  AND o1 o2 o3 | isImmOp o3 -> op3 (text "\tandi") o1 o2 o3
+               | otherwise  -> op3 (text "\tand") o1 o2 o3
   OR o1 o2 o3   -> op3 (text "\tor") o1 o2 o3
   ASR o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
   ASR o1 o2 o3  -> op3 (text "\tsra") o1 o2 o3
