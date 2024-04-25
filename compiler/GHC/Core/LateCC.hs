@@ -21,6 +21,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
+import GHC.Types.RepType (mightBeFunTy)
 
 -- | Late cost center insertion logic used by the driver
 addLateCostCenters ::
@@ -78,8 +79,11 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
     top_level_cc_pred :: CoreExpr -> Bool
     top_level_cc_pred =
         case lateCCConfig_whichBinds of
-          LateCCAllBinds ->
-            const True
+          LateCCBinds -> \rhs ->
+            -- Make sure we record any functions. Even if it's something like `f = g`.
+            mightBeFunTy (exprType rhs) ||
+            -- If the RHS is a CAF doing work also insert a CC.
+            not (exprIsWorkFree rhs)
           LateCCOverloadedBinds ->
             isOverloadedTy . exprType
           LateCCNone ->

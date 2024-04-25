@@ -34,6 +34,16 @@ See ``Note [The importance of tracking free coercion variables]``
 in ``GHC.Core.TyCo.Rep``, :ref:`constraint-solving-with-plugins`
 and the migration guide.
 
+- The flag `-fprof-late` will no longer prevent top level constructors from being statically allocated.
+
+  It used to be the case that we would add a cost centre for bindings like `foo = Just bar`.
+  This turned the binding into a caf that would allocate the constructor on first evaluation.
+
+  However without the cost centre `foo` can be allocated at compile time. This reduces code-bloat and
+  reduces overhead for short-running applications.
+
+  The tradeoff is that calling `whoCreated` on top level value definitions like `foo` will be less informative.
+
 
 GHCi
 ~~~~
