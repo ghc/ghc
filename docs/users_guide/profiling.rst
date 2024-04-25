@@ -483,10 +483,12 @@ of your profiled program will be different to that of the unprofiled one.
 
     :since: 9.4.1
 
-    Adds an automatic ``SCC`` annotation to all top level bindings late in the compilation pipeline after
-    the optimizer has run and unfoldings have been created. This means these cost centres will not interfere with core-level optimizations
+    Adds an automatic ``SCC`` annotation to all top level bindings which might perform work.
+    This is done late in the compilation pipeline after the optimizer has run and unfoldings have been created.
+    This means these cost centres will not interfere with core-level optimizations
     and the resulting profile will be closer to the performance profile of an optimized non-profiled
     executable.
+
     While the results of this are generally informative, some of the compiler internal names
     will leak into the profile. Further if a function is inlined into a use site it's costs will be counted against the
     caller's cost center.

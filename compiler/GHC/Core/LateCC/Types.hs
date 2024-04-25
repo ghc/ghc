@@ -34,7 +34,7 @@ data LateCCConfig =
 -- | The types of top-level bindings we support adding cost centers to.
 data LateCCBindSpec =
       LateCCNone
-    | LateCCAllBinds
+    | LateCCBinds
     | LateCCOverloadedBinds
 
 -- | Late cost centre insertion environment
