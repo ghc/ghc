@@ -535,15 +535,19 @@ retry_pop_stack:
             // be per-thread.
             CInt[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");
-            Sp = Sp - WDS(9);
-            Sp(8) = exception;
-            Sp(7) = stg_raise_ret_info;
-            Sp(6) = exception;
-            Sp(5) = ghczmprim_GHCziTypes_True_closure; // True <=> an exception
-            Sp(4) = stg_ap_ppv_info;
-            Sp(3) = 0;
-            Sp(2) = stg_ap_n_info;
-            Sp(1) = 0;
+            Sp = Sp - WDS(13);
+            Sp(12) = exception;
+            Sp(11) = stg_raise_ret_info;
+            Sp(10) = exception;
+            Sp(9)  = ghczmprim_GHCziTypes_True_closure; // True <=> an exception
+            Sp(8)  = stg_ap_ppv_info;
+            Sp(7)  = 0;
+            Sp(6)  = stg_ap_n_info;
+            Sp(5)  = 0;
+            Sp(4)  = stg_ap_n_info;
+            Sp(3)  = 0;
+            Sp(2)  = stg_ap_n_info;
+            Sp(1)  = 0;
             R1 = ioAction;
             jump RET_LBL(stg_ap_n) [R1];
         }

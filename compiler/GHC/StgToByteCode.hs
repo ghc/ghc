@@ -383,27 +383,40 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs mod) rhs) = do
+schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
-  current_mod_breaks <- getCurrentModBreaks
-  case break_info hsc_env mod current_mod current_mod_breaks of
+  mb_current_mod_breaks <- getCurrentModBreaks
+  case mb_current_mod_breaks of
+    -- if we're not generating ModBreaks for this module for some reason, we
+    -- can't store breakpoint occurrence information.
     Nothing -> pure code
-    Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr, modBreaks_ccs = cc_arr} -> do
-      platform <- profilePlatform <$> getProfile
-      let idOffSets = getVarOffSets platform d p fvs
-          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-          breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
-      newBreakInfo tick_no breakInfo
-      let cc | Just interp <- hsc_interp hsc_env
-            , interpreterProfiled interp
-            = cc_arr ! tick_no
-            | otherwise = toRemotePtr nullPtr
-          breakInstr = BRK_FUN breaks (fromIntegral tick_no) mod_ptr cc
-      return $ breakInstr `consOL` code
+    Just current_mod_breaks -> case break_info hsc_env tick_mod current_mod mb_current_mod_breaks of
+      Nothing -> pure code
+      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_ccs = cc_arr} -> do
+        platform <- profilePlatform <$> getProfile
+        let idOffSets = getVarOffSets platform d p fvs
+            ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+            toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+            toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+
+        let info_mod_ptr = modBreaks_module current_mod_breaks
+        infox <- newBreakInfo breakInfo
+
+        let cc | Just interp <- hsc_interp hsc_env
+              , interpreterProfiled interp
+              = cc_arr ! tick_no
+              | otherwise = toRemotePtr nullPtr
+
+        let -- cast that checks that round-tripping through Word16 doesn't change the value
+            toW16 x = let r = fromIntegral x :: Word16
+                      in if fromIntegral r == x
+                        then r
+                        else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
+            breakInstr = BRK_FUN breaks tick_mod_ptr (toW16 tick_no) info_mod_ptr (toW16 infox) cc
+        return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 -- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
@@ -2188,7 +2201,12 @@ data BcM_State
         , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
                                          -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
-        , breakInfo   :: IntMap CgBreakInfo
+
+        , breakInfo   :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
+                                            -- Indexed with breakpoint *info* index.
+                                            -- See Note [Breakpoint identifiers]
+                                            -- in GHC.Types.Breakpoint
+        , breakInfoIdx :: !Int              -- ^ Next index for breakInfo array
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
@@ -2202,7 +2220,7 @@ runBc :: HscEnv -> Module -> Maybe ModBreaks
       -> BcM r
       -> IO (BcM_State, r)
 runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty)
+   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty 0)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2258,9 +2276,14 @@ getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
                  in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
-newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
-newBreakInfo ix info = BcM $ \st ->
-  return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
+newBreakInfo :: CgBreakInfo -> BcM Int
+newBreakInfo info = BcM $ \st ->
+  let ix = breakInfoIdx st
+      st' = st
+              { breakInfo = IntMap.insert ix info (breakInfo st)
+              , breakInfoIdx = ix + 1
+              }
+  in return (st', ix)
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)

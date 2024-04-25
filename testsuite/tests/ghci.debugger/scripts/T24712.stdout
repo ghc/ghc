@@ -1,0 +1,4 @@
+Breakpoint 0 activated at T24712.hs:2:9-15
+Stopped in Main.foo, T24712.hs:2:9-15
+_result :: IO () = _
+n :: Integer = 123

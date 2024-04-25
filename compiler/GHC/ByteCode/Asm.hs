@@ -513,11 +513,16 @@ assembleI platform i = case i of
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
-  BRK_FUN arr index mod cc -> do p1 <- ptr (BCOPtrBreakArray arr)
-                                 m <- addr mod
+  BRK_FUN arr tick_mod tickx info_mod infox cc ->
+                              do p1 <- ptr (BCOPtrBreakArray arr)
+                                 tick_addr <- addr tick_mod
+                                 info_addr <- addr info_mod
                                  np <- addr cc
-                                 emit bci_BRK_FUN [Op p1, SmallOp index,
-                                                   Op m, Op np]
+                                 emit bci_BRK_FUN [ Op p1
+                                                  , Op tick_addr, Op info_addr
+                                                  , SmallOp tickx, SmallOp infox
+                                                  , Op np
+                                                  ]
 
   where
     literal (LitLabel fs (Just sz) _)

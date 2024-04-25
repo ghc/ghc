@@ -19,7 +19,7 @@ import GHCi.Message (EvalExpr, ResumeContext)
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Types.BreakInfo
+import GHC.Types.Breakpoint
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Utils.Exception
@@ -50,8 +50,8 @@ data ExecResult
        , execAllocation :: Word64
        }
   | ExecBreak
-       { breakNames :: [Name]
-       , breakInfo :: Maybe BreakInfo
+       { breakNames   :: [Name]
+       , breakPointId :: Maybe InternalBreakpointId
        }
 
 -- | Essentially a GlobalRdrEnv, but with additional cached values to allow
@@ -73,11 +73,10 @@ data Resume = Resume
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get
                                         -- value of the free variables.
-       , resumeBreakInfo :: Maybe BreakInfo
-                                        -- the breakpoint we stopped at
-                                        -- (module, index)
+       , resumeBreakpointId :: Maybe InternalBreakpointId
+                                        -- ^ the breakpoint we stopped at
                                         -- (Nothing <=> exception)
-       , resumeSpan      :: SrcSpan      -- just a copy of the SrcSpan
+       , resumeSpan      :: SrcSpan     -- just a copy of the SrcSpan
                                         -- from the ModBreaks,
                                         -- otherwise it's a pain to
                                         -- fetch the ModDetails &
@@ -90,9 +89,8 @@ data Resume = Resume
 
 type ResumeBindings = ([TyThing], IcGlobalRdrEnv)
 
-data History
-   = History {
-        historyApStack   :: ForeignHValue,
-        historyBreakInfo :: BreakInfo,
-        historyEnclosingDecls :: [String]  -- declarations enclosing the breakpoint
-   }
+data History = History
+  { historyApStack        :: ForeignHValue
+  , historyBreakpointId   :: InternalBreakpointId -- ^ breakpoint identifier
+  , historyEnclosingDecls :: [String]             -- ^ declarations enclosing the breakpoint
+  }

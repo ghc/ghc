@@ -1,0 +1,3 @@
+:l T24712.hs
+:b foo
+main
