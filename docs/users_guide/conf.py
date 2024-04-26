@@ -202,6 +202,10 @@ def parse_flag(env, sig, signode):
     # Reference name left unchanged
     return sig
 
+def isascii(c):
+    """ N.B. str.isascii isn't available until Python 3.7 """
+    return ord(c) < 128
+
 def haddock_role(lib):
     """
     For instance,
@@ -241,7 +245,7 @@ def haddock_role(lib):
             # Escape any symbols in the identifier;
             # see also Haddock.Utils.makeAnchorId
             def escapeChar(c):
-                if (c in ':_.') or (c.isascii() and c.isalnum()):
+                if (c in ':_.') or (isascii(c) and c.isalnum()):
                     return c
                 return '-%d-' % ord(c)
             thing = ''.join(escapeChar(c) for c in thing)
