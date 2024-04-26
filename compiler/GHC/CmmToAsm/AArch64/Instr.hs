@@ -100,6 +100,8 @@ regUsageOfInstr platform instr = case instr of
   UXTB dst src             -> usage (regOp src, regOp dst)
   SXTH dst src             -> usage (regOp src, regOp dst)
   UXTH dst src             -> usage (regOp src, regOp dst)
+  CLZ  dst src             -> usage (regOp src, regOp dst)
+  RBIT dst src             -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -139,7 +141,8 @@ regUsageOfInstr platform instr = case instr of
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
-  _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
+  LOCATION{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
+  NEWBLOCK{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
 
   where
         -- filtering the usage is necessary, otherwise the register
@@ -233,6 +236,8 @@ patchRegsOfInstr instr env = case instr of
     UXTB o1 o2       -> UXTB (patchOp o1) (patchOp o2)
     SXTH o1 o2       -> SXTH (patchOp o1) (patchOp o2)
     UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
+    CLZ o1 o2        -> CLZ  (patchOp o1) (patchOp o2)
+    RBIT o1 o2       -> RBIT  (patchOp o1) (patchOp o2)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -274,7 +279,8 @@ patchRegsOfInstr instr env = case instr of
     FMA s o1 o2 o3 o4 ->
       FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
 
-    _              -> panic $ "patchRegsOfInstr: " ++ instrCon instr
+    NEWBLOCK{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
+    LOCATION{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
@@ -589,6 +595,8 @@ data Instr
     -- Signed/Unsigned bitfield extract
     | SBFX Operand Operand Operand Operand -- rd = rn[i,j]
     | UBFX Operand Operand Operand Operand -- rd = rn[i,j]
+    | CLZ  Operand Operand -- rd = countLeadingZeros(rn)
+    | RBIT Operand Operand -- rd = reverseBits(rn)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     | AND Operand Operand Operand -- rd = rn & op2
@@ -672,6 +680,8 @@ instrCon i =
       UBFM{} -> "UBFM"
       SBFX{} -> "SBFX"
       UBFX{} -> "UBFX"
+      CLZ{} -> "CLZ"
+      RBIT{} -> "RBIT"
       AND{} -> "AND"
       ASR{} -> "ASR"
       EOR{} -> "EOR"

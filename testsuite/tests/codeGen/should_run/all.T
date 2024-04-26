@@ -249,3 +249,4 @@ test('T24664b', normal, compile_and_run, ['-O'])
 test('T23034', [req_c
                , when(arch('x86_64') and opsys('darwin'), expect_broken(25018))
                ], compile_and_run, ['-O2 T23034_c.c'])
+test('CtzClz0', normal, compile_and_run, [''])

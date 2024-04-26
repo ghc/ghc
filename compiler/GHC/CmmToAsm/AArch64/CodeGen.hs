@@ -1755,6 +1755,137 @@ genCCall target dest_regs arg_regs bid = do
                   truncateReg W64 w lo
                   , Nothing)
           | otherwise -> unsupported (MO_U_Mul2  w)
+    PrimTarget (MO_Clz  w)
+          | w == W64 || w == W32
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst_reg = getRegisterReg platform (CmmLocal dst)
+              return (
+                  code_x `snocOL`
+                  CLZ   (OpReg w dst_reg) (OpReg w reg_a)
+                  , Nothing)
+          | w == W16
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = clz(x << 16 | 0x0000_8000) -}
+              return (
+                  code_x `appOL` toOL
+                    [ LSL (r dst') (r reg_a) (imm 16)
+                    , ORR (r dst') (r dst')  (imm 0x00008000)
+                    , CLZ (r dst') (r dst')
+                    ]
+                  , Nothing)
+          | w == W8
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = clz(x << 24 | 0x0080_0000) -}
+              return (
+                  code_x `appOL` toOL
+                    [ LSL (r dst') (r reg_a) (imm 24)
+                    , ORR (r dst') (r dst')  (imm 0x00800000)
+                    , CLZ (r dst') (r dst')
+                    ]
+                  , Nothing)
+            | otherwise -> unsupported (MO_Clz  w)
+    PrimTarget (MO_Ctz  w)
+          | w == W64 || w == W32
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst_reg = getRegisterReg platform (CmmLocal dst)
+              return (
+                  code_x `snocOL`
+                  RBIT (OpReg w dst_reg) (OpReg w reg_a) `snocOL`
+                  CLZ  (OpReg w dst_reg) (OpReg w dst_reg)
+                  , Nothing)
+          | w == W16
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = clz(reverseBits(x) | 0x0000_8000) -}
+              return (
+                  code_x `appOL` toOL
+                    [ RBIT (r dst') (r reg_a)
+                    , ORR  (r dst') (r dst') (imm 0x00008000)
+                    , CLZ  (r dst') (r dst')
+                    ]
+                  , Nothing)
+          | w == W8
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = clz(reverseBits(x) | 0x0080_0000) -}
+              return (
+                  code_x `appOL` toOL
+                    [ RBIT (r dst') (r reg_a)
+                    , ORR (r dst')  (r dst') (imm 0x00800000)
+                    , CLZ  (r dst')  (r dst')
+                    ]
+                  , Nothing)
+            | otherwise -> unsupported (MO_Ctz  w)
+    PrimTarget (MO_BRev  w)
+          | w == W64 || w == W32
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst_reg = getRegisterReg platform (CmmLocal dst)
+              return (
+                  code_x `snocOL`
+                  RBIT (OpReg w dst_reg) (OpReg w reg_a)
+                  , Nothing)
+          | w == W16
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = reverseBits32(x << 16) -}
+              return (
+                  code_x `appOL` toOL
+                    [ LSL  (r dst') (r reg_a) (imm 16)
+                    , RBIT (r dst') (r dst')
+                    ]
+                  , Nothing)
+          | w == W8
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+                  imm n = OpImm (ImmInt n)
+              {- dst = reverseBits32(x << 24) -}
+              return (
+                  code_x `appOL` toOL
+                    [ LSL  (r dst') (r reg_a) (imm 24)
+                    , RBIT (r dst') (r dst')
+                    ]
+                  , Nothing)
+            | otherwise -> unsupported (MO_BRev  w)
 
 
     -- or a possibly side-effecting machine operation
@@ -1881,10 +2012,7 @@ genCCall target dest_regs arg_regs bid = do
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
-        MO_Clz w            -> mkCCall (clzLabel w)
-        MO_Ctz w            -> mkCCall (ctzLabel w)
         MO_BSwap w          -> mkCCall (bSwapLabel w)
-        MO_BRev w           -> mkCCall (bRevLabel w)
 
         -- -- Atomic read-modify-write.
         MO_AtomicRead w ord
