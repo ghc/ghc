@@ -2354,45 +2354,49 @@ we are optimizing away 'lazy' (see Note [lazyId magic], and also
 'cpeRhsE'.)  Then, we could have started with:
 
      let x :: ()
-         x = lazy @ () y
+         x = lazy @() y
 
-which is a perfectly fine, non-trivial thunk, but then CorePrep will
-drop 'lazy', giving us 'x = y' which is trivial and impermissible.
-The solution is CorePrep to have a miniature inlining pass which deals
-with cases like this.  We can then drop the let-binding altogether.
+which is a perfectly fine, non-trivial thunk, but then CorePrep will drop
+'lazy', giving us 'x = y' which is trivial and impermissible.  The solution is
+CorePrep to have a miniature inlining pass which deals with cases like this.
+We can then drop the let-binding altogether.
 
-Why does the removal of 'lazy' have to occur in CorePrep?
-The gory details are in Note [lazyId magic] in GHC.Types.Id.Make, but the
-main reason is that lazy must appear in unfoldings (optimizer
-output) and it must prevent call-by-value for catch# (which
-is implemented by CorePrep.)
+Why does the removal of 'lazy' have to occur in CorePrep?  The gory details
+are in Note [lazyId magic] in GHC.Types.Id.Make, but the main reason is that
+lazy must appear in unfoldings (optimizer output) and it must prevent
+call-by-value for catch# (which is implemented by CorePrep.)
 
-An alternate strategy for solving this problem is to have the
-inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
-We decided not to adopt this solution to keep the definition
-of 'exprIsTrivial' simple.
+An alternate strategy for solving this problem is to have the inliner treat
+'lazy e' as a trivial expression if 'e' is trivial.  We decided not to adopt
+this solution to keep the definition of 'exprIsTrivial' simple.
 
 There is ONE caveat however: for top-level bindings we have
 to preserve the binding so that we float the (hacky) non-recursive
 binding for data constructors; see Note [Data constructor workers].
 
-Note [CorePrep inlines trivial CoreExpr not Id]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO
-Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
-IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
-as per Note [Inlining in CorePrep] always have the form
-'lazy @ SomeType gbl_id'.  But this is not true: the following is
-perfectly reasonable Core:
+Note [CorePrepEnv: cpe_subst]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CorePrepEnv carries a substitution `Subst` in the `cpe_subst1 field,
+for these reasons:
 
-     let x :: ()
-         x = lazy @ (forall a. a) y @ Bool
+1. To support cloning of local Ids so that they are
+   all unique (see Note [Cloning in CorePrep])
 
-When we inline 'x' after eliminating 'lazy', we need to replace
-occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
-this can easily arise with higher-rank types; thus, cpe_env must
-map to CoreExprs, not Ids.
+2. To support beta-reduction of runRW, see Note [runRW magic] and
+   Note [runRW arg].
 
+3. To let us inline trivial RHSs of non top-level let-bindings,
+   see Note [lazyId magic], Note [Inlining in CorePrep] (#12076)
+
+   Note that, if (y::forall a. a->a), we could get
+      x = lazy @(forall a.a) y @Bool
+   so after eliminating `lazy`, we need to replace occurrences of `x` with
+   `y @Bool`, not just `y`.  Situations like this can easily arise with
+   higher-rank types; thus, `cpe_subst` must map to CoreExprs, not Ids, which
+   oc course it does
+
+4. The TyCoVar part of the substitution is used only for
+   Note [Cloning CoVars and TyVars]
 -}
 
 data CorePrepConfig = CorePrepConfig
@@ -2418,23 +2422,9 @@ data CorePrepEnv
         -- the case where a function we think should bottom
         -- unexpectedly returns.
 
-        , cpe_subst :: Subst
-        -- ^ The IdEnv part of the substitution is used for three operations:
-        --
-        --      1. To support cloning of local Ids so that they are
-        --      all unique (see Note [Cloning in CorePrep])
-        --
-        --      2. To support beta-reduction of runRW, see
-        --      Note [runRW magic] and Note [runRW arg].
-        --
-        --      3. To let us inline trivial RHSs of non top-level let-bindings,
-        --      see Note [lazyId magic], Note [Inlining in CorePrep]
-        --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
-        --
-        -- The TyCoVar part of the substitution is used only for
-        --     Note [Cloning CoVars and TyVars]
+        , cpe_subst :: Subst  -- ^ See Note [CorePrepEnv: cpe_subst]
 
-        , cpe_rec_ids         :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
+        , cpe_rec_ids :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
     }
 
 mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
