@@ -1,6 +1,7 @@
 
-:set -XUnboxedTuples -XNoListTuplePuns -XDataKinds
+:set -XUnboxedTuples -XMagicHash -XNoListTuplePuns -XDataKinds
 import GHC.Tuple (Solo (MkSolo))
+import Data.Tuple.Experimental (Solo# (MkSolo#))
 
 :i ()
 :i (##)
@@ -26,3 +27,5 @@ f i (j, k) = i + j + k :: Int
 :t f
 :t (\ (_, _) -> ())
 :t (\ (MkSolo _) -> ())
+:i Solo#
+:t MkSolo#

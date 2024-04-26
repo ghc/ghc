@@ -2633,7 +2633,7 @@ module Data.Tuple.Experimental where
   type Solo :: * -> *
   data Solo a = MkSolo a
   type Solo# :: forall (k :: GHC.Types.RuntimeRep). TYPE k -> TYPE (GHC.Types.TupleRep '[k])
-  data Solo# a = ...
+  data Solo# a = MkSolo# a
   type Tuple0 :: *
   type Tuple0 = ()
   type Tuple0# :: GHC.Types.ZeroBitType

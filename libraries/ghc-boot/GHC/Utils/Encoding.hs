@@ -79,7 +79,7 @@ The basic encoding scheme is this.
         :+              ZCzp
         ()              Z0T     0-tuple
         (,,,,)          Z5T     5-tuple
-        (# #)           Z1H     unboxed 1-tuple (note the space)
+        (##)            Z0H     unboxed 0-tuple
         (#,,,,#)        Z5H     unboxed 5-tuple
 -}
 
@@ -212,7 +212,6 @@ decode_tuple d rest
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
     go 0 ('T':rest)     = "()" ++ zDecodeString rest
     go n ('T':rest)     = '(' : replicate (n-1) ',' ++ ")" ++ zDecodeString rest
-    go 1 ('H':rest)     = "(# #)" ++ zDecodeString rest
     go n ('H':rest)     = '(' : '#' : replicate (n-1) ',' ++ "#)" ++ zDecodeString rest
     go n other = error ("decode_tuple: " ++ show n ++ ' ':other)
 
@@ -223,15 +222,13 @@ for 3-tuples or unboxed 3-tuples respectively.  No other encoding starts
         Z<digit>
 
 * "(##)" is the tycon for an unboxed 0-tuple
-* "(# #)" is the tycon for an unboxed 1-tuple
 
-* "()" is the tycon for a boxed 0-tuple.
+* "()" is the tycon for a boxed 0-tuple
 -}
 
 maybe_tuple :: UserString -> Maybe EncodedString
 
 maybe_tuple "(##)" = Just("Z0H")
-maybe_tuple "(# #)" = Just("Z1H")
 maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
                                  (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
                                  _                  -> Nothing

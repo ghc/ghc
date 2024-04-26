@@ -1933,9 +1933,7 @@ mk_tup_name n space boxed
       | space == DataName = "MkSolo"
       | otherwise = "Solo"
 
-    unboxed_solo
-      | space == DataName = "(# #)"
-      | otherwise = "Solo#"
+    unboxed_solo = solo ++ "#"
 
 -- Unboxed sum data and type constructors
 -- | Unboxed sum data constructor

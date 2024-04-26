@@ -6,5 +6,5 @@ GHC.Tuple.MkSolo 1 :: GHC.Tuple.Solo GHC.Num.Integer.Integer
 SigE (AppE (AppE (ConE GHC.Types.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Types.Tuple2#) (ConT GHC.Num.Integer.Integer)) (ConT GHC.Num.Integer.Integer))
 GHC.Types.(#,#) 1 2 :: GHC.Types.Tuple2# GHC.Num.Integer.Integer
                                          GHC.Num.Integer.Integer
-SigE (AppE (ConE GHC.Types.(# #)) (LitE (IntegerL 1))) (AppT (ConT GHC.Types.Solo#) (ConT GHC.Num.Integer.Integer))
-GHC.Types.(# #) 1 :: GHC.Types.Solo# GHC.Num.Integer.Integer
+SigE (AppE (ConE GHC.Types.MkSolo#) (LitE (IntegerL 1))) (AppT (ConT GHC.Types.Solo#) (ConT GHC.Num.Integer.Integer))
+GHC.Types.MkSolo# 1 :: GHC.Types.Solo# GHC.Num.Integer.Integer
