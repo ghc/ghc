@@ -515,3 +515,4 @@ test('T24229a', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typea
 test('T24229b', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques -dppr-cols=99999'])
 test('T24370', normal, compile, ['-O'])
 test('T24551', normal, compile, ['-O -dcore-lint'])
+test('T24726', normal, compile, ['-dcore-lint -dsuppress-uniques'])
