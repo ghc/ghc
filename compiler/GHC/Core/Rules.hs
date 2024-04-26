@@ -47,7 +47,7 @@ import GHC.Driver.Ppr( showSDoc )
 import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
-import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
+import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, exprsOrphNames )
 import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
@@ -1805,41 +1805,59 @@ ruleCheckProgram ropts phase rule_pat rules binds
           vcat [ p $$ line | p <- bagToList results ]
          ]
   where
+    line = text (replicate 20 '-')
     env = RuleCheckEnv { rc_is_active = isActive phase
                        , rc_id_unf    = idUnfolding     -- Not quite right
                                                         -- Should use activeUnfolding
                        , rc_pattern   = rule_pat
                        , rc_rules     = rules
                        , rc_ropts     = ropts
-                       }
-    results = unionManyBags (map (ruleCheckBind env) binds)
-    line = text (replicate 20 '-')
+                       , rc_in_scope  = emptyInScopeSet }
 
-data RuleCheckEnv = RuleCheckEnv {
-    rc_is_active :: Activation -> Bool,
-    rc_id_unf  :: IdUnfoldingFun,
-    rc_pattern :: String,
-    rc_rules :: Id -> [CoreRule],
-    rc_ropts :: RuleOpts
-}
+    results = go env binds
 
-ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
+    go _   []           = emptyBag
+    go env (bind:binds) = let (env', ds) = ruleCheckBind env bind
+                          in ds `unionBags` go env' binds
+
+data RuleCheckEnv = RuleCheckEnv
+    { rc_is_active :: Activation -> Bool
+    , rc_id_unf    :: IdUnfoldingFun
+    , rc_pattern   :: String
+    , rc_rules     :: Id -> [CoreRule]
+    , rc_ropts     :: RuleOpts
+    , rc_in_scope  :: InScopeSet }
+
+extendInScopeRC :: RuleCheckEnv -> Var -> RuleCheckEnv
+extendInScopeRC env@(RuleCheckEnv { rc_in_scope = in_scope }) v
+  = env { rc_in_scope = in_scope `extendInScopeSet` v }
+
+extendInScopeListRC :: RuleCheckEnv -> [Var] -> RuleCheckEnv
+extendInScopeListRC env@(RuleCheckEnv { rc_in_scope = in_scope }) vs
+  = env { rc_in_scope = in_scope `extendInScopeSetList` vs }
+
+ruleCheckBind :: RuleCheckEnv -> CoreBind -> (RuleCheckEnv, Bag SDoc)
    -- The Bag returned has one SDoc for each call site found
-ruleCheckBind env (NonRec _ r) = ruleCheck env r
-ruleCheckBind env (Rec prs)    = unionManyBags [ruleCheck env r | (_,r) <- prs]
+ruleCheckBind env (NonRec b r) = (env `extendInScopeRC` b, ruleCheck env r)
+ruleCheckBind env (Rec prs)    = (env', unionManyBags (map (ruleCheck env') rhss))
+                               where
+                                 (bs, rhss) = unzip prs
+                                 env' = env `extendInScopeListRC` bs
 
 ruleCheck :: RuleCheckEnv -> CoreExpr -> Bag SDoc
-ruleCheck _   (Var _)       = emptyBag
-ruleCheck _   (Lit _)       = emptyBag
-ruleCheck _   (Type _)      = emptyBag
-ruleCheck _   (Coercion _)  = emptyBag
-ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
-ruleCheck env (Tick _ e)  = ruleCheck env e
-ruleCheck env (Cast e _)    = ruleCheck env e
-ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
-ruleCheck env (Lam _ e)     = ruleCheck env e
-ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags`
-                                unionManyBags [ruleCheck env r | Alt _ _ r <- as]
+ruleCheck _   (Var _)         = emptyBag
+ruleCheck _   (Lit _)         = emptyBag
+ruleCheck _   (Type _)        = emptyBag
+ruleCheck _   (Coercion _)    = emptyBag
+ruleCheck env (App f a)       = ruleCheckApp env (App f a) []
+ruleCheck env (Tick _ e)      = ruleCheck env e
+ruleCheck env (Cast e _)      = ruleCheck env e
+ruleCheck env (Let bd e)      = let (env', ds) = ruleCheckBind env bd
+                                in  ds `unionBags` ruleCheck env' e
+ruleCheck env (Lam b e)       = ruleCheck (env `extendInScopeRC` b) e
+ruleCheck env (Case e b _ as) = ruleCheck env e `unionBags`
+                                unionManyBags [ruleCheck (env `extendInScopeListRC` (b:bs)) r
+                                              | Alt _ bs r <- as]
 
 ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> Bag SDoc
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
@@ -1863,8 +1881,9 @@ ruleAppCheck_help env fn args rules
     vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
           vcat (map check_rule rules)]
   where
-    n_args = length args
-    i_args = args `zip` [1::Int ..]
+    in_scope = rc_in_scope env
+    n_args   = length args
+    i_args   = args `zip` [1::Int ..]
     rough_args = map roughTopName args
 
     check_rule rule = rule_herald rule <> colon <+> rule_info (rc_ropts env) rule
@@ -1894,10 +1913,8 @@ ruleAppCheck_help env fn args rules
           mismatches   = [i | (rule_arg, (arg,i)) <- rule_args `zip` i_args,
                               not (isJust (match_fn rule_arg arg))]
 
-          lhs_fvs = exprsFreeVars rule_args     -- Includes template tyvars
           match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg MRefl
                 where
-                  in_scope = mkInScopeSet (lhs_fvs `unionVarSet` exprFreeVars arg)
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
                             , rv_tmpls = mkVarSet rule_bndrs
                             , rv_fltR  = mkEmptySubst in_scope

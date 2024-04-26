@@ -496,3 +496,4 @@ test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -
 test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 -O'])
 test('T23922a', normal, compile, ['-O'])
 test('T24370', normal, compile, ['-O'])
+test('T24726', normal, compile, ['-dcore-lint -dsuppress-uniques'])
