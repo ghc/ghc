@@ -114,16 +114,16 @@ if test "$HostOS" = "darwin"; then
     # The following is the work around suggested by @carter in #17418 during
     # install time. This should help us with code signing issues by removing
     # extended attributes from all files.
-    XATTR=${XATTR:-/usr/bin/xattr}
+    XATTR="${XATTR:-/usr/bin/xattr}"
 
-    if [ -e "${XATTR}" ]; then
+    if test -e "${XATTR}"; then
 
         # Instead of cleaning the attributes of the ghc-toolchain binary only,
         # we clean them from all files in the bin/ and lib/ directories, as it additionally future
         # proofs running executables from the bindist besides ghc-toolchain at configure time, and
         # we can avoid figuring out the path to the ghc-toolchain dynlib specifically.
-        /usr/bin/xattr -rc bin/
-        /usr/bin/xattr -rc lib/
+        "$XATTR" -rc bin/
+        "$XATTR" -rc lib/
 
     fi
 fi
