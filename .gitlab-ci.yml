@@ -297,6 +297,12 @@ lint-ci-config:
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    # Note [Nix-in-Docker]
+    # ~~~~~~~~~~~~~~~~~~~~
+    # FIXME: This is a workaround for a Nix-in-Docker issue. See
+    # https://gitlab.haskell.org/ghc/head.hackage/-/issues/38#note_560487 for
+    # discussion.
+    - nix-shell -p gnused --run "sed -i -e 's/nixbld//' /etc/nix/nix.conf"
   script:
     - nix run .gitlab/generate-ci#generate-jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
@@ -1106,6 +1112,8 @@ project-version:
     GIT_SUBMODULE_STRATEGY: "none"
   before_script:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    # FIXME: See Note [Nix-in-Docker]
+    - nix-shell -p gnused --run "sed -i -e 's/nixbld//' /etc/nix/nix.conf"
     - nix-channel --update
     - cat version.sh
     # Calculate the project version
