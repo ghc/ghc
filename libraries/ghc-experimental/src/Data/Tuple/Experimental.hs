@@ -21,7 +21,7 @@ module Data.Tuple.Experimental (
 
   -- * Unboxed tuples
   Unit#,
-  Solo#,
+  Solo#(..),
   Tuple0#,
   Tuple1#,
   Tuple2#,

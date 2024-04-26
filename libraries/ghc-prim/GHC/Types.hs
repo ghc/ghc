@@ -65,7 +65,7 @@ module GHC.Types (
 
         -- * Unboxed tuples
         Unit#,
-        Solo#,
+        Solo#(..),
         Tuple0#,
         Tuple1#,
         Tuple2#,
@@ -889,7 +889,7 @@ type Unit# :: TYPE (TupleRep '[])
 data Unit# = (# #)
 
 type Solo# :: TYPE rep -> TYPE (TupleRep '[rep])
-data Solo# a = (# a #)
+data Solo# a = MkSolo# a
 
 type Tuple0# = Unit#
 type Tuple1# = Solo#

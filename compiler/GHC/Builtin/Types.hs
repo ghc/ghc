@@ -1015,7 +1015,7 @@ mkUnboxedTupleStr ns 0
   | isDataConNameSpace ns = "(##)"
   | otherwise             = "Unit#"
 mkUnboxedTupleStr ns 1
-  | isDataConNameSpace ns = "(# #)"  -- See Note [One-tuples]
+  | isDataConNameSpace ns = "MkSolo#"  -- See Note [One-tuples]
   | otherwise             = "Solo#"
 mkUnboxedTupleStr ns ar
   | isDataConNameSpace ns = "(#" ++ commas ar ++ "#)"

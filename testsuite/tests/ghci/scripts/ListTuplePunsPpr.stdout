@@ -75,13 +75,17 @@ data Tuple2# a b = (#,#) a b
 (Int, Int) :: Tuple2 (*) (*)
 type T :: Tuple2 (*) (*)
 type T = (Int, Int) :: Tuple2 (*) (*)
-  	-- Defined at <interactive>:18:1
+  	-- Defined at <interactive>:19:1
 type S :: Solo (*)
 type S = MkSolo Int :: Solo (*)
-  	-- Defined at <interactive>:19:1
+  	-- Defined at <interactive>:20:1
 type L :: List (*)
 type L = [Int] :: List (*)
-  	-- Defined at <interactive>:20:1
+  	-- Defined at <interactive>:21:1
 f :: Int -> Tuple2 Int Int -> Int
 (\ (_, _) -> ()) :: Tuple2 a b -> Unit
 (\ (MkSolo _) -> ()) :: Solo a -> Unit
+type Solo# :: * -> TYPE (GHC.Types.TupleRep [GHC.Types.LiftedRep])
+data Solo# a = MkSolo# a
+  	-- Defined in ‘GHC.Types’
+MkSolo# :: a -> Solo# a
