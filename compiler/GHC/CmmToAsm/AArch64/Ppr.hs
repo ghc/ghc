@@ -396,6 +396,8 @@ pprInstr platform instr = case instr of
   -- 2. Bit Manipulation Instructions ------------------------------------------
   SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
+  CLZ  o1 o2       -> op2 (text "\tclz")  o1 o2
+  RBIT  o1 o2      -> op2 (text "\trbit")  o1 o2
   -- signed and unsigned bitfield extract
   SBFX o1 o2 o3 o4 -> op4 (text "\tsbfx") o1 o2 o3 o4
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
