@@ -419,6 +419,19 @@ test('MultiLayerModulesDefsGhciWithCore',
      ghci_script,
      ['MultiLayerModulesDefsGhciWithCore.script'])
 
+test('MultiLayerModulesDefsGhcWithCore',
+     [ collect_compiler_residency(15),
+       pre_cmd('$MAKE -s --no-print-directory MultiModulesDefsWithCore'),
+       extra_files(['genMultiLayerModulesCore']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     multimod_compile,
+     ['MultiLayerModules', '-v0 -fwrite-if-simplified-core'])
+
 test('MultiLayerModulesDefsGhciReload',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),

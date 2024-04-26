@@ -23,6 +23,9 @@ MultiModulesRecompDefsWithCore:
 	./genMultiLayerModulesCore
 	'$(TEST_HC)' --interactive $(TEST_HC_OPTS) -e "" -fwrite-if-simplified-core MultiLayerModules
 
+MultiModulesDefsWithCore:
+	./genMultiLayerModulesCore
+
 MultiComponentModulesRecomp:
 	'$(PYTHON)' genMultiComp.py
 	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run
