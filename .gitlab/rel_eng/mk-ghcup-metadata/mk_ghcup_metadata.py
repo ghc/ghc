@@ -65,7 +65,6 @@ eprint(f"Supported platforms: {job_mapping.keys()}")
 class Artifact(NamedTuple):
     job_name: str
     download_name: str
-    output_name: str
     subdir: str
 
 # Platform spec provides a specification which is agnostic to Job
@@ -76,10 +75,8 @@ class PlatformSpec(NamedTuple):
 
 source_artifact = Artifact('source-tarball'
                           , 'ghc-{version}-src.tar.xz'
-                          , 'ghc-{version}-src.tar.xz'
                           , 'ghc-{version}' )
 test_artifact = Artifact('source-tarball'
-                        , 'ghc-{version}-testsuite.tar.xz'
                         , 'ghc-{version}-testsuite.tar.xz'
                         , 'ghc-{version}/testsuite' )
 
@@ -163,11 +160,6 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
     res = { "dlUri": final_url
           , "dlSubdir": artifact.subdir.format(version=version)
           , "dlHash" : h }
-
-    # Only add dlOutput if it is inconsistent with the filename inferred from the URL
-    output = artifact.output_name.format(version=version)
-    if Path(urlparse(final_url).path).name != output:
-        res["dlOutput"] = output
 
     eprint(res)
     return res
