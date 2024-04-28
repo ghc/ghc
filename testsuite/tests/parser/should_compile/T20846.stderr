@@ -71,11 +71,7 @@
       (L
        (EpAnn
         (EpaSpan { T20846.hs:4:1-6 })
-        (NameAnn
-         (NameParens)
-         (EpaSpan { T20846.hs:4:1 })
-         (EpaSpan { T20846.hs:4:2-5 })
-         (EpaSpan { T20846.hs:4:6 })
+        (NameAnnTrailing
          [])
         (EpaComments
          []))
