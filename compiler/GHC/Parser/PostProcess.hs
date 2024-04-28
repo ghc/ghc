@@ -1210,37 +1210,34 @@ checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (L
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
 checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLArgPat (L l (ArgPatBuilderVisPat p))
-  = checkPat l (L l p) [] []
+checkLArgPat (L l (ArgPatBuilderVisPat p)) = checkLPat (L l p)
 checkLArgPat (L l (ArgPatBuilderArgPat p)) = return (L l p)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLPat e@(L l _) = checkPat l e [] []
+checkLPat (L l@(EpAnn anc an _) p) = do
+  (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) [] []
+  return (L (addCommentsToEpAnn l' cs) p')
 
-checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
-         -> PV (LPat GhcPs)
-checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
-  | isRdrDataCon c = do
-      let (_l', loc') = transferCommentsOnlyA l loc
-      return . L loc' $ ConPat
-        { pat_con_ext = noAnn -- AZ: where should this come from?
-        , pat_con = L ln c
-        , pat_args = PrefixCon tyargs args
-        }
+checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
+         -> PV (LPat GhcPs, EpAnnComments)
+checkPat loc cs (L l e@(PatBuilderVar (L ln c))) tyargs args
+  | isRdrDataCon c = return (L loc $ ConPat
+      { pat_con_ext = noAnn -- AZ: where should this come from?
+      , pat_con = L ln c
+      , pat_args = PrefixCon tyargs args
+      }, comments l Semi.<> cs)
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc (L _ (PatBuilderAppType (L lf f) at t)) tyargs args = do
-  let (loc', lf') = transferCommentsOnlyA loc lf
-  checkPat loc' (L lf' f) (HsConPatTyArg at t : tyargs) args
-checkPat loc (L _ (PatBuilderApp f (L le e))) [] args = do
-  let (loc', le') = transferCommentsOnlyA loc le
-  p <- checkLPat (L le' e)
-  checkPat loc' f [] (p : args)
-checkPat loc (L l e) [] [] = do
+checkPat loc cs (L la (PatBuilderAppType f at t)) tyargs args =
+  checkPat loc (cs Semi.<> comments la) f (HsConPatTyArg at t : tyargs) args
+checkPat loc cs (L la (PatBuilderApp f e)) [] args = do
+  p <- checkLPat e
+  checkPat loc (cs Semi.<> comments la) f [] (p : args)
+checkPat loc cs (L l e) [] [] = do
   p <- checkAPat loc e
-  return (L l p)
-checkPat loc e _ _ = do
+  return (L l p, cs)
+checkPat loc _ e _ _ = do
   details <- fromParseContext <$> askParseContext
   patFail (locA loc) (PsErrInPat (unLoc e) details)
 
@@ -1349,13 +1346,13 @@ checkFunBind :: SrcStrictness
              -> [LocatedA (ArgPatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
-checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
+checkFunBind strictness locF ann (L lf fun) is_infix pats (L _ grhss)
   = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
         let match_span = noAnnSrcSpan $ locF
-        return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
+        return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = ann
                                       , m_ctxt = FunRhs
-                                          { mc_fun    = fun
+                                          { mc_fun    = L lf fun
                                           , mc_fixity = is_infix
                                           , mc_strictness = strictness }
                                       , m_pats = ps
@@ -1364,7 +1361,7 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
         -- That isn't quite right, but it'll do for now.
   where
     extraDetails
-      | Infix <- is_infix = ParseContext (Just $ unLoc fun) NoIncompleteDoBlock
+      | Infix <- is_infix = ParseContext (Just fun) NoIncompleteDoBlock
       | otherwise         = noParseContext
 
 makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
