@@ -15,6 +15,7 @@ module GHC.Tc.Plugin (
         lookupOrig,
 
         -- * Looking up Names in the typechecking environment
+        lookupTHName,
         tcLookupGlobal,
         tcLookupTyCon,
         tcLookupDataCon,
@@ -74,6 +75,7 @@ import GHC.Tc.Utils.Env        ( TcTyThing )
 import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
                                , EvExpr, EvBindsVar, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
+import GHC.Plugins             ( thNameToGhcNameIO )
 
 import GHC.Unit.Module    ( ModuleName, Module )
 import GHC.Types.Name     ( OccName, Name )
@@ -90,6 +92,7 @@ import GHC.Core.InstEnv     ( InstEnvs )
 import GHC.Types.Unique     ( Unique )
 import GHC.Types.PkgQual    ( PkgQual )
 
+import qualified GHC.Internal.TH.Syntax as TH
 
 -- | Perform some IO, typically to interact with an external tool.
 tcPluginIO :: IO a -> TcPluginM a
@@ -108,6 +111,13 @@ findImportedModule mod_name mb_pkg = do
 lookupOrig :: Module -> OccName -> TcPluginM Name
 lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod
 
+-- | Resolve a @template-haskell@ 'TH.Name' to a GHC 'Name'.
+--
+-- @since 9.14.1
+lookupTHName :: TH.Name -> TcPluginM (Maybe Name)
+lookupTHName th = do
+    nc <- hsc_NC <$> getTopEnv
+    tcPluginIO $ thNameToGhcNameIO nc th
 
 tcLookupGlobal :: Name -> TcPluginM TyThing
 tcLookupGlobal = unsafeTcPluginTcM . TcM.tcLookupGlobal
