@@ -218,6 +218,9 @@ compileHsObjectAndHi rs objpath = do
   ctxPath <- contextPath ctx
   (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
   need (src:deps)
+  -- The .conf file is needed when template-haskell is implicitly added as a dependency
+  -- when a module in the template-haskell package is compiled. (See #24737)
+  when  (isLibrary (C.package ctx)) (need . (:[]) =<< pkgConfFile ctx)
 
   -- The .dependencies file lists indicating inputs. ghc will
   -- generally read more *.hi and *.hi-boot files (direct inputs).
