@@ -603,6 +603,7 @@ data ValidateRule =
             FullCI       -- ^ Run this job when the "full-ci" label is present.
           | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
           | JSBackend    -- ^ Run this job when the "javascript" label is present
+          | WasmBackend  -- ^ Run this job when the "wasm" label is present
           | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
           | IpeData      -- ^ Run this job when the "IPE" label is set
@@ -649,6 +650,7 @@ validateRuleString FullCI = or_all ([ labelString "full-ci"
 
 validateRuleString LLVMBackend  = labelString "LLVM backend"
 validateRuleString JSBackend    = labelString "javascript"
+validateRuleString WasmBackend  = labelString "wasm"
 validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc  = labelString "non-moving GC"
 validateRuleString IpeData      = labelString "IPE"
@@ -1048,7 +1050,7 @@ job_groups =
             . setVariable "HADRIAN_ARGS" "--docs=none"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
-        $ validateBuilds Amd64 (Linux AlpineWasm) cfg
+        $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
 
     wasm_build_config =
       (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)

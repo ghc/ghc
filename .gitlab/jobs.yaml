@@ -4502,7 +4502,7 @@
     ],
     "rules": [
       {
-        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4566,7 +4566,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
@@ -4630,7 +4630,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
