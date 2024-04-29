@@ -478,11 +478,6 @@ getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i <
 getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
 
-getRegister' config platform (CmmMachOp (MO_AlignmentCheck align wordWidth) [e])
-  = do
-      reg <- getRegister' config platform e
-      addAlignmentCheck align wordWidth reg
-
 -- Generic case.
 getRegister' config plat expr =
   case expr of
@@ -622,6 +617,9 @@ getRegister' config plat expr =
 
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
+        MO_AlignmentCheck align wordWidth -> do
+          reg <- getRegister' config plat e
+          addAlignmentCheck align wordWidth reg
 
         _ -> pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
       where
