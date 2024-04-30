@@ -276,11 +276,10 @@ genToplevel (StgRec bs)          =
 
 genToplevelDecl :: Id -> CgStgRhs -> G JStgStat
 genToplevelDecl i rhs = do
-  s1 <- resetSlots (genToplevelConEntry i rhs)
-  s2 <- resetSlots (genToplevelRhs i rhs)
-  return (s1 <> s2)
+  resetSlots (genToplevelConEntry i rhs)
+  resetSlots (genToplevelRhs i rhs)
 
-genToplevelConEntry :: Id -> CgStgRhs -> G JStgStat
+genToplevelConEntry :: Id -> CgStgRhs -> G ()
 genToplevelConEntry i rhs = case rhs of
    StgRhsCon _cc con _mu _ts _args _typ
      | isDataConWorkId i
@@ -288,24 +287,23 @@ genToplevelConEntry i rhs = case rhs of
    StgRhsClosure _ _cc _upd_flag _args _body _typ
      | Just dc <- isDataConWorkId_maybe i
        -> genSetConInfo i dc (stgRhsLive rhs) -- srt
-   _ -> pure mempty
+   _ -> pure ()
 
-genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStgStat
+genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G ()
 genSetConInfo i d l {- srt -} = do
   ei <- identForDataConEntryId i
   sr <- genStaticRefs l
-  emitClosureInfo $ ClosureInfo ei
-                                (CIRegs 0 [PtrV])
-                                (mkFastString $ renderWithContext defaultSDocContext (ppr d))
-                                (fixedLayout fields)
-                                (CICon $ dataConTag d)
-                                sr
-  return (mkDataEntry ei)
-    where
-      -- dataConRepArgTys sometimes returns unboxed tuples. is that a bug?
-      fields = concatMap (typeJSRep . unwrapType . scaledThing)
+  let fields = concatMap (typeJSRep . unwrapType . scaledThing)
                          (dataConRepArgTys d)
-        -- concatMap (map slotTyToType . repTypeSlots . repType) (dataConRepArgTys d)
+  emitClosureInfo $ ClosureInfo
+    { ciVar = ei
+    , ciRegs = CIRegs 0 [PtrV]
+    , ciName = mkFastString $ renderWithContext defaultSDocContext (ppr d)
+    , ciLayout = fixedLayout fields
+    , ciType = CICon $ dataConTag d
+    , ciStatic = sr
+    }
+  emitToplevel (mkDataEntry ei)
 
 mkDataEntry :: Ident -> JStgStat
 mkDataEntry i = FuncStat i [] returnStack
@@ -351,12 +349,14 @@ genToplevelRhs i rhs = case rhs of
                if et == CIThunk
                  then enterCostCentreThunk
                  else enterCostCentreFun cc
-    emitClosureInfo (ClosureInfo eid
-                                 regs
-                                 idt
-                                 (fixedLayout $ map (unaryTypeJSRep . idType) lids)
-                                 et
-                                 sr)
+    emitClosureInfo $ ClosureInfo
+      { ciVar = eid
+      , ciRegs = regs
+      , ciName = idt
+      , ciLayout = fixedLayout $ map (unaryTypeJSRep . idType) lids
+      , ciType = et
+      , ciStatic = sr
+      }
     ccId <- costCentreStackLbl cc
     emitStatic idt static ccId
     return $ (FuncStat eid [] (ll <> upd <> setcc <> body))

@@ -243,14 +243,14 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
   ei@(identFS -> eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
   let f = (blk_hl <> locals <> body)
-  emitClosureInfo $
-    ClosureInfo ei
-                (CIRegs 0 $ concatMap idJSRep args)
-                (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
-                (fixedLayout . reverse $
-                    map (stackSlotType . fst) (ctxLneFrameVars ctx))
-                CIStackFrame
-                sr
+  emitClosureInfo $ ClosureInfo
+    { ciVar = ei
+    , ciRegs = CIRegs 0 $ concatMap idJSRep args
+    , ciName = eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i))
+    , ciLayout = fixedLayout . reverse $ map (stackSlotType . fst) (ctxLneFrameVars ctx)
+    , ciType = CIStackFrame
+    , ciStatic = sr
+    }
   emitToplevel (FuncStat ei [] f)
 genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
@@ -265,28 +265,30 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
 -- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
 genEntry _ _i StgRhsCon {} = return ()
-genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) = resetSlots $ do
-  let live = stgLneLiveExpr rhs -- error "fixme" -- probably find live vars in body
+genEntry ctx i rhs@(StgRhsClosure _ext cc upd_flag args body typ) = resetSlots $ do
+  let live = stgLneLiveExpr rhs
   ll    <- loadLiveFun live
   llv   <- verifyRuntimeReps live
   upd   <- genUpdFrame upd_flag i
+  let entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
   body  <- genBody entryCtx R2 args body typ
-  ei@(identFS -> eii) <- identForEntryId i
   et    <- genEntryType args
   setcc <- ifProfiling $
              if et == CIThunk
                then enterCostCentreThunk
                else enterCostCentreFun cc
   sr <- genStaticRefsRhs rhs
-  emitClosureInfo $ ClosureInfo ei
-                                (CIRegs 0 $ PtrV : concatMap idJSRep args)
-                                (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
-                                (fixedLayout $ map (unaryTypeJSRep . idType) live)
-                                et
-                                sr
+
+  ei <- identForEntryId i
+  emitClosureInfo $ ClosureInfo
+    { ciVar = ei
+    , ciRegs = CIRegs 0 $ PtrV : concatMap idJSRep args
+    , ciName = identFS ei <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i))
+    , ciLayout = fixedLayout $ map (unaryTypeJSRep . idType) live
+    , ciType = et
+    , ciStatic = sr
+    }
   emitToplevel (FuncStat ei [] (mconcat [ll, llv, upd, setcc, body]))
-  where
-    entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
 -- | Generate the entry function types for identifiers. Note that this only
 -- returns either 'CIThunk' or 'CIFun'.
@@ -456,9 +458,9 @@ genUpdFrame u i
 --
 bhSingleEntry :: StgToJSConfig -> JStgStat
 bhSingleEntry _settings = mconcat
-  [ r1 .^ closureEntry_  |= var "h$blackholeTrap"
-  , r1 .^ closureField1_ |= undefined_
-  , r1 .^ closureField2_ |= undefined_
+  [ closureInfo   r1 |= var "h$blackholeTrap"
+  , closureField1 r1 |= undefined_
+  , closureField2 r1 |= undefined_
   ]
 
 genStaticRefsRhs :: CgStgRhs -> G CIStatic
@@ -646,15 +648,16 @@ genRet ctx e at as l = freshIdent >>= f
       fun'     <- fun free
       sr       <- genStaticRefs l -- srt
       prof     <- profiling
-      emitClosureInfo $
-        ClosureInfo r
-                    (CIRegs 0 altRegs)
-                    ri
-                    (fixedLayout . reverse $
+      emitClosureInfo $ ClosureInfo
+        { ciVar = r
+        , ciRegs = CIRegs 0 altRegs
+        , ciName = ri
+        , ciLayout = fixedLayout . reverse $
                        map (stackSlotType . fst3) free
-                       ++ if prof then [ObjV] else map stackSlotType lneVars)
-                    CIStackFrame
-                    sr
+                       ++ if prof then [ObjV] else map stackSlotType lneVars
+        , ciType = CIStackFrame
+        , ciStatic = sr
+        }
       emitToplevel $ FuncStat r [] fun'
       return (pushLne <> saveCCS <> pushRet)
     fst3 ~(x,_,_)  = x
@@ -1012,7 +1015,7 @@ allocDynAll haveDecl middle cls = do
       ccs <- maybeToList <$> costCentreStackLbl cc
       pure $ mconcat
         [ decl_maybe i $ if csInlineAlloc settings
-            then ValExpr (jhFromList $ [ (closureEntry_ , f)
+            then ValExpr (jhFromList $ [ (closureInfo_ , f)
                                        , (closureField1_, null_)
                                        , (closureField2_, null_)
                                        , (closureMeta_  , zero_)
@@ -1023,34 +1026,25 @@ allocDynAll haveDecl middle cls = do
 
     fillObjs :: [JStgStat]
     fillObjs = map fillObj cls
-    fillObj (i,_,es,_)
-      | csInlineAlloc settings || length es > 24 =
-          case es of
-            []      -> mempty
-            [ex]    -> toJExpr i .^ closureField1_ |= toJExpr ex
-            [e1,e2] -> mconcat
-                        [ toJExpr i .^ closureField1_ |= toJExpr e1
-                        , toJExpr i .^ closureField2_ |= toJExpr e2
-                        ]
-            (ex:es)  -> mconcat
-                        [ toJExpr i .^ closureField1_ |= toJExpr ex
-                        , toJExpr i .^ closureField2_ |= toJExpr (jhFromList (zip (map dataFieldName [1..]) es))
-                        ]
-      | otherwise = case es of
-            []      -> mempty
-            [ex]    -> toJExpr i .^ closureField1_ |= ex
-            [e1,e2] -> mconcat
-                        [ toJExpr i .^ closureField1_ |= e1
-                        , toJExpr i .^ closureField2_ |= e2
-                        ]
-            (ex:es)  -> mconcat
-                        [ toJExpr i .^ closureField1_ |= ex
-                        , toJExpr i .^ closureField2_ |= fillFun es
-                        ]
+    fillObj (ident,_,es,_) =
+      let i = toJExpr ident
+      in case es of
+          []      -> mempty
+          [ex]    -> closureField1 i |= ex
+          [e1,e2] -> mconcat
+                      [ closureField1 i |= e1
+                      , closureField2 i |= e2
+                      ]
+          (ex:es)
+            | csInlineAlloc settings || length es > 24
+            -> mconcat [ closureField1 i |= ex
+                       , closureField2 i |= ValExpr (jhFromList (zip (map dataFieldName [1..]) es))
+                       ]
 
-    fillFun :: [JStgExpr] -> JStgExpr
-    fillFun [] = null_
-    fillFun es = ApplExpr (allocData (length es)) es
+            | otherwise
+            -> mconcat [ closureField1 i |= ex
+                       , closureField2 i |= ApplExpr (allocData (length es)) es
+                       ]
 
     checkObjs :: [JStgStat]
     checkObjs | csAssertRts settings  =

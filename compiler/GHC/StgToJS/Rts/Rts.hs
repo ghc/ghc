@@ -449,13 +449,13 @@ rts_gen s = do
                                                 , r4 |= d4
                                                 , returnS (app "h$ap_3_3_fast" [])
                                                 ])
-             , closure (ClosureInfo (TxtI "h$upd_thunk_e") (CIRegs 0 [PtrV]) "updatable thunk" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+             , closure (ClosureInfo (global "h$upd_thunk_e") (CIRegs 0 [PtrV]) "updatable thunk" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                (jVar $ \t -> return $
                    mconcat [t |= closureField1 r1
                            , adjSp' 2
                            , stack .! (sp - 1) |= r1
                            , stack .! sp       |= var "h$upd_frame"
-                           , closureEntry  r1 |= var "h$blackhole"
+                           , closureInfo   r1 |= var "h$blackhole"
                            , closureField1 r1 |= var "h$currentThread"
                            , closureField2 r1 |= null_
                            , r1 |= t
@@ -470,7 +470,7 @@ rts_gen s = do
                                    , stack .! (sp - 2) |= r1
                                    , stack .! (sp - 1) |= var "h$upd_frame"
                                    , stack .! sp |= var "h$select1_ret"
-                                   , closureEntry  r1 |= var "h$blackhole"
+                                   , closureInfo   r1 |= var "h$blackhole"
                                    , closureField1 r1 |= var "h$currentThread"
                                    , closureField2 r1 |= null_
                                    , r1 |= t
@@ -490,7 +490,7 @@ rts_gen s = do
                                    , stack .! (sp - 2) |= r1
                                    , stack .! (sp - 1) |= var "h$upd_frame"
                                    , stack .! sp |= var "h$select2_ret"
-                                   , closureEntry  r1 |= var "h$blackhole"
+                                   , closureInfo   r1 |= var "h$blackhole"
                                    , closureField1 r1 |= var "h$currentThread"
                                    , closureField2 r1 |= null_
                                    , r1 |= t

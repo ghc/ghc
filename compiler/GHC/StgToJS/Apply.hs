@@ -246,7 +246,7 @@ jumpToII i vars load_app_in_r1
      return $ mconcat
       [ assignAllReverseOrder jsRegsFromR2 vars
       , load_app_in_r1
-      , returnS (closureEntry ii)
+      , returnS (closureInfo ii)
       ]
   | otherwise   = do
      ei <- varForEntryId i
@@ -449,14 +449,14 @@ genericStackApply cfg = closure info body
   where
     -- h$ap_gen body
     body = jVar $ \cf ->
-      do fun <- fun_case cf (funArity' cf)
+      do fun <- fun_case cf (infoFunArity cf)
          pap <- fun_case cf (papArity r1)
          return $
            mconcat $
            [ traceRts cfg (jString "h$ap_gen")
-           , cf |= closureEntry r1
+           , cf |= closureInfo r1
            -- switch on closure type
-           , SwitchStat (entryClosureType cf)
+           , SwitchStat (infoClosureType cf)
              [ (toJExpr Thunk    , thunk_case cfg cf)
              , (toJExpr Fun      , fun)
              , (toJExpr Pap      , pap)
@@ -476,7 +476,7 @@ genericStackApply cfg = closure info body
       }
 
     default_case cf = appS "throw" [jString "h$ap_gen: unexpected closure type "
-                                    + (entryClosureType cf)]
+                                    + (infoClosureType cf)]
 
     thunk_case cfg cf = mconcat
       [ profStat cfg pushRestoreCCS
@@ -596,7 +596,7 @@ genericFastApply s =
         fast_fun     <- jVar \farity ->
                                do fast_fun <- funCase c tag farity
                                   return $ mconcat $
-                                    [ farity |= funArity' c
+                                    [ farity |= infoFunArity c
                                     , traceRts s (jString "h$ap_gen_fast: fun " + farity)
                                     , fast_fun]
         fast_pap     <- jVar \parity ->
@@ -608,8 +608,8 @@ genericFastApply s =
                                     ]
         return $ mconcat $
           [traceRts s (jString "h$ap_gen_fast: " + tag)
-          , c |= closureEntry r1
-          , SwitchStat (entryClosureType c)
+          , c |= closureInfo r1
+          , SwitchStat (infoClosureType c)
             [ (toJExpr Thunk, traceRts s (jString "h$ap_gen_fast: thunk")
                 <> push_stk_app
                 <> returnS c)
@@ -623,7 +623,7 @@ genericFastApply s =
                 <> push_stk_app
                 <> push' s [r1, var "h$return"]
                 <> returnS (app "h$blockOnBlackhole" [r1]))
-            ] $ appS "throw" [jString "h$ap_gen_fast: unexpected closure type: " + entryClosureType c]
+            ] $ appS "throw" [jString "h$ap_gen_fast: unexpected closure type: " + infoClosureType c]
           ]
 
   where
@@ -729,8 +729,22 @@ stackApply s fun_name nargs nvars =
     then closure info0 body0
     else closure info body
   where
-    info  = ClosureInfo (global fun_name) (CIRegs 0 [PtrV]) fun_name (CILayoutUnknown nvars) CIStackFrame mempty
-    info0 = ClosureInfo (global fun_name) (CIRegs 0 [PtrV]) fun_name (CILayoutFixed 0 [])    CIStackFrame mempty
+    info  = ClosureInfo
+              { ciVar = global fun_name
+              , ciRegs = CIRegs 0 [PtrV]
+              , ciName = fun_name
+              , ciLayout = CILayoutUnknown nvars
+              , ciType = CIStackFrame
+              , ciStatic = mempty
+              }
+    info0 = ClosureInfo
+              { ciVar = global fun_name
+              , ciRegs = CIRegs 0 [PtrV]
+              , ciName = fun_name
+              , ciLayout = CILayoutFixed 0 []
+              , ciType = CIStackFrame
+              , ciStatic = mempty
+              }
 
     body0 = (adjSpN' 1 <>) <$> enter s r1
 
@@ -738,18 +752,18 @@ stackApply s fun_name nargs nvars =
       do fun_case <- funCase c
          pap_case <- papCase c
          return $ mconcat
-           [ c |= closureEntry r1
+           [ c |= closureInfo r1
            , traceRts s (toJExpr fun_name
                           + jString " "
                           + (c .^ "n")
                           + jString " sp: " + sp
                           + jString " a: "  + (c .^ "a"))
-           , SwitchStat (entryClosureType c)
+           , SwitchStat (infoClosureType c)
              [ (toJExpr Thunk, traceRts s (toJExpr $ fun_name <> ": thunk") <> profStat s pushRestoreCCS <> returnS c)
              , (toJExpr Fun, traceRts s (toJExpr $ fun_name <> ": fun") <> fun_case)
              , (toJExpr Pap, traceRts s (toJExpr $ fun_name <> ": pap") <> pap_case)
              , (toJExpr Blackhole, push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))
-             ] (appS "throw" [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (entryClosureType c)])
+             ] (appS "throw" [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (infoClosureType c)])
            ]
 
     funExact c = popSkip 1 (reverse $ take nvars jsRegsFromR2) <> returnS c
@@ -783,7 +797,7 @@ stackApply s fun_name nargs nvars =
       do oversat_case <- oversatCase c ar0 ar
          return $ mconcat $
            case expr of
-             ValExpr (JVar pap) -> [ ar0 |= funArity' c
+             ValExpr (JVar pap) -> [ ar0 |= infoFunArity c
                                    , ar |= mask8 ar0
                                    , ifS (toJExpr nargs .===. ar)
                                      (traceRts s (toJExpr (fun_name <> ": exact")) <> funExact c)
@@ -845,18 +859,18 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
         do fun_case_fun <- funCase c farity
            fun_case_pap <- funCase c arity
            return $ mconcat $
-             [ c |= closureEntry r1
+             [ c |= closureInfo r1
              , traceRts s (toJExpr (fun_name <> ": sp ") + sp)
-             , SwitchStat (entryClosureType c)
+             , SwitchStat (infoClosureType c)
                [(toJExpr Fun, traceRts s (toJExpr (fun_name <> ": ")
                                           + clName c
                                           + jString " (arity: " + (c .^ "a") + jString ")")
-                              <> (farity |= funArity' c)
+                              <> (farity |= infoFunArity c)
                               <> fun_case_fun)
                ,(toJExpr Pap, traceRts s (toJExpr (fun_name <> ": pap")) <> (arity |= papArity r1) <> fun_case_pap)
                ,(toJExpr Thunk, traceRts s (toJExpr (fun_name <> ": thunk")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> profStat s pushRestoreCCS <> returnS c)
                ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
-               (appS "throw" [toJExpr (fun_name <> ": unexpected closure type: ") + entryClosureType c])
+               (appS "throw" [toJExpr (fun_name <> ": unexpected closure type: ") + infoClosureType c])
              ]
 
       funCase :: JStgExpr -> JStgExpr -> JSM JStgStat
@@ -913,9 +927,9 @@ enter :: StgToJSConfig -> JStgExpr -> JSM JStgStat
 enter s ex = jVar \c ->
   return $ mconcat $
   [ jwhenS (app "typeof" [ex] .!==. jTyObject) returnStack
-  , c |= closureEntry ex
+  , c |= closureInfo ex
   , jwhenS (c .===. var "h$unbox_e") ((r1 |= closureField1 ex) <> returnStack)
-  , SwitchStat (entryClosureType c)
+  , SwitchStat (infoClosureType c)
     [ (toJExpr Con, mempty)
     , (toJExpr Fun, mempty)
     , (toJExpr Pap, returnStack)
@@ -930,7 +944,7 @@ updates s = do
   upd_frm_lne <- update_frame_lne
   return $ BlockStat [upd_frm, upd_frm_lne]
   where
-    unbox_closure f1 = Closure { clEntry  = var "h$unbox_e"
+    unbox_closure f1 = Closure { clInfo   = var "h$unbox_e"
                                , clField1 = f1
                                , clField2 = null_
                                , clMeta   = 0
@@ -946,7 +960,14 @@ updates s = do
                           , postIncrS i
                           ]
     update_frame = closure
-                   (ClosureInfo (global "h$upd_frame") (CIRegs 0 [PtrV]) "h$upd_frame" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+                   (ClosureInfo
+                      { ciVar = global "h$upd_frame"
+                      , ciRegs = CIRegs 0 [PtrV]
+                      , ciName = "h$upd_frame"
+                      , ciLayout = CILayoutFixed 1 [PtrV]
+                      , ciType = CIStackFrame
+                      , ciStatic = mempty
+                      })
                    $ jVars \(updatee, waiters, ss, si, sir) ->
                        do upd_loop         <- upd_loop' ss si sir
                           wake_thread_loop <- loop zero_ (.<. waiters .^ "length")
@@ -967,7 +988,7 @@ updates s = do
                                   <> upd_loop)
                                , -- overwrite the object
                                  ifS (app "typeof" [r1] .===. jTyObject)
-                                 (mconcat [ traceRts s (jString "$upd_frame: boxed: " + ((closureEntry r1) .^ "n"))
+                                 (mconcat [ traceRts s (jString "$upd_frame: boxed: " + ((closureInfo r1) .^ "n"))
                                           , copyClosure DontCopyCC updatee r1
                                           ])
                                -- the heap object is represented by another type of value
@@ -984,7 +1005,14 @@ updates s = do
                                ]
 
     update_frame_lne = closure
-                     (ClosureInfo (global "h$upd_frame_lne") (CIRegs 0 [PtrV]) "h$upd_frame_lne" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+                     (ClosureInfo
+                        { ciVar = global "h$upd_frame_lne"
+                        , ciRegs = CIRegs 0 [PtrV]
+                        , ciName = "h$upd_frame_lne"
+                        , ciLayout = CILayoutFixed 1 [PtrV]
+                        , ciType = CIStackFrame
+                        , ciStatic = mempty
+                        })
                      $ jVar \updateePos ->
                          return $ mconcat $
                          [ updateePos |= stack .! (sp - 1)
@@ -1028,7 +1056,14 @@ selectors s =
           , returnS (sel r)
           ]
       , closure
-        (ClosureInfo (global entryName) (CIRegs 0 [PtrV]) ("select " <> name) (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+        (ClosureInfo
+          { ciVar = global entryName
+          , ciRegs = CIRegs 0 [PtrV]
+          , ciName = "select " <> name
+          , ciLayout = CILayoutFixed 1 [PtrV]
+          , ciType = CIThunk
+          , ciStatic = mempty
+          })
         (jVar $ \tgt ->
           return $ mconcat $
           [ tgt |= closureField1 r1
@@ -1040,7 +1075,14 @@ selectors s =
               (returnS (app "h$e" [sel tgt]))
           ])
       , closure
-        (ClosureInfo (global frameName) (CIRegs 0 [PtrV]) ("select " <> name <> " frame") (CILayoutFixed 0 []) CIStackFrame mempty)
+        (ClosureInfo
+          { ciVar = global frameName
+          , ciRegs = CIRegs 0 [PtrV]
+          , ciName = "select " <> name <> " frame"
+          , ciLayout = CILayoutFixed 0 []
+          , ciType = CIStackFrame
+          , ciStatic = mempty
+          })
         $ return $
         mconcat [ traceRts s (toJExpr ("selector frame: " <> name))
                 , postDecrS sp
@@ -1093,7 +1135,14 @@ specPapIdents = listArray (0,numSpecPap) $ map (global . mkFastString . ("h$pap_
 pap :: StgToJSConfig
     -> Int
     -> JSM JStgStat
-pap s r = closure (ClosureInfo funcIdent CIRegsUnknown funcName (CILayoutUnknown (r+2)) CIPap mempty) body
+pap s r = closure (ClosureInfo
+                    { ciVar = funcIdent
+                    , ciRegs = CIRegsUnknown
+                    , ciName = funcName
+                    , ciLayout = CILayoutUnknown (r+2)
+                    , ciType = CIPap
+                    , ciStatic = mempty
+                    }) body
   where
     funcIdent = global funcName
     funcName = mkFastString ("h$pap_" ++ show r)
@@ -1102,7 +1151,7 @@ pap s r = closure (ClosureInfo funcIdent CIRegsUnknown funcName (CILayoutUnknown
              return $ mconcat $
              [ c |= closureField1 r1
              , d |= closureField2 r1
-             , f |= closureEntry  c
+             , f |= closureInfo  c
              , assertRts s (isFun' f .||. isPap' f) (funcName <> ": expected function or pap")
              , profStat s (enterCostCentreFun currentCCS)
              , extra |= (funOrPapArity c (Just f) .>>. 8) - toJExpr r
@@ -1122,12 +1171,19 @@ pap s r = closure (ClosureInfo funcIdent CIRegsUnknown funcName (CILayoutUnknown
 -- Construct a generic PAP
 papGen :: StgToJSConfig -> JSM JStgStat
 papGen cfg =
-   closure (ClosureInfo funcIdent CIRegsUnknown funcName CILayoutVariable CIPap mempty)
+   closure (ClosureInfo
+              { ciVar = funcIdent
+              , ciRegs = CIRegsUnknown
+              , ciName = funcName
+              , ciLayout = CILayoutVariable
+              , ciType = CIPap
+              , ciStatic = mempty
+              })
            (jVars $ \(c, f, d, pr, or, r) ->
               return $ mconcat
               [ c |= closureField1 r1
               , d |= closureField2 r1
-              , f |= closureEntry  c
+              , f |= closureInfo  c
               , pr |= funOrPapArity c (Just f) .>>. 8
               , or |= papArity r1 .>>. 8
               , r |= pr - or
@@ -1174,9 +1230,9 @@ moveRegs2 = jFunction (global "h$moveRegs2") moveSwitch
 
 -- Initalize a variable sized object from an array of values
 initClosure :: StgToJSConfig -> JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr
-initClosure cfg entry values ccs = app "h$init_closure"
+initClosure cfg info values ccs = app "h$init_closure"
   [ newClosure $ Closure
-      { clEntry  = entry
+      { clInfo   = info
       , clField1 = null_
       , clField2 = null_
       , clMeta   = 0

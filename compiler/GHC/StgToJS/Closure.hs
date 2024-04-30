@@ -28,7 +28,6 @@ import GHC.Data.FastString
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
-import GHC.StgToJS.Regs (stack,sp)
 
 import GHC.JS.Make
 import GHC.JS.JStg.Syntax
@@ -41,18 +40,23 @@ import Data.Array
 import Data.Monoid
 import qualified Data.Bits as Bits
 
+-- | Generate statements to set infotable field values for the given ClosureInfo
+--
+-- Depending on debug flag, it generates h$setObjInfo(...) or h$o(...). The
+-- latter form doesn't store the pretty-printed name in the closure to save
+-- space.
 closureInfoStat :: Bool -> ClosureInfo -> JStgStat
-closureInfoStat debug (ClosureInfo obj rs name layout ctype srefs)
-  = setObjInfoL debug obj rs layout ty name tag srefs
+closureInfoStat debug ci
+  = setObjInfoL debug (ciVar ci) (ciRegs ci) (ciLayout ci) ty (ciName ci) tag (ciStatic ci)
       where
-        !ty = case ctype of
+        !ty = case ciType ci of
           CIThunk      -> Thunk
           CIFun {}     -> Fun
           CICon {}     -> Con
           CIBlackhole  -> Blackhole
           CIPap        -> Pap
           CIStackFrame -> StackFrame
-        !tag = case ctype of
+        !tag = case ciType ci of
           CIThunk           -> 0
           CIFun arity nregs -> mkArityTag arity nregs
           CICon con         -> con
@@ -118,29 +122,37 @@ setObjInfo debug obj t name fields a size regs static
 
 -- | Special case of closures that do not need to generate any @fresh@ names
 closure :: ClosureInfo    -- ^ object being info'd see @ciVar@
-         -> (JSM JStgStat) -- ^ rhs
+         -> JSM JStgStat  -- ^ rhs
          -> JSM JStgStat
-closure ci body = do f <- (jFunction' (ciVar ci) body)
-                     return $ f `mappend` closureInfoStat False ci
+closure ci body = do
+  f <- jFunction' (ciVar ci) body
+  return $ f `mappend` closureInfoStat False ci
 
 conClosure :: Ident -> FastString -> CILayout -> Int -> JSM JStgStat
 conClosure symbol name layout constr = closure ci body
   where
-    ci = (ClosureInfo symbol (CIRegs 0 [PtrV]) name layout (CICon constr) mempty)
-    body   = pure . returnS $ stack .! sp
+    ci = ClosureInfo
+          { ciVar = symbol
+          , ciRegs = CIRegs 0 [PtrV]
+          , ciName = name
+          , ciLayout = layout
+          , ciType = CICon constr
+          , ciStatic = mempty
+          }
+    body   = pure returnStack
 
 -- | Used to pass arguments to newClosure with some safety
 data Closure = Closure
-  { clEntry  :: JStgExpr
-  , clField1 :: JStgExpr
-  , clField2 :: JStgExpr
+  { clInfo   :: JStgExpr        -- ^ InfoTable object
+  , clField1 :: JStgExpr        -- ^ Payload field 1
+  , clField2 :: JStgExpr        -- ^ Payload field 2
   , clMeta   :: JStgExpr
   , clCC     :: Maybe JStgExpr
   }
 
 newClosure :: Closure -> JStgExpr
 newClosure Closure{..} =
-  let xs = [ (closureEntry_ , clEntry)
+  let xs = [ (closureInfo_  , clInfo)
            , (closureField1_, clField1)
            , (closureField2_, clField2)
            , (closureMeta_  , clMeta)
@@ -153,7 +165,7 @@ newClosure Closure{..} =
 
 assignClosure :: JStgExpr -> Closure -> JStgStat
 assignClosure t Closure{..} = BlockStat
-  [ closureEntry  t |= clEntry
+  [ closureInfo   t |= clInfo
   , closureField1 t |= clField1
   , closureField2 t |= clField2
   , closureMeta   t |= clMeta
@@ -165,7 +177,7 @@ data CopyCC = CopyCC | DontCopyCC
 
 copyClosure :: CopyCC -> JStgExpr -> JStgExpr -> JStgStat
 copyClosure copy_cc t s = BlockStat
-  [ closureEntry  t |= closureEntry  s
+  [ closureInfo   t |= closureInfo   s
   , closureField1 t |= closureField1 s
   , closureField2 t |= closureField2 s
   , closureMeta   t |= closureMeta   s
@@ -174,8 +186,8 @@ copyClosure copy_cc t s = BlockStat
       CopyCC     -> closureCC t |= closureCC s
 
 mkClosure :: JStgExpr -> [JStgExpr] -> JStgExpr -> Maybe JStgExpr -> Closure
-mkClosure entry fields meta cc = Closure
-  { clEntry  = entry
+mkClosure info fields meta cc = Closure
+  { clInfo   = info
   , clField1 = x1
   , clField2 = x2
   , clMeta   = meta

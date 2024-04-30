@@ -69,7 +69,7 @@ of generating a wrapper object with a field for the value's payload, such as:
 
 // a JS object for an Int8
 var anInt8 = { d1 = <Int8# payload>
-             , f  : entry function which would scrutinize the payload
+             , f  : info table / entry function which would scrutinize the payload
              }
 
 we instead generate:

@@ -98,9 +98,9 @@ data StgToJSConfig = StgToJSConfig
   , csLinkerConfig    :: !LinkerConfig -- ^ Emscripten linker
   }
 
--- | Information relevenat to code generation for closures.
+-- | Closure info table
 data ClosureInfo = ClosureInfo
-  { ciVar     :: Ident      -- ^ object being infod
+  { ciVar     :: Ident      -- ^ entry code identifier: infotable fields are stored as properties of this function
   , ciRegs    :: CIRegs     -- ^ size of the payload (in number of JS values)
   , ciName    :: FastString -- ^ friendly name for printing
   , ciLayout  :: CILayout   -- ^ heap/stack layout of the object
