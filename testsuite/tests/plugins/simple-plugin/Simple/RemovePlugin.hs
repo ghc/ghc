@@ -64,9 +64,10 @@ metaPlugin' _ meta = pprPanic "meta" (showAstData BlankSrcSpan BlankEpAnnotation
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' [name, "interface"] iface
-  = return $ iface { mi_exports = filter (availNotNamedAs name)
-                                         (mi_exports iface)
-                   }
+  = return $ set_mi_exports (filter (availNotNamedAs name)
+                                    (mi_exports iface))
+                            iface
+
 interfaceLoadPlugin' _ iface = return iface
 
 availNotNamedAs :: String -> AvailInfo -> Bool

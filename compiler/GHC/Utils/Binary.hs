@@ -19,7 +19,7 @@
 --     http://www.cs.york.ac.uk/fp/nhc98/
 
 module GHC.Utils.Binary
-  ( {-type-}  Bin,
+  ( {-type-}  Bin, RelBin(..), getRelBin,
     {-class-} Binary(..),
     {-type-}  ReadBinHandle, WriteBinHandle,
     SymbolTable, Dictionary,
@@ -32,6 +32,7 @@ module GHC.Utils.Binary
 
    seekBinWriter,
    seekBinReader,
+   seekBinReaderRel,
    tellBinReader,
    tellBinWriter,
    castBin,
@@ -47,7 +48,9 @@ module GHC.Utils.Binary
    readBinMemN,
 
    putAt, getAt,
+   putAtRel,
    forwardPut, forwardPut_, forwardGet,
+   forwardPutRel, forwardPutRel_, forwardGetRel,
 
    -- * For writing instances
    putByte,
@@ -102,6 +105,8 @@ module GHC.Utils.Binary
    BindingName(..),
    simpleBindingNameWriter,
    simpleBindingNameReader,
+   FullBinData(..), freezeBinHandle, thawBinHandle, putFullBinData,
+   BinArray,
   ) where
 
 import GHC.Prelude
@@ -119,7 +124,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
-import GHC.Utils.Misc ( HasCallStack, HasDebugCallStack )
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -194,6 +198,62 @@ dataHandle (BinData size bin) = do
 
 handleData :: WriteBinHandle -> IO BinData
 handleData (WriteBinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
+
+---------------------------------------------------------------
+-- FullBinData
+---------------------------------------------------------------
+
+-- | 'FullBinData' stores a slice to a 'BinArray'.
+--
+-- It requires less memory than 'ReadBinHandle', and can be constructed from
+-- a 'ReadBinHandle' via 'freezeBinHandle' and turned back into a
+-- 'ReadBinHandle' using 'thawBinHandle'.
+-- Additionally, the byte array slice can be put into a 'WriteBinHandle' without extra
+-- conversions via 'putFullBinData'.
+data FullBinData = FullBinData
+  { fbd_readerUserData :: ReaderUserData
+  -- ^ 'ReaderUserData' that can be used to resume reading.
+  , fbd_off_s :: {-# UNPACK #-} !Int
+  -- ^ start offset
+  , fbd_off_e :: {-# UNPACK #-} !Int
+  -- ^ end offset
+  , fbd_size :: {-# UNPACK #-} !Int
+  -- ^ total buffer size
+  , fbd_buffer :: {-# UNPACK #-} !BinArray
+  }
+
+-- Equality and Ord assume that two distinct buffers are different, even if they compare the same things.
+instance Eq FullBinData where
+  (FullBinData _ b c d e) == (FullBinData _ b1 c1 d1 e1) = b == b1 && c == c1 && d == d1 && e == e1
+
+instance Ord FullBinData where
+  compare (FullBinData _ b c d e) (FullBinData _ b1 c1 d1 e1) =
+    compare b b1 `mappend` compare c c1 `mappend` compare d d1 `mappend` compare e e1
+
+-- | Write the 'FullBinData' slice into the 'WriteBinHandle'.
+putFullBinData :: WriteBinHandle -> FullBinData -> IO ()
+putFullBinData bh (FullBinData _ o1 o2 _sz ba) = do
+  let sz = o2 - o1
+  putPrim bh sz $ \dest ->
+    unsafeWithForeignPtr (ba `plusForeignPtr` o1) $ \orig ->
+    copyBytes dest orig sz
+
+-- | Freeze a 'ReadBinHandle' and a start index into a 'FullBinData'.
+--
+-- 'FullBinData' stores a slice starting from the 'Bin a' location to the current
+-- offset of the 'ReadBinHandle'.
+freezeBinHandle :: ReadBinHandle -> Bin a -> IO FullBinData
+freezeBinHandle (ReadBinMem user_data ixr sz binr) (BinPtr start) = do
+  ix <- readFastMutInt ixr
+  pure (FullBinData user_data start ix sz binr)
+
+-- | Turn the 'FullBinData' into a 'ReadBinHandle', setting the 'ReadBinHandle'
+-- offset to the start of the 'FullBinData' and restore the 'ReaderUserData' that was
+-- obtained from 'freezeBinHandle'.
+thawBinHandle :: FullBinData -> IO ReadBinHandle
+thawBinHandle (FullBinData user_data ix _end sz ba) = do
+  ixr <- newFastMutInt ix
+  return $ ReadBinMem user_data ixr sz ba
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -288,8 +348,46 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
 newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
 
+-- | Like a 'Bin' but is used to store relative offset pointers.
+-- Relative offset pointers store a relative location, but also contain an
+-- anchor that allow to obtain the absolute offset.
+data RelBin a = RelBin
+  { relBin_anchor :: {-# UNPACK #-} !(Bin a)
+  -- ^ Absolute position from where we read 'relBin_offset'.
+  , relBin_offset :: {-# UNPACK #-} !(RelBinPtr a)
+  -- ^ Relative offset to 'relBin_anchor'.
+  -- The absolute position of the 'RelBin' is @relBin_anchor + relBin_offset@
+  }
+  deriving (Eq, Ord, Show, Bounded)
+
+-- | A 'RelBinPtr' is like a 'Bin', but contains a relative offset pointer
+-- instead of an absolute offset.
+newtype RelBinPtr a = RelBinPtr (Bin a)
+  deriving (Eq, Ord, Show, Bounded)
+
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
+
+-- | Read a relative offset location and wrap it in 'RelBin'.
+--
+-- The resulting 'RelBin' can be translated into an absolute offset location using
+-- 'makeAbsoluteBin'
+getRelBin :: ReadBinHandle -> IO (RelBin a)
+getRelBin bh = do
+  start <- tellBinReader bh
+  off <- get bh
+  pure $ RelBin start off
+
+makeAbsoluteBin ::  RelBin a -> Bin a
+makeAbsoluteBin (RelBin (BinPtr !start) (RelBinPtr (BinPtr !offset))) =
+  BinPtr $ start + offset
+
+makeRelativeBin :: RelBin a -> RelBinPtr a
+makeRelativeBin (RelBin _ offset) = offset
+
+toRelBin :: Bin (RelBinPtr a) -> Bin a -> RelBin a
+toRelBin (BinPtr !start) (BinPtr !goal) =
+  RelBin (BinPtr start) (RelBinPtr $ BinPtr $ goal - start)
 
 ---------------------------------------------------------------
 -- class Binary
@@ -310,6 +408,9 @@ class Binary a where
 
 putAt  :: Binary a => WriteBinHandle -> Bin a -> a -> IO ()
 putAt bh p x = do seekBinWriter bh p; put_ bh x; return ()
+
+putAtRel :: WriteBinHandle -> Bin (RelBinPtr a) -> Bin a -> IO ()
+putAtRel bh from to = putAt bh from (makeRelativeBin $ toRelBin from to)
 
 getAt  :: Binary a => ReadBinHandle -> Bin a -> IO a
 getAt bh p = do seekBinReader bh p; get bh
@@ -344,7 +445,7 @@ freezeWriteHandle wbm = do
     , rbm_arr_r = rbm_arr_r
     }
 
--- Copy the BinBuffer to a new BinBuffer which is exactly the right size.
+-- | Copy the BinBuffer to a new BinBuffer which is exactly the right size.
 -- This performs a copy of the underlying buffer.
 -- The buffer may be truncated if the offset is not at the end of the written
 -- output.
@@ -396,6 +497,13 @@ seekBinReader :: ReadBinHandle -> Bin a -> IO ()
 seekBinReader (ReadBinMem _ ix_r sz_r _) (BinPtr !p) = do
   if (p > sz_r)
         then panic "seekBinReader: seek out of range"
+        else writeFastMutInt ix_r p
+
+seekBinReaderRel :: ReadBinHandle -> RelBin a -> IO ()
+seekBinReaderRel (ReadBinMem _ ix_r sz_r _) relBin = do
+  let (BinPtr !p) = makeAbsoluteBin relBin
+  if (p > sz_r)
+        then panic "seekBinReaderRel: seek out of range"
         else writeFastMutInt ix_r p
 
 writeBinMem :: WriteBinHandle -> FilePath -> IO ()
@@ -1118,12 +1226,17 @@ instance Binary (Bin a) where
   put_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
   get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
 
+-- Instance uses fixed-width encoding to allow inserting
+-- Bin placeholders in the stream.
+instance Binary (RelBinPtr a) where
+  put_ bh (RelBinPtr i) = put_ bh i
+  get bh = RelBinPtr <$> get bh
 
 -- -----------------------------------------------------------------------------
 -- Forward reading/writing
 
--- | "forwardPut put_A put_B" outputs A after B but allows A to be read before B
--- by using a forward reference
+-- | @'forwardPut' put_A put_B@ outputs A after B but allows A to be read before B
+-- by using a forward reference.
 forwardPut :: WriteBinHandle -> (b -> IO a) -> IO b -> IO (a,b)
 forwardPut bh put_A put_B = do
   -- write placeholder pointer to A
@@ -1146,6 +1259,8 @@ forwardPut_ :: WriteBinHandle -> (b -> IO a) -> IO b -> IO ()
 forwardPut_ bh put_A put_B = void $ forwardPut bh put_A put_B
 
 -- | Read a value stored using a forward reference
+--
+-- The forward reference is expected to be an absolute offset.
 forwardGet :: ReadBinHandle -> IO a -> IO a
 forwardGet bh get_A = do
     -- read forward reference
@@ -1154,6 +1269,48 @@ forwardGet bh get_A = do
     p_a <- tellBinReader bh
     -- go read the forward value, then seek back
     seekBinReader bh p
+    r <- get_A
+    seekBinReader bh p_a
+    pure r
+
+-- | @'forwardPutRel' put_A put_B@ outputs A after B but allows A to be read before B
+-- by using a forward reference.
+--
+-- This forward reference is a relative offset that allows us to skip over the
+-- result of 'put_A'.
+forwardPutRel :: WriteBinHandle -> (b -> IO a) -> IO b -> IO (a,b)
+forwardPutRel bh put_A put_B = do
+  -- write placeholder pointer to A
+  pre_a <- tellBinWriter bh
+  put_ bh pre_a
+
+  -- write B
+  r_b <- put_B
+
+  -- update A's pointer
+  a <- tellBinWriter bh
+  putAtRel bh pre_a a
+  seekBinNoExpandWriter bh a
+
+  -- write A
+  r_a <- put_A r_b
+  pure (r_a,r_b)
+
+-- | Like 'forwardGetRel', but discard the result.
+forwardPutRel_ :: WriteBinHandle -> (b -> IO a) -> IO b -> IO ()
+forwardPutRel_ bh put_A put_B = void $ forwardPutRel bh put_A put_B
+
+-- | Read a value stored using a forward reference.
+--
+-- The forward reference is expected to be a relative offset.
+forwardGetRel :: ReadBinHandle -> IO a -> IO a
+forwardGetRel bh get_A = do
+    -- read forward reference
+    p <- getRelBin bh
+    -- store current position
+    p_a <- tellBinReader bh
+    -- go read the forward value, then seek back
+    seekBinReader bh $ makeAbsoluteBin p
     r <- get_A
     seekBinReader bh p_a
     pure r
@@ -1167,19 +1324,19 @@ lazyPut = lazyPut' put_
 lazyGet :: Binary a => ReadBinHandle -> IO a
 lazyGet = lazyGet' get
 
-lazyPut' :: HasDebugCallStack => (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
+lazyPut' :: (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
 lazyPut' f bh a = do
     -- output the obj with a ptr to skip over it:
     pre_a <- tellBinWriter bh
     put_ bh pre_a       -- save a slot for the ptr
     f bh a           -- dump the object
     q <- tellBinWriter bh     -- q = ptr to after object
-    putAt bh pre_a q    -- fill in slot before a with ptr to q
+    putAtRel bh pre_a q    -- fill in slot before a with ptr to q
     seekBinWriter bh q        -- finally carry on writing at q
 
-lazyGet' :: HasDebugCallStack => (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
+lazyGet' :: (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
 lazyGet' f bh = do
-    p <- get bh -- a BinPtr
+    p <- getRelBin bh -- a BinPtr
     p_a <- tellBinReader bh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh rbm_off_r variable in the child thread, for thread
@@ -1188,7 +1345,7 @@ lazyGet' f bh = do
         let bh' = bh { rbm_off_r = off_r }
         seekBinReader bh' p_a
         f bh'
-    seekBinReader bh p -- skip over the object for now
+    seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
     return a
 
 -- | Serialize the constructor strictly but lazily serialize a value inside a
@@ -1324,7 +1481,7 @@ mkReader f = BinaryReader
 -- | Find the 'BinaryReader' for the 'Binary' instance for the type identified by 'Proxy a'.
 --
 -- If no 'BinaryReader' has been configured before, this function will panic.
-findUserDataReader :: forall a . (HasCallStack, Refl.Typeable a) => Proxy a -> ReadBinHandle -> BinaryReader a
+findUserDataReader :: forall a . Refl.Typeable a => Proxy a -> ReadBinHandle -> BinaryReader a
 findUserDataReader query bh =
   case Map.lookup (Refl.someTypeRep query) (ud_reader_data $ getReaderUserData bh) of
     Nothing -> panic $ "Failed to find BinaryReader for the key: " ++ show (Refl.someTypeRep query)
@@ -1346,7 +1503,7 @@ findUserDataReader query bh =
 -- | Find the 'BinaryWriter' for the 'Binary' instance for the type identified by 'Proxy a'.
 --
 -- If no 'BinaryWriter' has been configured before, this function will panic.
-findUserDataWriter :: forall a . (HasCallStack, Refl.Typeable a) => Proxy a -> WriteBinHandle -> BinaryWriter a
+findUserDataWriter :: forall a . Refl.Typeable a => Proxy a -> WriteBinHandle -> BinaryWriter a
 findUserDataWriter query bh =
   case Map.lookup (Refl.someTypeRep query) (ud_writer_data $ getWriterUserData bh) of
     Nothing -> panic $ "Failed to find BinaryWriter for the key: " ++ show (Refl.someTypeRep query)
@@ -1482,13 +1639,13 @@ putGenericSymbolTable gen_sym_tab serialiser bh = do
                 mapM_ (\n -> serialiser bh n) (reverse todo)
                 loop
       snd <$>
-        (forwardPut bh (const $ readFastMutInt symtab_next >>= put_ bh) $
+        (forwardPutRel bh (const $ readFastMutInt symtab_next >>= put_ bh) $
           loop)
 
 -- | Read the elements of a 'GenericSymbolTable' from disk into a 'SymbolTable'.
 getGenericSymbolTable :: forall a . (ReadBinHandle -> IO a) -> ReadBinHandle -> IO (SymbolTable a)
 getGenericSymbolTable deserialiser bh = do
-  sz <- forwardGet bh (get bh) :: IO Int
+  sz <- forwardGetRel bh (get bh) :: IO Int
   mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int a)
   forM_ [0..(sz-1)] $ \i -> do
     f <- deserialiser bh

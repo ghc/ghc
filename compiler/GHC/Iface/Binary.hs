@@ -63,6 +63,8 @@ import Data.Map.Strict (Map)
 import Data.Word
 import System.IO.Unsafe
 import Data.Typeable (Typeable)
+import qualified GHC.Data.Strict as Strict
+import Data.Function ((&))
 
 
 -- ---------------------------------------------------------------------------
@@ -173,22 +175,27 @@ readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
 
     mod_iface <- getIfaceWithExtFields name_cache bh
 
-    return mod_iface
-      { mi_src_hash = src_hash
-      }
+    return $ mod_iface
+      & addSourceFingerprint src_hash
+
 
 getIfaceWithExtFields :: NameCache -> ReadBinHandle -> IO ModIface
 getIfaceWithExtFields name_cache bh = do
-  extFields_p <- get bh
+  -- Start offset for the byte array that contains the serialised 'ModIface'.
+  start <- tellBinReader bh
+  extFields_p_rel <- getRelBin bh
 
   mod_iface <- getWithUserData name_cache bh
 
-  seekBinReader bh extFields_p
+  seekBinReaderRel bh extFields_p_rel
   extFields <- get bh
-  pure mod_iface
-    { mi_ext_fields = extFields
-    }
-
+  -- Store the 'ModIface' byte array, so that we can avoid serialisation if
+  -- the 'ModIface' isn't modified.
+  -- See Note [Sharing of ModIface]
+  modIfaceBinData <- freezeBinHandle bh start
+  pure $ mod_iface
+    & set_mi_ext_fields extFields
+    & set_mi_hi_bytes (FullIfaceBinHandle $ Strict.Just modIfaceBinData)
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
@@ -218,7 +225,7 @@ getTables name_cache bh = do
         -- add it to the 'ReaderUserData' of 'ReadBinHandle'.
         decodeReaderTable :: Typeable a => ReaderTable a -> ReadBinHandle -> IO ReadBinHandle
         decodeReaderTable tbl bh0 = do
-          table <- Binary.forwardGet bh (getTable tbl bh0)
+          table <- Binary.forwardGetRel bh (getTable tbl bh0)
           let binaryReader = mkReaderFromTable tbl table
           pure $ addReaderToUserData binaryReader bh0
 
@@ -260,11 +267,18 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     -- And send the result to the file
     writeBinMem bh hi_path
 
--- | Puts the 'ModIface'
+-- | Puts the 'ModIface' to the 'WriteBinHandle'.
+--
+-- This avoids serialisation of the 'ModIface' if the fields 'mi_hi_bytes' contains a
+-- 'Just' value. This field is populated by reading the 'ModIface' using
+-- 'getIfaceWithExtFields' and not modifying it in any way afterwards.
 putIfaceWithExtFields :: TraceBinIFace -> CompressionIFace -> WriteBinHandle -> ModIface -> IO ()
 putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
-  forwardPut_ bh (\_ -> put_ bh (mi_ext_fields mod_iface)) $ do
-    putWithUserData traceBinIface compressionLevel bh mod_iface
+  case mi_hi_bytes mod_iface of
+    FullIfaceBinHandle Strict.Nothing -> do
+      forwardPutRel_ bh (\_ -> put_ bh (mi_ext_fields mod_iface)) $ do
+        putWithUserData traceBinIface compressionLevel bh mod_iface
+    FullIfaceBinHandle (Strict.Just binData) -> putFullBinData bh binData
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.
@@ -339,7 +353,7 @@ putAllTables _ [] act = do
   a <- act
   pure ([], a)
 putAllTables bh (x : xs) act = do
-  (r, (res, a)) <- forwardPut bh (const $ putTable x bh) $ do
+  (r, (res, a)) <- forwardPutRel bh (const $ putTable x bh) $ do
     putAllTables bh xs act
   pure (r : res, a)
 
@@ -491,7 +505,7 @@ to the table we need to deserialise first.
 What deduplication tables exist and the order of serialisation is currently statically specified
 in 'putWithTables'. 'putWithTables' also takes care of the serialisation of used deduplication tables.
 The deserialisation of the deduplication tables happens 'getTables', using 'Binary' utility
-functions such as 'forwardGet'.
+functions such as 'forwardGetRel'.
 
 Here, a visualisation of the table structure we currently have (ignoring 'ExtensibleFields'):
 
@@ -591,7 +605,6 @@ initWriteIfaceType compressionLevel = do
         put_ bh ifaceTypeSharedByte
         putGenericSymTab sym_tab bh ty
       _ -> putIfaceType bh ty
-
 
     fullIfaceTypeSerialiser sym_tab bh ty = do
       put_ bh ifaceTypeSharedByte
