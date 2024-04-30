@@ -236,7 +236,7 @@ simple_opt_clo :: HasCallStack
 simple_opt_clo in_scope (e_env, e)
   = simple_opt_expr (soeSetInScope in_scope e_env) e
 
-simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
+simple_opt_expr :: HasDebugCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
   = go expr
   where

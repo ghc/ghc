@@ -485,7 +485,7 @@ only _ = panic "Util: only"
 -- | Extract the single element of a list and panic with the given message if
 -- there are more elements or the list was empty.
 -- Like 'expectJust', but for lists.
-expectOnly :: HasCallStack => String -> [a] -> a
+expectOnly :: HasDebugCallStack => String -> [a] -> a
 {-# INLINE expectOnly #-}
 #if defined(DEBUG)
 expectOnly _   [a]   = a
@@ -513,7 +513,7 @@ changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
 
 -- | Like @expectJust msg . nonEmpty@; a better alternative to 'NE.fromList'.
-expectNonEmpty :: HasCallStack => String -> [a] -> NonEmpty a
+expectNonEmpty :: HasDebugCallStack => String -> [a] -> NonEmpty a
 {-# INLINE expectNonEmpty #-}
 expectNonEmpty _   (x:xs) = x:|xs
 expectNonEmpty msg []     = expectNonEmptyPanic msg

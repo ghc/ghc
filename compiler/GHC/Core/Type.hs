@@ -1587,7 +1587,7 @@ tyConAppArgs_maybe ty = case splitTyConApp_maybe ty of
                           Just (_, tys) -> Just tys
                           Nothing       -> Nothing
 
-tyConAppArgs :: HasCallStack => Type -> [Type]
+tyConAppArgs :: HasDebugCallStack => Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
@@ -1627,7 +1627,7 @@ splitTyConAppNoView_maybe ty
 --
 -- Consequently, you may need to zonk your type before
 -- using this function.
-tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+tcSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty
   = case coreFullView ty of

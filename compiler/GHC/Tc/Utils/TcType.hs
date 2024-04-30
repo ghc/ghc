@@ -580,7 +580,7 @@ data TcTyVarDetails
            , mtv_ref   :: IORef MetaDetails
            , mtv_tclvl :: TcLevel }  -- See Note [TcLevel invariants]
 
-vanillaSkolemTvUnk :: HasCallStack => TcTyVarDetails
+vanillaSkolemTvUnk :: HasDebugCallStack => TcTyVarDetails
 vanillaSkolemTvUnk = SkolemTv unkSkol topTcLevel False
 
 instance Outputable TcTyVarDetails where

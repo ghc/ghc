@@ -67,6 +67,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Stack
 import GHC.Utils.Monad
+import GHC.Utils.Misc( HasDebugCallStack )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
@@ -311,10 +312,10 @@ data SkolemInfoAnon
 --
 -- We're hoping to be able to get rid of this entirely, but for the moment
 -- it's still needed.
-unkSkol :: HasCallStack => SkolemInfo
+unkSkol :: HasDebugCallStack => SkolemInfo
 unkSkol = SkolemInfo (mkUniqueGrimily 0) unkSkolAnon
 
-unkSkolAnon :: HasCallStack => SkolemInfoAnon
+unkSkolAnon :: HasDebugCallStack => SkolemInfoAnon
 unkSkolAnon = UnkSkol callStack
 
 -- | Wrap up the origin of a skolem type variable with a new 'Unique',
@@ -864,7 +865,7 @@ pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
 -- | Short one-liners
-pprCtO :: HasCallStack => CtOrigin -> SDoc
+pprCtO :: HasDebugCallStack => CtOrigin -> SDoc
 pprCtO (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
 pprCtO AppOrigin             = text "an application"

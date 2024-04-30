@@ -1,6 +1,6 @@
 module GHC.Tc.Types.Origin where
 
-import GHC.Stack ( HasCallStack )
+import GHC.Utils.Misc ( HasDebugCallStack )
 
 data SkolemInfoAnon
 data SkolemInfo
@@ -11,4 +11,4 @@ data CtOrigin
 data ClsInstOrQC = IsClsInst
                  | IsQC CtOrigin
 
-unkSkol :: HasCallStack => SkolemInfo
+unkSkol :: HasDebugCallStack => SkolemInfo

@@ -2349,7 +2349,7 @@ addWeakFVs dmd_ty weak_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-setBndrsDemandInfo :: HasCallStack => [Var] -> [Demand] -> [Var]
+setBndrsDemandInfo :: HasDebugCallStack => [Var] -> [Demand] -> [Var]
 setBndrsDemandInfo (b:bs) ds
   | isTyVar b = b : setBndrsDemandInfo bs ds
 setBndrsDemandInfo (b:bs) (d:ds) =
