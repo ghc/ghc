@@ -154,7 +154,7 @@ class TestConfig:
         self.ghc_has_smp = True
 
         # Does the target have SMP support?
-        self.target_has_smp = True
+        self.target_has_smp = False
 
         # Is gdb available?
         self.have_gdb = False

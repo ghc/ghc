@@ -282,7 +282,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
             , arg "-e", arg $ asBool "config.ghc_with_threaded_rts=" (hasThreadedRts)
             , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
-            , arg "-e", arg $ asBool "target_with_smp=" targetWithSMP
+            , arg "-e", arg $ asBool "config.target_has_smp=" targetWithSMP
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore
 
