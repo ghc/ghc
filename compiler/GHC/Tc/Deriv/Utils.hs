@@ -649,7 +649,7 @@ mkDirectThetaSpec origin t_or_k =
                , sps_type_or_kind = t_or_k
                })
 
-substPredSpec :: HasCallStack => Subst -> PredSpec -> PredSpec
+substPredSpec :: HasDebugCallStack => Subst -> PredSpec -> PredSpec
 substPredSpec subst ps =
   case ps of
     SimplePredSpec { sps_pred = pred

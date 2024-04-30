@@ -1,7 +1,7 @@
 module GHC.Tc.Types.Origin where
 
 import GHC.Prelude.Basic ( Int, Maybe )
-import GHC.Stack ( HasCallStack )
+import GHC.Utils.Misc ( HasDebugCallStack )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 
 data SkolemInfoAnon
@@ -16,4 +16,4 @@ data FixedRuntimeRepOrigin
 mkFRRUnboxedTuple :: Int -> FixedRuntimeRepContext
 mkFRRUnboxedSum :: Maybe Int -> FixedRuntimeRepContext
 
-unkSkol :: HasCallStack => SkolemInfo
+unkSkol :: HasDebugCallStack => SkolemInfo

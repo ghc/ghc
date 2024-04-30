@@ -3589,7 +3589,7 @@ data SkolemModeDetails
   | SMDSkolemTv SkolemInfo
 
 
-smVanilla :: HasCallStack => SkolemMode
+smVanilla :: HasDebugCallStack => SkolemMode
 smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
                , sm_parent = False
                , sm_tvtv   = pprPanic "sm_tvtv" callStackDoc -- We always override this

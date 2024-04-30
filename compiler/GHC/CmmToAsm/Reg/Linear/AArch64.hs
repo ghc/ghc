@@ -8,11 +8,11 @@ import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc( HasDebugCallStack )
 import GHC.Platform
 
 import Data.Word
 
-import GHC.Stack
 -- AArch64 has 32 64bit general purpose register r0..r30, and zr/sp
 -- AArch64 has 32 128bit floating point registers v0..v31 as part of the NEON
 -- extension in Armv8-A.
@@ -65,7 +65,7 @@ showBits :: Word32 -> String
 showBits w = map (\i -> if testBit w i then '1' else '0') [0..31]
 
 -- FR instance implementation (See Linear.FreeRegs)
-allocateReg :: HasCallStack => RealReg -> FreeRegs -> FreeRegs
+allocateReg :: HasDebugCallStack => RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs g f)
     | r > 31 && testBit f (r - 32) = FreeRegs g (clearBit f (r - 32))
     | r < 32 && testBit g r = FreeRegs (clearBit g r) f
@@ -127,7 +127,7 @@ getFreeRegs cls (FreeRegs g f)
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
-releaseReg :: HasCallStack => RealReg -> FreeRegs -> FreeRegs
+releaseReg :: HasDebugCallStack => RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle r) (FreeRegs g f)
   | r > 31 && testBit f (r - 32) = pprPanic "Linear.AArch64.releaseReg" (text  "can't release non-allocated reg v" <> int (r - 32))
   | r < 32 && testBit g r = pprPanic "Linear.AArch64.releaseReg" (text "can't release non-allocated reg x" <> int r)

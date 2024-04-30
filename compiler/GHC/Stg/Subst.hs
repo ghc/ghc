@@ -55,7 +55,7 @@ substBndrs = runState . traverse (state . substBndr)
 
 -- | Substitutes an occurrence of an identifier for its counterpart recorded
 -- in the 'Subst'.
-lookupIdSubst :: HasCallStack => Id -> Subst -> Id
+lookupIdSubst :: HasDebugCallStack => Id -> Subst -> Id
 lookupIdSubst id (Subst in_scope env)
   | not (isLocalId id) = id
   | Just id' <- lookupVarEnv env id = id'
@@ -65,7 +65,7 @@ lookupIdSubst id (Subst in_scope env)
 -- | Substitutes an occurrence of an identifier for its counterpart recorded
 -- in the 'Subst'. Does not generate a debug warning if the identifier to
 -- to substitute wasn't in scope.
-noWarnLookupIdSubst :: HasCallStack => Id -> Subst -> Id
+noWarnLookupIdSubst :: HasDebugCallStack => Id -> Subst -> Id
 noWarnLookupIdSubst id (Subst in_scope env)
   | not (isLocalId id) = id
   | Just id' <- lookupVarEnv env id = id'
