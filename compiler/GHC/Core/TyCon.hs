@@ -2063,8 +2063,9 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
     go_alg_rep (SumTyCon {})      _               = True
     go_alg_rep (DataTyCon {})     _               = True
     go_alg_rep (AbstractTyCon {}) _               = False
--- Not sure why we need this
---    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
+    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
+       -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
+       -- So newtype classes need to pretend to be injective.
     go_alg_rep (NewTyCon {})      _               = False
 
 {- Note [Newtype classes]
