@@ -56,7 +56,7 @@ import GHC.Types.Unique.FM
 import GHC.Unit.State
 import GHC.Utils.Binary
 
-import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
+import GHC.Iface.Type (IfaceType, putIfaceType)
 
 import Haddock.Options (Visibility (..))
 
@@ -200,7 +200,7 @@ writeInterfaceFile filename iface = do
 
   -- write the iface type pointer at the front of the file
   ifacetype_p <- tellBinWriter bh
-  putAt bh ifacetype_p_p ifacetype_p
+  putAtRel bh ifacetype_p_p ifacetype_p
   seekBinWriter bh ifacetype_p
 
   -- write the symbol table itself
@@ -208,7 +208,7 @@ writeInterfaceFile filename iface = do
 
   -- write the symtab pointer at the front of the file
   symtab_p <- tellBinWriter bh
-  putAt bh symtab_p_p symtab_p
+  putAtRel bh symtab_p_p symtab_p
   seekBinWriter bh symtab_p
 
   -- write the symbol table itself
@@ -218,7 +218,7 @@ writeInterfaceFile filename iface = do
 
   -- write the dictionary pointer at the fornt of the file
   dict_p <- tellBinWriter bh
-  putAt bh dict_p_p dict_p
+  putAtRel bh dict_p_p dict_p
   seekBinWriter bh dict_p
 
   -- write the dictionary itself

@@ -44,6 +44,7 @@ import GHC.Utils.Panic
 import qualified Data.Traversable as T
 
 import Data.IORef
+import Data.Function ((&))
 
 tcRnMsgMaybe :: IO (Either (Messages TcRnMessage) a) -> TcM a
 tcRnMsgMaybe do_this = do
@@ -108,13 +109,14 @@ rnModIface hsc_env insts nsubst iface =
         deps <- rnDependencies (mi_deps iface)
         -- TODO:
         -- mi_rules
-        return iface { mi_module = mod
-                     , mi_sig_of = sig_of
-                     , mi_insts = insts
-                     , mi_fam_insts = fams
-                     , mi_exports = exports
-                     , mi_decls = decls
-                     , mi_deps = deps }
+        return $ iface
+          & set_mi_module mod
+          & set_mi_sig_of sig_of
+          & set_mi_insts insts
+          & set_mi_fam_insts fams
+          & set_mi_exports exports
+          & set_mi_decls decls
+          & set_mi_deps deps
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
