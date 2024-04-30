@@ -1341,9 +1341,9 @@ isNewTypeClassApp v args
   | Just data_con <- isDataConWorkId_maybe v
   , let tycon = dataConTyCon data_con
   , isNewTyCon tycon
-  , let get_payload 0 rev_arg_tys (CpeApp payload : args')
+  , let get_payload 0 rev_arg_tys (AIApp payload : args')
           = Just (wrapNewTypeBody tycon (reverse rev_arg_tys) payload, args')
-        get_payload n rev_arg_tys (CpeApp (Type ty) : args)
+        get_payload n rev_arg_tys (AIApp (Type ty) : args)
           = get_payload (n-1) (ty:rev_arg_tys) args
         get_payload _ _ _
           = Nothing

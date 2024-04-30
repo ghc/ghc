@@ -52,7 +52,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.DataCon
-import GHC.Core.TyCon     ( TyCon, tyConArity, isInjectiveTyCon )
+import GHC.Core.TyCon     ( TyCon, tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy, isCallStackTy )
 import GHC.Core.Multiplicity
@@ -3078,7 +3078,6 @@ push_data_con to_tc to_tc_arg_tys dc dc_args co role
   = assertPpr (eqType from_ty dc_app_ty)     dump_doc $
     assertPpr (equalLength val_args arg_tys) dump_doc $
     assertPpr (role == coercionRole co)      dump_doc $
-    assertPpr (isInjectiveTyCon to_tc role)  dump_doc $
     (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
   where
     Pair from_ty to_ty = coercionKind co
