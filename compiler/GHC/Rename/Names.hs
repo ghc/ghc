@@ -1660,6 +1660,7 @@ lookupChildren all_kids rdr_items
 *********************************************************
 -}
 
+-- JADE_TODO
 reportUnusedNames :: TcGblEnv -> HscSource -> RnM ()
 reportUnusedNames gbl_env hsc_src
   = do  { keep <- readTcRef (tcg_keep gbl_env)
@@ -1704,6 +1705,7 @@ reportUnusedNames gbl_env hsc_src
               = partition (gre_is_used (used_names keep)) defined_names
 
       in filter is_unused_local defined_but_not_used
+
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre
                        && isExternalName (greName gre)

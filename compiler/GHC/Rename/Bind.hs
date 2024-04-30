@@ -366,6 +366,8 @@ rnLocalValBindsRHS bound_names binds
 --
 -- here there are no local fixity decls passed in;
 -- the local fixity decls come from the ValBinds sigs
+--
+-- JADE_TODO
 rnLocalValBindsAndThen
   :: HsValBinds GhcPs
   -> (HsValBinds GhcRn -> FreeVars -> RnM (result, FreeVars))

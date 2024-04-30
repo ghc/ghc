@@ -966,6 +966,7 @@ data WarningFlag =
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
    | Opt_WarnUnusedTopBinds
+   | Opt_WarnIndirectlyUnusedBinds
    | Opt_WarnUnusedLocalBinds
    | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
@@ -1132,6 +1133,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnusedMatches                           -> "unused-matches" :| []
   Opt_WarnUnusedPatternBinds                      -> "unused-pattern-binds" :| []
   Opt_WarnUnusedTopBinds                          -> "unused-top-binds" :| []
+  Opt_WarnIndirectlyUnusedBinds                   -> "indirectly-unused-binds" :| []
   Opt_WarnUnusedTypePatterns                      -> "unused-type-patterns" :| []
   Opt_WarnUnusedRecordWildcards                   -> "unused-record-wildcards" :| []
   Opt_WarnRedundantBangPatterns                   -> "redundant-bang-patterns" :| []

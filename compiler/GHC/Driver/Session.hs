@@ -2308,6 +2308,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnUnusedMatches -> warnSpec x
   Opt_WarnUnusedPatternBinds -> warnSpec x
   Opt_WarnUnusedTopBinds -> warnSpec x
+  Opt_WarnIndirectlyUnusedBinds -> warnSpec x
   Opt_WarnUnusedTypePatterns -> warnSpec x
   Opt_WarnUnusedRecordWildcards -> warnSpec x
   Opt_WarnRedundantBangPatterns -> warnSpec x

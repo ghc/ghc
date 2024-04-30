@@ -577,7 +577,7 @@ warnIfExportDeprecated gre@(GRE { gre_imp = iss })
 -------------------------
 --      Helpers
 warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
-warnUnusedGREs gres = mapM_ warnUnusedGRE gres
+warnUnusedGREs gres = mapM_ (\gre -> warnUnused1 UnusedNameTopDecl (greName gre) (greOccName gre)) gres
 
 -- NB the Names must not be the names of record fields!
 warnUnused :: UnusedNameProv -> [Name] -> RnM ()
@@ -592,18 +592,6 @@ warnUnused1 prov child child_occ
 warn_unused_name :: UnusedNameProv -> SrcSpan -> OccName -> RnM ()
 warn_unused_name prov span child_occ =
   addDiagnosticAt span (TcRnUnusedName child_occ prov)
-
-warnUnusedGRE :: GlobalRdrElt -> RnM ()
-warnUnusedGRE gre@(GRE { gre_lcl = lcl, gre_imp = is })
-  | lcl       = warnUnused1 UnusedNameTopDecl nm occ
-  | otherwise = when (reportable nm occ) (mapM_ warn is)
-  where
-    occ = greOccName gre
-    nm = greName gre
-    warn spec =
-      warn_unused_name (UnusedNameImported (importSpecModule spec)) span occ
-      where
-        span = importSpecLoc spec
 
 -- | Should we report the fact that this 'Name' is unused? The
 -- 'OccName' may differ from 'nameOccName' due to
