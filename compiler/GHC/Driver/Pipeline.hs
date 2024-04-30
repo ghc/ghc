@@ -250,7 +250,7 @@ compileOne' mHscMessage
    details <- initModDetails plugin_hsc_env iface
    linkable' <- traverse (initWholeCoreBindings plugin_hsc_env iface details) (homeMod_bytecode linkable)
    -- extra_decl is not used any more after generating byte code
-   let iface' = iface { mi_extra_decls = Nothing }
+   let iface' = set_mi_extra_decls Nothing iface
    --
    return $! HomeModInfo iface' details (linkable { homeMod_bytecode = linkable' })
 

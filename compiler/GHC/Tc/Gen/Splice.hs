@@ -1562,7 +1562,8 @@ lookupDeclDoc nm = do
       -- Wasn't in the current module. Try searching other external ones!
       mIface <- getExternalModIface nm
       case mIface of
-        Just ModIface { mi_docs = Just Docs{docs_decls = dmap} } ->
+        Just iface
+          | Just Docs{docs_decls = dmap} <- mi_docs iface ->
           pure $ renderHsDocStrings . map hsDocString <$> lookupUniqMap dmap nm
         _ -> pure Nothing
 
@@ -1578,7 +1579,8 @@ lookupArgDoc i nm = do
     Nothing -> do
       mIface <- getExternalModIface nm
       case mIface of
-        Just ModIface { mi_docs = Just Docs{docs_args = amap} } ->
+        Just iface
+          | Just Docs{docs_args = amap} <- mi_docs iface->
           pure $ renderHsDocString . hsDocString <$> (lookupUniqMap amap nm >>= IntMap.lookup i)
         _ -> pure Nothing
 

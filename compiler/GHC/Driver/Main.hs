@@ -974,7 +974,7 @@ add_iface_to_hpt iface details =
     addToHpt hpt (moduleName (mi_module iface'))
     (HomeModInfo iface' details emptyHomeModInfoLinkable)
   where
-    iface' = iface { mi_extra_decls = Nothing }
+    iface' = set_mi_extra_decls Nothing iface
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]

@@ -87,6 +87,7 @@ import Control.Monad
 import Data.List (find)
 
 import GHC.Iface.Errors.Types
+import Data.Function ((&))
 
 checkHsigDeclM :: ModIface -> TyThing -> TyThing -> TcRn ()
 checkHsigDeclM sig_iface sig_thing real_thing = do
@@ -369,8 +370,8 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
 thinModIface avails iface =
-    iface {
-        mi_exports = avails,
+    iface
+        & set_mi_exports avails
         -- mi_fixities = ...,
         -- mi_warns = ...,
         -- mi_anns = ...,
@@ -378,10 +379,9 @@ thinModIface avails iface =
         -- perhaps there might be two IfaceTopBndr that are the same
         -- OccName but different Name.  Requires better understanding
         -- of invariants here.
-        mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls
+        & set_mi_decls (exported_decls ++ non_exported_decls ++ dfun_decls)
         -- mi_insts = ...,
         -- mi_fam_insts = ...,
-    }
   where
     decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
     filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)

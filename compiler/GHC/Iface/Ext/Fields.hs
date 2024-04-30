@@ -41,7 +41,7 @@ instance Binary ExtensibleFields where
     -- to point to the start of each payload:
     forM_ header_entries $ \(field_p_p, dat) -> do
       field_p <- tellBinWriter bh
-      putAt bh field_p_p field_p
+      putAtRel bh field_p_p field_p
       seekBinWriter bh field_p
       put_ bh dat
 
@@ -50,11 +50,11 @@ instance Binary ExtensibleFields where
 
     -- Get the names and field pointers:
     header_entries <- replicateM n $
-      (,) <$> get bh <*> get bh
+      (,) <$> get bh <*> getRelBin bh
 
     -- Seek to and get each field's payload:
     fields <- forM header_entries $ \(name, field_p) -> do
-      seekBinReader bh field_p
+      seekBinReaderRel bh field_p
       dat <- get bh
       return (name, dat)
 
