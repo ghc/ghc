@@ -399,14 +399,14 @@ data ParFlags = ParFlags
 
 -- | Parameters pertaining to Haskell program coverage (HPC)
 --
--- @since base-4.22.0.0
+-- @since base-4.20.0.0
 data HpcFlags = HpcFlags
     { writeTixFile :: Bool
       -- ^ Controls whether the @<program>.tix@ file should be
       -- written after the execution of the program.
     }
-    deriving (Show -- ^ @since base-4.22.0.0
-             , Generic -- ^ @since base-4.22.0.0
+    deriving (Show -- ^ @since base-4.20.0.0
+             , Generic -- ^ @since base-4.20.0.0
              )
 -- | Parameters of the runtime system
 --
