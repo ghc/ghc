@@ -293,6 +293,13 @@ Runtime system
   can be individually enabled and disabled via
   :base-ref:`GHC.Exception.Backtrace.setEnabledBacktraceMechanisms`.
 
+- Deprecation of ``GHC.Pack`` has reached Phase 2. A warning is now thrown when importing the module.
+  See `ghc/ghc#21461 <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>`_.
+
+- `CLC proposal #258 <https://github.com/haskell/core-libraries-committee/issues/258>`_:
+  ``Data.List.NonEmpty.unzip`` raises a specific warning about its future monomorphisation.
+  Do consider switching to ``Data.Functor.unzip`` if you need to keep it polymorphic.
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
