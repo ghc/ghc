@@ -483,7 +483,7 @@ isOffsetImm off w
 
 -- TODO OPT: we might be able give getRegister
 --          a hint, what kind of register we want.
-getFloatReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
+getFloatReg :: HasDebugCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
 getFloatReg expr = do
   r <- getRegister expr
   case r of
