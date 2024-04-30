@@ -22,6 +22,7 @@ module GHC.Unit.Module.ModIface
       , mi_anns
       , mi_decls
       , mi_extra_decls
+      , mi_stub_objs
       , mi_top_env
       , mi_insts
       , mi_fam_insts
@@ -56,6 +57,7 @@ module GHC.Unit.Module.ModIface
    , set_mi_rules
    , set_mi_decls
    , set_mi_extra_decls
+   , set_mi_stub_objs
    , set_mi_top_env
    , set_mi_hpc
    , set_mi_trust
@@ -119,6 +121,7 @@ import GHC.Utils.Binary
 import Control.DeepSeq
 import Control.Exception
 import qualified GHC.Data.Strict as Strict
+import Data.ByteString (ByteString)
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -281,6 +284,13 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Extra variable definitions which are **NOT** exposed but when
                 -- combined with mi_decls allows us to restart code generation.
                 -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
+
+        mi_stub_objs_ :: ![ByteString],
+                -- ^ Serialized foreign stub dynamic objects when
+                -- compiled with -fbyte-code-and-object-code, empty
+                -- and unused in other cases. This is required to make
+                -- whole core bindings properly work with foreign
+                -- stubs (see #24634).
 
         mi_top_env_  :: !(Maybe IfaceTopEnv),
                 -- ^ Just enough information to reconstruct the top level environment in
@@ -453,6 +463,7 @@ instance Binary ModIface where
                  mi_anns_      = anns,
                  mi_decls_     = decls,
                  mi_extra_decls_ = extra_decls,
+                 mi_stub_objs_ = stub_objs,
                  mi_insts_     = insts,
                  mi_fam_insts_ = fam_insts,
                  mi_rules_     = rules,
@@ -497,6 +508,7 @@ instance Binary ModIface where
         lazyPut bh anns
         put_ bh decls
         put_ bh extra_decls
+        put_ bh stub_objs
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -529,6 +541,7 @@ instance Binary ModIface where
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
         extra_decls <- get bh
+        stub_objs   <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -558,6 +571,7 @@ instance Binary ModIface where
                  mi_warns_       = warns,
                  mi_decls_       = decls,
                  mi_extra_decls_ = extra_decls,
+                 mi_stub_objs_   = stub_objs,
                  mi_top_env_     = Nothing,
                  mi_insts_       = insts,
                  mi_fam_insts_   = fam_insts,
@@ -611,6 +625,7 @@ emptyPartialModIface mod
         mi_rules_       = [],
         mi_decls_       = [],
         mi_extra_decls_ = Nothing,
+        mi_stub_objs_   = [],
         mi_top_env_     = Nothing,
         mi_hpc_         = False,
         mi_trust_       = noIfaceTrustInfo,
@@ -664,7 +679,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
   rnf (PrivateModIface
                { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_, mi_usages_
                , mi_exports_, mi_used_th_, mi_fixities_, mi_warns_, mi_anns_
-               , mi_decls_, mi_extra_decls_, mi_top_env_, mi_insts_
+               , mi_decls_, mi_extra_decls_, mi_stub_objs_, mi_top_env_, mi_insts_
                , mi_fam_insts_, mi_rules_, mi_hpc_, mi_trust_, mi_trust_pkg_
                , mi_complete_matches_, mi_docs_, mi_final_exts_
                , mi_ext_fields_, mi_src_hash_ })
@@ -681,6 +696,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_anns_
     `seq` rnf mi_decls_
     `seq` rnf mi_extra_decls_
+    `seq` rnf mi_stub_objs_
     `seq` rnf mi_top_env_
     `seq` rnf mi_insts_
     `seq` rnf mi_fam_insts_
@@ -844,6 +860,9 @@ set_mi_decls val iface = clear_mi_hi_bytes $ iface { mi_decls_ = val }
 set_mi_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> ModIface_ phase -> ModIface_ phase
 set_mi_extra_decls val iface = clear_mi_hi_bytes $ iface { mi_extra_decls_ = val }
 
+set_mi_stub_objs :: [ByteString] -> ModIface_ phase -> ModIface_ phase
+set_mi_stub_objs stub_objs iface = clear_mi_hi_bytes $ iface { mi_stub_objs_ = stub_objs }
+
 set_mi_top_env :: Maybe IfaceTopEnv -> ModIface_ phase -> ModIface_ phase
 set_mi_top_env val iface = clear_mi_hi_bytes $ iface { mi_top_env_ = val }
 
@@ -940,6 +959,7 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_anns #-}
 {-# INLINE mi_decls #-}
 {-# INLINE mi_extra_decls #-}
+{-# INLINE mi_stub_objs #-}
 {-# INLINE mi_top_env #-}
 {-# INLINE mi_insts #-}
 {-# INLINE mi_fam_insts #-}
@@ -958,7 +978,7 @@ However, with the pragma, the correct core is generated:
 pattern ModIface ::
   Module -> Maybe Module -> HscSource -> Dependencies -> [Usage] ->
   [IfaceExport] -> Bool -> [(OccName, Fixity)] -> IfaceWarnings ->
-  [IfaceAnnotation] -> [IfaceDeclExts phase] -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] ->
+  [IfaceAnnotation] -> [IfaceDeclExts phase] -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> [ByteString] ->
   Maybe IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
   AnyHpcUsage -> IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
   IfaceBackendExts phase -> ExtensibleFields -> Fingerprint -> IfaceBinHandle phase ->
@@ -976,6 +996,7 @@ pattern ModIface
   , mi_anns
   , mi_decls
   , mi_extra_decls
+  , mi_stub_objs
   , mi_top_env
   , mi_insts
   , mi_fam_insts
@@ -1002,6 +1023,7 @@ pattern ModIface
     , mi_anns_ = mi_anns
     , mi_decls_ = mi_decls
     , mi_extra_decls_ = mi_extra_decls
+    , mi_stub_objs_ = mi_stub_objs
     , mi_top_env_ = mi_top_env
     , mi_insts_ = mi_insts
     , mi_fam_insts_ = mi_fam_insts
