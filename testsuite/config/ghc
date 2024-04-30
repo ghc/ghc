@@ -48,8 +48,7 @@ if config.have_interp:
 # whether the target supports smp
 if config.ghc_with_threaded_rts:
     config.run_ways.append('threaded1')
-    if target_with_smp:
-        config.target_has_smp = True
+    if config.target_has_smp:
         config.run_ways.append('threaded2')
         if config.speed == 0:
             config.run_ways.append('nonmoving_thr')

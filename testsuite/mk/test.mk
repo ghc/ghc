@@ -167,9 +167,9 @@ CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared
 endif
 
 ifeq "$(GhcWithSMP)" "YES"
-RUNTEST_OPTS += -e target_with_smp=True
+RUNTEST_OPTS += -e config.target_has_smp=True
 else
-RUNTEST_OPTS += -e target_with_smp=False
+RUNTEST_OPTS += -e config.target_has_smp=False
 endif
 
 ifeq "$(GhcWithRtsLinker)" "YES"
