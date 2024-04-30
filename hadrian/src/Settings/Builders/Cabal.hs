@@ -94,9 +94,9 @@ commonCabalArgs stage = do
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
               flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
-            -- We don't want to strip the debug RTS
-            , S.package rts ? pure [ "--disable-executable-stripping"
-                                  , "--disable-library-stripping" ]
+            -- We strip manually
+            , pure [ "--disable-executable-stripping"
+                   , "--disable-library-stripping" ]
             , arg "--cabal-file"
             , arg $ pkgCabalFile pkg
             , arg "--ipid"

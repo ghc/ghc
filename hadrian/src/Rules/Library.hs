@@ -65,6 +65,9 @@ buildStaticLib root archivePath = do
     removeFile archivePath
     build $ target context (Ar Pack stage) objs [archivePath]
     synopsis <- pkgSynopsis (package context)
+    build $ target context ObjCopy ["--only-keep-debug", archivePath, archivePath <.> "debug"] [archivePath <.> "debug"]
+    build $ target context Strip ["-g", archivePath] [archivePath]
+    build $ target context ObjCopy ["--add-gnu-debuglink="<>archivePath <.> "debug", archivePath] [archivePath]
     putSuccess $ renderLibrary
         (quote pkgname ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
         archivePath synopsis
@@ -93,6 +96,9 @@ buildDynamicLib root suffix dynlibpath = do
     registerPackages deps
     objs <- libraryObjects context
     build $ target context (Ghc LinkHs $ Context.stage context) objs [dynlibpath]
+    build $ target context ObjCopy ["--only-keep-debug", dynlibpath, dynlibpath <.> "debug"] [dynlibpath <.> "debug"]
+    build $ target context Strip ["-g", dynlibpath] [dynlibpath]
+    build $ target context ObjCopy ["--add-gnu-debuglink="<>dynlibpath <.> "debug", dynlibpath] [dynlibpath]
 
 -- | Build a "GHCi library" ('LibGhci') under the given build root, with the
 -- complete path of the file to build is given as the second argument.

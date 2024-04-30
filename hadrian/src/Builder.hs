@@ -44,6 +44,7 @@ import GHC.ResponseFile
 import GHC.Toolchain (Target(..))
 import qualified GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program
+import Debug.Trace
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -191,6 +192,8 @@ data Builder = Alex
              | Makeindex  -- ^ from xelatex
              | Git GitMode
              | Win32Tarballs Win32TarballsMode
+             | ObjCopy
+             | Strip
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -374,6 +377,9 @@ instance H.Builder Builder where
 
                 Tar _ -> cmd' buildOptions [path] buildArgs
 
+                ObjCopy -> cmd' buildOptions [path] buildInputs
+                Strip -> cmd' buildOptions [path] buildInputs
+
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
                 Testsuite RunTest -> do
@@ -449,6 +455,8 @@ systemBuilderPath builder = case builder of
     Makeindex       -> fromKey "makeindex"
     Win32Tarballs _ -> fromKey "python"
     Cabal _ _       -> fromKey "cabal"
+    ObjCopy         -> fromKey "objcopy"
+    Strip           -> fromKey "strip"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."

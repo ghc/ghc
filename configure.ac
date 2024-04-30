@@ -480,6 +480,12 @@ AC_CHECK_TARGET_TOOL([STRIP], [strip])
 StripCmd="$STRIP"
 AC_SUBST([StripCmd])
 
+dnl ** which objcopy to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([OBJCOPY], [objcopy])
+ObjCopyCmd="$OBJCOPY"
+AC_SUBST([ObjCopyCmd])
+
 dnl ** Which otool to use on macOS
 dnl --------------------------------------------------------------
 AC_CHECK_TARGET_TOOL([OTOOL], [otool])
