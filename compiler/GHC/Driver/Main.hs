@@ -975,7 +975,7 @@ initModDetails hsc_env iface =
   fixIO $ \details' -> do
     let -- For memory efficiency, HPT is not populated with serialized core bindings.
         act hpt  =
-          let iface' = iface { mi_extra_decls = Nothing }
+          let iface' = set_mi_extra_decls Nothing iface
           in addToHpt hpt (moduleName $ mi_module iface')
                           (HomeModInfo iface' details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
@@ -1003,7 +1003,7 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
     go (CoreBindings fi) = do
         let act hpt  =
               -- For memory efficiency, HPT is not populated with serialized core bindings.
-              let mod_iface' = mod_iface { mi_extra_decls = Nothing }
+              let mod_iface' = set_mi_extra_decls Nothing mod_iface
                in addToHpt hpt (moduleName $ mi_module mod_iface')
                                (HomeModInfo mod_iface' details emptyHomeModInfoLinkable)
         types_var <- newIORef (md_types details)

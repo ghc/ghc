@@ -117,6 +117,8 @@ import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
 import GHC.Iface.Errors.Types
+import GHC.Runtime.Context (emptyInteractiveContext)
+import Data.Function ((&))
 
 {-
 ************************************************************************
@@ -516,6 +518,12 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
         ; let final_iface = iface
+                               & set_mi_decls     (panic "No mi_decls in PIT")
+                               & set_mi_insts     (panic "No mi_insts in PIT")
+                               & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
+                               & set_mi_rules     (panic "No mi_rules in PIT")
+                               & set_mi_anns      (panic "No mi_anns in PIT")
+                               & set_mi_extra_decls (panic "No mi_extra_decls in PIT")
 
         ; let bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
@@ -1011,13 +1019,13 @@ readIface dflags name_cache wanted_mod file_path = do
 -- See Note [GHC.Prim] in primops.txt.pp.
 ghcPrimIface :: ModIface
 ghcPrimIface
-  = empty_iface {
-        mi_exports  = ghcPrimExports,
-        mi_decls    = [],
-        mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities },
-        mi_docs = Just ghcPrimDeclDocs -- See Note [GHC.Prim Docs]
-        }
+  = empty_iface
+      & set_mi_exports  ghcPrimExports
+      & set_mi_decls    []
+      & set_mi_fixities fixities
+      & set_mi_final_exts ((mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities })
+      & set_mi_docs (Just ghcPrimDeclDocs) -- See Note [GHC.Prim Docs]
+
   where
     empty_iface = emptyFullModIface gHC_PRIM
 
@@ -1114,7 +1122,7 @@ pprModIfaceSimple unit_state iface =
 --
 -- The UnitState is used to pretty-print units
 pprModIface :: UnitState -> ModIface -> SDoc
-pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
+pprModIface unit_state iface
  = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
                 <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
@@ -1155,6 +1163,7 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , text "extensible fields:" $$ nest 2 (pprExtensibleFields (mi_ext_fields iface))
         ]
   where
+    exts = mi_final_exts iface
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile   = text "[hsig]"
     pp_hsc_src HsSrcFile  = Outputable.empty
