@@ -820,6 +820,8 @@ known-key is the next-best way to teach the internals of the compiler about it.
 --
 -- Moreover, there is no need to include names of things that the user can't
 -- write (e.g. type representation bindings like $tc(,,,)).
+--
+-- Want to add a new case? See Note [isBuiltInOcc_maybe and isPunOcc_maybe] first!
 isBuiltInOcc_maybe :: OccName -> Maybe Name
 isBuiltInOcc_maybe occ =
     case name of
@@ -964,6 +966,45 @@ To parse strings of length 1 and 2 more efficiently, we
 can utilize an ad-hoc solution that matches their characters.
 This results in a speedup of up to 40 times compared to using
 `readMaybe @Int` on my machine.
+
+Note [isBuiltInOcc_maybe and isPunOcc_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some OccNames are special:
+
+* `isBuiltInOcc_maybe` is true of OccNames that are built-in
+  syntax, such as `[]`, `->`, `()`, `(,,)`, etc.  These are OccNames,
+  but because they are built-in syntax they behaved specially:
+  * They stand for a unique thing.  E.g. `[]` denotes the
+    empty-list data constructor, defined in a single, unique
+    place known to GHC.
+
+  * They are always in scope.  So `[]` stands for the empty
+    list, always and everywhere.
+
+  * They cannot be imported or exported; nor can they be redefined
+    in other modules.
+
+  * They get special errors in some cases, e.g. see `guard_builtin_syntax` in
+    `GHC.Rename.Env.lookupLocalTcName`
+
+  * Some of them form an infinite family, such as `(,)`, `(,,)`, `(,,,)`, ..etc..
+    We do not populate the Original Name Cache (see Note
+    [Built-in syntax and the OrigNameCache]) with these OccNames,
+    partly because the family is infinite, but also just to avoid
+    unncessarily bloating the cache.  Instead, when looking up in
+    the Original Name Cache we check for `isBuiltInOcc_maybe`
+    first (see `lookupOrigNameCache`).
+
+* `isPunOcc_maybe` is used for a few infinite families of OccNames,
+  simply to avoid bloating the Original Name Cache.
+  * Examples: `Tuple3`, `Tuple4` etc
+
+  * Unlike `isBuiltInOcc_maybe`, these OccNames are not built-in syntax:
+    they can be imported, exported, and even redefined in other modules e.g.
+        module MyMod where { type Tuple4 = Int }
+
+  * The /only/ special thing about `isPunOcc_maybe` OccNames is that they
+    don't pollute the Original Name Cache.
 -}
 
 -- When resolving names produced by Template Haskell (see thOrigRdrName
@@ -975,6 +1016,7 @@ This results in a speedup of up to 40 times compared to using
 --
 -- Test case: th/T13776
 --
+-- Want to add a new case? See Note [isBuiltInOcc_maybe and isPunOcc_maybe] first!
 isPunOcc_maybe :: Module -> OccName -> Maybe Name
 isPunOcc_maybe mod occ
   | mod == gHC_TYPES, occ == occName listTyConName
