@@ -17,6 +17,7 @@ Target
 , tgtCPreprocessor = Cpp {cppProgram = Program {prgPath = "@CPPCmd@", prgFlags = @CONF_CPP_OPTS_STAGE2List@}}
 , tgtHsCPreprocessor = HsCpp {hsCppProgram = Program {prgPath = "@HaskellCPPCmd@", prgFlags = @HaskellCPPArgsList@}}
 , tgtJsCPreprocessor = Just (JsCpp {jsCppProgram = Program {prgPath = "@JavaScriptCPPCmd@", prgFlags = @JavaScriptCPPArgsList@}})
+, tgtCmmCPreprocessor = CmmCpp {cmmCppProgram = Program {prgPath = "@CmmCPPCmd@", prgFlags = @CmmCPPArgsList@}, cmmCppSupportsG0 = @CmmCPPSupportsG0@}
 , tgtCCompilerLink = CcLink
 { ccLinkProgram = Program {prgPath = "@CC@", prgFlags = @CONF_GCC_LINKER_OPTS_STAGE2List@}
 , ccLinkSupportsNoPie = @CONF_GCC_SUPPORTS_NO_PIEBool@

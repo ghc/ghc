@@ -1,6 +1,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module GHC.Toolchain.Tools.Cpp (HsCpp(..), findHsCpp, Cpp(..), findCpp, JsCpp(..), findJsCpp) where
+module GHC.Toolchain.Tools.Cpp
+  (HsCpp(..), findHsCpp
+  , Cpp(..), findCpp
+  , JsCpp(..), findJsCpp
+  , CmmCpp(..), findCmmCpp
+  ) where
 
 import Control.Monad
 import System.FilePath
@@ -24,6 +29,24 @@ newtype HsCpp = HsCpp { hsCppProgram :: Program
 newtype JsCpp = JsCpp { jsCppProgram :: Program
                       }
     deriving (Show, Read, Eq, Ord)
+
+data CmmCpp = CmmCpp { cmmCppProgram :: Program
+                     , cmmCppSupportsG0 :: Bool
+                     -- ^ Whether the C-- preprocessor supports -g0.  Extracted
+                     -- out as -g0 needs to be appended to the complete
+                     -- invocation, rather than prefix flags, in order to
+                     -- override other flags.
+                     }
+    deriving (Show, Read, Eq, Ord)
+
+checkFlag :: String -> Program -> String -> M ()
+checkFlag conftest cpp flag = checking ("for "++flag++" support") $
+  -- Werror to ensure that unrecognized warnings result in an error
+  callProgram cpp ["-Werror", flag, conftest]
+-- tryFlag :: String -> Program -> String -> M [String]
+-- tryFlag conftest cpp flag =
+--   ([flag] <$ checkFlag conftest cpp flag) <|> return []
+
 
 ----- Haskell Preprocessor -----
 
@@ -65,20 +88,13 @@ findHsCppArgs cpp = withTempDir $ \dir -> do
   withTmpDir $ \dir -> do
   let tmp_h = dir </> "tmp.h"
 
-      -- Werror to ensure that unrecognized warnings result in an error
-  let checkFlag flag =
-          checking ("for "++flag++" support") $ callProgram cpp ["-Werror", flag, tmp_h]
-
-      tryFlag flag =
-          ([flag] <$ checkFlag flag) <|> return []
-
   writeFile tmp_h ""
   concat <$> sequence
       [ tryFlag "-undef"
-      , ["-traditional"] <$ checkFlag "-traditional"
-      , tryFlag "-Wno-invalid-pp-token"
-      , tryFlag "-Wno-unicode"
-      , tryFlag "-Wno-trigraphs"
+      , ["-traditional"] <$ checkFlag tmp_h cpp "-traditional"
+      , tryFlag tmp_h cpp "-Wno-invalid-pp-token"
+      , tryFlag tmp_h cpp "-Wno-unicode"
+      , tryFlag tmp_h cpp "-Wno-trigraphs"
       ]
       -}
 
@@ -135,6 +151,27 @@ findJsCpp progOpt cc = checking "for JavaScript C preprocessor" $ do
       file_output_in_dir_content <- readFile file_output_in_dir
       unless (trim file_output_in_dir_content == "// 1")
         $ throwE "JavaScript C Preprocessor didn't provide correct output"
+
+----- C-- preprocessor -----
+
+findCmmCpp :: ProgOpt -> Cc -> M CmmCpp
+findCmmCpp progOpt cc = checking "for a Cmm preprocessor" $ do
+  -- Use the specified CPP or try to use the c compiler
+  foundCppProg <- findProgram "Cmm preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  -- Check whether the C preprocessor needs -std=gnu99 (only very old toolchains need this)
+  Cc cpp <- oneOf "cc doesn't support C99" $ map checkC99Support
+        [ Cc foundCppProg
+        , Cc (foundCppProg & _prgFlags %++ "-std=gnu99")
+        ]
+
+  cmmCppSupportsG0 <- withTempDir $ \dir -> do
+    let conftest = dir </> "conftest.c"
+    writeFile conftest "int main(void) {}"
+    True <$ checkFlag conftest cpp "-g0" <|> return False
+
+  -- Always add the -E flag to the CPP, regardless of the user options
+  let cmmCppProgram = foldr addFlagIfNew cpp ["-E"]
+  return CmmCpp{cmmCppProgram, cmmCppSupportsG0}
 
 ----- C preprocessor -----
 

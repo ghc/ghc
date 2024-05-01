@@ -231,14 +231,14 @@ showErrorMessages msgs =
     $ msgs
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
-injectCppOptions CppOptions{..} dflags = folded_opt_jsp_with_p
+injectCppOptions CppOptions{..} dflags = folded_opt
   where
     mkDefine = ("-D" ++)
     mkIncludeDir = ("-I" ++)
     mkInclude = ("-include" ++)
     file_flags = map mkDefine cppDefine ++ map mkIncludeDir cppInclude ++ map mkInclude cppFile
-    folded_opt_p = foldr addOptP dflags file_flags
-    folded_opt_jsp_with_p = foldr addOptJSP folded_opt_p file_flags
+    addFs = [addOptP, addOptJSP, addOptCmmP]
+    folded_opt = foldr ($) dflags (addFs <*> file_flags)
 
 addOptP :: String -> GHC.DynFlags -> GHC.DynFlags
 addOptP   f = alterToolSettings $ \s -> s
@@ -249,6 +249,11 @@ addOptJSP :: String -> GHC.DynFlags -> GHC.DynFlags
 addOptJSP f = alterToolSettings $ \s -> s
           { GHC.toolSettings_opt_JSP   = f : GHC.toolSettings_opt_JSP s
           , GHC.toolSettings_opt_JSP_fingerprint = GHC.fingerprintStrings (f : GHC.toolSettings_opt_JSP s)
+          }
+addOptCmmP :: String -> GHC.DynFlags -> GHC.DynFlags
+addOptCmmP f = alterToolSettings $ \s -> s
+          { GHC.toolSettings_opt_CmmP = f : GHC.toolSettings_opt_CmmP s
+          , GHC.toolSettings_opt_CmmP_fingerprint = GHC.fingerprintStrings (f : GHC.toolSettings_opt_CmmP s)
           }
 alterToolSettings :: (GHC.ToolSettings -> GHC.ToolSettings) -> GHC.DynFlags -> GHC.DynFlags
 alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings dynFlags) }

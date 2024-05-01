@@ -64,11 +64,20 @@ AC_DEFUN([FP_SETTINGS],
     SettingsHaskellCPPFlags="$HaskellCPPArgs"
     SettingsJavaScriptCPPCommand="$JavaScriptCPPCmd"
     SettingsJavaScriptCPPFlags="$JavaScriptCPPArgs"
+    SettingsCmmCPPCommand="$CmmCPPCmd"
+    SettingsCmmCPPFlags="$CmmCPPArgs"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
     SettingsMergeObjectsCommand="$MergeObjsCmd"
     SettingsMergeObjectsFlags="$MergeObjsArgs"
+
+    AS_CASE(
+      ["$CmmCPPSupportsG0"],
+      [True], [SettingsCmmCPPSupportsG0=YES],
+      [False], [SettingsCmmCPPSupportsG0=NO],
+      [AC_MSG_ERROR(Unknown CPPSupportsG0 value $CmmCPPSupportsG0)]
+    )
 
     if test -z "$WindresCmd"; then
         SettingsWindresCommand="/bin/false"
@@ -81,6 +90,7 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         SettingsCCompilerCommand="$(basename $SettingsCCompilerCommand)"
         SettingsHaskellCPPCommand="$(basename $SettingsHaskellCPPCommand)"
+        SettingsCmmCPPCommand="$(basename $SettingsCmmCPPCommand)"
         SettingsJavaScriptCPPCommand="$(basename $SettingsJavaScriptCPPCommand)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
         SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
@@ -101,6 +111,8 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsCPPFlags])
         SUBST_TOOLDIR([SettingsHaskellCPPCommand])
         SUBST_TOOLDIR([SettingsHaskellCPPFlags])
+        SUBST_TOOLDIR([SettingsCmmCPPCommand])
+        SUBST_TOOLDIR([SettingsCmmCPPFlags])
         SUBST_TOOLDIR([SettingsJavaScriptCPPCommand])
         SUBST_TOOLDIR([SettingsJavaScriptCPPFlags])
         SUBST_TOOLDIR([SettingsMergeObjectsCommand])
@@ -145,6 +157,9 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCPPFlags)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
+    AC_SUBST(SettingsCmmCPPCommand)
+    AC_SUBST(SettingsCmmCPPFlags)
+    AC_SUBST(SettingsCmmCPPSupportsG0)
     AC_SUBST(SettingsJavaScriptCPPCommand)
     AC_SUBST(SettingsJavaScriptCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)

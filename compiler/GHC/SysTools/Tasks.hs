@@ -115,6 +115,8 @@ data SourceCodePreprocessor
     -- ^ Use the Haskell C preprocessor (don't remove C comments, don't break on names including single quotes)
   | SCPJsCpp
     -- ^ Use the JavaScript preprocessor (don't remove jsdoc and multiline comments)
+  | SCPCmmCpp
+    -- ^ Use the C-- preprocessor (don't emit debug information)
   deriving (Eq)
 
 -- | Run source code preprocessor.
@@ -140,11 +142,27 @@ runSourceCodePreprocessor logger tmpfs dflags preprocessor args =
     runSomething readable_name p all_args mb_env
 
   where
+    toolSettings' = toolSettings dflags
+    cmmG0 = ["-g0" | toolSettings_cmmCppSupportsG0 toolSettings']
+    -- GCC <=10 (pre commit r11-5596-g934a54180541d2) implied -dD for debug
+    -- flags by the spec snippet %{g3|ggdb3|gstabs3|gxcoff3|gvms3:-dD}.  This
+    -- means that a g0 will not override a previously-specified -g3 causing
+    -- debug info emission (see https://gcc.gnu.org/PR97989).  We're filtering
+    -- -optc here, rather than the combined command line, in order to avoid an
+    -- issue where a user has to, for some reason, override our decision.  If
+    -- they see the need to do that, they can pass -optCmmP.
+    g3Flags = ["-g3", "-ggdb3", "-gstabs3", "-gxcoff3", "-gvms3"]
+    optCFiltered = filter (`notElem` g3Flags) . opt_c
+    -- In the wild (and GHC), there is lots of code assuming that -optc gets
+    -- passed to the C-- preprocessor too.  Note that the arguments are
+    -- reversed by getOpts.
+    cAndCmmOpt dflags =  opt_CmmP dflags ++ cmmG0 ++ optCFiltered dflags
     (logger_name, pgm_getter, opt_getter, readable_name)
       = case preprocessor of
         SCPCpp -> ("cpp", pgm_cpp, opt_c, "C pre-processor")
         SCPHsCpp -> ("hs-cpp", pgm_P, opt_P, "Haskell C pre-processor")
         SCPJsCpp -> ("js-cpp", pgm_JSP, opt_JSP, "JavaScript C pre-processor")
+        SCPCmmCpp -> ("cmm-cpp", pgm_CmmP, cAndCmmOpt, "C-- C pre-processor")
 
     runSomethingResponseFileCpp
       = runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter
@@ -156,6 +174,7 @@ runSourceCodePreprocessor logger tmpfs dflags preprocessor args =
         SCPCpp -> runSomethingResponseFileCpp
         SCPHsCpp -> runSomethingFilteredOther
         SCPJsCpp -> runSomethingFilteredOther
+        SCPCmmCpp -> runSomethingResponseFileCpp
 
 runPp :: Logger -> DynFlags -> [Option] -> IO ()
 runPp logger dflags args = traceSystoolCommand logger "pp" $ do

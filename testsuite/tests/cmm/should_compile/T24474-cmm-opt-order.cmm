@@ -1,0 +1,6 @@
+/* Test that that C-- C pre-processor arguments are passed after the C
+   arguments, always.  */
+
+#if defined(FOO) || defined(BAR)
+# error "Arguments were applied in the wrong order"
+#endif

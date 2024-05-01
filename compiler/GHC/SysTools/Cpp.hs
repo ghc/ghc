@@ -48,15 +48,17 @@ data CppOpts = CppOpts
 {-
 Note [Preprocessing invocations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must consider three distinct preprocessors when preprocessing Haskell.
+We must consider four distinct preprocessors when preprocessing Haskell.
 These are:
 
 (1) The Haskell C preprocessor (HsCpp), which preprocesses Haskell files that make use
   of the CPP language extension
 
-(2) The C preprocessor (Cpp), which is used to preprocess C and Cmm files
+(2) The C preprocessor (Cpp), which is used to preprocess C files
 
 (3) The JavaScript preprocessor (JsCpp), which preprocesses JavaScript files
+
+(4) The C-- preprocessor (CmmCpp), which preprocesses C-- files
 
 These preprocessors are indeed different. Despite often sharing the same
 underlying program (the C compiler), the set of flags passed determines the
@@ -86,6 +88,17 @@ minifying software (for example, Google Closure Compiler) uses JSDoc
 information to apply more strict rules to code reduction which results in
 better but more dangerous minification. JSDoc comments are usually used to
 instruct minifiers where dangerous optimizations could be applied.
+
+The fourth, the C-- preprocessor, is needed as modern compilers emit defines
+for debug info generation when preprocessing.  The C-- preprocessor avoids this
+by suppressing debug info generation.  The C-- preprocessor also inherits flags
+passed to the C compiler.  This is done for compatibility.  Following those,
+the C-- compiler receives -g0, if it was detected as supported, and flags
+passed via -optCmmP specifically for the C-- preprocessor.  The combined
+command line looks like:
+
+  $pgmCmmP $optCs_without_g3s $g0_if_supported $optCmmP
+
 -}
 
 -- | Run either the Haskell preprocessor, JavaScript preprocessor
