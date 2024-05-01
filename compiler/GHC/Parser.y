@@ -2900,10 +2900,10 @@ aexp    :: { ECP }
                             [mj AnnLam $1] }
         | '\\' 'lcase' altslist(pats1)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb2 $1 $>) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
         | '\\' 'lcases' altslist(argpats)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb2 $1 $>) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                             return $ ECP $

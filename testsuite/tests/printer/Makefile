@@ -837,6 +837,11 @@ MatchPatComments:
 	$(CHECK_PPR)   $(LIBDIR) MatchPatComments.hs
 	$(CHECK_EXACT) $(LIBDIR) MatchPatComments.hs
 
+.PHONY: Test24748
+Test24748:
+	$(CHECK_PPR)   $(LIBDIR) Test24748.hs
+	$(CHECK_EXACT) $(LIBDIR) Test24748.hs
+
 .PHONY: DataDeclShort
 DataDeclShort:
 	$(CHECK_PPR)   $(LIBDIR) DataDeclShort.hs
