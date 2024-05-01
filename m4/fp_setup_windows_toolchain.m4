@@ -117,6 +117,7 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
 
     HaskellCPPArgs="$HaskellCPPArgs -I$mingwinclude"
     JavaScriptCPPCmd="$JavaScriptCPPCmd -I$mingwinclude"
+    CmmCPPArgs="$CmmCPPArgs -I$mingwinclude"
 
     CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags -L$mingwlib -L$mingw_mingw32_lib"
     CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags -L$mingwlib -L$mingw_mingw32_lib"
@@ -150,4 +151,5 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     USER_HS_CPP_ARGS="$HaskellCPPArgs"
     USER_LDFLAGS="$CONF_GCC_LINKER_OPTS_STAGE2"
     USER_JS_CPP_ARGS="$JavaScriptCPPArgs"
+    USER_CMM_CPP_ARGS="$CmmCPPArgs"
 ])

@@ -96,6 +96,9 @@ lib/settings : config.mk
 	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
 	@echo ',("JavaScript CPP command", "$(SettingsJavaScriptCPPCommand)")' >> $@
 	@echo ',("JavaScript CPP flags", "$(SettingsJavaScriptCPPFlags)")' >> $@
+	@echo ',("C-- CPP command", "$(SettingsCmmCPPCommand)")' >> $@
+	@echo ',("C-- CPP flags", "$(SettingsCmmCPPFlags)")' >> $@
+	@echo ',("C-- CPP supports -g0", "$(SettingsCmmCPPSupportsG0)")' >> $@
 	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld supports single module", "$(LdHasSingleModule)")' >> $@

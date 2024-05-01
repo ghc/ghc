@@ -38,6 +38,13 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the JavaScript C pre-processor (only for javascript-backend).
 
+.. ghc-flag:: -pgmCmmP ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the C-- C pre-processor
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the C-- C pre-processor.
+
 .. ghc-flag:: -pgmc ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the C compiler
     :type: dynamic
@@ -179,6 +186,17 @@ the following flags:
 
     Pass ⟨option⟩ to JavaScript C pre-processor (only for javascript-backend).
 
+.. ghc-flag:: -optCmmP ⟨option⟩
+    :shortdesc: pass ⟨option⟩ to the C-- C pre-processor.
+    :type: dynamic
+    :category: phase-options
+
+    Pass ⟨option⟩ to the C-- C pre-processor.
+
+    The C-- C pre-processor also receives C compiler flags.  Those flags will
+    come _before_ the flags added by this option.  As a result, the net effect
+    of the following pair of flags is zero: :code:`-optCmmP-UFOO -optc-DFOO`.
+
 .. ghc-flag:: -optF ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the custom pre-processor
     :type: dynamic
@@ -192,7 +210,7 @@ the following flags:
     :type: dynamic
     :category: phase-options
 
-    Pass ⟨option⟩ to the C compiler.
+    Pass ⟨option⟩ to the C compiler and, for compatibility, C-- pre-processor.
 
 .. ghc-flag:: -pgmc-supports-no-pie
     :shortdesc: *(deprecated)*

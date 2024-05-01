@@ -64,6 +64,12 @@ fingerprintDynFlags hsc_env this_mod nameio =
               , opt_JSP_signature dflags)
             -- See Note [Repeated -optP hashing]
 
+        -- -I, -D and -U flags affect C-- CPP Preprocessor
+        cmm = ( map normalise $ flattenIncludes includePathsMinusImplicit
+            -- normalise: eliminate spurious differences due to "./foo" vs "foo"
+              , picPOpts dflags
+              , opt_CmmP_signature dflags)
+
         -- Note [path flags and recompilation]
         paths = [ hcSuf ]
 
@@ -77,7 +83,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- Other flags which affect code generation
         codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
 
-        flags = ((mainis, safeHs, lang, cpp, js), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
+        flags = ((mainis, safeHs, lang, cpp, js, cmm), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags

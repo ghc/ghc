@@ -424,6 +424,16 @@ FP_JSCPP_CMD_WITH_ARGS(JavaScriptCPPCmd, JavaScriptCPPArgs)
 AC_SUBST([JavaScriptCPPCmd])
 AC_SUBST([JavaScriptCPPArgs])
 
+# --with-cmm-cpp/--with-cmm-cpp-flags
+FP_CMM_CPP_CMD_WITH_ARGS([$CC_STAGE0], [CmmCPPCmd_STAGE0], [CmmCPPArgs_STAGE0], [CmmCPPSupportsG0_STAGE0])
+AC_SUBST([CmmCPPCmd_STAGE0])
+AC_SUBST([CmmCPPArgs_STAGE0])
+AC_SUBST([CmmCPPSupportsG0_STAGE0])
+FP_CMM_CPP_CMD_WITH_ARGS([$CC], [CmmCPPCmd], [CmmCPPArgs], [CmmCPPSupportsG0])
+AC_SUBST([CmmCPPCmd])
+AC_SUBST([CmmCPPArgs])
+AC_SUBST([CmmCPPSupportsG0])
+
 FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
 FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
@@ -1012,6 +1022,9 @@ echo "\
    hs-cpp-flags : $HaskellCPPArgs
    js-cpp       : $JavaScriptCPPCmd
    js-cpp-flags : $JavaScriptCPPArgs
+   cmmcpp       : $CmmCPPCmd
+   cmmcpp-flags : $CmmCPPArgs
+   cmmcpp-g0    : $CmmCPPSupportsG0
    ar           : $ArCmd
    nm           : $NmCmd
    objdump      : $ObjdumpCmd

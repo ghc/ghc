@@ -45,6 +45,7 @@ main = do
       multipleArguments = Set.fromList
         [ "Haskell CPP flags"
         , "JavaScript CPP flags"
+        , "C-- CPP flags"
         , "C compiler flags"
         , "C++ compiler flags"
         , "CPP flags"
@@ -117,6 +118,9 @@ main = do
       -- Setting 'JavaScript CPP flags' contains '$topdir' reference.
       -- Resolving those while containing spaces, should not introduce more options.
       recordSetting "JavaScript CPP flags" (map showOpt . snd . toolSettings_pgm_JSP . sToolSettings)
+      -- Setting 'C-- CPP flags' contains '$topdir' reference.
+      -- Resolving those while containing spaces, should not introduce more options.
+      recordSetting "C-- CPP flags" (map showOpt . snd . toolSettings_pgm_CmmP . sToolSettings)
       -- Setting 'C compiler flags' contains strings with spaces.
       -- GHC should not split these by word.
       recordSetting "C compiler flags" (toolSettings_opt_c . sToolSettings)

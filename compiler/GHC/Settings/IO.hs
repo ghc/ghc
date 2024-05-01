@@ -87,12 +87,15 @@ initSettings top_dir = do
   cc_args_str <- getToolSetting "C compiler flags"
   cxx_args_str <- getToolSetting "C++ compiler flags"
   gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
+  cmmCppSupportsG0 <- getBooleanSetting "C-- CPP supports -g0"
   cpp_prog <- getToolSetting "CPP command"
   cpp_args_str <- getToolSetting "CPP flags"
   hs_cpp_prog <- getToolSetting "Haskell CPP command"
   hs_cpp_args_str <- getToolSetting "Haskell CPP flags"
   js_cpp_prog <- getToolSetting "JavaScript CPP command"
   js_cpp_args_str <- getToolSetting "JavaScript CPP flags"
+  cmmCpp_prog <- getToolSetting "C-- CPP command"
+  cmmCpp_args_str <- getToolSetting "C-- CPP flags"
 
   platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
 
@@ -102,6 +105,7 @@ initSettings top_dir = do
       cpp_args    = map Option (unescapeArgs cpp_args_str)
       hs_cpp_args = map Option (unescapeArgs hs_cpp_args_str)
       js_cpp_args = map Option (unescapeArgs js_cpp_args_str)
+      cmmCpp_args = map Option (unescapeArgs cmmCpp_args_str)
       cc_args  = unescapeArgs cc_args_str ++ unreg_cc_args
       cxx_args = unescapeArgs cxx_args_str
 
@@ -186,10 +190,12 @@ initSettings top_dir = do
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
       , toolSettings_useInplaceMinGW         = useInplaceMinGW
       , toolSettings_arSupportsDashL         = arSupportsDashL
+      , toolSettings_cmmCppSupportsG0        = cmmCppSupportsG0
 
       , toolSettings_pgm_L   = unlit_path
       , toolSettings_pgm_P   = (hs_cpp_prog, hs_cpp_args)
       , toolSettings_pgm_JSP = (js_cpp_prog, js_cpp_args)
+      , toolSettings_pgm_CmmP = (cmmCpp_prog, cmmCpp_args)
       , toolSettings_pgm_F   = ""
       , toolSettings_pgm_c   = cc_prog
       , toolSettings_pgm_cxx = cxx_prog
@@ -209,8 +215,10 @@ initSettings top_dir = do
       , toolSettings_opt_L       = []
       , toolSettings_opt_P       = []
       , toolSettings_opt_JSP     = []
+      , toolSettings_opt_CmmP    = []
       , toolSettings_opt_P_fingerprint   = fingerprint0
       , toolSettings_opt_JSP_fingerprint = fingerprint0
+      , toolSettings_opt_CmmP_fingerprint = fingerprint0
       , toolSettings_opt_F       = []
       , toolSettings_opt_c       = cc_args
       , toolSettings_opt_cxx     = cxx_args

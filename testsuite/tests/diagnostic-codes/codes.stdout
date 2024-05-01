@@ -13,7 +13,6 @@
 [GHC-58181] is untested (constructor = DsOrphanRule)
 [GHC-69441] is untested (constructor = DsRuleLhsTooComplicated)
 [GHC-19551] is untested (constructor = DsAggregatedViewExpressions)
-[GHC-75725] is untested (constructor = PsErrCmmLexer)
 [GHC-09848] is untested (constructor = PsErrCmmParser)
 [GHC-95644] is untested (constructor = PsErrBangPatWithoutSpace)
 [GHC-45106] is untested (constructor = PsErrInvalidInfixHole)
