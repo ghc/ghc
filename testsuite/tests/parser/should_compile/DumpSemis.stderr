@@ -856,7 +856,7 @@
                    (EpaSpan { DumpSemis.hs:22:10-30 })
                    (AnnList
                     (Just
-                     (EpaSpan { DumpSemis.hs:22:12-25 }))
+                     (EpaSpan { DumpSemis.hs:22:12-28 }))
                     (Just
                      (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:22:10 })))
                     (Just
