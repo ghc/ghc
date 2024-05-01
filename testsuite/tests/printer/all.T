@@ -199,3 +199,4 @@ test('AnnotationNoListTuplePuns', [ignore_stderr, req_ppr_deps], makefile_test, 
 test('Test24533', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24533'])
 test('PprLetIn', [ignore_stderr, req_ppr_deps], makefile_test, ['PprLetIn'])
 test('MatchPatComments', [ignore_stderr, req_ppr_deps], makefile_test, ['MatchPatComments'])
+test('Test24748', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24748'])
