@@ -202,3 +202,4 @@ test('CaseAltComments', [ignore_stderr, req_ppr_deps], makefile_test, ['CaseAltC
 test('MatchPatComments', [ignore_stderr, req_ppr_deps], makefile_test, ['MatchPatComments'])
 test('Test24748', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24748'])
 test('DataDeclShort', [ignore_stderr, req_ppr_deps], makefile_test, ['DataDeclShort'])
+test('Test24749', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24749'])
