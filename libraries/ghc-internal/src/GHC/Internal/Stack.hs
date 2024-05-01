@@ -24,6 +24,7 @@ module GHC.Internal.Stack (
 
     -- * Profiling call stacks
     currentCallStack,
+    currentCallStackIds,
     whoCreated,
 
     -- * HasCallStack call stacks
@@ -38,14 +39,17 @@ module GHC.Internal.Stack (
     -- * Internals
     CostCentreStack,
     CostCentre,
+    CostCentreId,
     getCurrentCCS,
     getCCSOf,
     clearCCS,
     ccsCC,
     ccsParent,
+    ccId,
     ccLabel,
     ccModule,
     ccSrcSpan,
+    ccsToIds,
     ccsToStrings,
     renderStack
   ) where
