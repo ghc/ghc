@@ -3444,7 +3444,7 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (
                              [] -> return (sLZ $1 $> ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2),snd $ unLoc $1))
                              (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
-                               ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
+                               ; return $ sLZ $1 $> (fst $ unLoc $1,h':t) }}
         | stmt                   { $1 >>= \ $1 ->
                                    return $ sL1 $1 (nilOL,[$1]) }
         | {- empty -}            { return $ noLoc (nilOL,[]) }

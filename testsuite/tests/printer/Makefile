@@ -851,3 +851,8 @@ DataDeclShort:
 Test24749:
 	$(CHECK_PPR)   $(LIBDIR) Test24749.hs
 	$(CHECK_EXACT) $(LIBDIR) Test24749.hs
+
+.PHONY: Test24754
+Test24754:
+	$(CHECK_PPR)   $(LIBDIR) Test24754.hs
+	$(CHECK_EXACT) $(LIBDIR) Test24754.hs
