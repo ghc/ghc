@@ -2652,7 +2652,7 @@ sigdecl :: { LHsDecl GhcPs }
                                     (Fixity fixText fixPrec (unLoc $1)))))
                    }}
 
-        | pattern_synonym_sig   { sL1a $1 . SigD noExtField . unLoc $ $1 }
+        | pattern_synonym_sig   { L (getLoc $1) . SigD noExtField . unLoc $ $1 }
 
         | '{-# COMPLETE' qcon_list opt_tyconsig  '#-}'
                 {% let (dcolon, tc) = $3
