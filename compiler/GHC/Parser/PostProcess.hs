@@ -236,7 +236,8 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
        ; let anns' = annsIn Semi.<> ann
        ; data_cons <- checkNewOrData loc' (unLoc tc) is_type_data new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
-       ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
+       ; !cs' <- getCommentsFor loc'
+       ; let loc = EpAnn (spanAsAnchor loc') noAnn (cs' Semi.<> cs)
        ; return (L loc (DataDecl { tcdDExt = anns',
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
@@ -2065,25 +2066,26 @@ instance DisambTD (HsType GhcPs) where
     return (L (addCommentsToEpAnn l cs) ty)
   mkUnpackednessPV = addUnpackednessP
 
-dataConBuilderCon :: DataConBuilder -> LocatedN RdrName
-dataConBuilderCon (PrefixDataConBuilder _ dc) = dc
-dataConBuilderCon (InfixDataConBuilder _ dc _) = dc
+dataConBuilderCon :: LocatedA DataConBuilder -> LocatedN RdrName
+dataConBuilderCon (L _ (PrefixDataConBuilder _ dc)) = dc
+dataConBuilderCon (L _ (InfixDataConBuilder _ dc _)) = dc
 
-dataConBuilderDetails :: DataConBuilder -> HsConDeclH98Details GhcPs
+dataConBuilderDetails :: LocatedA DataConBuilder -> HsConDeclH98Details GhcPs
 
 -- Detect when the record syntax is used:
 --   data T = MkT { ... }
-dataConBuilderDetails (PrefixDataConBuilder flds _)
+dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
   | [L (EpAnn anc _ cs) (HsRecTy an fields)] <- toList flds
   = RecCon (L (EpAnn anc an cs) fields)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
-dataConBuilderDetails (PrefixDataConBuilder flds _)
+dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
   = PrefixCon noTypeArgs (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
-dataConBuilderDetails (InfixDataConBuilder lhs _ rhs)
-  = InfixCon (hsLinear lhs) (hsLinear rhs)
+dataConBuilderDetails (L (EpAnn _ _ csl) (InfixDataConBuilder (L (EpAnn anc ann csll) lhs) _ rhs))
+  = InfixCon (hsLinear (L (EpAnn anc ann (csl Semi.<> csll)) lhs)) (hsLinear rhs)
+
 
 instance DisambTD DataConBuilder where
   mkHsAppTyHeadPV = tyToDataConBuilder

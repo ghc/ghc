@@ -2486,9 +2486,8 @@ forall :: { Located ([AddEpAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
 constr_stuff :: { Located (LocatedN RdrName, HsConDeclH98Details GhcPs) }
-        : infixtype       {% fmap (reLoc. (fmap (\b -> (dataConBuilderCon b,
-                                                        dataConBuilderDetails b))))
-                                  (runPV $1) }
+        : infixtype       {% do { b <- runPV $1
+                                ; return (sL1 b (dataConBuilderCon b, dataConBuilderDetails b)) }}
         | '(#' usum_constr '#)' {% let (t, tag, arity) = $2 in pure (sLL $1 $3 $ mkUnboxedSumCon t tag arity)}
 
 usum_constr :: { (LHsType GhcPs, Int, Int) } -- constructor for the data decls SumN#
