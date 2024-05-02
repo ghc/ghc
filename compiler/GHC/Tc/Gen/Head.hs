@@ -37,8 +37,6 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 
 import GHC.Tc.Gen.HsType
-import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
-
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
@@ -78,15 +76,14 @@ import GHC.Builtin.Types( multiplicityTy )
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
 
-import GHC.Driver.Env
 import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import Control.Monad
+import GHC.Rename.Unbound (WhatLooking(WL_Anything))
 
 
 
@@ -1164,46 +1161,11 @@ tc_infer_id id_name
 
              AGlobal (AConLike (RealDataCon con)) -> tcInferDataCon con
              AGlobal (AConLike (PatSynCon ps)) -> tcInferPatSyn id_name ps
-             (tcTyThingTyCon_maybe -> Just tc) -> fail_tycon tc -- TyCon or TcTyCon
-             ATyVar name _ -> fail_tyvar name
+             (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything tc -- TyCon or TcTyCon
+             ATyVar name _ -> failIllegalTyVal name
 
              _ -> failWithTc $ TcRnExpectedValueId thing }
   where
-    fail_tycon tc = do
-      gre <- getGlobalRdrEnv
-      let nm = tyConName tc
-          pprov = case lookupGRE_Name gre nm of
-                      Just gre -> nest 2 (pprNameProvenance gre)
-                      Nothing  -> empty
-          err | isClassTyCon tc = ClassTE
-              | otherwise       = TyConTE
-      fail_with_msg dataName nm pprov err
-
-    fail_tyvar nm =
-      let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
-      in fail_with_msg varName nm pprov TyVarTE
-
-    fail_with_msg whatName nm pprov err = do
-      (import_errs, hints) <- get_suggestions whatName
-      unit_state <- hsc_units <$> getTopEnv
-      let
-        -- TODO: unfortunate to have to convert to SDoc here.
-        -- This should go away once we refactor ErrInfo.
-        hint_msg = vcat $ map ppr hints
-        import_err_msg = vcat $ map ppr import_errs
-        info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
-      failWithTc $ TcRnMessageWithInfo unit_state (
-              mkDetailedMessage info (TcRnIllegalTermLevelUse nm err))
-
-    get_suggestions ns = do
-      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
-      if required_type_arguments && isVarNameSpace ns
-      then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
-      else do
-        let occ = mkOccNameFS ns (occNameFS (occName id_name))
-        lcl_env <- getLocalRdrEnv
-        unknownNameSuggestions lcl_env WL_Anything (mkRdrUnqual occ)
-
     return_id id = return (HsVar noExtField (noLocA id), idType id)
 
 {- Note [Suppress hints with RequiredTypeArguments]

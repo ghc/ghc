@@ -38,6 +38,7 @@ module GHC.Hs.Type (
         HsWildCardBndrs(..),
         HsPatSigType(..), HsPSRn(..),
         HsTyPat(..), HsTyPatRn(..),
+        HsTyPatRnBuilder(..), tpBuilderExplicitTV, tpBuilderPatSig, buildHsTyPatRn, builderFromHsTyPatRn,
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
@@ -128,6 +129,7 @@ import Data.Maybe
 import Data.Data (Data)
 
 import qualified Data.Semigroup as S
+import GHC.Data.Bag
 
 {-
 ************************************************************************
@@ -244,6 +246,51 @@ data HsTyPatRn = HsTPRn
   , hstp_exp_tvs :: [Name] -- ^ Explicitly bound variable names
   }
   deriving Data
+
+-- | A variant of HsTyPatRn that uses Bags for efficient concatenation.
+-- See Note [Implicit and explicit type variable binders]  in GHC.Rename.Pat
+data HsTyPatRnBuilder =
+  HsTPRnB {
+    hstpb_nwcs :: Bag Name,
+    hstpb_imp_tvs :: Bag Name,
+    hstpb_exp_tvs :: Bag Name
+  }
+
+tpBuilderExplicitTV :: Name -> HsTyPatRnBuilder
+tpBuilderExplicitTV name = mempty {hstpb_exp_tvs = unitBag name}
+
+tpBuilderPatSig :: HsPSRn -> HsTyPatRnBuilder
+tpBuilderPatSig HsPSRn {hsps_nwcs, hsps_imp_tvs} =
+  mempty {
+    hstpb_nwcs = listToBag hsps_nwcs,
+    hstpb_imp_tvs = listToBag hsps_imp_tvs
+  }
+
+instance Semigroup HsTyPatRnBuilder where
+  HsTPRnB nwcs1 imp_tvs1 exptvs1 <> HsTPRnB nwcs2 imp_tvs2 exptvs2 =
+    HsTPRnB
+      (nwcs1    `unionBags` nwcs2)
+      (imp_tvs1 `unionBags` imp_tvs2)
+      (exptvs1  `unionBags` exptvs2)
+
+instance Monoid HsTyPatRnBuilder where
+  mempty = HsTPRnB emptyBag emptyBag emptyBag
+
+buildHsTyPatRn :: HsTyPatRnBuilder -> HsTyPatRn
+buildHsTyPatRn HsTPRnB {hstpb_nwcs, hstpb_imp_tvs, hstpb_exp_tvs} =
+  HsTPRn {
+    hstp_nwcs =    bagToList hstpb_nwcs,
+    hstp_imp_tvs = bagToList hstpb_imp_tvs,
+    hstp_exp_tvs = bagToList hstpb_exp_tvs
+  }
+
+builderFromHsTyPatRn :: HsTyPatRn -> HsTyPatRnBuilder
+builderFromHsTyPatRn HsTPRn{hstp_nwcs, hstp_imp_tvs, hstp_exp_tvs} =
+  HsTPRnB {
+    hstpb_nwcs =    listToBag hstp_nwcs,
+    hstpb_imp_tvs = listToBag hstp_imp_tvs,
+    hstpb_exp_tvs = listToBag hstp_exp_tvs
+  }
 
 type instance XXHsPatSigType (GhcPass _) = DataConCantHappen
 type instance XXHsTyPat      (GhcPass _) = DataConCantHappen

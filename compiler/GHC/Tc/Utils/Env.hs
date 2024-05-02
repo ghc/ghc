@@ -28,6 +28,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe,
         addTypecheckedBinds,
+        failIllegalTyCon, failIllegalTyVal,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -137,6 +138,7 @@ import Data.List          ( intercalate )
 import Control.Monad
 import GHC.Iface.Errors.Types
 import GHC.Types.Error
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 
 {- *********************************************************************
 *                                                                      *
@@ -278,6 +280,7 @@ tcLookupConLike name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
+        ATyCon tc   -> failIllegalTyCon WL_Constructor tc
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
@@ -349,6 +352,45 @@ tcGetInstEnvs = do { eps <- getEps
 instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
+-- Illegal term-level use of type things
+failIllegalTyCon :: WhatLooking -> TyCon -> TcM a
+failIllegalTyVal :: Name -> TcM a
+(failIllegalTyCon, failIllegalTyVal) = (fail_tycon, fail_tyvar)
+  where
+    fail_tycon what_looking tc = do
+      gre <- getGlobalRdrEnv
+      let nm = tyConName tc
+          pprov = case lookupGRE_Name gre nm of
+                      Just gre -> nest 2 (pprNameProvenance gre)
+                      Nothing  -> empty
+          err | isClassTyCon tc = ClassTE
+              | otherwise       = TyConTE
+      fail_with_msg what_looking dataName nm pprov err
+
+    fail_tyvar nm =
+      let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
+      in fail_with_msg WL_Anything varName nm pprov TyVarTE
+
+    fail_with_msg what_looking whatName nm pprov err = do
+      (import_errs, hints) <- get_suggestions what_looking whatName nm
+      unit_state <- hsc_units <$> getTopEnv
+      let
+        -- TODO: unfortunate to have to convert to SDoc here.
+        -- This should go away once we refactor ErrInfo.
+        hint_msg = vcat $ map ppr hints
+        import_err_msg = vcat $ map ppr import_errs
+        info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
+      failWithTc $ TcRnMessageWithInfo unit_state (
+              mkDetailedMessage info (TcRnIllegalTermLevelUse nm err))
+
+    get_suggestions what_looking ns nm = do
+      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+      if required_type_arguments && isVarNameSpace ns
+      then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
+      else do
+        let occ = mkOccNameFS ns (occNameFS (occName nm))
+        lcl_env <- getLocalRdrEnv
+        unknownNameSuggestions lcl_env what_looking (mkRdrUnqual occ)
 {-
 ************************************************************************
 *                                                                      *

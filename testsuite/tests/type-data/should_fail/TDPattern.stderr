@@ -1,3 +1,6 @@
+TDPattern.hs:7:3: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘Zero’
+    • defined at TDPattern.hs:4:17
+    • In the pattern: Zero
+      In an equation for ‘f’: f Zero = 0
 
-TDPattern.hs:7:3: [GHC-76037]
-    Not in scope: data constructor ‘Zero’
