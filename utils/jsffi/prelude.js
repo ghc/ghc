@@ -75,17 +75,21 @@ class SetImmediate {
 
 // The actual setImmediate() to be used. This is a ESM module top
 // level binding and doesn't pollute the globalThis namespace.
-let setImmediate;
-if (globalThis.setImmediate) {
-  // node.js, bun
-  setImmediate = globalThis.setImmediate;
-} else {
+const setImmediate = await (async () => {
+  // https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
+  if (globalThis.scheduler) {
+    return (cb, ...args) => scheduler.postTask(() => cb(...args));
+  }
+  // node, bun, or other scripts might have set this up in the browser
+  if (globalThis.setImmediate) {
+    return globalThis.setImmediate;
+  }
   try {
     // deno
-    setImmediate = (await import("node:timers")).setImmediate;
+    return (await import("node:timers")).setImmediate;
   } catch {
     // browsers
     const sm = new SetImmediate();
-    setImmediate = (cb, ...args) => sm.setImmediate(cb, ...args);
+    return (cb, ...args) => sm.setImmediate(cb, ...args);
   }
-}
+})();
