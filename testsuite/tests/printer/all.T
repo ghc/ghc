@@ -205,3 +205,4 @@ test('DataDeclShort', [ignore_stderr, req_ppr_deps], makefile_test, ['DataDeclSh
 test('Test24749', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24749'])
 test('Test24754', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24754'])
 test('Test24755', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24755'])
+test('Test24753', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24753'])
