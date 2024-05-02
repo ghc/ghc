@@ -2059,7 +2059,10 @@ instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
   mkHsAppKindTyPV t at ki = return (mkHsAppKindTy at t ki)
-  mkHsOpTyPV prom t1 op t2 = return (mkLHsOpTy prom t1 op t2)
+  mkHsOpTyPV prom t1 op t2 = do
+    let (L l ty) = mkLHsOpTy prom t1 op t2
+    !cs <- getCommentsFor (locA l)
+    return (L (addCommentsToEpAnn l cs) ty)
   mkUnpackednessPV = addUnpackednessP
 
 dataConBuilderCon :: DataConBuilder -> LocatedN RdrName
@@ -2101,8 +2104,9 @@ instance DisambTD DataConBuilder where
   mkHsOpTyPV prom lhs tc rhs = do
       check_no_ops (unLoc rhs)  -- check the RHS because parsing type operators is right-associative
       data_con <- eitherToP $ tyConToDataCon tc
+      !cs <- getCommentsFor (locA l)
       checkNotPromotedDataCon prom data_con
-      return $ L l (InfixDataConBuilder lhs data_con rhs)
+      return $ L (addCommentsToEpAnn l cs) (InfixDataConBuilder lhs data_con rhs)
     where
       l = combineLocsA lhs rhs
       check_no_ops (HsBangTy _ _ t) = check_no_ops (unLoc t)
@@ -3223,8 +3227,8 @@ mkSumOrTuplePat l Boxed a@Sum{} _ =
 
 mkLHsOpTy :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy prom x op y =
-  let loc = getLoc x `combineSrcSpansA` (noAnnSrcSpan $ getLocA op) `combineSrcSpansA` getLoc y
-  in L loc (mkHsOpTy prom x op y)
+  let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
+  in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
 mkMultTy :: EpToken "%" -> LHsType GhcPs -> EpUniToken "->" "→" -> HsArrow GhcPs
 mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
