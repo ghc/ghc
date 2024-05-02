@@ -1075,13 +1075,17 @@ this is accomplished with the `ld -r` command. We rely on this for two ends:
 The command used for object linking is set using the -pgmlm and -optlm
 command-line options.
 
-Sadly, the LLD linker that we use on Windows does not support the `-r` flag
-needed to support object merging (see #21068). For this reason on Windows we do
-not support GHCi objects.  To deal with foreign stubs we build a static archive
-of all of a module's object files instead merging them. Consequently, we can
-end up producing `.o` files which are in fact static archives. However,
-toolchains generally don't have a problem with this as they use file headers,
-not the filename, to determine the nature of inputs.
+However, `ld -r` is broken in some cases:
+
+ * The LLD linker that we use on Windows does not support the `-r`
+   flag needed to support object merging (see #21068). For this reason
+   on Windows we do not support GHCi objects.
+
+In these cases, we bundle a module's own object file with its foreign
+stub's object file, instead of merging them. Consequently, we can end
+up producing `.o` files which are in fact static archives. This can
+only work if `ar -L` is supported, so the archive `.o` files can be
+properly added to the final static library.
 
 Note that this has somewhat non-obvious consequences when producing
 initializers and finalizers. See Note [Initializers and finalizers in Cmm]
@@ -1107,7 +1111,7 @@ via gcc.
 -- | See Note [Object merging].
 joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles hsc_env o_files output_fn
-  | can_merge_objs && not dashLSupported = do
+  | can_merge_objs = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
