@@ -300,6 +300,10 @@ The supported transformers are listed below:
         <td>Produce fully statically-linked executables and build libraries suitable for static linking.</td>
     </tr>
     <tr>
+        <td><code>host_fully_static</code></td>
+        <td>Ensure host executables are fully static, while still permitting shared target libraries.</td>
+    </tr>
+    <tr>
         <td><code>collect_timings</code></td>
         <td>Collects timings while building the stage2+ compiler by adding the
         flags <code>-ddump-to-file -ddump-timings</code>.</td>
