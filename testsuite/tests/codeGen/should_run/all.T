@@ -244,3 +244,6 @@ test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms
 test('T24700', normal, compile_and_run, ['-O'])
 test('T24893', normal, compile_and_run, ['-O'])
 test('T23034', req_c, compile_and_run, ['-O2 T23034_c.c'])
+test('T24664a', normal, compile_and_run, ['-O'])
+test('T24664b', normal, compile_and_run, ['-O'])
+
