@@ -3,6 +3,6 @@
 module Test24755 where
 
 class
-    a -- Before operator
-    :+
-    b -- After operator
+    a  -- c1
+    :+ -- c2
+    b  -- c3
