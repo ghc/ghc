@@ -202,3 +202,4 @@ test('MatchPatComments', [ignore_stderr, req_ppr_deps], makefile_test, ['MatchPa
 test('Test24748', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24748'])
 test('Test24755', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24755'])
 test('Test24753', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24753'])
+test('Test24771', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24771'])
