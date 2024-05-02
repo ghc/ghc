@@ -98,6 +98,8 @@ topLevelBindsCC pred core_bind =
     -- We want to put the cost centre below the lambda as we only care about
     -- executions of the RHS.
     addCC :: Id -> CoreExpr -> LateCCM s CoreExpr
+    addCC bndr (Cast rhs co) = pure Cast <*> addCC bndr rhs <*> pure co
+    addCC bndr (Tick t rhs) = (Tick t) <$> addCC bndr rhs
     addCC bndr (Lam b rhs) = Lam b <$> addCC bndr rhs
     addCC bndr rhs = do
       let name = idName bndr
