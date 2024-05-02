@@ -841,3 +841,8 @@ MatchPatComments:
 Test24748:
 	$(CHECK_PPR)   $(LIBDIR) Test24748.hs
 	$(CHECK_EXACT) $(LIBDIR) Test24748.hs
+
+.PHONY: Test24755
+Test24755:
+	$(CHECK_PPR)   $(LIBDIR) Test24755.hs
+	$(CHECK_EXACT) $(LIBDIR) Test24755.hs
