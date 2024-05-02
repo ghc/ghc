@@ -1031,8 +1031,32 @@ lookupOccRn = lookupOccRn' WL_Anything
 
 -- lookupOccRnConstr looks up an occurrence of a RdrName and displays
 -- constructors and pattern synonyms as suggestions if it is not in scope
+--
+-- There is a fallback to the type level, when the first lookup fails.
+-- This is required to implement a pat-to-type transformation
+-- (See Note [Pattern to type (P2T) conversion] in GHC.Tc.Gen.Pat)
+-- Consider this example:
+--
+--   data VisProxy a where VP :: forall a -> VisProxy a
+--
+--   f :: VisProxy Int -> ()
+--   f (VP Int) = ()
+--
+-- Here `Int` is actually a type, but it stays on position where
+-- we expect a data constructor.
+--
+-- In all other cases we just use this additional lookup for better
+-- error messaging (See Note [Promotion]).
 lookupOccRnConstr :: RdrName -> RnM Name
-lookupOccRnConstr = lookupOccRn' WL_Constructor
+lookupOccRnConstr rdr_name
+  = do { mb_gre <- lookupOccRn_maybe rdr_name
+       ; case mb_gre of
+           Just gre  -> return $ greName gre
+           Nothing   -> do
+            { mb_ty_gre <- lookup_promoted rdr_name
+            ; case mb_ty_gre of
+              Just gre -> return $ greName gre
+              Nothing ->  reportUnboundName' WL_Constructor rdr_name} }
 
 -- lookupOccRnRecField looks up an occurrence of a RdrName and displays
 -- record fields as suggestions if it is not in scope

@@ -56,7 +56,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
-import GHC.Types.SourceText
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -899,18 +898,12 @@ expr_to_type earg =
       where
         unwrap_op_tv (L _ (HsTyVar _ _ op_id)) = return op_id
         unwrap_op_tv _ = failWith $ TcRnIllformedTypeArgument (L l e)
-    go (L l e@(HsOverLit _ lit)) =
-      do { tylit <- case ol_val lit of
-             HsIntegral   n -> return $ HsNumTy NoSourceText (il_value n)
-             HsIsString _ s -> return $ HsStrTy NoSourceText s
-             HsFractional _ -> failWith $ TcRnIllformedTypeArgument (L l e)
-         ; return (L l (HsTyLit noExtField tylit)) }
-    go (L l e@(HsLit _ lit)) =
-      do { tylit <- case lit of
-             HsChar   _ c -> return $ HsCharTy NoSourceText c
-             HsString _ s -> return $ HsStrTy  NoSourceText s
-             _ -> failWith $ TcRnIllformedTypeArgument (L l e)
-         ; return (L l (HsTyLit noExtField tylit)) }
+    go (L l (HsOverLit _ lit))
+      | Just tylit <- tyLitFromOverloadedLit (ol_val lit)
+      = return (L l (HsTyLit noExtField tylit))
+    go (L l (HsLit _ lit))
+      | Just tylit <- tyLitFromLit lit
+      = return (L l (HsTyLit noExtField tylit))
     go (L l (ExplicitTuple _ tup_args boxity))
       -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be promoted
       | isBoxed boxity

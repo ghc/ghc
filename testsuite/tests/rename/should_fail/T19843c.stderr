@@ -1,4 +1,7 @@
+T19843c.hs:6:6: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘Map’
+    • imported from ‘Data.Map’ at T19843c.hs:3:1-22
+      (and originally defined in ‘Data.Map.Internal’)
+    • In the pattern: Map k v
+      In an equation for ‘foo’: foo (Map k v) = undefined
 
-T19843c.hs:6:6: error: [GHC-76037]
-    Not in scope: data constructor ‘Map.Map’
-    NB: the module ‘Data.Map’ does not export ‘Map’.

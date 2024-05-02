@@ -915,3 +915,4 @@ test('WarnDefaultedExceptionContext', normal, compile, ['-Wdefaulted-exception-c
 test('T24470b', normal, compile, [''])
 test('T24566', [], makefile_test, [])
 test('T23764', normal, compile, [''])
+test('T23739a', normal, compile, [''])

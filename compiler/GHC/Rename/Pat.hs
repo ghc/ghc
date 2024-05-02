@@ -71,7 +71,6 @@ import GHC.Types.SourceText
 import GHC.Utils.Misc
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
-import GHC.Data.Bag ( Bag, unitBag, unionBags, emptyBag, listToBag, bagToList )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
@@ -89,7 +88,6 @@ import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
-import qualified Data.Semigroup as S
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
@@ -1242,43 +1240,6 @@ lookupTypeOccTPRnM rdr_name = liftRnFV $ do
   name <- lookupTypeOccRn rdr_name
   pure (name, unitFV name)
 
--- | A variant of HsTyPatRn that uses Bags for efficient concatenation.
--- See Note [Implicit and explicit type variable binders]
-data HsTyPatRnBuilder =
-  HsTPRnB {
-    hstpb_nwcs :: Bag Name,
-    hstpb_imp_tvs :: Bag Name,
-    hstpb_exp_tvs :: Bag Name
-  }
-
-tpb_exp_tv :: Name -> HsTyPatRnBuilder
-tpb_exp_tv name = mempty {hstpb_exp_tvs = unitBag name}
-
-tpb_hsps :: HsPSRn -> HsTyPatRnBuilder
-tpb_hsps HsPSRn {hsps_nwcs, hsps_imp_tvs} =
-  mempty {
-    hstpb_nwcs = listToBag hsps_nwcs,
-    hstpb_imp_tvs = listToBag hsps_imp_tvs
-  }
-
-instance Semigroup HsTyPatRnBuilder where
-  HsTPRnB nwcs1 imp_tvs1 exptvs1 <> HsTPRnB nwcs2 imp_tvs2 exptvs2 =
-    HsTPRnB
-      (nwcs1    `unionBags` nwcs2)
-      (imp_tvs1 `unionBags` imp_tvs2)
-      (exptvs1  `unionBags` exptvs2)
-
-instance Monoid HsTyPatRnBuilder where
-  mempty = HsTPRnB emptyBag emptyBag emptyBag
-
-buildHsTyPatRn :: HsTyPatRnBuilder -> HsTyPatRn
-buildHsTyPatRn HsTPRnB {hstpb_nwcs, hstpb_imp_tvs, hstpb_exp_tvs} =
-  HsTPRn {
-    hstp_nwcs =    bagToList hstpb_nwcs,
-    hstp_imp_tvs = bagToList hstpb_imp_tvs,
-    hstp_exp_tvs = bagToList hstpb_exp_tvs
-  }
-
 rn_lty_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
 rn_lty_pat (L l hs_ty) = do
   hs_ty' <- rn_ty_pat hs_ty
@@ -1292,7 +1253,7 @@ rn_ty_pat_var lrdr@(L l rdr) = do
 
     then do -- binder
       name <- liftTPRnCps $ newPatName (LamMk True) lrdr
-      tellTPB (tpb_exp_tv name)
+      tellTPB (tpBuilderExplicitTV name)
       pure (L l name)
 
     else do -- usage
@@ -1413,7 +1374,7 @@ rn_ty_pat (HsKindSig an ty ki) = do
   ~(HsPS hsps ki') <- liftRnWithCont $
                       rnHsPatSigKind AlwaysBind ctxt (HsPS noAnn ki)
   ty' <- rn_lty_pat ty
-  tellTPB (tpb_hsps hsps)
+  tellTPB (tpBuilderPatSig hsps)
   pure (HsKindSig an ty' ki')
 
 rn_ty_pat (HsSpliceTy _ splice) = do
