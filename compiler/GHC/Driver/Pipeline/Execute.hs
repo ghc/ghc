@@ -1099,17 +1099,12 @@ However, `ld -r` is broken in some cases:
  * The LLD linker that we use on Windows does not support the `-r`
    flag needed to support object merging (see #21068). For this reason
    on Windows we do not support GHCi objects.
- * `wasm-ld -r` is prohibitively slow, especially when handling large
-   input objects (e.g. profiled objects).
 
 In these cases, we bundle a module's own object file with its foreign
 stub's object file, instead of merging them. Consequently, we can end
 up producing `.o` files which are in fact static archives. This can
 only work if `ar -L` is supported, so the archive `.o` files can be
-properly added to the final static library. We must also take care not
-to produce archive `.dyn_o` when building dynamic objects, otherwise
-we end up with broken `.so` files when GHC is built with `llvm-ar`
-(#22210).
+properly added to the final static library.
 
 Note that this has somewhat non-obvious consequences when producing
 initializers and finalizers. See Note [Initializers and finalizers in Cmm]
@@ -1135,7 +1130,7 @@ via gcc.
 -- | See Note [Object merging].
 joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles hsc_env o_files output_fn
-  | can_merge_objs && (not dashLSupported || is_dyn) = do
+  | can_merge_objs = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
@@ -1163,7 +1158,6 @@ joinObjectFiles hsc_env o_files output_fn
   withAtomicRename output_fn $ \tmp_ar ->
       liftIO $ runAr logger dflags Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
   where
-    is_dyn = ways dflags `hasWay` WayDyn
     dashLSupported = sArSupportsDashL (settings dflags)
     dashL = if dashLSupported then "L" else ""
     can_merge_objs = isJust (pgm_lm (hsc_dflags hsc_env))
