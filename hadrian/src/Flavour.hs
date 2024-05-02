@@ -60,6 +60,7 @@ flavourTransformers = M.fromList
     , "omit_pragmas"     =: omitPragmas
     , "ipe"              =: enableIPE
     , "fully_static"     =: fullyStatic
+    , "host_fully_static" =: hostFullyStatic
     , "collect_timings"  =: collectTimings
     , "assertions"       =: enableAssertions
     , "debug_ghc"        =: debugGhc Stage2
@@ -367,6 +368,23 @@ fullyStatic flavour =
          - the file).
          -}
         , builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
+        , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
+        , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
+        ]
+
+-- | Ensure stage0 executables and libraries are fully static. Useful
+-- for building cross GHC bindists that still contain shared target
+-- libraries.
+hostFullyStatic :: Flavour -> Flavour
+hostFullyStatic flavour =
+    addArgs staticExec $ disableDynamicGhcPrograms flavour
+  where
+    -- Unlike 'fullyStatic', we need to ensure these flags are only
+    -- applied to host code.
+    staticExec :: Args
+    staticExec = stage0 ? mconcat
+        [
+          builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
         , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
         , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
         ]
