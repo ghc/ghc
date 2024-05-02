@@ -78,6 +78,8 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List( partition )
 import Data.Maybe (isJust)
+import Control.Monad.Trans.Writer.CPS
+import Control.Monad.Trans.Class
 
 {-
 ************************************************************************
@@ -504,55 +506,108 @@ tc_forall_pat tv _ pat thing_inside
        ; let pat' = XPat $ ExpansionPat pat (EmbTyPat arg_ty tp)
        ; return (pat', result) }
 
+
 -- Convert a Pat into the equivalent HsTyPat.
 -- See `expr_to_type` (GHC.Tc.Gen.App) for the HsExpr counterpart.
 -- The `TcM` monad is only used to fail on ill-formed type patterns.
 pat_to_type_pat :: Pat GhcRn -> TcM (HsTyPat GhcRn)
-pat_to_type_pat (EmbTyPat _ tp) = return tp
-pat_to_type_pat (VarPat _ lname)  = return (HsTP x b)
+pat_to_type_pat pat = do
+  (ty, x) <- runWriterT (pat_to_type pat)
+  pure (HsTP (buildHsTyPatRn x) ty)
+
+pat_to_type :: Pat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
+pat_to_type (EmbTyPat _ (HsTP x t)) =
+  do { tell (builderFromHsTyPatRn x)
+     ; return t }
+pat_to_type (VarPat _ lname)  =
+  do { tell (tpBuilderExplicitTV (unLoc lname))
+     ; return b }
   where b = noLocA (HsTyVar noAnn NotPromoted lname)
-        x = HsTPRn { hstp_nwcs    = []
-                   , hstp_imp_tvs = []
-                   , hstp_exp_tvs = [unLoc lname] }
-pat_to_type_pat (WildPat _) = return (HsTP x b)
+pat_to_type (WildPat _) = return b
   where b = noLocA (HsWildCardTy noExtField)
-        x = HsTPRn { hstp_nwcs    = []
-                   , hstp_imp_tvs = []
-                   , hstp_exp_tvs = [] }
-pat_to_type_pat (SigPat _ pat sig_ty)
-  = do { HsTP x_hstp t <- pat_to_type_pat (unLoc pat)
+pat_to_type (SigPat _ pat sig_ty)
+  = do { t <- pat_to_type (unLoc pat)
        ; let { !(HsPS x_hsps k) = sig_ty
-             ; x = append_hstp_hsps x_hstp x_hsps
              ; b = noLocA (HsKindSig noAnn t k) }
-       ; return (HsTP x b) }
-  where
-    -- Quadratic for nested signatures ((p :: t1) :: t2)
-    -- but those are unlikely to occur in practice.
-    append_hstp_hsps :: HsTyPatRn -> HsPSRn -> HsTyPatRn
-    append_hstp_hsps t p
-      = HsTPRn { hstp_nwcs     = hstp_nwcs    t ++ hsps_nwcs    p
-               , hstp_imp_tvs  = hstp_imp_tvs t ++ hsps_imp_tvs p
-               , hstp_exp_tvs  = hstp_exp_tvs t }
-pat_to_type_pat (ParPat _ pat)
-  = do { HsTP x t <- pat_to_type_pat (unLoc pat)
-       ; return (HsTP x (noLocA (HsParTy noAnn t))) }
-pat_to_type_pat (SplicePat (HsUntypedSpliceTop mod_finalizers pat) splice) = do
-      { HsTP x t <- pat_to_type_pat pat
-      ; return (HsTP x (noLocA (HsSpliceTy (HsUntypedSpliceTop mod_finalizers t) splice))) }
-pat_to_type_pat pat =
-  -- There are other cases to handle (ConPat, ListPat, TuplePat, etc), but these
-  -- would always be rejected by the unification in `tcHsTyPat`, so it's fine to
-  -- skip them here. This won't continue to be the case when visible forall is
-  -- permitted in data constructors:
-  --
-  --   data T a where { Typed :: forall a -> a -> T a }
-  --   g :: T Int -> Int
-  --   g (Typed Int x) = x   -- Note the `Int` type pattern
-  --
-  -- See ticket #18389. When this feature lands, it would be best to extend
-  -- `pat_to_type_pat` to handle as many pattern forms as possible.
+       ; tell (tpBuilderPatSig x_hsps)
+       ; return b }
+pat_to_type (ParPat _ pat)
+  = do { t <- pat_to_type (unLoc pat)
+       ; return (noLocA (HsParTy noAnn t)) }
+pat_to_type (SplicePat (HsUntypedSpliceTop mod_finalizers pat) splice) = do
+      { t <- pat_to_type pat
+      ; return (noLocA (HsSpliceTy (HsUntypedSpliceTop mod_finalizers t) splice)) }
+
+pat_to_type (TuplePat _ pats Boxed)
+  = do { tys <- traverse (pat_to_type . unLoc) pats
+       ; let t = noLocA (HsExplicitTupleTy noExtField tys)
+       ; pure t }
+pat_to_type (ListPat _ pats)
+  = do { tys <- traverse (pat_to_type . unLoc) pats
+       ; let t = noLocA (HsExplicitListTy NoExtField NotPromoted tys)
+       ; pure t }
+
+pat_to_type (LitPat _ lit)
+  | Just ty_lit <- tyLitFromLit lit
+  = do { let t = noLocA (HsTyLit noExtField ty_lit)
+      ; pure t }
+pat_to_type (NPat _ (L _ lit) _ _)
+  | Just ty_lit <- tyLitFromOverloadedLit (ol_val lit)
+  = do { let t = noLocA (HsTyLit noExtField ty_lit)
+       ; pure t}
+
+pat_to_type (ConPat _ lname (InfixCon left right))
+  = do { lty <- pat_to_type (unLoc left)
+       ; rty <- pat_to_type (unLoc right)
+       ; let { t = noLocA (HsOpTy noAnn NotPromoted lty lname rty)}
+       ; pure t }
+pat_to_type (ConPat _ lname (PrefixCon invis_args vis_args))
+  = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname)}
+       ; ty_invis <- foldM apply_invis_arg appHead invis_args
+       ; tys_vis <- traverse (pat_to_type . unLoc) vis_args
+       ; let t = foldl' mkHsAppTy ty_invis tys_vis
+       ; pure t }
+      where
+        apply_invis_arg :: LHsType GhcRn -> HsConPatTyArg GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
+        apply_invis_arg !t (HsConPatTyArg _ (HsTP argx arg))
+          = do { tell (builderFromHsTyPatRn argx)
+               ; pure (mkHsAppKindTy noExtField t arg)}
+
+pat_to_type pat = lift $
   failWith $ TcRnIllformedTypePattern pat
   -- This failure is the only use of the TcM monad in `pat_to_type_pat`
+
+{-
+Note [Pattern to type (P2T) conversion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+
+  data T a b where
+    MkT :: forall a. forall b -> a -> b -> T a b
+    -- NB: `a` is invisible, but `b` is required
+
+  f (MkT @[Int] (Maybe Bool) x y) = ...
+
+The second type argument of `MkT` is Required, so we write it without
+an `@` sign in the pattern match.  So the (Maybe Bool) will be
+  * parsed and renamed as a term pattern
+  * converted to a type when typechecking the pattern-match: the P2T conversion
+
+This is the only place we have P2T. In type-lambdas, the "pattern" is always a
+type variable:
+
+   f :: forall a -> a -> blah
+   f b (x::b) = ...
+
+The `b` argument must be a simple variable; we can't pattern-match on types.
+
+The function `pat_to_type` does the P2T conversion:
+   pat_to_type :: Pat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
+
+It is arranged as a writer monad, where the `HsTyPatRnBuilder` accumulates the
+binders bound by the type.  (We could discover these binders by a subsequent
+traversal, that would mean writing another traversal.)
+-}
 
 tc_ty_pat :: HsTyPat GhcRn -> TcTyVar -> TcM r -> TcM (TcType, r)
 tc_ty_pat tp tv thing_inside

@@ -73,7 +73,10 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Error messages
-        funAppCtxt, addTyConFlavCtxt
+        funAppCtxt, addTyConFlavCtxt,
+
+        -- Utils
+        tyLitFromLit, tyLitFromOverloadedLit,
    ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -140,6 +143,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.List ( mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
+import GHC.Types.SourceText
 
 {-
         ----------------------------
@@ -4689,3 +4693,22 @@ addTyConFlavCtxt :: Name -> TyConFlavour tc -> TcM a -> TcM a
 addTyConFlavCtxt name flav
   = addErrCtxt $ hsep [ text "In the", ppr flav
                       , text "declaration for", quotes (ppr name) ]
+
+{-
+************************************************************************
+*                                                                      *
+          Utils for constructing TyLit
+*                                                                      *
+************************************************************************
+-}
+
+
+tyLitFromLit :: HsLit GhcRn -> Maybe (HsTyLit GhcRn)
+tyLitFromLit (HsString x str) = Just (HsStrTy x str)
+tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
+tyLitFromLit _ = Nothing
+
+tyLitFromOverloadedLit :: OverLitVal -> Maybe (HsTyLit GhcRn)
+tyLitFromOverloadedLit (HsIntegral n) = Just $ HsNumTy NoSourceText (il_value n)
+tyLitFromOverloadedLit (HsIsString _ s) = Just $ HsStrTy NoSourceText s
+tyLitFromOverloadedLit HsFractional{} = Nothing
