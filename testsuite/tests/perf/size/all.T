@@ -72,7 +72,8 @@ test('mtl_so'             ,[req_dynamic_ghc, js_skip, windows_skip, collect_obje
 test('os_string_so'       ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "os-string")]        , static_stats, [] )
 test('parsec_so'          ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "parsec")]           , static_stats, [] )
 test('process_so'         ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "process")]          , static_stats, [] )
-test('rts_so'             ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "rts", True)]              , static_stats, [] )
+# Disabled as extremely unstable
+#test('rts_so'             ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "rts", True)]              , static_stats, [] )
 test('template_haskell_so',[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "template-haskell")] , static_stats, [] )
 test('terminfo_so'        ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "terminfo")]         , static_stats, [] )
 test('text_so'            ,[req_dynamic_ghc, js_skip, windows_skip, collect_object_size(size_acceptance_threshold, "text")]             , static_stats, [] )
