@@ -1117,7 +1117,7 @@ live across the call.  Our job now is to expand the call so we get
    Sp[young(L1)] = L1
  ,-----------------------
  | SAVE_THREAD_STATE()
- | token = suspendThread(BaseReg, interruptible)
+ | token = suspendThread(BaseReg, interruptible, force_safe_ccs)
  | r = foo(x,y,z)
  | BaseReg = resumeThread(token)
  | LOAD_THREAD_STATE()
@@ -1147,7 +1147,7 @@ lowerSafeForeignCall profile block
     load_state_code <- loadThreadState profile
     let suspend = save_state_code  <*>
                   caller_save <*>
-                  mkMiddle (callSuspendThread platform id intrbl)
+                  mkMiddle (callSuspendThread platform id intrbl track_safe_ccs)
         midCall = mkUnsafeCall tgt res args
         resume  = mkMiddle (callResumeThread new_base id) <*>
                   -- Assign the result to BaseReg: we
@@ -1189,10 +1189,10 @@ lowerSafeForeignCall profile block
   | otherwise = return block
 
 
-callSuspendThread :: Platform -> LocalReg -> Bool -> CmmNode O O
-callSuspendThread platform id intrbl =
+callSuspendThread :: Platform -> LocalReg -> Bool -> Bool -> CmmNode O O
+callSuspendThread platform id intrbl force_safe_ccs =
   CmmUnsafeForeignCall (PrimTarget MO_SuspendThread)
-       [id] [baseExpr platform, mkIntExpr platform (fromEnum intrbl)]
+       [id] [baseExpr platform, mkIntExpr platform (fromEnum intrbl), mkIntExpr platform (fromEnum force_safe_ccs)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =

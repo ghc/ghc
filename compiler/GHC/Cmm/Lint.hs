@@ -212,7 +212,7 @@ lintCmmLast labels node = case node of
           _ <- lintCmmExpr target
           maybe (return ()) checkTarget cont
 
-  CmmForeignCall tgt _ args succ _ _ _ -> do
+  CmmForeignCall tgt _ args succ _ _ _ _track_safe-> do
           lintTarget tgt
           let lintArg expr = do
                 -- Arguments can't mention caller-saved

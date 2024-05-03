@@ -1594,10 +1594,18 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
      let
          -- do the call
          do_call      = unitOL (CCALL stk_offset token flags)
+           -- bitmap of <unsafe><interruptible><tracked_cost>
            where flags = case safety of
-                           PlaySafe          -> 0x0
-                           PlayInterruptible -> 0x1
-                           PlayRisky         -> 0x2
+                           SafeCall { safety_interruptible = interruptible,
+                                      safety_track_cost = track_cost }
+                                            -- First bit - safe call
+                                             -> 0x0
+                                             -- Second bit - interruptible?
+                                                + (if interruptible then 0x2 else 0)
+                                             -- Third bit - track call time?
+                                                + (if track_cost then 0x4 else 0)
+                           UnsafeCall        -> 0x1
+
 
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)

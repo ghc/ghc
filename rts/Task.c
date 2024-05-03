@@ -272,6 +272,7 @@ newInCall (Task *task)
     incall->task = task;
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
+    incall->suspended_tso_cc = NULL;
     incall->rstat         = NoStatus;
     incall->ret           = NULL;
     incall->next = NULL;

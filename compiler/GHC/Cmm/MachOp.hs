@@ -785,7 +785,7 @@ callishMachOpHints op = case op of
   MO_Memset _      -> ([], [AddrHint,NoHint,NoHint])
   MO_Memmove _     -> ([], [AddrHint,AddrHint,NoHint])
   MO_Memcmp _      -> ([], [AddrHint, AddrHint, NoHint])
-  MO_SuspendThread -> ([AddrHint], [AddrHint,NoHint])
+  MO_SuspendThread -> ([AddrHint], [AddrHint,NoHint,NoHint])
   MO_ResumeThread  -> ([AddrHint], [AddrHint])
   _                -> ([],[])
   -- empty lists indicate NoHint

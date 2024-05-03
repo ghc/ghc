@@ -184,7 +184,7 @@ genForeignCall :: HasDebugCallStack
 genForeignCall _ctx
                (CCall (CCallSpec (StaticTarget _ tgt Nothing True)
                                    JavaScriptCallConv
-                                   PlayRisky))
+                                   UnsafeCall))
                _t
                [obj]
                args

@@ -154,6 +154,7 @@ typedef struct _PROFILING_FLAGS {
     bool        startHeapProfileAtStartup; /* true if we start profiling from program startup */
     bool        startTimeProfileAtStartup; /* true if we start profiling from program startup */
     bool        incrementUserEra;
+    bool        trackSafeCalls;
 
 
     bool        showCCSOnException;

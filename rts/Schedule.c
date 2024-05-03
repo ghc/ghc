@@ -2476,10 +2476,14 @@ recoverSuspendedTask (Capability *cap, Task *task)
  * If this is an interruptible C call, this means that the FFI call may be
  * unceremoniously terminated and should be scheduled on an
  * unbound worker thread.
+ *
+ * If force_safe_ccs is set we keep track of the ccs this call originated from
+ * and attribute the time spent in the C call to the caller independt of the
+ * RTS flags.
  * ------------------------------------------------------------------------- */
 
 void *
-suspendThread (StgRegTable *reg, bool interruptible)
+suspendThread (StgRegTable *reg, bool interruptible, bool force_safe_ccs)
 {
   Capability *cap;
   int saved_errno;
@@ -2517,6 +2521,9 @@ suspendThread (StgRegTable *reg, bool interruptible)
   // Hand back capability
   task->incall->suspended_tso = tso;
   task->incall->suspended_cap = cap;
+  if(RtsFlags.ProfFlags.trackSafeCalls || force_safe_ccs) {
+    task->incall->suspended_tso_cc = reg->rCCCS;
+  }
 
   // Otherwise allocate() will write to invalid memory.
   cap->r.rCurrentTSO = NULL;

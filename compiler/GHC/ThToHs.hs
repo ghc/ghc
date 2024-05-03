@@ -824,9 +824,10 @@ cvtForD (ImportF callconv safety from nm ty) =
                                    , fd_fi = impspec })
            }
     safety' = case safety of
-                     Unsafe     -> PlayRisky
-                     Safe       -> PlaySafe
-                     Interruptible -> PlayInterruptible
+                     Unsafe     -> UnsafeCall
+                     -- TODO: Tracking cost support
+                     Safe       -> SafeCall { safety_interruptible = False, safety_track_cost = False}
+                     Interruptible -> SafeCall { safety_interruptible = True, safety_track_cost = False}
 
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameN nm

@@ -767,7 +767,7 @@ bool_op :: { CmmParse BoolExpr }
         | '(' bool_op ')'               { $2 }
 
 safety  :: { Safety }
-        : {- empty -}                   { PlayRisky }
+        : {- empty -}                   { UnsafeCall }
         | STRING                        {% parseSafety $1 }
 
 vols    :: { [GlobalReg] }
@@ -1190,10 +1190,11 @@ callishMachOps platform = listToUFM $
         -- in the MO_* constructor. In order to do this, however, we
         -- must intercept the arguments in primCall.
 
+-- TODO: Track cost
 parseSafety :: String -> PD Safety
-parseSafety "safe"   = return PlaySafe
-parseSafety "unsafe" = return PlayRisky
-parseSafety "interruptible" = return PlayInterruptible
+parseSafety "safe"   = return $ SafeCall False False
+parseSafety "unsafe" = return UnsafeCall
+parseSafety "interruptible" = return $ SafeCall True False
 parseSafety str      = failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
                                               PsErrCmmParser (CmmUnrecognisedSafety str)
 

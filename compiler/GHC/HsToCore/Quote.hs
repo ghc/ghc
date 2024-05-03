@@ -772,9 +772,11 @@ repCCallConv PrimCallConv       = rep2_nw primCallName []
 repCCallConv JavaScriptCallConv = rep2_nw javaScriptCallName []
 
 repSafety :: Safety -> MetaM (Core TH.Safety)
-repSafety PlayRisky = rep2_nw unsafeName []
-repSafety PlayInterruptible = rep2_nw interruptibleName []
-repSafety PlaySafe = rep2_nw safeName []
+repSafety UnsafeCall = rep2_nw unsafeName []
+repSafety SafeCall { safety_interruptible = interruptible, safety_track_cost = track_cost}
+  -- TODO: Support cost tracking
+  | interruptible = rep2_nw interruptibleName []
+  | otherwise = rep2_nw safeName []
 
 repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig

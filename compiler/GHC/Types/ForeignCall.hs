@@ -50,19 +50,21 @@ instance Outputable ForeignCall where
   ppr (CCall cc)  = ppr cc
 
 data Safety
-  = PlaySafe          -- ^ Might invoke Haskell GC, or do a call back, or
+  = SafeCall    { safety_interruptible :: Bool
+                      -- ^ True: Additionally
+                      --   the worker thread running this foreign call may
+                      --   be unceremoniously killed, so it must be scheduled
+                      --   on an unbound thread.
+                , safety_track_cost :: Bool
+                }
+                      -- ^ Might invoke Haskell GC, or do a call back, or
                       --   switch threads, etc.  So make sure things are
                       --   tidy before the call. Additionally, in the threaded
                       --   RTS we arrange for the external call to be executed
                       --   by a separate OS thread, i.e., _concurrently_ to the
                       --   execution of other Haskell threads.
 
-  | PlayInterruptible -- ^ Like PlaySafe, but additionally
-                      --   the worker thread running this foreign call may
-                      --   be unceremoniously killed, so it must be scheduled
-                      --   on an unbound thread.
-
-  | PlayRisky         -- ^ None of the above can happen; the call will return
+  | UnsafeCall        -- ^ None of the above can happen; the call will return
                       --   without interacting with the runtime system at all.
                       --   Specifically:
                       --
@@ -71,21 +73,20 @@ data Safety
                       --     * No blocking
                       --     * No precise exceptions
                       --
-  deriving ( Eq, Show, Data, Enum )
+  deriving ( Eq, Show, Data )
         -- Show used just for Show Lex.Token, I think
 
 instance Outputable Safety where
-  ppr PlaySafe = text "safe"
-  ppr PlayInterruptible = text "interruptible"
-  ppr PlayRisky = text "unsafe"
+  ppr SafeCall {safety_interruptible = False } = text "safe"
+  ppr SafeCall {safety_interruptible = True } = text "interruptible"
+  ppr UnsafeCall = text "unsafe"
 
 playSafe :: Safety -> Bool
-playSafe PlaySafe = True
-playSafe PlayInterruptible = True
-playSafe PlayRisky = False
+playSafe SafeCall {} = True
+playSafe UnsafeCall = False
 
 playInterruptible :: Safety -> Bool
-playInterruptible PlayInterruptible = True
+playInterruptible SafeCall{ safety_interruptible = safety_interruptible} = safety_interruptible
 playInterruptible _ = False
 
 {-
@@ -262,18 +263,20 @@ instance Binary ForeignCall where
     get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
-    put_ bh PlaySafe =
+    put_ bh SafeCall { safety_interruptible = safety_interruptible, safety_track_cost } = do
             putByte bh 0
-    put_ bh PlayInterruptible =
+            put_ bh safety_interruptible
+            put_ bh safety_track_cost
+    put_ bh UnsafeCall =
             putByte bh 1
-    put_ bh PlayRisky =
-            putByte bh 2
     get bh = do
             h <- getByte bh
             case h of
-              0 -> return PlaySafe
-              1 -> return PlayInterruptible
-              _ -> return PlayRisky
+              0 -> do
+                interrupt <- get bh
+                track_cost <- get bh
+                return (SafeCall interrupt track_cost)
+              _ -> return UnsafeCall
 
 instance Binary CExportSpec where
     put_ bh (CExportStatic ss aa ab) = do

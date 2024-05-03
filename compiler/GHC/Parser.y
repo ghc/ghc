@@ -2097,7 +2097,7 @@ fdecl : 'import' callconv safety fspec
                {% mkImport $2 $3 (snd $ unLoc $4) >>= \i ->
                  return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $4),i))  }
       | 'import' callconv        fspec
-               {% do { d <- mkImport $2 (noLoc PlaySafe) (snd $ unLoc $3);
+               {% do { d <- mkImport $2 (noLoc (SafeCall False False)) (snd $ unLoc $3);
                     return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $3),d)) }}
       | 'export' callconv fspec
                {% mkExport $2 (snd $ unLoc $3) >>= \i ->
@@ -2111,9 +2111,9 @@ callconv :: { Located CCallConv }
           | 'javascript'                { sLL $1 $> JavaScriptCallConv }
 
 safety :: { Located Safety }
-        : 'unsafe'                      { sLL $1 $> PlayRisky }
-        | 'safe'                        { sLL $1 $> PlaySafe }
-        | 'interruptible'               { sLL $1 $> PlayInterruptible }
+        : 'unsafe'                      { sLL $1 $> UnsafeCall }
+        | 'safe'                        { sLL $1 $> SafeCall { safety_interruptible = False, safety_track_cost = False} }
+        | 'interruptible'               { sLL $1 $> SafeCall { safety_interruptible = True, safety_track_cost = False} }
 
 fspec :: { Located ([AddEpAnn]
                     ,(Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)) }

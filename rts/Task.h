@@ -84,6 +84,9 @@ typedef struct InCall_ {
 
     StgTSO *   suspended_tso;   // the TSO is stashed here when we
                                 // make a foreign call (NULL otherwise);
+    struct CostCentreStack_ * suspended_tso_cc;
+                                // If non-null attribute cost of this foreign call to the cc stack.
+                                // This allows us to track the cost of safe ffi calls.
 
     Capability *suspended_cap;  // The capability that the
                                 // suspended_tso is on, because

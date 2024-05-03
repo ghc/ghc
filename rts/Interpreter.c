@@ -2031,8 +2031,9 @@ run_BCO:
             W_ stk_offset             = BCO_GET_LARGE_ARG;
             int o_itbl                = BCO_GET_LARGE_ARG;
             int flags                 = BCO_NEXT;
-            bool interruptible        = flags & 0x1;
-            bool unsafe_call          = flags & 0x2;
+            bool unsafe_call          = flags & 0x1;
+            bool interruptible        = flags & 0x2;
+            bool track_cost           = flags & 0x4;
             void(*marshal_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 
             /* the stack looks like this:
@@ -2133,7 +2134,7 @@ run_BCO:
 
             if (!unsafe_call) {
                 SAVE_THREAD_STATE();
-                tok = suspendThread(&cap->r, interruptible);
+                tok = suspendThread(&cap->r, interruptible, track_cost);
             }
 
             // We already made a copy of the arguments above.

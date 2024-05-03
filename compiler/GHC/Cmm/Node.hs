@@ -159,7 +159,8 @@ data CmmNode e x where
       succ  :: ULabel,          -- Label of continuation
       ret_args :: ByteOff,      -- same as cml_ret_args
       ret_off :: ByteOff,       -- same as cml_ret_off
-      intrbl:: Bool             -- whether or not the call is interruptible
+      intrbl:: Bool,             -- whether or not the call is interruptible
+      track_safe_ccs :: Bool
   } -> CmmNode O C
 
 instance OutputableP Platform (CmmNode e x) where
@@ -267,7 +268,7 @@ pprNode platform node = pp_node <+> pp_debug
                   | Just r <- k = text "returns to" <+> ppr r <> comma
                   | otherwise   = empty
 
-      CmmForeignCall {tgt=t, res=rs, args=as, succ=s, ret_args=a, ret_off=u, intrbl=i} ->
+      CmmForeignCall {tgt=t, res=rs, args=as, succ=s, ret_args=a, ret_off=u, intrbl=i, track_safe_ccs=track_safe} ->
           hcat $ if i then [text "interruptible", space] else [] ++
                [ text "foreign call", space
                , pdoc platform t, text "(...)", space
@@ -276,6 +277,7 @@ pprNode platform node = pp_node <+> pp_debug
                     <+> text "ress:" <+> parens (ppr rs)
                , text "ret_args:" <+> ppr a
                , text "ret_off:" <+> ppr u
+               , text "track_safe:" <+> ppr track_safe
                , semi ]
 
     pp_debug :: SDoc
@@ -690,7 +692,8 @@ mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi l)             = CmmCondBranch (f e) ti fi l
 mapExp f   (CmmSwitch e ids)                     = CmmSwitch (f e) ids
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
-mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
+mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl track_safe_ccs)
+  = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl track_safe_ccs
 
 mapExpDeep :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
 mapExpDeep f = mapExp $ wrapRecExp f
@@ -724,10 +727,10 @@ mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
         Nothing   -> (\xs -> CmmUnsafeForeignCall tgt fs xs) `fmap` mapListM f as
-mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
+mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl track_safe)
     = case mapForeignTargetM f tgt of
-        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl)
-        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ ret_args updfr intrbl) `fmap` mapListM f as
+        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl track_safe)
+        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ ret_args updfr intrbl track_safe) `fmap` mapListM f as
 
 -- share as much as possible
 mapListM :: (a -> Maybe a) -> [a] -> Maybe [a]

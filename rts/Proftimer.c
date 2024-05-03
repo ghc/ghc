@@ -122,11 +122,20 @@ handleProfTick(void)
     total_ticks++;
     if (RELAXED_LOAD_ALWAYS(&do_prof_ticks)) {
         uint32_t n;
+        InCall* ffi_calls;
         for (n=0; n < getNumCapabilities(); n++) {
             Capability *cap = getCapability(n);
             CostCentreStack *ccs = RELAXED_LOAD(&cap->r.rCCCS);
             ccs->time_ticks++;
             traceProfSampleCostCentre(cap, cap->r.rCCCS, total_ticks);
+
+            for(ffi_calls = cap->suspended_ccalls; ffi_calls != NULL; ffi_calls = ffi_calls->next) {
+              ccs = ffi_calls->suspended_tso_cc;
+              if(ccs) {
+                ccs->time_ticks++;
+                // traceProfSampleCostCentre(cap, cap->r.rCCCS, total_ticks);
+              }
+            }
         }
     }
 #endif

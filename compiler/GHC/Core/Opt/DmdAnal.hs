@@ -806,7 +806,7 @@ For an expression @f a1 ... an :: ty@ we determine that
             T13380{d,e}.)
   2. False  If f is a PrimOp, and it is *not* raiseIO#
   3. False  If f is the PrimOp-like `seq#`, cf. Note [seq# magic].
-  4. False  If f is an unsafe FFI call ('PlayRisky')
+  4. False  If f is an unsafe FFI call ('UnsafeCall')
   _. True   Otherwise "give up".
 
 It is sound to return False in those cases, because
@@ -817,7 +817,7 @@ It is sound to return False in those cases, because
      We keep it that way for back-compat.
      See the implementation bits of Note [seq# magic] in GHC.Types.Id.Make.
   4. Unsafe FFI calls may not interact with the RTS (to throw, for example).
-     See haddock on GHC.Types.ForeignCall.PlayRisky.
+     See haddock on GHC.Types.ForeignCall.UnsafeCall.
 
 We *need* to return False in those cases, because
   1. We would lose too much strictness in pure code, all over the place.

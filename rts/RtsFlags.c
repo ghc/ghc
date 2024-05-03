@@ -224,6 +224,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.incrementUserEra = false;
 
 #if defined(PROFILING)
+    RtsFlags.ProfFlags.trackSafeCalls   = false;
     RtsFlags.ProfFlags.showCCSOnException = false;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
     RtsFlags.ProfFlags.ccsLength          = 25;
@@ -378,6 +379,7 @@ usage_text[] = {
 "  -P         More detailed Time/Allocation profile in tree format",
 "  -Pa        Give information about *all* cost centres in tree format",
 "  -pj        Output cost-center profile in JSON format",
+"  -ps        Always attribute time spent evaluating save calls to the caller.",
 "",
 "  -h         Heap residency profile, by cost centre stack",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
@@ -1497,6 +1499,9 @@ error = true;
                         break;
                       }
                       RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
+                      break;
+                  case 's':
+                      RtsFlags.ProfFlags.trackSafeCalls = true;
                       break;
                   case '\0':
                       if (rts_argv[arg][1] == 'P') {

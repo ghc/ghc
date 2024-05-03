@@ -648,4 +648,4 @@ mkJsCall u tgt args t = mkFCall u ccall args t
     ccall = CCall $ CCallSpec
               (StaticTarget NoSourceText tgt (Just primUnit) True)
               JavaScriptCallConv
-              PlayRisky
+              UnsafeCall

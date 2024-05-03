@@ -188,7 +188,7 @@ emitCCall' :: CmmReturnInfo
            -> [(CmmActual,ForeignHint)]
            -> FCode ()
 emitCCall' ret_info hinted_results fn hinted_args
-  = void $ emitForeignCall PlayRisky results target args
+  = void $ emitForeignCall UnsafeCall results target args
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
@@ -211,7 +211,7 @@ emitCCallNeverReturns = emitCCall' CmmNeverReturns
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
-  = void $ emitForeignCall PlayRisky res (PrimTarget op) args
+  = void $ emitForeignCall UnsafeCall res (PrimTarget op) args
 
 -- alternative entry point, used by GHC.Cmm.Parser
 emitForeignCall
@@ -250,7 +250,8 @@ emitForeignCall safety results target args
                                        , succ = k
                                        , ret_args = off
                                        , ret_off = updfr_off
-                                       , intrbl = playInterruptible safety })
+                                       , intrbl = playInterruptible safety
+                                       , track_safe_ccs = False })
             <*> mkLabel k tscope
             <*> copyout
            )

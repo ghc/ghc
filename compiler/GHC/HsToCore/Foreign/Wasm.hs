@@ -170,7 +170,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
       (mkRepReflCo adjustor_ty)
       adjustor_js_src
       mUnitId
-      PlayRisky
+      UnsafeCall
   mkJSCallback_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "mkJSCallback"
   let wrap_rhs =
         mkCoreLams [tv | Bndr tv _ <- tv_bndrs]
@@ -290,11 +290,11 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
         | otherwise =
             js_src'
   case safety of
-    PlayRisky -> do
+    UnsafeCall -> do
       rhs <-
         importBindingRHS
           mUnitId
-          PlayRisky
+          UnsafeCall
           cfun_name
           tvs
           arg_tys
@@ -304,7 +304,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
           importCStub
-            PlayRisky
+            UnsafeCall
             cfun_name
             (map scaledThing arg_tys)
             res_ty
@@ -326,7 +326,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
       rhs <-
         importBindingRHS
           mUnitId
-          PlaySafe
+          (SafeCall False False)
           cfun_name
           tvs
           arg_tys
@@ -358,7 +358,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
           importCStub
-            PlaySafe
+            (SafeCall False False)
             cfun_name
             (map scaledThing arg_tys)
             jsval_ty
@@ -470,7 +470,7 @@ importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
                       ".asciz \"" ++ import_name ++ "\"\n",
                       ".asciz \""
                         ++ ( case safety of
-                               PlayRisky -> "("
+                               UnsafeCall -> "("
                                _ -> "async ("
                            )
                         ++ intercalate "," ["$" ++ show i | i <- [1 .. length arg_tys]]

@@ -451,8 +451,8 @@ instance Binary BlockDeps where
 
 instance Binary ForeignJSRef where
   put_ bh (ForeignJSRef span pat safety cconv arg_tys res_ty) =
-    put_ bh span >> put_ bh pat >> putEnum bh safety >> putEnum bh cconv >> put_ bh arg_tys >> put_ bh res_ty
-  get bh = ForeignJSRef <$> get bh <*> get bh <*> getEnum bh <*> getEnum bh <*> get bh <*> get bh
+    put_ bh span >> put_ bh pat >> put_ bh safety >> putEnum bh cconv >> put_ bh arg_tys >> put_ bh res_ty
+  get bh = ForeignJSRef <$> get bh <*> get bh <*> get bh <*> getEnum bh <*> get bh <*> get bh
 
 instance Binary ExpFun where
   put_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res

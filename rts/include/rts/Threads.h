@@ -41,7 +41,7 @@ StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
                                StgClosure *closure);
 
 // Suspending/resuming threads around foreign calls
-void *        suspendThread (StgRegTable *, bool interruptible);
+void *        suspendThread (StgRegTable *, bool interruptible, bool force_safe_ccs);
 StgRegTable * resumeThread  (void *);
 
 //
