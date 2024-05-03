@@ -624,7 +624,7 @@ hasNoBinding id = case Var.idDetails id of
                                                -- We don't generate bindings for newtype
                                                -- classes, so express that here
                                                -- ToDo explain!
-                  _                -> isCompulsoryUnfolding (realIdUnfolding id)
+                        _                -> isCompulsoryUnfolding (realIdUnfolding id)
   -- Note: this function must be very careful not to force
   -- any of the fields that aren't the 'uf_src' field of
   -- the 'Unfolding' of the 'Id'. This is because these fields are computed
