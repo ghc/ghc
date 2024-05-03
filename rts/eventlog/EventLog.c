@@ -1441,11 +1441,14 @@ void postTickyCounterSamples(StgEntCounter *counters)
 #endif /* TICKY_TICKY */
 void postIPE(const InfoProvEnt *ipe)
 {
+    char closure_desc_buf[CLOSURE_DESC_BUFFER_SIZE] = {};
+    formatClosureDescIpe(ipe, closure_desc_buf);
+
     // See Note [Maximum event length].
     const StgWord MAX_IPE_STRING_LEN = 65535;
     ACQUIRE_LOCK(&eventBufMutex);
     StgWord table_name_len = MIN(strlen(ipe->prov.table_name), MAX_IPE_STRING_LEN);
-    StgWord closure_desc_len = MIN(strlen(ipe->prov.closure_desc), MAX_IPE_STRING_LEN);
+    StgWord closure_desc_len = MIN(strlen(closure_desc_buf), MAX_IPE_STRING_LEN);
     StgWord ty_desc_len = MIN(strlen(ipe->prov.ty_desc), MAX_IPE_STRING_LEN);
     StgWord label_len = MIN(strlen(ipe->prov.label), MAX_IPE_STRING_LEN);
     StgWord module_len = MIN(strlen(ipe->prov.module), MAX_IPE_STRING_LEN);
@@ -1462,7 +1465,7 @@ void postIPE(const InfoProvEnt *ipe)
     postPayloadSize(&eventBuf, len);
     postWord64(&eventBuf, (StgWord) INFO_PTR_TO_STRUCT(ipe->info));
     postStringLen(&eventBuf, ipe->prov.table_name, table_name_len);
-    postStringLen(&eventBuf, ipe->prov.closure_desc, closure_desc_len);
+    postStringLen(&eventBuf, closure_desc_buf, closure_desc_len);
     postStringLen(&eventBuf, ipe->prov.ty_desc, ty_desc_len);
     postStringLen(&eventBuf, ipe->prov.label, label_len);
     postStringLen(&eventBuf, ipe->prov.module, module_len);

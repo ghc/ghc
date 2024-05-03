@@ -33,10 +33,7 @@ IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, int i) {
     snprintf(tableName, tableNameLength, "table_name_%03i", i);
     provEnt.table_name = add_string(st, tableName);
 
-    unsigned int closureDescLength = strlen("closure_desc_") + 3 /* digits */ + 1 /* null character */;
-    char *closureDesc = malloc(sizeof(char) * closureDescLength);
-    snprintf(closureDesc, closureDescLength, "closure_desc_%03i", i);
-    provEnt.closure_desc = add_string(st, closureDesc);
+    provEnt.closure_desc = i;
 
     unsigned int tyDescLength = strlen("ty_desc_") + 3 /* digits */ + 1 /* null character */;
     char *tyDesc = malloc(sizeof(char) * tyDescLength);

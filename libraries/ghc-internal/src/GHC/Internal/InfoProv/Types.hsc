@@ -18,8 +18,9 @@ module GHC.Internal.InfoProv.Types
     ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
+import GHC.Internal.Real (fromIntegral)
+import GHC.Internal.Word (Word32)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Ptr (Ptr(..), plusPtr)
 import GHC.Internal.Foreign.C.String.Encoding (CString, peekCString)
@@ -28,7 +29,6 @@ import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 import GHC.Internal.IO.Encoding (utf8)
 import GHC.Internal.Foreign.Storable (peekByteOff)
 import GHC.Internal.ClosureTypes
-import GHC.Internal.Text.Read
 import GHC.Prim (whereFrom##)
 
 data InfoProv = InfoProv {
@@ -70,9 +70,11 @@ getIPE obj fail k = allocaBytes (#size InfoProvEnt) $ \p -> IO $ \s ->
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = (#ptr InfoProvEnt, prov) p
 
-peekIpName, peekIpDesc, peekIpLabel, peekIpUnitId, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
-peekIpName p    =  (# peek InfoProv, table_name) p
+peekIpDesc :: Ptr InfoProv -> IO Word32
 peekIpDesc p    =  (# peek InfoProv, closure_desc) p
+
+peekIpName, peekIpLabel, peekIpUnitId, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
+peekIpName p    =  (# peek InfoProv, table_name) p
 peekIpLabel p   =  (# peek InfoProv, label) p
 peekIpUnitId p  =  (# peek InfoProv, unit_id) p
 peekIpModule p  =  (# peek InfoProv, module) p
@@ -83,7 +85,7 @@ peekIpTyDesc p  =  (# peek InfoProv, ty_desc) p
 peekInfoProv :: Ptr InfoProv -> IO InfoProv
 peekInfoProv infop = do
   name <- peekCString utf8 =<< peekIpName infop
-  desc <- peekCString utf8 =<< peekIpDesc infop
+  desc <- peekIpDesc infop
   tyDesc <- peekCString utf8 =<< peekIpTyDesc infop
   label <- peekCString utf8 =<< peekIpLabel infop
   unit_id <- peekCString utf8 =<< peekIpUnitId infop
@@ -94,7 +96,7 @@ peekInfoProv infop = do
       ipName = name,
       -- The INVALID_OBJECT case should be impossible as we
       -- control the C code generating these values.
-      ipDesc = maybe INVALID_OBJECT toEnum . readMaybe @Int $ desc,
+      ipDesc = toEnum $ fromIntegral desc,
       ipTyDesc = tyDesc,
       ipLabel = label,
       ipUnitId = unit_id,

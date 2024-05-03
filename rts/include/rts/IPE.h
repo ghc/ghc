@@ -15,7 +15,7 @@
 
 typedef struct InfoProv_ {
     const char *table_name;
-    const char *closure_desc;
+    uint32_t closure_desc; // closure type
     const char *ty_desc;
     const char *label;
     const char *unit_id;
@@ -54,7 +54,7 @@ typedef uint32_t StringIdx;
 // to ensure correct packing.
 typedef struct {
     StringIdx table_name;
-    StringIdx closure_desc;
+    uint32_t closure_desc; // closure type
     StringIdx ty_desc;
     StringIdx label;
     StringIdx src_file;
@@ -88,6 +88,12 @@ typedef struct IpeBufferListNode_ {
 } IpeBufferListNode;
 
 void registerInfoProvList(IpeBufferListNode *node);
+
+// We leave it in old format to keep compatibility with existing https://github.com/haskell/ghc-events
+// See: https://github.com/haskell/ghc-events/commit/cce6a35677f5f99b44c21d86febd295b909ef1ce
+// The format depends on tooling. At the moment of commit all tooling expects a stringified unsigned int.
+// I.e. 10 -> "10". No padding zeroes. No prefixes.
+void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf);
 
 // Returns true on success, initializes `out`.
 bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);

@@ -178,7 +178,7 @@ toIpeBufferEntries byte_order cg_ipes =
     to_ipe_buf_ent :: CgInfoProvEnt -> [Word32]
     to_ipe_buf_ent cg_ipe =
       [ ipeTableName cg_ipe
-      , ipeClosureDesc cg_ipe
+      , fromIntegral $ ipeClosureDesc cg_ipe
       , ipeTypeDesc cg_ipe
       , ipeLabel cg_ipe
       , ipeSrcFile cg_ipe
@@ -193,7 +193,6 @@ toIpeBufferEntries byte_order cg_ipes =
 toCgIPE :: Platform -> SDocContext -> InfoProvEnt -> State StringTable CgInfoProvEnt
 toCgIPE platform ctx ipe = do
     table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform (infoTablePtr ipe))
-    closure_desc <- lookupStringTable $ ST.pack $ show (infoProvEntClosureType ipe)
     type_desc <- lookupStringTable $ ST.pack $ infoTableType ipe
     let label_str = maybe "" ((\(LexicalFastString s) -> unpackFS s) . snd) (infoTableProv ipe)
     let (src_loc_file, src_loc_span) =
@@ -208,7 +207,7 @@ toCgIPE platform ctx ipe = do
     src_span <- lookupStringTable $ ST.pack src_loc_span
     return $ CgInfoProvEnt { ipeInfoTablePtr = infoTablePtr ipe
                            , ipeTableName = table_name
-                           , ipeClosureDesc = closure_desc
+                           , ipeClosureDesc = fromIntegral (infoProvEntClosureType ipe)
                            , ipeTypeDesc = type_desc
                            , ipeLabel = label
                            , ipeSrcFile = src_file
@@ -218,7 +217,7 @@ toCgIPE platform ctx ipe = do
 data CgInfoProvEnt = CgInfoProvEnt
                                { ipeInfoTablePtr :: !CLabel
                                , ipeTableName :: !StrTabOffset
-                               , ipeClosureDesc :: !StrTabOffset
+                               , ipeClosureDesc :: !Word32
                                , ipeTypeDesc :: !StrTabOffset
                                , ipeLabel :: !StrTabOffset
                                , ipeSrcFile :: !StrTabOffset
