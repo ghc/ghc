@@ -25,7 +25,8 @@
 
 #include <string.h>
 
-static void  initMBlock(void *mblock, uint32_t node);
+static void initMBlock(void *mblock, uint32_t node);
+static void free_mega_group (bdescr *mg);
 
 /*
  * By default the DEBUG RTS is built with block allocator assertions
@@ -478,13 +479,30 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
     else
     {
         void *mblock;
+        StgWord hugepage_mblocks;
+        if(RtsFlags.GcFlags.hugepages) {
+          // Round up allocation to hugepage size
+          hugepage_mblocks = MBLOCK_ROUND_UP_HUGEPAGE(mblocks);
+        }
+        else {
+          hugepage_mblocks = mblocks;
+        }
+
         if (RtsFlags.GcFlags.numa) {
-            mblock = getMBlocksOnNode(node, mblocks);
+            mblock = getMBlocksOnNode(node, hugepage_mblocks);
         } else {
-            mblock = getMBlocks(mblocks);
+            mblock = getMBlocks(hugepage_mblocks);
         }
         initMBlock(mblock, node); // only need to init the 1st one
         bd = FIRST_BDESCR(mblock);
+
+        // Free the slop
+        if(hugepage_mblocks > mblocks) {
+          bdescr *mblock_slop_bd = FIRST_BDESCR((uintptr_t)mblock + (uintptr_t)mblocks*MBLOCK_SIZE);
+          initMBlock(MBLOCK_ROUND_DOWN(mblock_slop_bd), node); 
+          mblock_slop_bd->blocks = MBLOCK_GROUP_BLOCKS(hugepage_mblocks-mblocks);
+          free_mega_group(mblock_slop_bd);
+        }
     }
     bd->blocks = MBLOCK_GROUP_BLOCKS(mblocks);
     return bd;
@@ -812,7 +830,7 @@ coalesce_mblocks (bdescr *p)
     return q;
 }
 
-static void
+void
 free_mega_group (bdescr *mg)
 {
     bdescr *bd, *prev;
@@ -1199,10 +1217,15 @@ uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
     return 0;
 #else
     bdescr *bd;
+    bdescr *rejects;
+    bdescr *next;
     uint32_t node;
-    StgWord size;
+    StgWord size, unaligned_size, freeable_size;
     uint32_t init_n;
     init_n = n;
+    if(RtsFlags.GcFlags.hugepages) {
+      n = MBLOCK_ROUND_DOWN_HUGEPAGE(n);
+    }
 
     // TODO: This is inefficient because this loop will essentially result in
     // quadratic runtime behavior: for each call to `freeMBlocks`, the
@@ -1215,22 +1238,66 @@ uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
     // ToDo: not fair, we free all the memory starting with node 0.
     for (node = 0; n > 0 && node < n_numa_nodes; node++) {
         bd = free_mblock_list[node];
+        rejects = NULL;
         while ((n > 0) && (bd != NULL)) {
             size = BLOCKS_TO_MBLOCKS(bd->blocks);
-            if (size > n) {
-                StgWord newSize = size - n;
-                char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
-                freeAddr += newSize * MBLOCK_SIZE;
-                bd->blocks = MBLOCK_GROUP_BLOCKS(newSize);
-                freeMBlocks(freeAddr, n);
-                n = 0;
-            }
+            next = bd->link;
+            char *aligned_start;
+
+            if(RtsFlags.GcFlags.hugepages) {
+              aligned_start = (char*)MBLOCK_ROUND_DOWN(bd) + ((uintptr_t)MBLOCK_ROUND_DOWN(bd) & HUGEPAGE_MASK);
+              unaligned_size = (aligned_start - (char*)MBLOCK_ROUND_DOWN(bd)) / MBLOCK_SIZE;
+              freeable_size = MBLOCK_ROUND_DOWN_HUGEPAGE(size - unaligned_size);
+            } 
             else {
-                char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
-                n -= size;
-                bd = bd->link;
-                freeMBlocks(freeAddr, size);
+              aligned_start = (char*)MBLOCK_ROUND_DOWN(bd);
+              unaligned_size = 0;
+              freeable_size = size;
             }
+
+            // We cannot free more than n
+            freeable_size = stg_min(n, freeable_size);
+
+            // Place the front unaligned section back on the list.
+            // If we can't free any of it then this is the entire thing.
+            if (unaligned_size > 0 || freeable_size == 0) { 
+              bd->link = rejects;
+              rejects = bd;
+              // If we are freeing some mblocks from the middle then initialise
+              // the first MBlock and update the sizes.
+              if (freeable_size > 0) {
+                bd->blocks = MBLOCK_GROUP_BLOCKS(unaligned_size);
+                bdescr *aligned_bd;
+                aligned_bd = FIRST_BDESCR(aligned_start);
+                aligned_bd->blocks = MBLOCK_GROUP_BLOCKS(freeable_size);
+                initMBlock(aligned_bd, node);
+              }
+            } 
+
+            if(freeable_size > 0) {
+                n -= freeable_size;
+                freeMBlocks(aligned_start, freeable_size);
+                // add the slop to the rejects list
+                if (size - unaligned_size - freeable_size > 0)
+                {
+                  void *slop = aligned_start + freeable_size * MBLOCK_SIZE;
+                  bdescr* slop_bd = FIRST_BDESCR(slop);
+                  initMBlock(slop_bd, node);
+                  slop_bd->blocks = MBLOCK_GROUP_BLOCKS(size - unaligned_size - freeable_size);
+                  slop_bd->link = rejects;
+                  rejects = slop_bd;
+                }
+            }
+            bd = next;
+        }
+        // Place the rejected mblocks back on the free list.
+        while(rejects) {
+          // pop the top of the rejects list.
+          next = rejects;
+          rejects = next->link;
+          // place it back on the free list.
+          next->link = bd;
+          bd = next;
         }
         free_mblock_list[node] = bd;
     }

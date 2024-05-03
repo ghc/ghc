@@ -10,6 +10,20 @@
 
 #include "BeginPrivate.h"
 
+#if defined(HAVE_LINUX_MMAN_H)
+#include <linux/mman.h>
+
+#define HUGEPAGE_SHIFT 21
+#define HUGEPAGE_FLAGS (MAP_HUGETLB | MAP_HUGE_2MB)
+#else
+#define HUGEPAGE_SHIFT 20
+#endif
+
+#define HUGEPAGE_SIZE (1 << HUGEPAGE_SHIFT)
+#define HUGEPAGE_MASK ((1 << HUGEPAGE_SHIFT) - 1)
+#define MBLOCK_ROUND_DOWN_HUGEPAGE(x) ((x) & ~(HUGEPAGE_SHIFT - MBLOCK_SHIFT))
+#define MBLOCK_ROUND_UP_HUGEPAGE(x) ((x) + ((x) & (HUGEPAGE_SHIFT - MBLOCK_SHIFT)))
+
 void osMemInit(void);
 void *osGetMBlocks(uint32_t n);
 void osFreeMBlocks(void *addr, uint32_t n);
