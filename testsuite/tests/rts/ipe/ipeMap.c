@@ -68,10 +68,13 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
 
     registerInfoProvList(node);
 
-    InfoProvEnt result = lookupIPE_("shouldFindOneIfItHasBeenRegistered", get_itbl(fortyTwo));
+    const InfoProvEnt result = lookupIPE_("shouldFindOneIfItHasBeenRegistered", get_itbl(fortyTwo));
+
+    char closure_desc_buf[CLOSURE_DESC_BUFFER_SIZE] = {};
+    formatClosureDescIpe(&result, closure_desc_buf);
 
     assertStringsEqual(result.prov.table_name, "table_name_042");
-    assertStringsEqual(result.prov.closure_desc, "closure_desc_042");
+    assertStringsEqual(closure_desc_buf, "42");
     assertStringsEqual(result.prov.ty_desc, "ty_desc_042");
     assertStringsEqual(result.prov.label, "label_042");
     assertStringsEqual(result.prov.unit_id, "unit-id");
