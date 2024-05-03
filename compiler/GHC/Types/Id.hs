@@ -146,6 +146,7 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
 import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.TyCon( isClassTyCon )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
@@ -157,16 +158,20 @@ import GHC.Types.Name
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 import GHC.Stg.EnforceEpt.TagSig
 
 import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Builtin.Uniques (mkBuiltinUnique)
-import GHC.Types.Unique.Supply
+import GHC.Builtin.Uniques (mkBuiltinUnique)
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import GHC.Data.Maybe
+
+import GHC.Unit.Module
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -613,8 +618,13 @@ hasNoBinding id = case Var.idDetails id of
 --                        PrimOpId _ lev_poly -> lev_poly    -- TEMPORARILY commented out
 
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-                        _                -> isCompulsoryUnfolding (realIdUnfolding id)
+                        DataConWorkId dc -> isUnboxedTupleDataCon dc
+                                            || isUnboxedSumDataCon dc
+                                            || isClassTyCon (dataConTyCon dc)
+                                               -- We don't generate bindings for newtype
+                                               -- classes, so express that here
+                                               -- ToDo explain!
+                  _                -> isCompulsoryUnfolding (realIdUnfolding id)
   -- Note: this function must be very careful not to force
   -- any of the fields that aren't the 'uf_src' field of
   -- the 'Unfolding' of the 'Id'. This is because these fields are computed

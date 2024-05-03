@@ -505,11 +505,9 @@ mkDictSelId name clas
     info | new_tycon  -- Same as non-new case; ToDo: explain
          = base_info `setRuleInfo` mkRuleInfo [rule]
                      `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
-                                           StableSystemSrc 1
-                                           (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
+                   -- TODO Fix this comment!
 
          | otherwise
          = base_info `setRuleInfo` mkRuleInfo [rule]
