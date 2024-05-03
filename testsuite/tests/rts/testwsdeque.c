@@ -34,16 +34,16 @@ void *
 myStealWSDeque_ (WSDeque *q, uint32_t n)
 {
     void * stolen;
-    
+
 // Can't do this on someone else's spark pool:
-// ASSERT_WSDEQUE_INVARIANTS(q); 
-    
+// ASSERT_WSDEQUE_INVARIANTS(q);
+
     // NB. these loads must be ordered, otherwise there is a race
     // between steal and pop.
     StgWord t = ACQUIRE_LOAD(&q->top);
     SEQ_CST_FENCE();
     StgWord b = ACQUIRE_LOAD(&q->bottom);
-    
+
     void *result = NULL;
     if (t < b) {
         /* Non-empty queue */
@@ -59,11 +59,11 @@ void *
 myStealWSDeque (WSDeque *q, uint32_t n)
 {
     void *stolen;
-    
-    do { 
+
+    do {
         stolen = myStealWSDeque_(q,n);
     } while (stolen == NULL && !looksEmptyWSDeque(q));
-    
+
     return stolen;
 }
 
@@ -89,15 +89,15 @@ void work(void *p, uint32_t n)
 
     // debugBelch("work %ld %d\n", p, n);
     val = *(StgWord *)p;
-    if (val != 0) { 
-        fflush(stdout); 
-        fflush(stderr); 
-        barf("FAIL: %ld %d %d", p, n, val);
+    if (val != 0) {
+        fflush(stdout);
+        fflush(stderr);
+        barf("FAIL: %p %" FMT_Word32 " %" FMT_Word, p, n, val);
     }
     *(StgWord*)p = n+10;
 }
-    
-void OSThreadProcAttr thief(void *info)
+
+void* OSThreadProcAttr thief(void *info)
 {
     void *p;
     StgWord n;
@@ -114,6 +114,7 @@ void OSThreadProcAttr thief(void *info)
         if (p != NULL) { work(p,n+1); count++; }
     }
     debugBelch("thread %ld finished, stole %d", n, count);
+    return NULL;
 }
 
 int main(int argc, char*argv[])
@@ -124,13 +125,13 @@ int main(int argc, char*argv[])
 
     q = newWSDeque(1024);
     done = 0;
-    
+
     for (n=0; n < SCRATCH_SIZE; n++) {
         scratch[n] = 0;
     }
 
     for (n=0; n < THREADS; n++) {
-        createOSThread(&ids[n], "thief", thief, (void*)(StgWord)n);
+        createOSThread(&ids[n], "thief", (OSThreadProc*)thief, (void*)(StgWord)n);
     }
 
     for (n=0; n < SCRATCH_SIZE; n++) {
