@@ -688,9 +688,12 @@ void traceIPE(const InfoProvEnt *ipe)
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         ACQUIRE_LOCK(&trace_utx);
 
+        char closure_desc_buf[CLOSURE_DESC_BUFFER_SIZE] = {};
+        formatClosureDescIpe(ipe, closure_desc_buf);
+
         tracePreface();
         debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, unit %s, module %s, srcloc %s:%s\n",
-                   ipe->prov.table_name, ipe->prov.closure_desc, ipe->prov.ty_desc,
+                   ipe->prov.table_name, closure_desc_buf, ipe->prov.ty_desc,
                    ipe->prov.label, ipe->prov.unit_id, ipe->prov.module,
                    ipe->prov.src_file, ipe->prov.src_span);
 

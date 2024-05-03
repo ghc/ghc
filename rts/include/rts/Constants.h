@@ -347,3 +347,10 @@
  * we can have static arrays of this size in the RTS for speed.
  */
 #define MAX_NUMA_NODES 16
+
+/*
+ * closure_desc of InfoProv is now uint32_t at all platforms, but
+ * we have to keep its stringified representation.
+ * It is known that maximum length of uint32_t in string is 10 chars (4294967295) + 1 NULL.
+ */
+#define CLOSURE_DESC_BUFFER_SIZE 11

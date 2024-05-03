@@ -105,7 +105,7 @@ static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, uint32_t i
             .info = node->tables[idx],
             .prov = {
                 .table_name = &strings[ent->table_name],
-                .closure_desc = &strings[ent->closure_desc],
+                .closure_desc = ent->closure_desc,
                 .ty_desc = &strings[ent->ty_desc],
                 .label = &strings[ent->label],
                 .unit_id = &strings[node->unit_id],
@@ -174,6 +174,10 @@ void registerInfoProvList(IpeBufferListNode *node) {
             return;
         }
     }
+}
+
+void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf) {
+    snprintf(str_buf, CLOSURE_DESC_BUFFER_SIZE, "%u", ipe_buf->prov.closure_desc);
 }
 
 bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out) {
