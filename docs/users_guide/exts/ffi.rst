@@ -1004,7 +1004,7 @@ the data.  We can do it like this:
        sp <- newStablePtrPrimMVar mvar
        fp <- mallocForeignPtr
        withForeignPtr fp $ \presult -> do
-         cap <- threadCapability =<< myThreadId
+         (cap, _) <- threadCapability =<< myThreadId
          scheduleCallback sp cap presult
          takeMVar mvar `onException`
            forkIO (do takeMVar mvar; touchForeignPtr fp)
