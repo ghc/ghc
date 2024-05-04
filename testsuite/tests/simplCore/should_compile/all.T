@@ -521,3 +521,4 @@ test('T25033', normal, compile, ['-O'])
 # T24944 needs -O2 because it's about SpecConstr
 test('T24944', [extra_files(['T24944a.hs'])], multimod_compile, ['T24944', '-v0 -O2'])
 test('T24808', [ grep_errmsg(r'myFunction') ], compile, ['-O -ddump-simpl'])
+test('T24768', normal, compile, ['-O'])

@@ -991,6 +991,11 @@ But, as ever, we need to be careful:
     as /another/ MFE, so we tell lvlFloatRhs not to do that, via the is_bot
     argument.
 
+    Do /not/ do this for bottoming /join-point/ bindings.   They may call other
+    join points (#24768), and floating to the top would abstract over those join
+    points, which we should never do.
+
+
 See Maessen's paper 1999 "Bottom extraction: factoring error handling out
 of functional programs" (unpublished I think).
 
@@ -1188,9 +1193,11 @@ lvlBind env (AnnNonRec bndr rhs)
 
     deann_rhs  = deAnnotate rhs
     mb_bot_str = exprBotStrictness_maybe deann_rhs
-    is_bot_lam = isJust mb_bot_str
+    is_bot_lam = not is_join && isJust mb_bot_str
         -- is_bot_lam: looks like (\xy. bot), maybe zero lams
-        -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
+        -- NB: not isBottomThunk!
+        -- NB: not is_join: don't send bottoming join points to the top.
+        -- See Note [Bottoming floats] point (3)
 
     n_extra    = count isId abs_vars
     mb_join_arity = idJoinPointHood bndr
