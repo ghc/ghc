@@ -890,6 +890,29 @@ cpeRhsE env (Case scrut bndr _ alts@[Alt con [covar] _])
              floats = snocFloat floats_scrut case_float `appFloats` floats_rhs
        ; return (floats, rhs) }
 
+cpeRhsE env (Case scrut bndr _ [Alt (DataAlt dc) [token_out, res] rhs])
+  -- See item (SEQ4) of Note [seq# magic]. We want to match
+  --   case seq# @a @RealWorld <ok-to-discard> s of (# s', _ #) -> rhs[s']
+  -- and simplify to rhs[s]. Triggers in T15226.
+  | isUnboxedTupleDataCon dc
+  , (Var f,[_ty1, _ty2, arg, Var token_in]) <- collectArgs scrut
+  , f `hasKey` seqHashKey
+  , exprOkToDiscard arg
+      -- ok-to-discard, because we want to discard the evaluation of `arg`.
+      -- ok-to-discard includes ok-for-spec, but *also* CanFail primops such as
+      -- `quotInt# 1# 0#`, but not ThrowsException primops.
+      -- See Note [Classifying primop effects]
+      -- and Note [Transformations affected by primop effects] for why this is
+      -- the correct choice.
+  , Var token_in' <- lookupCorePrepEnv env token_in
+  , isDeadBinder res, isDeadBinder bndr
+      -- Check that bndr and res are dead
+      -- We can rely on `isDeadBinder res`, despite the fact that the Simplifier
+      -- often zaps the OccInfo on case-alternative binders (see Note [DataAlt occ info]
+      -- in GHC.Core.Opt.Simplify.Iteration) because the scrutinee is not a
+      -- variable, and in that case the zapping doesn't happen; see that Note.
+  = cpeRhsE (extendCorePrepEnv env token_out token_in') rhs
+
 cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr

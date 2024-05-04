@@ -24,12 +24,8 @@ fun3 :: a -> IO a
 {-# OPAQUE fun3 #-}
 fun3 x = do
   pure ()
-  -- "evaluate $! x"
-  case x of !x' -> IO (noinline seq# x')
-                    -- noinline to work around the bogus seqRule
-  -- This ideally also should not push a continuation to the stack
-  -- before entering 'x'.  It currently does, but let's wait for
-  -- !11515 to land before worrying about that.
+  evaluate $! x
+  -- This should not push a continuation to the stack before entering 'x'
 
 funPair :: a -> IO (a, a)
 {-# OPAQUE funPair #-}

@@ -2295,9 +2295,16 @@ Things to note
   also we can attach an evaldUnfolding to x' to discard any
   subsequent evals such as the `case x' of __DEFAULT`.
 
+(SEQ4)
+  T15226 demonstrates that we want to discard ok-for-discard seq#s. That is,
+  simplify `case seq# <ok-to-discard> s of (# s', _ #) -> rhs[s']` to `rhs[s]`.
+  You might wonder whether the Simplifier could do this. But see the excellent
+  example in #24334 (immortalised as test T24334) for why it should be done in
+  CorePrep.
+
 Implementing seq#.  The compiler has magic for `seq#` in
 
-- GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s)
+- GHC.CoreToStg.Prep.cpeRhsE: Implement (SEQ4).
 
 - Simplify.addEvals records evaluated-ness for the result (cf. (SEQ3)); see
   Note [Adding evaluatedness info to pattern-bound variables]

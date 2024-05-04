@@ -2067,21 +2067,18 @@ unsafeEqualityProofRule
 
 {- *********************************************************************
 *                                                                      *
-             Rules for seq# and spark#
+             Rules for spark#
 *                                                                      *
 ********************************************************************* -}
 
-seqRule :: RuleM CoreExpr
-seqRule = do
+-- spark# :: forall a s . a -> State# s -> (# State# s, a #)
+sparkRule :: RuleM CoreExpr
+sparkRule = do -- reduce on HNF
   [Type _ty_a, Type _ty_s, a, s] <- getArgs
   guard $ exprIsHNF a
   return $ mkCoreUnboxedTuple [s, a]
-
--- spark# :: forall a s . a -> State# s -> (# State# s, a #)
-sparkRule :: RuleM CoreExpr
-sparkRule = seqRule -- reduce on HNF, just the same
-  -- XXX perhaps we shouldn't do this, because a spark eliminated by
-  -- this rule won't be counted as a dud at runtime?
+    -- XXX perhaps we shouldn't do this, because a spark eliminated by
+    -- this rule won't be counted as a dud at runtime?
 
 {-
 ************************************************************************
@@ -2158,9 +2155,7 @@ builtinRules
           platform <- getPlatform
           return $ Var (primOpId IntAndOp)
             `App` arg `App` mkIntVal platform (d - 1)
-        ],
-
-     mkBasicRule seqHashName 4 seqRule
+        ]
      ]
  ++ builtinBignumRules
 {-# NOINLINE builtinRules #-}
