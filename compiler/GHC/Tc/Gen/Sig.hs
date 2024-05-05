@@ -37,7 +37,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcInferRho, tcCheckMonoExpr )
 import GHC.Tc.Errors.Types ( FixedRuntimeRepProvenance(..), TcRnMessage(..) )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver
-import GHC.Tc.Solver.Monad( runTcS, runTcSWithEvBinds )
+import GHC.Tc.Solver.Monad( runTcS )
 import GHC.Tc.Validity ( checkValidType )
 
 import GHC.Tc.Utils.Monad
@@ -48,6 +48,7 @@ import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Tc.Types.Constraint
 
 import GHC.Tc.Zonk.TcType
