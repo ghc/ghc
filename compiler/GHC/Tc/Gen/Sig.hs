@@ -665,7 +665,7 @@ should add the arity later for all binders.  But it works fine like this.
 *                                                                      *
 ************************************************************************
 
-Note [Handling SPoECIALISE pragmas]
+Note [Handling SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea is this:
 
