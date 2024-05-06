@@ -5,6 +5,8 @@
  *       For the WINIO manager see base in the GHC.Event modules.
  */
 #include "Rts.h"
+#include "MIOManager.h"
+#include "ThreadLabels.h"
 #include <windows.h>
 #include "ConsoleHandler.h"
 #include "Schedule.h"

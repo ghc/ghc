@@ -9,6 +9,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "IOManager.h"
 #include "ThrIOManager.h"
 #include "MIOManager.h"
 #include "rts/OSThreads.h"

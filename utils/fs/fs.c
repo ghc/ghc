@@ -140,7 +140,7 @@ static int setErrNoFromWin32Error (void);
    This function should only be called when the creation of the fd actually
    failed and you want to return -1 for the fd.  */
 static
-int setErrNoFromWin32Error () {
+int setErrNoFromWin32Error (void) {
   switch (GetLastError()) {
     case ERROR_SUCCESS:
       errno = 0;
