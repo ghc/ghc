@@ -36,7 +36,7 @@ import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Core.Opt.OccurAnal( scrutBinderSwap_maybe )
+import GHC.Core.Opt.OccurAnal( BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
@@ -1104,7 +1104,7 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
    = (env2, alt_bndrs')
  where
    live_case_bndr = not (isDeadBinder case_bndr)
-   env1 | Just (v, mco) <- scrutBinderSwap_maybe scrut
+   env1 | DoBinderSwap v mco <- scrutOkForBinderSwap scrut
         , isReflMCo mco  = extendValEnv env v cval
         | otherwise      = env  -- See Note [Add scrutinee to ValueEnv too]
    env2 | live_case_bndr = extendValEnv env1 case_bndr cval
@@ -1198,7 +1198,7 @@ though the simplifier has systematically replaced uses of 'x' with 'y'
 and 'b' with 'c' in the code.  The use of 'b' in the ValueEnv came
 from outside the case.  See #4908 for the live example.
 
-It's very like the binder-swap story, so we use scrutBinderSwap_maybe
+It's very like the binder-swap story, so we use scrutOkForBinderSwap
 to identify suitable scrutinees -- but only if there is no cast
 (isReflMCo) because that's all that the ValueEnv allows.
 

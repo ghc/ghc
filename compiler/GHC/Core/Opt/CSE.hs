@@ -9,12 +9,8 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 import GHC.Prelude
 
 import GHC.Core.Subst
-import GHC.Types.Var    ( Var )
 import GHC.Types.Var.Env ( mkInScopeSet )
-import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
-                        , idInlineActivation, setInlineActivation
-                        , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
-                        , isJoinId, idJoinPointHood, idUnfolding )
+import GHC.Types.Id
 import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
@@ -754,7 +750,7 @@ combineAlts alts
   , Alt _ bndrs1 rhs1 <- alt1
   , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
   , not (equalLength rest_alts filtered_alts)
-  = assertPpr (null bndrs1) (ppr alts) $
+  = assertPpr (all isDeadBinder bndrs1) (ppr alts) $
     Alt DEFAULT [] rhs1 : filtered_alts
 
   | otherwise
@@ -762,14 +758,13 @@ combineAlts alts
   where
 
     find_bndr_free_alt :: [CoreAlt] -> (Maybe CoreAlt, [CoreAlt])
-       -- The (Just alt) is a binder-free alt
-       -- See Note [Combine case alts: awkward corner]
+       -- The (Just alt) is an alt where all fields are dead
     find_bndr_free_alt []
       = (Nothing, [])
     find_bndr_free_alt (alt@(Alt _ bndrs _) : alts)
-      | null bndrs = (Just alt, alts)
-      | otherwise  = case find_bndr_free_alt alts of
-                       (mb_bf, alts) -> (mb_bf, alt:alts)
+      | all isDeadBinder bndrs = (Just alt, alts)
+      | otherwise              = case find_bndr_free_alt alts of
+                                   (mb_bf, alts) -> (mb_bf, alt:alts)
 
     identical_alt rhs1 (Alt _ _ rhs) = eqCoreExpr rhs1 rhs
        -- Even if this alt has binders, they will have been cloned
@@ -823,9 +818,9 @@ big for cheapEqExpr to catch it.
 
 Note [Combine case alts: awkward corner]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We would really like to check isDeadBinder on the binders in the
-alternative.  But alas, the simplifer zaps occ-info on binders in case
-alternatives; see Note [Case alternative occ info] in GHC.Core.Opt.Simplify.
+We check isDeadBinder on field binders in order to collapse into a DEFAULT alt.
+But alas, the simplifer often zaps occ-info on field binders in DataAlts when
+the case binder is alive; see Note [DataAlt occ info] in GHC.Core.Opt.Simplify.
 
 * One alternative (perhaps a good one) would be to do OccAnal
   just before CSE.  Then perhaps we could get rid of combineIdenticalAlts
@@ -833,14 +828,12 @@ alternatives; see Note [Case alternative occ info] in GHC.Core.Opt.Simplify.
 
 * Another would be for CSE to return free vars as it goes.
 
-* But the current solution is to find a nullary alternative (including
-  the DEFAULT alt, if any). This will not catch
-      case x of
-        A y   -> blah
-        B z p -> blah
-  where no alternative is nullary or DEFAULT.  But the current
-  solution is at least cheap.
-
+* But the current solution is to accept that we do not catch cases such as
+      case x of c
+        A _   -> blah[c]
+        B _ _ -> blah[c]
+  where the case binder c is alive and no alternative is DEFAULT.
+  But the current solution is at least cheap.
 
 ************************************************************************
 *                                                                      *

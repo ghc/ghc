@@ -1719,7 +1719,7 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
-  -- We could use OccurAnal. scrutBinderSwap_maybe here, and perhaps
+  -- We could use OccurAnal. scrutOkForBinderSwap here, and perhaps
   -- get a bit more floating.  But we didn't in the past and it's
   -- an unforced change, so I'm leaving it.
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var

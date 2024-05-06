@@ -26,7 +26,7 @@ core expression with (hopefully) improved usage information.
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
     occurAnalyseExpr,
-    zapLambdaBndrs, scrutBinderSwap_maybe
+    zapLambdaBndrs, BinderSwapDecision(..), scrutOkForBinderSwap
   ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -3262,7 +3262,7 @@ inline x, cancel the casts, and away we go.
 
 Note [Care with binder-swap on dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note explains why we need isDictId in scrutBinderSwap_maybe.
+This Note explains why we need isDictId in scrutOkForBinderSwap.
 Consider this tricky example (#21229, #21470):
 
   class Sing (b :: Bool) where sing :: Bool
@@ -3306,7 +3306,7 @@ Conclusion:
   for a /dictionary variable/ do not perform
   the clever cast version of the binder-swap
 
-Hence the subtle isDictId in scrutBinderSwap_maybe.
+Hence the subtle isDictId in scrutOkForBinderSwap.
 
 Note [Zap case binders in proxy bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3328,7 +3328,7 @@ addBndrSwap :: OutExpr -> Id -> OccEnv -> OccEnv
 -- See Note [The binder-swap substitution]
 addBndrSwap scrut case_bndr
             env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars })
-  | Just (scrut_var, mco) <- scrutBinderSwap_maybe scrut
+  | DoBinderSwap scrut_var mco <- scrutOkForBinderSwap scrut
   , scrut_var /= case_bndr
       -- Consider: case x of x { ... }
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
@@ -3342,25 +3342,30 @@ addBndrSwap scrut case_bndr
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
 
-scrutBinderSwap_maybe :: OutExpr -> Maybe (OutVar, MCoercion)
--- If (scrutBinderSwap_maybe e = Just (v, mco), then
+-- | See bBinderSwaOk.
+data BinderSwapDecision
+  = NoBinderSwap
+  | DoBinderSwap OutVar MCoercion
+
+scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
+-- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
 --    v = e |> mco
 -- See Note [Case of cast]
 -- See Note [Care with binder-swap on dictionaries]
 --
 -- We use this same function in SpecConstr, and Simplify.Iteration,
 -- when something binder-swap-like is happening
-scrutBinderSwap_maybe (Var v)    = Just (v, MRefl)
-scrutBinderSwap_maybe (Cast (Var v) co)
-  | not (isDictId v)             = Just (v, MCo (mkSymCo co))
+scrutOkForBinderSwap (Var v)    = DoBinderSwap v MRefl
+scrutOkForBinderSwap (Cast (Var v) co)
+  | not (isDictId v)             = DoBinderSwap v (MCo (mkSymCo co))
         -- Cast: see Note [Case of cast]
         -- isDictId: see Note [Care with binder-swap on dictionaries]
         -- The isDictId rejects a Constraint/Constraint binder-swap, perhaps
         -- over-conservatively. But I have never seen one, so I'm leaving
         -- the code as simple as possible. Losing the binder-swap in a
         -- rare case probably has very low impact.
-scrutBinderSwap_maybe (Tick _ e) = scrutBinderSwap_maybe e  -- Drop ticks
-scrutBinderSwap_maybe _          = Nothing
+scrutOkForBinderSwap (Tick _ e) = scrutOkForBinderSwap e  -- Drop ticks
+scrutOkForBinderSwap _          = NoBinderSwap
 
 lookupBndrSwap :: OccEnv -> Id -> (CoreExpr, Id)
 -- See Note [The binder-swap substitution]
