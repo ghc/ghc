@@ -232,6 +232,9 @@ class TestConfig:
         # The path specifies the file in which to write the dependencies
         self.only_report_hadrian_deps = None # type: Optional[Path]
 
+        # Are we using GCC to preprocess C--?
+        self.cmm_cpp_is_gcc = False
+
     def validate(self) -> None:
         """ Check the TestConfig for self-consistency """
         def assert_implies(a: bool, b: bool):

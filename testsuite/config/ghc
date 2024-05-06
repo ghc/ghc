@@ -223,7 +223,7 @@ def get_compiler_info():
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = config.libdir.replace('\\', '/')
 
-    def test_compile(flags):
+    def test_compile(flags, test_filename='test.hs', test_src=None):
         """
         Check whether GHC can compile in the given way. This is used as a
         proxy to determine, e.g., whether profiled libraries were built, or
@@ -234,12 +234,15 @@ def get_compiler_info():
 
         res = False
 
-        with tempfile.TemporaryDirectory() as d:
-            src = Path(d) / 'test.hs'
-            src.write_text(textwrap.dedent('''
+        if test_src is None:
+            test_src = '''
                 module Main where
                 main = putStrLn "Hello World!"
-            '''))
+            '''
+
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / test_filename
+            src.write_text(textwrap.dedent(test_src))
             try:
                 p = subprocess.run(
                     '{} -v0 {} -o test '.format(config.compiler, src) + ' '.join(flags),
@@ -294,6 +297,16 @@ def get_compiler_info():
         config.ghci_way_flags   = "-static"
         config.plugin_way_flags = "-static"
         config.ghc_th_way       = "normal"
+
+    config.cmm_cpp_is_gcc = test_compile(
+        ['-c'],
+        test_filename='test.cmm',
+        test_src='''
+        #if defined(__clang__) || !defined(__GNUC__)
+        # error "not gcc"
+        #endif
+        '''
+    )
 
 # Note [Replacing backward slashes in config.libdir]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

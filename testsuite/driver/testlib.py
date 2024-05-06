@@ -996,6 +996,10 @@ def llvm_build ( ) -> bool:
 def have_thread_sanitizer( ) -> bool:
     return config.have_thread_sanitizer
 
+
+def gcc_as_cmmp() -> bool:
+    return config.cmm_cpp_is_gcc
+
 # ---
 
 # Note [Measuring residency]
