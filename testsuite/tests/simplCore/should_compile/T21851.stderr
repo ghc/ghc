@@ -10,8 +10,12 @@ g' :: Int -> Int
 [GblId,
  Arity=1,
  Str=<L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0] 30 0}]
 g'
-  = \ (x :: Int) -> case T21851a.$w$sf x of { (# ww, ww1 #) -> ww }
+  = \ (x :: Int) ->
+      case T21851a.$w$sf x of { (# ww, _ [Occ=Dead] #) -> ww }
+
+
 

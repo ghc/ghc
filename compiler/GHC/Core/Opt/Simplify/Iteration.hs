@@ -23,7 +23,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Simplify.Utils
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutBinderSwap_maybe )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutOkForBinderSwap, BinderSwapDecision (..) )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
@@ -33,7 +33,7 @@ import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleDataCon
-   , StrictnessMark (..) )
+   , StrictnessMark (..), dataConWrapId_maybe )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
@@ -3234,16 +3234,36 @@ The point is that we bring into the envt a binding
 after the outer case, and that makes (a,b) alive.  At least we do unless
 the case binder is guaranteed dead.
 
-Note [Case alternative occ info]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we are simply reconstructing a case (the common case), we always
-zap the occurrence info on the binders in the alternatives.  Even
-if the case binder is dead, the scrutinee is usually a variable, and *that*
-can bring the case-alternative binders back to life.
-See Note [Add unfolding for scrutinee]
+Note [DataAlt occ info]
+~~~~~~~~~~~~~~~~~~~~~~~
+Our general goal is to preserve dead-ness occ-info on the field binders of a
+case alternative. Why? It's generally a good idea, but one specific reason is to
+support (SEQ4) of Note [seq# magic].
+
+But we have to be careful: even if the field binder is not mentioned in the case
+alternative and thus annotated IAmDead by OccurAnal, it might "come back to
+life" in one of two ways:
+
+ 1. If the case binder is alive, its unfolding might bring back the field
+    binder, as in Note [knownCon occ info]:
+      case blah of y { I# _ -> $wf (case y of I# v -> v) }
+      ==>
+      case blah of y { I# v -> $wf v }
+ 2. Even if the case binder appears to be dead, there is the scenario in
+    Note [Add unfolding for scrutinee], in which the fields come back to live
+    through the unfolding of variable scrutinee, as follows:
+      join j = case x of Just v -> blah v; Nothing -> ... in
+      case x of Just _ -> jump j; Nothing -> ...
+      ==> { inline j, unfold x to Just v, simplify }
+      join j = case x of Just v -> blah v; Nothing -> ... in
+      case x of Just v -> blah v; Nothing -> ...
+
+Thus, when we are simply reconstructing a case (the common case), and the
+case binder is not dead, or the scrutinee is a variable, we zap the
+occurrence info on DataAlt field binders. See `adjustFieldOccInfo`.
 
 Note [Improving seq]
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 Consider
         type family F :: * -> *
         type instance F Int = Int
@@ -3349,7 +3369,9 @@ simplAlts env0 scrut case_bndr alts cont'
           -- NB: pass case_bndr::InId, not case_bndr' :: OutId, to prepareAlts
           --     See Note [Shadowing in prepareAlts] in GHC.Core.Opt.Simplify.Utils
 
-        ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
+        ; alts' <- forM in_alts $
+            simplAlt alt_env' (Just scrut') imposs_deflt_cons
+                     case_bndr' (scrutOkForBinderSwap scrut) cont'
 
         ; let alts_ty' = contResultType cont'
         -- See Note [Avoiding space leaks in OutType]
@@ -3375,36 +3397,42 @@ improveSeq _ env scrut _ case_bndr1 _
 
 ------------------------------------
 simplAlt :: SimplEnv
-         -> Maybe OutExpr  -- The scrutinee
-         -> [AltCon]       -- These constructors can't be present when
-                           -- matching the DEFAULT alternative
-         -> OutId          -- The case binder
+         -> Maybe OutExpr       -- The scrutinee
+         -> [AltCon]            -- These constructors can't be present when
+                                -- matching the DEFAULT alternative
+         -> OutId               -- The case binder `bndr`
+         -> BinderSwapDecision  -- DoBinderSwap v co <==> scrut = Just (v |> co),
+                                --           add unfolding `v :-> bndr |> sym co`
          -> SimplCont
          -> InAlt
          -> SimplM OutAlt
 
-simplAlt env scrut' imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
+simplAlt env _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT bndrs rhs)
   = assert (null bndrs) $
-    do  { let env' = addDefaultUnfoldings env scrut' case_bndr' imposs_deflt_cons
+    do  { let env' = addDefaultUnfoldings env case_bndr' bndr_swap' imposs_deflt_cons
         ; rhs' <- simplExprC env' rhs cont'
         ; return (Alt DEFAULT [] rhs') }
 
-simplAlt env scrut' _ case_bndr' cont' (Alt (LitAlt lit) bndrs rhs)
+simplAlt env _scrut' _ case_bndr' bndr_swap' cont' (Alt (LitAlt lit) bndrs rhs)
   = assert (null bndrs) $
-    do  { let env' = addAltUnfoldings env scrut' case_bndr' (Lit lit)
+    do  { let env' = addAltUnfoldings env case_bndr' bndr_swap' (Lit lit)
         ; rhs' <- simplExprC env' rhs cont'
         ; return (Alt (LitAlt lit) [] rhs') }
 
-simplAlt env scrut' _ case_bndr' cont' (Alt (DataAlt con) vs rhs)
+simplAlt env scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
-          let vs_with_evals = addEvals scrut' con vs
-        ; (env', vs') <- simplBinders env vs_with_evals
+          -- and Note [DataAlt occ info]
+        ; let vs_with_info = adjustFieldsIdInfo scrut' case_bndr' bndr_swap' con vs
+          -- Adjust evaluated-ness and occ-info flags before `simplBinders`
+          -- because the latter extends the in-scope set, which propagates this
+          -- adjusted info to use sites.
+        ; (env', vs') <- simplBinders env vs_with_info
 
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
               con_app :: OutExpr
               con_app = mkConApp2 con inst_tys' vs'
-              env''   = addAltUnfoldings env' scrut' case_bndr' con_app
+              env''   = addAltUnfoldings env' case_bndr' bndr_swap' con_app
 
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
@@ -3438,9 +3466,10 @@ do it here).  The right thing is to do some kind of binder-swap;
 see #15226 for discussion.
 -}
 
-addEvals :: Maybe OutExpr -> DataCon -> [Id] -> [Id]
+adjustFieldsIdInfo :: Maybe OutExpr -> OutId -> BinderSwapDecision -> DataCon -> [Id] -> [Id]
 -- See Note [Adding evaluatedness info to pattern-bound variables]
-addEvals scrut con vs
+-- and Note [DataAlt occ info]
+adjustFieldsIdInfo scrut case_bndr bndr_swap con vs
   -- Deal with seq# applications
   | Just scr <- scrut
   , isUnboxedTupleDataCon con
@@ -3449,59 +3478,75 @@ addEvals scrut con vs
     -- a list of arguments only to throw it away immediately.
   , Just (Var f) <- stripNArgs 4 scr
   , f `hasKey` seqHashKey
-  , let x' = zapIdOccInfoAndSetEvald MarkedStrict x
-  = [s, x']
+  , let x' = setCaseBndrEvald MarkedStrict x
+  = map (adjustFieldOccInfo case_bndr bndr_swap) [s, x']
 
   -- Deal with banged datacon fields
-addEvals _scrut con vs = go vs the_strs
-    where
-      the_strs = dataConRepStrictness con
+  -- This case is quite allocation sensitive to T9233 which has a large record
+  -- with strict fields. Hence we try not to update vs twice!
+adjustFieldsIdInfo _scrut case_bndr bndr_swap con vs
+  | Nothing <- dataConWrapId_maybe con
+      -- A common fast path; no need to allocate the_strs when they are all lazy
+      -- anyway! It shaves off 2% in T9675
+  = map (adjustFieldOccInfo case_bndr bndr_swap) vs
+  | otherwise
+  = go vs the_strs
+  where
+    the_strs = dataConRepStrictness con
 
-      go [] [] = []
-      go (v:vs') strs | isTyVar v = v : go vs' strs
-      go (v:vs') (str:strs) = zapIdOccInfoAndSetEvald str v : go vs' strs
-      go _ _ = pprPanic "Simplify.addEvals"
-                (ppr con $$
-                 ppr vs  $$
-                 ppr_with_length (map strdisp the_strs) $$
-                 ppr_with_length (dataConRepArgTys con) $$
-                 ppr_with_length (dataConRepStrictness con))
-        where
-          ppr_with_length list
-            = ppr list <+> parens (text "length =" <+> ppr (length list))
-          strdisp :: StrictnessMark -> SDoc
-          strdisp MarkedStrict = text "MarkedStrict"
-          strdisp NotMarkedStrict = text "NotMarkedStrict"
+    go [] [] = []
+    go (v:vs') strs | isTyVar v = v : go vs' strs
+    go (v:vs') (str:strs) = adjustFieldOccInfo case_bndr bndr_swap (setCaseBndrEvald str v) : go vs' strs
+    go _ _ = pprPanic "Simplify.adjustFieldsIdInfo"
+              (ppr con $$
+               ppr vs  $$
+               ppr_with_length (map strdisp the_strs) $$
+               ppr_with_length (dataConRepArgTys con) $$
+               ppr_with_length (dataConRepStrictness con))
+      where
+        ppr_with_length list
+          = ppr list <+> parens (text "length =" <+> ppr (length list))
+        strdisp :: StrictnessMark -> SDoc
+        strdisp MarkedStrict = text "MarkedStrict"
+        strdisp NotMarkedStrict = text "NotMarkedStrict"
 
-zapIdOccInfoAndSetEvald :: StrictnessMark -> Id -> Id
-zapIdOccInfoAndSetEvald str v =
-  setCaseBndrEvald str $ -- Add eval'dness info
-  zapIdOccInfo v         -- And kill occ info;
-                         -- see Note [Case alternative occ info]
+adjustFieldOccInfo :: OutId -> BinderSwapDecision -> CoreBndr -> CoreBndr
+-- Kill occ info if we do binder swap and the case binder is alive;
+-- see Note [DataAlt occ info]
+adjustFieldOccInfo case_bndr bndr_swap field_bndr
+  | isTyVar field_bndr
+  = field_bndr
 
-addDefaultUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> [AltCon] -> SimplEnv
-addDefaultUnfoldings env mb_scrut case_bndr imposs_deflt_cons
+  | not (isDeadBinder case_bndr)  -- (1) in the Note: If the case binder is alive,
+  = zapIdOccInfo field_bndr       -- the field binders might come back alive
+
+  | DoBinderSwap{} <- bndr_swap   -- (2) in the Note: If binder swap might take place,
+  = zapIdOccInfo field_bndr       -- the case binder might come back alive
+
+  | otherwise
+  = field_bndr                    -- otherwise the field binders stay dead
+
+addDefaultUnfoldings :: SimplEnv -> OutId -> BinderSwapDecision -> [AltCon] -> SimplEnv
+addDefaultUnfoldings env case_bndr bndr_swap imposs_deflt_cons
   = env2
   where
     unf = mkOtherCon imposs_deflt_cons
           -- Record the constructors that the case-binder *can't* be.
     env1 = addBinderUnfolding env case_bndr unf
-    env2 | Just scrut <- mb_scrut
-         , Just (v,_mco) <- scrutBinderSwap_maybe scrut
+    env2 | DoBinderSwap v _mco <- bndr_swap
          = addBinderUnfolding env1 v unf
          | otherwise = env1
 
 
-addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplEnv
-addAltUnfoldings env mb_scrut case_bndr con_app
+addAltUnfoldings :: SimplEnv -> OutId -> BinderSwapDecision -> OutExpr -> SimplEnv
+addAltUnfoldings env case_bndr bndr_swap con_app
   = env2
   where
     con_app_unf = mk_simple_unf con_app
     env1 = addBinderUnfolding env case_bndr con_app_unf
 
     -- See Note [Add unfolding for scrutinee]
-    env2 | Just scrut <- mb_scrut
-         , Just (v,mco) <- scrutBinderSwap_maybe scrut
+    env2 | DoBinderSwap v mco <- bndr_swap
          = addBinderUnfolding env1 v $
               if isReflMCo mco  -- isReflMCo: avoid calling mk_simple_unf
               then con_app_unf  --            twice in the common case
@@ -3580,7 +3625,7 @@ So instead we add the unfolding x -> Just a, and x -> Nothing in the
 respective RHSs.
 
 Since this transformation is tantamount to a binder swap, we use
-GHC.Core.Opt.OccurAnal.scrutBinderSwap_maybe to do the check.
+GHC.Core.Opt.OccurAnal.scrutOkForBinderSwap to do the check.
 
 Exactly the same issue arises in GHC.Core.Opt.SpecConstr;
 see Note [Add scrutinee to ValueEnv too] in GHC.Core.Opt.SpecConstr
@@ -3884,8 +3929,9 @@ mkDupableContWithDmds env _
         ; let cont_scaling = contHoleScaling cont
           -- See Note [Scaling in case-of-case]
         ; (alt_env', case_bndr') <- simplBinder alt_env (scaleIdBy cont_scaling case_bndr)
-        ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' alt_cont) (scaleAltsBy cont_scaling alts)
-        -- Safe to say that there are no handled-cons for the DEFAULT case
+        ; alts' <- forM (scaleAltsBy cont_scaling alts) $
+            simplAlt alt_env' Nothing [] case_bndr' NoBinderSwap alt_cont
+                -- Safe to say that there are no handled-cons for the DEFAULT case
                 -- NB: simplBinder does not zap deadness occ-info, so
                 -- a dead case_bndr' will still advertise its deadness
                 -- This is really important because in
