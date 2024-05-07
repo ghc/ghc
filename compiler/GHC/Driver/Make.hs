@@ -308,16 +308,16 @@ linkNodes summaries uid hue =
 
 -- Note [Missing home modules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Sometimes user doesn't want GHC to pick up modules, not explicitly listed
--- in a command line. For example, cabal may want to enable this warning
--- when building a library, so that GHC warns user about modules, not listed
--- neither in `exposed-modules`, nor in `other-modules`.
+-- Sometimes we don't want GHC to process modules that weren't specified as
+-- explicit targets. For example, cabal may want to enable this warning
+-- when building a library, so that GHC warns the user about modules listed
+-- neither in `exposed-modules` nor in `other-modules`.
 --
--- Here "home module" means a module, that doesn't come from an other package.
+-- Here "home module" means a module that doesn't come from another package.
 --
 -- For example, if GHC is invoked with modules "A" and "B" as targets,
 -- but "A" imports some other module "C", then GHC will issue a warning
--- about module "C" not being listed in a command line.
+-- about module "C" not being listed in the command line.
 --
 -- The warning in enabled by `-Wmissing-home-modules`. See #13129
 warnMissingHomeModules ::  DynFlags -> [Target] -> ModuleGraph -> DriverMessages
@@ -328,8 +328,6 @@ warnMissingHomeModules dflags targets mod_graph =
   where
     diag_opts = initDiagOpts dflags
 
-    is_known_module mod = any (is_my_target mod) targets
-
     -- We need to be careful to handle the case where (possibly
     -- path-qualified) filenames (aka 'TargetFile') rather than module
     -- names are being passed on the GHC command-line.
@@ -338,27 +336,29 @@ warnMissingHomeModules dflags targets mod_graph =
     -- `ghc --make -isrc-exe Main` are supposed to be equivalent.
     -- Note also that we can't always infer the associated module name
     -- directly from the filename argument.  See #13727.
-    is_my_target mod target =
-      let tuid = targetUnitId target
-      in case targetId target of
-          TargetModule name
-            -> moduleName (ms_mod mod) == name
-                && tuid == ms_unitid mod
-          TargetFile target_file _
-            | Just mod_file <- ml_hs_file (ms_location mod)
-            ->
-             augmentByWorkingDirectory dflags target_file == mod_file ||
+    is_known_module mod =
+      (Map.lookup (moduleName (ms_mod mod)) mod_targets == Just (ms_unitid mod))
+      ||
+      maybe False is_file_target (ml_hs_file (ms_location mod))
 
-             --  Don't warn on B.hs-boot if B.hs is specified (#16551)
-             addBootSuffix target_file == mod_file ||
+    is_file_target file = Set.member (withoutExt file) file_targets
 
-             --  We can get a file target even if a module name was
-             --  originally specified in a command line because it can
-             --  be converted in guessTarget (by appending .hs/.lhs).
-             --  So let's convert it back and compare with module name
-             mkModuleName (fst $ splitExtension target_file)
-              == moduleName (ms_mod mod)
-          _ -> False
+    file_targets = Set.fromList (mapMaybe file_target targets)
+
+    file_target Target {targetId} =
+      case targetId of
+        TargetModule _ -> Nothing
+        TargetFile file _ ->
+          Just (withoutExt (augmentByWorkingDirectory dflags file))
+
+    mod_targets = Map.fromList (mod_target <$> targets)
+
+    mod_target Target {targetUnitId, targetId} =
+      case targetId of
+        TargetModule name -> (name, targetUnitId)
+        TargetFile file _ -> (mkModuleName (withoutExt file), targetUnitId)
+
+    withoutExt = fst . splitExtension
 
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) $
