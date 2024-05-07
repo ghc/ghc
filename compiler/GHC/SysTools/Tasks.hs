@@ -131,15 +131,15 @@ runSourceCodePreprocessor
 runSourceCodePreprocessor logger tmpfs dflags preprocessor args =
   traceSystoolCommand logger logger_name $ do
     let
-      (p, args0) = pgm_getter dflags
-      args1 = Option <$> (augmentImports dflags $ getOpts dflags opt_getter)
-      args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
-                ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
-      all_args = args0 ++ args1 ++ args2 ++ args
+      (program, configured_args) = pgm_getter dflags
+      runtime_args = Option <$> (augmentImports dflags $ getOpts dflags opt_getter)
+      extra_warns = [Option "-Werror" | gopt Opt_WarnIsError dflags]
+                    ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
+      all_args = configured_args ++ runtime_args ++ extra_warns ++ args
 
-    mb_env <- getGccEnv (args0 ++ args1)
+    mb_env <- getGccEnv (configured_args ++ runtime_args)
 
-    runSomething readable_name p all_args mb_env
+    runSomething readable_name program all_args mb_env
 
   where
     toolSettings' = toolSettings dflags
@@ -155,7 +155,8 @@ runSourceCodePreprocessor logger tmpfs dflags preprocessor args =
     optCFiltered = filter (`notElem` g3Flags) . opt_c
     -- In the wild (and GHC), there is lots of code assuming that -optc gets
     -- passed to the C-- preprocessor too.  Note that the arguments are
-    -- reversed by getOpts.
+    -- reversed by getOpts. That is, in the invocation, first come the runtime
+    -- C opts, then -g0, then the runtime CmmP opts.
     cAndCmmOpt dflags =  opt_CmmP dflags ++ cmmG0 ++ optCFiltered dflags
     (logger_name, pgm_getter, opt_getter, readable_name)
       = case preprocessor of
