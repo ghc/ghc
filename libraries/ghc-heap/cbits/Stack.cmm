@@ -127,11 +127,11 @@ getWordzh(P_ stack, W_ offsetWords) {
 getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
-  ASSERT(LOOKS_LIKE_CLOURE_PTR(closurePtr));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
 
   P_ next_chunk;
   (next_chunk) = ccall getUnderflowFrameNextChunk(closurePtr);
-  ASSERT(LOOKS_LIKE_CLOURE_PTR(next_chunk));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(next_chunk));
   return (next_chunk);
 }
 
