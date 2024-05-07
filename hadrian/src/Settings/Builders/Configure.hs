@@ -17,6 +17,10 @@ configureBuilderArgs = do
                 pure $ [ "--enable-shared=no"
                      , "--host=" ++ targetPlatform    -- GMP's host is our target
                      , "--build=" ++ buildPlatform ]
+                     -- Disable FFT logic on wasm32, sacrifice
+                     -- performance of multiplying very large operands
+                     -- to save code size
+                     <> [ "--disable-fft" | targetArch == "wasm32" ]
                      -- Disable GMP's alloca usage on wasm32, it may
                      -- cause stack overflow (#22602) due to the
                      -- rather small 64KB default stack size. See
