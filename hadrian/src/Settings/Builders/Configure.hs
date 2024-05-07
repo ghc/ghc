@@ -27,7 +27,7 @@ configureBuilderArgs = do
                      -- https://gmplib.org/manual/Build-Options for
                      -- more detailed explanation of this configure
                      -- option.
-                     <> [ "--enable-alloca=malloc-reentrant" | targetArch == "wasm32" ]
+                     <> [ "--enable-alloca=malloc-notreentrant" | targetArch == "wasm32" ]
                      -- Enable PIC unless target is wasm32, in which
                      -- case we don't want libgmp.a to be bloated due
                      -- to PIC overhead.
