@@ -80,7 +80,7 @@ expand_do_stmts _ (stmt@(L _ (ParStmt {})):_) =
   pprPanic "expand_do_stmts: ParStmt" $ ppr stmt
   -- handeled by `GHC.Tc.Gen.Match.tcLcStmt`
 
-expand_do_stmts _ (stmt@(L _ (ApplicativeStmt{})): _) =
+expand_do_stmts _ (stmt@(L _ (XStmtLR ApplicativeStmt{})): _) =
   pprPanic "expand_do_stmts: Applicative Stmt" $ ppr stmt
   -- Handeled by tcSyntaxOp see `GHC.Tc.Gen.Match.tcStmtsAndThen`
 

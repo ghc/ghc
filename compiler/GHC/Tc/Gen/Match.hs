@@ -439,7 +439,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt x binds) : stmts)
 -- possible to do this with a popErrCtxt in the tcStmt case for
 -- ApplicativeStmt, but it did something strange and broke a test (ado002).
 tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
-  | ApplicativeStmt{} <- stmt
+  | XStmtLR ApplicativeStmt{} <- stmt
   = do  { (stmt', (stmts', thing)) <-
              stmt_chk ctxt stmt res_ty $ \ res_ty' ->
                tcStmtsAndThen ctxt stmt_chk stmts res_ty'  $
@@ -933,17 +933,6 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                 }
         ; return (BindStmt xbstc pat' rhs', thing) }
 
-tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
-  = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
-                                thing_inside . mkCheckExpType
-        ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
-            Nothing -> (, Nothing) <$> tc_app_stmts res_ty
-            Just join_op ->
-              second Just <$>
-              (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
-
-        ; return (ApplicativeStmt body_ty pairs' mb_join', thing) }
 tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax;
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
@@ -1007,6 +996,18 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                             , recS_rec_rets = tup_rets
                             , recS_ret_ty = stmts_ty} }, thing)
         }}
+
+tcDoStmt ctxt (XStmtLR (ApplicativeStmt _ pairs mb_join)) res_ty thing_inside
+  = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
+                                thing_inside . mkCheckExpType
+        ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
+            Nothing -> (, Nothing) <$> tc_app_stmts res_ty
+            Just join_op ->
+              second Just <$>
+              (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
+               \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
+
+        ; return (XStmtLR $ ApplicativeStmt body_ty pairs' mb_join', thing) }
 
 tcDoStmt _ stmt _ _
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)

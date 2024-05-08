@@ -1152,28 +1152,28 @@ collectMethodBinders binds = foldr (get . unXRec @idL) [] binds
 ----------------- Statements --------------------------
 --
 collectLStmtsBinders
-  :: CollectPass (GhcPass idL)
+  :: (IsPass idL, IsPass idR, CollectPass (GhcPass idL))
   => CollectFlag (GhcPass idL)
   -> [LStmtLR (GhcPass idL) (GhcPass idR) body]
   -> [IdP (GhcPass idL)]
 collectLStmtsBinders flag = concatMap (collectLStmtBinders flag)
 
 collectStmtsBinders
-  :: CollectPass (GhcPass idL)
+  :: (IsPass idL, IsPass idR, CollectPass (GhcPass idL))
   => CollectFlag (GhcPass idL)
   -> [StmtLR (GhcPass idL) (GhcPass idR) body]
   -> [IdP (GhcPass idL)]
 collectStmtsBinders flag = concatMap (collectStmtBinders flag)
 
 collectLStmtBinders
-  :: CollectPass (GhcPass idL)
+  :: (IsPass idL, IsPass idR, CollectPass (GhcPass idL))
   => CollectFlag (GhcPass idL)
   -> LStmtLR (GhcPass idL) (GhcPass idR) body
   -> [IdP (GhcPass idL)]
 collectLStmtBinders flag = collectStmtBinders flag . unLoc
 
 collectStmtBinders
-  :: CollectPass (GhcPass idL)
+  :: forall idL idR body . (IsPass idL, IsPass idR, CollectPass (GhcPass idL))
   => CollectFlag (GhcPass idL)
   -> StmtLR (GhcPass idL) (GhcPass idR) body
   -> [IdP (GhcPass idL)]
@@ -1186,12 +1186,16 @@ collectStmtBinders flag = \case
     ParStmt _ xs _ _ -> collectLStmtsBinders flag [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
     TransStmt { trS_stmts = stmts } -> collectLStmtsBinders flag stmts
     RecStmt { recS_stmts = L _ ss } -> collectLStmtsBinders flag ss
-    ApplicativeStmt _ args _        -> concatMap collectArgBinders args
-        where
-         collectArgBinders = \case
-            (_, ApplicativeArgOne { app_arg_pattern = pat }) -> collectPatBinders flag pat
-            (_, ApplicativeArgMany { bv_pattern = pat })     -> collectPatBinders flag pat
+    XStmtLR x -> case ghcPass :: GhcPass idR of
+        GhcRn -> collectApplicativeStmtBndrs x
+        GhcTc -> collectApplicativeStmtBndrs x
+  where
+    collectApplicativeStmtBndrs :: ApplicativeStmt (GhcPass idL) a -> [IdP (GhcPass idL)]
+    collectApplicativeStmtBndrs (ApplicativeStmt _ args _) = concatMap (collectArgBinders . snd) args
 
+    collectArgBinders = \case
+        ApplicativeArgOne { app_arg_pattern = pat } -> collectPatBinders flag pat
+        ApplicativeArgMany { bv_pattern = pat }     -> collectPatBinders flag pat
 
 ----------------- Patterns --------------------------
 
@@ -1760,31 +1764,34 @@ data ImplicitFieldBinders
                              -- (in practice, always a singleton: see Note [Collecting implicit binders])
                          }
 
-lStmtsImplicits :: [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
+lStmtsImplicits :: forall idR body . IsPass idR => [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
                 -> [(SrcSpan, [ImplicitFieldBinders])]
 lStmtsImplicits = hs_lstmts
   where
-    hs_lstmts :: [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
+    hs_lstmts :: forall idR body . IsPass idR => [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
               -> [(SrcSpan, [ImplicitFieldBinders])]
     hs_lstmts = concatMap (hs_stmt . unLoc)
 
-    hs_stmt :: StmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))
+    hs_stmt :: forall idR body . IsPass idR => StmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))
             -> [(SrcSpan, [ImplicitFieldBinders])]
     hs_stmt (BindStmt _ pat _) = lPatImplicits pat
-    hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
-      where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
-            do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts
+    hs_stmt (XStmtLR x) = case ghcPass :: GhcPass idR of
+        GhcRn -> hs_applicative_stmt x
+        GhcTc -> hs_applicative_stmt x
     hs_stmt (LetStmt _ binds)     = hs_local_binds binds
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []
-    hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs
-                                                , s <- ss]
+    hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs , s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = L _ ss }) = hs_lstmts ss
 
     hs_local_binds (HsValBinds _ val_binds) = hsValBindsImplicits val_binds
     hs_local_binds (HsIPBinds {})           = []
     hs_local_binds (EmptyLocalBinds _)      = []
+
+    hs_applicative_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
+      where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
+            do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts
 
 hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR)
                     -> [(SrcSpan, [ImplicitFieldBinders])]

@@ -377,7 +377,7 @@ desugarGuard guard = case guard of
   ParStmt         {} -> panic "desugarGuard ParStmt"
   TransStmt       {} -> panic "desugarGuard TransStmt"
   RecStmt         {} -> panic "desugarGuard RecStmt"
-  ApplicativeStmt {} -> panic "desugarGuard ApplicativeLastStmt"
+  XStmtLR ApplicativeStmt{} -> panic "desugarGuard ApplicativeLastStmt"
 
 -- | Desugar local bindings to a bunch of 'PmLet' guards.
 -- Deals only with simple @let@ or @where@ bindings without any polymorphism,

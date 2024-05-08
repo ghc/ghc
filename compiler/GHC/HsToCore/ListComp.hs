@@ -257,7 +257,7 @@ deListComp (ParStmt _ stmtss_w_bndrs _ _ : quals) list
 
 deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 
-deListComp (ApplicativeStmt {} : _) _ =
+deListComp (XStmtLR ApplicativeStmt {} : _) _ =
   panic "deListComp ApplicativeStmt"
 
 deBindComp :: LPat GhcTc
@@ -352,7 +352,7 @@ dfListComp c_id n_id (BindStmt _ pat list1 : quals) = do
 
 dfListComp _ _ (ParStmt {} : _) = panic "dfListComp ParStmt"
 dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
-dfListComp _ _ (ApplicativeStmt {} : _) =
+dfListComp _ _ (XStmtLR ApplicativeStmt {} : _) =
   panic "dfListComp ApplicativeStmt"
 
 dfBindComp :: Id -> Id             -- 'c' and 'n'
@@ -580,7 +580,7 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
             ; return (exp, mkBigCoreVarTupTy bndrs) }
 
-dsMcStmt stmt@(ApplicativeStmt {}) _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
+dsMcStmt stmt@(XStmtLR ApplicativeStmt {}) _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 dsMcStmt stmt@(RecStmt {}) _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 
 matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr

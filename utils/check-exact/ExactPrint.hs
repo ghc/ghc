@@ -3563,9 +3563,6 @@ instance (
     body' <- markAnnotated body
     return (BindStmt an0 pat' body')
 
-  exact (ApplicativeStmt _ _body _) = do
-    error $ "ApplicativeStmt is introduced in the renamer"
-
   exact (BodyStmt a body b c) = do
     debugM $ "BodyStmt"
     body' <- markAnnotated body

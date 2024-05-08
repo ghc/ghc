@@ -810,6 +810,7 @@ class ( HiePass (NoGhcTcPass p)
       , Data (IPBind (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
       , Anno (IdGhcP p) ~ SrcSpanAnnN
+      , Typeable p
       )
       => HiePass p where
   hiePass :: HiePassEv p
@@ -1346,12 +1347,6 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
         , whenPostTcGen @p $
             toHieSyntax $ L span (xbstc_bindOp monad)
         ]
-      ApplicativeStmt _ stmts _ ->
-        [ concatMapM (toHie . RS scope . snd) stmts
-        , let applicative_or_functor = map fst stmts
-           in whenPostTcGen @p $
-                concatMapM (toHieSyntax . L span) applicative_or_functor
-        ]
       BodyStmt _ body monad alternative ->
         [ toHie body
         , whenPostTc @p $
@@ -1373,10 +1368,20 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
       RecStmt {recS_stmts = L _ stmts} ->
         [ toHie $ map (RS $ combineScopes scope (mkScope (locA span))) stmts
         ]
+      XStmtLR x -> case hiePass @p of
+        HieRn -> extApplicativeStmt x
+        HieTc -> extApplicativeStmt x
     where
       node = case hiePass @p of
         HieTc -> makeNodeA stmt span
         HieRn -> makeNodeA stmt span
+      extApplicativeStmt :: ApplicativeStmt (GhcPass p) (GhcPass p) -> [ReaderT NodeOrigin (State HieState) [HieAST Type]]
+      extApplicativeStmt (ApplicativeStmt _ stmts _) =
+        [ concatMapM (toHie . RS scope . snd) stmts
+        , let applicative_or_functor = map fst stmts
+           in whenPostTcGen @p $
+                concatMapM (toHieSyntax . L span) applicative_or_functor
+        ]
 
 instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
   toHie (RS scope binds) = concatM $ makeNode binds (spanHsLocaLBinds binds) : case binds of

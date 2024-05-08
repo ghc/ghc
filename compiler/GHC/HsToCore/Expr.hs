@@ -775,37 +775,6 @@ dsDo ctx stmts
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
-    go _ (ApplicativeStmt body_ty args mb_join) stmts
-      = do {
-             let
-               (pats, rhss) = unzip (map (do_arg . snd) args)
-
-               do_arg (ApplicativeArgOne fail_op pat expr _) =
-                 ((pat, fail_op), dsLExpr expr)
-               do_arg (ApplicativeArgMany _ stmts ret pat _) =
-                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]))
-
-           ; rhss' <- sequence rhss
-
-           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
-
-           ; let match_args (pat, fail_op) (vs,body)
-                   = putSrcSpanDs (getLocA pat) $
-                     do { var   <- selectSimpleMatchVarL ManyTy pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
-                                   body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
-                        ; return (var:vs, match_code)
-                        }
-
-           ; (vars, body) <- foldrM match_args ([],body') pats
-           ; let fun' = mkLams vars body
-           ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
-           ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
-           ; case mb_join of
-               Nothing -> return expr
-               Just join_op -> dsSyntaxExpr join_op [expr] }
-
     go loc (RecStmt { recS_stmts = L _ rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
@@ -846,6 +815,37 @@ dsDo ctx stmts
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
                      -- so we must apply the return_op explicitly
+
+    go _ (XStmtLR (ApplicativeStmt body_ty args mb_join)) stmts
+      = do {
+             let
+               (pats, rhss) = unzip (map (do_arg . snd) args)
+
+               do_arg (ApplicativeArgOne fail_op pat expr _) =
+                 ((pat, fail_op), dsLExpr expr)
+               do_arg (ApplicativeArgMany _ stmts ret pat _) =
+                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]))
+
+           ; rhss' <- sequence rhss
+
+           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
+
+           ; let match_args (pat, fail_op) (vs,body)
+                   = putSrcSpanDs (getLocA pat) $
+                     do { var   <- selectSimpleMatchVarL ManyTy pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
+                                   body_ty (cantFailMatchResult body)
+                        ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
+                        ; return (var:vs, match_code)
+                        }
+
+           ; (vars, body) <- foldrM match_args ([],body') pats
+           ; let fun' = mkLams vars body
+           ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
+           ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
+           ; case mb_join of
+               Nothing -> return expr
+               Just join_op -> dsSyntaxExpr join_op [expr] }
 
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"

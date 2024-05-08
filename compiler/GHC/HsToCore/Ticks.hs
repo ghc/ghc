@@ -730,9 +730,6 @@ addTickStmt isGuard (ParStmt x pairs mzipExpr bindExpr) =
         (mapM (addTickStmtAndBinders isGuard) pairs)
         (unLoc <$> addTickLHsExpr (L (noAnnSrcSpan hpcSrcSpan) mzipExpr))
         (addTickSyntaxExpr hpcSrcSpan bindExpr)
-addTickStmt isGuard (ApplicativeStmt body_ty args mb_join) = do
-    args' <- mapM (addTickApplicativeArg isGuard) args
-    return (ApplicativeStmt body_ty args' mb_join)
 
 addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
                                     , trS_by = by, trS_using = using
@@ -754,6 +751,10 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
        ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
+
+addTickStmt isGuard (XStmtLR (ApplicativeStmt body_ty args mb_join)) = do
+    args' <- mapM (addTickApplicativeArg isGuard) args
+    return (XStmtLR (ApplicativeStmt body_ty args' mb_join))
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
@@ -966,7 +967,7 @@ addTickCmdStmt stmt@(RecStmt {})
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
        ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
-addTickCmdStmt ApplicativeStmt{} =
+addTickCmdStmt (XStmtLR (ApplicativeStmt{})) =
   panic "ToDo: addTickCmdStmt ApplicativeLastStmt"
 
 -- Others should never happen in a command context.

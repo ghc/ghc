@@ -1410,11 +1410,11 @@ zonkStmt zBody (BindStmt xbs pat body)
 
 -- Scopes: join > ops (in reverse order) > pats (in forward order)
 --              > rest of stmts
-zonkStmt _zBody (ApplicativeStmt body_ty args mb_join)
+zonkStmt _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
   = do  { new_mb_join   <- zonk_join mb_join
         ; new_args      <- zonk_args args
         ; new_body_ty   <- noBinders $ zonkTcTypeToTypeX body_ty
-        ; return $ ApplicativeStmt new_body_ty new_args new_mb_join }
+        ; return $ XStmtLR $ ApplicativeStmt new_body_ty new_args new_mb_join }
   where
     zonk_join Nothing  = return Nothing
     zonk_join (Just j) = Just <$> zonkSyntaxExpr j

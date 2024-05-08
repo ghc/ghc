@@ -1032,7 +1032,7 @@ methodNamesStmt (RecStmt { recS_stmts = L _ stmts }) =
 methodNamesStmt (LetStmt {})                   = emptyFVs
 methodNamesStmt (ParStmt {})                   = emptyFVs
 methodNamesStmt (TransStmt {})                 = emptyFVs
-methodNamesStmt ApplicativeStmt{}              = emptyFVs
+methodNamesStmt (XStmtLR ApplicativeStmt{})    = emptyFVs
    -- ParStmt and TransStmt can't occur in commands, but it's not
    -- convenient to error here so we just do what's convenient
 
@@ -1349,9 +1349,6 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
                                     , trS_ret = return_op, trS_bind = bind_op
                                     , trS_fmap = fmap_op }), fvs2)], thing), all_fvs) }
 
-rnStmt _ _ (L _ ApplicativeStmt{}) _ =
-  panic "rnStmt: ApplicativeStmt"
-
 rnParallelStmts :: forall thing. HsStmtContextRn
                 -> SyntaxExpr GhcRn
                 -> [ParStmtBlock GhcPs GhcPs]
@@ -1555,9 +1552,6 @@ rn_rec_stmt_lhs _ stmt@(L _ (ParStmt {}))       -- Syntactically illegal in mdo
 rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
 
-rn_rec_stmt_lhs _ stmt@(L _ (ApplicativeStmt {})) -- Shouldn't appear yet
-  = pprPanic "rn_rec_stmt" (ppr stmt)
-
 rn_rec_stmt_lhs _ (L _ (LetStmt _ (EmptyLocalBinds _)))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
 
@@ -1631,9 +1625,6 @@ rn_rec_stmt _ _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in m
 
 rn_rec_stmt _ _ _ (L _ (LetStmt _ (EmptyLocalBinds _)), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
-
-rn_rec_stmt _ _ _ stmt@(L _ (ApplicativeStmt {}), _)
-  = pprPanic "rn_rec_stmt: ApplicativeStmt" (ppr stmt)
 
 rn_rec_stmts :: AnnoBody body
              => HsStmtContextRn
@@ -2229,7 +2220,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
          tup = mkBigLHsVarTup pvars noExtField
      (stmts',fvs2) <- stmtTreeToStmts monad_names ctxt tree [] pvarset
      (mb_ret, fvs1) <-
-        if | L _ ApplicativeStmt{} <- last stmts' ->
+        if | L _ (XStmtLR ApplicativeStmt{}) <- last stmts' ->
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
@@ -2459,7 +2450,7 @@ mkApplicativeStmt ctxt args need_join body_stmts
        -- than the span of the do-block, but it is better than nothing for IDE info
        -- See Note [Source locations for implicit function calls]
        ; loc <- getSrcSpanM
-       ; let applicative_stmt = L (noAnnSrcSpan loc) $ ApplicativeStmt noExtField
+       ; let applicative_stmt = L (noAnnSrcSpan loc) $ XStmtLR $ ApplicativeStmt noExtField
                (zip (fmap_op : repeat ap_op) args)
                mb_join
        ; return ( applicative_stmt : body_stmts
@@ -2655,7 +2646,6 @@ okCompStmt dflags _ stmt
          | otherwise -> NotValid (Just LangExt.TransformListComp)
        RecStmt {}  -> emptyInvalid
        LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
-       ApplicativeStmt {} -> emptyInvalid
 
 ---------
 checkTupleSection :: [HsTupArg GhcPs] -> RnM ()

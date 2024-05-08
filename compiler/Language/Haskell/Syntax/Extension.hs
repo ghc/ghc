@@ -518,7 +518,6 @@ type family XXGRHS  x b
 -- StmtLR type families
 type family XLastStmt        x x' b
 type family XBindStmt        x x' b
-type family XApplicativeStmt x x' b
 type family XBodyStmt        x x' b
 type family XLetStmt         x x' b
 type family XParStmt         x x' b
@@ -545,17 +544,6 @@ type family XXCmd        x
 -- ParStmtBlock type families
 type family XParStmtBlock  x x'
 type family XXParStmtBlock x x'
-
--- -------------------------------------
--- ApplicativeArg type families
-type family XApplicativeArgOne   x
-type family XApplicativeArgMany  x
-type family XXApplicativeArg     x
-
--- =====================================================================
--- Type families for the HsImpExp extension points
-
--- TODO
 
 -- =====================================================================
 -- Type families for the HsLit extension points
@@ -704,7 +692,7 @@ type family XCFieldOcc x
 type family XXFieldOcc x
 
 -- =====================================================================
--- Type families for the HsImpExp type families
+-- Type families for the HsImpExp extension points
 
 -- -------------------------------------
 -- ImportDecl type families
