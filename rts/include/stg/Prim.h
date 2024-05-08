@@ -135,3 +135,30 @@ StgWord hs_ctz8(StgWord x);
 StgWord hs_ctz16(StgWord x);
 StgWord hs_ctz32(StgWord x);
 StgWord hs_ctz64(StgWord64 x);
+
+/* bitcasts, instead of creating a new C file we static inline these here. We
+ * use __builtin_memcpy instead of memcpy from string.h to avoid function
+ * prototype conflicts that occur in the C backend with the inclusion of
+ * string.h*/
+static inline StgFloat hs_bitcastword2float(StgWord32 x) {
+    StgFloat dest;
+    __builtin_memcpy(&dest, &x, sizeof(StgFloat));
+    return dest;
+}
+
+static inline StgDouble hs_bitcastword642double(StgWord64 x) {
+    StgDouble dest;
+    __builtin_memcpy(&dest, &x, sizeof(StgDouble));
+    return dest;
+}
+
+static inline StgWord32 hs_bitcastfloat2word(StgFloat x) {
+    StgWord32 dest;
+    __builtin_memcpy(&dest, &x, sizeof(StgWord32));
+    return dest;
+}
+static inline StgWord64 hs_bitcastdouble2word64(StgDouble x) {
+    StgWord64 dest;
+    __builtin_memcpy(&dest, &x, sizeof(StgWord64));
+    return dest;
+}

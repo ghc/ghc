@@ -848,10 +848,8 @@ getRegister' _ is32Bit (CmmReg reg)
             do
                let
                  fmt = cmmTypeFormat (cmmRegType reg)
-                 format  = fmt
-               --
                platform <- ncgPlatform <$> getConfig
-               return (Fixed format
+               return (Fixed fmt
                              (getRegisterReg platform reg)
                              nilOL)
 
@@ -1004,6 +1002,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = -- unary MachOps
       MO_SS_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intFormat rep1) x
       MO_XX_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intFormat rep1) x
 
+      MO_FW_Bitcast W32 -> bitcast FF32 II32 x
+      MO_WF_Bitcast W32 -> bitcast II32 FF32 x
+      MO_FW_Bitcast W64 -> bitcast FF64 II64 x
+      MO_WF_Bitcast W64 -> bitcast II64 FF64 x
+
       -- widenings
       MO_UU_Conv W8  W32 -> integerExtend W8  W32 MOVZxL x
       MO_UU_Conv W16 W32 -> integerExtend W16 W32 MOVZxL x
@@ -1045,8 +1048,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = -- unary MachOps
 
       MO_FF_Conv W64 W32 -> coerceFP2FP W32 x
 
-      MO_FS_Conv from to -> coerceFP2Int from to x
-      MO_SF_Conv from to -> coerceInt2FP from to x
+      MO_FS_Truncate from to -> coerceFP2Int from to x
+      MO_SF_Round    from to -> coerceInt2FP from to x
 
       MO_V_Insert {}   -> needLlvm
       MO_V_Extract {}  -> needLlvm
@@ -1083,6 +1086,12 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = -- unary MachOps
                   e_code `snocOL`
                   instr (intFormat from) (OpReg reg) (OpReg dst)
             return (Any (intFormat to) code)
+
+        bitcast :: Format -> Format -> CmmExpr -> NatM Register
+        bitcast fmt rfmt expr =
+          do (src, e_code) <- getSomeReg expr
+             let code = \dst -> e_code `snocOL` (MOVD fmt (OpReg src) (OpReg dst))
+             return (Any rfmt code)
 
         toI8Reg :: Width -> CmmExpr -> NatM Register
         toI8Reg new_rep expr

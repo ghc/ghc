@@ -140,8 +140,8 @@ data MachOp
 
   -- Conversions.  Some of these will be NOPs.
   -- Floating-point conversions use the signed variant.
-  | MO_SF_Conv Width Width      -- Signed int -> Float
-  | MO_FS_Conv Width Width      -- Float -> Signed int
+  | MO_SF_Round    Width Width  -- Signed int -> Float
+  | MO_FS_Truncate Width Width  -- Float -> Signed int
   | MO_SS_Conv Width Width      -- Signed int -> Signed int
   | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
   | MO_XX_Conv Width Width      -- int -> int; puts no requirements on the
@@ -152,7 +152,10 @@ data MachOp
                                 -- MO_XX_Conv, e.g.,
                                 --   MO_XX_CONV W64 W8 (MO_XX_CONV W8 W64 x)
                                 -- is equivalent to just x.
-  | MO_FF_Conv Width Width      -- Float -> Float
+  | MO_FF_Conv Width Width      -- Float  -> Float
+
+  | MO_WF_Bitcast Width      -- Word32/Word64   -> Float/Double
+  | MO_FW_Bitcast Width      -- Float/Double  -> Word32/Word64
 
   -- Vector element insertion and extraction operations
   | MO_V_Insert  Length Width   -- Insert scalar into vector
@@ -476,9 +479,11 @@ machOpResultType platform mop tys =
     MO_SS_Conv _ to     -> cmmBits to
     MO_UU_Conv _ to     -> cmmBits to
     MO_XX_Conv _ to     -> cmmBits to
-    MO_FS_Conv _ to     -> cmmBits to
-    MO_SF_Conv _ to     -> cmmFloat to
+    MO_FS_Truncate _ to -> cmmBits to
+    MO_SF_Round _ to    -> cmmFloat to
     MO_FF_Conv _ to     -> cmmFloat to
+    MO_WF_Bitcast   w   -> cmmFloat w
+    MO_FW_Bitcast   w   -> cmmBits w
 
     MO_V_Insert  l w    -> cmmVec l (cmmBits w)
     MO_V_Extract _ w    -> cmmBits w
@@ -568,12 +573,14 @@ machOpArgReps platform op =
     MO_U_Shr r          -> [r, wordWidth platform]
     MO_S_Shr r          -> [r, wordWidth platform]
 
-    MO_SS_Conv from _   -> [from]
-    MO_UU_Conv from _   -> [from]
-    MO_XX_Conv from _   -> [from]
-    MO_SF_Conv from _   -> [from]
-    MO_FS_Conv from _   -> [from]
-    MO_FF_Conv from _   -> [from]
+    MO_SS_Conv from _     -> [from]
+    MO_UU_Conv from _     -> [from]
+    MO_XX_Conv from _     -> [from]
+    MO_SF_Round from _    -> [from]
+    MO_FS_Truncate from _ -> [from]
+    MO_FF_Conv from _     -> [from]
+    MO_WF_Bitcast w       -> [w]
+    MO_FW_Bitcast w       -> [w]
 
     MO_V_Insert   l r   -> [typeWidth (vec l (cmmBits r)),r, W32]
     MO_V_Extract  l r   -> [typeWidth (vec l (cmmBits r)), W32]

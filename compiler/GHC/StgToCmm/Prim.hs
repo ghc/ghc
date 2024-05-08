@@ -1543,14 +1543,23 @@ emitPrimOp cfg primop =
 
 -- Conversions
 
-  IntToDoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W64)
-  DoubleToIntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth platform))
+  IntToDoubleOp   -> \args -> opTranslate args (MO_SF_Round (wordWidth platform) W64)
+  DoubleToIntOp   -> \args -> opTranslate args (MO_FS_Truncate W64 (wordWidth platform))
 
-  IntToFloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W32)
-  FloatToIntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth platform))
+  IntToFloatOp    -> \args -> opTranslate args (MO_SF_Round (wordWidth platform) W32)
+  FloatToIntOp    -> \args -> opTranslate args (MO_FS_Truncate W32 (wordWidth platform))
 
   FloatToDoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
   DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
+
+  CastFloatToWord32Op  ->
+    \args -> translateBitcasts (MO_FW_Bitcast W32) args
+  CastWord32ToFloatOp  ->
+    \args -> translateBitcasts (MO_WF_Bitcast W32) args
+  CastDoubleToWord64Op ->
+    \args -> translateBitcasts (MO_FW_Bitcast W64) args
+  CastWord64ToDoubleOp ->
+    \args -> translateBitcasts (MO_WF_Bitcast W64) args
 
   IntQuotRemOp -> \args -> opCallishHandledLater args $
     if allowQuotRem
@@ -1746,10 +1755,6 @@ emitPrimOp cfg primop =
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
   KeepAliveOp -> alwaysExternal
-  CastWord32ToFloatOp -> alwaysExternal
-  CastWord64ToDoubleOp -> alwaysExternal
-  CastDoubleToWord64Op -> alwaysExternal
-  CastFloatToWord32Op -> alwaysExternal
 
  where
   profile  = stgToCmmProfile  cfg
@@ -1833,6 +1838,14 @@ emitPrimOp cfg primop =
   allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
   allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
   allowWord2Mul = stgToCmmAllowWordMul2Instr        cfg
+
+  -- a bit of a hack, for certain code generaters, e.g. PPC, and i386 we
+  -- continue to use the cmm versions of these functions instead of inline
+  -- assembly. Tracked in #24841.
+  ppc  = isPPC $ platformArch platform
+  i386 = target32Bit platform
+  translateBitcasts mop args | ppc || i386 = alwaysExternal args
+                             | otherwise   = opTranslate args mop
 
   allowFMA = stgToCmmAllowFMAInstr cfg
 

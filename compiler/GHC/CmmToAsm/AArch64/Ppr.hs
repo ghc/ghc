@@ -524,6 +524,7 @@ pprInstr platform instr = case instr of
   DMBISH -> line $ text "\tdmb ish"
 
   -- 9. Floating Point Instructions --------------------------------------------
+  FMOV o1 o2 -> op2 (text "\tfmov") o1 o2
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
   FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2

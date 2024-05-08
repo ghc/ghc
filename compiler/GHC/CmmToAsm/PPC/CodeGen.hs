@@ -516,8 +516,8 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
       MO_FF_Conv W64 W32 -> trivialUCode  FF32 FRSP x
       MO_FF_Conv W32 W64 -> conversionNop FF64 x
 
-      MO_FS_Conv from to -> coerceFP2Int from to x
-      MO_SF_Conv from to -> coerceInt2FP from to x
+      MO_FS_Truncate from to -> coerceFP2Int from to x
+      MO_SF_Round    from to -> coerceInt2FP from to x
 
       MO_SS_Conv from to
         | from >= to -> conversionNop (intFormat to) x

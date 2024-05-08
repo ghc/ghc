@@ -89,7 +89,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
-      MO_SF_Conv _from to -> CmmLit (CmmFloat (fromInteger x) to)
+      MO_SF_Round _frm to -> CmmLit (CmmFloat (fromInteger x) to)
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
       MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)

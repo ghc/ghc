@@ -620,6 +620,49 @@ lower_MO_FF_Conv lbl W64 W32 [x] = do
         x_instr `WasmConcat` WasmF32DemoteF64
 lower_MO_FF_Conv _ _ _ _ = panic "lower_MO_FF_Conv: unreachable"
 
+
+-- | Lower a 'MO_WF_Bitcast' operation. Note that this is not a conversion,
+-- rather it reinterprets the data.
+lower_MO_WF_Bitcast ::
+  CLabel ->
+  Width ->
+  [CmmActual] ->
+  WasmCodeGenM w (SomeWasmExpr w)
+lower_MO_WF_Bitcast lbl W32 [x] = do
+  WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI32 x
+  pure $
+    SomeWasmExpr TagF32 $
+      WasmExpr  $
+        x_instr `WasmConcat` WasmReinterpret TagI32 TagF32
+lower_MO_WF_Bitcast lbl W64 [x] = do
+  WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI64 x
+  pure $
+    SomeWasmExpr TagF64 $
+      WasmExpr  $
+        x_instr `WasmConcat` WasmReinterpret TagI64 TagF64
+lower_MO_WF_Bitcast _ _ _ = panic "lower_MO_WF_Bitcast: unreachable"
+
+-- | Lower a 'MO_FW_Bitcast' operation. Note that this is not a conversion,
+-- rather it reinterprets the data.
+lower_MO_FW_Bitcast ::
+  CLabel ->
+  Width ->
+  [CmmActual] ->
+  WasmCodeGenM w (SomeWasmExpr w)
+lower_MO_FW_Bitcast lbl W32 [x] = do
+  WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF32 x
+  pure $
+    SomeWasmExpr TagI32 $
+      WasmExpr  $
+        x_instr `WasmConcat` WasmReinterpret TagF32 TagI32
+lower_MO_FW_Bitcast lbl W64 [x] = do
+  WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF64 x
+  pure $
+    SomeWasmExpr TagI64 $
+      WasmExpr  $
+        x_instr `WasmConcat` WasmReinterpret TagF64 TagI64
+lower_MO_FW_Bitcast _ _ _ = panic "lower_MO_FW_Bitcast: unreachable"
+
 -- | Lower a 'CmmMachOp'.
 lower_CmmMachOp ::
   CLabel ->
@@ -799,14 +842,14 @@ lower_CmmMachOp lbl (MO_Not w0) [x] =
 lower_CmmMachOp lbl (MO_Shl w0) xs = lower_MO_Shl lbl w0 xs
 lower_CmmMachOp lbl (MO_U_Shr w0) xs = lower_MO_U_Shr lbl w0 xs
 lower_CmmMachOp lbl (MO_S_Shr w0) xs = lower_MO_S_Shr lbl w0 xs
-lower_CmmMachOp lbl (MO_SF_Conv w0 w1) xs =
+lower_CmmMachOp lbl (MO_SF_Round w0 w1) xs =
   lower_MO_Un_Conv
     (WasmConvert Signed)
     lbl
     (cmmBits w0)
     (cmmFloat w1)
     xs
-lower_CmmMachOp lbl (MO_FS_Conv w0 w1) xs =
+lower_CmmMachOp lbl (MO_FS_Truncate w0 w1) xs =
   lower_MO_Un_Conv
     (WasmTruncSat Signed)
     lbl
@@ -817,6 +860,8 @@ lower_CmmMachOp lbl (MO_SS_Conv w0 w1) xs = lower_MO_SS_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_UU_Conv w0 w1) xs = lower_MO_UU_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_XX_Conv w0 w1) xs = lower_MO_UU_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_FF_Conv w0 w1) xs = lower_MO_FF_Conv lbl w0 w1 xs
+lower_CmmMachOp lbl (MO_FW_Bitcast w) xs  = lower_MO_FW_Bitcast lbl w xs
+lower_CmmMachOp lbl (MO_WF_Bitcast w) xs  = lower_MO_WF_Bitcast lbl w xs
 lower_CmmMachOp _ mop _ =
   pprPanic "lower_CmmMachOp: unreachable" $
     vcat [ text "offending MachOp:" <+> pprMachOp mop ]

@@ -1431,8 +1431,8 @@ genMachOp _ op [x] = case op of
         let all0 = LMLitVar $ LMFloatLit (-0) (widthToLlvmFloat w)
         in negate (widthToLlvmFloat w) all0 LM_MO_FSub
 
-    MO_SF_Conv _ w -> fiConv (widthToLlvmFloat w) LM_Sitofp
-    MO_FS_Conv _ w -> fiConv (widthToLlvmInt w) LM_Fptosi
+    MO_SF_Round    _ w -> fiConv (widthToLlvmFloat w) LM_Sitofp
+    MO_FS_Truncate _ w -> fiConv (widthToLlvmInt w) LM_Fptosi
 
     MO_SS_Conv from to
         -> sameConv from (widthToLlvmInt to) LM_Trunc LM_Sext
@@ -1445,6 +1445,9 @@ genMachOp _ op [x] = case op of
 
     MO_FF_Conv from to
         -> sameConv from (widthToLlvmFloat to) LM_Fptrunc LM_Fpext
+
+    MO_WF_Bitcast w -> fiConv (widthToLlvmFloat w) LM_Bitcast
+    MO_FW_Bitcast w -> fiConv (widthToLlvmInt w)   LM_Bitcast
 
     MO_VS_Neg len w ->
         let ty    = widthToLlvmInt w
@@ -1704,12 +1707,15 @@ genMachOp_slow opt op [x, y] = case op of
     MO_S_Neg _     -> panicOp
     MO_F_Neg _     -> panicOp
 
-    MO_SF_Conv _ _ -> panicOp
-    MO_FS_Conv _ _ -> panicOp
+    MO_SF_Round    _ _ -> panicOp
+    MO_FS_Truncate _ _ -> panicOp
     MO_SS_Conv _ _ -> panicOp
     MO_UU_Conv _ _ -> panicOp
     MO_XX_Conv _ _ -> panicOp
     MO_FF_Conv _ _ -> panicOp
+
+    MO_WF_Bitcast _to ->  panicOp
+    MO_FW_Bitcast _to ->  panicOp
 
     MO_V_Insert  {} -> panicOp
 

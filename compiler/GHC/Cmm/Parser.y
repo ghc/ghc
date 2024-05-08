@@ -1078,12 +1078,12 @@ machOps = listToUFM $
 
         ( "f2f32",    flip MO_FF_Conv W32 ),  -- TODO; rounding mode
         ( "f2f64",    flip MO_FF_Conv W64 ),  -- TODO; rounding mode
-        ( "f2i8",     flip MO_FS_Conv W8 ),
-        ( "f2i16",    flip MO_FS_Conv W16 ),
-        ( "f2i32",    flip MO_FS_Conv W32 ),
-        ( "f2i64",    flip MO_FS_Conv W64 ),
-        ( "i2f32",    flip MO_SF_Conv W32 ),
-        ( "i2f64",    flip MO_SF_Conv W64 )
+        ( "f2i8",     flip MO_FS_Truncate W8 ),
+        ( "f2i16",    flip MO_FS_Truncate W16 ),
+        ( "f2i32",    flip MO_FS_Truncate W32 ),
+        ( "f2i64",    flip MO_FS_Truncate W64 ),
+        ( "i2f32",    flip MO_SF_Round W32 ),
+        ( "i2f64",    flip MO_SF_Round W64 )
         ]
 
 callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))

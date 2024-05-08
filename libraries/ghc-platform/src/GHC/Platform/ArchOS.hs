@@ -10,7 +10,7 @@ module GHC.Platform.ArchOS
    , ArmISAExt(..)
    , ArmABI(..)
    , PPC_64ABI(..)
-   , isARM
+   , isARM, isPPC
    , stringEncodeArch
 
      -- * Operating systems
@@ -187,6 +187,11 @@ isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
 isARM ArchAArch64  = True
 isARM _ = False
+
+isPPC :: Arch -> Bool
+isPPC (ArchPPC_64 _) = True
+isPPC ArchPPC        = True
+isPPC _              = False
 
 -- | This predicate tells us whether the OS support Mach-O shared libraries.
 osMachOTarget :: OS -> Bool

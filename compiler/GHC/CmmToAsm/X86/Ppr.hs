@@ -591,6 +591,9 @@ pprInstr platform i = case i of
    CMOV cc format src dst
      -> pprCondOpReg (text "cmov") format cc src dst
 
+   MOVD format src dst
+     -> pprMovdOpOp (text "mov") format src dst
+
    MOVZxL II32 src dst
       -> pprFormatOpOp (text "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
@@ -979,6 +982,29 @@ pprInstr platform i = case i of
            comma,
            pprOperand platform format op2
        ]
+
+   pprMovdOpOp :: Line doc -> Format -> Operand -> Operand -> doc
+   pprMovdOpOp name format op1 op2
+     = let instr = case format of
+             -- bitcasts to/from a general purpose register to a floating point
+             -- register require II32 or II64.
+             II32 -> text "d"
+             II64 -> text "q"
+             FF32 -> text "d"
+             FF64 -> text "q"
+             _    -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
+           out_fmt = case format of
+             II32 -> FF32
+             II64 -> FF64
+             FF32 -> II32
+             FF64 -> II64
+             _    -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
+       in line $ hcat [
+           char '\t' <> name <> instr <> space,
+           pprOperand platform format op1,
+           comma,
+           pprOperand platform out_fmt op2
+           ]
 
    pprFormatOpRegReg :: Line doc -> Format -> Operand -> Reg -> Reg -> doc
    pprFormatOpRegReg name format op1 op2 op3

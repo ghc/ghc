@@ -755,8 +755,8 @@ getRegister' config plat expr
         MO_S_Neg w -> negate code w reg
         MO_F_Neg w -> return $ Any (floatFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
 
-        MO_SF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
-        MO_FS_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVTZS (OpReg to dst) (OpReg from reg)) -- (float convert (-> zero) signed)
+        MO_SF_Round    from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
+        MO_FS_Truncate from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVTZS (OpReg to dst) (OpReg from reg)) -- (float convert (-> zero) signed)
 
         -- TODO this is very hacky
         -- Note, UBFM and SBFM expect source and target register to be of the same size, so we'll use @max from to@
@@ -764,6 +764,8 @@ getRegister' config plat expr
         MO_UU_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` UBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
+        MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` FMOV (OpReg w dst) (OpReg w reg))
+        MO_FW_Bitcast w    -> return $ Any (intFormat w)    (\dst -> code `snocOL` FMOV (OpReg w dst) (OpReg w reg))
 
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e

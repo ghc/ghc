@@ -202,6 +202,11 @@ data Instr
              -- operand is interpreted to be a 32-bit sign-extended value.
              -- True 64-bit operands need to be moved with @MOVABS@, which we
              -- currently don't use.
+        | MOVD   Format Operand Operand -- ^ MOVD/MOVQ SSE2 instructions
+                                        -- (bitcast between a general purpose
+                                        -- register and a float register).
+                                        -- Format is input format, output format is
+                                        -- calculated in Ppr.hs
         | CMOV   Cond Format Operand Reg
         | MOVZxL      Format Operand Operand
               -- ^ The format argument is the size of operand 1 (the number of bits we keep)
@@ -368,6 +373,7 @@ regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
+    MOVD   _ src dst    -> usageRW src dst
     CMOV _ _ src dst    -> mkRU (use_R src [dst]) [dst]
     MOVZxL _ src dst    -> usageRW src dst
     MOVSxL _ src dst    -> usageRW src dst
@@ -549,6 +555,7 @@ patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 patchRegsOfInstr instr env
  = case instr of
     MOV  fmt src dst     -> patch2 (MOV  fmt) src dst
+    MOVD fmt src dst     -> patch2 (MOVD fmt) src dst
     CMOV cc fmt src dst  -> CMOV cc fmt (patchOp src) (env dst)
     MOVZxL fmt src dst   -> patch2 (MOVZxL fmt) src dst
     MOVSxL fmt src dst   -> patch2 (MOVSxL fmt) src dst

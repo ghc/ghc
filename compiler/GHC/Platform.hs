@@ -17,6 +17,7 @@ module GHC.Platform
    , ByteOrder(..)
    , target32Bit
    , isARM
+   , isPPC
    , osElfTarget
    , osMachOTarget
    , osSubsectionsViaSymbols

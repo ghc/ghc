@@ -132,6 +132,7 @@ regUsageOfInstr platform instr = case instr of
   DMBISH                   -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
+  FMOV dst src             -> usage (regOp src, regOp dst)
   FCVT dst src             -> usage (regOp src, regOp dst)
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
@@ -267,6 +268,7 @@ patchRegsOfInstr instr env = case instr of
     DMBISH         -> DMBISH
 
     -- 9. Floating Point Instructions ------------------------------------------
+    FMOV o1 o2     -> FMOV (patchOp o1) (patchOp o2)
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
@@ -623,6 +625,8 @@ data Instr
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBISH
     -- 9. Floating Point Instructions
+    -- move to/from general purpose <-> floating, or floating to floating
+    | FMOV Operand Operand
     -- Float ConVerT
     | FCVT Operand Operand
     -- Signed ConVerT Float
@@ -694,6 +698,7 @@ instrCon i =
       BL{} -> "BL"
       BCOND{} -> "BCOND"
       DMBISH{} -> "DMBISH"
+      FMOV{} -> "FMOV"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"

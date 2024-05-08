@@ -784,6 +784,28 @@ pprMachOp_for_C platform mop = case mop of
 -- We won't know to generate (void*) casts here, but maybe from
 -- context elsewhere
 
+-- bitcasts, in the C backend these are performed with __builtin_memcpy.
+-- See rts/include/stg/Prim.h
+
+        MO_FW_Bitcast W32 -> text "hs_bitcastfloat2word"
+        MO_FW_Bitcast W64 -> text "hs_bitcastdouble2word64"
+
+        MO_WF_Bitcast W32 -> text "hs_bitcastword2float"
+        MO_WF_Bitcast W64 -> text "hs_bitcastword642double"
+
+        MO_FW_Bitcast w -> pprTrace "offending mop:"
+                                (text "MO_FW_Bitcast")
+                                (panic $ "PprC.pprMachOp_for_C: MO_FW_Bitcast"
+                                      ++ " called with improper width!"
+                                      ++ show w)
+
+        MO_WF_Bitcast w -> pprTrace "offending mop:"
+                                (text "MO_WF_Bitcast")
+                                (panic $ "PprC.pprMachOp_for_C: MO_WF_Bitcast"
+                                      ++ " called with improper width!"
+                                      ++ show w)
+
+
 -- noop casts
         MO_UU_Conv from to | from == to -> empty
         MO_UU_Conv _from to -> parens (machRep_U_CType platform to)
@@ -797,8 +819,8 @@ pprMachOp_for_C platform mop = case mop of
         MO_FF_Conv from to | from == to -> empty
         MO_FF_Conv _from to -> parens (machRep_F_CType to)
 
-        MO_SF_Conv _from to -> parens (machRep_F_CType to)
-        MO_FS_Conv _from to -> parens (machRep_S_CType platform to)
+        MO_SF_Round    _from to -> parens (machRep_F_CType to)
+        MO_FS_Truncate _from to -> parens (machRep_S_CType platform to)
 
         MO_RelaxedRead _ -> pprTrace "offending mop:"
                                 (text "MO_RelaxedRead")
@@ -896,7 +918,7 @@ signedOp (MO_S_Gt   _)    = True
 signedOp (MO_S_Lt   _)    = True
 signedOp (MO_S_Shr  _)    = True
 signedOp (MO_SS_Conv _ _) = True
-signedOp (MO_SF_Conv _ _) = True
+signedOp (MO_SF_Round _ _) = True
 signedOp _                = False
 
 shiftOp :: MachOp -> Maybe Width
@@ -1446,7 +1468,6 @@ floatToWord32 r = CmmInt (toInteger (castFloatToWord32 (fromRational r))) W32
 
 doubleToWord64 :: Rational -> CmmLit
 doubleToWord64 r = CmmInt (toInteger (castDoubleToWord64 (fromRational r))) W64
-
 
 -- ---------------------------------------------------------------------------
 -- Utils
