@@ -48,7 +48,7 @@ import qualified GHC.Prelude as Partial (head)
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
+-- import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
@@ -1609,6 +1609,9 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   | otherwise
   = case occ_info of
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+        | n_br == 1, NotInsideLam <- in_lam  -- One syntactic occurrence
+        -> True                              -- See Note [Post-inline for single-use things]
+{-
         -- See Note [Inline small things to avoid creating a thunk]
 
         | n_br >= 100 -> False  -- See #23627
@@ -1630,7 +1633,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
         -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
               -- Multiple syntactic occurences; but lazy, and small enough to dup
               -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
-
+-}
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
                         -- Here x isn't mentioned in the RHS, so we don't want to
@@ -1639,6 +1642,12 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       _ -> False
 
   where
+    occ_info    = idOccInfo old_bndr
+    unfolding   = idUnfolding bndr
+    phase       = sePhase env
+    active      = isActive phase (idInlineActivation bndr)
+        -- See Note [pre/postInlineUnconditionally in gentle mode]
+{-
     work_ok NotInsideLam _              = True
     work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
     work_ok IsInsideLam  NotInteresting = False
@@ -1656,12 +1665,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 
 --    is_unlifted = isUnliftedType (idType bndr)
     is_demanded = isStrUsedDmd (idDemandInfo bndr)
-    occ_info    = idOccInfo old_bndr
-    unfolding   = idUnfolding bndr
     uf_opts     = seUnfoldingOpts env
-    phase       = sePhase env
-    active      = isActive phase (idInlineActivation bndr)
-        -- See Note [pre/postInlineUnconditionally in gentle mode]
+-}
 
 {- Note [Inline small things to avoid creating a thunk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
