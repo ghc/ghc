@@ -854,6 +854,10 @@ pprMachOp_for_C platform mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
                                       ++ " should have been handled earlier!")
 
+        MO_VF_Broadcast {} -> pprTrace "offending mop:"
+                                 (text "MO_VF_Broadcast")
+                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Broadcast"
+                                      ++ " should have been handled earlier!")
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (text "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"

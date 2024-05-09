@@ -53,11 +53,11 @@ type RegNo
 --      Virtual regs can be of either class, so that info is attached.
 --
 data VirtualReg
-        = VirtualRegI  {-# UNPACK #-} !Unique
-        | VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
-        | VirtualRegF  {-# UNPACK #-} !Unique
-        | VirtualRegD  {-# UNPACK #-} !Unique
-
+        = VirtualRegI   {-# UNPACK #-} !Unique
+        | VirtualRegHi  {-# UNPACK #-} !Unique  -- High part of 2-word register
+        | VirtualRegF   {-# UNPACK #-} !Unique
+        | VirtualRegD   {-# UNPACK #-} !Unique
+        | VirtualRegVec {-# UNPACK #-} !Unique
         deriving (Eq, Show)
 
 -- This is laborious, but necessary. We can't derive Ord because
@@ -70,6 +70,7 @@ instance Ord VirtualReg where
   compare (VirtualRegHi a) (VirtualRegHi b) = nonDetCmpUnique a b
   compare (VirtualRegF a) (VirtualRegF b) = nonDetCmpUnique a b
   compare (VirtualRegD a) (VirtualRegD b) = nonDetCmpUnique a b
+  compare (VirtualRegVec a) (VirtualRegVec b) = nonDetCmpUnique a b
 
   compare VirtualRegI{} _ = LT
   compare _ VirtualRegI{} = GT
@@ -77,7 +78,8 @@ instance Ord VirtualReg where
   compare _ VirtualRegHi{} = GT
   compare VirtualRegF{} _ = LT
   compare _ VirtualRegF{} = GT
-
+  compare VirtualRegVec{} _ = LT
+  compare _ VirtualRegVec{} = GT
 
 
 instance Uniquable VirtualReg where
@@ -87,6 +89,7 @@ instance Uniquable VirtualReg where
                 VirtualRegHi u  -> u
                 VirtualRegF u   -> u
                 VirtualRegD u   -> u
+                VirtualRegVec u -> u
 
 instance Outputable VirtualReg where
         ppr reg
@@ -96,8 +99,9 @@ instance Outputable VirtualReg where
                 -- this code is kinda wrong on x86
                 -- because float and double occupy the same register set
                 -- namely SSE2 register xmm0 .. xmm15
-                VirtualRegF  u  -> text "%vFloat_"   <> pprUniqueAlways u
-                VirtualRegD  u  -> text "%vDouble_"   <> pprUniqueAlways u
+                VirtualRegF  u  -> text "%vFloat_"  <> pprUniqueAlways u
+                VirtualRegD  u  -> text "%vDouble_" <> pprUniqueAlways u
+                VirtualRegVec u -> text "%vVec_"    <> pprUniqueAlways u
 
 
 
@@ -108,7 +112,7 @@ renameVirtualReg u r
         VirtualRegHi _  -> VirtualRegHi u
         VirtualRegF _   -> VirtualRegF  u
         VirtualRegD _   -> VirtualRegD  u
-
+        VirtualRegVec _ -> VirtualRegVec u
 
 classOfVirtualReg :: VirtualReg -> RegClass
 classOfVirtualReg vr
@@ -117,7 +121,12 @@ classOfVirtualReg vr
         VirtualRegHi{}  -> RcInteger
         VirtualRegF{}   -> RcFloat
         VirtualRegD{}   -> RcDouble
-
+        -- Below is an awful, largely x86-specific hack
+        VirtualRegVec{} -> RcDouble
+        -- SIMD NCG TODO: this seems very wrong and potentially the source of
+        -- bug #16927, because we use this function to determine how to spill
+        -- the contents of a virtual register
+        -- (see e.g. GHC.CmmToAsm.X86.Instr.mkSpillInstr).
 
 
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform

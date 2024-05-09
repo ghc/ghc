@@ -67,14 +67,16 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
       assign_regs assts (r:rs) regs | isVecType ty   = vec
                                     | isFloatType ty = float
                                     | otherwise      = int
-        where vec = case (w, regs) of
-                      (W128, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W128 profile -> k (RegisterParam (XmmReg s), AvailRegs vs fs ds ls ss)
-                      (W256, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W256 profile -> k (RegisterParam (YmmReg s), AvailRegs vs fs ds ls ss)
-                      (W512, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W512 profile -> k (RegisterParam (ZmmReg s), AvailRegs vs fs ds ls ss)
-                      _ -> (assts, (r:rs))
+        where vec = case regs of
+                      AvailRegs vs fs ds ls (s:ss)
+                        | passVectorInReg w profile
+                          -> let reg_class = case w of
+                                    W128 -> XmmReg
+                                    W256 -> YmmReg
+                                    W512 -> ZmmReg
+                                    _    -> panic "CmmCallConv.assignArgumentsPos: Invalid vector width"
+                              in k (RegisterParam (reg_class s), AvailRegs vs fs ds ls ss)
+                      _ -> (assts, r:rs)
               float = case (w, regs) of
                         (W32, AvailRegs vs fs ds ls (s:ss))
                             | passFloatInXmm          -> k (RegisterParam (FloatReg s), AvailRegs vs fs ds ls ss)
@@ -234,6 +236,7 @@ realArgRegsCover platform
       realDoubleRegs  platform ++
       realLongRegs    platform
         -- we don't save XMM registers if they are not used for parameter passing
+-- SLD TODO: do we need to save xmm/ymm registers now as well?
 
 
 {-

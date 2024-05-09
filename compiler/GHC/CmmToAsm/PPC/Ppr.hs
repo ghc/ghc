@@ -201,6 +201,7 @@ pprReg r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegVec u) -> text "%vVec_" <> pprUniqueAlways u
 
   where
     ppr_reg_no :: Int -> doc
@@ -220,7 +221,7 @@ pprFormat x
                 II64 -> text "d"
                 FF32 -> text "fs"
                 FF64 -> text "fd"
-
+                VecFormat _ _ _ -> panic "PPC pprFormat: VecFormat"
 
 pprCond :: IsLine doc => Cond -> doc
 pprCond c
@@ -383,6 +384,7 @@ pprInstr platform instr = case instr of
                II64 -> text "d"
                FF32 -> text "fs"
                FF64 -> text "fd"
+               VecFormat _ _ _ -> panic "PPC pprInstr: VecFormat"
                ),
            case addr of AddrRegImm _ _ -> empty
                         AddrRegReg _ _ -> char 'x',
@@ -425,6 +427,7 @@ pprInstr platform instr = case instr of
                II64 -> text "d"
                FF32 -> text "fs"
                FF64 -> text "fd"
+               VecFormat _ _ _ -> panic "PPC pprInstr: VecFormat"
                ),
            case addr of AddrRegImm _ _ -> empty
                         AddrRegReg _ _ -> char 'x',

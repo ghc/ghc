@@ -948,7 +948,7 @@ emitPrimOp cfg primop =
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility cfg vcat n w
-    doVecPackOp ty zeros (replicate n e) res
+    doVecBroadcastOp ty zeros e res
    where
     zeros :: CmmExpr
     zeros = CmmLit $ CmmVec (replicate n zero)
@@ -2476,6 +2476,33 @@ checkVecCompatibility cfg vcat l w =
 ------------------------------------------------------------------------------
 -- Helpers for translating vector packing and unpacking.
 
+doVecBroadcastOp :: CmmType       -- Type of vector
+                 -> CmmExpr       -- Initial vector
+                 -> CmmExpr     -- Elements
+                 -> CmmFormal     -- Destination for result
+                 -> FCode ()
+doVecBroadcastOp ty z es res = do
+    dst <- newTemp ty
+    emitAssign (CmmLocal dst) z
+    vecBroadcast dst es 0
+  where
+    vecBroadcast :: CmmFormal -> CmmExpr -> Int -> FCode ()
+    vecBroadcast src e _ = do
+        dst <- newTemp ty
+        if isFloatType (vecElemType ty)
+          then emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Broadcast len wid)
+                                                    [CmmReg (CmmLocal src), e])
+               --TODO : Add the MachOp MO_V_Broadcast
+          else emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert len wid)
+                                                    [CmmReg (CmmLocal src), e])
+        emitAssign (CmmLocal res) (CmmReg (CmmLocal dst))
+
+    len :: Length
+    len = vecLength ty
+
+    wid :: Width
+    wid = typeWidth (vecElemType ty)
+
 doVecPackOp :: CmmType       -- Type of vector
             -> CmmExpr       -- Initial vector
             -> [CmmExpr]     -- Elements
@@ -2490,6 +2517,8 @@ doVecPackOp ty z es res = do
     vecPack src [] _ =
         emitAssign (CmmLocal res) (CmmReg (CmmLocal src))
 
+    -- SIMD NCG TODO (optional): it should be possible to emit better code
+    -- for "pack" than doing a bunch of vector insertions in a row.
     vecPack src (e : es) i = do
         dst <- newTemp ty
         if isFloatType (vecElemType ty)
@@ -2500,7 +2529,7 @@ doVecPackOp ty z es res = do
         vecPack dst es (i + 1)
       where
         -- vector indices are always 32-bits
-        iLit = CmmLit (CmmInt (toInteger i) W32)
+        iLit = CmmLit (CmmInt ((toInteger i) * 16) W32)
 
     len :: Length
     len = vecLength ty

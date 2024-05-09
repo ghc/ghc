@@ -1,6 +1,8 @@
 -- | An architecture independent description of a register's class.
 module GHC.Platform.Reg.Class
-        ( RegClass (..) )
+        ( RegClass (..)
+        , allRegClasses
+        )
 
 where
 
@@ -19,8 +21,11 @@ data RegClass
         = RcInteger
         | RcFloat
         | RcDouble
-        deriving Eq
+        deriving (Eq, Show)
 
+allRegClasses :: [RegClass]
+allRegClasses =
+  [RcInteger, RcFloat, RcDouble]
 
 instance Uniquable RegClass where
     getUnique RcInteger = mkRegClassUnique 0

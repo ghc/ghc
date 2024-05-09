@@ -351,6 +351,36 @@ data Instr
         | XCHG        Format Operand Reg     -- src (r/m), dst (r/m)
         | MFENCE
 
+        -- Vector Instructions --
+        -- NOTE: Instructions follow the AT&T syntax
+        -- Constructors and deconstructors
+        | VBROADCAST  Format AddrMode Reg
+        | VEXTRACT    Format Operand Reg Operand
+        | INSERTPS    Format Operand Operand Reg
+
+        -- move operations
+        | VMOVU       Format Operand Operand
+        | MOVU        Format Operand Operand
+        | MOVL        Format Operand Operand
+        | MOVH        Format Operand Operand
+
+        -- logic operations
+        | VPXOR       Format Reg Reg Reg
+
+        -- Arithmetic
+        | VADD       Format Operand Reg Reg
+        | VSUB       Format Operand Reg Reg
+        | VMUL       Format Operand Reg Reg
+        | VDIV       Format Operand Reg Reg
+
+        -- Shuffle
+        | VPSHUFD    Format Operand Operand Reg
+        | PSHUFD     Format Operand Operand Reg
+
+        -- Shift
+        | PSLLDQ     Format Operand Reg
+        | PSRLDQ     Format Operand Reg
+
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
 
 
@@ -458,6 +488,30 @@ regUsageOfInstr platform instr
     CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
     XCHG _ src dst      -> usageMM src (OpReg dst)
     MFENCE -> noUsage
+
+    -- vector instructions
+    VBROADCAST _ src dst   -> mkRU (use_EA src []) [dst]
+    VEXTRACT     _ off src dst -> mkRU ((use_R off []) ++ [src]) (use_R dst [])
+    INSERTPS     _ off src dst
+      -> mkRU ((use_R off []) ++ (use_R src []) ++ [dst]) [dst]
+
+    VMOVU        _ src dst   -> mkRU (use_R src []) (use_R dst [])
+    MOVU         _ src dst   -> mkRU (use_R src []) (use_R dst [])
+    MOVL         _ src dst   -> mkRU (use_R src []) (use_R dst [])
+    MOVH         _ src dst   -> mkRU (use_R src []) (use_R dst [])
+    VPXOR        _ s1 s2 dst -> mkRU [s1,s2] [dst]
+
+    VADD         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
+    VSUB         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
+    VMUL         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
+    VDIV         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
+
+    VPSHUFD      _ off src dst
+      -> mkRU (concatMap (\op -> use_R op []) [off, src]) [dst]
+    PSHUFD       _ off src dst
+      -> mkRU (concatMap (\op -> use_R op []) [off, src]) [dst]
+
+    PSLLDQ       _ off dst -> mkRU (use_R off []) [dst]
 
     _other              -> panic "regUsage: unrecognised instr"
  where
@@ -630,6 +684,33 @@ patchRegsOfInstr instr env
     CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
     XCHG fmt src dst     -> XCHG fmt (patchOp src) (env dst)
     MFENCE               -> instr
+
+    -- vector instructions
+    VBROADCAST   fmt src dst   -> VBROADCAST fmt (lookupAddr src) (env dst)
+    VEXTRACT     fmt off src dst
+      -> VEXTRACT fmt (patchOp off) (env src) (patchOp dst)
+    INSERTPS    fmt off src dst
+      -> INSERTPS fmt (patchOp off) (patchOp src) (env dst)
+
+    VMOVU      fmt src dst   -> VMOVU fmt (patchOp src) (patchOp dst)
+    MOVU       fmt src dst   -> MOVU  fmt (patchOp src) (patchOp dst)
+    MOVL       fmt src dst   -> MOVL  fmt (patchOp src) (patchOp dst)
+    MOVH       fmt src dst   -> MOVH  fmt (patchOp src) (patchOp dst)
+    VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
+
+    VADD       fmt s1 s2 dst -> VADD fmt (patchOp s1) (env s2) (env dst)
+    VSUB       fmt s1 s2 dst -> VSUB fmt (patchOp s1) (env s2) (env dst)
+    VMUL       fmt s1 s2 dst -> VMUL fmt (patchOp s1) (env s2) (env dst)
+    VDIV       fmt s1 s2 dst -> VDIV fmt (patchOp s1) (env s2) (env dst)
+
+    VPSHUFD      fmt off src dst
+      -> VPSHUFD fmt (patchOp off) (patchOp src) (env dst)
+    PSHUFD       fmt off src dst
+      -> PSHUFD  fmt (patchOp off) (patchOp src) (env dst)
+    PSLLDQ       fmt off dst
+      -> PSLLDQ  fmt (patchOp off) (env dst)
+    PSRLDQ       fmt off dst
+      -> PSRLDQ  fmt (patchOp off) (env dst)
 
     _other              -> panic "patchRegs: unrecognised instr"
 

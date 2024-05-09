@@ -295,6 +295,7 @@ pprReg platform f r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegVec u) -> text "%vVec_" <> pprUniqueAlways u
 
   where
     ppr32_reg_no :: Format -> Int -> doc
@@ -405,6 +406,10 @@ pprFormat x = case x of
   II64  -> text "q"
   FF32  -> text "ss"      -- "scalar single-precision float" (SSE2)
   FF64  -> text "sd"      -- "scalar double-precision float" (SSE2)
+  VecFormat _ FmtFloat W32  -> text "ps"
+  VecFormat _ FmtDouble W64 -> text "pd"
+  -- TODO: Add Ints and remove panic
+  VecFormat {} -> panic "X86 pprFormat: unhandled VecFormat"
 
 pprFormat_x87 :: IsLine doc => Format -> doc
 pprFormat_x87 x = case x of
@@ -519,6 +524,8 @@ pprDataItem config lit
 
         ppr_item FF32 _ = [text "\t.float\t" <> pprImm platform imm]
         ppr_item FF64 _ = [text "\t.double\t" <> pprImm platform imm]
+        ppr_item (VecFormat {}) _ =
+          panic "X86 pprDataItem: VecFormat"
 
         ppr_item II64 _
             = case platformOS platform of
@@ -906,6 +913,39 @@ pprInstr platform i = case i of
    CMPXCHG format src dst
       -> pprFormatOpOp (text "cmpxchg") format src dst
 
+   -- Vector Instructions
+   VADD format s1 s2 dst
+     -> pprFormatOpRegReg (text "vadd") format s1 s2 dst
+   VSUB format s1 s2 dst
+     -> pprFormatOpRegReg (text "vsub") format s1 s2 dst
+   VMUL format s1 s2 dst
+     -> pprFormatOpRegReg (text "vmul") format s1 s2 dst
+   VDIV format s1 s2 dst
+     -> pprFormatOpRegReg (text "vdiv") format s1 s2 dst
+   VBROADCAST format from to
+     -> pprBroadcast (text "vbroadcast") format from to
+   VMOVU format from to
+     -> pprFormatOpOp (text "vmovu") format from to
+   MOVU format from to
+     -> pprFormatOpOp (text "movu") format from to
+   MOVL format from to
+     -> pprFormatOpOp (text "movl") format from to
+   MOVH format from to
+     -> pprFormatOpOp (text "movh") format from to
+   VPXOR format s1 s2 dst
+     -> pprXor (text "vpxor") format s1 s2 dst
+   VEXTRACT format offset from to
+     -> pprFormatOpRegOp (text "vextract") format offset from to
+   INSERTPS format offset addr dst
+     -> pprInsert (text "insertps") format offset addr dst
+   VPSHUFD format offset src dst
+     -> pprShuf (text "vpshufd") format offset src dst
+   PSHUFD format offset src dst
+     -> pprShuf (text "pshufd") format offset src dst
+   PSLLDQ format offset dst
+     -> pprShiftLeft (text "pslldq") format offset dst
+   PSRLDQ format offset dst
+     -> pprShiftRight (text "psrldq") format offset dst
 
   where
    gtab :: Line doc
@@ -945,6 +985,23 @@ pprInstr platform i = case i of
       char '\t' <> name <> pprFormat format <> space
 
 
+   pprGenMnemonic  :: Line doc -> Format -> Line doc
+   pprGenMnemonic name _ =
+      char '\t' <> name <> text "" <> space
+
+   pprBroadcastMnemonic  :: Line doc -> Format -> Line doc
+   pprBroadcastMnemonic name format =
+      char '\t' <> name <> pprBroadcastFormat format <> space
+
+   pprBroadcastFormat :: Format -> Line doc
+   pprBroadcastFormat x
+     = case x of
+         VecFormat _ FmtFloat W32  -> text "ss"
+         VecFormat _ FmtDouble W64 -> text "sd"
+         -- TODO: Add Ints and remove panic
+         VecFormat {} -> panic "Incorrect width"
+         _ -> panic "Scalar Format invading vector operation"
+
    pprFormatImmOp :: Line doc -> Format -> Imm -> Operand -> doc
    pprFormatImmOp name format imm op1
      = line $ hcat [
@@ -980,15 +1037,26 @@ pprInstr platform i = case i of
            pprOperand platform format op2
        ]
 
+   pprFormatOpRegOp :: Line doc -> Format -> Operand -> Reg -> Operand -> doc
+   pprFormatOpRegOp name format off reg1 op2
+     = line $ hcat [
+           pprMnemonic name format,
+           pprOperand platform format off,
+           comma,
+           pprReg platform format reg1,
+           comma,
+           pprOperand platform format op2
+       ]
+
    pprFormatOpRegReg :: Line doc -> Format -> Operand -> Reg -> Reg -> doc
-   pprFormatOpRegReg name format op1 op2 op3
+   pprFormatOpRegReg name format op1 reg2 reg3
      = line $ hcat [
            pprMnemonic name format,
            pprOperand platform format op1,
            comma,
-           pprReg platform format op2,
+           pprReg platform format reg2,
            comma,
-           pprReg platform format op3
+           pprReg platform format reg3
        ]
 
    pprFMAPermutation :: FMAPermutation -> Line doc
@@ -1099,3 +1167,66 @@ pprInstr platform i = case i of
    pprCondInstr :: Line doc -> Cond -> Line doc -> doc
    pprCondInstr name cond arg
      = line $ hcat [ char '\t', name, pprCond cond, space, arg]
+
+   -- Custom pretty printers
+   -- These instructions currently don't follow a uniform suffix pattern
+   -- in their names, so we have custom pretty printers for them.
+   pprBroadcast :: Line doc -> Format -> AddrMode -> Reg -> doc
+   pprBroadcast name format op dst
+     = line $ hcat [
+           pprBroadcastMnemonic name format,
+           pprAddr platform op,
+           comma,
+           pprReg platform format dst
+       ]
+
+   pprXor :: Line doc -> Format -> Reg -> Reg -> Reg -> doc
+   pprXor name format reg1 reg2 reg3
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprReg platform format reg1,
+           comma,
+           pprReg platform format reg2,
+           comma,
+           pprReg platform format reg3
+       ]
+
+   pprInsert :: Line doc -> Format -> Operand -> Operand -> Reg -> doc
+   pprInsert name format off src dst
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format off,
+           comma,
+           pprOperand platform format src,
+           comma,
+           pprReg platform format dst
+       ]
+
+   pprShuf :: Line doc -> Format -> Operand -> Operand -> Reg -> doc
+   pprShuf name format op1 op2 reg3
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format op1,
+           comma,
+           pprOperand platform format op2,
+           comma,
+           pprReg platform format reg3
+       ]
+
+   pprShiftLeft :: Line doc -> Format -> Operand -> Reg -> doc
+   pprShiftLeft name format off reg
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format off,
+           comma,
+           pprReg platform format reg
+       ]
+
+   pprShiftRight :: Line doc -> Format -> Operand -> Reg -> doc
+   pprShiftRight name format off reg
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format off,
+           comma,
+           pprReg platform format reg
+       ]

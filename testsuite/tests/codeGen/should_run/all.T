@@ -89,7 +89,16 @@ test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], comp
 test('cgrun078', normal, compile_and_run, [''])
 test('cgrun079', normal, compile_and_run, [''])
 test('cgrun080', normal, compile_and_run, [''])
+test('cgrun083', normal, compile_and_run, [''])
 test('cas_int', normal, compile_and_run, [''])
+
+# N.B. Only NCG and LLVM backends support SIMD operations
+test('simd000', when(unregisterised(), skip), compile_and_run, [''])
+test('simd001', when(unregisterised(), skip), compile_and_run, [''])
+test('simd002', when(unregisterised(), skip), compile_and_run, [''])
+test('simd003', when(unregisterised(), skip), compile_and_run, [''])
+test('simd004', when(unregisterised(), skip), compile_and_run, [''])
+test('simd005', when(unregisterised(), skip), compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
