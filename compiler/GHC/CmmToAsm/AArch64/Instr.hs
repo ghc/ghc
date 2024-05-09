@@ -15,6 +15,7 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
+import GHC.Platform.Reg.Class
 
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
@@ -30,6 +31,7 @@ import GHC.Utils.Panic
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack
+import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 
 -- | LR and FP (8 byte each) are the prologue of each stack frame
 stackFrameHeaderSize :: Int
@@ -149,8 +151,15 @@ regUsageOfInstr platform instr = case instr of
         -- filtering the usage is necessary, otherwise the register
         -- allocator will try to allocate pre-defined fixed stg
         -- registers as well, as they show up.
-        usage (src, dst) = RU (filter (interesting platform) src)
-                              (filter (interesting platform) dst)
+        usage (src, dst) = RU (map mkFmt $ filter (interesting platform) src)
+                              (map mkFmt $ filter (interesting platform) dst)
+          -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+          -- As the AArch64 NCG does not currently support SIMD registers,
+          -- this simple logic is OK.
+        mkFmt r = RegFormat r fmt
+          where fmt = case targetClassOfReg platform r of
+                        RcInteger -> II64
+                        RcFloatOrVector -> FF64
 
         regAddr :: AddrMode -> [Reg]
         regAddr (AddrRegReg r1 r2) = [r1, r2]
@@ -365,12 +374,12 @@ patchJumpInstr instr patchF
 mkSpillInstr
    :: HasCallStack
    => NCGConfig
-   -> Reg       -- register to spill
+   -> RegFormat -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> [Instr]
 
-mkSpillInstr config reg delta slot =
+mkSpillInstr config (RegFormat reg fmt) delta slot =
   case off - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkStrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStrSp imm ]
@@ -381,8 +390,8 @@ mkSpillInstr config reg delta slot =
     where
         a .&~. b = a .&. (complement b)
 
-        fmt = fmtOfRealReg (case reg of { RegReal r -> r; _ -> panic "Expected real reg"})
-
+        -- SIMD NCG TODO: emit the correct instructions to spill a vector register.
+        -- You can take inspiration from the X86_64 backend.
         mkIp0SpillAddr imm = ANN (text "Spill: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
         mkStrSp imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
         mkStrIp0 imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
@@ -391,12 +400,11 @@ mkSpillInstr config reg delta slot =
 
 mkLoadInstr
    :: NCGConfig
-   -> Reg       -- register to load
+   -> RegFormat
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> [Instr]
-
-mkLoadInstr config reg delta slot =
+mkLoadInstr config (RegFormat reg fmt) delta slot =
   case off - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkLdrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdrSp imm ]
@@ -407,8 +415,8 @@ mkLoadInstr config reg delta slot =
     where
         a .&~. b = a .&. (complement b)
 
-        fmt = fmtOfRealReg (case reg of { RegReal r -> r; _ -> panic "Expected real reg"})
-
+        -- SIMD NCG TODO: emit the correct instructions to load a vector register.
+        -- You can take inspiration from the X86_64 backend.
         mkIp0SpillAddr imm = ANN (text "Reload: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
         mkLdrSp imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
         mkLdrIp0 imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
@@ -438,8 +446,10 @@ isMetaInstr instr
 
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
-mkRegRegMoveInstr :: Reg -> Reg -> Instr
-mkRegRegMoveInstr src dst = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
+mkRegRegMoveInstr :: Format -> Reg -> Reg -> Instr
+mkRegRegMoveInstr _fmt src dst
+  = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
+  -- SIMD NCG TODO: incorrect for vector formats
 
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one

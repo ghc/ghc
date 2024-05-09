@@ -22,7 +22,7 @@ import GHC.Utils.Panic
 --      This gets hammered by scanGraph during register allocation,
 --      so needs to be fairly efficient.
 --
---      NOTE:   This only works for architectures with just RcInteger and RcDouble
+--      NOTE:   This only works for architectures with just RcInteger and RcFloatOrVector
 --              (which are disjoint) ie. x86, x86_64 and ppc
 --
 --      The number of allocatable regs is hard coded in here so we can do
@@ -134,42 +134,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
 
         = count3 < cALLOCATABLE_REGS_INTEGER
 
-trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
-        | let cALLOCATABLE_REGS_FLOAT
-                  =        (case platformArch platform of
-                    -- On x86_64 and x86, Float and RcDouble
-                    -- use the same registers,
-                    -- so we only use RcDouble to represent the
-                    -- register allocation problem on those types.
-                            ArchX86       -> 0
-                            ArchX86_64    -> 0
-                            ArchPPC       -> 0
-                            ArchPPC_64 _  -> 0
-                            ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            -- we can in principle address all the float regs as
-                            -- segments. So we could have 64 Float regs. Or
-                            -- 128 Half regs, or even 256 Byte regs.
-                            ArchAArch64   -> 0
-                            ArchAlpha     -> panic "trivColorable ArchAlpha"
-                            ArchMipseb    -> panic "trivColorable ArchMipseb"
-                            ArchMipsel    -> panic "trivColorable ArchMipsel"
-                            ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
-                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
-                            ArchJavaScript-> panic "trivColorable ArchJavaScript"
-                            ArchWasm32    -> panic "trivColorable ArchWasm32"
-                            ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_FLOAT
-                                (virtualRegSqueeze RcFloat)
-                                conflicts
-
-        , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_FLOAT
-                                (realRegSqueeze   RcFloat)
-                                exclusions
-
-        = count3 < cALLOCATABLE_REGS_FLOAT
-
-trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
+trivColorable platform virtualRegSqueeze realRegSqueeze RcFloatOrVector conflicts exclusions
         | let cALLOCATABLE_REGS_DOUBLE
                   =        (case platformArch platform of
                             ArchX86       -> 8
@@ -194,11 +159,11 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_DOUBLE
-                                (virtualRegSqueeze RcDouble)
+                                (virtualRegSqueeze RcFloatOrVector)
                                 conflicts
 
         , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_DOUBLE
-                                (realRegSqueeze   RcDouble)
+                                (realRegSqueeze   RcFloatOrVector)
                                 exclusions
 
         = count3 < cALLOCATABLE_REGS_DOUBLE
@@ -221,21 +186,21 @@ trivColorable classN conflicts exclusions
         acc r (cd, cf)
          = case regClass r of
                 RcInteger       -> (cd+1, cf)
-                RcFloat         -> (cd,   cf+1)
+                RcFloatOrVector -> (cd,   cf+1)
                 _               -> panic "Regs.trivColorable: reg class not handled"
 
         tmp                     = nonDetFoldUFM acc (0, 0) conflicts
         (countInt,  countFloat) = nonDetFoldUFM acc tmp    exclusions
 
         squeese         = worst countInt   classN RcInteger
-                        + worst countFloat classN RcFloat
+                        + worst countFloat classN RcFloatOrVector
 
    in   squeese < allocatableRegsInClass classN
 
 -- | Worst case displacement
 --      node N of classN has n neighbors of class C.
 --
---      We currently only have RcInteger and RcDouble, which don't conflict at all.
+--      We currently only have RcInteger and RcFloatOrVector, which don't conflict at all.
 --      This is a bit boring compared to what's in RegArchX86.
 --
 worst :: Int -> RegClass -> RegClass -> Int
@@ -244,11 +209,11 @@ worst n classN classC
         RcInteger
          -> case classC of
                 RcInteger       -> min n (allocatableRegsInClass RcInteger)
-                RcFloat         -> 0
+                RcFloatOrVector -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case classC of
-                RcFloat         -> min n (allocatableRegsInClass RcFloat)
+                RcFloatOrVector -> min n (allocatableRegsInClass RcFloatOrVector)
                 RcInteger       -> 0
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
@@ -267,15 +232,15 @@ allocatableRegsInClass :: RegClass -> Int
 allocatableRegsInClass cls
  = case cls of
         RcInteger       -> allocatableRegsInteger
-        RcFloat         -> allocatableRegsDouble
+        RcFloatOrVector -> allocatableRegsDouble
 
 allocatableRegsInteger :: Int
 allocatableRegsInteger
         = length $ filter (\r -> regClass r == RcInteger)
                  $ map RealReg allocatableRegs
 
-allocatableRegsFloat :: Int
-allocatableRegsFloat
-        = length $ filter (\r -> regClass r == RcFloat
+allocatableRegsDouble :: Int
+allocatableRegsDouble
+        = length $ filter (\r -> regClass r == RcFloatOrVector)
                  $ map RealReg allocatableRegs
 -}

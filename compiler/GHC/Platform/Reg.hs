@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 -- | An architecture independent description of a register.
 --      This needs to stay architecture independent because it is used
 --      by NCGMonad and the register allocators, which are shared
@@ -27,6 +29,7 @@ module GHC.Platform.Reg (
 where
 
 import GHC.Prelude
+import GHC.Exts ( Int(I#), dataToTag# )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -53,71 +56,49 @@ type RegNo
 --      Virtual regs can be of either class, so that info is attached.
 --
 data VirtualReg
-        = VirtualRegI  {-# UNPACK #-} !Unique
-        | VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
-        | VirtualRegF  {-# UNPACK #-} !Unique
-        | VirtualRegD  {-# UNPACK #-} !Unique
+   -- | Integer virtual register
+   = VirtualRegI    { virtualRegUnique :: {-# UNPACK #-} !Unique }
+   -- | High part of 2-word virtual register
+   | VirtualRegHi   { virtualRegUnique :: {-# UNPACK #-} !Unique }
+   -- | Double virtual register
+   | VirtualRegD    { virtualRegUnique :: {-# UNPACK #-} !Unique }
+   -- | 128-bit wide vector virtual register
+   | VirtualRegV128 { virtualRegUnique :: {-# UNPACK #-} !Unique }
+   deriving (Eq, Show)
 
-        deriving (Eq, Show)
-
--- This is laborious, but necessary. We can't derive Ord because
--- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
--- implementation. See Note [No Ord for Unique]
+-- We can't derive Ord, because Unique doesn't have an Ord instance.
+-- Note nonDetCmpUnique in the implementation. See Note [No Ord for Unique].
 -- This is non-deterministic but we do not currently support deterministic
 -- code-generation. See Note [Unique Determinism and code generation]
 instance Ord VirtualReg where
-  compare (VirtualRegI a) (VirtualRegI b) = nonDetCmpUnique a b
-  compare (VirtualRegHi a) (VirtualRegHi b) = nonDetCmpUnique a b
-  compare (VirtualRegF a) (VirtualRegF b) = nonDetCmpUnique a b
-  compare (VirtualRegD a) (VirtualRegD b) = nonDetCmpUnique a b
-
-  compare VirtualRegI{} _ = LT
-  compare _ VirtualRegI{} = GT
-  compare VirtualRegHi{} _ = LT
-  compare _ VirtualRegHi{} = GT
-  compare VirtualRegF{} _ = LT
-  compare _ VirtualRegF{} = GT
-
-
+  compare vr1 vr2 =
+    case compare (I# (dataToTag# vr1)) (I# (dataToTag# vr2)) of
+      LT -> LT
+      GT -> GT
+      EQ -> nonDetCmpUnique (virtualRegUnique vr1) (virtualRegUnique vr2)
 
 instance Uniquable VirtualReg where
-        getUnique reg
-         = case reg of
-                VirtualRegI u   -> u
-                VirtualRegHi u  -> u
-                VirtualRegF u   -> u
-                VirtualRegD u   -> u
+        getUnique = virtualRegUnique
 
 instance Outputable VirtualReg where
         ppr reg
          = case reg of
-                VirtualRegI  u  -> text "%vI_"   <> pprUniqueAlways u
-                VirtualRegHi u  -> text "%vHi_"  <> pprUniqueAlways u
-                -- this code is kinda wrong on x86
-                -- because float and double occupy the same register set
-                -- namely SSE2 register xmm0 .. xmm15
-                VirtualRegF  u  -> text "%vFloat_"   <> pprUniqueAlways u
-                VirtualRegD  u  -> text "%vDouble_"   <> pprUniqueAlways u
-
+                VirtualRegI    u -> text "%vI_"   <> pprUniqueAlways u
+                VirtualRegHi   u -> text "%vHi_"  <> pprUniqueAlways u
+                VirtualRegD    u -> text "%vDouble_" <> pprUniqueAlways u
+                VirtualRegV128 u -> text "%vV128_"   <> pprUniqueAlways u
 
 
 renameVirtualReg :: Unique -> VirtualReg -> VirtualReg
-renameVirtualReg u r
- = case r of
-        VirtualRegI _   -> VirtualRegI  u
-        VirtualRegHi _  -> VirtualRegHi u
-        VirtualRegF _   -> VirtualRegF  u
-        VirtualRegD _   -> VirtualRegD  u
-
+renameVirtualReg u r = r { virtualRegUnique = u }
 
 classOfVirtualReg :: VirtualReg -> RegClass
 classOfVirtualReg vr
- = case vr of
+  = case vr of
         VirtualRegI{}   -> RcInteger
         VirtualRegHi{}  -> RcInteger
-        VirtualRegF{}   -> RcFloat
-        VirtualRegD{}   -> RcDouble
-
+        VirtualRegD{}   -> RcFloatOrVector
+        VirtualRegV128{} -> RcFloatOrVector
 
 
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform

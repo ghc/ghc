@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -2609,6 +2610,8 @@ doVecPackOp ty z es res = do
     vecPack src [] _ =
         emitAssign (CmmLocal res) (CmmReg (CmmLocal src))
 
+    -- SIMD NCG TODO: it should be possible to emit better code
+    -- for "pack" than doing a bunch of vector insertions in a row.
     vecPack src (e : es) i = do
         dst <- newTemp ty
         if isFloatType (vecElemType ty)

@@ -83,13 +83,11 @@ virtualRegSqueeze cls vr
                 VirtualRegHi{}          -> 1
                 _other                  -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case vr of
                 VirtualRegD{}           -> 1
-                VirtualRegF{}           -> 0
+                VirtualRegV128{}        -> 1
                 _other                  -> 0
-
-        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -102,14 +100,12 @@ realRegSqueeze cls rr
                         | otherwise     -> 0
 
 
-        RcDouble
+        RcFloatOrVector
          -> case rr of
                 RealRegSingle regNo
                         | regNo < 32    -> 0
                         | otherwise     -> 1
 
-
-        _other -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -124,8 +120,7 @@ regDotColor :: RealReg -> SDoc
 regDotColor reg
  = case classOfRealReg reg of
         RcInteger       -> text "blue"
-        RcFloat         -> text "red"
-        RcDouble        -> text "green"
+        RcFloatOrVector -> text "red"
 
 
 
@@ -235,8 +230,8 @@ allMachRegNos   = [0..63]
 {-# INLINE classOfRealReg      #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-        | i < 32        = RcInteger
-        | otherwise     = RcDouble
+        | i < 32    = RcInteger
+        | otherwise = RcFloatOrVector
 
 showReg :: RegNo -> String
 showReg n

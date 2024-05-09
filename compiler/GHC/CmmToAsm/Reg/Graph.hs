@@ -21,6 +21,7 @@ import GHC.CmmToAsm.Reg.Graph.TrivColorable
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
@@ -32,7 +33,7 @@ import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import GHC.Utils.Misc (seqList)
+import GHC.Utils.Misc (seqList, HasDebugCallStack)
 import GHC.CmmToAsm.CFG
 
 import Data.Maybe
@@ -95,7 +96,8 @@ regAlloc config regsFree slotsFree slotsCount code cfg
 regAlloc_spin
         :: forall instr statics.
            (Instruction instr,
-            OutputableP Platform statics)
+            OutputableP Platform statics,
+            HasDebugCallStack)
         => NCGConfig
         -> Int  -- ^ Number of solver iterations we've already performed.
         -> Color.Triv VirtualReg RegClass RealReg
@@ -140,7 +142,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
 
         -- Build the register conflict graph from the cmm code.
         (graph  :: Color.Graph VirtualReg RegClass RealReg)
-                <- {-# SCC "BuildGraph" #-} buildGraph code
+                <- {-# SCC "BuildGraph" #-} buildGraph platform code
 
         -- VERY IMPORTANT:
         --   We really do want the graph to be fully evaluated _before_ we
@@ -188,7 +190,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 = reg
 
         let (code_coalesced :: [LiveCmmDecl statics instr])
-                = map (patchEraseLive patchF) code
+                = map (patchEraseLive platform patchF) code
 
         -- Check whether we've found a coloring.
         if isEmptyUniqSet rsSpill
@@ -214,7 +216,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 --   of a vreg, but it might not need to be on the stack for
                 --   its entire lifetime.
                 let code_spillclean
-                        = map (cleanSpills platform) code_patched
+                        = map (cleanSpills config) code_patched
 
                 -- Strip off liveness information from the allocated code.
                 -- Also rewrite SPILL/RELOAD meta instructions into real machine
@@ -234,7 +236,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                         , raSpillClean          = code_spillclean
                         , raFinal               = code_final
                         , raSRMs                = foldl' addSRM (0, 0, 0)
-                                                $ map countSRMs code_spillclean
+                                                $ map (countSRMs platform) code_spillclean
                         , raPlatform    = platform
                      }
 
@@ -304,14 +306,15 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
 -- | Build a graph from the liveness and coalesce information in this code.
 buildGraph
         :: Instruction instr
-        => [LiveCmmDecl statics instr]
+        => Platform
+        -> [LiveCmmDecl statics instr]
         -> UniqSM (Color.Graph VirtualReg RegClass RealReg)
 
-buildGraph code
+buildGraph platform code
  = do
         -- Slurp out the conflicts and reg->reg moves from this code.
         let (conflictList, moveList) =
-                unzip $ map slurpConflicts code
+                unzip $ map (slurpConflicts platform) code
 
         -- Slurp out the spill/reload coalesces.
         let moveList2           = map slurpReloadCoalesce code
@@ -335,21 +338,21 @@ buildGraph code
 -- | Add some conflict edges to the graph.
 --   Conflicts between virtual and real regs are recorded as exclusions.
 graphAddConflictSet
-        :: UniqSet Reg
+        :: UniqSet RegFormat
         -> Color.Graph VirtualReg RegClass RealReg
         -> Color.Graph VirtualReg RegClass RealReg
 
-graphAddConflictSet set graph
- = let  virtuals        = mkUniqSet
-                        [ vr | RegVirtual vr <- nonDetEltsUniqSet set ]
+graphAddConflictSet regs graph
+ = let  virtuals = takeVirtualRegs regs
+        reals    = takeRealRegs regs
 
         graph1  = Color.addConflicts virtuals classOfVirtualReg graph
 
         graph2  = foldr (\(r1, r2) -> Color.addExclusion r1 classOfVirtualReg r2)
                         graph1
                         [ (vr, rr)
-                                | RegVirtual vr <- nonDetEltsUniqSet set
-                                , RegReal    rr <- nonDetEltsUniqSet set]
+                        | vr <- nonDetEltsUniqSet virtuals
+                        , rr <- nonDetEltsUniqSet reals ]
                           -- See Note [Unique Determinism and code generation]
 
    in   graph2
@@ -393,7 +396,7 @@ patchRegsFromGraph
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
 patchRegsFromGraph platform graph code
- = patchEraseLive patchF code
+ = patchEraseLive platform patchF code
  where
         -- Function to lookup the hardreg for a virtual reg from the graph.
         patchF reg

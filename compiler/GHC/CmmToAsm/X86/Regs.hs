@@ -38,6 +38,7 @@ module GHC.CmmToAsm.X86.Regs (
         xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
         xmm,
         firstxmm, lastxmm,
+        intregnos, xmmregnos,
 
         ripRel,
         allFPArgRegs,
@@ -77,14 +78,12 @@ virtualRegSqueeze cls vr
                 VirtualRegHi{}          -> 1
                 _other                  -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case vr of
                 VirtualRegD{}           -> 1
-                VirtualRegF{}           -> 0
+                VirtualRegV128{}        -> 1
                 _other                  -> 0
 
-
-        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -96,13 +95,11 @@ realRegSqueeze cls rr
                         | regNo < firstxmm -> 1
                         | otherwise     -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case rr of
                 RealRegSingle regNo
                         | regNo >= firstxmm  -> 1
                         | otherwise     -> 0
-
-        _other -> 0
 
 -- -----------------------------------------------------------------------------
 -- Immediates
@@ -242,7 +239,7 @@ classOfRealReg platform reg
     = case reg of
         RealRegSingle i
             | i <= lastint platform -> RcInteger
-            | i <= lastxmm platform -> RcDouble
+            | i <= lastxmm platform -> RcFloatOrVector
             | otherwise             -> panic "X86.Reg.classOfRealReg registerSingle too high"
 
 -- | Get the name of the register with this number.
@@ -271,11 +268,8 @@ Intel x86 architecture:
 - Registers 0-7 have 16-bit counterparts (ax, bx etc.)
 - Registers 0-3 have 8 bit counterparts (ah, bh etc.)
 
-The fp registers are all Double registers; we don't have any RcFloat class
-regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
-never generate them.
-
-TODO: cleanup modelling float vs double registers and how they are the same class.
+The fp registers support Float, Doubles and vectors of those, as well
+as vectors of integer values.
 -}
 
 
@@ -385,7 +379,7 @@ callClobberedRegs platform
    -- Only xmm0-5 are caller-saves registers on 64-bit windows.
    -- For details check the Win64 ABI:
    -- https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions
-   ++ map xmm [0  .. 5]
+   ++ map xmm [0 .. 5]
  | otherwise
     -- all xmm regs are caller-saves
     -- caller-saves registers

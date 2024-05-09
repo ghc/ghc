@@ -24,11 +24,10 @@ mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
         FF32    -> VirtualRegD u
-        -- for scalar F32, we use the same xmm as F64!
-        -- this is a hack that needs some improvement.
-        -- For now we map both to being allocated as "Double" Registers
-        -- on X86/X86_64
+        -- On X86, we pass 32-bit floats in the same registers as 64-bit floats.
         FF64    -> VirtualRegD u
+        -- SIMD NCG TODO: add support for 256 and 512-wide vectors.
+        VecFormat {} -> VirtualRegV128 u
         _other  -> VirtualRegI u
 
 regDotColor :: Platform -> RealReg -> SDoc

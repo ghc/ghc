@@ -44,6 +44,7 @@ module GHC.Types.Unique.Set (
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
         nonDetStrictFoldUniqSet,
+        mapMaybeUniqSet_sameUnique,
 
         -- UniqueSet
         UniqueSet(..),
@@ -204,6 +205,11 @@ nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
 -- See Note [UniqSet invariant]
 mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 mapUniqSet f = mkUniqSet . map f . nonDetEltsUniqSet
+
+-- | Like 'Data.Set.mapMaybe', but you must ensure the passed in function
+-- does not change the 'Unique'.
+mapMaybeUniqSet_sameUnique :: (a -> Maybe b) -> UniqSet a -> UniqSet b
+mapMaybeUniqSet_sameUnique f (UniqSet a) = UniqSet $ mapMaybeUFM_sameUnique f a
 
 -- Two 'UniqSet's are considered equal if they contain the same
 -- uniques.

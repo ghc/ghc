@@ -1,5 +1,6 @@
 module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
+    allFreeRegs,
     maxSpillSlots
 )
 where
@@ -63,6 +64,10 @@ instance FR AArch64.FreeRegs where
     frGetFreeRegs = \_ -> AArch64.getFreeRegs
     frInitFreeRegs = AArch64.initFreeRegs
     frReleaseReg = \_ -> AArch64.releaseReg
+
+-- | For debugging output.
+allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
+allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
 
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of

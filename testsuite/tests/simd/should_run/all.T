@@ -1,0 +1,16 @@
+# N.B. Only the X86 NCG and LLVM backends support SIMD operations for now.
+setTestOpts([ unless(arch('x86_64'), only_ways(llvm_ways))
+            , when(unregisterised(), skip)
+            , js_skip, when(arch('wasm32'), skip)
+            ])
+
+test('simd000', [], compile_and_run, [''])
+test('simd001', [], compile_and_run, [''])
+test('simd002', [], compile_and_run, [''])
+test('simd003', [], compile_and_run, [''])
+test('simd004', [], compile_and_run, [''])
+test('simd005', [], compile_and_run, [''])
+test('simd006', [], compile_and_run, [''])
+test('simd007', [], compile_and_run, [''])
+test('simd008', [], compile_and_run, [''])
+test('simd010', [], compile_and_run, [''])

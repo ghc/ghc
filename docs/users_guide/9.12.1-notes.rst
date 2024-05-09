@@ -62,6 +62,12 @@ Compiler
 
 - :ghc-flag:`-Wderiving-typeable` has been added to :ghc-flag:`-Wall`.
 
+- SIMD support has been added to the X86 native code generator.
+  For the time being, only 128 bit wide vectors are supported, with most
+  floating-point operations implemented, together with a few integer vector
+  operations. Other operations still require the LLVM backend. Contributors
+  welcome!
+
 - i386 Windows support is now completely removed amid massive cleanup
   of legacy code to pave way for Arm64 Windows support (`#24883
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
