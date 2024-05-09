@@ -713,6 +713,9 @@ def _find_so(lib, directory, in_place):
 
     _find_so("Cabal-syntax-3.11.0.0", path-from-ghc-pkg, True) ==>
     /builds/ghc/ghc/_build/install/lib/ghc-9.11.20240410/lib/x86_64-linux-ghc-9.11.20240410/libHSCabal-syntax-3.11.0.0-inplace-ghc9.11.20240410.so
+
+    For a release build the filename replaces "inplace" for a hash (765d in
+    this case): libHSCabal-3.12.0.0-765d-ghc9.11.20240508.so
     """
 
     # produce the suffix for the CI operating system
@@ -722,11 +725,15 @@ def _find_so(lib, directory, in_place):
     elif config.os == "darwin":
         suffix = "dylib"
 
-    # Most artfacts are of the form foo-inplace, except for the rts.
+    # Most artfacts are of the form foo-inplace, or foo-<hash> for release
+    # builds, except for the rts.
+    # "\d+(\.\d+)+" matches version numbers, such as 3.12.0.0 in the above example
+    # "\w+"         matches the hash on release builds or "inplace", such as 765d in the example
+    # "ghc\S+"      matches the ghc build name: ghc9.11.20240508
     if in_place:
-        to_match = r'libHS{}-\d+(\.\d+)+-inplace-\S+\.' + suffix
+        to_match = r'libHS{}-\d+(\.\d+)+-\w+-ghc\S+\.' + suffix
     else:
-        to_match = r'libHS{}-\d+(\.\d+)+\S+\.' + suffix
+        to_match = r'libHS{}-\d+(\.\d+)+-ghc\S+\.' + suffix
 
     matches = []
     # wrap this in some exception handling, hadrian test will error out because
