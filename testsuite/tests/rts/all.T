@@ -114,6 +114,8 @@ test('outofmem2',
 test('T2047',
      [ignore_stdout,
       extra_run_opts('+RTS -c -RTS'),
+      # May timeout in CI
+      when(arch('i386'), run_timeout_multiplier(2)),
       # Non-moving collector doesn't support -c
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity', 'nonmoving_thr_ghc'])],
      compile_and_run, ['-package containers'])
