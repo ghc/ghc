@@ -65,7 +65,7 @@ eprint(f"Supported platforms: {job_mapping.keys()}")
 class Artifact(NamedTuple):
     job_name: str
     download_name: str
-    output_name: str
+    output_name: Optional[str]
     subdir: str
 
 # Platform spec provides a specification which is agnostic to Job
@@ -76,11 +76,11 @@ class PlatformSpec(NamedTuple):
 
 source_artifact = Artifact('source-tarball'
                           , 'ghc-{version}-src.tar.xz'
-                          , 'ghc-{version}-src.tar.xz'
+                          , None
                           , 'ghc-{version}' )
 test_artifact = Artifact('source-tarball'
                         , 'ghc-{version}-testsuite.tar.xz'
-                        , 'ghc-{version}-testsuite.tar.xz'
+                        , None
                         , 'ghc-{version}/testsuite' )
 
 def debian(arch, n):
@@ -114,8 +114,7 @@ def linux_platform(arch, opsys):
 
 base_url = 'https://gitlab.haskell.org/api/v4/projects/1/jobs/{job_id}/artifacts/{artifact_name}'
 
-
-hash_cache = {}
+hash_cache = {} # type: Dict[str, str]
 
 # Download a URL and return its hash
 def download_and_hash(url):
@@ -164,22 +163,20 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
           , "dlSubdir": artifact.subdir.format(version=version)
           , "dlHash" : h }
 
-    # Only add dlOutput if it is inconsistent with the filename inferred from the URL
-    output = artifact.output_name.format(version=version)
-    if Path(urlparse(final_url).path).name != output:
-        res["dlOutput"] = output
-
     eprint(res)
     return res
 
 # Turns a platform into an Artifact respecting pipeline_type
 # Looks up the right job to use from the .gitlab/jobs-metadata.json file
-def mk_from_platform(pipeline_type, platform):
+def mk_from_platform(release_mode, pipeline_type, platform):
     info = job_mapping[platform.name][pipeline_type]
     eprint(f"From {platform.name} / {pipeline_type} selecting {info['name']}")
+    output_name = None
+    if not release_mode:
+        output_name = "ghc-{version}-{pn}.tar.xz".format(version="{version}", pn=platform.name)
     return Artifact(info['name']
                    , f"{info['jobInfo']['bindistName']}.tar.xz"
-                   , "ghc-{version}-{pn}.tar.xz".format(version="{version}", pn=platform.name)
+                   , output_name
                    , platform.subdir)
 
 
@@ -187,7 +184,7 @@ def mk_from_platform(pipeline_type, platform):
 def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     def mk(platform):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
-        return mk_one_metadata(release_mode, version, job_map, mk_from_platform(pipeline_type, platform))
+        return mk_one_metadata(release_mode, version, job_map, mk_from_platform(release_mode, pipeline_type, platform))
 
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
