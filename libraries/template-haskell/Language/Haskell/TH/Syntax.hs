@@ -1951,7 +1951,7 @@ unboxedSumDataName alt arity
 
   | otherwise
   = Name (mkOccName sum_occ)
-         (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+         (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
 
   where
     prefix     = "unboxedSumDataName: "
@@ -1970,11 +1970,11 @@ unboxedSumTypeName arity
 
   | otherwise
   = Name (mkOccName sum_occ)
-         (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+         (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
 
   where
     -- Synced with the definition of mkSumTyConOcc in GHC.Builtin.Types
-    sum_occ = '(' : '#' : replicate (arity - 1) '|' ++ "#)"
+    sum_occ = "Sum" ++ show arity ++ "#"
 
 -----------------------------------------------------
 --              Locations
