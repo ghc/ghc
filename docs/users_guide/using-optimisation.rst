@@ -1814,3 +1814,23 @@ as such you shouldn't need to set any of them explicitly. A flag
     This flag sets the size (in bytes) threshold above which the second approach
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
+
+.. ghc-flag:: -fwrite-if-compression=⟨n⟩
+    :shortdesc: *default: 2.* Tweak the level of interface file compression.
+    :type: dynamic
+    :category: optimization
+
+    :default: 2
+
+    This flag defines the level of compression of interface files when writing to disk.
+    The higher the flag, the more we deduplicate the interface file, at the cost of a higher compilation time.
+    Deduplication (when applied to :ghc-flag:`--make` mode and :ghc-flag:`--interactive` mode) decreases the size of interface files as well as reducing
+    the overall memory usage of GHC.
+
+    Compression cannot be fully turned off, GHC always compresses interface files to a certain degree.
+    Currently, we support values of ``1``, ``2`` and ``3``.
+    Lower or higher values are clamped to ``1`` and ``3`` respectively.
+
+    * ``1``: Compress as little as possible. No run-time impact, at the cost of interface file size and memory usage.
+    * ``2``: Apply compression with minimal run-time overhead, reducing the interface file size and memory usage.
+    * ``3``: Apply all possible compressions, minimal interface file sizes and memory usage, at the cost of run-time overhead.
