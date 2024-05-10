@@ -164,7 +164,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -1339,7 +1339,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           withTiming logger
               (text "WriteIface"<+>brackets (text iface_name))
               (const ())
-              (writeIface logger profile iface_name iface)
+              (writeIface logger profile (flagsToIfCompression dflags) iface_name iface)
 
     if (write_interface || force_write_interface) then do
 
