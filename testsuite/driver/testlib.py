@@ -743,7 +743,7 @@ def find_so(lib):
 def find_non_inplace_so(lib):
     return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
 
-# Define the a generic stat test, which computes the statistic by calling the function
+# Define a generic stat test, which computes the statistic by calling the function
 # given as the third argument.
 def collect_generic_stat ( metric, deviation, get_stat ):
     return collect_generic_stats ( { metric: { 'deviation': deviation, 'current': get_stat } } )
@@ -1752,6 +1752,9 @@ async def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
+async def make_depend( name, way, mods, extra_hc_opts ):
+    return await do_compile( name, way, False,  ' '.join(mods), [], [], extra_hc_opts, mode = '-M')
+
 async def do_compile(name: TestName,
                way: WayName,
                should_fail: bool,
@@ -2030,7 +2033,9 @@ async def simple_build(name: Union[TestName, str],
                  addsuf: bool,
                  backpack: bool = False,
                  suppress_stdout: bool = False,
-                 filter_with: str = '') -> Any:
+                 filter_with: str = '',
+                 # Override auto-detection of whether to use --make or -c etc.
+                 mode: Optional[str] = None) -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
@@ -2047,7 +2052,9 @@ async def simple_build(name: Union[TestName, str],
     else:
         srcname = Path(name)
 
-    if top_mod is not None:
+    if mode is not None:
+        to_do = mode
+    elif top_mod is not None:
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
