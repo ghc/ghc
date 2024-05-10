@@ -1608,10 +1608,11 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
                                         --     in GHC.Core.Opt.Simplify.Iteration
   | otherwise
   = case occ_info of
-      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+      OneOcc { occ_in_lam = in_lam, occ_n_br = n_br }
         | n_br == 1, NotInsideLam <- in_lam  -- One syntactic occurrence
         -> True                              -- See Note [Post-inline for single-use things]
 {-
+      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
         -- See Note [Inline small things to avoid creating a thunk]
 
         | n_br >= 100 -> False  -- See #23627
