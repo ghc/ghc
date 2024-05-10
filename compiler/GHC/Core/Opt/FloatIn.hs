@@ -25,14 +25,16 @@ import GHC.Core
 import GHC.Core.Unfold( ExprSize(..), sizeExpr,
                         UnfoldingOpts(..), defaultUnfoldingOpts )
 import GHC.Core.Opt.Arity( isOneShotBndr )
+import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
 -- import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood )
+import GHC.Types.Basic      ( RecFlag(..), isRec, isOneOcc )
+import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood, idDemandInfo, idOccInfo )
+import GHC.Types.Demand     ( isStrUsedDmd )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -53,10 +55,11 @@ floatInwards :: Platform -> CoreProgram -> CoreProgram
 floatInwards platform binds = map (fi_top_bind platform) binds
   where
     fi_top_bind platform (NonRec binder rhs)
-      = NonRec binder (fiExpr platform [] (freeVars rhs))
+      = NonRec binder (fiExpr platform [] (preprocess rhs))
     fi_top_bind platform (Rec pairs)
-      = Rec [ (b, fiExpr platform [] (freeVars rhs)) | (b, rhs) <- pairs ]
+      = Rec [ (b, fiExpr platform [] (preprocess rhs)) | (b, rhs) <- pairs ]
 
+    preprocess rhs = freeVars (occurAnalyseExpr rhs)
 
 {-
 ************************************************************************
@@ -687,7 +690,9 @@ noFloatIntoArg expr
       -- See Note [noFloatInto considerations] wrinkle 2
 
   | otherwise  -- See Note [noFloatInto considerations] wrinkle 2
-  = exprIsTrivial deann_expr || exprIsHNF deann_expr
+  = exprIsTrivial deann_expr -- || exprIsHNF deann_expr
+      -- let x = e in Just (Just (x+1))
+      -- here we want to float in!
   where
     deann_expr = deAnnotate' expr
 
@@ -802,11 +807,30 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
         = (dropBoxFloats here_box, map dropBoxFloats fork_boxes)
 
     go (bind_w_fvs@(FB bndrs bind_fvs bind) : binds) here_box fork_boxes
-        | drop_here = go binds (insert here_box) fork_boxes
-        | otherwise = go binds here_box          new_fork_boxes
+        | push_it_in = go binds here_box          new_fork_boxes
+        | otherwise  = go binds (insert here_box) fork_boxes
         where
-          drop_here = used_here || cant_push
+          push_it_in = not used_here && can_push && (n_used_alts == 1 || some_benefit)
           -- "here" means the group of bindings dropped at the top of the fork
+          -- Otherwise always float in if there is just one arm; or if there is
+          -- some benefit to doing so
+
+          -- can_push: see Note [Floating primops]
+          can_push | is_case   = True
+                   | otherwise = not (floatIsCase bind)
+
+          -- some_benefit is used only if (n_used_alts > 1) and (not used_here)
+          -- So some duplication is going to occur
+          some_benefit = small_enough &&
+                         no_work_duplication &&
+                         (saves_alloc || not not_thunky)
+
+          saves_alloc = n_used_alts < n_alts
+          small_enough = floatIsDupable platform bind
+          no_work_duplication = is_case || case bind of
+                                  FloatCase {}          -> True   -- Always a primop
+                                  FloatLet (NonRec b _) -> isOneOcc (idOccInfo b)
+                                  FloatLet (Rec {})     -> False  -- One will be a loop breaker
 
           used_here     = bndrs `usedInDropBox` here_box
           used_in_flags = case fork_boxes of
@@ -821,9 +845,11 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           not_thunky = case bind of
                          FloatCase{}           -> True
-                         FloatLet (NonRec _ r) -> exprIsHNF r
+                         FloatLet (NonRec b r) -> isStrUsedDmd (idDemandInfo b)
+                                                  || exprIsHNF r
                          FloatLet (Rec prs)    -> all (exprIsHNF . snd) prs
 
+{-
           cant_push
             | is_case
             = -- The alternatives of a case expresison
@@ -840,7 +866,7 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
                  -- Don't float in if used in all alternatives and not a thunk
               (n_used_alts > 1 && not (floatIsDupable platform bind))
                  -- Nor if used in multiple alts and not small
-
+-}
           new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe
                                         fork_boxes used_in_flags
 
