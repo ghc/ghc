@@ -14,6 +14,7 @@ module GHC.Iface.Binary (
         writeBinIface,
         readBinIface,
         readBinIfaceHeader,
+        CompressionIFace(..),
         getSymtabName,
         CheckHiWay(..),
         TraceBinIFace(..),
@@ -48,7 +49,7 @@ import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint
-import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
+import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
 
 import Control.Monad
 import Data.Array
@@ -72,6 +73,30 @@ data CheckHiWay = CheckHiWay | IgnoreHiWay
 data TraceBinIFace
    = TraceBinIFace (SDoc -> IO ())
    | QuietBinIFace
+
+-- | The compression/deduplication level of 'ModIface' files.
+--
+-- A 'ModIface' contains many duplicated symbols and names. To keep interface
+-- files small, we deduplicate them during serialisation.
+-- It is impossible to write an interface file with *no* compression/deduplication.
+--
+-- We support different levels of compression/deduplication, with different
+-- trade-offs for run-time performance and memory usage.
+-- If you don't have any specific requirements, then 'SafeExtraCompression' is a good default.
+data CompressionIFace
+  = NormalCompression
+  -- ^ Perform the normal compression operations,
+  -- such as deduplicating 'Name's and 'FastString's
+  | SafeExtraCompression
+  -- ^ Perform some extra compression steps that have minimal impact
+  -- on the run-time of 'ghc'.
+  --
+  -- This reduces the size of '.hi' files significantly in some cases
+  -- and reduces overall memory usage in certain scenarios.
+  | MaximumCompression
+  -- ^ Try to compress as much as possible.
+  --
+  -- Yields the smallest '.hi' files but at the cost of additional run-time.
 
 -- | Read an interface file header, checking the magic number, version, and
 -- way. Returns the hash of the source file and a BinHandle which points at the
@@ -200,8 +225,8 @@ getTables name_cache bh = do
 -- | Write an interface file.
 --
 -- See Note [Deduplication during iface binary serialisation] for details.
-writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
-writeBinIface profile traceBinIface hi_path mod_iface = do
+writeBinIface :: Profile -> TraceBinIFace -> CompressionIFace -> FilePath -> ModIface -> IO ()
+writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
     let platform = profilePlatform profile
     put_ bh (binaryInterfaceMagic platform)
@@ -215,7 +240,7 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     extFields_p_p <- tellBinWriter bh
     put_ bh extFields_p_p
 
-    putWithUserData traceBinIface bh mod_iface
+    putWithUserData traceBinIface compressionLevel bh mod_iface
 
     extFields_p <- tellBinWriter bh
     putAt bh extFields_p_p extFields_p
@@ -229,9 +254,9 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => TraceBinIFace -> WriteBinHandle -> a -> IO ()
-putWithUserData traceBinIface bh payload = do
-  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> put bh' payload)
+putWithUserData :: Binary a => TraceBinIFace -> CompressionIFace -> WriteBinHandle -> a -> IO ()
+putWithUserData traceBinIface compressionLevel bh payload = do
+  (name_count, fs_count, ifacetype_count, _b) <- putWithTables compressionLevel bh (\bh' -> put bh' payload)
 
   case traceBinIface of
     QuietBinIFace         -> return ()
@@ -240,26 +265,30 @@ putWithUserData traceBinIface bh payload = do
                                       <+> text "Names")
        printer (text "writeBinIface:" <+> int fs_count
                                       <+> text "dict entries")
+       printer (text "writeBinIface:" <+> int ifacetype_count
+                                      <+> text "dict entries")
 
--- | Write name/symbol tables
+-- | Write name/symbol/ifacetype tables
 --
--- 1. setup the given BinHandle with Name/FastString table handling
+-- 1. setup the given BinHandle with Name/FastString/IfaceType table handling
 -- 2. write the following
 --    - FastString table pointer
 --    - Name table pointer
+--    - IfaceType table pointer
 --    - payload
+--    - IfaceType table
 --    - Name table
 --    - FastString table
 --
--- It returns (number of names, number of FastStrings, payload write result)
+-- It returns (number of names, number of FastStrings, number of IfaceTypes, payload write result)
 --
 -- See Note [Order of deduplication tables during iface binary serialisation]
-putWithTables :: WriteBinHandle -> (WriteBinHandle -> IO b) -> IO (Int, Int, b)
-putWithTables bh' put_payload = do
+putWithTables :: CompressionIFace -> WriteBinHandle -> (WriteBinHandle -> IO b) -> IO (Int, Int, Int, b)
+putWithTables compressionLevel bh' put_payload = do
   -- Initialise deduplicating tables.
   (fast_wt, fsWriter) <- initFastStringWriterTable
   (name_wt, nameWriter) <- initNameWriterTable
-  (ifaceType_wt, ifaceTypeWriter) <- initWriteIfaceType
+  (ifaceType_wt, ifaceTypeWriter) <- initWriteIfaceType compressionLevel
 
   -- Initialise the 'WriterUserData'.
   let writerUserData = mkWriterUserData
@@ -275,14 +304,14 @@ putWithTables bh' put_payload = do
         ]
   let bh = setWriterUserData bh' writerUserData
 
-  (fs_count : name_count : _, r) <-
+  ([fs_count, name_count, ifacetype_count] , r) <-
     -- The order of these entries matters!
     --
     -- See Note [Order of deduplication tables during iface binary serialisation] for details.
     putAllTables bh [fast_wt, name_wt, ifaceType_wt] $ do
       put_payload bh
 
-  return (name_count, fs_count, r)
+  return (name_count, fs_count, ifacetype_count, r)
 
 -- | Write all deduplication tables to disk after serialising the
 -- main payload.
@@ -526,15 +555,33 @@ initReadIfaceTypeTable ud = do
       , mkReaderFromTable = \tbl -> mkReader (getGenericSymtab tbl)
       }
 
-initWriteIfaceType :: IO (WriterTable, BinaryWriter IfaceType)
-initWriteIfaceType = do
+initWriteIfaceType :: CompressionIFace -> IO (WriterTable, BinaryWriter IfaceType)
+initWriteIfaceType compressionLevel = do
   sym_tab <- initGenericSymbolTable @(Map IfaceType)
   pure
     ( WriterTable
         { putTable = putGenericSymbolTable sym_tab (lazyPut' putIfaceType)
         }
-    , mkWriter $ putGenericSymTab sym_tab
+    , mkWriter $ ifaceWriter sym_tab
     )
+  where
+    ifaceWriter sym_tab = case compressionLevel of
+      NormalCompression -> literalIfaceTypeSerialiser
+      SafeExtraCompression -> ifaceTyConAppSerialiser sym_tab
+      MaximumCompression -> fullIfaceTypeSerialiser sym_tab
+
+    ifaceTyConAppSerialiser sym_tab bh ty = case ty of
+      IfaceTyConApp {} -> do
+        put_ bh ifaceTypeSharedByte
+        putGenericSymTab sym_tab bh ty
+      _ -> putIfaceType bh ty
+
+
+    fullIfaceTypeSerialiser sym_tab bh ty = do
+      put_ bh ifaceTypeSharedByte
+      putGenericSymTab sym_tab bh ty
+
+    literalIfaceTypeSerialiser = putIfaceType
 
 
 initNameReaderTable :: NameCache -> IO (ReaderTable Name)
