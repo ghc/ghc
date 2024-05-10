@@ -15,20 +15,24 @@ module GHC.Iface.Ext.Binary
    )
 where
 
+import GHC.Prelude
+
+import GHC.Builtin.Utils
 import GHC.Settings.Utils         ( maybeRead )
 import GHC.Settings.Config        ( cProjectVersion )
-import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Data.FastMutInt
 import GHC.Data.FastString        ( FastString )
+import GHC.Iface.Ext.Types
+import GHC.Iface.Binary           ( putAllTables )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import qualified GHC.Utils.Binary as Binary
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import qualified Data.Array        as A
 import qualified Data.Array.IO     as A
@@ -41,12 +45,6 @@ import Data.Word                  ( Word8, Word32 )
 import Control.Monad              ( replicateM, when, forM_, foldM )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
-
-import GHC.Iface.Ext.Types
-import GHC.Iface.Binary (initWriteIfaceType, putAllTables, initReadIfaceTypeTable)
-import GHC.Iface.Type (IfaceType)
-import System.IO.Unsafe (unsafeInterleaveIO)
-import qualified GHC.Utils.Binary as Binary
 
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
@@ -72,7 +70,7 @@ putBinLine bh xs = do
   putByte bh 10 -- newline char
 
 -- | Write a `HieFile` to the given `FilePath`, with a proper header and
--- symbol tables for `Name`s and `FastString`s
+-- symbol tables for `Name`s and `FastString`s.
 writeHieFile :: FilePath -> HieFile -> IO ()
 writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
@@ -85,18 +83,16 @@ writeHieFile hie_file_path hiefile = do
 
   (fs_tbl, fs_w) <- initFastStringWriterTable
   (name_tbl, name_w) <- initWriteNameTable
-  (iface_tbl, iface_w) <- initWriteIfaceType
 
   let bh = setWriterUserData bh0 $ mkWriterUserData
-        [ mkSomeBinaryWriter @IfaceType iface_w
-        , mkSomeBinaryWriter @Name name_w
+        [ mkSomeBinaryWriter @Name name_w
         , mkSomeBinaryWriter @BindingName (simpleBindingNameWriter name_w)
         , mkSomeBinaryWriter @FastString fs_w
         ]
 
   -- Discard number of written elements
   -- Order matters! See Note [Order of deduplication tables during iface binary serialisation]
-  _ <- putAllTables bh [fs_tbl, name_tbl, iface_tbl] $ do
+  _ <- putAllTables bh [fs_tbl, name_tbl] $ do
     put_ bh hiefile
 
   -- and send the result to the file
@@ -215,14 +211,8 @@ readHieFileHeader file bh0 = do
 
 readHieFileContents :: ReadBinHandle -> NameCache -> IO HieFile
 readHieFileContents bh0 name_cache = do
-  bhRef <- newIORef (error "used too soon")
-  -- It is important this is passed to 'getTable'
-  -- See Note [Lazy ReaderUserData during IfaceType serialisation]
-  ud <- unsafeInterleaveIO (readIORef bhRef)
-
   fsReaderTable <- initFastStringReaderTable
   nameReaderTable <- initReadNameTable name_cache
-  ifaceTypeReaderTable <- initReadIfaceTypeTable ud
 
   -- read the symbol table so we are capable of reading the actual data
   bh1 <-
@@ -232,10 +222,8 @@ readHieFileContents bh0 name_cache = do
       -- See Note [Order of deduplication tables during iface binary serialisation] for details.
       [ get_dictionary fsReaderTable
       , get_dictionary nameReaderTable
-      , get_dictionary ifaceTypeReaderTable
       ]
 
-  writeIORef bhRef (getReaderUserData bh1)
   -- load the actual data
   get bh1
   where
