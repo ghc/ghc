@@ -15,16 +15,11 @@ run() {
   cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | jq --sort-keys | tee "plan-bootstrap-$ver.json"
 }
 
-run "9_4_1"
-run "9_4_2"
-run "9_4_3"
-run "9_4_4"
-run "9_4_5"
-run "9_4_6"
-run "9_4_7"
 run "9_4_8"
 run "9_6_1"
 run "9_6_2"
 run "9_6_3"
 run "9_6_4"
+run "9_6_5"
 run "9_8_1"
+run "9_8_2"

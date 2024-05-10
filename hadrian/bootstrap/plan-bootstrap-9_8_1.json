@@ -123,13 +123,13 @@
       "version": "0.8.4"
     },
     {
-      "cabal_sha256": "03db065161987f614a3a2bbcd16264f78e47efe231fb5bd161be2043eaf20488",
+      "cabal_sha256": "200d756a7b3bab7ca2bac6eb50ed8252f26de77ac8def490a3ad743f2933acbd",
       "flags": [
         "-exe",
         "+use-cbits"
       ],
       "package": "cryptohash-sha256",
-      "revision": 3,
+      "revision": 4,
       "source": "hackage",
       "src_sha256": "73a7dc7163871a80837495039a099967b11f5c4fe70a118277842f7a713c6bf6",
       "version": "0.11.102.1"
@@ -228,12 +228,12 @@
       "version": "0.8.0.0"
     },
     {
-      "cabal_sha256": "bac0ae8d46a04e410666b0c8081cff63f060f29157983b569ca86ddb6e6e0dc6",
+      "cabal_sha256": "caa9b4a92abf1496c7f6a3c0f4e357426a54880077cb9f04e260a8bfa034b77b",
       "flags": [
         "-optimised-mixer"
       ],
       "package": "splitmix",
-      "revision": 0,
+      "revision": 1,
       "source": "hackage",
       "src_sha256": "9df07a9611ef45f1b1258a0b412f4d02c920248f69d2e2ce8ccda328f7e13002",
       "version": "0.1.0.5"
@@ -248,12 +248,12 @@
       "version": "1.2.1.1"
     },
     {
-      "cabal_sha256": "859ec9a017e51194755cb8a445b767afc5ce0ac991cd50b0f96abd31b3687aab",
+      "cabal_sha256": "21f9dd4be45897e487a98bfc152d900f1d69213d41dc0096d8adf9429349a164",
       "flags": [
         "-debug"
       ],
       "package": "unordered-containers",
-      "revision": 0,
+      "revision": 1,
       "source": "hackage",
       "src_sha256": "bccf68bcf262a149e8cdb25bc4a87d59642faa772ec4db384e16ac8f4f3f49ef",
       "version": "0.2.16.0"
