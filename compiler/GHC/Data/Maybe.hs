@@ -68,8 +68,11 @@ firstJustsM = foldlM go Nothing where
 
 expectJust :: HasDebugCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
-expectJust _   (Just x) = x
-expectJust err Nothing  = error ("expectJust " ++ err)
+expectJust = fromMaybe . expectJustError
+
+expectJustError :: String -> a
+expectJustError msg = error ("expectJust: " ++ msg)
+{-# NOINLINE expectJustError #-}
 
 whenIsJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
 whenIsJust = for_
