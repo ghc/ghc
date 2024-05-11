@@ -1,8 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
@@ -83,6 +81,7 @@ import GHC.Platform.Regs
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Foldable (toList)
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
@@ -520,14 +519,12 @@ ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyM
 
 -- | like 'toBlockList', but the entry block always comes first
 toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
-toBlockListEntryFirst g
-  | mapNull m  = []
-  | otherwise  = entry_block : others
+toBlockListEntryFirst g = do
+    entry_block <- toList $ mapLookup entry_id m
+    entry_block : filter ((/= entry_id) . entryLabel) (mapElems m)
   where
     m = toBlockMap g
     entry_id = g_entry g
-    Just entry_block = mapLookup entry_id m
-    others = filter ((/= entry_id) . entryLabel) (mapElems m)
 
 -- | Like 'toBlockListEntryFirst', but we strive to ensure that we order blocks
 -- so that the false case of a conditional jumps to the next block in the output
@@ -538,13 +535,10 @@ toBlockListEntryFirst g
 -- of successors returned for CmmCondBranch by the NonLocal instance for CmmNode
 -- defined in "GHC.Cmm.Node". -GBM
 toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
-toBlockListEntryFirstFalseFallthrough g
-  | mapNull m  = []
-  | otherwise  = dfs setEmpty [entry_block]
+toBlockListEntryFirstFalseFallthrough g = dfs setEmpty $ toList $ mapLookup entry_id m
   where
     m = toBlockMap g
     entry_id = g_entry g
-    Just entry_block = mapLookup entry_id m
 
     dfs :: LabelSet -> [CmmBlock] -> [CmmBlock]
     dfs _ [] = []

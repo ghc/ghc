@@ -4,7 +4,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 #include <ghcplatform.h>
 
 {- Functions for providing the default interpretation of the 'TPhase' actions
@@ -963,7 +962,7 @@ llvmOptions llvm_config dflags =
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
         target_os = platformOS (targetPlatform dflags)
-        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets llvm_config)
+        LlvmTarget _ mcpu mattr = expectJust "llvmOptions" $ lookup target (llvmTargets llvm_config)
 
         -- Relocation models
         rmodel |  gopt Opt_PIC dflags

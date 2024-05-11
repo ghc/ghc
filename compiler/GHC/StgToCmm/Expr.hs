@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -729,7 +728,9 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; tagged_cmms <- cgAltRhss gc_plan bndr alts
 
         ; let bndr_reg = CmmLocal (idToReg platform bndr)
-              (DEFAULT,deflt) = head tagged_cmms
+              deflt = case tagged_cmms of
+                  (DEFAULT,deflt):_ -> deflt
+                  _ -> panic "cgAlts PrimAlt"
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
 

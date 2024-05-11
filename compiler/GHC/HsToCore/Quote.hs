@@ -12,8 +12,6 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2006
@@ -120,8 +118,8 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
       -- to be used to construct the monadWrapper.
       quote_tc <- dsLookupTyCon quoteClassName
       monad_tc <- dsLookupTyCon monadClassName
-      let Just cls = tyConClass_maybe quote_tc
-          Just monad_cls = tyConClass_maybe monad_tc
+      let cls = expectJust "mkMetaWrappers" $ tyConClass_maybe quote_tc
+          monad_cls = expectJust "mkMetaWrappers" $ tyConClass_maybe monad_tc
           -- Quote m -> Monad m
           monad_sel = classSCSelId cls 0
 
@@ -176,7 +174,7 @@ dsBracket (HsBracketTc { hsb_wrap = mb_wrap, hsb_splices = splices, hsb_quote = 
       DecBrG _ gp -> runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
       DecBrL {}   -> panic "dsUntypedBracket: unexpected DecBrL"
   where
-    Just wrap = mb_wrap  -- Not used in VarBr case
+    wrap = expectJust "dsBracket" mb_wrap  -- Not used in VarBr case
       -- In the overloaded case we have to get given a wrapper, it is just
       -- the VarBr case that there is no wrapper, because they
       -- have a simple type.

@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- | Handy functions for creating much Core syntax
 module GHC.Core.Make (
         -- * Constructing normal syntax
@@ -83,8 +81,10 @@ import GHC.Utils.Panic
 
 import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString
+import GHC.Data.Maybe ( expectJust )
 
 import Data.List        ( partition )
+import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Char        ( ord )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
@@ -236,7 +236,7 @@ mkLitRubbish ty
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where
-    Just (torc, rep) = sORTKind_maybe (typeKind ty)
+    (torc, rep) = expectJust "mkLitRubbish" $ sORTKind_maybe (typeKind ty)
 
 {-
 ************************************************************************
@@ -616,8 +616,13 @@ mkBigTupleSelector vars the_var scrut_var scrut
         where
           tpl_tys = [mkBoxedTupleTy (map idType gp) | gp <- vars_s]
           tpl_vs  = mkTemplateLocals tpl_tys
-          [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkBigTupleSelector" tpl_vs vars_s,
-                                         the_var `elem` gp ]
+          (tpl_v, group) = case
+            [ (tpl,gp)
+            | (tpl,gp) <- zipEqual "mkBigTupleSelector" tpl_vs vars_s
+            , the_var `elem` gp
+            ] of
+              [x] -> x
+              _ -> panic "mkBigTupleSelector"
 -- ^ 'mkBigTupleSelectorSolo' is like 'mkBigTupleSelector'
 -- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
 mkBigTupleSelectorSolo vars the_var scrut_var scrut
@@ -1284,7 +1289,7 @@ mkRuntimeErrorTy :: TypeOrConstraint -> Type
 mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
                         mkFunctionType ManyTy addrPrimTy (mkTyVarTy tyvar)
   where
-    (tyvar:_) = mkTemplateTyVars [kind]
+    tyvar:|_ = expectNonEmpty "mkRuntimeErrorTy" $ mkTemplateTyVars [kind]
     kind = case torc of
               TypeLike       -> mkTYPEapp       runtimeRep1Ty
               ConstraintLike -> mkCONSTRAINTapp runtimeRep1Ty

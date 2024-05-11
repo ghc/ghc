@@ -1,6 +1,4 @@
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- The register allocator
@@ -141,7 +139,7 @@ import GHC.Platform
 
 import Data.Containers.ListUtils
 import Data.Maybe
-import Data.List (partition)
+import Data.List (sortOn)
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -178,8 +176,7 @@ regAlloc config (CmmProc static lbl live sccs)
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
-                let !(!(!first':_), !rest')
-                                = partition ((== first_id) . blockId) final_blocks
+                let !final_blocks' = sortOn ((/= first_id) . blockId) final_blocks
 
                 let max_spill_slots = maxSpillSlots config
                     extra_stack
@@ -188,7 +185,7 @@ regAlloc config (CmmProc static lbl live sccs)
                       | otherwise
                       = Nothing
 
-                return  ( CmmProc info lbl live (ListGraph (first' : rest'))
+                return  ( CmmProc info lbl live (ListGraph final_blocks')
                         , extra_stack
                         , Just stats)
 

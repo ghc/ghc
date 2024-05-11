@@ -1,7 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The University of Glasgow, 1994-2006
 
@@ -765,7 +763,9 @@ cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
 -- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
   = assert (isJoinId bndr) $
-    do { let JoinPoint join_arity = idJoinPointHood bndr
+    do { let join_arity = case idJoinPointHood bndr of
+                 JoinPoint join_arity -> join_arity
+                 _ -> panic "cpeJoinPair"
              (bndrs, body)        = collectNBinders join_arity rhs
 
        ; (env', bndrs') <- cpCloneBndrs env bndrs

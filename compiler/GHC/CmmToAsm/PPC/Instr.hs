@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- Machine-dependent assembly language
@@ -60,7 +58,7 @@ import GHC.Types.Unique.DSM
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.FastString (FastString)
-import Data.Maybe (fromMaybe)
+import GHC.Data.Maybe (expectJust, fromMaybe)
 
 
 --------------------------------------------------------------------------------
@@ -721,7 +719,7 @@ makeFarBranches _platform info_env blocks
             = BCCFAR cond tgt p
             | otherwise
             = BCC cond tgt p
-            where Just targetAddr = lookupUFM blockAddressMap tgt
+            where targetAddr = expectJust "makeFarBranches" $ lookupUFM blockAddressMap tgt
         makeFar _ other            = other
 
         -- 8192 instructions are allowed; let's keep some distance, as

@@ -8,7 +8,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules ) where
 
 import GHC.Prelude
@@ -69,6 +68,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Misc
 
 import Control.Monad
+import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -3866,7 +3866,7 @@ mkDupableContWithDmds env _
   , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
 --    pprTrace "Using plan A" (ppr (ai_fun fun) $$ text "args" <+> ppr (ai_args fun) $$ text "cont" <+> ppr cont) $
-    do { let (_ : dmds) = ai_dmds fun
+    do { let _ :| dmds = expectNonEmpty "mkDupableContWithDmds" $ ai_dmds fun
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
                               -- Use the demands from the function to add the right
                               -- demand info on any bindings we make for further args
@@ -3912,7 +3912,7 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let (dmd:cont_dmds) = dmds   -- Never fails
+    do  { let dmd:|cont_dmds = expectNonEmpty "mkDupableContWithDmds" dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg

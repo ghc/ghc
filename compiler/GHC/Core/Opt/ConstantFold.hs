@@ -20,7 +20,7 @@ ToDo:
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 -- | Constant Folder
 module GHC.Core.Opt.ConstantFold
@@ -55,7 +55,7 @@ import GHC.Core.Rules.Config
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
-   ( TyCon, tyConDataCons_maybe, tyConDataCons, tyConFamilySize
+   ( TyCon, tyConDataCons_maybe, tyConDataCons, tyConSingleDataCon, tyConFamilySize
    , isEnumerationTyCon, isValidDTT2TyCon, isNewTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
@@ -2059,7 +2059,7 @@ unsafeEqualityProofRule
        ; fn <- getFunction
        ; let (_, ue) = splitForAllTyCoVars (idType fn)
              tc      = tyConAppTyCon ue  -- tycon:    UnsafeEquality
-             (dc:_)  = tyConDataCons tc  -- data con: UnsafeRefl
+             dc      = tyConSingleDataCon tc  -- data con: UnsafeRefl
              -- UnsafeRefl :: forall (r :: RuntimeRep) (a :: TYPE r).
              --               UnsafeEquality r a a
        ; return (mkTyApps (Var (dataConWrapId dc)) [rep, t1]) }

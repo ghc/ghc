@@ -1,7 +1,5 @@
 
 {-# LANGUAGE DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
@@ -1313,7 +1311,7 @@ tidyTopPair unfold_env boot_exports rhs_tidy_env (bndr, rhs)
     (bndr1, rhs1)
 
   where
-    Just (name',show_unfold) = lookupVarEnv unfold_env bndr
+    (name',show_unfold) = expectJust "tidyTopPair" $ lookupVarEnv unfold_env bndr
     !cbv_bndr = tidyCbvInfoTop boot_exports bndr rhs
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails cbv_bndr -- Preserve the IdDetails

@@ -2,8 +2,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.Tc.Solver.InertSet (
     -- * The work list
     WorkList(..), isEmptyWorkList, emptyWorkList,
@@ -78,6 +76,7 @@ import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.Pair
 import GHC.Data.Maybe
 import GHC.Data.Bag
 
@@ -1894,8 +1893,8 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
     -- that the fresh variables are really fresh between the given and
     -- the wanted. Flattening both at the same time is needed to get
     -- Example 10 from the Note.
-    ([flattened_given, flattened_wanted], var_mapping)
-      = flattenTysX in_scope [given_pred, wanted_pred]
+    (Pair flattened_given flattened_wanted, var_mapping)
+      = flattenTysX in_scope (Pair given_pred wanted_pred)
 
     bind_fun :: BindFun
     bind_fun tv rhs_ty

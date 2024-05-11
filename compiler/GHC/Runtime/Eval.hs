@@ -2,8 +2,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2005-2007
@@ -678,7 +676,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
      noSkolems = noFreeVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
       let tmp_ids = [id | AnId id <- ic_tythings ic]
-          Just id = find (\i -> idName i == name) tmp_ids
+          id = expectJust "rttiEnvironment" $ find (\i -> idName i == name) tmp_ids
       if noSkolems id
          then return hsc_env
          else do

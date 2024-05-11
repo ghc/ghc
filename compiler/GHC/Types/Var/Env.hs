@@ -517,7 +517,7 @@ varEnvDomain      :: VarEnv elt -> UnVarSet
 partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
 -- | Only keep variables contained in the VarSet
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
-delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
+delVarEnvList     :: Foldable f => VarEnv a -> f Var -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
@@ -550,6 +550,8 @@ plusVarEnv_C     = plusUFM_C
 plusVarEnv_CD    = plusUFM_CD
 plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM
+-- INLINE due to polymorphism
+{-# INLINE delVarEnvList #-}
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
 plusVarEnv       = plusUFM

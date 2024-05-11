@@ -240,11 +240,13 @@ adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 delFromUFM :: Uniquable key => UniqFM key elt -> key    -> UniqFM key elt
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
 
-delListFromUFM :: Uniquable key => UniqFM key elt -> [key] -> UniqFM key elt
+delListFromUFM :: (Uniquable key, Foldable f) => UniqFM key elt -> f key -> UniqFM key elt
 delListFromUFM = foldl' delFromUFM
+{-# INLINE delListFromUFM #-}
 
-delListFromUFM_Directly :: UniqFM key elt -> [Unique] -> UniqFM key elt
+delListFromUFM_Directly :: Foldable f => UniqFM key elt -> f Unique -> UniqFM key elt
 delListFromUFM_Directly = foldl' delFromUFM_Directly
+{-# INLINE delListFromUFM_Directly #-}
 
 delFromUFM_Directly :: UniqFM key elt -> Unique -> UniqFM key elt
 delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)

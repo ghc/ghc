@@ -2063,11 +2063,12 @@ emptyFlattenEnv in_scope
 updateInScopeSet :: FlattenEnv -> (InScopeSet -> InScopeSet) -> FlattenEnv
 updateInScopeSet env upd = env { fe_in_scope = upd (fe_in_scope env) }
 
-flattenTys :: InScopeSet -> [Type] -> [Type]
+flattenTys :: Traversable f => InScopeSet -> f Type -> f Type
 -- See Note [Flattening type-family applications when matching instances]
-flattenTys in_scope tys = fst (flattenTysX in_scope tys)
+flattenTys = \ in_scope tys -> fst (flattenTysX in_scope tys)
+{-# INLINE flattenTys #-}
 
-flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarEnv (TyCon, [Type]))
+flattenTysX :: Traversable f => InScopeSet -> f Type -> (f Type, TyVarEnv (TyCon, [Type]))
 -- See Note [Flattening type-family applications when matching instances]
 -- NB: the returned types mention the fresh type variables
 --     in the domain of the returned env, whose range includes
@@ -2083,14 +2084,16 @@ flattenTysX in_scope tys
   = let (env, result) = coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys in
     (result, build_env (fe_type_map env))
   where
-    build_env :: TypeMap (TyVar, TyCon, [Type]) -> TyVarEnv (TyCon, [Type])
+    build_env :: TypeMap (TyVar, TyCon, f Type) -> TyVarEnv (TyCon, f Type)
     build_env env_in
       = foldTM (\(tv, tc, tys) env_out -> extendVarEnv env_out tv (tc, tys))
                env_in emptyVarEnv
+{-# SPECIALIZE flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarEnv (TyCon, [Type])) #-}
 
-coreFlattenTys :: TvSubstEnv -> FlattenEnv
-               -> [Type] -> (FlattenEnv, [Type])
-coreFlattenTys subst = mapAccumL (coreFlattenTy subst)
+coreFlattenTys :: Traversable f => TvSubstEnv -> FlattenEnv
+               -> f Type -> (FlattenEnv, f Type)
+coreFlattenTys = mapAccumL . coreFlattenTy
+{-# INLINE coreFlattenTys #-}
 
 coreFlattenTy :: TvSubstEnv -> FlattenEnv
               -> Type -> (FlattenEnv, Type)

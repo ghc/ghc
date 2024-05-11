@@ -14,7 +14,6 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE RankNTypes #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- For the HasLoc instances
 
 {-
@@ -59,6 +58,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
+import GHC.Data.Pair
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -83,6 +83,7 @@ import Control.Monad.Trans.Class  ( lift )
 import Control.Applicative        ( (<|>) )
 import GHC.Types.TypeEnv          ( TypeEnv )
 import Control.Arrow              ( second )
+import Data.Traversable           ( mapAccumR )
 
 {- Note [Updating HieAst for changes in the GHC AST]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -508,24 +509,19 @@ data TVScoped a = TVS TyVarScope Scope a -- TyVarScope
 -- things to its right, ala RScoped
 
 -- | Each element scopes over the elements to the right
-listScopes :: Scope -> [LocatedA a] -> [RScoped (LocatedA a)]
-listScopes _ [] = []
-listScopes rhsScope [pat] = [RS rhsScope pat]
-listScopes rhsScope (pat : pats) = RS sc pat : pats'
-  where
-    pats'@((RS scope p):_) = listScopes rhsScope pats
-    sc = combineScopes scope $ mkScope $ getLocA p
+listScopes :: Traversable f => Scope -> f (LocatedA a) -> f (RScoped (LocatedA a))
+listScopes = fmap snd . mapAccumR (\ (scope :: Scope) pat -> let scope' = combineScopes scope $ mkScope $ getLocA pat in (scope', RS scope pat))
 
 -- | 'listScopes' specialised to 'PScoped' things
 patScopes
-  :: Maybe Span
+  :: Traversable f
+  => Maybe Span
   -> Scope
   -> Scope
-  -> [LPat (GhcPass p)]
-  -> [PScoped (LPat (GhcPass p))]
-patScopes rsp useScope patScope xs =
-  map (\(RS sc a) -> PS rsp useScope sc a) $
-    listScopes patScope xs
+  -> f (LPat (GhcPass p))
+  -> f (PScoped (LPat (GhcPass p)))
+patScopes rsp useScope patScope =
+    fmap (\(RS sc a) -> PS rsp useScope sc a) . listScopes patScope
 
 -- | 'listScopes' specialised to 'HsConPatTyArg'
 taScopes
@@ -1093,7 +1089,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                   (patScopes rsp scope pscope args)
         where argscope = foldr combineScopes NoScope $ map mkScope args
       contextify (InfixCon a b) = InfixCon a' b'
-        where [a', b'] = patScopes rsp scope pscope [a,b]
+        where Pair a' b' = patScopes rsp scope pscope (Pair a b)
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
       contextify_rec (HsRecFields x fds a) = HsRecFields x (map go scoped_fds) a
         where

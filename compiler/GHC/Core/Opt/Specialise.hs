@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
@@ -1318,7 +1316,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
 --       ; pprTrace "specCase" (ppr case_bndr $$ ppr scrut_bind) $
        ; return (Var case_bndr_flt, case_bndr', [alt'], all_uds) }
   where
-    (env_rhs, (case_bndr':args')) = substBndrs env (case_bndr:args)
+    (env_rhs, (case_bndr':|args')) = substBndrs env (case_bndr:|args)
     sc_args' = filter is_flt_sc_arg args'
 
     clone_me bndr = do { uniq <- getUniqueM
@@ -3466,7 +3464,7 @@ substBndr :: SpecEnv -> CoreBndr -> (SpecEnv, CoreBndr)
 substBndr env bs = case Core.substBndr (se_subst env) bs of
                       (subst', bs') -> (env { se_subst = subst' }, bs')
 
-substBndrs :: SpecEnv -> [CoreBndr] -> (SpecEnv, [CoreBndr])
+substBndrs :: Traversable f => SpecEnv -> f CoreBndr -> (SpecEnv, f CoreBndr)
 substBndrs env bs = case Core.substBndrs (se_subst env) bs of
                       (subst', bs') -> (env { se_subst = subst' }, bs')
 

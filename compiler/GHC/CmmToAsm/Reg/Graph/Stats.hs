@@ -1,6 +1,3 @@
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- | Carries interesting info for debugging / profiling of the
 --   graph coloring register allocator.
 module GHC.CmmToAsm.Reg.Graph.Stats (
@@ -287,18 +284,19 @@ pprStatsLifeConflict stats graph
                 $ foldl' plusSpillCostInfo zeroSpillCostInfo
                 $ [ sc | RegAllocStatsStart{ raSpillCosts = sc } <- stats ]
 
-        scatter = map   (\r ->  let lifetime  = case lookupUFM lifeMap r of
-                                                      Just (_, l) -> l
-                                                      Nothing     -> 0
-                                    Just node = Color.lookupNode graph r
-                                in parens $ hcat $ punctuate (text ", ")
-                                        [ doubleQuotes $ ppr $ Color.nodeId node
-                                        , ppr $ sizeUniqSet (Color.nodeConflicts node)
-                                        , ppr $ lifetime ])
-                $ map Color.nodeId
-                $ nonDetEltsUFM
+        scatter =
+          [ let lifetime  = case lookupUFM lifeMap r of
+                    Just (_, l) -> l
+                    Nothing     -> 0
+            in parens $ hcat $ punctuate (text ", ")
+              [ doubleQuotes $ ppr $ Color.nodeId node
+              , ppr $ sizeUniqSet (Color.nodeConflicts node)
+              , ppr $ lifetime ]
+          | node <- nonDetEltsUFM
                 -- See Note [Unique Determinism and code generation]
                 $ Color.graphMap graph
+          , let r = Color.nodeId node
+          ]
 
    in   (  text "-- vreg-conflict-lifetime"
         $$ text "--   (vreg, vreg_conflicts, vreg_lifetime)"

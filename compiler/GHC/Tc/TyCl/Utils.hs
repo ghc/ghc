@@ -1,8 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
@@ -736,13 +734,14 @@ updateRoleEnv :: Name -> Int -> Role -> RoleM ()
 updateRoleEnv name n role
   = RM $ \_ _ _ state@(RIS { role_env = role_env }) -> ((),
          case lookupNameEnv role_env name of
-           Nothing -> pprPanic "updateRoleEnv" (ppr name)
-           Just roles -> let (before, old_role : after) = splitAt n roles in
-                         if role `ltRole` old_role
+           Just roles
+             | (before, old_role : after) <- splitAt n roles
+             ->          if role `ltRole` old_role
                          then let roles' = before ++ role : after
                                   role_env' = extendNameEnv role_env name roles' in
                               RIS { role_env = role_env', update = True }
-                         else state )
+                         else state
+           _ -> pprPanic "updateRoleEnv" (ppr name))
 
 
 {- *********************************************************************

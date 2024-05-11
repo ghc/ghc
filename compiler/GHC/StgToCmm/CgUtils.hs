@@ -147,7 +147,7 @@ get_Regtable_addr_from_offset platform offset =
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.
-fixStgRegisters :: Platform -> RawCmmDecl -> RawCmmDecl
+fixStgRegisters :: Platform -> GenCmmDecl d h (GenCmmGraph CmmNode) -> GenCmmDecl d h (GenCmmGraph CmmNode)
 fixStgRegisters _ top@(CmmData _ _) = top
 
 fixStgRegisters platform (CmmProc info lbl live graph) =

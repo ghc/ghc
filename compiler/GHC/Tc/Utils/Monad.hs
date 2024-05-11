@@ -88,6 +88,7 @@ module GHC.Tc.Utils.Monad(
   addErrTcM,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
+  checkJustTc, checkJustTcM,
   failIfTc, failIfTcM,
   mkErrCtxt,
   addTcRnDiagnostic, addDetailedDiagnostic,
@@ -1584,6 +1585,12 @@ checkTc False err = failWithTc err
 checkTcM :: Bool -> (TidyEnv, TcRnMessage) -> TcM ()
 checkTcM True  _   = return ()
 checkTcM False err = failWithTcM err
+
+checkJustTc :: TcRnMessage -> Maybe a -> TcM a
+checkJustTc err = maybe (failWithTc err) pure
+
+checkJustTcM :: (TidyEnv, TcRnMessage) -> Maybe a -> TcM a
+checkJustTcM err = maybe (failWithTcM err) pure
 
 failIfTc :: Bool -> TcRnMessage -> TcM ()         -- Check that the boolean is false
 failIfTc False _   = return ()

@@ -732,9 +732,7 @@ unariseAlts rho (MultiValAlt _) bndr [GenStgAlt{ alt_con    = DEFAULT
 unariseAlts rho (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, scrt_bndrs) <- unariseConArgBinder rho bndr
-       let (tag_bndr, real_bndrs) = case scrt_bndrs of
-               [] -> panic "unariseAlts: empty scrt_bndrs"
-               x:xs -> (x, xs)
+       let tag_bndr:|real_bndrs = expectNonEmpty "unariseAlts" scrt_bndrs
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
        let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
        return [GenStgAlt{ alt_con   = DataAlt (tupleDataCon Unboxed (length scrt_bndrs))

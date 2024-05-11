@@ -600,7 +600,7 @@ addNodesBetween weights m updates =
 
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
-getCfgProc :: Platform -> Weights -> RawCmmDecl -> CFG
+getCfgProc :: Platform -> Weights -> GenCmmDecl d h CmmGraph -> CFG
 getCfgProc _        _       (CmmData {}) = mapEmpty
 getCfgProc platform weights (CmmProc _info _lab _live graph) = getCfg platform weights graph
 

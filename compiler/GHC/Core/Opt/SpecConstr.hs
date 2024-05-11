@@ -11,10 +11,6 @@ ToDo [Oct 2013]
 \section[SpecConstr]{Specialise over constructors}
 -}
 
-
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.Core.Opt.SpecConstr(
         specConstrProgram,
         SpecConstrAnnotation(..),
@@ -65,7 +61,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.Unique( hasKey )
 
-import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
+import GHC.Data.Maybe     ( fromMaybe, orElse, catMaybes, isJust, isNothing )
 import GHC.Data.FastString
 
 import GHC.Utils.Misc
@@ -81,6 +77,7 @@ import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad
 import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL )
+import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
 import Data.Tuple
@@ -1305,10 +1302,10 @@ combineUsages :: [ScUsage] -> ScUsage
 combineUsages [] = nullUsage
 combineUsages us = foldr1 combineUsage us
 
-lookupOccs :: ScUsage -> [OutVar] -> (ScUsage, [ArgOcc])
+lookupOccs :: Traversable f => ScUsage -> f OutVar -> (ScUsage, f ArgOcc)
 lookupOccs (SCU { scu_calls = sc_calls, scu_occs = sc_occs }) bndrs
   = (SCU {scu_calls = sc_calls, scu_occs = delVarEnvList sc_occs bndrs},
-     [lookupVarEnv sc_occs b `orElse` NoOcc | b <- bndrs])
+    fromMaybe NoOcc . lookupVarEnv sc_occs <$> bndrs)
 
 data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | UnkOcc    -- Used in some unknown way
@@ -1584,7 +1581,7 @@ scExpr' env (Case scrut b ty alts)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
                 (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
           ; (usg, rhs', ws) <- scExpr env2 rhs
-          ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
+          ; let (usg', b_occ:|arg_occs) = lookupOccs usg (b':|bs2)
                 scrut_occ = case con of
                                DataAlt dc -- See Note [Do not specialise evals]
                                   | not (single_alt && all deadArgOcc arg_occs)
@@ -2511,22 +2508,21 @@ trim_pats :: ScEnv -> Id -> SpecInfo -> [CallPat] -> (Bool, [CallPat])
 -- True <=> some patterns were discarded
 -- See Note [Choosing patterns]
 trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
-  | sc_force env
-    || isNothing mb_scc
-    || n_remaining >= n_pats
-  = -- pprTrace "trim_pats: no-trim" (ppr (sc_force env) $$ ppr mb_scc $$ ppr n_remaining $$ ppr n_pats)
-    (False, pats)          -- No need to trim
+  | False <- sc_force env
+  , Just max_specs <- mb_scc
+  , let n_remaining = max_specs - done_spec_count
+  , n_remaining < n_pats
+  = emit_trace max_specs n_remaining $  -- Need to trim, so keep the best ones
+    (True, take n_remaining sorted_pats)
 
   | otherwise
-  = emit_trace $  -- Need to trim, so keep the best ones
-    (True, take n_remaining sorted_pats)
+  = -- pprTrace "trim_pats: no-trim" (ppr (sc_force env) $$ ppr mb_scc $$ ppr n_remaining $$ ppr n_pats)
+    (False, pats)          -- No need to trim
 
   where
     n_pats         = length pats
     spec_count'    = n_pats + done_spec_count
-    n_remaining    = max_specs - done_spec_count
     mb_scc         = sc_count $ sc_opts env
-    Just max_specs = mb_scc
 
     sorted_pats = map fst $
                   sortBy (comparing snd) $
@@ -2549,21 +2545,24 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
           n_cons (Lit {})    = 1
           n_cons _           = 0
 
-    emit_trace result
+    emit_trace max_specs n_remaining result
        | debugIsOn || sc_debug (sc_opts env)
          -- Suppress this scary message for ordinary users!  #5125
        = pprTrace "SpecConstr" msg result
        | otherwise
        = result
-    msg = vcat [ sep [ text "Function" <+> quotes (ppr fn)
-                     , nest 2 (text "has" <+>
-                               speakNOf spec_count' (text "call pattern") <> comma <+>
-                               text "but the limit is" <+> int max_specs) ]
-               , text "Use -fspec-constr-count=n to set the bound"
-               , text "done_spec_count =" <+> int done_spec_count
-               , text "Keeping " <+> int n_remaining <> text ", out of" <+> int n_pats
-               , text "Discarding:" <+> ppr (drop n_remaining sorted_pats) ]
-
+      where
+        msg = vcat
+          [ sep
+              [ text "Function" <+> quotes (ppr fn)
+              , nest 2
+                  ( text "has" <+>
+                    speakNOf spec_count' (text "call pattern") <> comma <+>
+                    text "but the limit is" <+> int max_specs ) ]
+          , text "Use -fspec-constr-count=n to set the bound"
+          , text "done_spec_count =" <+> int done_spec_count
+          , text "Keeping " <+> int n_remaining <> text ", out of" <+> int n_pats
+          , text "Discarding:" <+> ppr (drop n_remaining sorted_pats) ]
 
 callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         -- The [Var] is the variables to quantify over in the rule

@@ -1,8 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -1087,7 +1085,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noAnn is_deflt new_v new_ty, fvs) }
   where
-    (v1:_) = vs
+    v1:|_ = expectNonEmpty "renameSig" vs
     ty_ctxt = GenericCtx (text "a class method signature for"
                           <+> quotes (ppr v1))
 

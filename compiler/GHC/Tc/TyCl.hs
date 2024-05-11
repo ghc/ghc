@@ -10,8 +10,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
         tcTyAndClassDecls,

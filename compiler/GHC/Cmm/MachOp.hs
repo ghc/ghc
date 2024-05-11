@@ -1,7 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.Cmm.MachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
@@ -39,6 +37,9 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type
 import GHC.Utils.Outputable
+import GHC.Utils.Misc (expectNonEmpty)
+
+import Data.List.NonEmpty (NonEmpty (..))
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -542,7 +543,7 @@ machOpResultType platform mop tys =
     MO_RelaxedRead w    -> cmmBits w
     MO_AlignmentCheck _ _ -> ty1
   where
-    (ty1:_) = tys
+    ty1:|_ = expectNonEmpty "machOpResultType" tys
 
 comparisonResultRep :: Platform -> CmmType
 comparisonResultRep = bWord  -- is it?

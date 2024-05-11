@@ -1,5 +1,4 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,
@@ -58,6 +57,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
+import GHC.Data.Maybe ( expectJust )
 
 import GHC.Unit.Module.Warnings
 
@@ -465,8 +465,8 @@ matchWithDict [cls, mty]
                  (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
        ; tc <- tcLookupTyCon withDictClassName
-       ; let Just withdict_data_con
-                 = tyConSingleDataCon_maybe tc    -- "Data constructor"
+       ; let withdict_data_con = expectJust "matchWithDict"
+                 $ tyConSingleDataCon_maybe tc    -- "Data constructor"
                                                   -- for WithDict
              mk_ev [c] = evDataConApp withdict_data_con
                             [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
@@ -1279,7 +1279,8 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                                       `mkTransCo` mkSymCo co2
                          mk_ev [] = panic "matchHasField.mk_ev"
 
-                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas) tys
+                         (_, co2) = expectJust "matchHasField" $
+                             tcInstNewTyCon_maybe (classTyCon clas) tys
 
                      -- The selector must not be "naughty" (i.e. the field
                      -- cannot have an existentially quantified type),

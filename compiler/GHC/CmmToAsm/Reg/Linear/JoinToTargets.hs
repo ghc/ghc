@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- | Handles joining of a jump instruction to its targets.
 
 --      The first time we encounter a jump to a particular basic block, we
@@ -25,6 +23,7 @@ import GHC.Platform.Reg
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
 import GHC.Utils.Panic
 import GHC.Utils.Monad (concatMapM)
 import GHC.Types.Unique
@@ -90,7 +89,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
-        let Just live_set       = mapLookup dest block_live
+        let live_set            = expectJust "joinToTargets'" $ mapLookup dest block_live
         let still_live uniq _   = uniq `elemUniqSet_Directly` live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 

@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Handle conversion of CmmProc to LLVM code.
 module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
@@ -27,6 +26,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 
 import GHC.Data.FastString
+import GHC.Data.Maybe (expectJust)
 import GHC.Data.OrdList
 
 import GHC.Types.ForeignCall
@@ -43,7 +43,10 @@ import Control.Monad.Trans.Writer
 import Control.Monad
 
 import qualified Data.Semigroup as Semigroup
+import Data.Foldable ( toList )
 import Data.List ( nub )
+import qualified Data.List as List
+import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import Data.Maybe ( catMaybes, isJust )
 
 type Atomic = Maybe MemoryOrdering
@@ -55,9 +58,8 @@ data Signage = Signed | Unsigned deriving (Eq, Show)
 -- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
-genLlvmProc (CmmProc infos lbl live graph) = do
-    let blocks = toBlockListEntryFirstFalseFallthrough graph
-
+genLlvmProc (CmmProc infos lbl live graph)
+  | Just blocks <- nonEmpty $ toBlockListEntryFirstFalseFallthrough graph = do
     (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)
@@ -77,9 +79,8 @@ newtype UnreachableBlockId = UnreachableBlockId BlockId
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
 -- point.
-basicBlocksCodeGen :: LiveGlobalRegUses -> [CmmBlock]
+basicBlocksCodeGen :: LiveGlobalRegUses -> NonEmpty CmmBlock
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
-basicBlocksCodeGen _    []                     = panic "no entry block!"
 basicBlocksCodeGen live cmmBlocks
   = do -- Emit the prologue
        -- N.B. this must be its own block to ensure that the entry block of the
@@ -97,7 +98,7 @@ basicBlocksCodeGen live cmmBlocks
        let ubblock = BasicBlock ubid' [Unreachable]
 
        -- Generate code
-       (blocks, topss) <- fmap unzip $ mapM (basicBlockCodeGen ubid) cmmBlocks
+       (blocks, topss) <- fmap unzip $ mapM (basicBlockCodeGen ubid) $ toList cmmBlocks
 
        -- Compose
        return (entryBlock : ubblock : blocks, prologueTops ++ concat topss)
@@ -2194,7 +2195,7 @@ convertMemoryOrdering MemOrderSeqCst  = SyncSeqCst
 -- question is never written. Therefore we skip it where we can to
 -- save a few lines in the output and hopefully speed compilation up a
 -- bit.
-funPrologue :: LiveGlobalRegUses -> [CmmBlock] -> LlvmM StmtData
+funPrologue :: LiveGlobalRegUses -> NonEmpty CmmBlock -> LlvmM StmtData
 funPrologue live cmmBlocks = do
   platform <- getPlatform
 
@@ -2226,7 +2227,7 @@ funPrologue live cmmBlocks = do
 
   return (concatOL stmtss `snocOL` jumpToEntry, [])
   where
-    entryBlk : _ = cmmBlocks
+    entryBlk :| _ = cmmBlocks
     jumpToEntry = Branch $ blockIdToLlvm (entryLabel entryBlk)
 
 -- | Function epilogue. Load STG variables to use as argument for call.
@@ -2339,9 +2340,8 @@ pprPanic s d = Panic.pprPanic ("GHC.CmmToLlvm.CodeGen." ++ s) d
 
 -- | Returns TBAA meta data by unique
 getTBAAMeta :: Unique -> LlvmM [MetaAnnot]
-getTBAAMeta u = do
-    mi <- getUniqMeta u
-    return [MetaAnnot tbaa (MetaNode i) | let Just i = mi]
+getTBAAMeta u =
+    List.singleton . MetaAnnot tbaa . MetaNode . expectJust "getTBAAMeta" <$> getUniqMeta u
 
 -- | Returns TBAA meta data for given register
 getTBAARegMeta :: GlobalReg -> LlvmM [MetaAnnot]

@@ -1,8 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
 
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- The register liveness determinator
@@ -62,7 +59,7 @@ import GHC.Types.Unique.DSM
 import GHC.Data.Bag
 import GHC.Utils.Monad.State.Strict
 
-import Data.List (mapAccumL, partition)
+import Data.List (mapAccumL, sortOn)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import GHC.Utils.Misc
@@ -530,11 +527,10 @@ stripLive config live
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output. This is the entry point
                 --      of the proc, and it needs to come first.
-                ((first':_), rest')
-                                = partition ((== first_id) . blockId) final_blocks
+                final_blocks' = sortOn ((/= first_id) . blockId) final_blocks
 
-           in   CmmProc info label live
-                          (ListGraph $ map (stripLiveBlock config) $ first' : rest')
+           in   CmmProc info label live $ ListGraph $
+                map (stripLiveBlock config) final_blocks'
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
