@@ -169,11 +169,12 @@ rnUntypedBracket e br_body
        ; recordThUse
 
        ; traceRn "Renaming untyped TH bracket" empty
+       ; lcl_env <- getLclEnv
        ; ps_var <- newMutVar []
        ; (body', fvs_e) <-
          -- See Note [Rebindable syntax and Template Haskell]
          unsetXOptM LangExt.RebindableSyntax $
-         setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
+         setStage (Brack cur_stage (RnPendingUntyped lcl_env ps_var)) $
                   rn_utbracket cur_stage br_body
        ; pendings <- readMutVar ps_var
        ; return (HsUntypedBracket pendings body', fvs_e)
@@ -313,8 +314,9 @@ rnUntypedSpliceGen run_splice pend_splice splice
           -> failWithTc $ thSyntaxError
                         $ MismatchedSpliceType Untyped IsSplice
 
-        Brack pop_stage (RnPendingUntyped ps_var)
+        Brack pop_stage (RnPendingUntyped lcl_env ps_var)
           -> do { (splice', fvs) <- setStage pop_stage $
+                                    restoreLclEnv lcl_env $
                                     rnUntypedSplice splice
                 ; loc  <- getSrcSpanM
                 ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
@@ -466,7 +468,7 @@ rnTypedSplice expr
         Brack pop_stage RnPendingTyped
           -> setStage pop_stage rn_splice
 
-        Brack _ (RnPendingUntyped _)
+        Brack _ (RnPendingUntyped _ _)
           -> failWithTc $ thSyntaxError $ MismatchedSpliceType Typed IsSplice
 
         _ -> do { unlessXOptM LangExt.TemplateHaskell
@@ -993,7 +995,7 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 -- this is only run on *untyped* brackets.
 
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
-  | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
+  | Brack _ (RnPendingUntyped _ ps_var) <- use_stage   -- Only for untyped brackets
   , use_lvl > bind_lvl                               -- Cross-stage condition
   = check_cross_stage_lifting top_lvl name ps_var
   | otherwise

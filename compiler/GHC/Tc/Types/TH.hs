@@ -18,6 +18,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Prelude
 import GHC.Tc.Types.TcRef
+import {-# SOURCE #-} GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Constraint
 import GHC.Hs.Expr ( PendingTcSplice, PendingRnSplice )
 
@@ -63,6 +64,7 @@ data ThStage    -- See Note [Template Haskell state diagram]
 
 data PendingStuff
   = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
+      TcLclEnv                    -- Local env outside the quote
       (TcRef [PendingRnSplice])   -- Pending splices in here
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket

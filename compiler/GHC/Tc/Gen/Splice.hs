@@ -438,7 +438,7 @@ without having to walk over the untyped bracket code.  Our example
 
 RENAMER (rnUntypedBracket):
 
-* Set the ThStage to (Brack s (RnPendingUntyped ps_var))
+* Set the ThStage to (Brack s (RnPendingUntyped lcl_env ps_var))
 
 * Rename the body
 
