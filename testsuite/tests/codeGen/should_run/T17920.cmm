@@ -1,5 +1,9 @@
 #include "Cmm.h"
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE msg;
+#endif
+
 section "rodata" { msg : bits8[] "Test\n"; }
 section "data" { faketso : bits8[1000]; }
 
@@ -8,12 +12,13 @@ stg_myExit {
 }
 
 stg_foo {
-  
+   CInt _unused;
+
    BaseReg = faketso;
 
    SAVE_REGS();
 
-   foreign "C" printf(msg "ptr");
+   (_unused) = ccall puts(msg "ptr");
 
    RESTORE_REGS();
 
