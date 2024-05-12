@@ -145,6 +145,18 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
    -------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
+
+/*
+  These prototypes are in RtsFlags.h. We can't include RtsFlags.h here
+  because that's a private header, but we do need these prototypes to
+  be duplicated here, otherwise there will be some
+  -Wimplicit-function-declaration compilation errors. Especially when
+  GHC compiles out-of-tree cbits that rely on SET_HDR in RTS API.
+*/
+bool doingLDVProfiling(void);
+bool doingRetainerProfiling(void);
+bool doingErasProfiling(void);
+
 /*
   The following macro works for both retainer profiling and LDV profiling. For
  retainer profiling, we set 'trav' to 0, which is an invalid
