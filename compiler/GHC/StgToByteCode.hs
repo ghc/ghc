@@ -59,7 +59,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               addIdReps, addArgReps,
-                              nonVoidIds, nonVoidStgArgs )
+                              assertNonVoidIds, assertNonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -552,14 +552,11 @@ returnUnboxedTuple d s p es = do
                                          massert (off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
-    let rep_to_maybe :: PrimOrVoidRep -> Maybe PrimRep
-        rep_to_maybe VoidRep = Nothing
-        rep_to_maybe (NVRep rep) = Just rep
 
     ret <- returnUnliftedReps d
                               s
                               (wordsToBytes platform $ nativeCallSize call_info)
-                              (mapMaybe (rep_to_maybe . stgArgRep1) es)
+                              (map stgArgRepU es)
     return (mconcat pushes `appOL` ret)
 
 -- Compile code to apply the given expression to the remaining args
@@ -760,7 +757,7 @@ mkConAppCode orig_d _ p con args = app_code
         let platform = profilePlatform profile
 
             non_voids =
-                addArgReps (nonVoidStgArgs args)
+                addArgReps (assertNonVoidStgArgs args)
             (_, _, args_offsets) =
                 mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
 
@@ -942,14 +939,14 @@ doCase d s p scrut bndr alts
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
-             let bndr_ty = primRepCmmType platform . idPrimRepU
+             let bndr_ty = primRepCmmType platform . idPrimRepU . fromNonVoid
                  tuple_start = d_bndr
                  (call_info, args_offsets) =
                    layoutNativeCall profile
                                     NativeTupleReturn
                                     0
                                     bndr_ty
-                                    bndrs
+                                    (assertNonVoidIds bndrs)
 
                  stack_bot = d_alts
 
@@ -957,8 +954,7 @@ doCase d s p scrut bndr alts
                         [ (arg, tuple_start -
                                 wordsToBytes platform (nativeCallSize call_info) +
                                 offset)
-                        | (arg, offset) <- args_offsets
-                        , not (isZeroBitTy $ idType arg)]
+                        | (NonVoid arg, offset) <- args_offsets]
                         p_alts
              in do
                rhs_code <- schemeE stack_bot s p' rhs
@@ -967,7 +963,7 @@ doCase d s p scrut bndr alts
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
                      mkVirtHeapOffsets profile NoHeader
-                         (addIdReps (nonVoidIds real_bndrs))
+                         (addIdReps (assertNonVoidIds real_bndrs))
                  size = WordOff tot_wds
 
                  stack_bot = d_alts + wordsToBytes platform size
@@ -1645,7 +1641,7 @@ primRepToFFIType platform (NVRep r)
      FloatRep    -> FFIFloat
      DoubleRep   -> FFIDouble
      BoxedRep _  -> FFIPointer
-     _           -> pprPanic "primRepToFFIType" (ppr r)
+     VecRep{}    -> pprPanic "primRepToFFIType" (ppr r)
   where
     (signed_word, unsigned_word) = case platformWordSize platform of
        PW4 -> (FFISInt32, FFIUInt32)
@@ -1670,7 +1666,7 @@ mkDummyLiteral platform pr
         DoubleRep   -> LitDouble 0
         FloatRep    -> LitFloat 0
         BoxedRep _  -> LitNullAddr
-        _           -> pprPanic "mkDummyLiteral" (ppr pr)
+        VecRep{}    -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
 -- Convert (eg)
