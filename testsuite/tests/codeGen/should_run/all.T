@@ -207,7 +207,7 @@ test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 
-test('T17920', [cmm_src, when(arch('wasm32'), fragile(22854))], compile_and_run, [''])
+test('T17920', [cmm_src], compile_and_run, [''])
 test('T18527', req_c, compile_and_run, ['T18527FFI.c'])
 test('T19149', [req_c,only_ways('sanity')], compile_and_run, ['T19149_c.c'])
 test('T20275', normal, compile_and_run, [''])
@@ -246,4 +246,3 @@ test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])
 test('T24664a', normal, compile_and_run, ['-O'])
 test('T24664b', normal, compile_and_run, ['-O'])
-
