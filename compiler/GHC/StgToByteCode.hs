@@ -523,7 +523,7 @@ returnUnliftedReps d s szb reps = do
              [rep] -> return (unitOL $ RETURN (toArgRep platform rep))
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
-               let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 (primRepCmmType platform) nv_reps
+               let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 id nv_reps
                tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
                return $ PUSH_UBX (mkNativeCallInfoLit platform call_info) 1 `consOL`
                         PUSH_BCO tuple_bco `consOL`
@@ -541,11 +541,10 @@ returnUnboxedTuple
 returnUnboxedTuple d s p es = do
     profile <- getProfile
     let platform = profilePlatform profile
-        arg_ty e = primRepCmmType platform (stgArgRepU e)
         (call_info, tuple_components) = layoutNativeCall profile
                                                          NativeTupleReturn
                                                          d
-                                                         arg_ty
+                                                         stgArgRepU
                                                          es
         go _   pushes [] = return (reverse pushes)
         go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
@@ -898,10 +897,9 @@ doCase d s p scrut bndr alts
 
         (bndr_size, call_info, args_offsets)
            | ubx_tuple_frame =
-               let bndr_ty = primRepCmmType platform
-                   bndr_reps = typePrimRep (idType bndr)
+               let bndr_reps = typePrimRep (idType bndr)
                    (call_info, args_offsets) =
-                       layoutNativeCall profile NativeTupleReturn 0 bndr_ty bndr_reps
+                       layoutNativeCall profile NativeTupleReturn 0 id bndr_reps
                in ( wordsToBytes platform (nativeCallSize call_info)
                   , call_info
                   , args_offsets
@@ -939,7 +937,7 @@ doCase d s p scrut bndr alts
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
-             let bndr_ty = primRepCmmType platform . idPrimRepU . fromNonVoid
+             let bndr_ty = idPrimRepU . fromNonVoid
                  tuple_start = d_bndr
                  (call_info, args_offsets) =
                    layoutNativeCall profile
@@ -1098,13 +1096,14 @@ doCase d s p scrut bndr alts
 layoutNativeCall :: Profile
                  -> NativeCallType
                  -> ByteOff
-                 -> (a -> CmmType)
+                 -> (a -> PrimRep)
                  -> [a]
                  -> ( NativeCallInfo      -- See Note [GHCi TupleInfo]
                     , [(a, ByteOff)] -- argument, offset on stack
                     )
-layoutNativeCall profile call_type start_off arg_ty reps =
+layoutNativeCall profile call_type start_off arg_rep reps =
   let platform = profilePlatform profile
+      arg_ty = primRepCmmType platform . arg_rep
       (orig_stk_bytes, pos) = assignArgumentsPos profile
                                                  0
                                                  NativeReturn
@@ -1388,7 +1387,7 @@ generatePrimCall d s p target _mb_unit _result_ty args
               layoutNativeCall profile
                                NativePrimCall
                                0
-                               (primRepCmmType platform . stgArgRepU)
+                               stgArgRepU
                                nv_args
 
          prim_args_offsets = mapFst stgArgRepU args_offsets
