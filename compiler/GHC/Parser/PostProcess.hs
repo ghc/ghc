@@ -1957,8 +1957,21 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsOverLitPV (L l a) = return $ L l (PatBuilderOverLit a)
   mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (PatBuilderPat (WildPat noExtField))
   mkHsTySigPV l b sig anns = do
-    p <- checkLPat b
-    return $ L l (PatBuilderPat (SigPat anns p (mkHsPatSigType noAnn sig)))
+    -- addSigPat ensures the correct nesting.
+    -- Test case: f (id -> isJust -> True :: Bool) = ()
+    -- TODO (int-index): 1. make it an actual test case
+    --                   2. add the warning -Wview-pattern-signatures in -Wdefault
+    let addSigPat (L l' (ViewPat anns' e' p')) =
+            L l' (ViewPat anns' e' (addSigPat p'))  -- this branch triggers the warning
+        addSigPat p = L l (SigPat anns p (mkHsPatSigType noAnn sig))
+          -- FIXME (int-index): sort out annotations/locations
+
+        addSigPatP p@(L _ ViewPat{}) = do
+          addPsMessage (locA l) PsWarnViewPatternSignatures
+          return (addSigPat p)
+        addSigPatP p = return $ L l (SigPat anns p (mkHsPatSigType noAnn sig))
+    p <- checkLPat b >>= addSigPatP
+    return $ fmap PatBuilderPat p
   mkHsExplicitListPV l xs anns = do
     ps <- traverse checkLPat xs
     !cs <- getCommentsFor l
@@ -3113,10 +3126,7 @@ instance MonadP PV where
       PV_Ok acc{pv_warnings= w `addMessage` pv_warnings acc} ()
   addFatalError err =
     addError err >> PV (const PV_Failed)
-  getBit ext =
-    PV $ \ctx acc ->
-      let b = ext `xtest` pExtsBitmap (pv_options ctx) in
-      PV_Ok acc $! b
+  getParserOpts = PV $ \ctx acc -> PV_Ok acc $! pv_options ctx
   allocateCommentsP ss = PV $ \_ s ->
     if null (pv_comment_q s) then PV_Ok s emptyComments else  -- fast path
     let (comment_q', newAnns) = allocateComments ss (pv_comment_q s) in

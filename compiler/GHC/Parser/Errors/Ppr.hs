@@ -121,6 +121,9 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
+    PsWarnViewPatternSignatures
+      -> mkSimpleDecorated $
+            text "TODO PsWarnViewPatternSignatures message"
 
     PsErrLexer err kind
       -> mkSimpleDecorated $ hcat
@@ -555,6 +558,7 @@ instance Diagnostic PsMessage where
     PsWarnUnrecognisedPragma{}                    -> WarningWithFlag Opt_WarnUnrecognisedPragmas
     PsWarnMisplacedPragma{}                       -> WarningWithFlag Opt_WarnMisplacedPragmas
     PsWarnImportPreQualified                      -> WarningWithFlag Opt_WarnPrepositiveQualifiedModule
+    PsWarnViewPatternSignatures                   -> WarningWithFlag Opt_WarnViewPatternSignatures
     PsErrLexer{}                                  -> ErrorWithoutFlag
     PsErrCmmLexer                                 -> ErrorWithoutFlag
     PsErrCmmParser{}                              -> ErrorWithoutFlag
@@ -679,6 +683,7 @@ instance Diagnostic PsMessage where
     PsWarnMisplacedPragma{}                       -> [SuggestPlacePragmaInHeader]
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
                                                      , suggestExtension LangExt.ImportQualifiedPost]
+    PsWarnViewPatternSignatures                   -> noHints
     PsErrLexer{}                                  -> noHints
     PsErrCmmLexer                                 -> noHints
     PsErrCmmParser{}                              -> noHints

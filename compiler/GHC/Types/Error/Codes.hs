@@ -184,6 +184,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsWarnUnrecognisedPragma"                      = 42044
   GhcDiagnosticCode "PsWarnMisplacedPragma"                         = 28007
   GhcDiagnosticCode "PsWarnImportPreQualified"                      = 07924
+  GhcDiagnosticCode "PsWarnViewPatternSignatures"                   = 00834
   GhcDiagnosticCode "PsErrLexer"                                    = 21231
   GhcDiagnosticCode "PsErrCmmLexer"                                 = 75725
   GhcDiagnosticCode "PsErrCmmParser"                                = 09848

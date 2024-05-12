@@ -141,6 +141,23 @@ data PsMessage
 
    | PsWarnOperatorWhitespace !FastString !OperatorWhitespaceOccurrence
 
+   {- | PsWarnViewPatternSignatures is a warning triggered by view patterns whose
+        RHS is an unparenthesised pattern signature. It warns on code that is
+        highly likely to break when the precedence of view patterns relative to
+        pattern signatures is changed per GHC Proposal #281. The suggested fix
+        is to add parentheses.
+
+        Example:
+          f1 (isJust -> True :: Bool) = ()
+
+        Suggested fix:
+          f1 (isJust -> (True :: Bool)) = ()
+
+        Test cases:
+          T24159_viewpat
+   -}
+   | PsWarnViewPatternSignatures
+
    -- | LambdaCase syntax used without the extension enabled
    | PsErrLambdaCase
 

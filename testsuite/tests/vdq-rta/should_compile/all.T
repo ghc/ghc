@@ -23,6 +23,7 @@ test('T23739_symbolVal', normal, compile, [''])
 test('T23739_typeRep', normal, compile, [''])
 test('T23739_nested', normal, compile, [''])
 test('T24570', normal, compile, [''])
+test('T24159_viewpat', normal, compile, [''])
 
 test('T22326_th_dump1', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T23739_th_dump1', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
