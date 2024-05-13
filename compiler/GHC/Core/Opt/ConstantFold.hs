@@ -2602,6 +2602,10 @@ The moving parts are simple:
      inline f_ty (f a b c) = <f's unfolding> a b c
   (if f has an unfolding, EVEN if it's a loop breaker)
 
+  Additionally the rule looks through ticks/casts as well (#24808):
+      inline f_ty (f a b c |> co) = <f's unfolding> a b c |> co
+      inline f_ty <tick> ( f a b c ) = <tick> <f's unfolding> a b c
+
   It's important to allow the argument to 'inline' to have args itself
   (a) because its more forgiving to allow the programmer to write
       either  inline f a b c
@@ -2614,11 +2618,17 @@ The moving parts are simple:
 -}
 
 match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_inline (Type _ : e : _)
-  | (Var f, args1) <- collectArgs e,
-    Just unf <- maybeUnfoldingTemplate (realIdUnfolding f)
-             -- Ignore the IdUnfoldingFun here!
-  = Just (mkApps unf args1)
+match_inline (Type _ : e : _) = go e
+  -- Maybe Monad ahead:
+  where
+    go (Var f)      = -- Ignore the IdUnfoldingFun here!
+                      (maybeUnfoldingTemplate (realIdUnfolding f))
+    go (App f a)    = do { f' <- go f; pure $ App f' a }
+    -- inline (f |> co)
+    go (Cast e co)  = do { app <- go e; pure (Cast app co) }
+    -- inline (<tick> f)
+    go (Tick t e)   = do { app <- go e; pure (Tick t app) }
+    go _            = Nothing
 
 match_inline _ = Nothing
 
